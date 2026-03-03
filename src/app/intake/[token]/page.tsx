@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Loader2, CheckCircle, AlertCircle, Sparkles } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, Sparkles, Wand2, PenLine, RefreshCw } from 'lucide-react'
 
 interface RequestInfo {
   position_title: string
@@ -34,6 +34,12 @@ export default function IntakePage() {
     additional_notes: '',
   })
 
+  // JD state — managed separately from the requirements form
+  const [jd, setJd] = useState('')
+  const [jdMode, setJdMode] = useState<'ai' | 'manual' | null>(null)
+  const [generatingJD, setGeneratingJD] = useState(false)
+  const [jdGenError, setJdGenError] = useState<string | null>(null)
+
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
@@ -52,10 +58,52 @@ export default function IntakePage() {
   const set = (key: keyof typeof form, value: string | number | boolean) =>
     setForm(f => ({ ...f, [key]: value }))
 
+  const getFormPayload = () => ({
+    ...form,
+    headcount: Number(form.headcount),
+    budget_min: form.budget_min ? Number(form.budget_min) : undefined,
+    budget_max: form.budget_max ? Number(form.budget_max) : undefined,
+  })
+
+  const handleGenerateJD = async () => {
+    if (!form.team_context.trim() || !form.key_requirements.trim()) {
+      setJdGenError('Please fill in Team Context and Key Requirements above before generating.')
+      return
+    }
+    setJdMode('ai')
+    setGeneratingJD(true)
+    setJdGenError(null)
+
+    const res = await fetch(`/api/intake/${token}/generate-jd`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(getFormPayload()),
+    })
+
+    const data = await res.json()
+    setGeneratingJD(false)
+
+    if (!res.ok) {
+      setJdGenError(data.error ?? 'Failed to generate JD. Please try again.')
+    } else {
+      setJd(data.jd)
+    }
+  }
+
+  const handleWriteManually = () => {
+    setJdMode('manual')
+    setJdGenError(null)
+    if (!jd) setJd('')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.team_context.trim() || !form.key_requirements.trim()) {
       setSubmitError('Please fill in the team context and key requirements.')
+      return
+    }
+    if (!jd.trim()) {
+      setSubmitError('Please add a Job Description before submitting.')
       return
     }
     setSubmitting(true)
@@ -64,12 +112,7 @@ export default function IntakePage() {
     const res = await fetch(`/api/intake/${token}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        headcount: Number(form.headcount),
-        budget_min: form.budget_min ? Number(form.budget_min) : undefined,
-        budget_max: form.budget_max ? Number(form.budget_max) : undefined,
-      }),
+      body: JSON.stringify({ ...getFormPayload(), final_jd: jd }),
     })
 
     const json = await res.json()
@@ -112,7 +155,7 @@ export default function IntakePage() {
           <CheckCircle className="h-12 w-12 text-emerald-400 mx-auto mb-4" />
           <h2 className="text-lg font-bold text-slate-800">Already submitted</h2>
           <p className="text-sm text-slate-500 mt-2">
-            Requirements for <strong>{requestInfo?.position_title}</strong> have already been submitted. Check your email for the JD.
+            The intake for <strong>{requestInfo?.position_title}</strong> has already been completed. Your recruiter has been notified.
           </p>
         </div>
       </div>
@@ -129,10 +172,10 @@ export default function IntakePage() {
           </div>
           <CheckCircle className="h-14 w-14 text-emerald-500 mx-auto" />
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Requirements submitted!</h2>
+            <h2 className="text-2xl font-bold text-slate-900">Ticket submitted!</h2>
             <p className="text-slate-500 mt-2 text-sm leading-relaxed">
-              Claude is now generating the Job Description for <strong>{requestInfo?.position_title}</strong>.
-              You'll receive it via email and Slack within a minute for review.
+              Your requirements and JD for <strong>{requestInfo?.position_title}</strong> have been submitted.
+              Your recruiter has been notified and will take it from here.
             </p>
           </div>
           <p className="text-xs text-slate-400">You can close this window.</p>
@@ -140,6 +183,8 @@ export default function IntakePage() {
       </div>
     )
   }
+
+  const wordCount = jd.trim() ? jd.trim().split(/\s+/).length : 0
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4">
@@ -155,9 +200,9 @@ export default function IntakePage() {
             Hi {requestInfo?.hiring_manager_name?.split(' ')[0]}! 👋
           </h1>
           <p className="text-slate-500 text-sm max-w-md mx-auto">
-            We're drafting a Job Description for <strong>{requestInfo?.position_title}</strong>
-            {requestInfo?.department ? ` in ${requestInfo.department}` : ''}.
-            Share a few details below and Claude will generate the full JD in seconds.
+            Fill in the details below for <strong>{requestInfo?.position_title}</strong>
+            {requestInfo?.department ? ` (${requestInfo.department})` : ''},
+            then generate or write the Job Description. Once you're happy, submit the ticket.
           </p>
         </div>
 
@@ -239,7 +284,7 @@ export default function IntakePage() {
                 rows={4}
                 value={form.key_requirements}
                 onChange={e => set('key_requirements', e.target.value)}
-                placeholder="E.g. 5+ years React, experience with Node.js, shipped production apps, strong communicator, experience in B2C products…"
+                placeholder="E.g. 5+ years React, experience with Node.js, shipped production apps, strong communicator…"
                 className={inputCls + ' resize-none'}
               />
             </div>
@@ -293,7 +338,7 @@ export default function IntakePage() {
             </div>
           </div>
 
-          {/* Anything else */}
+          {/* Additional notes */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <label className={labelCls}>Anything else we should know?</label>
             <textarea
@@ -305,20 +350,126 @@ export default function IntakePage() {
             />
           </div>
 
+          {/* ── JD Section ──────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border-2 border-violet-200 shadow-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                  Job Description <span className="text-red-500">*</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Generate one with AI from your input above, or write it yourself.
+                </p>
+              </div>
+              {jd && (
+                <span className="text-xs text-slate-400">{wordCount} words</span>
+              )}
+            </div>
+
+            {jdGenError && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
+                {jdGenError}
+              </div>
+            )}
+
+            {/* Mode selector — shown when no mode chosen yet, or as action buttons */}
+            {jdMode === null ? (
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={handleGenerateJD}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 transition-colors shadow-sm"
+                >
+                  <Wand2 className="h-4 w-4" />
+                  Generate JD with AI
+                </button>
+                <button
+                  type="button"
+                  onClick={handleWriteManually}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  <PenLine className="h-4 w-4" />
+                  Write Manually
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateJD}
+                  disabled={generatingJD}
+                  className="flex items-center gap-1.5 rounded-lg bg-violet-50 border border-violet-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 transition-colors"
+                >
+                  {generatingJD
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <RefreshCw className="h-3.5 w-3.5" />
+                  }
+                  {generatingJD ? 'Generating…' : (jd ? 'Regenerate with AI' : 'Generate with AI')}
+                </button>
+                {jdMode === 'ai' && (
+                  <button
+                    type="button"
+                    onClick={handleWriteManually}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <PenLine className="h-3.5 w-3.5" />
+                    Write Manually
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Textarea — shown once mode is selected */}
+            {jdMode !== null && (
+              <div className="space-y-2">
+                {generatingJD ? (
+                  <div className="flex items-center justify-center gap-3 rounded-xl border border-violet-100 bg-violet-50 py-12 text-sm text-violet-600">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Claude is writing the JD…
+                  </div>
+                ) : (
+                  <textarea
+                    rows={20}
+                    value={jd}
+                    onChange={e => setJd(e.target.value)}
+                    placeholder={
+                      jdMode === 'manual'
+                        ? 'Write your Job Description here. You can paste from a doc or write from scratch…'
+                        : 'The AI-generated JD will appear here. You can edit it freely before submitting.'
+                    }
+                    className={inputCls + ' resize-y font-mono text-xs leading-relaxed'}
+                  />
+                )}
+                {jd && !generatingJD && (
+                  <p className="text-xs text-slate-400">
+                    You can edit the text above freely — this is the final version the recruiter will receive.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Submit */}
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors shadow-sm"
+            disabled={submitting || !jd.trim()}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
             {submitting ? (
-              <><Loader2 className="h-4 w-4 animate-spin" />Generating JD with Claude…</>
+              <><Loader2 className="h-4 w-4 animate-spin" />Submitting ticket…</>
             ) : (
-              <><Sparkles className="h-4 w-4" />Submit & Generate JD</>
+              <><CheckCircle className="h-4 w-4" />Submit Ticket</>
             )}
           </button>
 
+          {!jd.trim() && jdMode !== null && !generatingJD && (
+            <p className="text-xs text-slate-400 text-center -mt-2">
+              Add a Job Description above to enable submission.
+            </p>
+          )}
+
           <p className="text-xs text-slate-400 text-center pb-4">
-            Claude will generate the JD and email it to you for review within seconds.
+            Once submitted, the recruiter will be notified and take it from here.
           </p>
         </form>
       </div>

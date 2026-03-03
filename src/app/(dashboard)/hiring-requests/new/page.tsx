@@ -199,10 +199,10 @@ export default function NewHiringRequestPage() {
 
         <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-700 space-y-1">
           <p className="font-semibold">What happens next:</p>
-          <p>1. {form.hiring_manager_name || 'The hiring manager'} gets an email + Slack with a link to fill in their requirements</p>
-          <p>2. Claude generates a polished JD from their input</p>
-          <p>3. The JD gets emailed + Slacked to them for review</p>
-          <p>4. One click to approve — done!</p>
+          <p>1. {form.hiring_manager_name || 'The hiring manager'} gets an email + Slack with their personal intake link</p>
+          <p>2. They fill in the role details and requirements</p>
+          <p>3. They generate a JD with AI (or write their own) directly on the form</p>
+          <p>4. They submit the ticket — you get notified and pick it up from here</p>
         </div>
 
         <button

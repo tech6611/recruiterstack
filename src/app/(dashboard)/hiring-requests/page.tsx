@@ -6,11 +6,11 @@ import { Plus, Loader2, Clock, Mail, CheckCircle, FileText, Send } from 'lucide-
 import type { HiringRequest, HiringRequestStatus } from '@/lib/types/database'
 
 const STATUS_CONFIG: Record<HiringRequestStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  intake_pending:   { label: 'Intake Pending',     color: 'bg-amber-50 text-amber-700 border-amber-200',   icon: <Clock className="h-3 w-3" /> },
+  intake_pending:   { label: 'Awaiting HM',        color: 'bg-amber-50 text-amber-700 border-amber-200',   icon: <Clock className="h-3 w-3" /> },
   intake_submitted: { label: 'Intake Received',    color: 'bg-blue-50 text-blue-700 border-blue-200',      icon: <FileText className="h-3 w-3" /> },
   jd_generated:    { label: 'JD Generated',        color: 'bg-violet-50 text-violet-700 border-violet-200', icon: <FileText className="h-3 w-3" /> },
   jd_sent:         { label: 'JD Sent for Review',  color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: <Mail className="h-3 w-3" /> },
-  jd_approved:     { label: 'JD Approved',         color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
+  jd_approved:     { label: 'JD Ready — Review',   color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
   posted:          { label: 'Posted',              color: 'bg-slate-50 text-slate-600 border-slate-200',   icon: <Send className="h-3 w-3" /> },
 }
 
@@ -44,10 +44,9 @@ export default function HiringRequestsPage() {
       <div className="rounded-xl border border-slate-200 bg-white p-4 flex items-center gap-0 overflow-x-auto text-xs">
         {[
           { label: 'Recruiter creates', sub: 'request' },
-          { label: 'Email + Slack', sub: 'sent to HM' },
-          { label: 'HM submits', sub: 'requirements' },
-          { label: 'Claude writes', sub: 'the JD' },
-          { label: 'HM reviews', sub: '& approves' },
+          { label: 'HM gets', sub: 'intake link' },
+          { label: 'HM fills details', sub: '& writes JD' },
+          { label: 'Ticket submitted', sub: 'recruiter notified' },
           { label: 'Ready', sub: 'to post' },
         ].map((step, i) => (
           <div key={i} className="flex items-center shrink-0">
@@ -55,7 +54,7 @@ export default function HiringRequestsPage() {
               <div className="font-semibold text-slate-700">{step.label}</div>
               <div className="text-slate-400">{step.sub}</div>
             </div>
-            {i < 5 && <div className="text-slate-300 font-light text-base px-1">→</div>}
+            {i < 4 && <div className="text-slate-300 font-light text-base px-1">→</div>}
           </div>
         ))}
       </div>
