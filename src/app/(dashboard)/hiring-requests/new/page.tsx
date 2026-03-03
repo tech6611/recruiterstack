@@ -118,7 +118,7 @@ export default function NewHiringRequestPage() {
         </Link>
         <h1 className="text-2xl font-bold text-slate-900">New Hiring Request</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Fill in the basics — we'll send the hiring manager an intake form to collect the full requirements.
+          Fill in the basics — we&apos;ll send the hiring manager an intake form to collect the full requirements.
         </p>
       </div>
 

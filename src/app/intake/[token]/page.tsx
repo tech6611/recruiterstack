@@ -202,7 +202,7 @@ export default function IntakePage() {
           <p className="text-slate-500 text-sm max-w-md mx-auto">
             Fill in the details below for <strong>{requestInfo?.position_title}</strong>
             {requestInfo?.department ? ` (${requestInfo.department})` : ''},
-            then generate or write the Job Description. Once you're happy, submit the ticket.
+            then generate or write the Job Description. Once you&apos;re happy, submit the ticket.
           </p>
         </div>
 
