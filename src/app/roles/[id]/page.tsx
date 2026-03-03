@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Pencil, Trash2, Sparkles, MapPin, Briefcase, DollarSign, Loader2, Copy, Check } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Sparkles, MapPin, Briefcase, DollarSign, Loader2, Copy, Check, Send, TrendingUp, TrendingDown } from 'lucide-react'
 import { SlideOver } from '@/components/ui/SlideOver'
 import { RoleForm } from '@/components/roles/RoleForm'
 import { MatchCard } from '@/components/matching/MatchCard'
@@ -20,6 +20,7 @@ export default function RoleDetailPage() {
   const [loading, setLoading] = useState(true)
   const [matching, setMatching] = useState(false)
   const [matchMsg, setMatchMsg] = useState<string | null>(null)
+  const [matchMsgType, setMatchMsgType] = useState<'success' | 'error'>('success')
   const [editOpen, setEditOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -29,8 +30,12 @@ export default function RoleDetailPage() {
   const [emailSubject, setEmailSubject] = useState('')
   const [emailBody, setEmailBody] = useState('')
   const [emailCandidate, setEmailCandidate] = useState<string>('')
+  const [emailCandidateEmail, setEmailCandidateEmail] = useState<string>('')
   const [copiedSubject, setCopiedSubject] = useState(false)
   const [copiedBody, setCopiedBody] = useState(false)
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
+  const [emailSendError, setEmailSendError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -61,10 +66,16 @@ export default function RoleDetailPage() {
     })
     const json = await res.json()
     if (res.ok) {
-      setMatchMsg(`Scored ${json.count} candidate${json.count !== 1 ? 's' : ''}${json.failed > 0 ? ` (${json.failed} failed)` : ''}.`)
+      const parts = [`Scored ${json.count} candidate${json.count !== 1 ? 's' : ''}`]
+      if (json.failed > 0) parts.push(`${json.failed} failed`)
+      if (json.advanced > 0) parts.push(`${json.advanced} auto-advanced to Interviewing`)
+      if (json.rejected > 0) parts.push(`${json.rejected} auto-rejected`)
+      setMatchMsg(parts.join(' · ') + '.')
+      setMatchMsgType('success')
       await fetchData()
     } else {
       setMatchMsg(json.error ?? 'Matching failed.')
+      setMatchMsgType('error')
     }
     setMatching(false)
   }
@@ -73,6 +84,9 @@ export default function RoleDetailPage() {
     setEmailSubject('')
     setEmailBody('')
     setEmailCandidate(match.candidates.name)
+    setEmailCandidateEmail(match.candidates.email)
+    setEmailSent(false)
+    setEmailSendError(null)
     setEmailSlideOpen(true)
     setEmailLoading(true)
 
@@ -96,6 +110,29 @@ export default function RoleDetailPage() {
       setEmailBody(json.body ?? '')
     } else {
       setEmailBody(json.error ?? 'Failed to generate email.')
+    }
+  }
+
+  const handleSendEmail = async () => {
+    setEmailSending(true)
+    setEmailSendError(null)
+    const res = await fetch('/api/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: emailCandidateEmail,
+        subject: emailSubject,
+        body: emailBody,
+        from_name: settings.recruiter_name || settings.company_name || undefined,
+        reply_to: settings.recruiter_email || undefined,
+      }),
+    })
+    const json = await res.json()
+    setEmailSending(false)
+    if (res.ok) {
+      setEmailSent(true)
+    } else {
+      setEmailSendError(json.error ?? 'Failed to send email.')
     }
   }
 
@@ -196,6 +233,27 @@ export default function RoleDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Auto-decision thresholds display */}
+        {(role.auto_advance_threshold || role.auto_reject_threshold) && (
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Auto-Decisions</p>
+            <div className="flex flex-wrap gap-2">
+              {role.auto_advance_threshold && (
+                <span className="flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700">
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  Score ≥ {role.auto_advance_threshold} → Interviewing
+                </span>
+              )}
+              {role.auto_reject_threshold && (
+                <span className="flex items-center gap-1.5 rounded-lg bg-red-50 border border-red-200 px-3 py-1 text-xs font-medium text-red-600">
+                  <TrendingDown className="h-3.5 w-3.5" />
+                  Score ≤ {role.auto_reject_threshold} → Rejected
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* AI Match section */}
@@ -215,7 +273,7 @@ export default function RoleDetailPage() {
         </div>
 
         {matchMsg && (
-          <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-2.5 text-sm text-violet-700">
+          <div className={`rounded-xl border px-4 py-2.5 text-sm ${matchMsgType === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-violet-50 border-violet-200 text-violet-700'}`}>
             {matchMsg}
           </div>
         )}
@@ -254,6 +312,14 @@ export default function RoleDetailPage() {
           </div>
         ) : (
           <div className="space-y-5">
+            {/* Recipient */}
+            {emailCandidateEmail && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-semibold uppercase tracking-wide">To</span>
+                <span className="text-sm text-slate-700">{emailCandidateEmail}</span>
+              </div>
+            )}
+
             {/* Subject */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -288,9 +354,31 @@ export default function RoleDetailPage() {
               </div>
             </div>
 
-            <p className="text-xs text-slate-400 text-center">
-              Review and edit before sending — AI-generated drafts may need personalisation.
-            </p>
+            {/* Send section */}
+            {emailSent ? (
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 flex items-center gap-2 text-emerald-700 text-sm font-medium">
+                <Check className="h-4 w-4" />
+                Email sent to {emailCandidateEmail}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {emailSendError && (
+                  <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">
+                    {emailSendError}
+                  </div>
+                )}
+                <button
+                  onClick={handleSendEmail}
+                  disabled={emailSending || !emailCandidateEmail || !emailSubject}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {emailSending ? <><Loader2 className="h-4 w-4 animate-spin" />Sending…</> : <><Send className="h-4 w-4" />Send Email</>}
+                </button>
+                <p className="text-xs text-slate-400 text-center">
+                  Review and edit before sending — AI-generated drafts may need personalisation.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </SlideOver>

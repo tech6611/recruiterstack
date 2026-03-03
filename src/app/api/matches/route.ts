@@ -72,7 +72,37 @@ export async function POST(request: NextRequest) {
 
   const failed = results.filter((r) => r.status === 'rejected').length
 
-  return NextResponse.json({ data: succeeded, count: succeeded.length, failed })
+  // Apply auto-decision thresholds
+  const typedRole = role as Role
+  const toAdvance: string[] = []
+  const toReject: string[] = []
+
+  if (typedRole.auto_advance_threshold || typedRole.auto_reject_threshold) {
+    for (const match of succeeded) {
+      if (typedRole.auto_advance_threshold && match.score >= typedRole.auto_advance_threshold) {
+        toAdvance.push(match.candidate_id)
+      } else if (typedRole.auto_reject_threshold && match.score <= typedRole.auto_reject_threshold) {
+        toReject.push(match.candidate_id)
+      }
+    }
+
+    await Promise.all([
+      ...toAdvance.map((id) =>
+        supabase.from('candidates').update({ status: 'interviewing' }).eq('id', id),
+      ),
+      ...toReject.map((id) =>
+        supabase.from('candidates').update({ status: 'rejected' }).eq('id', id),
+      ),
+    ])
+  }
+
+  return NextResponse.json({
+    data: succeeded,
+    count: succeeded.length,
+    failed,
+    advanced: toAdvance.length,
+    rejected: toReject.length,
+  })
 }
 
 // GET /api/matches?role_id=xxx  OR  ?candidate_id=xxx

@@ -44,6 +44,8 @@ export interface Role {
   salary_min: number | null
   salary_max: number | null
   status: RoleStatus
+  auto_advance_threshold: number | null
+  auto_reject_threshold: number | null
   created_at: string
   updated_at: string
 }

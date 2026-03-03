@@ -28,6 +28,8 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
     salary_max: role?.salary_max ?? '',
     required_skills: role?.required_skills.join(', ') ?? '',
     status: (role?.status ?? 'draft') as RoleStatus,
+    auto_advance_threshold: role?.auto_advance_threshold ?? '',
+    auto_reject_threshold: role?.auto_reject_threshold ?? '',
   })
 
   const [loading, setLoading] = useState(false)
@@ -52,6 +54,8 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
         .map((s) => s.trim())
         .filter(Boolean),
       status: form.status,
+      auto_advance_threshold: form.auto_advance_threshold !== '' ? Number(form.auto_advance_threshold) : null,
+      auto_reject_threshold: form.auto_reject_threshold !== '' ? Number(form.auto_reject_threshold) : null,
     }
 
     const url = isEdit ? `/api/roles/${role.id}` : '/api/roles'
@@ -177,6 +181,46 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
             placeholder="TypeScript, React, Node.js, PostgreSQL"
             className={inputCls}
           />
+        </div>
+      </div>
+
+      {/* Auto-Decision Thresholds */}
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+        <div>
+          <p className="text-xs font-semibold text-slate-600">Auto-Decision Thresholds</p>
+          <p className="text-xs text-slate-400 mt-0.5">After AI matching runs, candidates are automatically moved based on their score.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-emerald-600 mb-1.5">
+              Auto-Advance if score ≥
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={form.auto_advance_threshold}
+              onChange={(e) => set('auto_advance_threshold', e.target.value)}
+              placeholder="e.g. 75"
+              className={inputCls}
+            />
+            <p className="text-xs text-slate-400 mt-1">→ Moves to Interviewing</p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-red-500 mb-1.5">
+              Auto-Reject if score ≤
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={form.auto_reject_threshold}
+              onChange={(e) => set('auto_reject_threshold', e.target.value)}
+              placeholder="e.g. 35"
+              className={inputCls}
+            />
+            <p className="text-xs text-slate-400 mt-1">→ Moves to Rejected</p>
+          </div>
         </div>
       </div>
 
