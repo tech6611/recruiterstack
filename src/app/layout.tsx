@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { Analytics } from '@vercel/analytics/next'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -20,6 +21,7 @@ export default function RootLayout({
       <body className={`${inter.className} flex min-h-screen bg-slate-50`}>
         <Sidebar />
         <main className="flex-1 overflow-auto">{children}</main>
+        <Analytics />
       </body>
     </html>
   )
