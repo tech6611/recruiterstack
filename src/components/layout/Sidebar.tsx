@@ -9,14 +9,16 @@ import {
   Kanban,
   Settings,
   Zap,
+  ClipboardList,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { href: '/',           label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/candidates', label: 'Candidates', icon: Users },
-  { href: '/pipeline',   label: 'Pipeline',   icon: Kanban },
-  { href: '/roles',      label: 'Roles',      icon: Briefcase },
-  { href: '/settings',   label: 'Settings',   icon: Settings },
+  { href: '/',                  label: 'Dashboard',       icon: LayoutDashboard },
+  { href: '/hiring-requests',   label: 'Hiring',          icon: ClipboardList },
+  { href: '/candidates',        label: 'Candidates',      icon: Users },
+  { href: '/pipeline',          label: 'Pipeline',        icon: Kanban },
+  { href: '/roles',             label: 'Roles',           icon: Briefcase },
+  { href: '/settings',          label: 'Settings',        icon: Settings },
 ]
 
 export function Sidebar() {
@@ -62,7 +64,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-slate-100 px-6 py-4">
-        <p className="text-xs text-slate-400">Phase 2 · AI Matching</p>
+        <p className="text-xs text-slate-400">Phase 4 · JD Generation</p>
       </div>
     </aside>
   )

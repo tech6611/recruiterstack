@@ -58,6 +58,44 @@ export interface RoleInsert extends Omit<Role, 'id' | 'created_at' | 'updated_at
 
 export interface RoleUpdate extends Partial<RoleInsert> {}
 
+// ── Hiring Request ────────────────────────────────────────────────────────
+
+export type HiringRequestStatus =
+  | 'intake_pending'
+  | 'intake_submitted'
+  | 'jd_generated'
+  | 'jd_sent'
+  | 'jd_approved'
+  | 'posted'
+
+export interface HiringRequest {
+  id: string
+  position_title: string
+  department: string | null
+  hiring_manager_name: string
+  hiring_manager_email: string
+  hiring_manager_slack: string | null
+  intake_token: string
+  status: HiringRequestStatus
+  team_context: string | null
+  level: string | null
+  headcount: number
+  location: string | null
+  remote_ok: boolean
+  key_requirements: string | null
+  nice_to_haves: string | null
+  budget_min: number | null
+  budget_max: number | null
+  target_start_date: string | null
+  additional_notes: string | null
+  generated_jd: string | null
+  intake_sent_at: string | null
+  intake_submitted_at: string | null
+  jd_sent_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 // ── Match ─────────────────────────────────────────────────────────────────
 
 export type MatchRecommendation = 'strong_yes' | 'yes' | 'maybe' | 'no'
