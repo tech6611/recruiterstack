@@ -104,7 +104,6 @@ export default function IntakeStatusPage() {
             {STEPS.map((step, i) => {
               const isDone = step.doneStatuses.includes(info.status)
               const isActive = step.activeStatuses?.includes(info.status) ?? false
-              const isPending = !isDone && !isActive
 
               return (
                 <div key={step.key} className="flex items-start gap-4">

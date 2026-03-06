@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Loader2, CheckCircle, Clock, Send, Copy, Check,
-  ExternalLink, MapPin, Users, Calendar, Building2, FileText,
+  ArrowLeft, Loader2, CheckCircle, Clock, Copy, Check,
+  ExternalLink, MapPin, Users, Calendar, FileText,
   Globe, Briefcase,
 } from 'lucide-react'
 import type { HiringRequest } from '@/lib/types/database'
