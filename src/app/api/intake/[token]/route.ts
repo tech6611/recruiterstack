@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import sgMail from '@sendgrid/mail'
 
-// GET /api/intake/:token — validate token, return basic request info
+// GET /api/intake/:token — validate token, return request info for the HM form
 export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('hiring_requests')
-    .select('id, position_title, department, hiring_manager_name, status')
+    .select('id, ticket_number, position_title, department, hiring_manager_name, status, intake_submitted_at, jd_sent_at, created_at')
     .eq('intake_token', params.token)
     .single()
 
@@ -17,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
   return NextResponse.json({ data })
 }
 
-// POST /api/intake/:token — HM submits requirements + final JD, recruiter gets notified
+// POST /api/intake/:token — HM submits requirements + final JD → status = jd_approved
 export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
   const supabase = createAdminClient()
 
@@ -35,6 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   }
 
   let body: {
+    position_title?: string           // HM can update the title
     team_context: string
     level?: string
     headcount?: number
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     remote_ok?: boolean
     key_requirements: string
     nice_to_haves?: string
+    target_companies?: string
     budget_min?: number
     budget_max?: number
     target_start_date?: string
@@ -58,8 +60,8 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     return NextResponse.json({ error: 'A Job Description is required before submitting.' }, { status: 400 })
   }
 
-  // Save everything and mark as jd_approved — HM's job is done
   const { error: updateError } = await supabase.from('hiring_requests').update({
+    position_title: body.position_title || req.position_title,
     team_context: body.team_context || null,
     level: body.level || null,
     headcount: body.headcount || 1,
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     remote_ok: body.remote_ok || false,
     key_requirements: body.key_requirements || null,
     nice_to_haves: body.nice_to_haves || null,
+    target_companies: body.target_companies || null,
     budget_min: body.budget_min || null,
     budget_max: body.budget_max || null,
     target_start_date: body.target_start_date || null,
@@ -83,8 +86,9 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const dashboardUrl = `${appUrl}/hiring-requests`
+  const statusUrl = `${appUrl}/intake/${params.token}/status`
 
-  // Notify recruiter via Slack (team channel)
+  // Slack: notify recruiter channel
   const slackWebhook = process.env.SLACK_WEBHOOK_URL
   if (slackWebhook) {
     try {
@@ -92,7 +96,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: `✅ *${req.hiring_manager_name}* has submitted the intake for *${req.position_title}* — the JD is ready for review!\n→ View in dashboard: ${dashboardUrl}`,
+          text: `✅ *${req.hiring_manager_name}* has submitted the intake for *${req.position_title}* — JD is ready for review!\n→ Dashboard: ${dashboardUrl}`,
         }),
       })
     } catch (e) {
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     }
   }
 
-  // Email recruiter if RECRUITER_EMAIL is set
+  // Email: notify recruiter if RECRUITER_EMAIL is set
   const recruiterEmail = process.env.RECRUITER_EMAIL
   const apiKey = process.env.SENDGRID_API_KEY
   const fromEmail = process.env.SENDGRID_FROM_EMAIL
@@ -111,17 +115,12 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         to: recruiterEmail,
         from: { email: fromEmail, name: 'RecruiterStack' },
         subject: `JD Ready: ${req.position_title}`,
-        text: `${req.hiring_manager_name} has submitted the intake form for ${req.position_title}. The Job Description is ready for your review.\n\n→ ${dashboardUrl}`,
+        text: `${req.hiring_manager_name} has submitted the intake for ${req.position_title}. The JD is ready.\n\n→ ${dashboardUrl}`,
         html: `
-          <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;">
-            <p><strong>${req.hiring_manager_name}</strong> has submitted the intake for <strong>${req.position_title}</strong>.</p>
-            <p>The Job Description is ready for your review in the dashboard.</p>
-            <p style="margin:24px 0;">
-              <a href="${dashboardUrl}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
-                View in Dashboard →
-              </a>
-            </p>
-          </div>
+          <p><strong>${req.hiring_manager_name}</strong> submitted the intake for <strong>${req.position_title}</strong>. The JD is ready for your review.</p>
+          <p style="margin:24px 0;">
+            <a href="${dashboardUrl}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">View in Dashboard →</a>
+          </p>
         `,
       })
     } catch (e) {
@@ -129,5 +128,5 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     }
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, status_url: statusUrl })
 }

@@ -14,7 +14,9 @@ export async function GET() {
   return NextResponse.json({ data })
 }
 
-// POST /api/hiring-requests  { position_title, department?, hiring_manager_name, hiring_manager_email, hiring_manager_slack? }
+// POST /api/hiring-requests
+// Mode A (send_to_hm):  { position_title, department?, hiring_manager_name, hiring_manager_email, hiring_manager_slack? }
+// Mode B (fill_myself): above + filled_by_recruiter:true + all intake fields + generated_jd
 export async function POST(request: NextRequest) {
   const supabase = createAdminClient()
 
@@ -22,8 +24,23 @@ export async function POST(request: NextRequest) {
     position_title: string
     department?: string
     hiring_manager_name: string
-    hiring_manager_email: string
+    hiring_manager_email?: string
     hiring_manager_slack?: string
+    filled_by_recruiter?: boolean
+    // Intake fields (Option B only)
+    team_context?: string
+    level?: string
+    headcount?: number
+    location?: string
+    remote_ok?: boolean
+    key_requirements?: string
+    nice_to_haves?: string
+    target_companies?: string
+    budget_min?: number
+    budget_max?: number
+    target_start_date?: string
+    additional_notes?: string
+    generated_jd?: string
   }
   try {
     body = await request.json()
@@ -31,53 +48,90 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  if (!body.position_title || !body.hiring_manager_name || !body.hiring_manager_email) {
+  if (!body.position_title || !body.hiring_manager_name) {
     return NextResponse.json(
-      { error: 'position_title, hiring_manager_name, and hiring_manager_email are required' },
+      { error: 'position_title and hiring_manager_name are required' },
       { status: 400 },
     )
   }
 
+  // For Option A, email is required (we send a link to HM)
+  if (!body.filled_by_recruiter && !body.hiring_manager_email) {
+    return NextResponse.json(
+      { error: 'hiring_manager_email is required when sending to hiring manager' },
+      { status: 400 },
+    )
+  }
+
+  const isOptionB = Boolean(body.filled_by_recruiter)
+
+  const insertPayload: Record<string, unknown> = {
+    position_title: body.position_title,
+    department: body.department || null,
+    hiring_manager_name: body.hiring_manager_name,
+    hiring_manager_email: body.hiring_manager_email || null,
+    hiring_manager_slack: body.hiring_manager_slack || null,
+    filled_by_recruiter: isOptionB,
+    status: isOptionB ? 'jd_approved' : 'intake_pending',
+    intake_sent_at: isOptionB ? null : new Date().toISOString(),
+  }
+
+  if (isOptionB) {
+    // Save all intake details immediately
+    Object.assign(insertPayload, {
+      team_context: body.team_context || null,
+      level: body.level || null,
+      headcount: body.headcount || 1,
+      location: body.location || null,
+      remote_ok: body.remote_ok || false,
+      key_requirements: body.key_requirements || null,
+      nice_to_haves: body.nice_to_haves || null,
+      target_companies: body.target_companies || null,
+      budget_min: body.budget_min || null,
+      budget_max: body.budget_max || null,
+      target_start_date: body.target_start_date || null,
+      additional_notes: body.additional_notes || null,
+      generated_jd: body.generated_jd || null,
+      intake_submitted_at: new Date().toISOString(),
+    })
+  }
+
   const { data: req, error: insertError } = await supabase
     .from('hiring_requests')
-    .insert({
-      position_title: body.position_title,
-      department: body.department || null,
-      hiring_manager_name: body.hiring_manager_name,
-      hiring_manager_email: body.hiring_manager_email,
-      hiring_manager_slack: body.hiring_manager_slack || null,
-      intake_sent_at: new Date().toISOString(),
-    } as any)
+    .insert(insertPayload as any)
     .select()
     .single()
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
+  // Option B — no email/Slack, return immediately
+  if (isOptionB) {
+    return NextResponse.json({ data: req }, { status: 201 })
+  }
+
+  // Option A — send intake link to HM
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const intakeUrl = `${appUrl}/intake/${req.intake_token}`
 
-  // Send email to hiring manager
   const apiKey = process.env.SENDGRID_API_KEY
   const fromEmail = process.env.SENDGRID_FROM_EMAIL
-  if (apiKey && fromEmail) {
+  if (apiKey && fromEmail && body.hiring_manager_email) {
     sgMail.setApiKey(apiKey)
     try {
       await sgMail.send({
         to: body.hiring_manager_email,
         from: { email: fromEmail, name: 'RecruiterStack' },
         subject: `Action needed: Share your requirements for ${body.position_title}`,
-        text: `Hi ${body.hiring_manager_name},\n\nA hiring request has been kicked off for ${body.position_title}.\n\nTo get the Job Description drafted, we need a few details from you — takes about 5 minutes:\n\n→ ${intakeUrl}\n\nOnce you submit, Claude will generate a polished JD and send it back to you for review.\n\nThanks!`,
+        text: `Hi ${body.hiring_manager_name},\n\nA hiring request has been kicked off for ${body.position_title}.\n\nFill in your requirements here (5 mins): ${intakeUrl}\n\nThanks!`,
         html: `
           <p>Hi ${body.hiring_manager_name},</p>
           <p>A hiring request has been kicked off for <strong>${body.position_title}</strong>.</p>
-          <p>To get the Job Description drafted, we need a few details from you — takes about 5 minutes:</p>
           <p style="margin:24px 0;">
             <a href="${intakeUrl}" style="background:#2563eb;color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;display:inline-block;">
-              Share Your Requirements →
+              Fill In Your Requirements →
             </a>
           </p>
-          <p>Once you submit, Claude will generate a polished JD and send it back to you for review within minutes.</p>
-          <p>Thanks!</p>
+          <p>Once submitted, you can generate or write the JD directly and the recruiter will be notified.</p>
         `,
       })
     } catch (e) {
@@ -85,7 +139,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Send Slack notification
   const slackWebhook = process.env.SLACK_WEBHOOK_URL
   if (slackWebhook) {
     const mention = body.hiring_manager_slack

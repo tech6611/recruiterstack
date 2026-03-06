@@ -70,13 +70,15 @@ export type HiringRequestStatus =
 
 export interface HiringRequest {
   id: string
+  ticket_number: string | null
   position_title: string
   department: string | null
   hiring_manager_name: string
-  hiring_manager_email: string
+  hiring_manager_email: string | null   // nullable — optional when recruiter fills form
   hiring_manager_slack: string | null
   intake_token: string
   status: HiringRequestStatus
+  filled_by_recruiter: boolean
   team_context: string | null
   level: string | null
   headcount: number
@@ -84,6 +86,7 @@ export interface HiringRequest {
   remote_ok: boolean
   key_requirements: string | null
   nice_to_haves: string | null
+  target_companies: string | null
   budget_min: number | null
   budget_max: number | null
   target_start_date: string | null
