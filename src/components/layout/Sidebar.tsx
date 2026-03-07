@@ -8,12 +8,14 @@ import {
   Briefcase,
   Settings,
   Zap,
+  BarChart2,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { href: '/',            label: 'Dashboard',  icon: LayoutDashboard },
   { href: '/jobs',        label: 'Jobs',       icon: Briefcase },
   { href: '/candidates',  label: 'Candidates', icon: Users },
+  { href: '/analytics',  label: 'Analytics',  icon: BarChart2 },
   { href: '/settings',    label: 'Settings',   icon: Settings },
 ]
 
