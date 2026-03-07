@@ -21,6 +21,7 @@ export interface Candidate {
   experience_years: number
   current_title: string | null
   location: string | null
+  linkedin_url: string | null
   status: CandidateStatus
   created_at: string
   updated_at: string
@@ -34,6 +35,11 @@ export interface CandidateInsert
 }
 
 export interface CandidateUpdate extends Partial<CandidateInsert> {}
+
+// Candidate enriched with aggregated pipeline data — used by the list page
+export interface CandidateListItem extends Candidate {
+  active_applications_count: number
+}
 
 export interface Role {
   id: string

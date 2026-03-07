@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import type { CandidateInsert, CandidateStatus } from '@/lib/types/database'
+import type { CandidateInsert, CandidateListItem, CandidateStatus } from '@/lib/types/database'
 
 // GET /api/candidates?status=active&limit=50&offset=0
 export async function GET(request: NextRequest) {
@@ -25,13 +25,29 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const { data, error, count } = await query
+  // Run in parallel: paginated candidates + all active application candidate_ids
+  const [{ data, error, count }, appsRes] = await Promise.all([
+    query,
+    supabase.from('applications').select('candidate_id').eq('status', 'active'),
+  ])
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ data, count, limit, offset })
+  // Build count map: candidate_id → number of active applications
+  const countMap = new Map<string, number>()
+  for (const app of (appsRes.data ?? [])) {
+    countMap.set(app.candidate_id, (countMap.get(app.candidate_id) ?? 0) + 1)
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const enriched: CandidateListItem[] = (data as any[]).map(c => ({
+    ...c,
+    active_applications_count: countMap.get(c.id) ?? 0,
+  }))
+
+  return NextResponse.json({ data: enriched, count, limit, offset })
 }
 
 // POST /api/candidates
