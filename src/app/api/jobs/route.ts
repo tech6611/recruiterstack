@@ -42,10 +42,12 @@ export async function GET() {
     }))
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { pipeline_stages: _ps, applications: _apps, ...jobFields } = job as any
+    const jobAny = job as any
+    delete jobAny.pipeline_stages
+    delete jobAny.applications
 
     return {
-      ...jobFields,
+      ...jobAny,
       total_candidates: apps.length,
       stage_counts,
     }
