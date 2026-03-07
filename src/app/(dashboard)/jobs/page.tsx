@@ -634,6 +634,13 @@ export default function JobsPage() {
 
   useEffect(() => { fetchJobs() }, [fetchJobs])
 
+  // Refetch when the tab regains focus (e.g. after navigating back via browser Back)
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchJobs() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [fetchJobs])
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
