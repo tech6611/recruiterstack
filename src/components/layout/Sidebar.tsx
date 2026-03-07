@@ -9,6 +9,7 @@ import {
   Settings,
   Zap,
   BarChart2,
+  Inbox,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { href: '/jobs',        label: 'Jobs',       icon: Briefcase },
   { href: '/candidates',  label: 'Candidates', icon: Users },
   { href: '/analytics',  label: 'Analytics',  icon: BarChart2 },
+  { href: '/inbox',       label: 'Inbox',      icon: Inbox },
   { href: '/settings',    label: 'Settings',   icon: Settings },
 ]
 
