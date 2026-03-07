@@ -8,7 +8,8 @@ import type { StageColor } from '@/lib/types/database'
 
 interface AnalyticsData {
   stats: {
-    total_active:       number
+    active_candidates:  number
+    in_pipeline:        number
     total_hired:        number
     total_rejected:     number
     interviewing:       number
@@ -182,7 +183,7 @@ export default function AnalyticsPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="Active Candidates"  value={stats.total_active}       icon={Users}       color="bg-blue-500"    />
+        <StatCard label="Active Candidates"  value={stats.active_candidates}  icon={Users}       color="bg-blue-500"    sub={`${stats.in_pipeline} in pipeline`} />
         <StatCard label="Active Jobs"        value={stats.active_jobs}        icon={Briefcase}   color="bg-violet-500"  />
         <StatCard label="In Interviews"      value={stats.interviewing}       icon={Clock}       color="bg-amber-500"   />
         <StatCard label="Total Applications" value={stats.total_applications} icon={TrendingUp}  color="bg-slate-500"   />
@@ -307,7 +308,7 @@ export default function AnalyticsPage() {
           <div className="flex items-center gap-0">
             {[
               { label: 'Applied',    value: stats.total_applications, color: 'bg-slate-200 text-slate-700' },
-              { label: 'Active',     value: stats.total_active,       color: 'bg-blue-100 text-blue-700'   },
+              { label: 'In Pipeline', value: stats.in_pipeline,      color: 'bg-blue-100 text-blue-700'   },
               { label: 'Hired',      value: stats.total_hired,        color: 'bg-emerald-100 text-emerald-700' },
             ].map((step, i) => (
               <div key={step.label} className="flex items-center gap-0 flex-1 min-w-0">

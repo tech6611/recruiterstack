@@ -5,23 +5,27 @@ import { createAdminClient } from '@/lib/supabase/server'
 export async function GET() {
   const supabase = createAdminClient()
 
-  const [jobsRes, appsRes, stagesRes] = await Promise.all([
+  const [jobsRes, appsRes, stagesRes, candsRes] = await Promise.all([
     supabase
       .from('hiring_requests')
       .select('id, position_title, department, status')
       .order('created_at', { ascending: false }),
     supabase
       .from('applications')
-      .select('id, status, source, stage_id, applied_at, hiring_request_id'),
+      .select('id, status, source, stage_id, applied_at, hiring_request_id, candidate_id'),
     supabase
       .from('pipeline_stages')
       .select('id, name, color, order_index, hiring_request_id')
       .order('order_index'),
+    supabase
+      .from('candidates')
+      .select('id, status'),
   ])
 
   const jobs   = jobsRes.data   ?? []
   const apps   = appsRes.data   ?? []
   const stages = stagesRes.data ?? []
+  const cands  = candsRes.data  ?? []
 
   // ── 1. Jobs funnel ────────────────────────────────────────────────────────
   const ACTIVE_JOB_STATUSES = ['active', 'jd_approved', 'jd_sent', 'jd_generated', 'posted']
@@ -90,8 +94,14 @@ export async function GET() {
     return stage?.name?.toLowerCase().includes('interview')
   }).length
 
+  // Distinct candidates with at least one active application (in pipeline)
+  const inPipelineCandidateIds = new Set(
+    apps.filter(a => a.status === 'active').map(a => a.candidate_id)
+  )
+
   const stats = {
-    total_active:       apps.filter(a => a.status === 'active').length,
+    active_candidates:  cands.filter(c => c.status === 'active').length,
+    in_pipeline:        inPipelineCandidateIds.size,
     total_hired:        apps.filter(a => a.status === 'hired').length,
     total_rejected:     apps.filter(a => a.status === 'rejected').length,
     interviewing:       interviewingCount,
