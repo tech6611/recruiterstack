@@ -175,6 +175,27 @@ export interface JobListItem extends HiringRequest {
   stage_counts: { stage_id: string; stage_name: string; color: StageColor; count: number }[]
 }
 
+// ── Scorecards ────────────────────────────────────────────────────────────
+
+export type ScorecardRecommendation = 'strong_yes' | 'yes' | 'maybe' | 'no'
+
+export interface ScorecardScore {
+  criterion: string
+  rating:    1 | 2 | 3 | 4
+  notes:     string
+}
+
+export interface Scorecard {
+  id:               string
+  application_id:   string
+  interviewer_name: string
+  stage_name:       string | null
+  recommendation:   ScorecardRecommendation
+  scores:           ScorecardScore[]
+  overall_notes:    string | null
+  created_at:       string
+}
+
 // ── Match ─────────────────────────────────────────────────────────────────
 
 export type MatchRecommendation = 'strong_yes' | 'yes' | 'maybe' | 'no'

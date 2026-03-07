@@ -5,9 +5,12 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Mail, Phone, MapPin, Briefcase, ExternalLink,
   FileText, Send, Clock, ChevronRight, Loader2, AlertCircle,
-  Pencil, Check, X, Plus, Linkedin,
+  Pencil, Check, X, Plus, Linkedin, Star, Trash2, ClipboardList,
 } from 'lucide-react'
-import type { Candidate, Application, ApplicationEvent } from '@/lib/types/database'
+import type {
+  Candidate, Application, ApplicationEvent,
+  Scorecard, ScorecardRecommendation, ScorecardScore,
+} from '@/lib/types/database'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -34,6 +37,37 @@ function fmtRelative(d: string) {
   if (hrs < 24) return `${hrs}h ago`
   return `${Math.floor(hrs / 24)}d ago`
 }
+
+// ── Scorecard config ──────────────────────────────────────────────────────────
+
+const DEFAULT_CRITERIA = ['Technical Skills', 'Communication', 'Problem Solving', 'Culture Fit']
+
+const RECOMMENDATION_CONFIG: Record<ScorecardRecommendation, { label: string; badge: string; active: string; btn: string }> = {
+  strong_yes: { label: 'Strong Yes', badge: 'bg-emerald-100 text-emerald-700', active: 'bg-emerald-600 text-white border-emerald-600', btn: 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
+  yes:        { label: 'Yes',        badge: 'bg-blue-100 text-blue-700',       active: 'bg-blue-600 text-white border-blue-600',       btn: 'border border-blue-200 text-blue-700 hover:bg-blue-50'       },
+  maybe:      { label: 'Maybe',      badge: 'bg-amber-100 text-amber-700',     active: 'bg-amber-500 text-white border-amber-500',     btn: 'border border-amber-200 text-amber-700 hover:bg-amber-50'   },
+  no:         { label: 'No',         badge: 'bg-red-100 text-red-700',         active: 'bg-red-600 text-white border-red-600',         btn: 'border border-red-200 text-red-700 hover:bg-red-50'         },
+}
+
+const RATING_CONFIG = [
+  { value: 1 as const, label: 'Poor',      dot: 'bg-red-400',     active: 'bg-red-500 text-white border-red-500',         btn: 'border border-red-200 text-red-600 hover:bg-red-50'         },
+  { value: 2 as const, label: 'Fair',      dot: 'bg-amber-400',   active: 'bg-amber-500 text-white border-amber-500',     btn: 'border border-amber-200 text-amber-600 hover:bg-amber-50'   },
+  { value: 3 as const, label: 'Good',      dot: 'bg-blue-400',    active: 'bg-blue-500 text-white border-blue-500',       btn: 'border border-blue-200 text-blue-600 hover:bg-blue-50'       },
+  { value: 4 as const, label: 'Excellent', dot: 'bg-emerald-400', active: 'bg-emerald-500 text-white border-emerald-500', btn: 'border border-emerald-200 text-emerald-600 hover:bg-emerald-50' },
+]
+
+function RatingDots({ rating }: { rating: number }) {
+  const cfg = RATING_CONFIG[rating - 1]
+  return (
+    <div className="flex gap-0.5 items-center">
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className={`h-2 w-2 rounded-full ${i <= rating ? (cfg?.dot ?? 'bg-slate-400') : 'bg-slate-200'}`} />
+      ))}
+    </div>
+  )
+}
+
+// ── Event config ──────────────────────────────────────────────────────────────
 
 const EVENT_CONFIG: Record<string, { label: (e: ApplicationEvent) => string; icon: React.ReactNode; color: string }> = {
   applied: {
@@ -69,7 +103,7 @@ const STAGE_COLOR_MAP: Record<string, string> = {
   pink:    'bg-pink-50 text-pink-700',
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface CandidateWithPipeline extends Candidate {
   applications: (Application & {
@@ -81,13 +115,301 @@ interface CandidateWithPipeline extends Candidate {
 
 type JobOption = { id: string; position_title: string; department: string | null; ticket_number: string | null }
 
+// ── Scorecard Drawer ──────────────────────────────────────────────────────────
+
+function ScorecardDrawer({
+  activeApps,
+  defaultAppId,
+  onClose,
+  onSaved,
+}: {
+  activeApps: CandidateWithPipeline['applications']
+  defaultAppId: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [appId, setAppId]           = useState(defaultAppId)
+  const [interviewer, setInterviewer] = useState('')
+  const [round, setRound]           = useState('')
+  const [recommendation, setRecommendation] = useState<ScorecardRecommendation | ''>('')
+  const [scores, setScores]         = useState<{ criterion: string; rating: 0 | 1 | 2 | 3 | 4; notes: string }[]>(
+    DEFAULT_CRITERIA.map(c => ({ criterion: c, rating: 0, notes: '' })),
+  )
+  const [notes, setNotes]           = useState('')
+  const [saving, setSaving]         = useState(false)
+  const [error, setError]           = useState('')
+
+  const setRating = (idx: number, rating: 1 | 2 | 3 | 4) => {
+    setScores(prev => prev.map((s, i) => i === idx ? { ...s, rating } : s))
+  }
+
+  const submit = async () => {
+    if (!interviewer.trim()) { setError('Interviewer name is required'); return }
+    if (!recommendation)     { setError('Please select a recommendation'); return }
+    const unrated = scores.filter(s => s.rating === 0)
+    if (unrated.length > 0)  { setError(`Please rate all criteria (missing: ${unrated.map(s => s.criterion).join(', ')})`); return }
+
+    setSaving(true)
+    setError('')
+    const res = await fetch('/api/scorecards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        application_id:   appId,
+        interviewer_name: interviewer.trim(),
+        stage_name:       round.trim() || null,
+        recommendation,
+        scores:           scores.map(s => ({ criterion: s.criterion, rating: s.rating, notes: s.notes })) as ScorecardScore[],
+        overall_notes:    notes.trim() || null,
+      }),
+    })
+    setSaving(false)
+    if (!res.ok) {
+      const json = await res.json()
+      setError(json.error ?? 'Failed to save scorecard')
+      return
+    }
+    onSaved()
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="w-full max-w-xl bg-white shadow-2xl flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+              <ClipboardList className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Add Scorecard</h2>
+              <p className="text-xs text-slate-400">Structured interview feedback</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          {/* Application selector (if multiple) */}
+          {activeApps.length > 1 && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Application</label>
+              <select
+                value={appId}
+                onChange={e => setAppId(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
+              >
+                {activeApps.map(app => (
+                  <option key={app.id} value={app.id}>
+                    {app.hiring_requests?.position_title ?? 'Unknown Role'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Interviewer + Round */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                Interviewer Name *
+              </label>
+              <input
+                value={interviewer}
+                onChange={e => setInterviewer(e.target.value)}
+                placeholder="Jane Smith"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                Interview Round
+              </label>
+              <input
+                value={round}
+                onChange={e => setRound(e.target.value)}
+                placeholder="e.g. Phone Screen, Onsite"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+          </div>
+
+          {/* Criteria ratings */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Criteria Ratings *</p>
+            <div className="space-y-4">
+              {scores.map((s, idx) => (
+                <div key={s.criterion}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-medium text-slate-700">{s.criterion}</span>
+                    {s.rating > 0 && (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${RATING_CONFIG[s.rating - 1].active}`}>
+                        {RATING_CONFIG[s.rating - 1].label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {RATING_CONFIG.map(r => (
+                      <button
+                        key={r.value}
+                        onClick={() => setRating(idx, r.value)}
+                        className={`flex-1 rounded-xl px-2 py-2 text-xs font-semibold border transition-all ${
+                          s.rating === r.value ? r.active : r.btn
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Overall recommendation */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Overall Recommendation *</p>
+            <div className="grid grid-cols-4 gap-2">
+              {(Object.entries(RECOMMENDATION_CONFIG) as [ScorecardRecommendation, typeof RECOMMENDATION_CONFIG[ScorecardRecommendation]][]).map(([key, cfg]) => (
+                <button
+                  key={key}
+                  onClick={() => setRecommendation(key)}
+                  className={`rounded-xl px-3 py-2.5 text-sm font-semibold border transition-all ${
+                    recommendation === key ? cfg.active : cfg.btn
+                  }`}
+                >
+                  {cfg.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+              Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Overall impression, key observations…"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2.5">
+              <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-200 shrink-0">
+          <button
+            onClick={onClose}
+            className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors border border-slate-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
+            Submit Scorecard
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Scorecard Card ────────────────────────────────────────────────────────────
+
+function ScorecardCard({
+  scorecard,
+  onDelete,
+}: {
+  scorecard: Scorecard
+  onDelete: (id: string) => void
+}) {
+  const [deleting, setDeleting] = useState(false)
+  const rec = RECOMMENDATION_CONFIG[scorecard.recommendation]
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this scorecard?')) return
+    setDeleting(true)
+    await fetch(`/api/scorecards/${scorecard.id}`, { method: 'DELETE' })
+    onDelete(scorecard.id)
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${rec.badge}`}>
+            {rec.label}
+          </span>
+          <span className="text-sm font-semibold text-slate-800">{scorecard.interviewer_name}</span>
+          {scorecard.stage_name && (
+            <>
+              <span className="text-slate-300">·</span>
+              <span className="text-xs text-slate-500">{scorecard.stage_name}</span>
+            </>
+          )}
+          <span className="text-slate-300">·</span>
+          <span className="text-xs text-slate-400">{fmtRelative(scorecard.created_at)}</span>
+        </div>
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="shrink-0 p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+
+      {/* Criteria grid */}
+      {scorecard.scores.length > 0 && (
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+          {scorecard.scores.map(s => (
+            <div key={s.criterion} className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-500 truncate">{s.criterion}</span>
+              <RatingDots rating={s.rating} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Notes */}
+      {scorecard.overall_notes && (
+        <p className="text-xs text-slate-500 bg-white rounded-lg border border-slate-100 px-3 py-2 leading-relaxed">
+          {scorecard.overall_notes}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function CandidateProfilePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
 
   const [candidate, setCandidate] = useState<CandidateWithPipeline | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [note, setNote] = useState('')
+  const [loading, setLoading]     = useState(true)
+  const [note, setNote]           = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [editSkills, setEditSkills] = useState(false)
   const [skillInput, setSkillInput] = useState('')
@@ -98,9 +420,15 @@ export default function CandidateProfilePage() {
 
   // Add to Job modal
   const [showAddToJob, setShowAddToJob] = useState(false)
-  const [jobs, setJobs] = useState<JobOption[]>([])
+  const [jobs, setJobs]           = useState<JobOption[]>([])
   const [addingToJob, setAddingToJob] = useState<string | null>(null)
   const [jobsLoading, setJobsLoading] = useState(false)
+
+  // Scorecards
+  const [scorecards, setScorecards] = useState<Map<string, Scorecard[]>>(new Map())
+  const [scorecardsLoading, setScorecardsLoading] = useState(false)
+  const [showScorecardDrawer, setShowScorecardDrawer] = useState(false)
+  const [drawerDefaultAppId, setDrawerDefaultAppId] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -110,7 +438,29 @@ export default function CandidateProfilePage() {
     setLoading(false)
   }, [id])
 
+  const loadScorecards = useCallback(async (activeApps: CandidateWithPipeline['applications']) => {
+    if (activeApps.length === 0) return
+    setScorecardsLoading(true)
+    const results = await Promise.all(
+      activeApps.map(app =>
+        fetch(`/api/scorecards?application_id=${app.id}`)
+          .then(r => r.json())
+          .then(j => ({ appId: app.id, data: (j.data ?? []) as Scorecard[] }))
+      )
+    )
+    const map = new Map<string, Scorecard[]>()
+    for (const { appId, data } of results) map.set(appId, data)
+    setScorecards(map)
+    setScorecardsLoading(false)
+  }, [])
+
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!candidate) return
+    const activeApps = candidate.applications.filter(a => a.status === 'active')
+    loadScorecards(activeApps)
+  }, [candidate, loadScorecards])
 
   const addNote = async (applicationId: string) => {
     if (!note.trim()) return
@@ -172,6 +522,26 @@ export default function CandidateProfilePage() {
     }
   }
 
+  const openScorecardDrawer = (appId: string) => {
+    setDrawerDefaultAppId(appId)
+    setShowScorecardDrawer(true)
+  }
+
+  const handleScorecardDeleted = (scorecardId: string, appId: string) => {
+    setScorecards(prev => {
+      const next = new Map(prev)
+      const current = next.get(appId) ?? []
+      next.set(appId, current.filter(s => s.id !== scorecardId))
+      return next
+    })
+  }
+
+  const handleScorecardSaved = useCallback(async () => {
+    if (!candidate) return
+    const activeApps = candidate.applications.filter(a => a.status === 'active')
+    await loadScorecards(activeApps)
+  }, [candidate, loadScorecards])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-slate-400 text-sm gap-2">
@@ -192,10 +562,10 @@ export default function CandidateProfilePage() {
 
   const activeApps = candidate.applications.filter(a => a.status === 'active')
   const closedApps  = candidate.applications.filter(a => a.status !== 'active')
-
-  // Jobs the candidate is NOT already in
   const existingJobIds = new Set(candidate.applications.map(a => a.hiring_request_id))
   const availableJobs  = jobs.filter(j => !existingJobIds.has(j.id))
+
+  const totalScorecards = activeApps.reduce((sum, app) => sum + (scorecards.get(app.id)?.length ?? 0), 0)
 
   return (
     <div className="flex flex-col min-h-full">
@@ -271,7 +641,7 @@ export default function CandidateProfilePage() {
                 </a>
               )}
 
-              {/* ── LinkedIn ── */}
+              {/* LinkedIn */}
               <div className="flex items-start gap-2.5">
                 <Linkedin className="h-4 w-4 shrink-0 text-slate-400 mt-0.5" />
                 {editLinkedin ? (
@@ -441,6 +811,70 @@ export default function CandidateProfilePage() {
             </div>
           )}
 
+          {/* Scorecards */}
+          {activeApps.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-slate-800">Scorecards</h2>
+                  {totalScorecards > 0 && (
+                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-700">
+                      {totalScorecards}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => openScorecardDrawer(activeApps[0].id)}
+                  className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Scorecard
+                </button>
+              </div>
+
+              <div className="px-6 py-4">
+                {scorecardsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+                  </div>
+                ) : totalScorecards === 0 ? (
+                  <div className="flex flex-col items-center py-10 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-400 mb-3">
+                      <Star className="h-6 w-6" />
+                    </div>
+                    <p className="text-sm font-medium text-slate-600">No scorecards yet</p>
+                    <p className="text-xs text-slate-400 mt-1">Add structured feedback after interviews</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {activeApps.map(app => {
+                      const appScorecards = scorecards.get(app.id) ?? []
+                      if (appScorecards.length === 0) return null
+                      return (
+                        <div key={app.id}>
+                          {activeApps.length > 1 && (
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                              {app.hiring_requests?.position_title}
+                            </p>
+                          )}
+                          <div className="space-y-3">
+                            {appScorecards.map(sc => (
+                              <ScorecardCard
+                                key={sc.id}
+                                scorecard={sc}
+                                onDelete={scId => handleScorecardDeleted(scId, app.id)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Notes for first active application */}
           {activeApps.length > 0 && (
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -504,7 +938,7 @@ export default function CandidateProfilePage() {
             </div>
           )}
 
-          {/* Closed / historical applications */}
+          {/* Previous applications */}
           {closedApps.length > 0 && (
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100">
@@ -548,17 +982,21 @@ export default function CandidateProfilePage() {
         </div>
       </div>
 
+      {/* ── Scorecard Drawer ──────────────────────────────────────────────── */}
+      {showScorecardDrawer && (
+        <ScorecardDrawer
+          activeApps={activeApps}
+          defaultAppId={drawerDefaultAppId}
+          onClose={() => setShowScorecardDrawer(false)}
+          onSaved={handleScorecardSaved}
+        />
+      )}
+
       {/* ── Add to Job Modal ──────────────────────────────────────────────── */}
       {showAddToJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-            onClick={() => setShowAddToJob(false)}
-          />
-          {/* Modal */}
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowAddToJob(false)} />
           <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[80vh]">
-            {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Add to Job</h3>
@@ -571,8 +1009,6 @@ export default function CandidateProfilePage() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-
-            {/* Body */}
             <div className="flex-1 overflow-y-auto">
               {jobsLoading ? (
                 <div className="flex items-center justify-center py-10">

@@ -5,9 +5,50 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
   UserPlus, Search, ChevronDown, MoreHorizontal,
-  Loader2, AlertCircle, ExternalLink,
+  Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
 } from 'lucide-react'
-import type { JobWithPipeline, PipelineStage, Application, Candidate, StageColor } from '@/lib/types/database'
+import type {
+  JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
+  Scorecard, ScorecardRecommendation, ScorecardScore,
+} from '@/lib/types/database'
+
+// ── Scorecard config (shared) ─────────────────────────────────────────────────
+
+const DEFAULT_CRITERIA = ['Technical Skills', 'Communication', 'Problem Solving', 'Culture Fit']
+
+const RECOMMENDATION_CONFIG: Record<ScorecardRecommendation, { label: string; badge: string; active: string; btn: string }> = {
+  strong_yes: { label: 'Strong Yes', badge: 'bg-emerald-100 text-emerald-700', active: 'bg-emerald-600 text-white border-emerald-600', btn: 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
+  yes:        { label: 'Yes',        badge: 'bg-blue-100 text-blue-700',       active: 'bg-blue-600 text-white border-blue-600',       btn: 'border border-blue-200 text-blue-700 hover:bg-blue-50'       },
+  maybe:      { label: 'Maybe',      badge: 'bg-amber-100 text-amber-700',     active: 'bg-amber-500 text-white border-amber-500',     btn: 'border border-amber-200 text-amber-700 hover:bg-amber-50'   },
+  no:         { label: 'No',         badge: 'bg-red-100 text-red-700',         active: 'bg-red-600 text-white border-red-600',         btn: 'border border-red-200 text-red-700 hover:bg-red-50'         },
+}
+
+const RATING_CONFIG = [
+  { value: 1 as const, label: 'Poor',      dot: 'bg-red-400',     active: 'bg-red-500 text-white border-red-500',         btn: 'border border-red-200 text-red-600 hover:bg-red-50'         },
+  { value: 2 as const, label: 'Fair',      dot: 'bg-amber-400',   active: 'bg-amber-500 text-white border-amber-500',     btn: 'border border-amber-200 text-amber-600 hover:bg-amber-50'   },
+  { value: 3 as const, label: 'Good',      dot: 'bg-blue-400',    active: 'bg-blue-500 text-white border-blue-500',       btn: 'border border-blue-200 text-blue-600 hover:bg-blue-50'       },
+  { value: 4 as const, label: 'Excellent', dot: 'bg-emerald-400', active: 'bg-emerald-500 text-white border-emerald-500', btn: 'border border-emerald-200 text-emerald-600 hover:bg-emerald-50' },
+]
+
+function RatingDots({ rating }: { rating: number }) {
+  const cfg = RATING_CONFIG[rating - 1]
+  return (
+    <div className="flex gap-0.5 items-center">
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className={`h-2 w-2 rounded-full ${i <= rating ? (cfg?.dot ?? 'bg-slate-400') : 'bg-slate-200'}`} />
+      ))}
+    </div>
+  )
+}
+
+function fmtRelative(d: string) {
+  const diff = Date.now() - new Date(d).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
 
 // ── Stage colours ─────────────────────────────────────────────────────────────
 
@@ -480,8 +521,35 @@ function CandidateSlideOver({
   onStatusChange: (appId: string, status: string) => void
 }) {
   const c = app.candidate!
+  const [tab, setTab]   = useState<'details' | 'scorecards'>('details')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Scorecards tab state
+  const [scorecards, setScorecards]         = useState<Scorecard[]>([])
+  const [scLoading, setScLoading]           = useState(false)
+  const [showAddForm, setShowAddForm]       = useState(false)
+  const [scInterviewer, setScInterviewer]   = useState('')
+  const [scRound, setScRound]               = useState('')
+  const [scRec, setScRec]                   = useState<ScorecardRecommendation | ''>('')
+  const [scScores, setScScores]             = useState(
+    DEFAULT_CRITERIA.map(c => ({ criterion: c, rating: 0 as 0 | 1 | 2 | 3 | 4 }))
+  )
+  const [scNotes, setScNotes]               = useState('')
+  const [scSaving, setScSaving]             = useState(false)
+  const [scError, setScError]               = useState('')
+
+  const loadScorecards = useCallback(async () => {
+    setScLoading(true)
+    const res = await fetch(`/api/scorecards?application_id=${app.id}`)
+    const json = await res.json()
+    setScorecards(json.data ?? [])
+    setScLoading(false)
+  }, [app.id])
+
+  useEffect(() => {
+    if (tab === 'scorecards') loadScorecards()
+  }, [tab, loadScorecards])
 
   const addNote = async () => {
     if (!note.trim()) return
@@ -495,12 +563,46 @@ function CandidateSlideOver({
     setSaving(false)
   }
 
+  const submitScorecard = async () => {
+    if (!scInterviewer.trim()) { setScError('Interviewer name is required'); return }
+    if (!scRec)                 { setScError('Please select a recommendation'); return }
+    const unrated = scScores.filter(s => s.rating === 0)
+    if (unrated.length > 0)    { setScError(`Please rate: ${unrated.map(s => s.criterion).join(', ')}`); return }
+
+    setScSaving(true); setScError('')
+    const res = await fetch('/api/scorecards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        application_id:   app.id,
+        interviewer_name: scInterviewer.trim(),
+        stage_name:       scRound.trim() || null,
+        recommendation:   scRec,
+        scores:           scScores.map(s => ({ criterion: s.criterion, rating: s.rating, notes: '' })) as ScorecardScore[],
+        overall_notes:    scNotes.trim() || null,
+      }),
+    })
+    setScSaving(false)
+    if (!res.ok) { const j = await res.json(); setScError(j.error ?? 'Failed'); return }
+    // Reset form
+    setScInterviewer(''); setScRound(''); setScRec(''); setScNotes('')
+    setScScores(DEFAULT_CRITERIA.map(c => ({ criterion: c, rating: 0 as 0 | 1 | 2 | 3 | 4 })))
+    setShowAddForm(false)
+    await loadScorecards()
+  }
+
+  const deleteScorecard = async (id: string) => {
+    if (!confirm('Delete this scorecard?')) return
+    await fetch(`/api/scorecards/${id}`, { method: 'DELETE' })
+    setScorecards(prev => prev.filter(s => s.id !== id))
+  }
+
   return (
     <div className="fixed inset-0 z-40 flex">
       <div className="flex-1" onClick={onClose} />
-      <div className="w-[400px] bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full overflow-y-auto">
+      <div className="w-[420px] bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full overflow-hidden">
         {/* Header */}
-        <div className="flex items-start justify-between px-6 py-5 border-b border-slate-200 sticky top-0 bg-white z-10">
+        <div className="flex items-start justify-between px-6 py-5 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-3">
             <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold ${avatarColor(c.name)}`}>
               {initials(c.name)}
@@ -515,70 +617,274 @@ function CandidateSlideOver({
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="flex border-b border-slate-200 shrink-0">
+          {[
+            { key: 'details',    label: 'Details'    },
+            { key: 'scorecards', label: 'Scorecards', count: tab === 'scorecards' ? scorecards.length : null },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key as 'details' | 'scorecards')}
+              className={`flex items-center gap-1.5 flex-1 py-3 text-sm font-medium transition-colors ${
+                tab === t.key
+                  ? 'text-blue-700 border-b-2 border-blue-600'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {t.label}
+              {t.count != null && t.count > 0 && (
+                <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-xs font-bold text-violet-700">
+                  {t.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* Body */}
-        <div className="flex-1 px-6 py-5 space-y-5">
-          {/* Contact */}
-          <div className="space-y-1.5 text-sm">
-            <a href={`mailto:${c.email}`} className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors">
-              {c.email}
-            </a>
-            {c.phone && <p className="text-slate-600">{c.phone}</p>}
-            {c.location && <p className="text-slate-400">{c.location}</p>}
-          </div>
+        <div className="flex-1 overflow-y-auto">
+          {tab === 'details' && (
+            <div className="px-6 py-5 space-y-5">
+              {/* Contact */}
+              <div className="space-y-1.5 text-sm">
+                <a href={`mailto:${c.email}`} className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors">
+                  {c.email}
+                </a>
+                {c.phone && <p className="text-slate-600">{c.phone}</p>}
+                {c.location && <p className="text-slate-400">{c.location}</p>}
+              </div>
 
-          {/* Stage */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Stage</label>
-            <div className="relative">
-              <select
-                value={app.stage_id ?? ''}
-                onChange={e => onStageChange(app.id, e.target.value)}
-                className="w-full appearance-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white pr-8"
-              >
-                {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              {/* Stage */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Stage</label>
+                <div className="relative">
+                  <select
+                    value={app.stage_id ?? ''}
+                    onChange={e => onStageChange(app.id, e.target.value)}
+                    className="w-full appearance-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white pr-8"
+                  >
+                    {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onStatusChange(app.id, 'rejected')}
+                  className="flex-1 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  Reject
+                </button>
+                <button
+                  onClick={() => onStatusChange(app.id, 'withdrawn')}
+                  className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  Withdraw
+                </button>
+              </div>
+
+              {/* Note */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Add Note</label>
+                <textarea
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  rows={3}
+                  placeholder="Leave a note about this candidate…"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+                <button
+                  onClick={addNote}
+                  disabled={saving || !note.trim()}
+                  className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save Note'}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Actions */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => onStatusChange(app.id, 'rejected')}
-              className="flex-1 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-            >
-              Reject
-            </button>
-            <button
-              onClick={() => onStatusChange(app.id, 'withdrawn')}
-              className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-            >
-              Withdraw
-            </button>
-          </div>
+          {tab === 'scorecards' && (
+            <div className="px-6 py-5 space-y-4">
+              {/* Add Scorecard button / form toggle */}
+              {!showAddForm && (
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="flex items-center gap-2 w-full rounded-xl border-2 border-dashed border-violet-200 px-4 py-3 text-sm font-medium text-violet-600 hover:bg-violet-50 hover:border-violet-300 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Scorecard
+                </button>
+              )}
 
-          {/* Note */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Add Note</label>
-            <textarea
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              rows={3}
-              placeholder="Leave a note about this candidate…"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-            <button
-              onClick={addNote}
-              disabled={saving || !note.trim()}
-              className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save Note'}
-            </button>
-          </div>
+              {/* Inline scorecard form */}
+              {showAddForm && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-slate-800">New Scorecard</p>
+                    <button onClick={() => { setShowAddForm(false); setScError('') }} className="p-1 text-slate-400 hover:text-slate-700">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Interviewer *</label>
+                      <input
+                        value={scInterviewer}
+                        onChange={e => setScInterviewer(e.target.value)}
+                        placeholder="Jane Smith"
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Round</label>
+                      <input
+                        value={scRound}
+                        onChange={e => setScRound(e.target.value)}
+                        placeholder="Phone Screen"
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Criteria */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-slate-500">Criteria *</p>
+                    {scScores.map((s, idx) => (
+                      <div key={s.criterion}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-slate-600">{s.criterion}</span>
+                          {s.rating > 0 && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${RATING_CONFIG[s.rating - 1].active}`}>
+                              {RATING_CONFIG[s.rating - 1].label}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-1.5">
+                          {RATING_CONFIG.map(r => (
+                            <button
+                              key={r.value}
+                              onClick={() => setScScores(prev => prev.map((sc, i) => i === idx ? { ...sc, rating: r.value } : sc))}
+                              className={`flex-1 rounded-lg px-1 py-1.5 text-[10px] font-semibold border transition-all ${
+                                s.rating === r.value ? r.active : r.btn
+                              }`}
+                            >
+                              {r.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Recommendation */}
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 mb-2">Recommendation *</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(Object.entries(RECOMMENDATION_CONFIG) as [ScorecardRecommendation, typeof RECOMMENDATION_CONFIG[ScorecardRecommendation]][]).map(([key, cfg]) => (
+                        <button
+                          key={key}
+                          onClick={() => setScRec(key)}
+                          className={`rounded-lg px-2 py-2 text-xs font-semibold border transition-all ${
+                            scRec === key ? cfg.active : cfg.btn
+                          }`}
+                        >
+                          {cfg.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <textarea
+                    value={scNotes}
+                    onChange={e => setScNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Overall notes (optional)…"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+                  />
+
+                  {scError && (
+                    <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
+                      <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                      <p className="text-xs text-red-700">{scError}</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={submitScorecard}
+                    disabled={scSaving}
+                    className="flex items-center justify-center gap-2 w-full rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-60"
+                  >
+                    {scSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
+                    Submit Scorecard
+                  </button>
+                </div>
+              )}
+
+              {/* Scorecards list */}
+              {scLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+                </div>
+              ) : scorecards.length === 0 && !showAddForm ? (
+                <div className="flex flex-col items-center py-10 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-300 mb-3">
+                    <Star className="h-6 w-6" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-500">No scorecards yet</p>
+                  <p className="text-xs text-slate-400 mt-1">Add feedback after the interview</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {scorecards.map(sc => {
+                    const rec = RECOMMENDATION_CONFIG[sc.recommendation]
+                    return (
+                      <div key={sc.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${rec.badge}`}>{rec.label}</span>
+                            <span className="text-xs font-semibold text-slate-700">{sc.interviewer_name}</span>
+                            {sc.stage_name && <span className="text-xs text-slate-400">· {sc.stage_name}</span>}
+                            <span className="text-xs text-slate-300">· {fmtRelative(sc.created_at)}</span>
+                          </div>
+                          <button
+                            onClick={() => deleteScorecard(sc.id)}
+                            className="p-1 text-slate-300 hover:text-red-500 transition-colors shrink-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        {sc.scores.length > 0 && (
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                            {sc.scores.map(s => (
+                              <div key={s.criterion} className="flex items-center justify-between gap-1">
+                                <span className="text-xs text-slate-500 truncate">{s.criterion}</span>
+                                <RatingDots rating={s.rating} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {sc.overall_notes && (
+                          <p className="text-xs text-slate-500 bg-white rounded-lg border border-slate-100 px-2.5 py-1.5">
+                            {sc.overall_notes}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-slate-200 px-6 py-4 sticky bottom-0 bg-white">
+        <div className="border-t border-slate-200 px-6 py-4 shrink-0">
           <a
             href={`/candidates/${c.id}`}
             className="flex items-center justify-center gap-2 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
