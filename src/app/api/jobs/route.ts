@@ -1,57 +1,65 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { StageColor } from '@/lib/types/database'
 
 // GET /api/jobs — list all hiring requests with candidate counts per stage
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = createAdminClient()
+  const debug = request.nextUrl.searchParams.get('debug') === '1'
 
-  // Use a single joined query so stage/application data is always consistent
-  // for each job (no cross-job contamination from global JS filtering).
-  const { data, error } = await supabase
-    .from('hiring_requests')
-    .select(`
-      *,
-      pipeline_stages(*),
-      applications(id, stage_id, status)
-    `)
-    .order('created_at', { ascending: false })
+  // Fetch all three datasets independently (explicit FK, no join ambiguity)
+  const [jobsRes, stagesRes, appsRes] = await Promise.all([
+    supabase
+      .from('hiring_requests')
+      .select('*')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('pipeline_stages')
+      .select('id, hiring_request_id, name, color, order_index'),
+    supabase
+      .from('applications')
+      .select('id, hiring_request_id, stage_id, status'),
+  ])
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  if (jobsRes.error) {
+    return NextResponse.json({ error: jobsRes.error.message }, { status: 500 })
   }
 
-  const jobs = (data ?? []).map(job => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const stages = ((job as any).pipeline_stages ?? []) as {
-      id: string; name: string; color: string; order_index: number
-    }[]
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const apps = ((job as any).applications ?? []) as {
-      id: string; stage_id: string | null; status: string
-    }[]
+  if (debug) {
+    return NextResponse.json({
+      debug: {
+        stages: stagesRes.data,
+        stages_error: stagesRes.error,
+        apps: appsRes.data,
+        apps_error: appsRes.error,
+      },
+    })
+  }
 
-    const activeApps = apps.filter(a => a.status === 'active')
-    const sortedStages = [...stages].sort((a, b) => a.order_index - b.order_index)
+  const stages = stagesRes.data ?? []
+  const apps = appsRes.data ?? []
 
-    const stage_counts = sortedStages.map(s => ({
+  const data = (jobsRes.data ?? []).map(job => {
+    const jobStages = stages
+      .filter(s => s.hiring_request_id === job.id)
+      .sort((a, b) => a.order_index - b.order_index)
+    const jobApps = apps.filter(
+      a => a.hiring_request_id === job.id && a.status === 'active'
+    )
+
+    const stage_counts = jobStages.map(s => ({
       stage_id: s.id,
       stage_name: s.name,
       color: s.color as StageColor,
-      count: activeApps.filter(a => a.stage_id === s.id).length,
+      count: jobApps.filter(a => a.stage_id === s.id).length,
     }))
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const jobAny = job as any
-    delete jobAny.pipeline_stages
-    delete jobAny.applications
-
     return {
-      ...jobAny,
-      total_candidates: apps.length,
+      ...job,
+      total_candidates: apps.filter(a => a.hiring_request_id === job.id).length,
       stage_counts,
     }
   })
 
-  return NextResponse.json({ data: jobs })
+  return NextResponse.json({ data })
 }
