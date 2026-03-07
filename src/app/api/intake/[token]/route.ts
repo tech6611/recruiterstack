@@ -7,7 +7,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('hiring_requests')
-    .select('id, ticket_number, position_title, department, hiring_manager_name, status, intake_submitted_at, jd_sent_at, created_at')
+    .select('id, position_title, department, hiring_manager_name, status, intake_submitted_at, jd_sent_at, created_at')
     .eq('intake_token', params.token)
     .single()
 
