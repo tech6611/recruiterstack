@@ -6,17 +6,15 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
-  ClipboardList,
   Settings,
   Zap,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { href: '/',                  label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/jobs',              label: 'Jobs',         icon: Briefcase },
-  { href: '/hiring-requests',  label: 'Hiring',       icon: ClipboardList },
-  { href: '/candidates',       label: 'Candidates',   icon: Users },
-  { href: '/settings',         label: 'Settings',     icon: Settings },
+  { href: '/',            label: 'Dashboard',  icon: LayoutDashboard },
+  { href: '/jobs',        label: 'Jobs',       icon: Briefcase },
+  { href: '/candidates',  label: 'Candidates', icon: Users },
+  { href: '/settings',    label: 'Settings',   icon: Settings },
 ]
 
 export function Sidebar() {
