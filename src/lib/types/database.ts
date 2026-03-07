@@ -74,9 +74,10 @@ export interface HiringRequest {
   position_title: string
   department: string | null
   hiring_manager_name: string
-  hiring_manager_email: string | null   // nullable — optional when recruiter fills form
+  hiring_manager_email: string | null
   hiring_manager_slack: string | null
   intake_token: string
+  apply_link_token: string | null  // public apply form token
   status: HiringRequestStatus
   filled_by_recruiter: boolean
   team_context: string | null
@@ -97,6 +98,75 @@ export interface HiringRequest {
   jd_sent_at: string | null
   created_at: string
   updated_at: string
+}
+
+// ── Pipeline ──────────────────────────────────────────────────────────────
+
+export type StageColor = 'slate' | 'blue' | 'violet' | 'amber' | 'emerald' | 'green' | 'red' | 'pink'
+
+export interface PipelineStage {
+  id: string
+  hiring_request_id: string
+  name: string
+  order_index: number
+  color: StageColor
+  created_at: string
+}
+
+// ── Applications ──────────────────────────────────────────────────────────
+
+export type ApplicationStatus = 'active' | 'rejected' | 'withdrawn' | 'hired'
+export type ApplicationSource = 'manual' | 'applied' | 'imported' | 'sourced' | 'referral'
+
+export interface Application {
+  id: string
+  candidate_id: string
+  hiring_request_id: string
+  stage_id: string | null
+  status: ApplicationStatus
+  source: ApplicationSource
+  source_detail: string | null
+  resume_url: string | null
+  cover_letter: string | null
+  applied_at: string
+  created_at: string
+  // Joined
+  candidate?: Candidate
+  stage?: PipelineStage
+  hiring_request?: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number'>
+}
+
+// ── Application Events ────────────────────────────────────────────────────
+
+export type ApplicationEventType =
+  | 'applied'
+  | 'stage_moved'
+  | 'note_added'
+  | 'status_changed'
+  | 'email_sent'
+
+export interface ApplicationEvent {
+  id: string
+  application_id: string
+  event_type: ApplicationEventType
+  from_stage: string | null
+  to_stage: string | null
+  note: string | null
+  metadata: Record<string, unknown>
+  created_by: string
+  created_at: string
+}
+
+// ── Job (hiring_request + pipeline data) ─────────────────────────────────
+
+export interface JobWithPipeline extends HiringRequest {
+  pipeline_stages: PipelineStage[]
+  applications: Application[]
+}
+
+export interface JobListItem extends HiringRequest {
+  total_candidates: number
+  stage_counts: { stage_id: string; stage_name: string; color: StageColor; count: number }[]
 }
 
 // ── Match ─────────────────────────────────────────────────────────────────
@@ -121,7 +191,6 @@ export interface MatchWithRelations extends Match {
 }
 
 // Supabase Database shape for typed client
-// Must conform to GenericSchema expected by @supabase/supabase-js
 export type Database = {
   public: {
     Tables: {
