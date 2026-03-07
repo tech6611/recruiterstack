@@ -1,13 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { StageColor } from '@/lib/types/database'
 
 // GET /api/jobs — list all hiring requests with candidate counts per stage
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = createAdminClient()
-  const debug = request.nextUrl.searchParams.get('debug') === '1'
 
-  // Fetch all three datasets independently (explicit FK, no join ambiguity)
   const [jobsRes, stagesRes, appsRes] = await Promise.all([
     supabase
       .from('hiring_requests')
@@ -23,17 +21,6 @@ export async function GET(request: NextRequest) {
 
   if (jobsRes.error) {
     return NextResponse.json({ error: jobsRes.error.message }, { status: 500 })
-  }
-
-  if (debug) {
-    return NextResponse.json({
-      debug: {
-        stages: stagesRes.data,
-        stages_error: stagesRes.error,
-        apps: appsRes.data,
-        apps_error: appsRes.error,
-      },
-    })
   }
 
   const stages = stagesRes.data ?? []

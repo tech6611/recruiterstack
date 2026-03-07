@@ -923,6 +923,13 @@ export default function JobPipelinePage() {
 
   useEffect(() => { load() }, [load])
 
+  // Refetch when tab regains focus so drag-and-drop from another tab stays in sync
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [load])
+
   const activeApps = job?.applications.filter(a => a.status === 'active') ?? []
 
   const grouped = (job?.pipeline_stages ?? []).reduce<Record<string, Application[]>>((acc, s) => {
