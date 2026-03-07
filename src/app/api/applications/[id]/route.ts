@@ -11,7 +11,7 @@ export async function GET(
   const [appRes, eventsRes] = await Promise.all([
     supabase
       .from('applications')
-      .select('*, candidates(*), pipeline_stages(name, color)')
+      .select('*, candidate:candidates(*), pipeline_stages(name, color)')
       .eq('id', params.id)
       .single(),
     supabase
@@ -78,7 +78,7 @@ export async function PATCH(
       .from('applications')
       .update({ stage_id } as never)
       .eq('id', params.id)
-      .select('*, candidates(*)')
+      .select('*, candidate:candidates(*)')
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -107,7 +107,7 @@ export async function PATCH(
       .from('applications')
       .update({ status } as never)
       .eq('id', params.id)
-      .select('*, candidates(*)')
+      .select('*, candidate:candidates(*)')
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

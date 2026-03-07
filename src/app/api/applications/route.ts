@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       source,
       source_detail: source_detail ?? null,
     } as any)
-    .select('*, candidates(*)')
+    .select('*, candidate:candidates(*)')
     .single()
 
   if (appErr) {

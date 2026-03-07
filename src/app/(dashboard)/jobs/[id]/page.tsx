@@ -283,7 +283,7 @@ function AddCandidateModal({
   jobId: string
   stages: PipelineStage[]
   onClose: () => void
-  onAdded: (app: Application) => void
+  onAdded: () => void
 }) {
   const [tab, setTab] = useState<'new' | 'search'>('new')
   const [stageId, setStageId] = useState(stages[0]?.id ?? '')
@@ -330,7 +330,7 @@ function AddCandidateModal({
     })
     const json = await res.json()
     if (!res.ok) { setError(json.error ?? 'Failed to add'); setSaving(false); return }
-    onAdded(json.data)
+    onAdded()
   }
 
   const addExisting = async (candidateId: string) => {
@@ -347,7 +347,7 @@ function AddCandidateModal({
     })
     const json = await res.json()
     if (!res.ok) { setError(json.error ?? 'Failed to add'); setSaving(false); return }
-    onAdded(json.data)
+    onAdded()
   }
 
   return (
@@ -1199,9 +1199,9 @@ export default function JobPipelinePage() {
           jobId={id}
           stages={job.pipeline_stages}
           onClose={() => setShowAdd(false)}
-          onAdded={app => {
-            setJob(prev => prev ? { ...prev, applications: [...prev.applications, app] } : prev)
+          onAdded={async () => {
             setShowAdd(false)
+            await load()
           }}
         />
       )}
