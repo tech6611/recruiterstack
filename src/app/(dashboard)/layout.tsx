@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/layout/Sidebar'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { userId, orgId } = auth()
+  const { userId } = auth()
 
   if (!userId) redirect('/sign-in')
-  if (!orgId) redirect('/org-setup')
 
   return (
     <div className="flex min-h-screen bg-slate-50">
