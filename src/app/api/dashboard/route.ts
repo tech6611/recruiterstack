@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 import type { CandidateStatus, StageColor } from '@/lib/types/database'
 
 export async function GET() {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   const [jobsRes, stagesRes, appsRes, candidatesRes, eventsRes] = await Promise.all([
-    supabase.from('hiring_requests').select('*').order('created_at', { ascending: false }),
-    supabase.from('pipeline_stages').select('*').order('order_index'),
-    supabase.from('applications').select('id, hiring_request_id, stage_id, status, candidate_id'),
-    supabase.from('candidates').select('id, name, status'),
+    supabase.from('hiring_requests').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
+    supabase.from('pipeline_stages').select('*').eq('org_id', orgId).order('order_index'),
+    supabase.from('applications').select('id, hiring_request_id, stage_id, status, candidate_id').eq('org_id', orgId),
+    supabase.from('candidates').select('id, name, status').eq('org_id', orgId),
     supabase
       .from('application_events')
       .select(`
@@ -19,6 +24,7 @@ export async function GET() {
           hiring_requests ( position_title )
         )
       `)
+      .eq('org_id', orgId)
       .order('created_at', { ascending: false })
       .limit(10),
   ])

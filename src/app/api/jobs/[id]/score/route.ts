@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import type { Candidate, HiringRequest } from '@/lib/types/database'
 
@@ -21,21 +22,27 @@ export async function POST(
   _req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
   const jobId = params.id
 
   // ── 1. Fetch job, stages, and active applications ──────────────────────────
   const [jobRes, stagesRes, appsRes] = await Promise.all([
-    supabase.from('hiring_requests').select('*').eq('id', jobId).single(),
+    supabase.from('hiring_requests').select('*').eq('id', jobId).eq('org_id', orgId).single(),
     supabase
       .from('pipeline_stages')
       .select('*')
       .eq('hiring_request_id', jobId)
+      .eq('org_id', orgId)
       .order('order_index'),
     supabase
       .from('applications')
       .select('*, candidate:candidates(*)')
       .eq('hiring_request_id', jobId)
+      .eq('org_id', orgId)
       .eq('status', 'active'),
   ])
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 import type { Candidate } from '@/lib/types/database'
 
 // POST /api/applications
@@ -13,6 +14,10 @@ import type { Candidate } from '@/lib/types/database'
 //   candidate_data?: { name, email, phone?, current_title?, location? }  (new/upsert)
 // }
 export async function POST(request: NextRequest) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   let body: Record<string, unknown>
@@ -48,6 +53,7 @@ export async function POST(request: NextRequest) {
       .from('candidates')
       .select('id')
       .eq('email', candidate_data.email.toLowerCase())
+      .eq('org_id', orgId)
       .single()
 
     if (existing) {
@@ -65,6 +71,7 @@ export async function POST(request: NextRequest) {
           skills: [],
           experience_years: 0,
           status: 'active',
+          org_id: orgId,
         } as any)
         .select('id')
         .single()
@@ -115,6 +122,7 @@ export async function POST(request: NextRequest) {
       status: 'active',
       source,
       source_detail: source_detail ?? null,
+      org_id: orgId,
     } as any)
     .select('*, candidate:candidates(*)')
     .single()
@@ -133,6 +141,7 @@ export async function POST(request: NextRequest) {
       event_type: 'applied',
       to_stage: stageName,
       created_by: 'Recruiter',
+      org_id: orgId,
     } as any)
 
   return NextResponse.json({ data: app }, { status: 201 })

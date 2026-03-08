@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 
 // GET /api/hiring-requests/:id
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('hiring_requests')
     .select('*')
     .eq('id', params.id)
+    .eq('org_id', orgId)
     .single()
 
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -16,6 +22,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 // PATCH /api/hiring-requests/:id  — update status or other fields
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   let body: Record<string, unknown>
@@ -29,6 +39,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     .from('hiring_requests')
     .update({ ...body, updated_at: new Date().toISOString() } as any)
     .eq('id', params.id)
+    .eq('org_id', orgId)
     .select()
     .single()
 

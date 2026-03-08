@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 import type { RoleUpdate } from '@/lib/types/database'
 
 // GET /api/roles/:id
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('roles')
     .select('*')
     .eq('id', params.id)
+    .eq('org_id', orgId)
     .single()
 
   if (error) {
@@ -25,6 +31,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   let body: RoleUpdate
@@ -39,6 +49,7 @@ export async function PATCH(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .update(body as any)
     .eq('id', params.id)
+    .eq('org_id', orgId)
     .select()
     .single()
 
@@ -55,9 +66,13 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
-  const { error } = await supabase.from('roles').delete().eq('id', params.id)
+  const { error } = await supabase.from('roles').delete().eq('id', params.id).eq('org_id', orgId)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 
 // GET /api/inbox — recent activity feed + needs-attention queue
 export async function GET() {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
@@ -19,6 +24,7 @@ export async function GET() {
           job:hiring_requests(id, position_title, department)
         )
       `)
+      .eq('org_id', orgId)
       .order('created_at', { ascending: false })
       .limit(50),
 
@@ -31,6 +37,7 @@ export async function GET() {
         job:hiring_requests(id, position_title, department),
         stage:pipeline_stages(name, color)
       `)
+      .eq('org_id', orgId)
       .eq('status', 'active')
       .lt('applied_at', fourteenDaysAgo)
       .order('applied_at', { ascending: true })

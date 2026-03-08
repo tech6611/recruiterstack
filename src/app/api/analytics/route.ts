@@ -1,25 +1,34 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 
 // GET /api/analytics — pipeline funnel, source breakdown, time-in-stage
 export async function GET() {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   const [jobsRes, appsRes, stagesRes, candsRes] = await Promise.all([
     supabase
       .from('hiring_requests')
       .select('id, position_title, department, status')
+      .eq('org_id', orgId)
       .order('created_at', { ascending: false }),
     supabase
       .from('applications')
-      .select('id, status, source, stage_id, applied_at, hiring_request_id, candidate_id'),
+      .select('id, status, source, stage_id, applied_at, hiring_request_id, candidate_id')
+      .eq('org_id', orgId),
     supabase
       .from('pipeline_stages')
       .select('id, name, color, order_index, hiring_request_id')
+      .eq('org_id', orgId)
       .order('order_index'),
     supabase
       .from('candidates')
-      .select('id, status'),
+      .select('id, status')
+      .eq('org_id', orgId),
   ])
 
   const jobs   = jobsRes.data   ?? []

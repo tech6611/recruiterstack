@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 
 type TemplateKey = 'interview_invite' | 'rejection' | 'offer' | 'followup'
 
@@ -16,6 +17,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return NextResponse.json(
@@ -49,6 +54,7 @@ export async function POST(
       stage:pipeline_stages(name)
     `)
     .eq('id', params.id)
+    .eq('org_id', orgId)
     .single()
 
   if (error || !app) {

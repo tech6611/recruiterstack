@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 
 // POST /api/jobs/[id]/stages
 // body: { action: 'create', name, color }
@@ -10,6 +11,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
   const jobId = params.id
 
@@ -40,7 +45,7 @@ export async function POST(
     const { data, error } = await supabase
       .from('pipeline_stages')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .insert({ hiring_request_id: jobId, name, color, order_index: nextIndex } as any)
+      .insert({ hiring_request_id: jobId, name, color, order_index: nextIndex, org_id: orgId } as any)
       .select()
       .single()
 

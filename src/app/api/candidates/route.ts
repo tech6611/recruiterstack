@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 import type { CandidateInsert, CandidateListItem, CandidateStatus } from '@/lib/types/database'
 
 // GET /api/candidates?status=active&limit=50&offset=0
 export async function GET(request: NextRequest) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
   const { searchParams } = new URL(request.url)
 
@@ -15,6 +20,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('candidates')
     .select('*', { count: 'exact' })
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -28,7 +34,7 @@ export async function GET(request: NextRequest) {
   // Run in parallel: paginated candidates + all active application candidate_ids
   const [{ data, error, count }, appsRes] = await Promise.all([
     query,
-    supabase.from('applications').select('candidate_id').eq('status', 'active'),
+    supabase.from('applications').select('candidate_id').eq('status', 'active').eq('org_id', orgId),
   ])
 
   if (error) {
@@ -52,6 +58,10 @@ export async function GET(request: NextRequest) {
 
 // POST /api/candidates
 export async function POST(request: NextRequest) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   let body: CandidateInsert
@@ -71,7 +81,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from('candidates')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .insert(body as any)
+    .insert({ ...body, org_id: orgId } as any)
     .select()
     .single()
 

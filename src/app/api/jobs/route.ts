@@ -1,22 +1,30 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 import type { StageColor } from '@/lib/types/database'
 
 // GET /api/jobs — list all hiring requests with candidate counts per stage
 export async function GET() {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   const [jobsRes, stagesRes, appsRes] = await Promise.all([
     supabase
       .from('hiring_requests')
       .select('*')
+      .eq('org_id', orgId)
       .order('created_at', { ascending: false }),
     supabase
       .from('pipeline_stages')
-      .select('id, hiring_request_id, name, color, order_index'),
+      .select('id, hiring_request_id, name, color, order_index')
+      .eq('org_id', orgId),
     supabase
       .from('applications')
-      .select('id, hiring_request_id, stage_id, status'),
+      .select('id, hiring_request_id, stage_id, status')
+      .eq('org_id', orgId),
   ])
 
   if (jobsRes.error) {

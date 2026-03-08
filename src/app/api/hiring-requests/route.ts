@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 import sgMail from '@sendgrid/mail'
 
 // GET /api/hiring-requests
 export async function GET() {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('hiring_requests')
     .select('*')
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -18,6 +24,10 @@ export async function GET() {
 // Mode A (send_to_hm):  { position_title, department?, hiring_manager_name, hiring_manager_email, hiring_manager_slack? }
 // Mode B (fill_myself): above + filled_by_recruiter:true + all intake fields + generated_jd
 export async function POST(request: NextRequest) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   let body: {
@@ -74,6 +84,7 @@ export async function POST(request: NextRequest) {
     filled_by_recruiter: isOptionB,
     status: isOptionB ? 'jd_approved' : 'intake_pending',
     intake_sent_at: isOptionB ? null : new Date().toISOString(),
+    org_id: orgId,
   }
 
   if (isOptionB) {

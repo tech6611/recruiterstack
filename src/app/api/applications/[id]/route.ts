@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 
 // GET /api/applications/[id]
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   const [appRes, eventsRes] = await Promise.all([
@@ -13,6 +18,7 @@ export async function GET(
       .from('applications')
       .select('*, candidate:candidates(*), pipeline_stages(name, color)')
       .eq('id', params.id)
+      .eq('org_id', orgId)
       .single(),
     supabase
       .from('application_events')
@@ -38,6 +44,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   let body: Record<string, unknown>
@@ -52,6 +62,7 @@ export async function PATCH(
     .from('applications')
     .select('*, pipeline_stages(name)')
     .eq('id', params.id)
+    .eq('org_id', orgId)
     .single()
 
   if (fetchErr || !current) {
@@ -94,6 +105,7 @@ export async function PATCH(
         from_stage: (current.pipeline_stages as any)?.name ?? null,
         to_stage: newStageName,
         created_by: 'Recruiter',
+        org_id: orgId,
       } as any)
 
     return NextResponse.json({ data })
@@ -120,6 +132,7 @@ export async function PATCH(
         event_type: 'status_changed',
         to_stage: status,
         created_by: 'Recruiter',
+        org_id: orgId,
       } as any)
 
     return NextResponse.json({ data })
@@ -141,6 +154,7 @@ export async function PATCH(
         event_type: 'note_added',
         note,
         created_by,
+        org_id: orgId,
       } as any)
       .select()
       .single()

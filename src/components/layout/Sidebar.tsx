@@ -11,6 +11,7 @@ import {
   BarChart2,
   Inbox,
 } from 'lucide-react'
+import { UserButton, useOrganization } from '@clerk/nextjs'
 
 const NAV_ITEMS = [
   { href: '/',            label: 'Dashboard',  icon: LayoutDashboard },
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { organization } = useOrganization()
 
   return (
     <aside className="flex h-screen w-60 flex-col border-r border-slate-200 bg-white">
@@ -62,9 +64,17 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-slate-100 px-6 py-4">
-        <p className="text-xs text-slate-400">RecruiterStack · ATS</p>
+      {/* Footer — user + org */}
+      <div className="border-t border-slate-100 px-4 py-4">
+        <div className="flex items-center gap-3">
+          <UserButton afterSignOutUrl="/sign-in" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-slate-700">
+              {organization?.name ?? 'RecruiterStack'}
+            </p>
+            <p className="text-xs text-slate-400">ATS</p>
+          </div>
+        </div>
       </div>
     </aside>
   )

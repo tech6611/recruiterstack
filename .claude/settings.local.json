@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(printenv)",
+      "Bash(ln -sf /Users/sagar.kumar/cowork/recruiterstack/.env.local /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/.env.local)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(sort -k6,7)",
+      "Bash(git push origin claude/amazing-keller:main)",
+      "Bash(python3 -c \":*)",
+      "Bash(ls -la \"/Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\(dashboard\\)/\")",
+      "Bash(cat \"/Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\(dashboard\\)/layout.tsx\")",
+      "Bash(find \"/Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\(dashboard\\)\" -type f -name \"*.tsx\" -o -name \"*.ts\")",
+      "Bash(find \"/Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\(dashboard\\)\" -type f)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(git add src/app/api/analytics/route.ts \"src/app/\\(dashboard\\)/analytics/page.tsx\" src/components/layout/Sidebar.tsx)",
+      "Bash(git commit:*)",
+      "Bash(git add src/app/api/inbox/route.ts src/app/\\\\\\(dashboard\\\\\\)/inbox/page.tsx src/components/layout/Sidebar.tsx)",
+      "Bash(git -C /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller add src/app/api/inbox/route.ts \"src/app/\\(dashboard\\)/inbox/page.tsx\" src/components/layout/Sidebar.tsx)",
+      "Bash(git -C:*)",
+      "Bash(git add src/app/\\\\\\(dashboard\\\\\\)/jobs/page.tsx)",
+      "Bash(git add \"src/app/\\(dashboard\\)/jobs/page.tsx\")",
+      "Bash(wc -l /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/jobs/[id]/page.tsx)",
+      "Bash(grep -n \"Add Candidate\\\\|showAdd\\\\|UserPlus\" /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/jobs/[id]/page.tsx)",
+      "Bash(sed -n '275,470p' /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/jobs/[id]/page.tsx)",
+      "Bash(python3 -c \"import sys,json; data=sys.stdin.read\\(\\); parsed=json.loads\\(data[data.index\\(''[''\\):data.rindex\\('']''\\)+1]\\); print\\(parsed[0][''text'']\\)\")",
+      "Bash(python3:*)"
+    ]
+  }
+}

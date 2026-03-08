@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 import type { RoleInsert, RoleStatus } from '@/lib/types/database'
 
 // GET /api/roles?status=active&limit=50&offset=0
 export async function GET(request: NextRequest) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
   const { searchParams } = new URL(request.url)
 
@@ -14,6 +19,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('roles')
     .select('*', { count: 'exact' })
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -30,6 +36,10 @@ export async function GET(request: NextRequest) {
 
 // POST /api/roles
 export async function POST(request: NextRequest) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   let body: RoleInsert
@@ -46,7 +56,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from('roles')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .insert(body as any)
+    .insert({ ...body, org_id: orgId } as any)
     .select()
     .single()
 

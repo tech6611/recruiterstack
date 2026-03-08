@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const application_id = req.nextUrl.searchParams.get('application_id')
   if (!application_id) {
     return NextResponse.json({ error: 'application_id required' }, { status: 400 })
@@ -12,6 +17,7 @@ export async function GET(req: NextRequest) {
     .from('scorecards')
     .select('*')
     .eq('application_id', application_id)
+    .eq('org_id', orgId)
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -19,6 +25,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authResult = requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const body = await req.json()
   const { application_id, interviewer_name, stage_name, recommendation, scores, overall_notes } = body
 
@@ -39,6 +49,7 @@ export async function POST(req: NextRequest) {
       recommendation,
       scores:           scores ?? [],
       overall_notes:    overall_notes?.trim() || null,
+      org_id:           orgId,
     } as any)
     .select()
     .single()
