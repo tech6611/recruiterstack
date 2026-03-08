@@ -18,7 +18,7 @@ export async function GET(
       .order('order_index'),
     supabase
       .from('applications')
-      .select('*, candidate:candidates(*)')
+      .select('*, ai_score, ai_recommendation, ai_strengths, ai_gaps, ai_scored_at, candidate:candidates(*)')
       .eq('hiring_request_id', id)
       .order('applied_at', { ascending: true }),
   ])
