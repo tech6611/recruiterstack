@@ -1,22 +1,9 @@
 'use client'
 
 import { CreateOrganization, OrganizationList } from '@clerk/nextjs'
-import { useOrganization } from '@clerk/nextjs'
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
 import { Zap } from 'lucide-react'
 
 export default function OrgSetupPage() {
-  const { organization } = useOrganization()
-  const router = useRouter()
-
-  // If org is now selected, redirect to dashboard
-  useEffect(() => {
-    if (organization) {
-      router.push('/')
-    }
-  }, [organization, router])
-
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4">
       {/* Logo */}
