@@ -1258,9 +1258,15 @@ export default function JobPipelinePage() {
   const load = useCallback(async () => {
     // Never stomp on live scoring state — scores are patched directly from SSE
     // events and a stale server response would wipe them.
-    if (scoringRef.current) return
+    if (scoringRef.current) {
+      console.warn('[SCORE-DEBUG] load() BLOCKED by scoringRef — stale fetch suppressed')
+      return
+    }
+    console.log('[SCORE-DEBUG] load() RUNNING — will overwrite job state with server data')
     const res = await fetch(`/api/jobs/${id}`, { cache: 'no-store' })
     const json = await res.json()
+    const serverScores = (json.data?.applications ?? []).map((a: { id: string; ai_score: number | null }) => `${a.id.slice(0,6)}=${a.ai_score}`)
+    console.log('[SCORE-DEBUG] load() server returned scores:', serverScores)
     setJob(json.data ?? null)
     setLoading(false)
   }, [id])
@@ -1272,6 +1278,13 @@ export default function JobPipelinePage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // DEBUG: log every time job state changes so we can see when/why scores vanish
+  useEffect(() => {
+    if (!job) return
+    const scores = job.applications.map(a => `${a.id.slice(0,6)}=${a.ai_score}`)
+    console.log('[SCORE-DEBUG] job state updated — scores:', scores, '| scoringRef:', scoringRef.current)
+  }, [job])
 
   // Refetch when tab regains focus so drag-and-drop from another tab stays in sync
   useEffect(() => {
@@ -1406,6 +1419,7 @@ export default function JobPipelinePage() {
     if (total === 0) return
 
     scoringRef.current = true   // block load() for the duration of scoring
+    console.log('[SCORE-DEBUG] startScoring — scoringRef set to TRUE')
     setScoring(true)
     setScoreError('')
     setScoreResult(null)
@@ -1438,6 +1452,7 @@ export default function JobPipelinePage() {
           if (!line) continue
           try {
             const evt = JSON.parse(line) as Record<string, unknown>
+            console.log('[SCORE-DEBUG] SSE event received:', evt.type, evt.type === 'progress' ? `id=${String(evt.application_id).slice(0,6)} score=${evt.score}` : JSON.stringify(evt))
             if (evt.type === 'progress') {
               setScoreProgress(prev => ({ ...prev, done: prev.done + 1 }))
 
@@ -1494,10 +1509,14 @@ export default function JobPipelinePage() {
     } catch (err) {
       setScoreError(err instanceof Error ? err.message : 'Scoring failed')
     } finally {
+      console.log('[SCORE-DEBUG] finally — setScoring(false), scoringRef stays TRUE for 5s')
       setScoring(false)
       // Keep load() suppressed for 5 s so that a visibilitychange or tab-switch
       // that fires right after scoring can't fetch stale data and overwrite scores.
-      setTimeout(() => { scoringRef.current = false }, 5000)
+      setTimeout(() => {
+        console.log('[SCORE-DEBUG] scoringRef cleared — load() now allowed again')
+        scoringRef.current = false
+      }, 5000)
     }
   }
 
