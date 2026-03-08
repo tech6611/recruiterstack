@@ -1252,11 +1252,17 @@ export default function JobPipelinePage() {
   const [scoreError,    setScoreError]    = useState('')
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/jobs/${id}`)
+    const res = await fetch(`/api/jobs/${id}`, { cache: 'no-store' })
     const json = await res.json()
     setJob(json.data ?? null)
     setLoading(false)
   }, [id])
+
+  // Reload fresh data when switching to Ranked so scores are always current
+  const switchView = useCallback(async (mode: 'kanban' | 'ranked') => {
+    setViewMode(mode)
+    if (mode === 'ranked') await load()
+  }, [load])
 
   useEffect(() => { load() }, [load])
 
@@ -1503,7 +1509,7 @@ export default function JobPipelinePage() {
           {/* View toggle */}
           <div className="flex items-center rounded-xl border border-slate-200 p-0.5 bg-slate-50">
             <button
-              onClick={() => setViewMode('kanban')}
+              onClick={() => switchView('kanban')}
               className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 viewMode === 'kanban' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
@@ -1512,7 +1518,7 @@ export default function JobPipelinePage() {
               Kanban
             </button>
             <button
-              onClick={() => setViewMode('ranked')}
+              onClick={() => switchView('ranked')}
               className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 viewMode === 'ranked' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}

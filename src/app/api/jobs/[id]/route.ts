@@ -27,11 +27,16 @@ export async function GET(
     return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   }
 
-  return NextResponse.json({
-    data: {
-      ...jobRes.data,
-      pipeline_stages: stagesRes.data ?? [],
-      applications: appsRes.data ?? [],
+  return NextResponse.json(
+    {
+      data: {
+        ...jobRes.data,
+        pipeline_stages: stagesRes.data ?? [],
+        applications: appsRes.data ?? [],
+      },
     },
-  })
+    {
+      headers: { 'Cache-Control': 'no-store' },
+    },
+  )
 }
