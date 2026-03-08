@@ -1416,6 +1416,15 @@ export default function JobPipelinePage() {
       const dec    = new TextDecoder()
       let   buf    = ''
 
+      // Accumulate scored results during progress events so we can re-apply them
+      // after load() completes — load() may return stale cached data from the server
+      // (e.g. if the CDN or PostgREST schema cache hasn't caught up) and would
+      // otherwise overwrite our in-memory patches and make scores "vanish".
+      const scoredMap = new Map<string, {
+        ai_score:          number
+        ai_recommendation: Application['ai_recommendation']
+      }>()
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -1432,18 +1441,20 @@ export default function JobPipelinePage() {
             const evt = JSON.parse(line) as Record<string, unknown>
             if (evt.type === 'progress') {
               setScoreProgress(prev => ({ ...prev, done: prev.done + 1 }))
-              // Patch the score directly into React state — no re-fetch needed,
-              // no caching issues, and scores appear live as each candidate finishes
+
               const appId = evt.application_id as string
+              const score = evt.score          as number
+              const rec   = evt.recommendation as Application['ai_recommendation']
+
+              // Remember this result so we can re-apply after load()
+              scoredMap.set(appId, { ai_score: score, ai_recommendation: rec })
+
+              // Patch score directly into React state for live updates
               setJob(prev => prev ? {
                 ...prev,
                 applications: prev.applications.map(a =>
                   a.id === appId
-                    ? {
-                        ...a,
-                        ai_score:          evt.score          as number,
-                        ai_recommendation: evt.recommendation as Application['ai_recommendation'],
-                      }
+                    ? { ...a, ai_score: score, ai_recommendation: rec }
                     : a
                 ),
               } : prev)
@@ -1456,8 +1467,19 @@ export default function JobPipelinePage() {
                 auto_rejected: (evt.auto_rejected as number) ?? 0,
                 emails_sent:   (evt.emails_sent   as number) ?? 0,
               })
-              // Full reload to get strengths/gaps/auto-advance stage changes
+              // Full reload to get strengths/gaps/auto-advance stage changes from DB
               await load()
+              // Re-apply scores — load() may have returned stale data before the
+              // server's cache caught up, which would wipe the in-memory patches
+              if (scoredMap.size > 0) {
+                setJob(prev => prev ? {
+                  ...prev,
+                  applications: prev.applications.map(a => {
+                    const s = scoredMap.get(a.id)
+                    return s ? { ...a, ai_score: s.ai_score, ai_recommendation: s.ai_recommendation } : a
+                  }),
+                } : prev)
+              }
             }
           } catch { /* ignore malformed frames */ }
         }
