@@ -104,6 +104,13 @@ export interface HiringRequest {
   jd_sent_at: string | null
   created_at: string
   updated_at: string
+  // Autopilot settings (migration 006)
+  auto_advance_score:       number | null
+  auto_reject_score:        number | null
+  auto_advance_stage_id:    string | null
+  auto_email_rejection:     boolean
+  autopilot_recruiter_name: string | null
+  autopilot_company_name:   string | null
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────
@@ -123,6 +130,7 @@ export interface PipelineStage {
 
 export type ApplicationStatus = 'active' | 'rejected' | 'withdrawn' | 'hired'
 export type ApplicationSource = 'manual' | 'applied' | 'imported' | 'sourced' | 'referral'
+export type AiRecommendation = 'strong_yes' | 'yes' | 'maybe' | 'no'
 
 export interface Application {
   id: string
@@ -136,6 +144,12 @@ export interface Application {
   cover_letter: string | null
   applied_at: string
   created_at: string
+  // AI scoring (null until scored)
+  ai_score:          number | null
+  ai_recommendation: AiRecommendation | null
+  ai_strengths:      string[]
+  ai_gaps:           string[]
+  ai_scored_at:      string | null
   // Joined
   candidate?: Candidate
   stage?: PipelineStage

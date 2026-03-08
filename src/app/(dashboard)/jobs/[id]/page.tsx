@@ -6,10 +6,11 @@ import {
   ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
+  Zap, Settings2, LayoutList, Kanban,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
-  Scorecard, ScorecardRecommendation, ScorecardScore,
+  Scorecard, ScorecardRecommendation, ScorecardScore, AiRecommendation,
 } from '@/lib/types/database'
 
 // ── Scorecard config (shared) ─────────────────────────────────────────────────
@@ -108,6 +109,28 @@ function daysSince(dateStr: string) {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
 }
 
+// ── AI Score pill ─────────────────────────────────────────────────────────────
+
+function ScorePill({ score }: { score: number | null }) {
+  if (score === null) return null
+  const color =
+    score >= 75 ? 'bg-emerald-100 text-emerald-700' :
+    score >= 60 ? 'bg-amber-100 text-amber-700'     :
+                  'bg-red-100 text-red-700'
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${color}`}>
+      {score}
+    </span>
+  )
+}
+
+const AI_REC_CONFIG: Record<AiRecommendation, { label: string; cls: string }> = {
+  strong_yes: { label: 'Strong Yes', cls: 'bg-emerald-100 text-emerald-700' },
+  yes:        { label: 'Yes',        cls: 'bg-blue-100 text-blue-700'       },
+  maybe:      { label: 'Maybe',      cls: 'bg-amber-100 text-amber-700'     },
+  no:         { label: 'No',         cls: 'bg-red-100 text-red-700'         },
+}
+
 // ── Candidate card ────────────────────────────────────────────────────────────
 
 function CandidateCard({
@@ -146,7 +169,10 @@ function CandidateCard({
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${SOURCE_COLORS[app.source] ?? SOURCE_COLORS.manual}`}>
           {SOURCE_LABELS[app.source] ?? app.source}
         </span>
-        <span className="text-xs text-slate-400">{daysSince(app.applied_at)}d</span>
+        <div className="flex items-center gap-1.5">
+          {app.ai_score !== null && <ScorePill score={app.ai_score} />}
+          <span className="text-xs text-slate-400">{daysSince(app.applied_at)}d</span>
+        </div>
       </div>
     </div>
   )
@@ -898,6 +924,305 @@ function CandidateSlideOver({
   )
 }
 
+// ── Ranked View ───────────────────────────────────────────────────────────────
+
+function RankedView({
+  apps,
+  stages,
+  onCardClick,
+  onMoveToStage,
+}: {
+  apps: Application[]
+  stages: PipelineStage[]
+  onCardClick: (app: Application) => void
+  onMoveToStage: (appId: string, stageId: string) => void
+}) {
+  const sorted = [...apps].sort((a, b) => {
+    if (a.ai_score === null && b.ai_score === null) return 0
+    if (a.ai_score === null) return 1
+    if (b.ai_score === null) return -1
+    return b.ai_score - a.ai_score
+  })
+
+  // The second stage (index 1) is a sensible default move target
+  const targetStage = stages[1] ?? stages[0]
+
+  let scoredRank = 0
+
+  return (
+    <div className="px-8 py-6 flex-1">
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/60">
+              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3 w-10">#</th>
+              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Candidate</th>
+              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Score</th>
+              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">AI Signal</th>
+              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Stage</th>
+              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Source</th>
+              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Days</th>
+              <th className="px-4 py-3 w-10" />
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(app => {
+              const c = app.candidate!
+              const stage = stages.find(s => s.id === app.stage_id)
+              const rec = app.ai_recommendation ? AI_REC_CONFIG[app.ai_recommendation] : null
+              if (app.ai_score !== null) scoredRank++
+              const rank = app.ai_score !== null ? scoredRank : null
+
+              return (
+                <tr
+                  key={app.id}
+                  onClick={() => onCardClick(app)}
+                  className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors last:border-0"
+                >
+                  <td className="px-4 py-3 text-xs font-bold text-slate-400 w-10">
+                    {rank !== null ? rank : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${avatarColor(c.name)}`}>
+                        {initials(c.name)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{c.name}</p>
+                        {c.current_title && (
+                          <p className="text-xs text-slate-400">{c.current_title}</p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {app.ai_score !== null
+                      ? <ScorePill score={app.ai_score} />
+                      : <span className="text-xs text-slate-300">—</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3">
+                    {rec
+                      ? <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${rec.cls}`}>{rec.label}</span>
+                      : <span className="text-xs text-slate-300">—</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    {stage?.name ?? <span className="text-slate-300">Unstaged</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${SOURCE_COLORS[app.source] ?? SOURCE_COLORS.manual}`}>
+                      {SOURCE_LABELS[app.source] ?? app.source}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-400">
+                    {daysSince(app.applied_at)}d
+                  </td>
+                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                    {targetStage && app.stage_id !== targetStage.id && (
+                      <button
+                        onClick={() => onMoveToStage(app.id, targetStage.id)}
+                        className="flex items-center gap-1 rounded-lg border border-blue-200 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors whitespace-nowrap"
+                      >
+                        → {targetStage.name}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        {sorted.length === 0 && (
+          <div className="py-16 text-center text-sm text-slate-400">No active candidates</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Autopilot Drawer ──────────────────────────────────────────────────────────
+
+function AutopilotDrawer({
+  job,
+  stages,
+  onClose,
+  onSaved,
+}: {
+  job: JobWithPipeline
+  stages: PipelineStage[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [advanceScore,   setAdvanceScore]   = useState<number>(job.auto_advance_score   ?? 75)
+  const [rejectScore,    setRejectScore]    = useState<number>(job.auto_reject_score    ?? 40)
+  const [advanceStageId, setAdvanceStageId] = useState<string>(job.auto_advance_stage_id ?? (stages[1]?.id ?? stages[0]?.id ?? ''))
+  const [autoEmail,      setAutoEmail]      = useState<boolean>(job.auto_email_rejection ?? false)
+  const [recruiterName,  setRecruiterName]  = useState<string>(job.autopilot_recruiter_name ?? '')
+  const [companyName,    setCompanyName]    = useState<string>(job.autopilot_company_name   ?? '')
+  const [saving,  setSaving]  = useState(false)
+  const [error,   setError]   = useState('')
+
+  const isActive = job.auto_advance_score !== null || job.auto_reject_score !== null
+
+  const save = async () => {
+    setSaving(true); setError('')
+    const res = await fetch(`/api/jobs/${job.id}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        auto_advance_score:       advanceScore,
+        auto_reject_score:        rejectScore,
+        auto_advance_stage_id:    advanceStageId || null,
+        auto_email_rejection:     autoEmail,
+        autopilot_recruiter_name: recruiterName.trim() || null,
+        autopilot_company_name:   companyName.trim()   || null,
+      }),
+    })
+    setSaving(false)
+    if (!res.ok) { setError('Failed to save settings'); return }
+    onSaved()
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex">
+      <div className="flex-1" onClick={onClose} />
+      <div className="w-[380px] bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 shrink-0">
+          <div className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5 text-slate-500" />
+            <h2 className="text-base font-bold text-slate-900">Autopilot</h2>
+            {isActive && (
+              <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+                ON
+              </span>
+            )}
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+
+          {/* Auto-advance */}
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Auto-Advance</p>
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-slate-700">Score ≥</span>
+                <input
+                  type="number" min={0} max={100}
+                  value={advanceScore}
+                  onChange={e => setAdvanceScore(Math.max(0, Math.min(100, +e.target.value)))}
+                  className="w-16 rounded-lg border border-emerald-300 bg-white px-2 py-1 text-sm text-center font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+                <span className="text-sm text-slate-700">→ Move to</span>
+              </div>
+              <select
+                value={advanceStageId}
+                onChange={e => setAdvanceStageId(e.target.value)}
+                className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              >
+                <option value="">— Select stage —</option>
+                {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Auto-reject */}
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Auto-Reject</p>
+            <div className="rounded-xl bg-red-50 border border-red-200 p-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-slate-700">Score ≤</span>
+                <input
+                  type="number" min={0} max={100}
+                  value={rejectScore}
+                  onChange={e => setRejectScore(Math.max(0, Math.min(100, +e.target.value)))}
+                  className="w-16 rounded-lg border border-red-300 bg-white px-2 py-1 text-sm text-center font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-400"
+                />
+                <span className="text-sm text-slate-700">→ Reject application</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Rejection email */}
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Rejection Email</p>
+            <div className="rounded-xl border border-slate-200 p-4 space-y-4">
+              <label className="flex items-center justify-between cursor-pointer gap-3">
+                <span className="text-sm text-slate-700">Send rejection email automatically</span>
+                <button
+                  type="button"
+                  onClick={() => setAutoEmail(v => !v)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${autoEmail ? 'bg-blue-600' : 'bg-slate-200'}`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${autoEmail ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+              </label>
+              {autoEmail && (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Recruiter Name</label>
+                    <input
+                      value={recruiterName}
+                      onChange={e => setRecruiterName(e.target.value)}
+                      placeholder="e.g. Priya Sharma"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Company Name</label>
+                    <input
+                      value={companyName}
+                      onChange={e => setCompanyName(e.target.value)}
+                      placeholder="e.g. TalentOS"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400 italic">
+                    Emails will be signed: &quot;Best, {recruiterName || 'The Recruiting Team'}{companyName ? ` · ${companyName}` : ''}&quot;
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2">
+              <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-slate-200 px-6 py-4 shrink-0 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-60"
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function JobPipelinePage() {
@@ -913,6 +1238,18 @@ export default function JobPipelinePage() {
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
   const [copied, setCopied] = useState(false)
   const dragId = useRef<string | null>(null)
+
+  // View mode
+  const [viewMode, setViewMode] = useState<'kanban' | 'ranked'>('kanban')
+
+  // Autopilot drawer
+  const [showAutopilot, setShowAutopilot] = useState(false)
+
+  // Scoring state
+  const [scoring, setScoring] = useState(false)
+  const [scoreProgress, setScoreProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
+  const [scoreResult,   setScoreResult]   = useState<{ scored: number; auto_advanced: number; auto_rejected: number; emails_sent: number } | null>(null)
+  const [scoreError,    setScoreError]    = useState('')
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/jobs/${id}`)
@@ -1050,6 +1387,66 @@ export default function JobPipelinePage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const startScoring = async () => {
+    if (scoring) return
+    const total = activeApps.length
+    if (total === 0) return
+
+    setScoring(true)
+    setScoreError('')
+    setScoreResult(null)
+    setScoreProgress({ done: 0, total })
+
+    try {
+      const res = await fetch(`/api/jobs/${id}/score`, { method: 'POST' })
+      if (!res.ok || !res.body) {
+        const j = await res.json().catch(() => ({}))
+        setScoreError((j as { error?: string }).error ?? 'Scoring failed')
+        setScoring(false)
+        return
+      }
+
+      const reader = res.body.getReader()
+      const dec    = new TextDecoder()
+      let   buf    = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+
+        // SSE frames are separated by \n\n
+        const frames = buf.split('\n\n')
+        buf = frames.pop() ?? ''
+
+        for (const frame of frames) {
+          const line = frame.replace(/^data: /, '').trim()
+          if (!line) continue
+          try {
+            const evt = JSON.parse(line) as Record<string, unknown>
+            if (evt.type === 'progress') {
+              setScoreProgress(prev => ({ ...prev, done: prev.done + 1 }))
+            } else if (evt.type === 'complete') {
+              setScoreResult({
+                scored:        (evt.scored        as number) ?? 0,
+                auto_advanced: (evt.auto_advanced as number) ?? 0,
+                auto_rejected: (evt.auto_rejected as number) ?? 0,
+                emails_sent:   (evt.emails_sent   as number) ?? 0,
+              })
+              await load()
+            } else if (evt.type === 'error') {
+              // individual candidate errors are non-fatal; keep going
+            }
+          } catch { /* ignore malformed frames */ }
+        }
+      }
+    } catch (err) {
+      setScoreError(err instanceof Error ? err.message : 'Scoring failed')
+    } finally {
+      setScoring(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen text-slate-400 text-sm gap-2">
@@ -1103,6 +1500,58 @@ export default function JobPipelinePage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center rounded-xl border border-slate-200 p-0.5 bg-slate-50">
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === 'kanban' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Kanban className="h-3.5 w-3.5" />
+              Kanban
+            </button>
+            <button
+              onClick={() => setViewMode('ranked')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === 'ranked' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <LayoutList className="h-3.5 w-3.5" />
+              Ranked
+            </button>
+          </div>
+
+          <div className="h-5 w-px bg-slate-200" />
+
+          {/* Autopilot */}
+          <button
+            onClick={() => setShowAutopilot(true)}
+            className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors border ${
+              job.auto_advance_score !== null || job.auto_reject_score !== null
+                ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Settings2 className="h-4 w-4" />
+            Autopilot
+            {(job.auto_advance_score !== null || job.auto_reject_score !== null) && (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            )}
+          </button>
+
+          {/* Score All */}
+          <button
+            onClick={startScoring}
+            disabled={scoring || activeApps.length === 0}
+            className="flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-60 shadow-sm"
+          >
+            {scoring
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Scoring {scoreProgress.done}/{scoreProgress.total}</>
+              : <><Zap className="h-4 w-4" /> Score All</>
+            }
+          </button>
+
           <button
             onClick={() => setEditMode(e => !e)}
             className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
@@ -1129,7 +1578,65 @@ export default function JobPipelinePage() {
         </div>
       </div>
 
+      {/* Score progress / result banner */}
+      {(scoring || scoreResult || scoreError) && (
+        <div className={`px-8 py-3 border-b flex items-center gap-3 text-sm ${
+          scoreError   ? 'bg-red-50 border-red-200 text-red-700' :
+          scoreResult  ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+                         'bg-violet-50 border-violet-200 text-violet-700'
+        }`}>
+          {scoring && (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium">Scoring {scoreProgress.done} of {scoreProgress.total} candidates…</p>
+                <div className="mt-1.5 h-1.5 rounded-full bg-violet-200 overflow-hidden">
+                  <div
+                    className="h-full bg-violet-500 rounded-full transition-all duration-300"
+                    style={{ width: scoreProgress.total > 0 ? `${(scoreProgress.done / scoreProgress.total) * 100}%` : '0%' }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+          {scoreResult && !scoring && (
+            <>
+              <Check className="h-4 w-4 shrink-0" />
+              <p className="flex-1 font-medium">
+                ✓ {scoreResult.scored} scored
+                {scoreResult.auto_advanced > 0 && ` · ${scoreResult.auto_advanced} advanced`}
+                {scoreResult.auto_rejected > 0 && ` · ${scoreResult.auto_rejected} rejected`}
+                {scoreResult.emails_sent   > 0 && ` · ${scoreResult.emails_sent} emails sent`}
+              </p>
+              <button onClick={() => setScoreResult(null)} className="p-0.5 rounded hover:bg-emerald-200 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          {scoreError && (
+            <>
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <p className="flex-1">{scoreError}</p>
+              <button onClick={() => setScoreError('')} className="p-0.5 rounded hover:bg-red-200 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Ranked view */}
+      {viewMode === 'ranked' && (
+        <RankedView
+          apps={activeApps}
+          stages={job.pipeline_stages}
+          onCardClick={setSelectedApp}
+          onMoveToStage={handleStageChange}
+        />
+      )}
+
       {/* Kanban */}
+      {viewMode === 'kanban' && (
       <div className="flex gap-4 items-start overflow-x-auto px-8 py-6 flex-1">
         {job.pipeline_stages.map(stage => (
           <StageColumn
@@ -1199,6 +1706,7 @@ export default function JobPipelinePage() {
           </div>
         )}
       </div>
+      )} {/* end viewMode === 'kanban' */}
 
       {/* Modals & overlays */}
       {showAdd && (
@@ -1220,6 +1728,15 @@ export default function JobPipelinePage() {
           onClose={() => setSelectedApp(null)}
           onStageChange={handleStageChange}
           onStatusChange={handleStatusChange}
+        />
+      )}
+
+      {showAutopilot && (
+        <AutopilotDrawer
+          job={job}
+          stages={job.pipeline_stages}
+          onClose={() => setShowAutopilot(false)}
+          onSaved={load}
         />
       )}
     </div>
