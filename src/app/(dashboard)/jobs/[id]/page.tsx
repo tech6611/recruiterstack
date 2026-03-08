@@ -1248,7 +1248,7 @@ export default function JobPipelinePage() {
   // Scoring state
   const [scoring, setScoring] = useState(false)
   const [scoreProgress, setScoreProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
-  const [scoreResult,   setScoreResult]   = useState<{ scored: number; auto_advanced: number; auto_rejected: number; emails_sent: number } | null>(null)
+  const [scoreResult,   setScoreResult]   = useState<{ scored: number; errors: number; first_error: string | null; auto_advanced: number; auto_rejected: number; emails_sent: number } | null>(null)
   const [scoreError,    setScoreError]    = useState('')
 
   const load = useCallback(async () => {
@@ -1429,13 +1429,13 @@ export default function JobPipelinePage() {
             } else if (evt.type === 'complete') {
               setScoreResult({
                 scored:        (evt.scored        as number) ?? 0,
+                errors:        (evt.errors        as number) ?? 0,
+                first_error:   (evt.first_error   as string | null) ?? null,
                 auto_advanced: (evt.auto_advanced as number) ?? 0,
                 auto_rejected: (evt.auto_rejected as number) ?? 0,
                 emails_sent:   (evt.emails_sent   as number) ?? 0,
               })
               await load()
-            } else if (evt.type === 'error') {
-              // individual candidate errors are non-fatal; keep going
             }
           } catch { /* ignore malformed frames */ }
         }
@@ -1581,9 +1581,11 @@ export default function JobPipelinePage() {
       {/* Score progress / result banner */}
       {(scoring || scoreResult || scoreError) && (
         <div className={`px-8 py-3 border-b flex items-center gap-3 text-sm ${
-          scoreError   ? 'bg-red-50 border-red-200 text-red-700' :
-          scoreResult  ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-                         'bg-violet-50 border-violet-200 text-violet-700'
+          scoreError                                          ? 'bg-red-50 border-red-200 text-red-700'         :
+          scoreResult && scoreResult.errors > 0 && scoreResult.scored === 0 ? 'bg-red-50 border-red-200 text-red-700' :
+          scoreResult && scoreResult.errors > 0              ? 'bg-amber-50 border-amber-200 text-amber-800'   :
+          scoreResult                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+                                                               'bg-violet-50 border-violet-200 text-violet-700'
         }`}>
           {scoring && (
             <>
@@ -1601,13 +1603,22 @@ export default function JobPipelinePage() {
           )}
           {scoreResult && !scoring && (
             <>
-              <Check className="h-4 w-4 shrink-0" />
-              <p className="flex-1 font-medium">
-                ✓ {scoreResult.scored} scored
-                {scoreResult.auto_advanced > 0 && ` · ${scoreResult.auto_advanced} advanced`}
-                {scoreResult.auto_rejected > 0 && ` · ${scoreResult.auto_rejected} rejected`}
-                {scoreResult.emails_sent   > 0 && ` · ${scoreResult.emails_sent} emails sent`}
-              </p>
+              {scoreResult.errors > 0 && scoreResult.scored === 0
+                ? <AlertCircle className="h-4 w-4 shrink-0" />
+                : <Check className="h-4 w-4 shrink-0" />
+              }
+              <div className="flex-1">
+                <p className="font-medium">
+                  {scoreResult.scored > 0 && `✓ ${scoreResult.scored} scored`}
+                  {scoreResult.scored > 0 && scoreResult.auto_advanced > 0 && ` · ${scoreResult.auto_advanced} advanced`}
+                  {scoreResult.scored > 0 && scoreResult.auto_rejected > 0 && ` · ${scoreResult.auto_rejected} rejected`}
+                  {scoreResult.scored > 0 && scoreResult.emails_sent   > 0 && ` · ${scoreResult.emails_sent} emails sent`}
+                  {scoreResult.errors > 0 && (scoreResult.scored > 0 ? ` · ` : '') + `${scoreResult.errors} failed`}
+                </p>
+                {scoreResult.first_error && (
+                  <p className="text-xs mt-0.5 opacity-80">{scoreResult.first_error}</p>
+                )}
+              </div>
               <button onClick={() => setScoreResult(null)} className="p-0.5 rounded hover:bg-emerald-200 transition-colors">
                 <X className="h-4 w-4" />
               </button>

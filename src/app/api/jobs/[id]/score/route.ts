@@ -58,7 +58,8 @@ export async function POST(
       const send = (payload: object) =>
         controller.enqueue(enc.encode(`data: ${JSON.stringify(payload)}\n\n`))
 
-      let scored = 0, autoAdvanced = 0, autoRejected = 0, emailsSent = 0
+      let scored = 0, autoAdvanced = 0, autoRejected = 0, emailsSent = 0, errors = 0
+      let firstError = ''
 
       const advanceStage = job.auto_advance_stage_id
         ? stages.find(s => s.id === job.auto_advance_stage_id)
@@ -71,7 +72,6 @@ export async function POST(
 
         try {
           const result = await scoreApplicationForJob(candidate, job)
-          scored++
 
           // Write score back to applications
           const { error: updateErr } = await supabase
@@ -86,6 +86,8 @@ export async function POST(
             .eq('id', app.id)
 
           if (updateErr) throw new Error(`DB write failed: ${updateErr.message}`)
+
+          scored++ // only count if DB write succeeded
 
           // ── Auto-advance ───────────────────────────────────────────────────
           let action: 'advanced' | 'rejected' | 'none' = 'none'
@@ -199,11 +201,14 @@ export async function POST(
           })
 
         } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Scoring failed'
+          errors++
+          if (!firstError) firstError = msg
           send({
             type:           'error',
             application_id: app.id,
             candidate_name: candidate.name,
-            error:          err instanceof Error ? err.message : 'Scoring failed',
+            error:          msg,
           })
         }
       }
@@ -213,6 +218,8 @@ export async function POST(
         type:          'complete',
         total:         apps.length,
         scored,
+        errors,
+        first_error:   firstError || null,
         auto_advanced: autoAdvanced,
         auto_rejected: autoRejected,
         emails_sent:   emailsSent,
