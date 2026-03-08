@@ -64,7 +64,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-slate-100 px-6 py-4">
-        <p className="text-xs text-slate-400">RecruiterStack · ATS · <span className="font-mono text-blue-400">v8b</span></p>
+        <p className="text-xs text-slate-400">RecruiterStack · ATS</p>
       </div>
     </aside>
   )
