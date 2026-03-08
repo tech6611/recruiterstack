@@ -1432,6 +1432,21 @@ export default function JobPipelinePage() {
             const evt = JSON.parse(line) as Record<string, unknown>
             if (evt.type === 'progress') {
               setScoreProgress(prev => ({ ...prev, done: prev.done + 1 }))
+              // Patch the score directly into React state — no re-fetch needed,
+              // no caching issues, and scores appear live as each candidate finishes
+              const appId = evt.application_id as string
+              setJob(prev => prev ? {
+                ...prev,
+                applications: prev.applications.map(a =>
+                  a.id === appId
+                    ? {
+                        ...a,
+                        ai_score:          evt.score          as number,
+                        ai_recommendation: evt.recommendation as Application['ai_recommendation'],
+                      }
+                    : a
+                ),
+              } : prev)
             } else if (evt.type === 'complete') {
               setScoreResult({
                 scored:        (evt.scored        as number) ?? 0,
@@ -1441,6 +1456,7 @@ export default function JobPipelinePage() {
                 auto_rejected: (evt.auto_rejected as number) ?? 0,
                 emails_sent:   (evt.emails_sent   as number) ?? 0,
               })
+              // Full reload to get strengths/gaps/auto-advance stage changes
               await load()
             }
           } catch { /* ignore malformed frames */ }
