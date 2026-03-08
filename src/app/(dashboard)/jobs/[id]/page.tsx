@@ -1416,15 +1416,6 @@ export default function JobPipelinePage() {
       const dec    = new TextDecoder()
       let   buf    = ''
 
-      // Accumulate scored results during progress events so we can re-apply them
-      // after load() completes — load() may return stale cached data from the server
-      // (e.g. if the CDN or PostgREST schema cache hasn't caught up) and would
-      // otherwise overwrite our in-memory patches and make scores "vanish".
-      const scoredMap = new Map<string, {
-        ai_score:          number
-        ai_recommendation: Application['ai_recommendation']
-      }>()
-
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -1442,22 +1433,41 @@ export default function JobPipelinePage() {
             if (evt.type === 'progress') {
               setScoreProgress(prev => ({ ...prev, done: prev.done + 1 }))
 
-              const appId = evt.application_id as string
-              const score = evt.score          as number
-              const rec   = evt.recommendation as Application['ai_recommendation']
+              const appId  = evt.application_id as string
+              const score  = evt.score          as number
+              const rec    = evt.recommendation as Application['ai_recommendation']
+              const action = evt.action         as 'advanced' | 'rejected' | 'none'
+              const strengths = (evt.strengths as string[] | undefined) ?? []
+              const gaps      = (evt.gaps      as string[] | undefined) ?? []
 
-              // Remember this result so we can re-apply after load()
-              scoredMap.set(appId, { ai_score: score, ai_recommendation: rec })
-
-              // Patch score directly into React state for live updates
-              setJob(prev => prev ? {
-                ...prev,
-                applications: prev.applications.map(a =>
-                  a.id === appId
-                    ? { ...a, ai_score: score, ai_recommendation: rec }
-                    : a
-                ),
-              } : prev)
+              // Patch everything directly into React state — no server refetch needed.
+              // This is the only reliable approach: the SSE event IS the ground truth
+              // (it fires right after the DB write succeeds), so we never need to
+              // round-trip back to the server and risk stale-cache overwrites.
+              setJob(prev => {
+                if (!prev) return prev
+                return {
+                  ...prev,
+                  applications: prev.applications.map(a => {
+                    if (a.id !== appId) return a
+                    const updated: Application = {
+                      ...a,
+                      ai_score:          score,
+                      ai_recommendation: rec,
+                      ai_strengths:      strengths,
+                      ai_gaps:           gaps,
+                      ai_scored_at:      new Date().toISOString(),
+                    }
+                    if (action === 'advanced' && prev.auto_advance_stage_id) {
+                      updated.stage_id = prev.auto_advance_stage_id
+                    }
+                    if (action === 'rejected') {
+                      updated.status = 'rejected'
+                    }
+                    return updated
+                  }),
+                }
+              })
             } else if (evt.type === 'complete') {
               setScoreResult({
                 scored:        (evt.scored        as number) ?? 0,
@@ -1467,19 +1477,8 @@ export default function JobPipelinePage() {
                 auto_rejected: (evt.auto_rejected as number) ?? 0,
                 emails_sent:   (evt.emails_sent   as number) ?? 0,
               })
-              // Full reload to get strengths/gaps/auto-advance stage changes from DB
-              await load()
-              // Re-apply scores — load() may have returned stale data before the
-              // server's cache caught up, which would wipe the in-memory patches
-              if (scoredMap.size > 0) {
-                setJob(prev => prev ? {
-                  ...prev,
-                  applications: prev.applications.map(a => {
-                    const s = scoredMap.get(a.id)
-                    return s ? { ...a, ai_score: s.ai_score, ai_recommendation: s.ai_recommendation } : a
-                  }),
-                } : prev)
-              }
+              // No load() here — all state was already patched per-candidate above.
+              // Calling load() would risk a stale-cache overwrite that erases scores.
             }
           } catch { /* ignore malformed frames */ }
         }

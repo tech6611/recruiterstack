@@ -197,6 +197,8 @@ export async function POST(
             candidate_name: candidate.name,
             score:          result.score,
             recommendation: result.recommendation,
+            strengths:      result.strengths,
+            gaps:           result.gaps,
             action,
           })
 
