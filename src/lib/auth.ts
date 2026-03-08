@@ -21,3 +21,13 @@ export function requireOrg(): { orgId: string } | NextResponse {
   }
   return { orgId }
 }
+
+/**
+ * Like requireOrg but returns null orgId instead of 401.
+ * Use for read-only aggregation routes (dashboard, analytics, inbox)
+ * where an empty response is better UX than an error during JWT refresh.
+ */
+export function getOrgId(): string | null {
+  const { orgId } = auth()
+  return orgId ?? null
+}

@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { getOrgId } from '@/lib/auth'
 
 // GET /api/analytics — pipeline funnel, source breakdown, time-in-stage
 export async function GET() {
-  const authResult = requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const orgId = getOrgId()
+  if (!orgId) {
+    return NextResponse.json({
+      data: { stats: { active_candidates: 0, in_pipeline: 0, total_hired: 0, total_rejected: 0, interviewing: 0, total_applications: 0, active_jobs: 0 }, jobs_funnel: [], source_breakdown: [], avg_time_per_stage: [] },
+    })
+  }
 
   const supabase = createAdminClient()
 

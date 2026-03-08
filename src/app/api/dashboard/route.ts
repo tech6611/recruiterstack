@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { getOrgId } from '@/lib/auth'
 import type { CandidateStatus, StageColor } from '@/lib/types/database'
 
 export async function GET() {
-  const authResult = requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const orgId = getOrgId()
+  if (!orgId) {
+    const ALL_STATUSES: CandidateStatus[] = ['active', 'interviewing', 'offer_extended', 'hired', 'inactive', 'rejected']
+    return NextResponse.json({
+      stats: { open_jobs: 0, total_jobs: 0, active_candidates: 0, interviewing: 0, hired_total: 0 },
+      top_jobs: [],
+      recent_activity: [],
+      candidate_breakdown: ALL_STATUSES.map(status => ({ status, count: 0 })),
+    })
+  }
 
   const supabase = createAdminClient()
 

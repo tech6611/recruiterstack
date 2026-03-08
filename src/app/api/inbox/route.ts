@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { getOrgId } from '@/lib/auth'
 
 // GET /api/inbox — recent activity feed + needs-attention queue
 export async function GET() {
-  const authResult = requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const orgId = getOrgId()
+  if (!orgId) {
+    return NextResponse.json({ data: { activity: [], needs_attention: [] } })
+  }
 
   const supabase = createAdminClient()
 
