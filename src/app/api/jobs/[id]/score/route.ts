@@ -74,7 +74,7 @@ export async function POST(
           scored++
 
           // Write score back to applications
-          await supabase
+          const { error: updateErr } = await supabase
             .from('applications')
             .update({
               ai_score:          result.score,
@@ -84,6 +84,8 @@ export async function POST(
               ai_scored_at:      new Date().toISOString(),
             } as never)
             .eq('id', app.id)
+
+          if (updateErr) throw new Error(`DB write failed: ${updateErr.message}`)
 
           // ── Auto-advance ───────────────────────────────────────────────────
           let action: 'advanced' | 'rejected' | 'none' = 'none'
