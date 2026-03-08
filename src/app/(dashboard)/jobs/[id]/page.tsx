@@ -1237,7 +1237,11 @@ export default function JobPipelinePage() {
   const [addingStage, setAddingStage] = useState(false)
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
   const [copied, setCopied] = useState(false)
-  const dragId = useRef<string | null>(null)
+  const dragId    = useRef<string | null>(null)
+  // Prevents load() from overwriting scored state with stale server data.
+  // Set to true at scoring start; cleared 5 s after scoring ends so that
+  // the visibilitychange / switchView refetch guards don't live forever.
+  const scoringRef = useRef(false)
 
   // View mode
   const [viewMode, setViewMode] = useState<'kanban' | 'ranked'>('kanban')
@@ -1252,17 +1256,20 @@ export default function JobPipelinePage() {
   const [scoreError,    setScoreError]    = useState('')
 
   const load = useCallback(async () => {
+    // Never stomp on live scoring state — scores are patched directly from SSE
+    // events and a stale server response would wipe them.
+    if (scoringRef.current) return
     const res = await fetch(`/api/jobs/${id}`, { cache: 'no-store' })
     const json = await res.json()
     setJob(json.data ?? null)
     setLoading(false)
   }, [id])
 
-  // Reload fresh data when switching to Ranked so scores are always current
-  const switchView = useCallback(async (mode: 'kanban' | 'ranked') => {
+  const switchView = useCallback((mode: 'kanban' | 'ranked') => {
     setViewMode(mode)
-    if (mode === 'ranked') await load()
-  }, [load])
+    // No load() here — job data is already in state; scores come from SSE patches,
+    // not from a server refetch, so fetching would risk overwriting them.
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -1398,6 +1405,7 @@ export default function JobPipelinePage() {
     const total = activeApps.length
     if (total === 0) return
 
+    scoringRef.current = true   // block load() for the duration of scoring
     setScoring(true)
     setScoreError('')
     setScoreResult(null)
@@ -1487,6 +1495,9 @@ export default function JobPipelinePage() {
       setScoreError(err instanceof Error ? err.message : 'Scoring failed')
     } finally {
       setScoring(false)
+      // Keep load() suppressed for 5 s so that a visibilitychange or tab-switch
+      // that fires right after scoring can't fetch stale data and overwrite scores.
+      setTimeout(() => { scoringRef.current = false }, 5000)
     }
   }
 
