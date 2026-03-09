@@ -23,7 +23,20 @@
       "Bash(grep -n \"Add Candidate\\\\|showAdd\\\\|UserPlus\" /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/jobs/[id]/page.tsx)",
       "Bash(sed -n '275,470p' /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/jobs/[id]/page.tsx)",
       "Bash(python3 -c \"import sys,json; data=sys.stdin.read\\(\\); parsed=json.loads\\(data[data.index\\(''[''\\):data.rindex\\('']''\\)+1]\\); print\\(parsed[0][''text'']\\)\")",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(npm run build)",
+      "Bash(git add src/app/\\\\\\(dashboard\\\\\\)/dashboard/page.tsx)",
+      "Bash(git add \"src/app/\\(dashboard\\)/dashboard/page.tsx\")",
+      "Bash(git push origin claude/amazing-keller)",
+      "Bash(git checkout main)",
+      "Bash(git merge claude/amazing-keller --ff-only)",
+      "Bash(git push origin main)",
+      "Bash(gh run list --repo tech6611/recruiterstack --limit 3)",
+      "Bash(curl -s \"https://lvzdttievphhvxhuglfg.supabase.co/rest/v1/hiring_requests?select=org_id&org_id=eq.org_3AezudTBXrGG7mwimkk7QQ0Eaz9&limit=1\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2emR0dGlldnBoaHZ4aHVnbGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ1MDA3MSwiZXhwIjoyMDg4MDI2MDcxfQ.XMue8qdypfsOCNz8EQ1sFcKjwnggQq4rwWAColpsT5c\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2emR0dGlldnBoaHZ4aHVnbGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ1MDA3MSwiZXhwIjoyMDg4MDI2MDcxfQ.XMue8qdypfsOCNz8EQ1sFcKjwnggQq4rwWAColpsT5c\")",
+      "Bash(curl -s \"https://lvzdttievphhvxhuglfg.supabase.co/rest/v1/hiring_requests?select=id,position_title,org_id&org_id=eq.org_3AezudTBXrGG7mwimkk7QQ0Eaz9\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2emR0dGlldnBoaHZ4aHVnbGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ1MDA3MSwiZXhwIjoyMDg4MDI2MDcxfQ.XMue8qdypfsOCNz8EQ1sFcKjwnggQq4rwWAColpsT5c\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2emR0dGlldnBoaHZ4aHVnbGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ1MDA3MSwiZXhwIjoyMDg4MDI2MDcxfQ.XMue8qdypfsOCNz8EQ1sFcKjwnggQq4rwWAColpsT5c\")",
+      "Bash(grep -n \"useEffect\\\\|fetchJobs\\\\|fetchCandidates\\\\|loadData\\\\|fetchData\\\\|useAuth\\\\|useOrganization\\\\|import.*clerk\" /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/jobs/page.tsx /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/candidates/page.tsx /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/pipeline/page.tsx /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/roles/[id]/page.tsx)",
+      "Bash(curl -s -I \"https://www.recruiterstack.in/jobs\")",
+      "Bash(git add src/app/api/debug-auth/route.ts)"
     ]
   }
 }
