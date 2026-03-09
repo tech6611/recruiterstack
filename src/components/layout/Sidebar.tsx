@@ -14,7 +14,7 @@ import {
 import { UserButton, useOrganization } from '@clerk/nextjs'
 
 const NAV_ITEMS = [
-  { href: '/',            label: 'Dashboard',  icon: LayoutDashboard },
+  { href: '/dashboard',   label: 'Dashboard',  icon: LayoutDashboard },
   { href: '/jobs',        label: 'Jobs',       icon: Briefcase },
   { href: '/candidates',  label: 'Candidates', icon: Users },
   { href: '/analytics',  label: 'Analytics',  icon: BarChart2 },
@@ -42,7 +42,7 @@ export function Sidebar() {
       <nav className="flex-1 space-y-0.5 px-3 py-4">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const isActive =
-            href === '/' ? pathname === '/' : pathname.startsWith(href)
+            href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
 
           return (
             <Link

@@ -23,8 +23,8 @@ export default function OrgSetupPage() {
       <div className="mb-6 w-full max-w-md">
         <OrganizationList
           hidePersonal
-          afterSelectOrganizationUrl="/"
-          afterCreateOrganizationUrl="/"
+          afterSelectOrganizationUrl="/dashboard"
+          afterCreateOrganizationUrl="/dashboard"
         />
       </div>
 
@@ -32,7 +32,7 @@ export default function OrgSetupPage() {
         <p className="mb-4 text-center text-xs font-medium uppercase tracking-wide text-slate-400">
           Or create a new workspace
         </p>
-        <CreateOrganization afterCreateOrganizationUrl="/" />
+        <CreateOrganization afterCreateOrganizationUrl="/dashboard" />
       </div>
     </div>
   )
