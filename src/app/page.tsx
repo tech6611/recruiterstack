@@ -5,202 +5,305 @@ import {
   Zap,
   ArrowRight,
   Brain,
-  Users,
   BarChart2,
-  CheckCircle,
-  Shield,
   Inbox,
+  Users,
+  Shield,
+  Workflow,
+  Building2,
+  Briefcase,
+  Bot,
+  ChevronRight,
 } from 'lucide-react'
+import { EmailCapture } from '@/components/EmailCapture'
 
 export default function HomePage() {
   const { userId } = auth()
   if (userId) redirect('/dashboard')
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
-      {/* ── Nav ───────────────────────────────────────────────────────────── */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-slate-100 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-            <Zap className="h-4 w-4 text-white" />
+    <div className="min-h-screen bg-zinc-950 text-white">
+
+      {/* ── Nav ─────────────────────────────────────────────────────────── */}
+      <nav className="sticky top-0 z-50 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-600">
+              <Zap className="h-3.5 w-3.5 text-white" />
+            </div>
+            <span className="text-sm font-semibold tracking-tight text-white">RecruiterStack</span>
           </div>
-          <span className="text-base font-bold tracking-tight">RecruiterStack</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/sign-in"
-            className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/sign-up"
-            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
-          >
-            Get started free
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/sign-in"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/sign-up"
+              className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:border-zinc-500 hover:bg-zinc-800 transition-colors"
+            >
+              Get started
+            </Link>
+          </div>
         </div>
       </nav>
 
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-50/60 via-white to-white pointer-events-none" />
+        {/* Radial glow */}
+        <div className="pointer-events-none absolute inset-0 flex items-start justify-center">
+          <div className="mt-10 h-[400px] w-[900px] rounded-full bg-violet-900/20 blur-[120px]" />
+        </div>
 
-        <div className="relative max-w-5xl mx-auto px-6 pt-20 pb-24 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 mb-8">
-            <Zap className="h-3 w-3" />
-            AI-powered recruiting, built for modern teams
+        <div className="relative mx-auto max-w-5xl px-6 pb-28 pt-24 text-center">
+          {/* Eyebrow */}
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/80 px-3.5 py-1.5 text-xs font-medium text-zinc-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+            AI-native Recruitment Operating System
           </div>
 
-          <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight text-slate-900 leading-tight mb-6">
-            Hire smarter.<br />
-            <span className="text-blue-600">Close faster.</span>
+          {/* Headline */}
+          <h1 className="mx-auto max-w-4xl text-5xl font-black tracking-tight text-white sm:text-6xl lg:text-7xl leading-[1.05]">
+            The OS for{' '}
+            <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-indigo-400 bg-clip-text text-transparent">
+              modern recruiting
+            </span>
           </h1>
 
-          <p className="text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-            RecruiterStack is the AI-native ATS that scores candidates automatically,
-            keeps your pipeline moving, and lets you focus on the conversations that matter.
+          {/* Sub-headline */}
+          <p className="mx-auto mt-7 max-w-2xl text-lg text-zinc-400 leading-relaxed">
+            RecruiterStack is the first AI-native recruitment operating system —
+            built for agencies running mandates, enterprise TA teams drowning in
+            applications, and lean teams that need AI to recruit for them.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          {/* CTAs */}
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
               href="/sign-up"
-              className="flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3.5 text-base font-semibold text-white hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
+              className="flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-3.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
             >
-              Start hiring for free
+              Start for free
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/sign-in"
-              className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3.5 text-base font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-2 rounded-xl border border-zinc-800 px-6 py-3.5 text-sm font-medium text-zinc-300 hover:border-zinc-600 hover:text-white transition-colors"
             >
               Sign in to your workspace
             </Link>
           </div>
 
-          <p className="mt-5 text-sm text-slate-400">Free to start · No credit card required</p>
+          <p className="mt-4 text-xs text-zinc-600">Free to start · No credit card required</p>
         </div>
       </section>
 
-      {/* ── Social proof bar ──────────────────────────────────────────────── */}
-      <section className="border-y border-slate-100 bg-slate-50/60 py-6">
-        <div className="max-w-4xl mx-auto px-6 flex flex-wrap items-center justify-center gap-8">
-          {[
-            { value: '10×', label: 'faster candidate review' },
-            { value: '100%', label: 'data isolation per org' },
-            { value: 'AI', label: 'scoring on every resume' },
-            { value: '0', label: 'setup required' },
-          ].map(({ value, label }) => (
-            <div key={label} className="text-center">
-              <p className="text-2xl font-extrabold text-blue-600">{value}</p>
-              <p className="text-xs text-slate-500 mt-0.5">{label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Features ──────────────────────────────────────────────────────── */}
-      <section className="max-w-6xl mx-auto px-6 py-24">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold text-slate-900">Everything you need to hire well</h2>
-          <p className="mt-3 text-lg text-slate-500">
-            From the first application to the offer letter — all in one place.
-          </p>
-        </div>
-
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            {
-              icon: Brain,
-              color: 'bg-violet-100 text-violet-600',
-              title: 'AI Candidate Scoring',
-              desc: 'Every resume is automatically scored against your job requirements. Surface the best candidates instantly without manual screening.',
-            },
-            {
-              icon: BarChart2,
-              color: 'bg-blue-100 text-blue-600',
-              title: 'Visual Pipeline',
-              desc: 'Drag-and-drop stages, colour-coded by progress. See exactly where every candidate stands across all your open roles.',
-            },
-            {
-              icon: Inbox,
-              color: 'bg-amber-100 text-amber-600',
-              title: 'Smart Inbox',
-              desc: 'A single feed of what needs your attention — stale applications, recent activity, and follow-ups that are overdue.',
-            },
-            {
-              icon: Users,
-              color: 'bg-emerald-100 text-emerald-600',
-              title: 'Team Workspaces',
-              desc: 'Create a workspace for your company. Invite recruiters and hiring managers. Each org sees only their own data.',
-            },
-            {
-              icon: Shield,
-              color: 'bg-slate-100 text-slate-600',
-              title: 'Multi-tenant Security',
-              desc: 'Powered by Clerk + Supabase. Every query is scoped to your organisation — no data leaks, ever.',
-            },
-            {
-              icon: CheckCircle,
-              color: 'bg-green-100 text-green-600',
-              title: 'Analytics & Reporting',
-              desc: 'Pipeline funnel, source breakdown, time-in-stage velocity. Know exactly where your hiring process is breaking down.',
-            },
-          ].map(({ icon: Icon, color, title, desc }) => (
-            <div
-              key={title}
-              className="rounded-2xl border border-slate-200 bg-white p-6 hover:shadow-md hover:-translate-y-0.5 transition-all"
-            >
-              <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl ${color}`}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <h3 className="text-base font-semibold text-slate-900 mb-1.5">{title}</h3>
-              <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── How it works ──────────────────────────────────────────────────── */}
-      <section className="bg-slate-50 py-24">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold text-slate-900">Up and running in minutes</h2>
-            <p className="mt-3 text-lg text-slate-500">No consultants. No lengthy onboarding. Just sign up and go.</p>
+      {/* ── Who it's for ─────────────────────────────────────────────────── */}
+      <section className="border-t border-zinc-900 py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mb-4 text-center">
+            <p className="text-xs font-semibold uppercase tracking-widest text-violet-500">
+              Built for
+            </p>
+            <h2 className="mt-3 text-3xl font-bold text-white">
+              Three types of recruiting teams
+            </h2>
+            <p className="mt-3 text-zinc-500">
+              One platform. Three distinct workflows. All powered by AI.
+            </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="mt-14 grid gap-5 md:grid-cols-3">
+            {/* Agencies */}
+            <div className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/50 p-7 hover:border-zinc-700 transition-colors">
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-violet-600/10 border border-violet-600/20">
+                <Briefcase className="h-5 w-5 text-violet-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Recruiting Agencies</h3>
+              <p className="mt-3 text-sm leading-relaxed text-zinc-500">
+                Manage multiple client mandates from a single workspace. AI workflows handle
+                sourcing, screening, and shortlisting — so your team closes roles, not
+                spreadsheets.
+              </p>
+              <ul className="mt-5 space-y-2">
+                {[
+                  'Multi-client workspace management',
+                  'AI candidate screening & scoring',
+                  'Automated outreach sequences',
+                ].map(item => (
+                  <li key={item} className="flex items-start gap-2 text-xs text-zinc-500">
+                    <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Enterprises */}
+            <div className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/50 p-7 hover:border-zinc-700 transition-colors">
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600/10 border border-indigo-600/20">
+                <Building2 className="h-5 w-5 text-indigo-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Enterprise TA Teams</h3>
+              <p className="mt-3 text-sm leading-relaxed text-zinc-500">
+                Hundreds of applications per role. Dozens of open reqs. RecruiterStack
+                processes the volume so your TA team can focus on the humans, not the
+                inbox.
+              </p>
+              <ul className="mt-5 space-y-2">
+                {[
+                  'High-volume application processing',
+                  'Cross-team pipeline visibility',
+                  'Analytics & hiring velocity reporting',
+                ].map(item => (
+                  <li key={item} className="flex items-start gap-2 text-xs text-zinc-500">
+                    <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Small teams */}
+            <div className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/50 p-7 hover:border-zinc-700 transition-colors">
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-fuchsia-600/10 border border-fuchsia-600/20">
+                <Bot className="h-5 w-5 text-fuchsia-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Small Teams</h3>
+              <p className="mt-3 text-sm leading-relaxed text-zinc-500">
+                No dedicated recruiter? No problem. Our AI agents run your entire
+                hiring pipeline — from job description to shortlist — while you
+                stay focused on building.
+              </p>
+              <ul className="mt-5 space-y-2">
+                {[
+                  'AI-drafted job descriptions',
+                  'Autonomous candidate pipeline',
+                  'Zero-setup recruiting agents',
+                ].map(item => (
+                  <li key={item} className="flex items-start gap-2 text-xs text-zinc-500">
+                    <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-fuchsia-500" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── What makes it an OS ───────────────────────────────────────────── */}
+      <section className="border-t border-zinc-900 py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mb-14 text-center">
+            <p className="text-xs font-semibold uppercase tracking-widest text-violet-500">
+              Capabilities
+            </p>
+            <h2 className="mt-3 text-3xl font-bold text-white">
+              Not just an ATS. An operating system.
+            </h2>
+            <p className="mt-3 max-w-xl mx-auto text-zinc-500">
+              Traditional ATS tools track candidates. RecruiterStack runs your
+              entire recruiting operation end-to-end.
+            </p>
+          </div>
+
+          <div className="grid gap-px bg-zinc-800 rounded-2xl overflow-hidden sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
-                step: '01',
+                icon: Brain,
+                color: 'text-violet-400',
+                title: 'AI Candidate Scoring',
+                desc: 'Every resume scored against your JD the moment it lands. Surface top 10% in seconds, not days.',
+              },
+              {
+                icon: Workflow,
+                color: 'text-indigo-400',
+                title: 'AI Recruiting Workflows',
+                desc: 'Automated screening, stage moves, follow-ups, and rejections — triggered by rules you set.',
+              },
+              {
+                icon: Inbox,
+                color: 'text-fuchsia-400',
+                title: 'Unified Recruiting Inbox',
+                desc: 'One feed for everything that needs attention. Stale apps, interview requests, urgent follow-ups.',
+              },
+              {
+                icon: BarChart2,
+                color: 'text-sky-400',
+                title: 'Pipeline Analytics',
+                desc: 'Funnel drop-off, source attribution, time-to-hire, and stage velocity — all live.',
+              },
+              {
+                icon: Users,
+                color: 'text-emerald-400',
+                title: 'Multi-Org Tenancy',
+                desc: 'Each company or client gets their own isolated workspace. Secure by default, no data bleed.',
+              },
+              {
+                icon: Shield,
+                color: 'text-amber-400',
+                title: 'Enterprise-grade Security',
+                desc: 'Built on Clerk + Supabase with row-level isolation. Your data never touches another org.',
+              },
+            ].map(({ icon: Icon, color, title, desc }) => (
+              <div key={title} className="bg-zinc-950 p-7 hover:bg-zinc-900/60 transition-colors">
+                <Icon className={`mb-4 h-5 w-5 ${color}`} />
+                <h3 className="text-sm font-semibold text-white">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-zinc-500">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── How it works ─────────────────────────────────────────────────── */}
+      <section className="border-t border-zinc-900 py-24">
+        <div className="mx-auto max-w-4xl px-6">
+          <div className="mb-14 text-center">
+            <p className="text-xs font-semibold uppercase tracking-widest text-violet-500">
+              How it works
+            </p>
+            <h2 className="mt-3 text-3xl font-bold text-white">
+              Live in minutes, not months
+            </h2>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              {
+                n: '01',
                 title: 'Create your workspace',
-                desc: 'Sign up with Google or email, create your company org, and invite your team.',
+                desc: 'Sign up, create your company workspace, invite your team. Done in under two minutes.',
               },
               {
-                step: '02',
-                title: 'Post your first job',
-                desc: 'Write a job description (or let AI draft it) and get a shareable application link instantly.',
+                n: '02',
+                title: 'Post a role',
+                desc: 'Write a job description or let AI draft it. Get a shareable application link instantly.',
               },
               {
-                step: '03',
-                title: 'Let AI do the screening',
-                desc: 'Candidates apply, resumes are parsed and scored automatically. You review only the top fits.',
+                n: '03',
+                title: 'AI handles the top of funnel',
+                desc: 'Candidates apply, resumes are parsed and scored automatically against your requirements.',
               },
               {
-                step: '04',
-                title: 'Move fast, hire great',
-                desc: 'Advance candidates through your pipeline, send AI-drafted outreach emails, and close roles faster.',
+                n: '04',
+                title: 'You close the best fits',
+                desc: 'Review only the candidates worth your time. Move them through stages, send AI-drafted emails, hire faster.',
               },
-            ].map(({ step, title, desc }) => (
+            ].map(({ n, title, desc }) => (
               <div
-                key={step}
-                className="flex items-start gap-5 rounded-2xl border border-slate-200 bg-white px-6 py-5"
+                key={n}
+                className="flex items-start gap-6 rounded-2xl border border-zinc-800 bg-zinc-900/30 px-6 py-5 hover:bg-zinc-900/60 transition-colors"
               >
-                <span className="shrink-0 text-3xl font-black text-blue-100 leading-none">{step}</span>
+                <span className="shrink-0 font-black text-3xl text-zinc-800 leading-none tabular-nums">
+                  {n}
+                </span>
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-                  <p className="mt-1 text-sm text-slate-500">{desc}</p>
+                  <h3 className="text-sm font-semibold text-white">{title}</h3>
+                  <p className="mt-1 text-sm text-zinc-500">{desc}</p>
                 </div>
               </div>
             ))}
@@ -208,43 +311,60 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Final CTA ─────────────────────────────────────────────────────── */}
-      <section className="py-24 px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="rounded-3xl bg-blue-600 px-8 py-14 shadow-xl shadow-blue-200">
-            <h2 className="text-3xl font-extrabold text-white mb-4">
-              Ready to hire better?
+      {/* ── Lead capture ─────────────────────────────────────────────────── */}
+      <section className="border-t border-zinc-900 py-24">
+        <div className="mx-auto max-w-2xl px-6 text-center">
+          <div className="rounded-3xl border border-zinc-800 bg-zinc-900/50 px-8 py-14">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Now in early access
+            </div>
+            <h2 className="mt-5 text-3xl font-bold text-white">
+              Ready to modernise how you hire?
             </h2>
-            <p className="text-blue-200 text-lg mb-8">
-              Join teams already using RecruiterStack to build their dream teams.
+            <p className="mt-3 text-zinc-500">
+              Join teams already using RecruiterStack. Or drop your email and
+              we'll reach out to walk you through the platform.
             </p>
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center gap-2 rounded-2xl bg-white px-7 py-3.5 text-base font-bold text-blue-600 hover:bg-blue-50 transition-colors shadow-lg"
-            >
-              Get started free
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+
+            <div className="mt-8">
+              <EmailCapture
+                placeholder="you@company.com"
+                buttonLabel="Get early access"
+                source="homepage-cta"
+              />
+            </div>
+
+            <p className="mt-5 text-xs text-zinc-600">
+              Or{' '}
+              <Link href="/sign-up" className="text-violet-400 hover:text-violet-300 transition-colors">
+                create a free account now
+              </Link>{' '}
+              — no credit card required.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* ── Footer ────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-slate-100 py-8 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* ── Footer ───────────────────────────────────────────────────────── */}
+      <footer className="border-t border-zinc-900 py-8 px-6">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-600">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-violet-600">
               <Zap className="h-3 w-3 text-white" />
             </div>
-            <span className="text-sm font-semibold text-slate-700">RecruiterStack</span>
+            <span className="text-sm font-semibold text-zinc-400">RecruiterStack</span>
           </div>
-          <p className="text-xs text-slate-400">© {new Date().getFullYear()} RecruiterStack. All rights reserved.</p>
-          <div className="flex items-center gap-4 text-xs text-slate-400">
-            <Link href="/sign-in" className="hover:text-slate-600 transition-colors">Sign in</Link>
-            <Link href="/sign-up" className="hover:text-slate-600 transition-colors">Sign up</Link>
+          <p className="text-xs text-zinc-700">
+            © {new Date().getFullYear()} RecruiterStack. All rights reserved.
+          </p>
+          <div className="flex items-center gap-5 text-xs text-zinc-600">
+            <Link href="/sign-in" className="hover:text-zinc-400 transition-colors">Sign in</Link>
+            <Link href="/sign-up" className="hover:text-zinc-400 transition-colors">Sign up</Link>
           </div>
         </div>
       </footer>
+
     </div>
   )
 }
