@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useOrganization } from '@clerk/nextjs'
+import { useAuth } from '@clerk/nextjs'
 import Link from 'next/link'
 import {
   Activity,
@@ -197,7 +197,7 @@ function StatusBreakdownBar({ breakdown }: { breakdown: StatusBreakdown[] }) {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { organization } = useOrganization()
+  const { orgId } = useAuth()
   const [data, setData]           = useState<DashboardData | null>(null)
   const [loading, setLoading]     = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -219,8 +219,8 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    if (organization) fetchData()
-  }, [fetchData, organization])
+    if (orgId) fetchData()
+  }, [fetchData, orgId])
 
   // ── Loading skeleton ─────────────────────────────────────────────────────
   if (loading) {
