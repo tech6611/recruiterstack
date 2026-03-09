@@ -324,7 +324,7 @@ export default function HomePage() {
             </h2>
             <p className="mt-3 text-zinc-500">
               Join teams already using RecruiterStack. Or drop your email and
-              we'll reach out to walk you through the platform.
+              we&apos;ll reach out to walk you through the platform.
             </p>
 
             <div className="mt-8">
