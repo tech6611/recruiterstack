@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Pencil, Trash2, Sparkles, MapPin, Briefcase, DollarSign, Loader2, Copy, Check, Send, TrendingUp, TrendingDown } from 'lucide-react'
 import { SlideOver } from '@/components/ui/SlideOver'
@@ -13,6 +14,7 @@ import type { Role, MatchWithRelations } from '@/lib/types/database'
 export default function RoleDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { orgId } = useAuth()
   const { settings } = useSettings()
 
   const [role, setRole] = useState<Role | null>(null)
@@ -54,7 +56,7 @@ export default function RoleDetailPage() {
     setLoading(false)
   }, [id])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { if (orgId) fetchData() }, [fetchData, orgId])
 
   const runMatching = async () => {
     setMatching(true)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import { RefreshCw, TrendingUp, Users, CheckCircle, XCircle, Briefcase, Clock } from 'lucide-react'
 import type { StageColor } from '@/lib/types/database'
 
@@ -107,6 +108,7 @@ function StatCard({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
+  const { orgId } = useAuth()
   const [data, setData]           = useState<AnalyticsData | null>(null)
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState('')
@@ -122,7 +124,7 @@ export default function AnalyticsPage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (orgId) load() }, [load, orgId])
 
   if (loading) {
     return (

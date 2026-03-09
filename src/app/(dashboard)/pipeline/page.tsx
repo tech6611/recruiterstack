@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import type { Candidate, CandidateStatus } from '@/lib/types/database'
 
@@ -128,6 +129,7 @@ function BoardColumn({
 
 export default function PipelinePage() {
   const router = useRouter()
+  const { orgId } = useAuth()
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
   const dragId = useRef<string | null>(null)
@@ -142,7 +144,7 @@ export default function PipelinePage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchCandidates() }, [fetchCandidates])
+  useEffect(() => { if (orgId) fetchCandidates() }, [fetchCandidates, orgId])
 
   const handleDrop = async (newStatus: CandidateStatus) => {
     const id = dragId.current

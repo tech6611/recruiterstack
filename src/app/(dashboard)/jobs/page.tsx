@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import {
   Briefcase, Plus, Search, Clock, X, Mail, FileText, Send,
@@ -616,6 +617,7 @@ function PipelineBar({ stages }: { stages: JobListItem['stage_counts'] }) {
 
 export default function JobsPage() {
   const router = useRouter()
+  const { orgId } = useAuth()
   const [jobs, setJobs] = useState<JobListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -632,7 +634,7 @@ export default function JobsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { fetchJobs() }, [fetchJobs])
+  useEffect(() => { if (orgId) fetchJobs() }, [fetchJobs, orgId])
 
   // Refetch when the tab regains focus (e.g. after navigating back via browser Back)
   useEffect(() => {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import Link from 'next/link'
 import {
   Inbox, RefreshCw, AlertCircle, ArrowRight, Clock,
@@ -99,6 +100,7 @@ function eventLabel(e: ActivityEvent): { icon: React.ElementType; text: string; 
 type Tab = 'activity' | 'attention'
 
 export default function InboxPage() {
+  const { orgId } = useAuth()
   const [data, setData]       = useState<InboxData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
@@ -113,7 +115,7 @@ export default function InboxPage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (orgId) load() }, [load, orgId])
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {

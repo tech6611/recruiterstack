@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Search, X, Users, Loader2,
@@ -40,6 +41,7 @@ const BLANK_FORM = {
 
 export default function CandidatesPage() {
   const router = useRouter()
+  const { orgId } = useAuth()
 
   // ── List state ─────────────────────────────────────────────────────────────
   const [candidates, setCandidates] = useState<CandidateListItem[]>([])
@@ -67,7 +69,7 @@ export default function CandidatesPage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchCandidates() }, [fetchCandidates])
+  useEffect(() => { if (orgId) fetchCandidates() }, [fetchCandidates, orgId])
 
   // ── Sorting ────────────────────────────────────────────────────────────────
   const toggleSort = (key: SortKey) => {
