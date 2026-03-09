@@ -8,6 +8,7 @@ const isPublic = createRouteMatcher([
   '/org-setup(.*)',
   '/apply/(.*)',
   '/intake/(.*)',
+  '/api/leads',
   '/api/apply/(.*)',
   '/api/intake/(.*)',
   '/api/parse-document(.*)',
