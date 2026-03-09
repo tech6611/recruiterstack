@@ -7,7 +7,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const authResult = requireOrg()
+  const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 
@@ -44,7 +44,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const authResult = requireOrg()
+  const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 

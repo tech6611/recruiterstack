@@ -4,7 +4,7 @@ import { getOrgId } from '@/lib/auth'
 import type { CandidateStatus, StageColor } from '@/lib/types/database'
 
 export async function GET() {
-  const orgId = getOrgId()
+  const orgId = await getOrgId()
   if (!orgId) {
     const ALL_STATUSES: CandidateStatus[] = ['active', 'interviewing', 'offer_extended', 'hired', 'inactive', 'rejected']
     return NextResponse.json({

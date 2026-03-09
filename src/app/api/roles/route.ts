@@ -5,7 +5,7 @@ import type { RoleInsert, RoleStatus } from '@/lib/types/database'
 
 // GET /api/roles?status=active&limit=50&offset=0
 export async function GET(request: NextRequest) {
-  const authResult = requireOrg()
+  const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/roles
 export async function POST(request: NextRequest) {
-  const authResult = requireOrg()
+  const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 

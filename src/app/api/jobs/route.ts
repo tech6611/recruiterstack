@@ -5,7 +5,7 @@ import type { StageColor } from '@/lib/types/database'
 
 // GET /api/jobs — list all hiring requests with candidate counts per stage
 export async function GET() {
-  const authResult = requireOrg()
+  const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 

@@ -4,7 +4,7 @@ import { getOrgId } from '@/lib/auth'
 
 // GET /api/inbox — recent activity feed + needs-attention queue
 export async function GET() {
-  const orgId = getOrgId()
+  const orgId = await getOrgId()
   if (!orgId) {
     return NextResponse.json({ data: { activity: [], needs_attention: [] } })
   }

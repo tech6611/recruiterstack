@@ -14,7 +14,7 @@ import type { Candidate } from '@/lib/types/database'
 //   candidate_data?: { name, email, phone?, current_title?, location? }  (new/upsert)
 // }
 export async function POST(request: NextRequest) {
-  const authResult = requireOrg()
+  const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 

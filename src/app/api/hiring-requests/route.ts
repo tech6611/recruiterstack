@@ -5,7 +5,7 @@ import sgMail from '@sendgrid/mail'
 
 // GET /api/hiring-requests
 export async function GET() {
-  const authResult = requireOrg()
+  const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 
@@ -24,7 +24,7 @@ export async function GET() {
 // Mode A (send_to_hm):  { position_title, department?, hiring_manager_name, hiring_manager_email, hiring_manager_slack? }
 // Mode B (fill_myself): above + filled_by_recruiter:true + all intake fields + generated_jd
 export async function POST(request: NextRequest) {
-  const authResult = requireOrg()
+  const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 

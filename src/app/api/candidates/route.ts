@@ -5,7 +5,7 @@ import type { CandidateInsert, CandidateListItem, CandidateStatus } from '@/lib/
 
 // GET /api/candidates?status=active&limit=50&offset=0
 export async function GET(request: NextRequest) {
-  const authResult = requireOrg()
+  const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/candidates
 export async function POST(request: NextRequest) {
-  const authResult = requireOrg()
+  const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 
