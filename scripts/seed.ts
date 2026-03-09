@@ -20,6 +20,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// ── Org ID ───────────────────────────────────────────────────────────────────
+// Pass your Clerk org ID as an env var:
+//   ORG_ID=org_xxxxxxxxxxxx npx tsx scripts/seed.ts
+const ORG_ID = process.env.ORG_ID
+if (!ORG_ID) {
+  console.error('❌  ORG_ID is required.\n')
+  console.error('    Find it in: Clerk Dashboard → Organizations → <your org> → copy the ID')
+  console.error('    Then run:   ORG_ID=org_xxxx npx tsx scripts/seed.ts\n')
+  process.exit(1)
+}
+
 // ── 1. JOBS ──────────────────────────────────────────────────────────────────
 
 const jobs = [
@@ -510,29 +521,44 @@ async function addEvent(applicationId: string, type: string, toStage: string, no
     note: note ?? null,
     created_by: 'Recruiter',
     created_at: daysAgo(daysBack),
+    org_id: ORG_ID,
   } as any)
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
 
 async function run() {
-  console.log('🌱 Seeding RecruiterStack...\n')
+  console.log(`🌱 Seeding RecruiterStack for org: ${ORG_ID}\n`)
+
+  // 0. Clean up any previous seed data for this org
+  console.log('🧹 Clearing previous seed data for this org...')
+  await supabase.from('application_events').delete().eq('org_id', ORG_ID)
+  await supabase.from('applications').delete().eq('org_id', ORG_ID)
+  await supabase.from('candidates').delete().eq('org_id', ORG_ID)
+  await supabase.from('pipeline_stages').delete().eq('org_id', ORG_ID)
+  await supabase.from('hiring_requests').delete().eq('org_id', ORG_ID)
+  console.log('   ✓ Cleared\n')
 
   // 1. Insert jobs
   console.log('📋 Creating jobs...')
   const { data: insertedJobs, error: jobsErr } = await supabase
     .from('hiring_requests')
-    .insert(jobs as any[])
+    .insert(jobs.map(j => ({ ...j, org_id: ORG_ID })) as any[])
     .select('id, position_title')
 
   if (jobsErr) { console.error('Jobs error:', jobsErr); process.exit(1) }
   console.log(`   ✓ ${insertedJobs!.length} jobs created`)
 
-  // 2. Insert candidates
+  // Fix pipeline_stages org_id — trigger may have defaulted to 'seed'
+  const jobIds = insertedJobs!.map(j => j.id)
+  await supabase.from('pipeline_stages').update({ org_id: ORG_ID }).in('hiring_request_id', jobIds)
+  console.log('   ✓ Pipeline stages org_id patched')
+
+  // 2. Upsert candidates (email is globally unique — upsert handles re-runs)
   console.log('👤 Creating candidates...')
   const { data: insertedCandidates, error: candErr } = await supabase
     .from('candidates')
-    .insert(candidates as any[])
+    .upsert(candidates.map(c => ({ ...c, org_id: ORG_ID })) as any[], { onConflict: 'email' })
     .select('id, name')
 
   if (candErr) { console.error('Candidates error:', candErr); process.exit(1) }
@@ -641,6 +667,7 @@ async function run() {
         status:             'active',
         source,
         applied_at:         daysAgo(daysBack),
+        org_id:             ORG_ID,
       } as any)
       .select('id')
       .single()
