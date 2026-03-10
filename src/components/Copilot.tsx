@@ -1,10 +1,14 @@
 'use client'
 
 /**
- * AI Recruiter Copilot
+ * AI Recruiter Copilot — Phase 8.5: Autonomous Workflow Agent
  *
  * Floating chat button (bottom-right) → slide-over panel.
  * Streams responses from POST /api/copilot with SSE.
+ *
+ * Simple Q&A (< 3 tool calls) → text bubble + small tool pills
+ * Workflows (≥ 3 tool calls)  → WorkflowStepList with numbered nodes
+ * Checkpoints                  → amber CheckpointCard with Proceed / Cancel
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -23,12 +27,14 @@ type Message = {
   role:        'user' | 'assistant'
   content:     string
   toolEvents?: ToolEvent[]
+  checkpoint?: { action_summary: string; details: string; impact: string }
 }
 
 type SSEEvent =
   | { type: 'text';       delta: string }
   | { type: 'tool_start'; name: string; label: string }
   | { type: 'tool_done';  name: string; summary: string }
+  | { type: 'checkpoint'; action_summary: string; details: string; impact: string }
   | { type: 'done' }
   | { type: 'error';      message: string }
 
@@ -38,7 +44,7 @@ const SUGGESTIONS = [
   "What's stale in my pipeline?",
   'Who are my top candidates right now?',
   'Show me all active jobs',
-  'How many candidates are we interviewing?',
+  'Hire 3 backend engineers in New York',
 ]
 
 // ── Inline markdown renderer ──────────────────────────────────────────────────
@@ -59,6 +65,121 @@ function MarkdownText({ text }: { text: string }) {
         </span>
       ))}
     </>
+  )
+}
+
+// ── WorkflowStepList ──────────────────────────────────────────────────────────
+// Rendered when a message has 3 or more tool events (autonomous workflow mode).
+
+function WorkflowStepList({
+  steps,
+  isStreaming,
+}: {
+  steps:      ToolEvent[]
+  isStreaming: boolean
+}) {
+  return (
+    <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="px-3.5 py-2 border-b border-slate-100 bg-white">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          Workflow
+        </span>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {steps.map((step, i) => {
+          const isDone     = !!step.summary
+          const isRunning  = !isDone && i === steps.length - 1 && isStreaming
+          const isPending  = !isDone && !isRunning
+
+          return (
+            <div key={i} className="flex items-start gap-2.5 px-3.5 py-2.5">
+              {/* Step icon */}
+              <span
+                className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5 ${
+                  isDone    ? 'bg-emerald-100 text-emerald-600' :
+                  isRunning ? 'bg-violet-100 text-violet-600' :
+                              'bg-slate-100 text-slate-400'
+                }`}
+              >
+                {isDone ? '✓' : String(i + 1)}
+              </span>
+
+              {/* Step label / summary */}
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs leading-snug ${isDone || isRunning ? 'text-slate-700' : 'text-slate-400'}`}>
+                  {isDone ? step.summary : step.label}
+                </p>
+                {isRunning && (
+                  <span className="flex items-center gap-1 mt-1">
+                    <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── CheckpointCard ────────────────────────────────────────────────────────────
+// Rendered when request_approval is triggered — pauses the workflow for human sign-off.
+
+function CheckpointCard({
+  checkpoint,
+  onProceed,
+  onCancel,
+}: {
+  checkpoint: { action_summary: string; details: string; impact: string }
+  onProceed:  () => void
+  onCancel:   () => void
+}) {
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2.5">
+      {/* Header */}
+      <div className="flex items-start gap-2">
+        <span className="text-base leading-none flex-shrink-0 mt-0.5">⏸️</span>
+        <div>
+          <p className="text-sm font-semibold text-amber-900 leading-snug">
+            Approval needed
+          </p>
+          <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+            {checkpoint.action_summary}
+          </p>
+        </div>
+      </div>
+
+      {/* Details */}
+      {checkpoint.details && (
+        <p className="text-xs text-amber-700 leading-relaxed">{checkpoint.details}</p>
+      )}
+
+      {/* Impact badge */}
+      {checkpoint.impact && (
+        <div className="text-xs text-amber-700 bg-amber-100 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-relaxed">
+          <span className="font-semibold">Impact: </span>{checkpoint.impact}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2 pt-0.5">
+        <button
+          onClick={onProceed}
+          className="flex-1 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-lg px-3 py-2 transition-colors active:scale-95"
+        >
+          Proceed →
+        </button>
+        <button
+          onClick={onCancel}
+          className="text-xs font-medium text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-lg px-3 py-2 transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -177,6 +298,22 @@ export function Copilot() {
               ))
               break
 
+            case 'checkpoint':
+              setMessages(prev => prev.map((m, i) =>
+                i === prev.length - 1 && m.role === 'assistant'
+                  ? {
+                      ...m,
+                      checkpoint: {
+                        action_summary: event.action_summary,
+                        details:        event.details,
+                        impact:         event.impact,
+                      },
+                    }
+                  : m
+              ))
+              setStreaming(false)
+              break
+
             case 'error':
               setMessages(prev => prev.map((m, i) =>
                 i === prev.length - 1 && m.role === 'assistant'
@@ -232,7 +369,7 @@ export function Copilot() {
 
       {/* Slide-over panel */}
       <div
-        className={`fixed right-0 top-0 h-full w-[420px] bg-white z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 top-0 h-full w-[440px] bg-white z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -246,9 +383,9 @@ export function Copilot() {
               <p className="text-sm font-semibold text-slate-800 leading-none">AI Copilot</p>
               <p className="text-xs text-slate-400 mt-0.5">
                 {streaming ? (
-                  <span className="text-violet-500">Thinking…</span>
+                  <span className="text-violet-500">Working…</span>
                 ) : (
-                  'Your recruiting assistant'
+                  'Your autonomous recruiting agent'
                 )}
               </p>
             </div>
@@ -269,11 +406,11 @@ export function Copilot() {
               <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
                 <Bot className="w-7 h-7 text-violet-400" />
               </div>
-              <p className="text-sm font-semibold text-slate-700 mb-1">How can I help?</p>
-              <p className="text-xs text-slate-400 mb-5 max-w-[200px]">
-                Ask about candidates, pipelines, or take actions
+              <p className="text-sm font-semibold text-slate-700 mb-1">What should we work on?</p>
+              <p className="text-xs text-slate-400 mb-5 max-w-[220px]">
+                Give me a goal and I&apos;ll execute the full recruiting workflow autonomously
               </p>
-              <div className="flex flex-col gap-2 w-full max-w-[280px]">
+              <div className="flex flex-col gap-2 w-full max-w-[290px]">
                 {SUGGESTIONS.map(s => (
                   <button
                     key={s}
@@ -289,6 +426,7 @@ export function Copilot() {
             messages.map((msg, msgIdx) => {
               const isLastAssistant = msgIdx === messages.length - 1 && msg.role === 'assistant'
               const allToolsDone    = !msg.toolEvents?.length || msg.toolEvents.every(te => !!te.summary)
+              const isWorkflow      = (msg.toolEvents?.length ?? 0) >= 3
 
               return (
                 <div
@@ -301,10 +439,19 @@ export function Copilot() {
                       {msg.content}
                     </div>
                   ) : (
-                    /* Assistant bubble + tool chips */
-                    <div className="max-w-[92%] space-y-1.5">
-                      {/* Tool event pills */}
-                      {msg.toolEvents && msg.toolEvents.length > 0 && (
+                    /* Assistant bubble */
+                    <div className="max-w-[96%] w-full space-y-2">
+
+                      {/* ── Workflow step list (≥3 tools) ──── */}
+                      {isWorkflow && msg.toolEvents && (
+                        <WorkflowStepList
+                          steps={msg.toolEvents}
+                          isStreaming={isLastAssistant && streaming}
+                        />
+                      )}
+
+                      {/* ── Small tool pills (<3 tools) ─────── */}
+                      {!isWorkflow && msg.toolEvents && msg.toolEvents.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
                           {msg.toolEvents.map((te, i) => (
                             <span
@@ -324,14 +471,29 @@ export function Copilot() {
                         </div>
                       )}
 
-                      {/* Text content */}
+                      {/* ── Checkpoint approval card ─────────── */}
+                      {msg.checkpoint && (
+                        <CheckpointCard
+                          checkpoint={msg.checkpoint}
+                          onProceed={() => submit('Approved, please proceed with the plan.')}
+                          onCancel={() => {
+                            setMessages(prev => prev.map((m, i) =>
+                              i === prev.length - 1 && m.role === 'assistant'
+                                ? { ...m, checkpoint: undefined }
+                                : m
+                            ))
+                          }}
+                        />
+                      )}
+
+                      {/* ── Text content ─────────────────────── */}
                       {msg.content ? (
                         <div className="bg-slate-50 border border-slate-100 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm text-slate-700 leading-relaxed">
                           <MarkdownText text={msg.content} />
                         </div>
                       ) : (
-                        /* Loading dots — only while streaming and no text yet */
-                        isLastAssistant && streaming && allToolsDone && (
+                        /* Loading dots — while streaming, all tools done, no checkpoint */
+                        isLastAssistant && streaming && allToolsDone && !msg.checkpoint && (
                           <div className="bg-slate-50 border border-slate-100 rounded-2xl rounded-tl-sm px-3.5 py-3">
                             <span className="flex items-center gap-1">
                               <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -368,7 +530,7 @@ export function Copilot() {
                   submit(input)
                 }
               }}
-              placeholder="Ask about your pipeline… (Enter to send)"
+              placeholder="Give me a goal or ask a question…"
               rows={1}
               disabled={streaming}
               className="flex-1 resize-none rounded-xl border border-slate-200 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 outline-none text-sm px-3 py-2 text-slate-700 placeholder:text-slate-400 disabled:bg-slate-50 disabled:cursor-not-allowed transition-colors leading-relaxed"
