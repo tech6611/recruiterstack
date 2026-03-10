@@ -13,7 +13,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Slack integration not configured' }, { status: 500 })
   }
 
-  const scopes = 'chat:write,users:read.email,im:write'
+  const scopes = 'chat:write,users:read,users:read.email,im:write'
   const redirectUri = encodeURIComponent(
     `${process.env.NEXT_PUBLIC_APP_URL}/api/slack/callback`
   )
