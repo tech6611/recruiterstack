@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { notifySlack } from '@/lib/notifications'
 
 // GET /api/apply?token=xxx — fetch job info for the public apply page
 export async function GET(request: NextRequest) {
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
   // ── Verify token & get job ────────────────────────────────────────────────
   const { data: job, error: jobErr } = await supabase
     .from('hiring_requests')
-    .select('id, position_title, status')
+    .select('id, org_id, position_title, status')
     .eq('apply_link_token', token)
     .single()
 
@@ -138,6 +139,12 @@ export async function POST(request: NextRequest) {
       note: linkedin_url ? `LinkedIn: ${linkedin_url}` : null,
       created_by: name,
     } as any)
+
+  // ── Slack notification ────────────────────────────────────────────────────
+  await notifySlack(
+    job.org_id,
+    `📥 New application: *${name}* applied for *${job.position_title}*`
+  )
 
   return NextResponse.json(
     {

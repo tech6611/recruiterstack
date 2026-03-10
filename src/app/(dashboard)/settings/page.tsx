@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle, Building2, User, Sparkles, Database } from 'lucide-react'
+import { CheckCircle, Building2, User, Sparkles, Database, Bell } from 'lucide-react'
 import { useSettings } from '@/lib/hooks/useSettings'
 import type { AppSettings } from '@/lib/hooks/useSettings'
 
@@ -10,10 +10,22 @@ export default function SettingsPage() {
   const [form, setForm] = useState<AppSettings>(settings)
   const [saved, setSaved] = useState(false)
 
+  // Slack webhook state
+  const [slackUrl, setSlackUrl] = useState('')
+  const [slackStatus, setSlackStatus] = useState<'idle' | 'saving' | 'saved' | 'testing' | 'ok' | 'error'>('idle')
+
   // Sync form once settings load from localStorage
   useEffect(() => {
     if (loaded) setForm(settings)
   }, [loaded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load Slack webhook from server
+  useEffect(() => {
+    fetch('/api/org-settings')
+      .then(r => r.json())
+      .then(({ data }) => { if (data?.slack_webhook_url) setSlackUrl(data.slack_webhook_url) })
+      .catch(() => {})
+  }, [])
 
   const set = (key: keyof AppSettings, value: string) =>
     setForm(f => ({ ...f, [key]: value }))
@@ -23,6 +35,34 @@ export default function SettingsPage() {
     save(form)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+  }
+
+  const saveSlack = async () => {
+    setSlackStatus('saving')
+    try {
+      await fetch('/api/org-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slack_webhook_url: slackUrl || null }),
+      })
+      setSlackStatus('saved')
+      setTimeout(() => setSlackStatus('idle'), 2500)
+    } catch {
+      setSlackStatus('error')
+      setTimeout(() => setSlackStatus('idle'), 2500)
+    }
+  }
+
+  const testSlack = async () => {
+    setSlackStatus('testing')
+    try {
+      const res = await fetch('/api/org-settings/test', { method: 'POST' })
+      setSlackStatus(res.ok ? 'ok' : 'error')
+      setTimeout(() => setSlackStatus('idle'), 3000)
+    } catch {
+      setSlackStatus('error')
+      setTimeout(() => setSlackStatus('idle'), 3000)
+    }
   }
 
   const inputCls =
@@ -125,6 +165,57 @@ export default function SettingsPage() {
           )}
         </button>
       </form>
+
+      {/* Slack Notifications */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
+        <div className="flex items-center gap-2.5 mb-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50">
+            <Bell className="h-4 w-4 text-green-600" />
+          </div>
+          <h2 className="text-sm font-semibold text-slate-800">Slack Notifications</h2>
+          <span className="text-xs text-slate-400">Get notified on new applications and stage moves</span>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 mb-1.5">Incoming Webhook URL</label>
+          <input
+            value={slackUrl}
+            onChange={e => setSlackUrl(e.target.value)}
+            placeholder="https://hooks.slack.com/services/..."
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+          />
+          <p className="mt-1 text-xs text-slate-400">
+            Create a webhook at <span className="font-medium text-slate-500">api.slack.com/apps</span> and paste the URL here.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={saveSlack}
+            disabled={slackStatus === 'saving'}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60"
+          >
+            {slackStatus === 'saving' ? 'Saving…' : slackStatus === 'saved' ? (
+              <><CheckCircle className="h-4 w-4" /> Saved!</>
+            ) : 'Save'}
+          </button>
+
+          {slackUrl && (
+            <button
+              type="button"
+              onClick={testSlack}
+              disabled={slackStatus === 'testing'}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-60"
+            >
+              {slackStatus === 'testing' ? 'Sending…'
+                : slackStatus === 'ok' ? '✅ Sent!'
+                : slackStatus === 'error' ? '❌ Failed'
+                : 'Test'}
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Info cards */}
       <div className="grid grid-cols-2 gap-4">

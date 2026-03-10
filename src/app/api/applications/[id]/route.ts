@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
+import { notifySlack } from '@/lib/notifications'
 
 // GET /api/applications/[id]
 export async function GET(
@@ -60,7 +61,7 @@ export async function PATCH(
   // ── Fetch current application ─────────────────────────────────────────────
   const { data: current, error: fetchErr } = await supabase
     .from('applications')
-    .select('*, pipeline_stages(name)')
+    .select('*, pipeline_stages(name), candidate:candidates(name)')
     .eq('id', params.id)
     .eq('org_id', orgId)
     .single()
@@ -108,6 +109,10 @@ export async function PATCH(
         org_id: orgId,
       } as any)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const candidateName = (current.candidate as any)?.name ?? 'Candidate'
+    await notifySlack(orgId, `➡️ *${candidateName}* moved to *${newStageName ?? 'a new stage'}*`)
+
     return NextResponse.json({ data })
   }
 
@@ -134,6 +139,16 @@ export async function PATCH(
         created_by: 'Recruiter',
         org_id: orgId,
       } as any)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const candidateName = (current.candidate as any)?.name ?? 'Candidate'
+    const label =
+      status === 'hired'
+        ? `🎉 *${candidateName}* was marked Hired`
+        : status === 'rejected'
+        ? `❌ *${candidateName}* was rejected`
+        : `🔔 *${candidateName}* status changed to ${status}`
+    await notifySlack(orgId, label)
 
     return NextResponse.json({ data })
   }
