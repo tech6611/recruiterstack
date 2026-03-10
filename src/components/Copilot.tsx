@@ -87,9 +87,8 @@ function WorkflowStepList({
       </div>
       <div className="divide-y divide-slate-100">
         {steps.map((step, i) => {
-          const isDone     = !!step.summary
-          const isRunning  = !isDone && i === steps.length - 1 && isStreaming
-          const isPending  = !isDone && !isRunning
+          const isDone    = !!step.summary
+          const isRunning = !isDone && i === steps.length - 1 && isStreaming
 
           return (
             <div key={i} className="flex items-start gap-2.5 px-3.5 py-2.5">
