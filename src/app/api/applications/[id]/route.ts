@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
-import { notifySlack } from '@/lib/notifications'
+import { notifySlack, notifySlackDM } from '@/lib/notifications'
 
 // GET /api/applications/[id]
 export async function GET(
@@ -61,7 +61,7 @@ export async function PATCH(
   // ── Fetch current application ─────────────────────────────────────────────
   const { data: current, error: fetchErr } = await supabase
     .from('applications')
-    .select('*, pipeline_stages(name), candidate:candidates(name)')
+    .select('*, pipeline_stages(name), candidate:candidates(name), hiring_request:hiring_requests(hiring_manager_email, position_title)')
     .eq('id', params.id)
     .eq('org_id', orgId)
     .single()
@@ -111,7 +111,16 @@ export async function PATCH(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const candidateName = (current.candidate as any)?.name ?? 'Candidate'
-    await notifySlack(orgId, `➡️ *${candidateName}* moved to *${newStageName ?? 'a new stage'}*`)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hmEmail = (current.hiring_request as any)?.hiring_manager_email as string | null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const jobTitle = (current.hiring_request as any)?.position_title as string | null
+    const stageMsg = `➡️ *${candidateName}* moved to *${newStageName ?? 'a new stage'}*${jobTitle ? ` for *${jobTitle}*` : ''}`
+
+    await Promise.all([
+      notifySlack(orgId, stageMsg),
+      hmEmail ? notifySlackDM(orgId, hmEmail, stageMsg) : Promise.resolve(),
+    ])
 
     return NextResponse.json({ data })
   }
@@ -142,13 +151,19 @@ export async function PATCH(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const candidateName = (current.candidate as any)?.name ?? 'Candidate'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hmEmailStatus = (current.hiring_request as any)?.hiring_manager_email as string | null
     const label =
       status === 'hired'
         ? `🎉 *${candidateName}* was marked Hired`
         : status === 'rejected'
         ? `❌ *${candidateName}* was rejected`
         : `🔔 *${candidateName}* status changed to ${status}`
-    await notifySlack(orgId, label)
+
+    await Promise.all([
+      notifySlack(orgId, label),
+      hmEmailStatus ? notifySlackDM(orgId, hmEmailStatus, label) : Promise.resolve(),
+    ])
 
     return NextResponse.json({ data })
   }

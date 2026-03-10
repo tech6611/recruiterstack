@@ -11,11 +11,18 @@ export async function GET() {
   const supabase = createAdminClient()
   const { data } = await supabase
     .from('org_settings')
-    .select('slack_webhook_url')
+    .select('slack_webhook_url, slack_bot_token, slack_team_name')
     .eq('org_id', orgId)
     .single()
 
-  return NextResponse.json({ data: data ?? { slack_webhook_url: null } })
+  // Never expose the bot token to the client
+  return NextResponse.json({
+    data: {
+      slack_webhook_url: data?.slack_webhook_url ?? null,
+      slack_connected: !!data?.slack_bot_token,
+      slack_team_name: data?.slack_team_name ?? null,
+    },
+  })
 }
 
 // PATCH /api/org-settings — upsert { slack_webhook_url }
