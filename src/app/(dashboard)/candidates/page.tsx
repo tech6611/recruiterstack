@@ -4,9 +4,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import {
-  Plus, Search, X, Users, Loader2,
+  Plus, Search, X, Users,
   UserCheck, UserMinus, MessageSquare, FileCheck, CheckCircle, XCircle,
-  ChevronUp, ChevronDown, ChevronsUpDown,
+  ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import type { CandidateStatus, CandidateListItem } from '@/lib/types/database'
 
@@ -24,6 +24,8 @@ const STATUS_CONFIG: Record<CandidateStatus, { label: string; color: string; ico
 }
 
 type SortKey = 'name' | 'current_title' | 'status' | 'created_at'
+
+const PAGE_SIZE = 30
 
 const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition'
 const labelCls = 'block text-xs font-semibold text-slate-500 mb-1.5'
@@ -50,6 +52,7 @@ export default function CandidatesPage() {
   const [filterStatus, setFilterStatus] = useState<CandidateStatus | 'all'>('all')
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [page, setPage] = useState(1)
 
   // ── Drawer state ───────────────────────────────────────────────────────────
   const [showDrawer, setShowDrawer] = useState(false)
@@ -73,6 +76,7 @@ export default function CandidatesPage() {
 
   // ── Sorting ────────────────────────────────────────────────────────────────
   const toggleSort = (key: SortKey) => {
+    setPage(1)
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
   }
@@ -114,6 +118,12 @@ export default function CandidatesPage() {
     })
     return result
   }, [candidates, filterStatus, search, sortKey, sortDir])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return filtered.slice(start, start + PAGE_SIZE)
+  }, [filtered, page])
 
   // ── Drawer helpers ─────────────────────────────────────────────────────────
   const closeDrawer = () => {
@@ -198,7 +208,16 @@ export default function CandidatesPage() {
       </div>
 
       {/* Stat cards */}
-      {!loading && (
+      {loading ? (
+        <div className="grid grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-white p-3.5 animate-pulse">
+              <div className="h-7 w-10 rounded bg-slate-200 mb-2" />
+              <div className="h-3 w-16 rounded bg-slate-100" />
+            </div>
+          ))}
+        </div>
+      ) : (
         <div className="grid grid-cols-4 gap-3">
           {([
             { label: 'Total',        value: counts.total,        color: 'bg-slate-50 border-slate-200 text-slate-700',       filter: 'all'          },
@@ -208,7 +227,7 @@ export default function CandidatesPage() {
           ] as const).map(stat => (
             <button
               key={stat.label}
-              onClick={() => setFilterStatus(filterStatus === stat.filter ? 'all' : stat.filter)}
+              onClick={() => { setFilterStatus(filterStatus === stat.filter ? 'all' : stat.filter); setPage(1) }}
               className={`rounded-xl border p-3.5 text-left transition-all hover:shadow-sm ${stat.color} ${
                 filterStatus === stat.filter ? 'ring-2 ring-offset-1 ring-blue-400' : ''
               }`}
@@ -226,7 +245,7 @@ export default function CandidatesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
             placeholder="Search name, email, title…"
             className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
           />
@@ -238,7 +257,7 @@ export default function CandidatesPage() {
         </div>
         <select
           value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value as CandidateStatus | 'all')}
+          onChange={e => { setFilterStatus(e.target.value as CandidateStatus | 'all'); setPage(1) }}
           className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
         >
           <option value="all">All statuses</option>
@@ -248,7 +267,7 @@ export default function CandidatesPage() {
         </select>
         {(filterStatus !== 'all' || search) && (
           <button
-            onClick={() => { setFilterStatus('all'); setSearch('') }}
+            onClick={() => { setFilterStatus('all'); setSearch(''); setPage(1) }}
             className="text-xs text-slate-500 hover:text-slate-800 transition-colors"
           >
             Clear filters
@@ -258,8 +277,33 @@ export default function CandidatesPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                {['w-10', 'w-40', 'w-36', 'w-24', 'w-28', 'w-24'].map((w, i) => (
+                  <th key={i} className="px-4 py-3">
+                    <div className={`h-3 ${w} rounded bg-slate-200 animate-pulse`} />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i} className="border-b border-slate-100 last:border-0">
+                  <td className="px-4 py-4"><div className="h-3 w-4 rounded bg-slate-100 animate-pulse" /></td>
+                  <td className="px-4 py-4">
+                    <div className="h-3.5 w-32 rounded bg-slate-200 animate-pulse mb-2" />
+                    <div className="h-2.5 w-24 rounded bg-slate-100 animate-pulse" />
+                  </td>
+                  <td className="px-4 py-4"><div className="h-3 w-28 rounded bg-slate-100 animate-pulse" /></td>
+                  <td className="px-4 py-4"><div className="h-5 w-14 rounded-full bg-slate-100 animate-pulse" /></td>
+                  <td className="px-4 py-4"><div className="h-5 w-20 rounded-full bg-slate-100 animate-pulse" /></td>
+                  <td className="px-4 py-4"><div className="h-3 w-20 rounded bg-slate-100 animate-pulse" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : candidates.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-16 text-center">
@@ -304,7 +348,7 @@ export default function CandidatesPage() {
                     No results match your filters.
                   </td>
                 </tr>
-              ) : filtered.map((c, idx) => {
+              ) : paginated.map((c, idx) => {
                 const s = STATUS_CONFIG[c.status]
                 return (
                   <tr
@@ -314,7 +358,7 @@ export default function CandidatesPage() {
                   >
                     {/* Row number */}
                     <td className="px-4 py-3.5 text-xs text-slate-400 font-medium tabular-nums">
-                      {idx + 1}
+                      {(page - 1) * PAGE_SIZE + idx + 1}
                     </td>
                     {/* Name + email */}
                     <td className="px-4 py-3.5">
@@ -352,10 +396,31 @@ export default function CandidatesPage() {
             </tbody>
           </table>
           {filtered.length > 0 && (
-            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50">
+            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
               <p className="text-xs text-slate-400">
-                Showing {filtered.length} of {candidates.length} candidate{candidates.length !== 1 ? 's' : ''}
+                {filtered.length < candidates.length
+                  ? `${filtered.length} match${filtered.length !== 1 ? 'es' : ''} · ${candidates.length} total`
+                  : `${candidates.length} candidate${candidates.length !== 1 ? 's' : ''}`}
               </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-3 w-3" /> Prev
+                  </button>
+                  <span className="text-xs text-slate-400 tabular-nums">{page} / {totalPages}</span>
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

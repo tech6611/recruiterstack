@@ -117,7 +117,8 @@ export async function PATCH(
     const jobTitle = (current.hiring_request as any)?.position_title as string | null
     const stageMsg = `➡️ *${candidateName}* moved to *${newStageName ?? 'a new stage'}*${jobTitle ? ` for *${jobTitle}*` : ''}`
 
-    await Promise.all([
+    // Fire-and-forget — don't block the API response waiting for Slack
+    void Promise.all([
       notifySlack(orgId, stageMsg),
       hmEmail ? notifySlackDM(orgId, hmEmail, stageMsg) : Promise.resolve(),
     ])
@@ -160,7 +161,8 @@ export async function PATCH(
         ? `❌ *${candidateName}* was rejected`
         : `🔔 *${candidateName}* status changed to ${status}`
 
-    await Promise.all([
+    // Fire-and-forget — don't block the API response waiting for Slack
+    void Promise.all([
       notifySlack(orgId, label),
       hmEmailStatus ? notifySlackDM(orgId, hmEmailStatus, label) : Promise.resolve(),
     ])

@@ -706,7 +706,16 @@ export default function JobsPage() {
       </div>
 
       {/* Stat cards */}
-      {!loading && (
+      {loading ? (
+        <div className="grid grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-white p-3.5 animate-pulse">
+              <div className="h-7 w-10 rounded bg-slate-200 mb-2" />
+              <div className="h-3 w-20 rounded bg-slate-100" />
+            </div>
+          ))}
+        </div>
+      ) : (
         <div className="grid grid-cols-4 gap-3">
           {([
             { label: 'Total',       value: counts.total,    color: 'bg-slate-50 border-slate-200 text-slate-700',    filter: 'all'             },
@@ -766,8 +775,39 @@ export default function JobsPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                {['w-10', 'w-40', 'w-32', 'w-32', 'w-24', 'w-24'].map((w, i) => (
+                  <th key={i} className="px-4 py-3">
+                    <div className={`h-3 ${w} rounded bg-slate-200 animate-pulse`} />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i} className="border-b border-slate-100 last:border-0">
+                  <td className="px-4 py-4"><div className="h-3 w-12 rounded bg-slate-100 animate-pulse" /></td>
+                  <td className="px-4 py-4">
+                    <div className="h-3.5 w-40 rounded bg-slate-200 animate-pulse mb-2" />
+                    <div className="h-2.5 w-24 rounded bg-slate-100 animate-pulse" />
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex gap-1">
+                      {Array.from({ length: 3 }).map((_, j) => (
+                        <div key={j} className="h-5 w-10 rounded-full bg-slate-100 animate-pulse" />
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4"><div className="h-3 w-28 rounded bg-slate-100 animate-pulse" /></td>
+                  <td className="px-4 py-4"><div className="h-5 w-20 rounded-full bg-slate-100 animate-pulse" /></td>
+                  <td className="px-4 py-4"><div className="h-3 w-20 rounded bg-slate-100 animate-pulse" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : jobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-16 text-center">
