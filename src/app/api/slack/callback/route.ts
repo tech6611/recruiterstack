@@ -10,18 +10,25 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error')
 
   if (error || !code) {
-    return NextResponse.redirect(`${appUrl}/settings?slack=error`)
+    console.error('[slack-oauth] slack returned error or no code:', error)
+    return NextResponse.redirect(`${appUrl}/settings?slack=error&reason=${error ?? 'no_code'}`)
   }
 
   // Get the org for the currently logged-in user (Clerk session cookie persists)
   const orgId = await getOrgId()
   if (!orgId) {
-    return NextResponse.redirect(`${appUrl}/settings?slack=error`)
+    console.error('[slack-oauth] getOrgId() returned null — Clerk session may not persist through OAuth redirect')
+    return NextResponse.redirect(`${appUrl}/settings?slack=error&reason=no_orgid`)
   }
 
-  // Exchange code for bot token
-  const clientId = process.env.SLACK_CLIENT_ID!
-  const clientSecret = process.env.SLACK_CLIENT_SECRET!
+  // Verify env vars are present
+  const clientId = process.env.SLACK_CLIENT_ID
+  const clientSecret = process.env.SLACK_CLIENT_SECRET
+  if (!clientId || !clientSecret) {
+    console.error('[slack-oauth] SLACK_CLIENT_ID or SLACK_CLIENT_SECRET not set')
+    return NextResponse.redirect(`${appUrl}/settings?slack=error&reason=missing_env`)
+  }
+
   const redirectUri = `${appUrl}/api/slack/callback`
 
   const params = new URLSearchParams({
@@ -41,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   if (!tokenData.ok) {
     console.error('[slack-oauth] token exchange failed:', tokenData.error)
-    return NextResponse.redirect(`${appUrl}/settings?slack=error`)
+    return NextResponse.redirect(`${appUrl}/settings?slack=error&reason=token_${tokenData.error ?? 'unknown'}`)
   }
 
   const botToken = tokenData.access_token as string

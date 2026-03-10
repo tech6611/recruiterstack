@@ -20,6 +20,7 @@ export default function SettingsPage() {
   const [slackConnected, setSlackConnected] = useState(false)
   const [slackTeamName, setSlackTeamName] = useState<string | null>(null)
   const [oauthToast, setOauthToast] = useState<'connected' | 'error' | null>(null)
+  const [oauthErrorReason, setOauthErrorReason] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
 
   // Sync form once settings load from localStorage
@@ -52,8 +53,10 @@ export default function SettingsPage() {
         .then(({ data }) => setSlackTeamName(data?.slack_team_name ?? null))
         .catch(() => {})
     } else if (result === 'error') {
+      const reason = searchParams.get('reason')
+      setOauthErrorReason(reason)
       setOauthToast('error')
-      setTimeout(() => setOauthToast(null), 4000)
+      setTimeout(() => setOauthToast(null), 8000)
     }
   }, [searchParams])
 
@@ -127,7 +130,7 @@ export default function SettingsPage() {
         }`}>
           {oauthToast === 'connected'
             ? '✅ Slack connected! Hiring managers will now receive DMs on candidate updates.'
-            : '❌ Slack connection failed. Please try again.'}
+            : `❌ Slack connection failed${oauthErrorReason ? ` · reason: ${oauthErrorReason}` : ''}. Please try again.`}
         </div>
       )}
 
