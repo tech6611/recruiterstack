@@ -7,8 +7,8 @@
  *
  * Streams SSE:
  *   { type: "text",        delta: string }
- *   { type: "tool_start",  name: string, label: string }
- *   { type: "tool_done",   name: string, summary: string }
+ *   { type: "tool_start",  id: string, name: string, label: string }
+ *   { type: "tool_done",   id: string, name: string, summary: string }
  *   { type: "checkpoint",  action_summary: string, details: string, impact: string }
  *   { type: "done" }
  *   { type: "error",       message: string }
@@ -40,6 +40,15 @@ function toolLabel(name: string): string {
     bulk_score_applications:   '🤖 AI scoring applicants...',
     send_outreach_email:       '✉️  Sending outreach email...',
     request_approval:          '⏸️  Awaiting your approval...',
+    // Extended action tools
+    create_candidate:          '👤 Creating candidate...',
+    update_candidate_status:   '🔄 Updating candidate status...',
+    update_application_status: '📋 Updating application status...',
+    bulk_move_to_stage:        '➡️  Moving candidates to stage...',
+    bulk_reject_below_score:   '🚫 Rejecting low-score applicants...',
+    get_application_events:    '📜 Fetching activity history...',
+    update_job:                '✏️  Updating job details...',
+    get_scorecard:             '🗒️  Loading scorecard...',
   }
   return labels[name] ?? `⚙️ Running ${name}...`
 }
@@ -75,16 +84,22 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = `You are an AI recruiting copilot inside RecruiterStack, a modern ATS. Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
 
-You help recruiters understand their pipeline, find candidates, and take actions.
+You help recruiters manage their full recruiting workflow end-to-end.
 - Be concise and direct. Prefer bullet points over prose when listing data.
 - Always use names (not IDs) in your responses — IDs are for tool calls only.
-- When you complete a write action (move stage, add note), confirm briefly what you did.
+- When you complete a write action (move stage, add note, reject, hire), confirm briefly what you did.
 - If you're unsure which candidate or job the recruiter means, ask for clarification rather than guessing.
-- You have access to tools to query and modify the recruiter's pipeline.
+- If asked to do something you have no tool for, say so clearly and suggest what the recruiter can do in the app instead.
+
+CAPABILITIES (what you can do):
+- Query: search candidates, view pipeline, list jobs, get stats, find stale apps, get candidate details, view activity history, view scorecards
+- Write (single): move stage, add note, create candidate, update candidate status, update application status (reject/hire/withdraw), update job details
+- Bulk write: add candidates to pipeline, AI-score applications, bulk move to stage, bulk reject below score, send outreach emails
+- Orchestrate: create job + pipeline, source candidates, run full hiring workflows
 
 AUTONOMOUS AGENT RULES (for complex multi-step goals):
 - For high-level goals like "hire N engineers in [city]", plan briefly then execute tool-by-tool without waiting for confirmation between steps — EXCEPT before checkpoints.
-- ALWAYS call request_approval before: sending any emails, creating jobs, or taking actions that affect 3+ candidates at once. The recruiter must approve before you proceed.
+- ALWAYS call request_approval before: sending any emails, creating jobs, or taking bulk actions that affect 3+ candidates at once. The recruiter must approve before you proceed.
 - When calling send_outreach_email: YOU write the subject and body — warm, professional, personalized to the candidate's specific skills/title and how they match the role. 3-4 short paragraphs.
 - After completing a full workflow, give a 2-sentence summary: what was accomplished + recommended next action.
 - search_candidate_pool returns internal candidates only. If the pool is too small, tell the recruiter and suggest they add candidates via the app.`
@@ -127,7 +142,7 @@ AUTONOMOUS AGENT RULES (for complex multi-step goals):
                   name:      event.content_block.name,
                   inputJson: '',
                 }
-                send({ type: 'tool_start', name: currentToolCall.name, label: toolLabel(currentToolCall.name) })
+                send({ type: 'tool_start', id: currentToolCall.id, name: currentToolCall.name, label: toolLabel(currentToolCall.name) })
               }
             }
 
@@ -188,7 +203,7 @@ AUTONOMOUS AGENT RULES (for complex multi-step goals):
             }
 
             const result = await executeTool(tc.name, parsedInput, orgId, supabase)
-            send({ type: 'tool_done', name: tc.name, summary: toolSummary(tc.name, result) })
+            send({ type: 'tool_done', id: tc.id, name: tc.name, summary: toolSummary(tc.name, result) })
 
             toolResults.push({
               type:        'tool_result',

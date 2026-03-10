@@ -12,11 +12,12 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { Bot, X, Send } from 'lucide-react'
+import { Bot, X, Send, Trash2 } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type ToolEvent = {
+  id:       string
   name:     string
   label:    string
   summary?: string
@@ -32,8 +33,8 @@ type Message = {
 
 type SSEEvent =
   | { type: 'text';       delta: string }
-  | { type: 'tool_start'; name: string; label: string }
-  | { type: 'tool_done';  name: string; summary: string }
+  | { type: 'tool_start'; id: string; name: string; label: string }
+  | { type: 'tool_done';  id: string; name: string; summary: string }
   | { type: 'checkpoint'; action_summary: string; details: string; impact: string }
   | { type: 'done' }
   | { type: 'error';      message: string }
@@ -186,12 +187,27 @@ function CheckpointCard({
 
 export function Copilot() {
   const [open,      setOpen]      = useState(false)
-  const [messages,  setMessages]  = useState<Message[]>([])
+  const [messages,  setMessages]  = useState<Message[]>(() => {
+    // Lazy init — restore conversation from localStorage (survives page navigations)
+    if (typeof window === 'undefined') return []
+    try {
+      const stored = localStorage.getItem('copilot_messages')
+      if (stored) return JSON.parse(stored) as Message[]
+    } catch { /* ignore parse errors */ }
+    return []
+  })
   const [input,     setInput]     = useState('')
   const [streaming, setStreaming] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLTextAreaElement>(null)
+
+  // Persist messages to localStorage whenever they change (keep last 50)
+  useEffect(() => {
+    try {
+      localStorage.setItem('copilot_messages', JSON.stringify(messages.slice(-50)))
+    } catch { /* ignore quota errors */ }
+  }, [messages])
 
   // Auto-scroll to newest content
   useEffect(() => {
@@ -277,7 +293,7 @@ export function Copilot() {
             case 'tool_start':
               setMessages(prev => prev.map((m, i) =>
                 i === prev.length - 1 && m.role === 'assistant'
-                  ? { ...m, toolEvents: [...(m.toolEvents ?? []), { name: event.name, label: event.label }] }
+                  ? { ...m, toolEvents: [...(m.toolEvents ?? []), { id: event.id, name: event.name, label: event.label }] }
                   : m
               ))
               break
@@ -288,7 +304,7 @@ export function Copilot() {
                   ? {
                       ...m,
                       toolEvents: (m.toolEvents ?? []).map(te =>
-                        te.name === event.name && !te.summary
+                        te.id === event.id
                           ? { ...te, summary: event.summary }
                           : te
                       ),
@@ -389,12 +405,26 @@ export function Copilot() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setOpen(false)}
-            className="text-slate-400 hover:text-slate-600 rounded-lg p-1.5 hover:bg-slate-100 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <button
+                onClick={() => {
+                  setMessages([])
+                  try { localStorage.removeItem('copilot_messages') } catch { /* ignore */ }
+                }}
+                title="Clear conversation"
+                className="text-slate-400 hover:text-red-500 rounded-lg p-1.5 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={() => setOpen(false)}
+              className="text-slate-400 hover:text-slate-600 rounded-lg p-1.5 hover:bg-slate-100 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* ── Messages ───────────────────────────────────────────────────── */}
