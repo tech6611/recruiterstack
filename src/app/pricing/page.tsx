@@ -251,8 +251,8 @@ export default function PricingPage() {
       <section className="border-b border-zinc-900 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-10 text-center">
-            <h2 className="text-2xl font-bold text-white sm:text-3xl">Build your own stack</h2>
-            <p className="mt-2 text-zinc-400">Add only the agents your team needs. Remove any time.</p>
+            <h2 className="text-2xl font-bold text-white sm:text-3xl">Meet the agents</h2>
+            <p className="mt-2 text-zinc-400">All five are included in Pro. Buy individually coming soon.</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -291,12 +291,12 @@ export default function PricingPage() {
                     ))}
                   </ul>
 
-                  <Link
-                    href="/sign-up"
-                    className={`mt-auto block rounded-xl px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors ${agent.btnBg}`}
+                  <a
+                    href="#full-suite"
+                    className="mt-auto block rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-center text-sm font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white transition-colors"
                   >
-                    Add to stack
-                  </Link>
+                    Included in Pro ↓
+                  </a>
                 </div>
               )
             })}
@@ -305,7 +305,7 @@ export default function PricingPage() {
       </section>
 
       {/* Full suite */}
-      <section className="border-b border-zinc-900 py-20">
+      <section id="full-suite" className="border-b border-zinc-900 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-10 text-center">
             <h2 className="text-2xl font-bold text-white sm:text-3xl">Full suite</h2>
