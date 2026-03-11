@@ -339,7 +339,7 @@ export default function HomePage() {
 
             {/* Architecture diagram */}
             <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6 font-mono text-xs">
-              <p className="text-zinc-600 mb-4">// Your existing infrastructure</p>
+              <p className="text-zinc-600 mb-4">{'// Your existing infrastructure'}</p>
 
               <div className="space-y-2 mb-6">
                 {['Workday / SAP', 'Greenhouse / Lever', 'LinkedIn / Naukri', 'Google Calendar / Slack'].map(tool => (
@@ -367,7 +367,7 @@ export default function HomePage() {
                 ))}
               </div>
 
-              <p className="text-zinc-600 mt-4">// Bidirectional sync · No migration</p>
+              <p className="text-zinc-600 mt-4">{'// Bidirectional sync · No migration'}</p>
             </div>
           </div>
         </div>
