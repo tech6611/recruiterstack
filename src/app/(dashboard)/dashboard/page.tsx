@@ -118,6 +118,8 @@ const VIEW_ICONS: Record<string, React.FC<{ className?: string }>> = {
 
 const LS_VIEWS   = 'rs_dashboard_views'
 const LS_ACTIVE  = 'rs_dashboard_active_view'
+const LS_VERSION = 'rs_dashboard_version'
+const CURRENT_VERSION = 'v2' // bump when DashView shape changes
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -873,14 +875,38 @@ export default function DashboardPage() {
   const [widgetMode,   setWidgetMode]   = useState(false)
   const [hydrated,     setHydrated]     = useState(false)
 
-  // Hydrate localStorage
+  // Hydrate localStorage — migrate old data that lacks `widgets`
   useEffect(() => {
     try {
-      const v = localStorage.getItem(LS_VIEWS)
-      if (v) setViews(JSON.parse(v))
-      const a = localStorage.getItem(LS_ACTIVE)
-      if (a) setActiveViewId(a)
-    } catch {}
+      const version = localStorage.getItem(LS_VERSION)
+
+      if (version !== CURRENT_VERSION) {
+        // First load after upgrade — clear stale data, start fresh with defaults
+        localStorage.removeItem(LS_VIEWS)
+        localStorage.removeItem(LS_ACTIVE)
+        localStorage.setItem(LS_VERSION, CURRENT_VERSION)
+      } else {
+        const v = localStorage.getItem(LS_VIEWS)
+        if (v) {
+          const parsed = JSON.parse(v) as DashView[]
+          // Migrate any view missing the widgets array
+          const migrated = parsed.map(view => {
+            if (!Array.isArray(view.widgets)) {
+              const def = DEFAULT_VIEWS.find(d => d.id === view.id)
+              return { ...view, widgets: def?.widgets ?? (['interviews', 'tasks'] as WidgetId[]) }
+            }
+            return view
+          })
+          setViews(migrated)
+        }
+        const a = localStorage.getItem(LS_ACTIVE)
+        if (a) setActiveViewId(a)
+      }
+    } catch {
+      // Corrupted storage — reset silently
+      localStorage.removeItem(LS_VIEWS)
+      localStorage.removeItem(LS_ACTIVE)
+    }
     setHydrated(true)
   }, [])
 
@@ -934,12 +960,12 @@ export default function DashboardPage() {
   function handleRemoveWidget(id: WidgetId) {
     const view = views.find(v => v.id === activeViewId)
     if (!view) return
-    updateWidgets(view.widgets.filter(w => w !== id))
+    updateWidgets((view.widgets ?? []).filter(w => w !== id))
   }
   function handleAddWidget(id: WidgetId) {
     const view = views.find(v => v.id === activeViewId)
     if (!view) return
-    updateWidgets([...view.widgets, id])
+    updateWidgets([...(view.widgets ?? []), id])
   }
 
   if (loading || !hydrated) return <DashboardSkeleton />
