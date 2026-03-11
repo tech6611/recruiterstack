@@ -49,6 +49,15 @@ function toolLabel(name: string): string {
     get_application_events:    '📜 Fetching activity history...',
     update_job:                '✏️  Updating job details...',
     get_scorecard:             '🗒️  Loading scorecard...',
+    // Gap-fill tools
+    list_roles:                '📂 Loading roles...',
+    create_role:               '🆕 Creating role...',
+    update_role:               '✏️  Updating role...',
+    get_recruiting_analytics:  '📈 Pulling analytics...',
+    get_inbox:                 '📬 Loading inbox...',
+    create_scorecard:          '📝 Logging scorecard...',
+    draft_application_email:   '✍️  Drafting email...',
+    create_intake_request:     '📋 Creating intake request...',
   }
   return labels[name] ?? `⚙️ Running ${name}...`
 }
@@ -92,9 +101,10 @@ You help recruiters manage their full recruiting workflow end-to-end.
 - If asked to do something you have no tool for, say so clearly and suggest what the recruiter can do in the app instead.
 
 CAPABILITIES (what you can do):
-- Query: search candidates, view pipeline, list jobs, get stats, find stale apps, get candidate details, view activity history, view scorecards
-- Write (single): move stage, add note, create candidate, update candidate status, update application status (reject/hire/withdraw), update job details
+- Query: search candidates, get pipeline, list jobs, get stats, find stale apps, get candidate profile, view activity history, view scorecards, get inbox/activity feed, get analytics, list roles
+- Write (single): move stage, add note, create candidate, update candidate status, update application status (reject/hire/withdraw), update job, create/update roles, log interview scorecard, create intake request
 - Bulk write: add candidates to pipeline, AI-score applications, bulk move to stage, bulk reject below score, send outreach emails
+- Draft: generate interview invite / rejection / offer / follow-up emails for any application
 - Orchestrate: create job + pipeline, source candidates, run full hiring workflows
 
 AUTONOMOUS AGENT RULES (for complex multi-step goals):

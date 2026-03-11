@@ -251,6 +251,252 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
       required: ['action_summary', 'impact'],
     },
   },
+
+  // ── Extended platform tools ───────────────────────────────────────────────
+  {
+    name: 'create_candidate',
+    description: 'Add a new candidate to the system manually.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name:             { type: 'string', description: 'Full name (required)' },
+        email:            { type: 'string', description: 'Email address (required)' },
+        current_title:    { type: 'string', description: 'Current job title' },
+        location:         { type: 'string', description: 'City or location, e.g. "New York"' },
+        experience_years: { type: 'number', description: 'Years of professional experience' },
+        skills: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of skills, e.g. ["React", "TypeScript"]',
+        },
+        phone:        { type: 'string', description: 'Phone number' },
+        linkedin_url: { type: 'string', description: 'LinkedIn profile URL' },
+      },
+      required: ['name', 'email'],
+    },
+  },
+  {
+    name: 'update_candidate_status',
+    description: "Update a candidate's overall status. Use 'hired' when closing an offer, 'inactive' when no longer pursuing, 'interviewing' when in active interviews.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        candidate_id: { type: 'string', description: 'UUID of the candidate' },
+        status: {
+          type: 'string',
+          enum: ['active', 'inactive', 'interviewing', 'offer_extended', 'hired', 'rejected'],
+          description: 'New candidate status',
+        },
+        reason: { type: 'string', description: 'Optional reason for the change' },
+      },
+      required: ['candidate_id', 'status'],
+    },
+  },
+  {
+    name: 'update_application_status',
+    description: 'Change the status of one or more applications (reject, hire, withdraw, or re-activate). For bulk rejection after scoring, prefer bulk_reject_below_score.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of application UUIDs',
+        },
+        status: {
+          type: 'string',
+          enum: ['active', 'rejected', 'hired', 'withdrawn'],
+          description: 'Target status',
+        },
+        reason: { type: 'string', description: 'Optional reason (stored in event log)' },
+      },
+      required: ['application_ids', 'status'],
+    },
+  },
+  {
+    name: 'bulk_move_to_stage',
+    description: 'Move multiple applications to a specific pipeline stage at once. Use after bulk_score_applications to advance high-scorers.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of application UUIDs to move',
+        },
+        stage_id: { type: 'string', description: 'Target pipeline stage UUID (get from get_job_pipeline)' },
+        note:     { type: 'string', description: 'Optional note logged for all moved applications' },
+      },
+      required: ['application_ids', 'stage_id'],
+    },
+  },
+  {
+    name: 'bulk_reject_below_score',
+    description: 'Reject all active applications for a job whose AI score is strictly below a threshold. Always run bulk_score_applications first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        job_id:      { type: 'string', description: 'UUID of the job' },
+        below_score: { type: 'number', description: 'Reject apps with AI score < this value, e.g. 50' },
+        reason:      { type: 'string', description: 'Rejection reason stored in event log' },
+      },
+      required: ['job_id', 'below_score'],
+    },
+  },
+  {
+    name: 'get_application_events',
+    description: 'Get the full activity timeline for an application: stage moves, notes, emails sent, status changes. Useful for understanding candidate history.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id: { type: 'string', description: 'UUID of the application' },
+      },
+      required: ['application_id'],
+    },
+  },
+  {
+    name: 'update_job',
+    description: "Update an existing job's status, title, hiring manager, or requirements. Use status 'posted' to publish, 'paused' to pause, or update details after creation.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        job_id:               { type: 'string', description: 'UUID of the hiring request' },
+        status:               { type: 'string', enum: ['intake_pending', 'intake_submitted', 'jd_generated', 'jd_sent', 'jd_approved', 'posted'], description: 'New status' },
+        position_title:       { type: 'string', description: 'Updated job title' },
+        hiring_manager_name:  { type: 'string', description: 'Updated hiring manager name' },
+        key_requirements:     { type: 'string', description: 'Updated key requirements' },
+        location:             { type: 'string', description: 'Updated location' },
+        headcount:            { type: 'number', description: 'Updated headcount' },
+      },
+      required: ['job_id'],
+    },
+  },
+  {
+    name: 'get_scorecard',
+    description: "Get interview scorecards for an application. Shows interviewer name, recommendation, scores per criterion, and notes.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id: { type: 'string', description: 'UUID of the application' },
+      },
+      required: ['application_id'],
+    },
+  },
+  // ── Gap-fill tools: full platform parity ───────────────────────────────────
+  {
+    name: 'list_roles',
+    description: 'List all roles in the ATS (roles are distinct from hiring requests — they define standing job templates with scoring thresholds).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['draft', 'active', 'paused', 'closed'],
+          description: 'Optional: filter by role status',
+        },
+      },
+    },
+  },
+  {
+    name: 'create_role',
+    description: 'Create a new role template in the ATS with scoring criteria.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        job_title:               { type: 'string',  description: 'Title of the role (required)' },
+        required_skills:         { type: 'array', items: { type: 'string' }, description: 'List of required skill keywords (e.g. ["React", "TypeScript"])' },
+        min_experience:          { type: 'number',  description: 'Minimum years of experience required (default: 0)' },
+        location:                { type: 'string',  description: 'Location or "Remote"' },
+        salary_min:              { type: 'number',  description: 'Minimum salary (USD)' },
+        salary_max:              { type: 'number',  description: 'Maximum salary (USD)' },
+        status:                  { type: 'string',  enum: ['draft', 'active', 'paused', 'closed'], description: 'Role status (default: active)' },
+        auto_advance_threshold:  { type: 'number',  description: 'AI score threshold (0-100) to auto-advance candidates' },
+        auto_reject_threshold:   { type: 'number',  description: 'AI score threshold (0-100) to auto-reject candidates' },
+      },
+      required: ['job_title'],
+    },
+  },
+  {
+    name: 'update_role',
+    description: 'Update an existing role: change title, skills, location, salary range, status, or scoring thresholds.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        role_id:                 { type: 'string',  description: 'UUID of the role to update' },
+        job_title:               { type: 'string',  description: 'New title' },
+        required_skills:         { type: 'array', items: { type: 'string' }, description: 'Updated required skills list' },
+        min_experience:          { type: 'number',  description: 'Updated minimum years of experience' },
+        location:                { type: 'string',  description: 'Updated location' },
+        salary_min:              { type: 'number',  description: 'Updated minimum salary' },
+        salary_max:              { type: 'number',  description: 'Updated maximum salary' },
+        status:                  { type: 'string',  enum: ['draft', 'active', 'paused', 'closed'], description: 'New status' },
+        auto_advance_threshold:  { type: 'number',  description: 'New auto-advance AI score threshold' },
+        auto_reject_threshold:   { type: 'number',  description: 'New auto-reject AI score threshold' },
+      },
+      required: ['role_id'],
+    },
+  },
+  {
+    name: 'get_recruiting_analytics',
+    description: 'Get detailed recruiting analytics: per-job pipeline funnel with stage counts, source distribution of applications, and average days per stage across active applications.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'get_inbox',
+    description: 'Get the recruiter inbox: recent activity events (stage moves, notes, status changes) and a list of active applications stale for 14+ days that need attention.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'create_scorecard',
+    description: 'Log an interview scorecard for an application. Records the interviewer name, recommendation, optional per-criterion scores, and notes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id:   { type: 'string', description: 'UUID of the application being scored' },
+        interviewer_name: { type: 'string', description: 'Full name of the interviewer' },
+        stage_name:       { type: 'string', description: 'Interview stage (e.g. "Technical Screen", "Final Round")' },
+        recommendation:   { type: 'string', enum: ['strong_yes', 'yes', 'maybe', 'no'], description: 'Overall hiring recommendation' },
+        overall_notes:    { type: 'string', description: 'Overall interview notes or summary' },
+      },
+      required: ['application_id', 'interviewer_name', 'recommendation'],
+    },
+  },
+  {
+    name: 'draft_application_email',
+    description: 'Generate an AI-drafted email for a candidate application. Use for interview invitations, rejections, offer letters, or follow-ups. Returns subject + body for recruiter review.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id:   { type: 'string', description: 'UUID of the application (used to fetch candidate name, job title, and current stage)' },
+        template:         { type: 'string', enum: ['interview_invite', 'rejection', 'offer', 'followup'], description: 'Email type to draft' },
+        recruiter_name:   { type: 'string', description: 'Recruiter name for the sign-off (default: "The Recruiting Team")' },
+        recruiter_title:  { type: 'string', description: 'Recruiter title (optional)' },
+        company_name:     { type: 'string', description: 'Company name to use in the email body' },
+      },
+      required: ['application_id', 'template'],
+    },
+  },
+  {
+    name: 'create_intake_request',
+    description: 'Create a new hiring request and generate an intake form link to send to the hiring manager. Returns the intake URL for the recruiter to forward. Does NOT send the email automatically — the recruiter must share the link.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        position_title:         { type: 'string', description: 'Job title for the new role' },
+        hiring_manager_name:    { type: 'string', description: 'Hiring manager full name' },
+        hiring_manager_email:   { type: 'string', description: 'Hiring manager email (required to generate the intake link)' },
+        department:             { type: 'string', description: 'Department (optional)' },
+        hiring_manager_slack:   { type: 'string', description: 'HM Slack handle e.g. @john (optional — for Slack notification)' },
+      },
+      required: ['position_title', 'hiring_manager_name', 'hiring_manager_email'],
+    },
+  },
 ]
 
 // ── Tool executor ─────────────────────────────────────────────────────────────
@@ -280,6 +526,24 @@ export async function executeTool(
       case 'send_outreach_email':       return await sendOutreachEmail(input, orgId, supabase)
       case 'request_approval':
         return `CHECKPOINT: ${input.action_summary}. Impact: ${input.impact}.${input.details ? ' ' + input.details : ''}`
+      // Extended platform tools
+      case 'create_candidate':           return await createCandidate(input, orgId, supabase)
+      case 'update_candidate_status':    return await updateCandidateStatus(input, orgId, supabase)
+      case 'update_application_status':  return await updateApplicationStatus(input, orgId, supabase)
+      case 'bulk_move_to_stage':         return await bulkMoveToStage(input, orgId, supabase)
+      case 'bulk_reject_below_score':    return await bulkRejectBelowScore(input, orgId, supabase)
+      case 'get_application_events':     return await getApplicationEvents(input, orgId, supabase)
+      case 'update_job':                 return await updateJob(input, orgId, supabase)
+      case 'get_scorecard':              return await getScorecard(input, orgId, supabase)
+      // Gap-fill tools
+      case 'list_roles':                 return await listRoles(input, orgId, supabase)
+      case 'create_role':                return await createRole(input, orgId, supabase)
+      case 'update_role':                return await updateRole(input, orgId, supabase)
+      case 'get_recruiting_analytics':   return await getRecruitingAnalytics(orgId, supabase)
+      case 'get_inbox':                  return await getInbox(orgId, supabase)
+      case 'create_scorecard':           return await createScorecard(input, orgId, supabase)
+      case 'draft_application_email':    return await draftApplicationEmail(input, orgId, supabase)
+      case 'create_intake_request':      return await createIntakeRequest(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -1017,4 +1281,798 @@ async function sendOutreachEmail(
   } as never)
 
   return `Email sent to ${candidate.name} (${candidate.email}) re: ${job?.position_title ?? 'the role'}.`
+}
+
+// ── Extended platform tools ───────────────────────────────────────────────────
+
+async function createCandidate(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { name, email, current_title, location, experience_years, skills, phone, linkedin_url } = input
+
+  // Duplicate check
+  const { data: existing } = await supabase
+    .from('candidates')
+    .select('id, name')
+    .eq('email', email)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (existing) {
+    return `A candidate with email ${email} already exists: ${existing.name} (ID: ${existing.id})`
+  }
+
+  const { data: candidate, error } = await supabase
+    .from('candidates')
+    .insert({
+      name,
+      email,
+      current_title:    current_title    ?? null,
+      location:         location         ?? null,
+      experience_years: experience_years ?? 0,
+      skills:           skills           ?? [],
+      phone:            phone            ?? null,
+      linkedin_url:     linkedin_url     ?? null,
+      status:           'active',
+      org_id:           orgId,
+    } as never)
+    .select('id, name')
+    .single()
+
+  if (error) return `Error creating candidate: ${error.message}`
+  return `Created candidate ${candidate.name} (ID: ${candidate.id}).`
+}
+
+async function updateCandidateStatus(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { candidate_id, status, reason } = input
+
+  const { data: candidate, error: fetchErr } = await supabase
+    .from('candidates')
+    .select('name, status')
+    .eq('id', candidate_id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (fetchErr || !candidate) return 'Candidate not found in your organization.'
+
+  const { error: updateErr } = await supabase
+    .from('candidates')
+    .update({ status } as never)
+    .eq('id', candidate_id)
+    .eq('org_id', orgId)
+
+  if (updateErr) return `Error updating status: ${updateErr.message}`
+  return `Updated ${candidate.name}'s status from "${candidate.status}" to "${status}".${reason ? ` Reason: ${reason}` : ''}`
+}
+
+async function updateApplicationStatus(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_ids, status, reason } = input
+
+  if (!Array.isArray(application_ids) || application_ids.length === 0) {
+    return 'Error: application_ids must be a non-empty array'
+  }
+
+  const eventNote = reason ?? `Status changed to ${status} by AI Copilot`
+  let updated = 0
+
+  for (const application_id of application_ids as string[]) {
+    const { data: app } = await supabase
+      .from('applications')
+      .select('id')
+      .eq('id', application_id)
+      .eq('org_id', orgId)
+      .single()
+
+    if (!app) continue
+
+    await supabase
+      .from('applications')
+      .update({ status } as never)
+      .eq('id', application_id)
+      .eq('org_id', orgId)
+
+    await supabase.from('application_events').insert({
+      application_id,
+      event_type:  'status_changed',
+      note:        eventNote,
+      created_by:  'AI Copilot',
+      org_id:      orgId,
+    } as never)
+
+    updated++
+  }
+
+  const skipped = application_ids.length - updated
+  return `Updated ${updated} application(s) to "${status}".${skipped > 0 ? ` ${skipped} not found or skipped.` : ''}`
+}
+
+async function bulkMoveToStage(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_ids, stage_id, note } = input
+
+  if (!Array.isArray(application_ids) || application_ids.length === 0) {
+    return 'Error: application_ids must be a non-empty array'
+  }
+
+  const { data: stage, error: stageErr } = await supabase
+    .from('pipeline_stages')
+    .select('id, name')
+    .eq('id', stage_id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (stageErr || !stage) return 'Stage not found in your organization.'
+
+  let moved = 0
+  for (const application_id of application_ids as string[]) {
+    const { data: app } = await supabase
+      .from('applications')
+      .select('id, pipeline_stages(name)')
+      .eq('id', application_id)
+      .eq('org_id', orgId)
+      .single()
+
+    if (!app) continue
+
+    await supabase
+      .from('applications')
+      .update({ stage_id } as never)
+      .eq('id', application_id)
+
+    await supabase.from('application_events').insert({
+      application_id,
+      event_type: 'stage_moved',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      from_stage: (app.pipeline_stages as any)?.name ?? 'unknown',
+      to_stage:   stage.name,
+      note:       note ?? `Moved to ${stage.name} by AI Copilot`,
+      created_by: 'AI Copilot',
+      org_id:     orgId,
+    } as never)
+
+    moved++
+  }
+
+  return `Moved ${moved} application(s) to stage "${stage.name}".`
+}
+
+async function bulkRejectBelowScore(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { job_id, below_score, reason = 'Score below threshold' } = input
+
+  const { data: apps, error } = await supabase
+    .from('applications')
+    .select('id, ai_score, candidate:candidates(name)')
+    .eq('hiring_request_id', job_id)
+    .eq('org_id', orgId)
+    .eq('status', 'active')
+    .not('ai_score', 'is', null)
+    .lt('ai_score', below_score)
+
+  if (error) return `Error: ${error.message}`
+  if (!apps || apps.length === 0) return `No active scored applications below ${below_score} found.`
+
+  let rejected = 0
+  for (const app of apps as Record<string, unknown>[]) {
+    const appId = app.id as string
+
+    await supabase
+      .from('applications')
+      .update({ status: 'rejected' } as never)
+      .eq('id', appId)
+
+    await supabase.from('application_events').insert({
+      application_id: appId,
+      event_type:     'status_changed',
+      note:           `${reason} (AI score: ${app.ai_score})`,
+      created_by:     'AI Copilot',
+      org_id:         orgId,
+    } as never)
+
+    rejected++
+  }
+
+  return `Rejected ${rejected} application(s) with AI score < ${below_score}.`
+}
+
+async function getApplicationEvents(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_id } = input
+
+  const { data: app, error: appErr } = await supabase
+    .from('applications')
+    .select('id, candidate:candidates(name), hiring_request:hiring_requests(position_title)')
+    .eq('id', application_id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (appErr || !app) return 'Application not found in your organization.'
+
+  const { data: events, error: eventsErr } = await supabase
+    .from('application_events')
+    .select('event_type, from_stage, to_stage, note, created_by, created_at')
+    .eq('application_id', application_id)
+    .order('created_at', { ascending: true })
+
+  if (eventsErr) return `Error fetching events: ${eventsErr.message}`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const candidateName = (app.candidate as any)?.name ?? 'Candidate'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const jobTitle      = (app.hiring_request as any)?.position_title ?? 'Unknown job'
+
+  if (!events || events.length === 0) {
+    return `No activity recorded for ${candidateName}'s application to ${jobTitle}.`
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lines = (events as any[]).map(e => {
+    const date   = new Date(e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const detail = e.event_type === 'stage_moved'
+      ? `${e.from_stage} → ${e.to_stage}`
+      : (e.note ?? '')
+    return `• [${date}] ${e.event_type.replace(/_/g, ' ')}${detail ? ': ' + detail : ''} (by ${e.created_by})`
+  })
+
+  return `Timeline for ${candidateName} / ${jobTitle}:\n${lines.join('\n')}`
+}
+
+async function updateJob(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { job_id, status, position_title, hiring_manager_name, key_requirements, location, headcount } = input
+
+  const { data: job, error: fetchErr } = await supabase
+    .from('hiring_requests')
+    .select('id, position_title, status')
+    .eq('id', job_id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (fetchErr || !job) return 'Job not found in your organization.'
+
+  // Build update payload only from provided fields
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updates: Record<string, any> = {}
+  if (status             != null) updates.status              = status
+  if (position_title     != null) updates.position_title      = position_title
+  if (hiring_manager_name != null) updates.hiring_manager_name = hiring_manager_name
+  if (key_requirements   != null) updates.key_requirements    = key_requirements
+  if (location           != null) updates.location            = location
+  if (headcount          != null) updates.headcount           = headcount
+
+  if (Object.keys(updates).length === 0) return 'No fields provided to update.'
+
+  const { error: updateErr } = await supabase
+    .from('hiring_requests')
+    .update(updates as never)
+    .eq('id', job_id)
+    .eq('org_id', orgId)
+
+  if (updateErr) return `Error updating job: ${updateErr.message}`
+
+  const changes = Object.entries(updates).map(([k, v]) => `${k}: "${v}"`).join(', ')
+  return `Updated "${job.position_title}": ${changes}.`
+}
+
+async function getScorecard(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_id } = input
+
+  const { data: app, error: appErr } = await supabase
+    .from('applications')
+    .select('id, candidate:candidates(name), hiring_request:hiring_requests(position_title)')
+    .eq('id', application_id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (appErr || !app) return 'Application not found in your organization.'
+
+  const { data: scorecards, error } = await supabase
+    .from('scorecards')
+    .select('interviewer_name, stage_name, recommendation, scores, overall_notes, created_at')
+    .eq('application_id', application_id)
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+
+  if (error) return `Error fetching scorecards: ${error.message}`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const candidateName = (app.candidate as any)?.name ?? 'Candidate'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const jobTitle      = (app.hiring_request as any)?.position_title ?? 'Unknown job'
+
+  if (!scorecards || scorecards.length === 0) {
+    return `No scorecards found for ${candidateName}'s application to ${jobTitle}.`
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sections = (scorecards as any[]).map(sc => {
+    const date   = new Date(sc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const scores = (sc.scores ?? []).map((s: { criterion: string; rating: number; notes: string }) =>
+      `  - ${s.criterion}: ${s.rating}/4${s.notes ? ` (${s.notes})` : ''}`
+    ).join('\n')
+    return [
+      `${sc.interviewer_name}${sc.stage_name ? ` / ${sc.stage_name}` : ''} [${date}] — ${sc.recommendation}`,
+      scores,
+      sc.overall_notes ? `  Overall: ${sc.overall_notes}` : '',
+    ].filter(Boolean).join('\n')
+  })
+
+  return `Scorecards for ${candidateName} / ${jobTitle}:\n\n${sections.join('\n\n')}`
+}
+
+// ── Gap-fill implementations ───────────────────────────────────────────────────
+
+async function listRoles(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { status } = input
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q: any = supabase
+    .from('roles')
+    .select('id, job_title, status, location, min_experience, required_skills, salary_min, salary_max, auto_advance_threshold, auto_reject_threshold, created_at')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+
+  if (status) q = q.eq('status', status)
+
+  const { data, error } = await q.limit(50)
+  if (error) return `Error: ${error.message}`
+  if (!data || data.length === 0) return `No roles found${status ? ` with status "${status}"` : ''}.`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lines = (data as any[]).map(r => {
+    const skills  = (r.required_skills ?? []).join(', ') || 'none'
+    const salary  = r.salary_min && r.salary_max ? ` | $${r.salary_min.toLocaleString()}–$${r.salary_max.toLocaleString()}` : ''
+    const tholds  = r.auto_advance_threshold != null ? ` | auto-advance ≥${r.auto_advance_threshold}` : ''
+    return `• ${r.job_title} | ${r.status}${r.location ? ` | ${r.location}` : ''} | ${r.min_experience}y+ exp | skills: ${skills}${salary}${tholds} | ID: ${r.id}`
+  })
+
+  return `${data.length} role(s):\n${lines.join('\n')}`
+}
+
+async function createRole(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const {
+    job_title, required_skills, min_experience, location,
+    salary_min, salary_max, status,
+    auto_advance_threshold, auto_reject_threshold,
+  } = input
+
+  if (!job_title?.trim()) return 'Error: job_title is required.'
+
+  const { data, error } = await supabase
+    .from('roles')
+    .insert({
+      job_title:              job_title.trim(),
+      required_skills:        required_skills ?? [],
+      min_experience:         min_experience  ?? 0,
+      location:               location        ?? null,
+      salary_min:             salary_min      ?? null,
+      salary_max:             salary_max      ?? null,
+      status:                 status          ?? 'active',
+      auto_advance_threshold: auto_advance_threshold ?? null,
+      auto_reject_threshold:  auto_reject_threshold  ?? null,
+      org_id:                 orgId,
+    } as never)
+    .select('id, job_title, status')
+    .single()
+
+  if (error) return `Error creating role: ${error.message}`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = data as any
+  return `Role created: "${r.job_title}" (${r.status}) | ID: ${r.id}`
+}
+
+async function updateRole(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { role_id, ...rest } = input
+  if (!role_id) return 'Error: role_id is required.'
+
+  // Verify the role belongs to this org
+  const { data: existing, error: fetchErr } = await supabase
+    .from('roles')
+    .select('id, job_title')
+    .eq('id', role_id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (fetchErr || !existing) return `Role not found: ${role_id}`
+
+  // Build update payload from provided fields only
+  const allowed = ['job_title', 'required_skills', 'min_experience', 'location', 'salary_min', 'salary_max', 'status', 'auto_advance_threshold', 'auto_reject_threshold']
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updates: Record<string, any> = {}
+  for (const key of allowed) {
+    if (rest[key] !== undefined) updates[key] = rest[key]
+  }
+
+  if (Object.keys(updates).length === 0) return 'No fields provided to update.'
+
+  const { error } = await supabase
+    .from('roles')
+    .update(updates as never)
+    .eq('id', role_id)
+    .eq('org_id', orgId)
+
+  if (error) return `Error updating role: ${error.message}`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const changes = Object.entries(updates).map(([k, v]) => `${k}: "${Array.isArray(v) ? v.join(', ') : v}"`).join(', ')
+  return `Updated role "${(existing as any).job_title}": ${changes}.`
+}
+
+async function getRecruitingAnalytics(
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const [jobsRes, appsRes, stagesRes] = await Promise.all([
+    supabase
+      .from('hiring_requests')
+      .select('id, position_title, department, status')
+      .eq('org_id', orgId),
+    supabase
+      .from('applications')
+      .select('id, status, source, stage_id, applied_at, hiring_request_id, candidate_id')
+      .eq('org_id', orgId),
+    supabase
+      .from('pipeline_stages')
+      .select('id, name, order_index, hiring_request_id')
+      .eq('org_id', orgId)
+      .order('order_index'),
+  ])
+
+  const jobs   = jobsRes.data   ?? []
+  const apps   = appsRes.data   ?? []
+  const stages = stagesRes.data ?? []
+
+  const ACTIVE_JOB_STATUSES = ['active', 'jd_approved', 'jd_sent', 'jd_generated', 'posted']
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const activeJobs = jobs.filter((j: any) => ACTIVE_JOB_STATUSES.includes(j.status))
+
+  // 1. Jobs funnel
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const funnelLines = activeJobs.map((job: any) => {
+    const jobStages  = stages.filter((s: any) => s.hiring_request_id === job.id)
+    const activeApps = apps.filter((a: any) => a.hiring_request_id === job.id && a.status === 'active')
+    const stageStr   = jobStages
+      .map((s: any) => `${s.name}: ${activeApps.filter((a: any) => a.stage_id === s.id).length}`)
+      .join(' → ')
+    return `• ${job.position_title} (${activeApps.length} active) — ${stageStr || 'no stages'}`
+  }).slice(0, 10)
+
+  // 2. Source breakdown
+  const sourceMap: Record<string, number> = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  apps.forEach((a: any) => { sourceMap[a.source] = (sourceMap[a.source] ?? 0) + 1 })
+  const sourceLines = Object.entries(sourceMap)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([src, cnt]) => `• ${src}: ${cnt}`)
+
+  // 3. Avg days per stage
+  const velocityMap: Record<string, { total: number; count: number }> = {}
+  const now = Date.now()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  apps.filter((a: any) => a.status === 'active' && a.stage_id).forEach((a: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stage = stages.find((s: any) => s.id === a.stage_id)
+    if (!stage) return
+    const days = Math.floor((now - new Date(a.applied_at).getTime()) / 86_400_000)
+    if (!velocityMap[stage.name]) velocityMap[stage.name] = { total: 0, count: 0 }
+    velocityMap[stage.name].total += days
+    velocityMap[stage.name].count += 1
+  })
+  const velocityLines = Object.entries(velocityMap)
+    .map(([name, { total, count }]) => `• ${name}: avg ${Math.round(total / count)}d (${count} active)`)
+
+  // 4. Summary
+  const totalHired    = apps.filter((a: any) => a.status === 'hired').length
+  const totalRejected = apps.filter((a: any) => a.status === 'rejected').length
+  const totalActive   = apps.filter((a: any) => a.status === 'active').length
+
+  return [
+    `RECRUITING ANALYTICS`,
+    `\nSummary: ${activeJobs.length} active jobs | ${totalActive} active applications | ${totalHired} hired | ${totalRejected} rejected`,
+    `\nPipeline funnel (top 10 active jobs):`,
+    funnelLines.length ? funnelLines.join('\n') : '  No active jobs with candidates.',
+    `\nApplication sources:`,
+    sourceLines.length ? sourceLines.join('\n') : '  No data.',
+    `\nAvg days in stage (active candidates):`,
+    velocityLines.length ? velocityLines.join('\n') : '  No data.',
+  ].join('\n')
+}
+
+async function getInbox(
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+
+  const [eventsRes, staleRes] = await Promise.all([
+    supabase
+      .from('application_events')
+      .select(`
+        id, event_type, from_stage, to_stage, note, created_by, created_at,
+        application:applications(
+          id, status,
+          candidate:candidates(full_name, email),
+          job:hiring_requests(position_title)
+        )
+      `)
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('applications')
+      .select(`
+        id, status, applied_at, stage_id,
+        candidate:candidates(full_name),
+        job:hiring_requests(position_title),
+        stage:pipeline_stages(name)
+      `)
+      .eq('org_id', orgId)
+      .eq('status', 'active')
+      .lt('applied_at', fourteenDaysAgo)
+      .order('applied_at', { ascending: true })
+      .limit(20),
+  ])
+
+  const events = eventsRes.data ?? []
+  const stale  = staleRes.data  ?? []
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const activityLines = (events as any[]).map(ev => {
+    const candidate = ev.application?.candidate?.full_name ?? 'Unknown'
+    const job       = ev.application?.job?.position_title  ?? 'Unknown job'
+    const date      = new Date(ev.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const detail    = ev.event_type === 'stage_change'
+      ? `moved ${ev.from_stage ?? '?'} → ${ev.to_stage ?? '?'}`
+      : ev.event_type === 'note_added' ? 'note added'
+      : ev.event_type === 'status_changed' ? 'status changed'
+      : ev.event_type
+    return `• [${date}] ${candidate} / ${job} — ${detail}`
+  })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const staleLines = (stale as any[]).map(app => {
+    const name  = app.candidate?.full_name ?? 'Unknown'
+    const job   = app.job?.position_title  ?? 'Unknown job'
+    const stage = app.stage?.name          ?? 'Unassigned'
+    const days  = Math.floor((Date.now() - new Date(app.applied_at).getTime()) / 86_400_000)
+    return `• ${name} / ${job} | Stage: ${stage} | ${days}d stale | appId: ${app.id}`
+  })
+
+  return [
+    `INBOX`,
+    `\nRecent activity (last 20 events):`,
+    activityLines.length ? activityLines.join('\n') : '  No recent activity.',
+    `\nNeeds attention (stale 14+ days, ${stale.length} found):`,
+    staleLines.length ? staleLines.join('\n') : '  All applications are up to date. ✓',
+  ].join('\n')
+}
+
+async function createScorecard(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_id, interviewer_name, stage_name, recommendation, overall_notes } = input
+
+  if (!application_id || !interviewer_name?.trim() || !recommendation) {
+    return 'Error: application_id, interviewer_name, and recommendation are required.'
+  }
+
+  // Verify application belongs to org
+  const { data: app, error: appErr } = await supabase
+    .from('applications')
+    .select('id, candidate:candidates(full_name), job:hiring_requests(position_title)')
+    .eq('id', application_id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (appErr || !app) return `Application not found: ${application_id}`
+
+  const { data, error } = await supabase
+    .from('scorecards')
+    .insert({
+      application_id,
+      interviewer_name: interviewer_name.trim(),
+      stage_name:       stage_name?.trim() || null,
+      recommendation,
+      scores:           [],
+      overall_notes:    overall_notes?.trim() || null,
+      org_id:           orgId,
+    } as never)
+    .select('id')
+    .single()
+
+  if (error) return `Error creating scorecard: ${error.message}`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const candidateName = (app.candidate as any)?.full_name ?? 'candidate'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const jobTitle      = (app.job as any)?.position_title ?? 'Unknown job'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sc = data as any
+
+  return `Scorecard logged for ${candidateName} / ${jobTitle}: ${interviewer_name} → ${recommendation}${stage_name ? ` (${stage_name})` : ''}. ID: ${sc.id}`
+}
+
+async function draftApplicationEmail(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_id, template, recruiter_name, recruiter_title, company_name } = input
+
+  type TemplateKey = 'interview_invite' | 'rejection' | 'offer' | 'followup'
+  const TEMPLATE_DESC: Record<TemplateKey, string> = {
+    interview_invite: 'an interview invitation',
+    rejection:        'a respectful, empathetic rejection',
+    offer:            'an exciting job offer congratulations',
+    followup:         'a friendly follow-up to check on their application status',
+  }
+
+  const templateKey = (template ?? 'interview_invite') as TemplateKey
+  if (!TEMPLATE_DESC[templateKey]) return `Invalid template "${template}". Choose: interview_invite, rejection, offer, followup.`
+
+  const { data: app, error: appErr } = await supabase
+    .from('applications')
+    .select(`
+      id, status,
+      candidate:candidates(full_name, email),
+      job:hiring_requests(position_title, department),
+      stage:pipeline_stages(name)
+    `)
+    .eq('id', application_id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (appErr || !app) return `Application not found: ${application_id}`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const candidate  = app.candidate as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const job        = app.job       as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stage      = app.stage     as any
+
+  const firstName  = candidate?.full_name?.split(' ')[0] ?? 'there'
+  const jobTitle   = job?.position_title ?? 'the position'
+  const dept       = job?.department
+  const stageName  = stage?.name ?? 'Applied'
+  const company    = company_name   ?? 'our company'
+  const recName    = recruiter_name ?? 'The Recruiting Team'
+  const recTitle   = recruiter_title ?? ''
+
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return 'Error: ANTHROPIC_API_KEY not configured — cannot draft email.'
+
+  const client = new Anthropic({ apiKey })
+  const prompt = `Write ${TEMPLATE_DESC[templateKey]} email from a recruiter to a job candidate.
+
+Context:
+- Candidate first name: ${firstName}
+- Role: ${jobTitle}${dept ? ` — ${dept}` : ''}
+- Current pipeline stage: ${stageName}
+- Company: ${company}
+- Recruiter: ${recName}${recTitle ? `, ${recTitle}` : ''}
+
+Requirements:
+- Professional but warm tone
+- Concise (3-5 short paragraphs)
+- Address candidate by first name
+- Sign off with recruiter name and title
+- No placeholder brackets like [date] or [time] — use natural language instead
+
+Respond with ONLY valid JSON: {"subject": "...", "body": "..."}`
+
+  try {
+    const msg = await client.messages.create({
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      messages:   [{ role: 'user', content: prompt }],
+    })
+    const raw   = msg.content[0].type === 'text' ? msg.content[0].text.trim() : ''
+    const json  = raw.startsWith('{') ? raw : (raw.match(/\{[\s\S]*\}/)?.[0] ?? '')
+    const draft = JSON.parse(json) as { subject: string; body: string }
+    return `EMAIL DRAFT (${templateKey}) for ${candidate?.full_name ?? 'candidate'}:\n\nSubject: ${draft.subject}\n\n${draft.body}`
+  } catch {
+    return 'Error: AI email generation failed.'
+  }
+}
+
+async function createIntakeRequest(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { position_title, hiring_manager_name, hiring_manager_email, department, hiring_manager_slack } = input
+
+  if (!position_title?.trim() || !hiring_manager_name?.trim() || !hiring_manager_email?.trim()) {
+    return 'Error: position_title, hiring_manager_name, and hiring_manager_email are required.'
+  }
+
+  const { data: req, error } = await supabase
+    .from('hiring_requests')
+    .insert({
+      position_title:        position_title.trim(),
+      hiring_manager_name:   hiring_manager_name.trim(),
+      hiring_manager_email:  hiring_manager_email.trim(),
+      hiring_manager_slack:  hiring_manager_slack ?? null,
+      department:            department ?? null,
+      status:                'intake_pending',
+      filled_by_recruiter:   false,
+      intake_sent_at:        new Date().toISOString(),
+      org_id:                orgId,
+    } as never)
+    .select('id, intake_token, position_title')
+    .single()
+
+  if (error) return `Error creating intake request: ${error.message}`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = req as any
+  const appUrl    = process.env.NEXT_PUBLIC_APP_URL || 'https://app.recruiterstack.com'
+  const intakeUrl = `${appUrl}/intake/${r.intake_token}`
+
+  return [
+    `Intake request created for "${r.position_title}" (HM: ${hiring_manager_name}).`,
+    `Status: intake_pending | ID: ${r.id}`,
+    ``,
+    `Intake URL (share this with the hiring manager):`,
+    intakeUrl,
+    ``,
+    `Note: Email NOT sent automatically. Copy the URL above and forward it to ${hiring_manager_email}.`,
+  ].join('\n')
 }
