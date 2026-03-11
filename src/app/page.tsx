@@ -2,20 +2,117 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Zap,
-  ArrowRight,
-  Brain,
-  BarChart2,
-  Inbox,
-  Users,
-  Shield,
-  Workflow,
-  Building2,
-  Briefcase,
-  Bot,
-  ChevronRight,
+  ArrowRight, ChevronRight,
+  FileText, Search, Brain, CalendarCheck, BadgeCheck,
+  Plug, Layers, BarChart2, Shield,
 } from 'lucide-react'
 import { EmailCapture } from '@/components/EmailCapture'
+import { MarketingNav } from '@/components/marketing/MarketingNav'
+import { MarketingFooter } from '@/components/marketing/MarketingFooter'
+
+// ── Agent definitions ──────────────────────────────────────────────────────────
+
+const AGENTS = [
+  {
+    n:        '01',
+    name:     'Drafter',
+    role:     'Job Creation & Tracking',
+    icon:     FileText,
+    color:    'text-violet-400',
+    border:   'border-violet-500/30',
+    bg:       'bg-violet-500/10',
+    badge:    'bg-violet-500/20 text-violet-300',
+    dot:      'bg-violet-500',
+    features: [
+      'AI-drafted job descriptions in seconds',
+      'Requisition tracking & approval workflows',
+      'One-click job board posting links',
+      'Intake form for hiring manager alignment',
+    ],
+  },
+  {
+    n:        '02',
+    name:     'Scout',
+    role:     'Sourcing',
+    icon:     Search,
+    color:    'text-blue-400',
+    border:   'border-blue-500/30',
+    bg:       'bg-blue-500/10',
+    badge:    'bg-blue-500/20 text-blue-300',
+    dot:      'bg-blue-500',
+    features: [
+      'Bulk CSV import from any job board',
+      'PDF CV parsing via AI',
+      'LinkedIn, Naukri & Indeed export guides',
+      'Automatic duplicate detection',
+    ],
+  },
+  {
+    n:        '03',
+    name:     'Sifter',
+    role:     'Screening & Scoring',
+    icon:     Brain,
+    color:    'text-fuchsia-400',
+    border:   'border-fuchsia-500/30',
+    bg:       'bg-fuchsia-500/10',
+    badge:    'bg-fuchsia-500/20 text-fuchsia-300',
+    dot:      'bg-fuchsia-500',
+    features: [
+      'AI score vs. JD the moment a CV lands',
+      'Strengths & gaps analysis per candidate',
+      'Shortlist top 10% automatically',
+      'Bulk stage moves & rejections',
+    ],
+  },
+  {
+    n:        '04',
+    name:     'Scheduler',
+    role:     'Interview Coordination',
+    icon:     CalendarCheck,
+    color:    'text-emerald-400',
+    border:   'border-emerald-500/30',
+    bg:       'bg-emerald-500/10',
+    badge:    'bg-emerald-500/20 text-emerald-300',
+    dot:      'bg-emerald-500',
+    features: [
+      'Automated interview invites & reminders',
+      'Calendar availability sync (coming soon)',
+      'Interview prep packs for candidates',
+      'Structured scorecard collection',
+    ],
+  },
+  {
+    n:        '05',
+    name:     'Closer',
+    role:     'Offer Management',
+    icon:     BadgeCheck,
+    color:    'text-amber-400',
+    border:   'border-amber-500/30',
+    bg:       'bg-amber-500/10',
+    badge:    'bg-amber-500/20 text-amber-300',
+    dot:      'bg-amber-500',
+    features: [
+      'AI-drafted offer letters',
+      'Approval workflow routing',
+      'E-sign ready documentation',
+      'Offer acceptance tracking',
+    ],
+  },
+]
+
+const INTEGRATIONS = [
+  'Workday', 'Greenhouse', 'Lever', 'BambooHR',
+  'SAP SuccessFactors', 'Slack', 'Google Workspace', 'Naukri', 'LinkedIn',
+]
+
+const HOW_IT_WORKS = [
+  { n: '01', title: 'Connect your stack',   desc: 'Link RecruiterStack to your existing ATS, HRIS, or job boards via API or CSV. No data migration needed.' },
+  { n: '02', title: 'Pick your agents',     desc: 'Deploy just the agents you need — or go full suite. Each agent activates independently in minutes.' },
+  { n: '03', title: 'AI takes the wheel',   desc: 'Agents handle the repetitive work: scoring, shortlisting, scheduling, drafting. You review the best.' },
+  { n: '04', title: 'Close faster',         desc: 'Your team focuses on the 10% of candidates that matter. Hire in days, not months.' },
+]
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
   const { userId } = auth()
@@ -23,284 +120,406 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
+      <MarketingNav />
 
-      {/* ── Nav ─────────────────────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-50 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-600">
-              <Zap className="h-3.5 w-3.5 text-white" />
-            </div>
-            <span className="text-sm font-semibold tracking-tight text-white">RecruiterStack</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/sign-in"
-              className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/sign-up"
-              className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:border-zinc-500 hover:bg-zinc-800 transition-colors"
-            >
-              Get started
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      {/* ══ HERO ══════════════════════════════════════════════════════════════ */}
       <section className="relative overflow-hidden">
-        {/* Radial glow */}
         <div className="pointer-events-none absolute inset-0 flex items-start justify-center">
-          <div className="mt-10 h-[400px] w-[900px] rounded-full bg-violet-900/20 blur-[120px]" />
+          <div className="mt-0 h-[500px] w-[1000px] rounded-full bg-violet-900/15 blur-[140px]" />
         </div>
 
-        <div className="relative mx-auto max-w-5xl px-6 pb-28 pt-24 text-center">
+        <div className="relative mx-auto max-w-5xl px-6 pb-20 pt-24 text-center">
           {/* Eyebrow */}
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/80 px-3.5 py-1.5 text-xs font-medium text-zinc-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
-            AI-native Recruitment Operating System
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/80 px-4 py-1.5 text-xs font-medium text-zinc-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-500 animate-pulse" />
+            Plug-and-play AI recruitment agents
           </div>
 
           {/* Headline */}
           <h1 className="mx-auto max-w-4xl text-5xl font-black tracking-tight text-white sm:text-6xl lg:text-7xl leading-[1.05]">
-            The OS for{' '}
+            Hire smarter.{' '}
             <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-indigo-400 bg-clip-text text-transparent">
-              modern recruiting
+              Ship faster.
+            </span>
+            <br />
+            <span className="text-4xl sm:text-5xl lg:text-6xl font-bold text-zinc-300">
+              With AI agents for every stage.
             </span>
           </h1>
 
-          {/* Sub-headline */}
+          {/* Sub */}
           <p className="mx-auto mt-7 max-w-2xl text-lg text-zinc-400 leading-relaxed">
-            RecruiterStack is the first AI-native recruitment operating system —
-            built for agencies running mandates, enterprise TA teams drowning in
-            applications, and lean teams that need AI to recruit for them.
+            5 specialised AI agents that slot into your existing HR stack —
+            no rip-and-replace, no 6-month implementation.
+            Just deploy the agents you need and close roles faster.
           </p>
 
           {/* CTAs */}
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
-              href="/sign-up"
+              href="#agents"
               className="flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-3.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
             >
-              Start for free
+              Meet the agents
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/sign-in"
+              href="/sign-up"
               className="flex items-center gap-2 rounded-xl border border-zinc-800 px-6 py-3.5 text-sm font-medium text-zinc-300 hover:border-zinc-600 hover:text-white transition-colors"
             >
-              Sign in to your workspace
+              Start free — no card needed
             </Link>
           </div>
+          <p className="mt-4 text-xs text-zinc-600">Free to start · Deploy in minutes · No lock-in</p>
 
-          <p className="mt-4 text-xs text-zinc-600">Free to start · No credit card required</p>
+          {/* Agent funnel visual */}
+          <div className="mt-16 flex items-center justify-center gap-0 overflow-x-auto pb-2">
+            {AGENTS.map((agent, i) => {
+              const Icon = agent.icon
+              return (
+                <div key={agent.name} className="flex items-center">
+                  <div className={`flex flex-col items-center gap-2 rounded-2xl border ${agent.border} ${agent.bg} px-4 py-4 min-w-[100px] sm:min-w-[110px]`}>
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${agent.bg} border ${agent.border}`}>
+                      <Icon className={`h-4 w-4 ${agent.color}`} />
+                    </div>
+                    <span className={`text-xs font-bold ${agent.color}`}>{agent.name}</span>
+                    <span className="text-[10px] text-zinc-500 text-center leading-tight">{agent.role}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${agent.badge}`}>{agent.n}</span>
+                  </div>
+                  {i < AGENTS.length - 1 && (
+                    <div className="flex items-center px-1">
+                      <div className="h-px w-6 bg-zinc-800" />
+                      <ChevronRight className="h-3 w-3 text-zinc-700 -mx-1" />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </section>
 
-      {/* ── Who it's for ─────────────────────────────────────────────────── */}
-      <section className="border-t border-zinc-900 py-24">
+      {/* ══ INTEGRATION BAR ═══════════════════════════════════════════════════ */}
+      <section className="border-y border-zinc-900 bg-zinc-900/30 py-8">
+        <div className="mx-auto max-w-5xl px-6 text-center">
+          <p className="mb-5 text-xs font-semibold uppercase tracking-widest text-zinc-600">
+            Works with your existing stack — no lock-in
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {INTEGRATIONS.map(name => (
+              <span
+                key={name}
+                className="rounded-full border border-zinc-800 bg-zinc-900 px-3.5 py-1.5 text-xs font-medium text-zinc-500"
+              >
+                {name}
+              </span>
+            ))}
+            <span className="rounded-full border border-dashed border-zinc-700 px-3.5 py-1.5 text-xs font-medium text-zinc-600">
+              + more
+            </span>
+          </div>
+          <p className="mt-4 text-xs text-zinc-700">Connects via API or CSV export · Bidirectional sync · No migration needed</p>
+        </div>
+      </section>
+
+      {/* ══ AGENTS SECTION ════════════════════════════════════════════════════ */}
+      <section id="agents" className="border-t border-zinc-900 py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-4 text-center">
-            <p className="text-xs font-semibold uppercase tracking-widest text-violet-500">
-              Built for
-            </p>
-            <h2 className="mt-3 text-3xl font-bold text-white">
-              Three types of recruiting teams
-            </h2>
-            <p className="mt-3 text-zinc-500">
-              One platform. Three distinct workflows. All powered by AI.
+            <p className="text-xs font-semibold uppercase tracking-widest text-violet-500">The agents</p>
+            <h2 className="mt-3 text-3xl font-bold text-white">Meet your AI recruiting team</h2>
+            <p className="mt-3 text-zinc-500 max-w-xl mx-auto">
+              Deploy one. Deploy all five. Each agent handles a specific stage of your funnel
+              and plugs into your existing tools.
             </p>
           </div>
 
-          <div className="mt-14 grid gap-5 md:grid-cols-3">
-            {/* Agencies */}
-            <div className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/50 p-7 hover:border-zinc-700 transition-colors">
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-violet-600/10 border border-violet-600/20">
-                <Briefcase className="h-5 w-5 text-violet-400" />
-              </div>
-              <h3 className="text-lg font-bold text-white">Recruiting Agencies</h3>
-              <p className="mt-3 text-sm leading-relaxed text-zinc-500">
-                Manage multiple client mandates from a single workspace. AI workflows handle
-                sourcing, screening, and shortlisting — so your team closes roles, not
-                spreadsheets.
+          {/* Funnel label row */}
+          <div className="mt-12 mb-4 flex items-center justify-center gap-2 text-xs text-zinc-600">
+            <span>Job Creation</span>
+            <ChevronRight className="h-3 w-3" />
+            <span>Sourcing</span>
+            <ChevronRight className="h-3 w-3" />
+            <span>Screening</span>
+            <ChevronRight className="h-3 w-3" />
+            <span>Interviews</span>
+            <ChevronRight className="h-3 w-3" />
+            <span>Offer</span>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {AGENTS.map(agent => {
+              const Icon = agent.icon
+              return (
+                <div
+                  key={agent.name}
+                  className={`group relative rounded-2xl border ${agent.border} bg-zinc-900/40 p-5 hover:bg-zinc-900/70 transition-colors flex flex-col`}
+                >
+                  {/* Header */}
+                  <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl ${agent.bg} border ${agent.border}`}>
+                    <Icon className={`h-5 w-5 ${agent.color}`} />
+                  </div>
+                  <div className={`mb-1 text-[10px] font-bold uppercase tracking-widest ${agent.color}`}>
+                    Agent {agent.n}
+                  </div>
+                  <h3 className="text-base font-bold text-white">{agent.name}</h3>
+                  <p className="mt-0.5 text-xs text-zinc-500 mb-4">{agent.role}</p>
+
+                  {/* Features */}
+                  <ul className="space-y-2 flex-1">
+                    {agent.features.map(f => (
+                      <li key={f} className="flex items-start gap-2 text-xs text-zinc-500">
+                        <span className={`mt-1.5 h-1.5 w-1.5 rounded-full ${agent.dot} shrink-0`} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA */}
+                  <Link
+                    href={`/agents`}
+                    className={`mt-5 flex items-center gap-1 text-xs font-semibold ${agent.color} hover:opacity-80 transition-opacity`}
+                  >
+                    Learn more <ChevronRight className="h-3 w-3" />
+                  </Link>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="mt-10 text-center">
+            <Link
+              href="/agents"
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 px-5 py-2.5 text-sm font-medium text-zinc-300 hover:border-zinc-600 hover:text-white transition-colors"
+            >
+              Deep-dive into every agent <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ══ PLUG & PLAY ═══════════════════════════════════════════════════════ */}
+      <section className="border-t border-zinc-900 py-24 bg-zinc-900/20">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="grid gap-12 lg:grid-cols-2 items-center">
+
+            {/* Copy */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-violet-500 mb-3">
+                Plug &amp; Play
               </p>
-              <ul className="mt-5 space-y-2">
+              <h2 className="text-3xl font-bold text-white leading-tight">
+                Drop in. <span className="text-zinc-500">Not rip out.</span>
+              </h2>
+              <p className="mt-5 text-zinc-400 leading-relaxed">
+                RecruiterStack is designed to <strong className="text-white">layer on top of your existing stack</strong>,
+                not replace it. Connect to Workday, Greenhouse, Lever, or any ATS via our
+                API — or start with CSV exports in minutes.
+              </p>
+              <ul className="mt-6 space-y-3">
                 {[
-                  'Multi-client workspace management',
-                  'AI candidate screening & scoring',
-                  'Automated outreach sequences',
-                ].map(item => (
-                  <li key={item} className="flex items-start gap-2 text-xs text-zinc-500">
-                    <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500" />
-                    {item}
+                  { icon: Plug,     text: 'Connect via API, webhook, or CSV — your choice' },
+                  { icon: Layers,   text: 'Agents run independently — no full-suite required' },
+                  { icon: BarChart2, text: 'Data stays in your existing systems, enriched by AI' },
+                  { icon: Shield,   text: 'Row-level data isolation — your data never touches another org' },
+                ].map(({ icon: Icon, text }) => (
+                  <li key={text} className="flex items-start gap-3 text-sm text-zinc-400">
+                    <Icon className="h-4 w-4 text-violet-400 mt-0.5 shrink-0" />
+                    {text}
                   </li>
                 ))}
               </ul>
+              <Link
+                href="/sign-up"
+                className="mt-8 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+              >
+                Connect your stack <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
 
-            {/* Enterprises */}
-            <div className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/50 p-7 hover:border-zinc-700 transition-colors">
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600/10 border border-indigo-600/20">
-                <Building2 className="h-5 w-5 text-indigo-400" />
-              </div>
-              <h3 className="text-lg font-bold text-white">Enterprise TA Teams</h3>
-              <p className="mt-3 text-sm leading-relaxed text-zinc-500">
-                Hundreds of applications per role. Dozens of open reqs. RecruiterStack
-                processes the volume so your TA team can focus on the humans, not the
-                inbox.
-              </p>
-              <ul className="mt-5 space-y-2">
-                {[
-                  'High-volume application processing',
-                  'Cross-team pipeline visibility',
-                  'Analytics & hiring velocity reporting',
-                ].map(item => (
-                  <li key={item} className="flex items-start gap-2 text-xs text-zinc-500">
-                    <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {/* Architecture diagram */}
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-6 font-mono text-xs">
+              <p className="text-zinc-600 mb-4">// Your existing infrastructure</p>
 
-            {/* Small teams */}
-            <div className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/50 p-7 hover:border-zinc-700 transition-colors">
-              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-fuchsia-600/10 border border-fuchsia-600/20">
-                <Bot className="h-5 w-5 text-fuchsia-400" />
-              </div>
-              <h3 className="text-lg font-bold text-white">Small Teams</h3>
-              <p className="mt-3 text-sm leading-relaxed text-zinc-500">
-                No dedicated recruiter? No problem. Our AI agents run your entire
-                hiring pipeline — from job description to shortlist — while you
-                stay focused on building.
-              </p>
-              <ul className="mt-5 space-y-2">
-                {[
-                  'AI-drafted job descriptions',
-                  'Autonomous candidate pipeline',
-                  'Zero-setup recruiting agents',
-                ].map(item => (
-                  <li key={item} className="flex items-start gap-2 text-xs text-zinc-500">
-                    <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-fuchsia-500" />
-                    {item}
-                  </li>
+              <div className="space-y-2 mb-6">
+                {['Workday / SAP', 'Greenhouse / Lever', 'LinkedIn / Naukri', 'Google Calendar / Slack'].map(tool => (
+                  <div key={tool} className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
+                    <span className="h-2 w-2 rounded-full bg-zinc-600" />
+                    <span className="text-zinc-400">{tool}</span>
+                  </div>
                 ))}
-              </ul>
+              </div>
+
+              <div className="flex items-center gap-2 mb-4 text-zinc-600">
+                <div className="h-px flex-1 border-t border-dashed border-zinc-800" />
+                <span className="text-violet-500 font-bold text-[11px]">RecruiterStack layer</span>
+                <div className="h-px flex-1 border-t border-dashed border-zinc-800" />
+              </div>
+
+              <div className="grid grid-cols-5 gap-1">
+                {AGENTS.map(agent => (
+                  <div
+                    key={agent.name}
+                    className={`rounded-lg border ${agent.border} ${agent.bg} px-1.5 py-2 text-center`}
+                  >
+                    <span className={`text-[10px] font-bold ${agent.color}`}>{agent.name}</span>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-zinc-600 mt-4">// Bidirectional sync · No migration</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── What makes it an OS ───────────────────────────────────────────── */}
+      {/* ══ AUDIENCE ══════════════════════════════════════════════════════════ */}
       <section className="border-t border-zinc-900 py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-14 text-center">
-            <p className="text-xs font-semibold uppercase tracking-widest text-violet-500">
-              Capabilities
-            </p>
-            <h2 className="mt-3 text-3xl font-bold text-white">
-              Not just an ATS. An operating system.
-            </h2>
-            <p className="mt-3 max-w-xl mx-auto text-zinc-500">
-              Traditional ATS tools track candidates. RecruiterStack runs your
-              entire recruiting operation end-to-end.
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-violet-500">Built for</p>
+            <h2 className="mt-3 text-3xl font-bold text-white">Every recruiting team</h2>
           </div>
 
-          <div className="grid gap-px bg-zinc-800 rounded-2xl overflow-hidden sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             {[
               {
-                icon: Brain,
-                color: 'text-violet-400',
-                title: 'AI Candidate Scoring',
-                desc: 'Every resume scored against your JD the moment it lands. Surface top 10% in seconds, not days.',
+                title:   'Recruiting Agencies',
+                sub:     'Run multiple client mandates from one workspace.',
+                agents:  ['Scout', 'Sifter'],
+                color:   'text-violet-400',
+                border:  'border-violet-500/20',
+                bullets: ['Multi-client workspace isolation', 'AI screening saves 10+ hrs/week', 'Automated candidate shortlists'],
               },
               {
-                icon: Workflow,
-                color: 'text-indigo-400',
-                title: 'AI Recruiting Workflows',
-                desc: 'Automated screening, stage moves, follow-ups, and rejections — triggered by rules you set.',
+                title:   'Enterprise TA Teams',
+                sub:     'Process hundreds of applications across dozens of reqs.',
+                agents:  ['Drafter', 'Scout', 'Sifter', 'Scheduler', 'Closer'],
+                color:   'text-fuchsia-400',
+                border:  'border-fuchsia-500/20',
+                bullets: ['Full-funnel automation', 'Cross-team pipeline visibility', 'Analytics & velocity reporting'],
               },
               {
-                icon: Inbox,
-                color: 'text-fuchsia-400',
-                title: 'Unified Recruiting Inbox',
-                desc: 'One feed for everything that needs attention. Stale apps, interview requests, urgent follow-ups.',
+                title:   'Startups & Small Teams',
+                sub:     'No dedicated recruiter? AI fills the gap.',
+                agents:  ['Sifter', 'Scheduler'],
+                color:   'text-emerald-400',
+                border:  'border-emerald-500/20',
+                bullets: ['Zero setup — live in minutes', 'AI handles top-of-funnel entirely', 'Pay only for what you use'],
               },
-              {
-                icon: BarChart2,
-                color: 'text-sky-400',
-                title: 'Pipeline Analytics',
-                desc: 'Funnel drop-off, source attribution, time-to-hire, and stage velocity — all live.',
-              },
-              {
-                icon: Users,
-                color: 'text-emerald-400',
-                title: 'Multi-Org Tenancy',
-                desc: 'Each company or client gets their own isolated workspace. Secure by default, no data bleed.',
-              },
-              {
-                icon: Shield,
-                color: 'text-amber-400',
-                title: 'Enterprise-grade Security',
-                desc: 'Built on Clerk + Supabase with row-level isolation. Your data never touches another org.',
-              },
-            ].map(({ icon: Icon, color, title, desc }) => (
-              <div key={title} className="bg-zinc-950 p-7 hover:bg-zinc-900/60 transition-colors">
-                <Icon className={`mb-4 h-5 w-5 ${color}`} />
-                <h3 className="text-sm font-semibold text-white">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-zinc-500">{desc}</p>
+            ].map(({ title, sub, agents, color, border, bullets }) => (
+              <div key={title} className={`rounded-2xl border ${border} bg-zinc-900/40 p-7`}>
+                <h3 className="text-lg font-bold text-white">{title}</h3>
+                <p className="mt-2 text-sm text-zinc-500">{sub}</p>
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {agents.map(a => (
+                    <span key={a} className={`text-xs px-2.5 py-1 rounded-full border ${border} ${color} bg-zinc-900`}>{a}</span>
+                  ))}
+                </div>
+                <ul className="mt-5 space-y-2">
+                  {bullets.map(b => (
+                    <li key={b} className="flex items-start gap-2 text-xs text-zinc-500">
+                      <ChevronRight className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${color}`} />
+                      {b}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── How it works ─────────────────────────────────────────────────── */}
+      {/* ══ PRICING TEASER ════════════════════════════════════════════════════ */}
+      <section className="border-t border-zinc-900 py-24 bg-zinc-900/20">
+        <div className="mx-auto max-w-5xl px-6 text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-violet-500 mb-3">Pricing</p>
+          <h2 className="text-3xl font-bold text-white">Pay only for what you deploy</h2>
+          <p className="mt-3 text-zinc-500">Individual agents or the full suite — your call.</p>
+
+          <div className="mt-12 grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                label:  'Individual Agents',
+                price:  'From $19',
+                period: '/mo per agent',
+                desc:   'Pick exactly the agents you need. Add more anytime.',
+                cta:    'See all modules',
+                href:   '/pricing',
+                highlight: false,
+              },
+              {
+                label:  'RecruiterStack Pro',
+                price:  '$149',
+                period: '/mo',
+                desc:   'All 5 agents. Unlimited candidates. Full analytics.',
+                cta:    'Start Pro trial',
+                href:   '/sign-up',
+                highlight: true,
+              },
+              {
+                label:  'Enterprise',
+                price:  'Custom',
+                period: '',
+                desc:   'SSO, dedicated support, custom integrations, SLAs.',
+                cta:    'Talk to sales',
+                href:   '/contact',
+                highlight: false,
+              },
+            ].map(({ label, price, period, desc, cta, href, highlight }) => (
+              <div
+                key={label}
+                className={`rounded-2xl p-6 text-left ${
+                  highlight
+                    ? 'border border-violet-500/50 bg-violet-600/10'
+                    : 'border border-zinc-800 bg-zinc-900/50'
+                }`}
+              >
+                {highlight && (
+                  <span className="mb-3 inline-block rounded-full bg-violet-600 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">
+                    Most popular
+                  </span>
+                )}
+                <p className="text-sm font-semibold text-zinc-400">{label}</p>
+                <p className="mt-1">
+                  <span className="text-3xl font-black text-white">{price}</span>
+                  {period && <span className="text-sm text-zinc-500 ml-1">{period}</span>}
+                </p>
+                <p className="mt-3 text-sm text-zinc-500">{desc}</p>
+                <Link
+                  href={href}
+                  className={`mt-5 block rounded-xl py-2.5 text-sm font-semibold text-center transition-colors ${
+                    highlight
+                      ? 'bg-violet-600 text-white hover:bg-violet-500'
+                      : 'border border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white'
+                  }`}
+                >
+                  {cta}
+                </Link>
+              </div>
+            ))}
+          </div>
+
+          <Link href="/pricing" className="mt-6 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
+            See full pricing &amp; feature comparison <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </section>
+
+      {/* ══ HOW IT WORKS ══════════════════════════════════════════════════════ */}
       <section className="border-t border-zinc-900 py-24">
         <div className="mx-auto max-w-4xl px-6">
           <div className="mb-14 text-center">
-            <p className="text-xs font-semibold uppercase tracking-widest text-violet-500">
-              How it works
-            </p>
-            <h2 className="mt-3 text-3xl font-bold text-white">
-              Live in minutes, not months
-            </h2>
+            <p className="text-xs font-semibold uppercase tracking-widest text-violet-500">How it works</p>
+            <h2 className="mt-3 text-3xl font-bold text-white">Live in minutes, not months</h2>
           </div>
-
           <div className="space-y-3">
-            {[
-              {
-                n: '01',
-                title: 'Create your workspace',
-                desc: 'Sign up, create your company workspace, invite your team. Done in under two minutes.',
-              },
-              {
-                n: '02',
-                title: 'Post a role',
-                desc: 'Write a job description or let AI draft it. Get a shareable application link instantly.',
-              },
-              {
-                n: '03',
-                title: 'AI handles the top of funnel',
-                desc: 'Candidates apply, resumes are parsed and scored automatically against your requirements.',
-              },
-              {
-                n: '04',
-                title: 'You close the best fits',
-                desc: 'Review only the candidates worth your time. Move them through stages, send AI-drafted emails, hire faster.',
-              },
-            ].map(({ n, title, desc }) => (
+            {HOW_IT_WORKS.map(({ n, title, desc }) => (
               <div
                 key={n}
                 className="flex items-start gap-6 rounded-2xl border border-zinc-800 bg-zinc-900/30 px-6 py-5 hover:bg-zinc-900/60 transition-colors"
               >
-                <span className="shrink-0 font-black text-3xl text-zinc-800 leading-none tabular-nums">
-                  {n}
-                </span>
+                <span className="shrink-0 font-black text-3xl text-zinc-800 leading-none tabular-nums">{n}</span>
                 <div>
                   <h3 className="text-sm font-semibold text-white">{title}</h3>
                   <p className="mt-1 text-sm text-zinc-500">{desc}</p>
@@ -311,22 +530,21 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Lead capture ─────────────────────────────────────────────────── */}
+      {/* ══ LEAD CAPTURE ══════════════════════════════════════════════════════ */}
       <section className="border-t border-zinc-900 py-24">
         <div className="mx-auto max-w-2xl px-6 text-center">
           <div className="rounded-3xl border border-zinc-800 bg-zinc-900/50 px-8 py-14">
             <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Now in early access
             </div>
             <h2 className="mt-5 text-3xl font-bold text-white">
-              Ready to modernise how you hire?
+              Ready to deploy your AI recruiting team?
             </h2>
             <p className="mt-3 text-zinc-500">
-              Join teams already using RecruiterStack. Or drop your email and
-              we&apos;ll reach out to walk you through the platform.
+              Join teams already running AI agents across their hiring funnel.
+              Drop your email and we&apos;ll walk you through the right agents for your workflow.
             </p>
-
             <div className="mt-8">
               <EmailCapture
                 placeholder="you@company.com"
@@ -334,11 +552,10 @@ export default function HomePage() {
                 source="homepage-cta"
               />
             </div>
-
             <p className="mt-5 text-xs text-zinc-600">
               Or{' '}
               <Link href="/sign-up" className="text-violet-400 hover:text-violet-300 transition-colors">
-                create a free account now
+                create a free account
               </Link>{' '}
               — no credit card required.
             </p>
@@ -346,25 +563,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <footer className="border-t border-zinc-900 py-8 px-6">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-violet-600">
-              <Zap className="h-3 w-3 text-white" />
-            </div>
-            <span className="text-sm font-semibold text-zinc-400">RecruiterStack</span>
-          </div>
-          <p className="text-xs text-zinc-700">
-            © {new Date().getFullYear()} RecruiterStack. All rights reserved.
-          </p>
-          <div className="flex items-center gap-5 text-xs text-zinc-600">
-            <Link href="/sign-in" className="hover:text-zinc-400 transition-colors">Sign in</Link>
-            <Link href="/sign-up" className="hover:text-zinc-400 transition-colors">Sign up</Link>
-          </div>
-        </div>
-      </footer>
-
+      <MarketingFooter />
     </div>
   )
 }
