@@ -10,6 +10,7 @@ import {
   Zap,
   BarChart2,
   Inbox,
+  Search,
 } from 'lucide-react'
 import { UserButton, useOrganization } from '@clerk/nextjs'
 
@@ -17,7 +18,8 @@ const NAV_ITEMS = [
   { href: '/dashboard',   label: 'Dashboard',  icon: LayoutDashboard },
   { href: '/jobs',        label: 'Jobs',       icon: Briefcase },
   { href: '/candidates',  label: 'Candidates', icon: Users },
-  { href: '/analytics',  label: 'Analytics',  icon: BarChart2 },
+  { href: '/sourcing',    label: 'Sourcing',   icon: Search },
+  { href: '/analytics',   label: 'Analytics',  icon: BarChart2 },
   { href: '/inbox',       label: 'Inbox',      icon: Inbox },
   { href: '/settings',    label: 'Settings',   icon: Settings },
 ]
