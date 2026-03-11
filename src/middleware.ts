@@ -3,11 +3,23 @@ import { NextResponse } from 'next/server'
 
 const isPublic = createRouteMatcher([
   '/',
+  // Marketing pages — publicly accessible
+  '/features',
+  '/agents',
+  '/pricing',
+  '/about',
+  '/blog',
+  '/contact',
+  '/privacy',
+  '/terms',
+  // Auth flows
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/org-setup(.*)',
+  // External-facing flows
   '/apply/(.*)',
   '/intake/(.*)',
+  // Public APIs
   '/api/leads',
   '/api/apply/(.*)',
   '/api/intake/(.*)',
