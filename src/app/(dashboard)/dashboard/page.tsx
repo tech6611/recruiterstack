@@ -31,6 +31,14 @@ import {
   Briefcase,
   UserCheck,
   Activity,
+  Building2,
+  UserCog,
+  Clock,
+  Award,
+  PieChart,
+  Send,
+  Zap,
+  TrendingUp,
 } from 'lucide-react'
 import type { StageColor } from '@/lib/types/database'
 
@@ -63,6 +71,26 @@ interface TopJob {
   stage_counts: { stage_id: string; stage_name: string; color: StageColor; count: number }[]
 }
 interface StatusBreakdown { status: string; count: number }
+interface RecentApplication {
+  id: string; candidate_id: string; candidate_name: string
+  job_title: string; stage_name: string | null
+  applied_at: string; source: string; ai_score: number | null
+}
+interface TopScored {
+  id: string; candidate_id: string; candidate_name: string
+  job_title: string; ai_score: number; ai_recommendation: string | null
+}
+interface CandidateSource { source: string; count: number }
+interface OfferTrackerItem {
+  candidate_id: string; candidate_name: string
+  current_title: string | null; job_title: string
+}
+interface JobByDept { department: string; job_count: number; candidate_count: number }
+interface StageFunnelItem { stage_id: string; stage_name: string; color: StageColor; count: number }
+interface RecentEvent {
+  id: string; event_type: string; candidate_name: string
+  job_title: string; to_stage: string | null; note: string | null; created_at: string
+}
 
 interface DashboardData {
   stats: {
@@ -75,26 +103,55 @@ interface DashboardData {
   application_review: ApplicationReviewItem[]
   top_jobs: TopJob[]
   candidate_breakdown: StatusBreakdown[]
+  recent_activity: RecentEvent[]
+  recent_applications: RecentApplication[]
+  top_scored: TopScored[]
+  candidate_sources: CandidateSource[]
+  offer_tracker: OfferTrackerItem[]
+  jobs_by_dept: JobByDept[]
+  stage_funnel: StageFunnelItem[]
 }
 
 // ── Widget definitions ─────────────────────────────────────────────────────────
 
-type WidgetId = 'interviews' | 'tasks' | 'overview_stats' | 'pipeline' | 'jobs_mini'
+type WidgetId =
+  | 'interviews' | 'tasks' | 'overview_stats' | 'pipeline' | 'jobs_mini'
+  | 'jobs_by_dept' | 'hm_actions'
+  | 'recent_applications' | 'top_scored' | 'candidate_sources' | 'offer_tracker'
+  | 'recent_activity' | 'stage_funnel'
+
+type WidgetCategory = 'jobs' | 'candidates' | 'activity'
 
 interface WidgetDef {
   id:          WidgetId
   name:        string
   description: string
   icon:        React.FC<{ className?: string }>
+  category:    WidgetCategory
 }
 
 const ALL_WIDGET_DEFS: WidgetDef[] = [
-  { id: 'interviews',    name: 'Interviews',        icon: Video,      description: 'Candidates currently in interview stages' },
-  { id: 'tasks',         name: 'Tasks',             icon: CheckSquare,description: 'Approvals, feedback, and overdue follow-ups' },
-  { id: 'overview_stats',name: 'Overview Stats',    icon: BarChart2,  description: 'Open jobs, active candidates, hiring numbers' },
-  { id: 'pipeline',      name: 'Pipeline Overview', icon: Layers,     description: 'Candidate status breakdown across all roles' },
-  { id: 'jobs_mini',     name: 'Active Jobs',       icon: Briefcase,  description: 'Open roles with candidate counts' },
+  // ── Jobs ──
+  { id: 'jobs_mini',           category: 'jobs',       name: 'Active Jobs',         icon: Briefcase,   description: 'Open roles with per-stage candidate counts' },
+  { id: 'jobs_by_dept',        category: 'jobs',       name: 'Jobs by Department',  icon: Building2,   description: 'Job and candidate count grouped by department' },
+  { id: 'hm_actions',          category: 'jobs',       name: 'HM Actions',          icon: UserCog,     description: 'JDs awaiting hiring manager approval to post' },
+  // ── Candidates ──
+  { id: 'overview_stats',      category: 'candidates', name: 'Overview Stats',      icon: BarChart2,   description: 'Open jobs, active candidates, offers, hires' },
+  { id: 'pipeline',            category: 'candidates', name: 'Pipeline Overview',   icon: Layers,      description: 'Candidate status breakdown across all roles' },
+  { id: 'recent_applications', category: 'candidates', name: 'Recent Applications', icon: Clock,       description: 'Most recently submitted applications' },
+  { id: 'top_scored',          category: 'candidates', name: 'Top AI-Scored',       icon: Award,       description: 'Highest AI-scored candidates across all roles' },
+  { id: 'candidate_sources',   category: 'candidates', name: 'Candidate Sources',   icon: PieChart,    description: 'Breakdown by application source (applied, sourced…)' },
+  { id: 'offer_tracker',       category: 'candidates', name: 'Offer Tracker',       icon: Send,        description: 'Candidates currently at the offer stage' },
+  // ── Activity ──
+  { id: 'interviews',          category: 'activity',   name: 'Interviews',          icon: Video,       description: 'Candidates currently in interview stages' },
+  { id: 'tasks',               category: 'activity',   name: 'Tasks',               icon: CheckSquare, description: 'Approvals, feedback, and overdue follow-ups' },
+  { id: 'recent_activity',     category: 'activity',   name: 'Recent Activity',     icon: Zap,         description: 'Latest events across candidates and jobs' },
+  { id: 'stage_funnel',        category: 'activity',   name: 'Stage Funnel',        icon: TrendingUp,  description: 'Active candidates broken down by pipeline stage' },
 ]
+
+const CATEGORY_LABELS: Record<WidgetCategory, string> = {
+  jobs: 'Jobs', candidates: 'Candidates', activity: 'Activity',
+}
 
 // ── View type & defaults ──────────────────────────────────────────────────────
 
@@ -119,7 +176,7 @@ const VIEW_ICONS: Record<string, React.FC<{ className?: string }>> = {
 const LS_VIEWS   = 'rs_dashboard_views'
 const LS_ACTIVE  = 'rs_dashboard_active_view'
 const LS_VERSION = 'rs_dashboard_version'
-const CURRENT_VERSION = 'v2' // bump when DashView shape changes
+const CURRENT_VERSION = 'v3' // bump when DashView shape changes
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -554,6 +611,340 @@ function JobsMiniWidget({ jobs }: { jobs: TopJob[] }) {
   )
 }
 
+// ── Source / recommendation config (shared by multiple widgets) ───────────────
+
+const SOURCE_LABELS: Record<string, string> = {
+  manual: 'Manual', applied: 'Applied', imported: 'Import',
+  sourced: 'Sourced', referral: 'Referral',
+}
+const SOURCE_COLORS: Record<string, string> = {
+  manual: 'bg-slate-400', applied: 'bg-blue-500', imported: 'bg-violet-500',
+  sourced: 'bg-emerald-500', referral: 'bg-amber-400',
+}
+const RECO_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  strong_yes: { label: 'Strong Yes', bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  yes:        { label: 'Yes',        bg: 'bg-blue-100',    text: 'text-blue-700' },
+  maybe:      { label: 'Maybe',      bg: 'bg-amber-100',   text: 'text-amber-700' },
+  no:         { label: 'No',         bg: 'bg-red-100',     text: 'text-red-600' },
+}
+
+// ── JobsByDeptWidget ──────────────────────────────────────────────────────────
+
+function JobsByDeptWidget({ departments }: { departments: JobByDept[] }) {
+  const max = Math.max(...departments.map(d => d.candidate_count), 1)
+  return (
+    <div>
+      <h2 className="mb-4 px-1 text-sm font-semibold text-slate-900">Jobs by Department</h2>
+      {departments.length === 0 ? (
+        <p className="text-sm text-slate-400">No department data yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {departments.map(d => (
+            <div key={d.department}>
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span className="font-medium text-slate-700 truncate">{d.department}</span>
+                <span className="shrink-0 ml-2 text-slate-400">
+                  {d.job_count} job{d.job_count !== 1 ? 's' : ''} · {d.candidate_count} candidate{d.candidate_count !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-blue-500 transition-all"
+                  style={{ width: `${(d.candidate_count / max) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── HmActionsWidget ───────────────────────────────────────────────────────────
+
+function HmActionsWidget({ approvals }: { approvals: TaskApproval[] }) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between px-1">
+        <h2 className="text-sm font-semibold text-slate-900">HM Actions</h2>
+        <Link href="/jobs" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all</Link>
+      </div>
+      {approvals.length === 0 ? (
+        <p className="text-sm text-slate-400">No pending HM actions — all JDs are live or in progress.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {approvals.map(a => (
+            <Link key={a.id} href={`/jobs/${a.id}`}
+              className="flex items-center justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5 hover:bg-amber-100 transition-colors"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-slate-800">{a.title}</p>
+                <p className="text-xs text-slate-500">{a.department ?? 'No department'} · JD ready to post</p>
+              </div>
+              <span className="shrink-0 rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                Approval
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── RecentApplicationsWidget ──────────────────────────────────────────────────
+
+function RecentApplicationsWidget({ applications }: { applications: RecentApplication[] }) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between px-1">
+        <h2 className="text-sm font-semibold text-slate-900">Recent Applications</h2>
+        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all</Link>
+      </div>
+      {applications.length === 0 ? (
+        <p className="text-sm text-slate-400">No applications yet.</p>
+      ) : (
+        <div className="space-y-0">
+          {applications.map(a => (
+            <Link key={a.id} href={`/candidates/${a.candidate_id}`}
+              className="flex items-center gap-3 rounded-lg border-b border-slate-50 px-1 py-2.5 hover:bg-slate-50 transition-colors"
+            >
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
+                {a.candidate_name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-xs font-medium text-slate-800">{a.candidate_name}</p>
+                <p className="truncate text-[10px] text-slate-400">
+                  {a.job_title}{a.stage_name ? ` · ${a.stage_name}` : ''}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[10px] text-slate-400">{timeAgo(a.applied_at)}</p>
+                <span className="text-[10px] text-slate-500">{SOURCE_LABELS[a.source] ?? a.source}</span>
+              </div>
+              {a.ai_score !== null && (
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  a.ai_score >= 80 ? 'bg-emerald-100 text-emerald-700' :
+                  a.ai_score >= 60 ? 'bg-amber-100 text-amber-700' :
+                  'bg-slate-100 text-slate-600'
+                }`}>{a.ai_score}</span>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── TopScoredWidget ───────────────────────────────────────────────────────────
+
+function TopScoredWidget({ candidates }: { candidates: TopScored[] }) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between px-1">
+        <h2 className="text-sm font-semibold text-slate-900">Top AI-Scored Candidates</h2>
+        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all</Link>
+      </div>
+      {candidates.length === 0 ? (
+        <p className="text-sm text-slate-400">No AI scores yet — candidates are scored automatically when added.</p>
+      ) : (
+        <div className="space-y-1">
+          {candidates.map((c, idx) => {
+            const reco = RECO_CONFIG[c.ai_recommendation ?? '']
+            return (
+              <Link key={c.id} href={`/candidates/${c.candidate_id}`}
+                className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 hover:bg-slate-100 transition-colors"
+              >
+                <span className="w-5 shrink-0 text-center text-[10px] font-bold text-slate-400">#{idx + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-800">{c.candidate_name}</p>
+                  <p className="truncate text-xs text-slate-400">{c.job_title}</p>
+                </div>
+                {reco && (
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${reco.bg} ${reco.text}`}>
+                    {reco.label}
+                  </span>
+                )}
+                <div className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+                  c.ai_score >= 80 ? 'bg-emerald-100 text-emerald-700' :
+                  c.ai_score >= 60 ? 'bg-amber-100 text-amber-700' :
+                  'bg-slate-100 text-slate-600'
+                }`}>
+                  {c.ai_score}
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── CandidateSourcesWidget ────────────────────────────────────────────────────
+
+function CandidateSourcesWidget({ sources }: { sources: CandidateSource[] }) {
+  const total = sources.reduce((s, x) => s + x.count, 0)
+  return (
+    <div>
+      <h2 className="mb-4 px-1 text-sm font-semibold text-slate-900">Candidate Sources</h2>
+      {total === 0 ? (
+        <p className="text-sm text-slate-400">No source data yet.</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex h-3 w-full overflow-hidden rounded-full gap-0.5">
+            {sources.map(s => (
+              <div
+                key={s.source}
+                style={{ width: `${(s.count / total) * 100}%` }}
+                className={`h-full ${SOURCE_COLORS[s.source] ?? 'bg-slate-300'}`}
+                title={`${SOURCE_LABELS[s.source] ?? s.source}: ${s.count}`}
+              />
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            {sources.map(s => (
+              <div key={s.source} className="flex items-center gap-2">
+                <div className={`h-2 w-2 shrink-0 rounded-full ${SOURCE_COLORS[s.source] ?? 'bg-slate-300'}`} />
+                <span className="flex-1 text-xs text-slate-600">{SOURCE_LABELS[s.source] ?? s.source}</span>
+                <span className="text-xs font-semibold text-slate-700">{s.count}</span>
+                <span className="w-8 text-right text-[10px] text-slate-400">
+                  {Math.round((s.count / total) * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── OfferTrackerWidget ────────────────────────────────────────────────────────
+
+function OfferTrackerWidget({ offers }: { offers: OfferTrackerItem[] }) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between px-1">
+        <h2 className="text-sm font-semibold text-slate-900">Offer Tracker</h2>
+        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all</Link>
+      </div>
+      {offers.length === 0 ? (
+        <p className="text-sm text-slate-400">No candidates at the offer stage right now.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {offers.map(o => (
+            <Link key={o.candidate_id} href={`/candidates/${o.candidate_id}`}
+              className="flex items-center gap-3 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2.5 hover:bg-violet-100 transition-colors"
+            >
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-200 text-xs font-bold text-violet-700">
+                {o.candidate_name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-sm font-medium text-slate-800">{o.candidate_name}</p>
+                <p className="truncate text-xs text-slate-500">{o.job_title}</p>
+                {o.current_title && (
+                  <p className="text-[10px] text-slate-400">{o.current_title}</p>
+                )}
+              </div>
+              <span className="shrink-0 rounded-full border border-violet-200 bg-violet-100 px-2.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                Offer Out
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── RecentActivityWidget ──────────────────────────────────────────────────────
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  applied: 'applied', stage_moved: 'moved to stage', note_added: 'note added',
+  status_changed: 'status changed', email_sent: 'email sent',
+}
+const EVENT_TYPE_ICONS: Record<string, string> = {
+  applied: '→', stage_moved: '↑', note_added: '✎', status_changed: '⟳', email_sent: '✉',
+}
+const EVENT_TYPE_COLORS: Record<string, string> = {
+  applied: 'bg-blue-100 text-blue-600', stage_moved: 'bg-emerald-100 text-emerald-600',
+  note_added: 'bg-slate-100 text-slate-500', status_changed: 'bg-amber-100 text-amber-600',
+  email_sent: 'bg-violet-100 text-violet-600',
+}
+
+function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
+  return (
+    <div>
+      <h2 className="mb-4 px-1 text-sm font-semibold text-slate-900">Recent Activity</h2>
+      {activity.length === 0 ? (
+        <p className="text-sm text-slate-400">No recent activity.</p>
+      ) : (
+        <div>
+          {activity.map((e, idx) => (
+            <div key={e.id} className="flex gap-3 py-2.5 border-b border-slate-50">
+              <div className="flex flex-col items-center">
+                <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs shrink-0 ${EVENT_TYPE_COLORS[e.event_type] ?? 'bg-slate-100 text-slate-500'}`}>
+                  {EVENT_TYPE_ICONS[e.event_type] ?? '·'}
+                </div>
+                {idx < activity.length - 1 && (
+                  <div className="w-px flex-1 bg-slate-100 mt-1" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0 pb-1">
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-xs font-medium text-slate-800">{e.candidate_name}</span>
+                  <span className="text-[10px] text-slate-400">{EVENT_TYPE_LABELS[e.event_type] ?? e.event_type}</span>
+                  {e.to_stage && (
+                    <span className="text-[10px] font-medium text-blue-600">→ {e.to_stage}</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400 truncate">{e.job_title}</p>
+                {e.note && (
+                  <p className="mt-0.5 text-[10px] italic text-slate-500 truncate">&ldquo;{e.note}&rdquo;</p>
+                )}
+                <p className="mt-0.5 text-[10px] text-slate-300">{timeAgo(e.created_at)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── StageFunnelWidget ─────────────────────────────────────────────────────────
+
+function StageFunnelWidget({ funnel }: { funnel: StageFunnelItem[] }) {
+  const max = Math.max(...funnel.map(s => s.count), 1)
+  return (
+    <div>
+      <h2 className="mb-4 px-1 text-sm font-semibold text-slate-900">Stage Funnel</h2>
+      {funnel.length === 0 ? (
+        <p className="text-sm text-slate-400">No active candidates in the pipeline.</p>
+      ) : (
+        <div className="space-y-2.5">
+          {funnel.map(s => (
+            <div key={s.stage_id} className="flex items-center gap-3">
+              <div className={`h-2.5 w-2.5 shrink-0 rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'}`} />
+              <span className="w-32 shrink-0 truncate text-xs text-slate-600">{s.stage_name}</span>
+              <div className="flex-1 h-4 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className={`h-full rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'} transition-all`}
+                  style={{ width: `${(s.count / max) * 100}%` }}
+                />
+              </div>
+              <span className="w-6 shrink-0 text-right text-xs font-semibold text-slate-700">{s.count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── ActivityPanel (right column — always visible) ─────────────────────────────
 
 function ActivityPanel({
@@ -808,30 +1199,41 @@ function WidgetCustomizer({
         )}
       </div>
 
-      {/* Available widgets to add */}
+      {/* Available widgets to add — grouped by category */}
       {availableToAdd.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Add widgets</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {availableToAdd.map(def => {
-              const Icon = def.icon
-              return (
-                <button
-                  key={def.id}
-                  onClick={() => onAdd(def.id)}
-                  className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2.5 text-left hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                >
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100">
-                    <Icon className="h-3.5 w-3.5 text-slate-500" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-medium text-slate-700">{def.name}</p>
-                  </div>
-                  <Plus className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-400" />
-                </button>
-              )
-            })}
-          </div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Add widgets</p>
+          {(['jobs', 'candidates', 'activity'] as WidgetCategory[]).map(cat => {
+            const defsInCat = availableToAdd.filter(d => d.category === cat)
+            if (defsInCat.length === 0) return null
+            return (
+              <div key={cat} className="mb-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                  {CATEGORY_LABELS[cat]}
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {defsInCat.map(def => {
+                    const Icon = def.icon
+                    return (
+                      <button
+                        key={def.id}
+                        onClick={() => onAdd(def.id)}
+                        className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2.5 text-left hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                      >
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100">
+                          <Icon className="h-3.5 w-3.5 text-slate-500" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-medium text-slate-700">{def.name}</p>
+                        </div>
+                        <Plus className="ml-auto h-3.5 w-3.5 shrink-0 text-slate-400" />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -1045,11 +1447,19 @@ export default function DashboardPage() {
           {/* Render widgets in order */}
           {(activeView?.widgets ?? []).map(wId => (
             <div key={wId} className={widgetMode ? 'opacity-50 pointer-events-none' : ''}>
-              {wId === 'interviews'    && <InterviewsWidget    interviews={data.upcoming_interviews} />}
-              {wId === 'tasks'         && <TasksWidget         tasks={data.tasks} />}
-              {wId === 'overview_stats'&& <OverviewStatsWidget stats={data.stats} />}
-              {wId === 'pipeline'      && <PipelineWidget      breakdown={data.candidate_breakdown} />}
-              {wId === 'jobs_mini'     && <JobsMiniWidget      jobs={data.top_jobs} />}
+              {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} />}
+              {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} />}
+              {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
+              {wId === 'pipeline'           && <PipelineWidget           breakdown={data.candidate_breakdown} />}
+              {wId === 'jobs_mini'          && <JobsMiniWidget           jobs={data.top_jobs} />}
+              {wId === 'jobs_by_dept'       && <JobsByDeptWidget         departments={data.jobs_by_dept} />}
+              {wId === 'hm_actions'         && <HmActionsWidget          approvals={data.tasks.pending_approvals} />}
+              {wId === 'recent_applications'&& <RecentApplicationsWidget applications={data.recent_applications} />}
+              {wId === 'top_scored'         && <TopScoredWidget          candidates={data.top_scored} />}
+              {wId === 'candidate_sources'  && <CandidateSourcesWidget   sources={data.candidate_sources} />}
+              {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} />}
+              {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
+              {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
             </div>
           ))}
 

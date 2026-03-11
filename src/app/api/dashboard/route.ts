@@ -45,7 +45,7 @@ export async function GET() {
 
     supabase
       .from('applications')
-      .select('id, candidate_id, hiring_request_id, stage_id, status, applied_at')
+      .select('id, candidate_id, hiring_request_id, stage_id, status, applied_at, ai_score, ai_recommendation, source')
       .eq('org_id', orgId),
 
     supabase
@@ -208,6 +208,118 @@ export async function GET() {
 
   const overdue_followups_count = overdue_followups.length
 
+  // ── Recent applications (sorted by applied_at desc) ──────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recent_applications = [...apps]
+    .sort((a, b) => new Date((b as any).applied_at).getTime() - new Date((a as any).applied_at).getTime())
+    .slice(0, 15)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((a: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const candidate = candidateMap.get(a.candidate_id) as any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const job       = jobMap.get(a.hiring_request_id) as any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stage     = stageMap.get(a.stage_id) as any
+      return {
+        id:             a.id,
+        candidate_id:   a.candidate_id,
+        candidate_name: candidate?.name         ?? 'Unknown',
+        job_title:      job?.position_title     ?? 'Unknown',
+        stage_name:     stage?.name             ?? null,
+        applied_at:     a.applied_at,
+        source:         a.source                ?? 'manual',
+        ai_score:       a.ai_score              ?? null,
+      }
+    })
+
+  // ── Top AI-scored candidates ──────────────────────────────────────────────────
+  const top_scored = apps
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((a: any) => a.ai_score !== null && a.ai_score !== undefined)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .sort((a: any, b: any) => (b.ai_score as number) - (a.ai_score as number))
+    .slice(0, 10)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((a: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const candidate = candidateMap.get(a.candidate_id) as any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const job       = jobMap.get(a.hiring_request_id) as any
+      return {
+        id:                a.id,
+        candidate_id:      a.candidate_id,
+        candidate_name:    candidate?.name         ?? 'Unknown',
+        job_title:         job?.position_title     ?? 'Unknown',
+        ai_score:          a.ai_score as number,
+        ai_recommendation: (a.ai_recommendation   ?? null) as string | null,
+      }
+    })
+
+  // ── Candidate sources ─────────────────────────────────────────────────────────
+  const sourceCounts = new Map<string, number>()
+  for (const a of apps) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const src = (a as any).source ?? 'manual'
+    sourceCounts.set(src, (sourceCounts.get(src) ?? 0) + 1)
+  }
+  const candidate_sources = Array.from(sourceCounts.entries())
+    .map(([source, count]) => ({ source, count }))
+    .sort((a, b) => b.count - a.count)
+
+  // ── Offer tracker ─────────────────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const offer_tracker = candidates
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((c: any) => c.status === 'offer_extended')
+    .slice(0, 10)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((c: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const app = apps.find((a: any) => a.candidate_id === c.id && a.status === 'active')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const job = app ? (jobMap.get((app as any).hiring_request_id) as any) : null
+      return {
+        candidate_id:   c.id,
+        candidate_name: c.name,
+        current_title:  c.current_title ?? null,
+        job_title:      job?.position_title ?? 'Unknown',
+      }
+    })
+
+  // ── Jobs by department ────────────────────────────────────────────────────────
+  const deptMap = new Map<string, { job_count: number; candidate_count: number }>()
+  for (const j of jobs) {
+    const dept    = j.department ?? 'No Department'
+    const existing = deptMap.get(dept) ?? { job_count: 0, candidate_count: 0 }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const jobApps  = apps.filter((a: any) => a.hiring_request_id === j.id).length
+    deptMap.set(dept, { job_count: existing.job_count + 1, candidate_count: existing.candidate_count + jobApps })
+  }
+  const jobs_by_dept = Array.from(deptMap.entries())
+    .map(([department, { job_count, candidate_count }]) => ({ department, job_count, candidate_count }))
+    .sort((a, b) => b.candidate_count - a.candidate_count)
+    .slice(0, 8)
+
+  // ── Stage funnel (active candidates per stage, cross-job) ────────────────────
+  const stageFunnelMap = new Map<string, { stage_name: string; color: string; count: number }>()
+  for (const a of apps) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((a as any).status !== 'active' || !(a as any).stage_id) continue
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stage = stageMap.get((a as any).stage_id) as any
+    if (!stage) continue
+    const entry = stageFunnelMap.get(stage.id)
+    if (entry) entry.count++
+    else stageFunnelMap.set(stage.id, { stage_name: stage.name, color: stage.color, count: 1 })
+  }
+  const stage_funnel = Array.from(stageFunnelMap.entries())
+    .map(([stage_id, { stage_name, color, count }]) => ({
+      stage_id, stage_name, color: color as StageColor, count,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+
   // ── Application review (posted jobs with first-stage apps) ──────────────────
   const application_review = jobs
     .filter(j => j.status === 'posted')
@@ -291,5 +403,11 @@ export async function GET() {
     upcoming_interviews,
     tasks: { pending_approvals, feedback_needed, overdue_followups },
     application_review,
+    recent_applications,
+    top_scored,
+    candidate_sources,
+    offer_tracker,
+    jobs_by_dept,
+    stage_funnel,
   })
 }
