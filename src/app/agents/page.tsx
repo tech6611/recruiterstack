@@ -385,7 +385,7 @@ export default function AgentsPage() {
                     href="/sign-up"
                     className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
                   >
-                    Deploy {agent.name}
+                    Try {agent.name} free
                     <ChevronRight className="h-4 w-4" />
                   </Link>
                 </div>
@@ -404,7 +404,7 @@ export default function AgentsPage() {
       <section className="py-24 text-center">
         <div className="mx-auto max-w-2xl px-6">
           <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Deploy your full team
+            Start with one. Scale to all five.
           </h2>
           <p className="mt-4 text-zinc-400">
             All 5 agents. One platform. Zero manual handoffs between stages.
