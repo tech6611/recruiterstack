@@ -1388,13 +1388,11 @@ const DURATION_OPTIONS = [
 function ScheduleInterviewModal({
   apps,
   job,
-  stages,
   onClose,
   onScheduled,
 }: {
   apps: Application[]
   job: JobWithPipeline
-  stages: PipelineStage[]
   onClose: () => void
   onScheduled: () => void
 }) {
@@ -1672,7 +1670,6 @@ export default function JobPipelinePage() {
     if (next.has(appId)) next.delete(appId); else next.add(appId)
     return next
   })
-  const clearSelection = () => setSelectedApps(new Set())
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [scheduleModalApps, setScheduleModalApps] = useState<Application[] | null>(null)
 
@@ -2378,7 +2375,6 @@ export default function JobPipelinePage() {
         <ScheduleInterviewModal
           apps={scheduleModalApps}
           job={job}
-          stages={job.pipeline_stages}
           onClose={() => setScheduleModalApps(null)}
           onScheduled={load}
         />
