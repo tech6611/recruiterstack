@@ -172,10 +172,30 @@ const VIEW_ICONS: Record<string, React.FC<{ className?: string }>> = {
   workflow: Workflow, shield: Shield, users: Users, star: Star, bar: BarChart,
 }
 
-const LS_VIEWS   = 'rs_dashboard_views'
-const LS_ACTIVE  = 'rs_dashboard_active_view'
-const LS_VERSION = 'rs_dashboard_version'
-const CURRENT_VERSION = 'v4' // bump when DashView shape changes
+const LS_VIEWS         = 'rs_dashboard_views'
+const LS_ACTIVE        = 'rs_dashboard_active_view'
+const LS_VERSION       = 'rs_dashboard_version'
+const LS_RIGHT_WIDGETS = 'rs_right_panel_widgets'
+const CURRENT_VERSION  = 'v4' // bump when DashView shape changes
+
+// ── Right Panel Widget definitions ─────────────────────────────────────────────
+
+type RightPanelWidgetId = 'activities' | 'app_review' | 'jobs_panel'
+
+interface RightPanelWidgetDef {
+  id:          RightPanelWidgetId
+  name:        string
+  description: string
+  icon:        React.FC<{ className?: string }>
+}
+
+const RIGHT_WIDGET_DEFS: RightPanelWidgetDef[] = [
+  { id: 'activities', name: 'Activities',         icon: Activity,  description: 'Key activity metrics and counts' },
+  { id: 'app_review', name: 'Application Review', icon: Eye,       description: 'Jobs with pending applications to review' },
+  { id: 'jobs_panel', name: 'Jobs',               icon: Briefcase, description: 'Active jobs list with pipeline mini-bar' },
+]
+
+const DEFAULT_RIGHT_WIDGETS: RightPanelWidgetId[] = ['activities', 'app_review', 'jobs_panel']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1010,143 +1030,394 @@ function StageFunnelWidget({ funnel }: { funnel: StageFunnelItem[] }) {
   )
 }
 
-// ── ActivityPanel (right column — always visible) ─────────────────────────────
+// ── Right Panel — individual widget sub-components ────────────────────────────
 
-function ActivityPanel({
-  stats, applicationReview, topJobs,
-}: {
-  stats: DashboardData['stats']
-  applicationReview: ApplicationReviewItem[]
-  topJobs: TopJob[]
-}) {
+function ActivitiesPanelWidget({ stats }: { stats: DashboardData['stats'] }) {
   const [tab, setTab] = useState<'mine' | 'all'>('mine')
 
   const STAT_ROWS = [
-    { label: 'Application Review',      value: null as number | null, href: '/candidates' },
-    { label: 'Interviews to Schedule',  value: stats.interviews_to_schedule,  href: '/candidates', color: stats.interviews_to_schedule  > 0 ? 'text-blue-600'    : 'text-slate-800' },
-    { label: 'Overdue Follow-ups',      value: stats.overdue_followups_count, href: '/candidates', color: stats.overdue_followups_count > 0 ? 'text-red-500'     : 'text-emerald-600' },
-    { label: 'Pending Offers',          value: stats.pending_offers,          href: '/candidates', color: stats.pending_offers          > 0 ? 'text-violet-600'  : 'text-slate-800' },
-    { label: 'Active Candidates',       value: stats.active_candidates,       href: '/candidates', color: 'text-slate-800' },
+    { label: 'Application Review',     value: null as number | null, href: '/candidates' },
+    { label: 'Interviews to Schedule', value: stats.interviews_to_schedule,  href: '/candidates', color: stats.interviews_to_schedule  > 0 ? 'text-blue-600'   : 'text-slate-800' },
+    { label: 'Overdue Follow-ups',     value: stats.overdue_followups_count, href: '/candidates', color: stats.overdue_followups_count > 0 ? 'text-red-500'    : 'text-emerald-600' },
+    { label: 'Pending Offers',         value: stats.pending_offers,          href: '/candidates', color: stats.pending_offers          > 0 ? 'text-violet-600' : 'text-slate-800' },
+    { label: 'Active Candidates',      value: stats.active_candidates,       href: '/candidates', color: 'text-slate-800' },
   ]
 
   return (
-    <aside className="sticky top-0 h-screen w-72 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
-      {/* Activities */}
-      <div className="border-b border-slate-100 px-4 pt-5 pb-4">
-        <h3 className="mb-3 text-sm font-semibold text-slate-900">Activities</h3>
-        <div className="mb-3 flex gap-0 border-b border-slate-100">
-          {(['mine', 'all'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`border-b-2 px-3 py-1.5 text-xs font-medium transition-colors ${
-                tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              {t === 'mine' ? 'My Activities' : 'All Activities'}
-            </button>
-          ))}
-        </div>
+    <div>
+      <h3 className="mb-3 text-sm font-semibold text-slate-900">Activities</h3>
+      <div className="mb-3 flex gap-0 border-b border-slate-100">
+        {(['mine', 'all'] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`border-b-2 px-3 py-1.5 text-xs font-medium transition-colors ${
+              tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {t === 'mine' ? 'My Activities' : 'All Activities'}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-0.5">
+        {STAT_ROWS.map(row => (
+          <Link key={row.label} href={row.href}
+            className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors"
+          >
+            <span className="text-xs text-slate-600">{row.label}</span>
+            {row.value !== null
+              ? <span className={`text-xs font-semibold ${row.color ?? 'text-slate-800'}`}>{row.value}</span>
+              : <ChevronRight className="h-3 w-3 text-slate-300" />
+            }
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AppReviewPanelWidget({ applicationReview }: { applicationReview: ApplicationReviewItem[] }) {
+  return (
+    <div>
+      <h3 className="mb-3 text-xs font-semibold text-slate-900">Application Review</h3>
+      {applicationReview.length === 0 ? (
+        <p className="text-xs text-slate-400">No applications pending review.</p>
+      ) : (
         <div className="space-y-0.5">
-          {STAT_ROWS.map(row => (
-            <Link key={row.label} href={row.href}
-              className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors"
+          {applicationReview.map(item => (
+            <Link key={item.job_id} href={`/jobs/${item.job_id}`}
+              className="flex items-start justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors"
             >
-              <span className="text-xs text-slate-600">{row.label}</span>
-              {row.value !== null
-                ? <span className={`text-xs font-semibold ${row.color ?? 'text-slate-800'}`}>{row.value}</span>
-                : <ChevronRight className="h-3 w-3 text-slate-300" />
-              }
+              <div className="min-w-0">
+                <p className="truncate text-xs font-medium text-slate-800">{item.job_title}</p>
+                <p className="text-[10px] text-slate-400">Application Review</p>
+              </div>
+              <div className="shrink-0">
+                <span className="text-xs font-medium text-blue-600">
+                  {item.count} Application{item.count !== 1 ? 's' : ''}
+                </span>
+                <ArrowRight className="ml-1 inline h-3 w-3 text-blue-400" />
+              </div>
             </Link>
           ))}
         </div>
-      </div>
+      )}
+    </div>
+  )
+}
 
-      {/* Application Review */}
-      {applicationReview.length > 0 && (
-        <div className="border-b border-slate-100 px-4 py-4">
-          <h3 className="mb-3 text-xs font-semibold text-slate-900">Application Review</h3>
+function JobsPanelWidget({ topJobs }: { topJobs: TopJob[] }) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-slate-900">Jobs</h3>
+        <Link href="/jobs" className="text-[10px] font-medium text-blue-600 hover:text-blue-700 transition-colors">
+          View All Jobs
+        </Link>
+      </div>
+      {topJobs.length === 0
+        ? <p className="text-xs text-slate-400">No open jobs.</p>
+        : (
           <div className="space-y-0.5">
-            {applicationReview.map(item => (
-              <Link key={item.job_id} href={`/jobs/${item.job_id}`}
-                className="flex items-start justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors"
+            {topJobs.map(job => (
+              <Link key={job.id} href={`/jobs/${job.id}`}
+                className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-slate-800">{item.job_title}</p>
-                  <p className="text-[10px] text-slate-400">Application Review</p>
+                  <p className="truncate text-xs font-medium text-slate-800">{job.position_title}</p>
+                  {job.location && (
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-2.5 w-2.5 text-slate-400" />
+                      <span className="text-[10px] text-slate-400">{job.location}</span>
+                    </div>
+                  )}
                 </div>
-                <div className="shrink-0">
-                  <span className="text-xs font-medium text-blue-600">
-                    {item.count} Application{item.count !== 1 ? 's' : ''}
-                  </span>
-                  <ArrowRight className="ml-1 inline h-3 w-3 text-blue-400" />
-                </div>
+                <span className="shrink-0 text-xs font-semibold text-slate-700">{job.total_candidates}</span>
               </Link>
+            ))}
+          </div>
+        )
+      }
+
+      {/* Pipeline mini-bar for top job */}
+      {topJobs.length > 0 && topJobs[0].stage_counts.length > 0 && (
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <p className="mb-1 text-[10px] text-slate-400">Pipeline — {topJobs[0].position_title}</p>
+          <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100 gap-0.5">
+            {topJobs[0].stage_counts.map(s => {
+              const pct = topJobs[0].total_candidates > 0 ? (s.count / topJobs[0].total_candidates) * 100 : 0
+              if (pct === 0) return null
+              return (
+                <div key={s.stage_id} style={{ width: `${pct}%` }}
+                  className={`h-full rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'}`}
+                  title={`${s.stage_name}: ${s.count}`}
+                />
+              )
+            })}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+            {topJobs[0].stage_counts.filter(s => s.count > 0).map(s => (
+              <div key={s.stage_id} className="flex items-center gap-1">
+                <div className={`h-1.5 w-1.5 rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'}`} />
+                <span className="text-[10px] text-slate-500">{s.stage_name}</span>
+                <span className="text-[10px] font-semibold text-slate-700">{s.count}</span>
+              </div>
             ))}
           </div>
         </div>
       )}
+    </div>
+  )
+}
 
-      {/* Jobs */}
-      <div className="px-4 py-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-slate-900">Jobs</h3>
-          <Link href="/jobs" className="text-[10px] font-medium text-blue-600 hover:text-blue-700 transition-colors">
-            View All Jobs
-          </Link>
+// ── RightPanelCustomizer ───────────────────────────────────────────────────────
+
+function RightPanelCustomizer({
+  activeWidgets,
+  snapshotWidgets,
+  onClose,
+  onDiscard,
+  onReorder,
+  onRemove,
+  onAdd,
+}: {
+  activeWidgets:   RightPanelWidgetId[]
+  snapshotWidgets: RightPanelWidgetId[]
+  onClose:   () => void
+  onDiscard: () => void
+  onReorder: (widgets: RightPanelWidgetId[]) => void
+  onRemove:  (id: RightPanelWidgetId) => void
+  onAdd:     (id: RightPanelWidgetId) => void
+}) {
+  const [draggingId,     setDraggingId]     = useState<RightPanelWidgetId | null>(null)
+  const [dragOverId,     setDragOverId]     = useState<RightPanelWidgetId | null>(null)
+  const [showExitDialog, setShowExitDialog] = useState(false)
+
+  const hasChanges     = JSON.stringify(activeWidgets) !== JSON.stringify(snapshotWidgets)
+  const availableToAdd = RIGHT_WIDGET_DEFS.filter(w => !activeWidgets.includes(w.id))
+
+  function handleDoneClick() {
+    if (hasChanges) setShowExitDialog(true)
+    else onClose()
+  }
+
+  function handleDragStart(id: RightPanelWidgetId) { setDraggingId(id) }
+
+  function handleDragOver(e: React.DragEvent, id: RightPanelWidgetId) {
+    e.preventDefault()
+    setDragOverId(id)
+  }
+
+  function handleDrop(targetId: RightPanelWidgetId) {
+    if (!draggingId || draggingId === targetId) { setDraggingId(null); setDragOverId(null); return }
+    const fromIdx = activeWidgets.indexOf(draggingId)
+    const toIdx   = activeWidgets.indexOf(targetId)
+    const next    = [...activeWidgets]
+    next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, draggingId)
+    onReorder(next)
+    setDraggingId(null)
+    setDragOverId(null)
+  }
+
+  function handleDragEnd() { setDraggingId(null); setDragOverId(null) }
+
+  return (
+    <div className="border-b border-slate-100 bg-blue-50/40 px-4 py-4">
+      {/* Header */}
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-xs font-semibold text-slate-800">Customize panel</p>
+        <div className="flex items-center gap-1.5">
+          {hasChanges && (
+            <button
+              onClick={() => setShowExitDialog(true)}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-500 hover:text-red-500 transition-colors"
+            >
+              Discard
+            </button>
+          )}
+          <button
+            onClick={handleDoneClick}
+            className="rounded-lg bg-blue-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            Done
+          </button>
         </div>
-        {topJobs.length === 0
-          ? <p className="text-xs text-slate-400">No open jobs.</p>
-          : (
-            <div className="space-y-0.5">
-              {topJobs.map(job => (
-                <Link key={job.id} href={`/jobs/${job.id}`}
-                  className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-medium text-slate-800">{job.position_title}</p>
-                    {job.location && (
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-2.5 w-2.5 text-slate-400" />
-                        <span className="text-[10px] text-slate-400">{job.location}</span>
-                      </div>
-                    )}
-                  </div>
-                  <span className="shrink-0 text-xs font-semibold text-slate-700">{job.total_candidates}</span>
-                </Link>
-              ))}
+      </div>
+
+      {/* Hint */}
+      <p className="mb-3 text-[10px] text-slate-400">Drag to reorder · click × to hide</p>
+
+      {/* Save/Discard dialog */}
+      {showExitDialog && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs font-semibold text-slate-800">Save changes?</p>
+          <div className="mt-2 flex gap-1.5">
+            <button
+              onClick={() => setShowExitDialog(false)}
+              className="flex-1 rounded-lg border border-slate-200 bg-white py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Keep editing
+            </button>
+            <button
+              onClick={onDiscard}
+              className="flex-1 rounded-lg border border-red-200 bg-white py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors"
+            >
+              Discard
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-lg bg-blue-600 py-1 text-[11px] font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active sections — drag to reorder */}
+      <div className="mb-3 space-y-1">
+        <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Active sections</p>
+        {activeWidgets.map(wId => {
+          const def        = RIGHT_WIDGET_DEFS.find(w => w.id === wId)
+          if (!def) return null
+          const Icon       = def.icon
+          const isDragging = draggingId === wId
+          const isDragOver = dragOverId === wId && draggingId !== wId
+          return (
+            <div
+              key={wId}
+              draggable
+              onDragStart={() => handleDragStart(wId)}
+              onDragOver={e => handleDragOver(e, wId)}
+              onDrop={() => handleDrop(wId)}
+              onDragEnd={handleDragEnd}
+              className={`flex items-center gap-2 rounded-lg border bg-white px-2.5 py-2 cursor-grab active:cursor-grabbing transition-all ${
+                isDragging ? 'opacity-40 scale-95 border-blue-300' :
+                isDragOver ? 'border-blue-400 shadow-sm ring-1 ring-blue-300 -translate-y-0.5' :
+                'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <GripVertical className="h-3.5 w-3.5 shrink-0 text-slate-300" />
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100">
+                <Icon className="h-3 w-3 text-slate-600" />
+              </div>
+              <span className="flex-1 min-w-0 text-xs font-medium text-slate-700 truncate">{def.name}</span>
+              <button
+                onClick={() => onRemove(wId)}
+                className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </div>
           )
-        }
-
-        {/* Pipeline mini-bar */}
-        {topJobs.length > 0 && topJobs[0].stage_counts.length > 0 && (
-          <div className="mt-3 border-t border-slate-100 pt-3">
-            <p className="mb-1 text-[10px] text-slate-400">Pipeline — {topJobs[0].position_title}</p>
-            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100 gap-0.5">
-              {topJobs[0].stage_counts.map(s => {
-                const pct = topJobs[0].total_candidates > 0 ? (s.count / topJobs[0].total_candidates) * 100 : 0
-                if (pct === 0) return null
-                return (
-                  <div key={s.stage_id} style={{ width: `${pct}%` }}
-                    className={`h-full rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'}`}
-                    title={`${s.stage_name}: ${s.count}`}
-                  />
-                )
-              })}
-            </div>
-            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-              {topJobs[0].stage_counts.filter(s => s.count > 0).map(s => (
-                <div key={s.stage_id} className="flex items-center gap-1">
-                  <div className={`h-1.5 w-1.5 rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'}`} />
-                  <span className="text-[10px] text-slate-500">{s.stage_name}</span>
-                  <span className="text-[10px] font-semibold text-slate-700">{s.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        })}
+        {activeWidgets.length === 0 && (
+          <p className="py-3 text-center text-xs text-slate-400">No sections active. Add one below.</p>
         )}
       </div>
+
+      {/* Available to add */}
+      {availableToAdd.length > 0 && (
+        <div>
+          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Add sections</p>
+          <div className="space-y-1">
+            {availableToAdd.map(def => {
+              const Icon = def.icon
+              return (
+                <button
+                  key={def.id}
+                  onClick={() => onAdd(def.id)}
+                  className="flex w-full items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-2 text-left hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                >
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100">
+                    <Icon className="h-3 w-3 text-slate-500" />
+                  </div>
+                  <span className="flex-1 text-xs font-medium text-slate-700">{def.name}</span>
+                  <Plus className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── ActivityPanel (right column — customizable) ────────────────────────────────
+
+function ActivityPanel({
+  stats, applicationReview, topJobs,
+  rightWidgets, rightPanelMode, rightWidgetSnapshot,
+  onOpenCustomizer, onCloseCustomizer, onDiscardCustomizer,
+  onReorderWidgets, onRemoveWidget, onAddWidget,
+}: {
+  stats: DashboardData['stats']
+  applicationReview: ApplicationReviewItem[]
+  topJobs: TopJob[]
+  rightWidgets:        RightPanelWidgetId[]
+  rightPanelMode:      boolean
+  rightWidgetSnapshot: RightPanelWidgetId[]
+  onOpenCustomizer:    () => void
+  onCloseCustomizer:   () => void
+  onDiscardCustomizer: () => void
+  onReorderWidgets:    (widgets: RightPanelWidgetId[]) => void
+  onRemoveWidget:      (id: RightPanelWidgetId) => void
+  onAddWidget:         (id: RightPanelWidgetId) => void
+}) {
+  return (
+    <aside className="sticky top-0 h-screen w-72 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
+
+      {/* Panel header */}
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <span className="text-xs font-semibold text-slate-600">Panel</span>
+        <button
+          onClick={rightPanelMode ? undefined : onOpenCustomizer}
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors ${
+            rightPanelMode
+              ? 'border-blue-300 bg-blue-50 text-blue-700 cursor-default'
+              : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+          }`}
+        >
+          <Settings2 className="h-3 w-3" />
+          Customize
+        </button>
+      </div>
+
+      {/* In-place customizer */}
+      {rightPanelMode && (
+        <RightPanelCustomizer
+          activeWidgets={rightWidgets}
+          snapshotWidgets={rightWidgetSnapshot}
+          onClose={onCloseCustomizer}
+          onDiscard={onDiscardCustomizer}
+          onReorder={onReorderWidgets}
+          onRemove={onRemoveWidget}
+          onAdd={onAddWidget}
+        />
+      )}
+
+      {/* Widgets rendered in user-defined order */}
+      {rightWidgets.map((wId, idx) => (
+        <div
+          key={wId}
+          className={`px-4 py-4 ${idx < rightWidgets.length - 1 ? 'border-b border-slate-100' : ''} ${rightPanelMode ? 'pointer-events-none opacity-40' : ''}`}
+        >
+          {wId === 'activities' && <ActivitiesPanelWidget stats={stats} />}
+          {wId === 'app_review' && <AppReviewPanelWidget applicationReview={applicationReview} />}
+          {wId === 'jobs_panel' && <JobsPanelWidget topJobs={topJobs} />}
+        </div>
+      ))}
+
+      {/* Empty state */}
+      {rightWidgets.length === 0 && !rightPanelMode && (
+        <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
+          <Settings2 className="mb-2 h-7 w-7 text-slate-200" />
+          <p className="text-xs font-medium text-slate-500">Panel is empty</p>
+          <p className="mt-1 text-[10px] text-slate-400">Click Customize to add sections</p>
+        </div>
+      )}
     </aside>
   )
 }
@@ -1400,6 +1671,11 @@ export default function DashboardPage() {
   const [widgetSnapshot, setWidgetSnapshot] = useState<WidgetId[]>([])
   const [hydrated,       setHydrated]      = useState(false)
 
+  // Right panel state
+  const [rightWidgets,        setRightWidgets]        = useState<RightPanelWidgetId[]>(DEFAULT_RIGHT_WIDGETS)
+  const [rightPanelMode,      setRightPanelMode]      = useState(false)
+  const [rightWidgetSnapshot, setRightWidgetSnapshot] = useState<RightPanelWidgetId[]>([])
+
   // Hydrate localStorage — migrate old data that lacks `widgets`
   useEffect(() => {
     try {
@@ -1432,6 +1708,14 @@ export default function DashboardPage() {
       localStorage.removeItem(LS_VIEWS)
       localStorage.removeItem(LS_ACTIVE)
     }
+    // Hydrate right panel widgets (independent of version gating)
+    try {
+      const rw = localStorage.getItem(LS_RIGHT_WIDGETS)
+      if (rw) {
+        const parsed = JSON.parse(rw) as RightPanelWidgetId[]
+        if (Array.isArray(parsed)) setRightWidgets(parsed)
+      }
+    } catch {}
     setHydrated(true)
   }, [])
 
@@ -1444,6 +1728,11 @@ export default function DashboardPage() {
     if (!hydrated) return
     try { localStorage.setItem(LS_ACTIVE, activeViewId) } catch {}
   }, [activeViewId, hydrated])
+
+  useEffect(() => {
+    if (!hydrated) return
+    try { localStorage.setItem(LS_RIGHT_WIDGETS, JSON.stringify(rightWidgets)) } catch {}
+  }, [rightWidgets, hydrated])
 
   // Fetch
   const fetchData = useCallback(async (isRefresh = false) => {
@@ -1501,6 +1790,17 @@ export default function DashboardPage() {
     setWidgetSnapshot(view?.widgets ?? [])
     setWidgetMode(true)
   }
+
+  // Right panel handlers
+  function handleRightOpenCustomizer() {
+    setRightWidgetSnapshot(rightWidgets)
+    setRightPanelMode(true)
+  }
+  function handleRightCloseCustomizer()   { setRightPanelMode(false) }
+  function handleRightDiscardCustomizer() { setRightWidgets(rightWidgetSnapshot); setRightPanelMode(false) }
+  function handleRightReorderWidgets(widgets: RightPanelWidgetId[]) { setRightWidgets(widgets) }
+  function handleRightRemoveWidget(id: RightPanelWidgetId)         { setRightWidgets(prev => prev.filter(w => w !== id)) }
+  function handleRightAddWidget(id: RightPanelWidgetId)            { setRightWidgets(prev => [...prev, id]) }
 
   if (loading || !hydrated) return <DashboardSkeleton />
 
@@ -1618,11 +1918,20 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Right activity panel */}
+      {/* Right activity panel — customizable */}
       <ActivityPanel
         stats={data.stats}
         applicationReview={data.application_review}
         topJobs={data.top_jobs}
+        rightWidgets={rightWidgets}
+        rightPanelMode={rightPanelMode}
+        rightWidgetSnapshot={rightWidgetSnapshot}
+        onOpenCustomizer={handleRightOpenCustomizer}
+        onCloseCustomizer={handleRightCloseCustomizer}
+        onDiscardCustomizer={handleRightDiscardCustomizer}
+        onReorderWidgets={handleRightReorderWidgets}
+        onRemoveWidget={handleRightRemoveWidget}
+        onAddWidget={handleRightAddWidget}
       />
     </div>
   )
