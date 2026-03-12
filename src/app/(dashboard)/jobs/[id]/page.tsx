@@ -1045,6 +1045,8 @@ function RankedView({
   onMoveToStage,
   selectedApps,
   onToggleSelect,
+  onScheduleApp,
+  onRejectApp,
 }: {
   apps: Application[]
   stages: PipelineStage[]
@@ -1052,7 +1054,11 @@ function RankedView({
   onMoveToStage: (appId: string, stageId: string) => void
   selectedApps: Set<string>
   onToggleSelect: (id: string) => void
+  onScheduleApp: (app: Application) => void
+  onRejectApp: (appId: string) => void
 }) {
+  const [openRowMenu, setOpenRowMenu] = useState<string | null>(null)
+
   const sorted = [...apps].sort((a, b) => {
     if (a.ai_score === null && b.ai_score === null) return 0
     if (a.ai_score === null) return 1
@@ -1077,6 +1083,7 @@ function RankedView({
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Source</th>
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Days</th>
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3 w-44">Suggestion</th>
+              <th className="px-4 py-3 w-12" />
             </tr>
           </thead>
           <tbody>
@@ -1170,6 +1177,59 @@ function RankedView({
                         → Move to {nextStage.name}
                       </button>
                     ) : null}
+                  </td>
+                  <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                    <div className="relative">
+                      <button
+                        onClick={e => { e.stopPropagation(); setOpenRowMenu(openRowMenu === app.id ? null : app.id) }}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          openRowMenu === app.id ? 'bg-slate-200 text-slate-700' : 'text-slate-300 hover:text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                      {openRowMenu === app.id && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenRowMenu(null)} />
+                          <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-white border border-slate-200 rounded-xl shadow-xl py-1 overflow-hidden">
+                            <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+                              {c.name}
+                            </div>
+                            <button
+                              onClick={() => { setOpenRowMenu(null); onCardClick(app) }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
+                              View profile
+                            </button>
+                            <button
+                              onClick={() => { setOpenRowMenu(null); onScheduleApp(app) }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                            >
+                              <span className="text-base leading-none w-3.5 text-center">📅</span>
+                              Schedule interview
+                            </button>
+                            {nextStage && (
+                              <button
+                                onClick={() => { setOpenRowMenu(null); onMoveToStage(app.id, nextStage.id) }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                              >
+                                <span className="text-base leading-none w-3.5 text-center">→</span>
+                                Move to {nextStage.name}
+                              </button>
+                            )}
+                            <div className="my-1 border-t border-slate-100" />
+                            <button
+                              onClick={() => { setOpenRowMenu(null); onRejectApp(app.id) }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              Reject candidate
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -1397,7 +1457,7 @@ function ScheduleInterviewModal({
   onScheduled: () => void
 }) {
   const today = new Date()
-  const defaultDate = new Date(today.getTime() + 86400000) // tomorrow
+  const defaultDate = new Date(today.getTime() + 86400000)
   const dateStr = defaultDate.toISOString().split('T')[0]
 
   const [interviewType, setInterviewType] = useState<string>('video')
@@ -1409,7 +1469,40 @@ function ScheduleInterviewModal({
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [scheduledAt, setScheduledAt] = useState<string | null>(null)
   const [error, setError] = useState('')
+
+  const hmEmail = (job as unknown as { hiring_manager_email?: string }).hiring_manager_email ?? null
+
+  const MEETING_INTEGRATIONS = [
+    { id: 'gmeet',    label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
+    { id: 'zoom',     label: 'Zoom',        color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://zoom.us/start/videomeeting',        placeholder: 'https://zoom.us/j/...' },
+    { id: 'teams',    label: 'MS Teams',    color: 'hover:bg-violet-50 hover:border-violet-300',   url: 'https://teams.microsoft.com/l/meeting/new', placeholder: 'https://teams.microsoft.com/l/...' },
+    { id: 'calendly', label: 'Calendly',    color: 'hover:bg-emerald-50 hover:border-emerald-300', url: 'https://calendly.com',                      placeholder: 'https://calendly.com/yourname/...' },
+  ] as const
+
+  const [activePlatform, setActivePlatform] = useState<string | null>(null)
+
+  const openIntegration = (platform: typeof MEETING_INTEGRATIONS[number]) => {
+    setActivePlatform(platform.id)
+    window.open(platform.url, '_blank', 'noopener')
+  }
+
+  const buildGCalLink = () => {
+    if (!scheduledAt) return '#'
+    const start = new Date(scheduledAt)
+    const end = new Date(start.getTime() + duration * 60000)
+    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+    const title = encodeURIComponent(`${interviewType === 'phone' ? 'Phone Screen' : 'Interview'}: ${apps.map(a => a.candidate?.name).join(', ')} — ${job.position_title}`)
+    const details = encodeURIComponent([
+      `Job: ${job.position_title}`,
+      `Interviewer: ${interviewer}`,
+      location ? `Link: ${location}` : '',
+      notes ? `Notes: ${notes}` : '',
+    ].filter(Boolean).join('\n'))
+    const add = hmEmail ? `&add=${encodeURIComponent(hmEmail)}` : ''
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${fmt(start)}/${fmt(end)}&details=${details}${add}`
+  }
 
   const handleSubmit = async () => {
     if (!date || !time || !interviewer.trim()) {
@@ -1419,7 +1512,7 @@ function ScheduleInterviewModal({
     setSaving(true)
     setError('')
 
-    const scheduled_at = new Date(`${date}T${time}:00`).toISOString()
+    const scheduled = new Date(`${date}T${time}:00`).toISOString()
 
     try {
       const results = await Promise.all(apps.map(app =>
@@ -1427,30 +1520,29 @@ function ScheduleInterviewModal({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            application_id:   app.id,
-            candidate_id:     app.candidate_id,
+            application_id:    app.id,
+            candidate_id:      app.candidate_id,
             hiring_request_id: job.id,
-            stage_id:         app.stage_id ?? null,
-            interviewer_name: interviewer.trim(),
-            interview_type:   interviewType,
-            scheduled_at,
-            duration_minutes: duration,
-            location:         location.trim() || null,
-            notes:            notes.trim() || null,
+            stage_id:          app.stage_id ?? null,
+            interviewer_name:  interviewer.trim(),
+            interview_type:    interviewType,
+            scheduled_at:      scheduled,
+            duration_minutes:  duration,
+            location:          location.trim() || null,
+            notes:             notes.trim() || null,
           }),
         }).then(r => r.json())
       ))
 
       const hasError = results.some(r => r.error)
       if (hasError) {
-        const firstErr = results.find(r => r.error)
-        setError(firstErr?.error ?? 'Failed to schedule some interviews')
+        setError(results.find(r => r.error)?.error ?? 'Failed to schedule some interviews')
         setSaving(false)
         return
       }
 
+      setScheduledAt(scheduled)
       setSaved(true)
-      setTimeout(() => { onScheduled(); onClose() }, 1200)
     } catch {
       setError('Network error. Please try again.')
       setSaving(false)
@@ -1461,6 +1553,59 @@ function ScheduleInterviewModal({
     ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     : ''
 
+  // ── Success screen ─────────────────────────────────────────────────────────
+  if (saved && scheduledAt) {
+    const fmtScheduled = new Date(scheduledAt).toLocaleString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    })
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-8 text-center">
+          <div className="h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+            <Check className="h-7 w-7 text-emerald-600" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 mb-1">
+            {apps.length === 1 ? 'Interview scheduled!' : `${apps.length} interviews scheduled!`}
+          </h2>
+          <p className="text-sm text-slate-500 mb-1">{fmtScheduled}</p>
+          {hmEmail && (
+            <p className="text-xs text-slate-400 mb-6">Interviewer: {interviewer} ({hmEmail})</p>
+          )}
+
+          <div className="flex flex-col gap-2.5 mb-5">
+            <a
+              href={buildGCalLink()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <span>📅</span> Add to Google Calendar
+            </a>
+            {location && (
+              <a
+                href={location}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" /> Open meeting link
+              </a>
+            )}
+          </div>
+
+          <button
+            onClick={() => { onScheduled(); onClose() }}
+            className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Form ───────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
@@ -1479,8 +1624,8 @@ function ScheduleInterviewModal({
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
-          {/* Candidates list */}
+        <div className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Candidates list (multi) */}
           {apps.length > 1 && (
             <div className="flex flex-wrap gap-1.5">
               {apps.map(app => (
@@ -1491,6 +1636,22 @@ function ScheduleInterviewModal({
                   {app.candidate?.name}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* HM info banner */}
+          {(job.hiring_manager_name || hmEmail) && (
+            <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(job.hiring_manager_name ?? 'HM')}`}>
+                {initials(job.hiring_manager_name ?? 'HM')}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-700">{job.hiring_manager_name}</p>
+                {hmEmail && (
+                  <a href={`mailto:${hmEmail}`} className="text-xs text-blue-600 hover:underline truncate block">{hmEmail}</a>
+                )}
+              </div>
+              <span className="ml-auto text-[10px] font-medium text-slate-400 bg-white border border-slate-200 rounded-full px-2 py-0.5">HM</span>
             </div>
           )}
 
@@ -1569,22 +1730,66 @@ function ScheduleInterviewModal({
             />
           </div>
 
-          {/* Location / Meeting link */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              {interviewType === 'in_person' ? 'Location / Address' : 'Meeting link'}
-            </label>
-            <input
-              value={location}
-              onChange={e => setLocation(e.target.value)}
-              placeholder={interviewType === 'in_person' ? 'e.g. 4th floor, conference room B' : 'e.g. https://zoom.us/j/...'}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
-          </div>
+          {/* Meeting platform + link */}
+          {interviewType !== 'in_person' && interviewType !== 'phone' && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Meeting platform</label>
+              <div className="grid grid-cols-4 gap-1.5 mb-2">
+                {MEETING_INTEGRATIONS.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => openIntegration(p)}
+                    className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+                      activePlatform === p.id
+                        ? 'border-blue-400 bg-blue-50 text-blue-700'
+                        : `border-slate-200 text-slate-600 ${p.color}`
+                    }`}
+                  >
+                    <span className="text-base">
+                      {p.id === 'gmeet' ? '🎥' : p.id === 'zoom' ? '💻' : p.id === 'teams' ? '🟦' : '🗓️'}
+                    </span>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {activePlatform && (
+                <p className="text-xs text-slate-400 mb-1.5">
+                  {activePlatform === 'calendly' ? 'Paste your Calendly link below' : 'Copy the link from the new tab and paste it below'}
+                </p>
+              )}
+              <input
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                placeholder={
+                  activePlatform
+                    ? MEETING_INTEGRATIONS.find(p => p.id === activePlatform)?.placeholder ?? 'Paste meeting link...'
+                    : 'Paste meeting link (Zoom, Meet, Teams, Calendly…)'
+                }
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          )}
+
+          {/* Location (in-person / phone) */}
+          {(interviewType === 'in_person' || interviewType === 'phone') && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                {interviewType === 'in_person' ? 'Address / Room' : 'Phone number or dial-in'}
+              </label>
+              <input
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                placeholder={interviewType === 'in_person' ? 'e.g. 4th floor, Room B' : 'e.g. +1 (555) 000-0000'}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          )}
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Notes <span className="font-normal text-slate-400">(optional)</span></label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+              Notes <span className="font-normal text-slate-400">(optional)</span>
+            </label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
@@ -1612,16 +1817,10 @@ function ScheduleInterviewModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={saving || saved}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-              saved
-                ? 'bg-emerald-500 text-white'
-                : 'bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60'
-            }`}
+            disabled={saving}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
           >
-            {saved ? (
-              <><Check className="h-4 w-4" /> Scheduled!</>
-            ) : saving ? (
+            {saving ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</>
             ) : (
               `Schedule ${apps.length > 1 ? `${apps.length} interviews` : 'interview'}`
@@ -2235,6 +2434,15 @@ export default function JobPipelinePage() {
           onMoveToStage={handleStageChange}
           selectedApps={selectedApps}
           onToggleSelect={toggleSelect}
+          onScheduleApp={app => setScheduleModalApps([app])}
+          onRejectApp={async appId => {
+            await fetch(`/api/applications/${appId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'rejected' }),
+            })
+            load()
+          }}
         />
       )}
 
