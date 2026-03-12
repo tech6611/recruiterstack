@@ -150,6 +150,19 @@ const CATEGORY_LABELS: Record<WidgetCategory, string> = {
   jobs: 'Jobs', candidates: 'Candidates', activity: 'Activity',
 }
 
+// ── Widget card accent colours (top border per category) ──────────────────────
+
+const CATEGORY_ACCENT: Record<WidgetCategory, { border: string; icon: string; iconText: string; label: string }> = {
+  jobs:       { border: 'border-t-blue-400',   icon: 'bg-blue-100',   iconText: 'text-blue-600',   label: 'bg-blue-50 text-blue-700' },
+  candidates: { border: 'border-t-violet-400', icon: 'bg-violet-100', iconText: 'text-violet-600', label: 'bg-violet-50 text-violet-700' },
+  activity:   { border: 'border-t-amber-400',  icon: 'bg-amber-100',  iconText: 'text-amber-600',  label: 'bg-amber-50 text-amber-700' },
+}
+
+function widgetAccent(wId: WidgetId) {
+  const cat = ALL_WIDGET_DEFS.find(w => w.id === wId)?.category ?? 'activity'
+  return CATEGORY_ACCENT[cat]
+}
+
 // ── View type & defaults ──────────────────────────────────────────────────────
 
 interface DashView {
@@ -318,20 +331,46 @@ function ViewsSidebar({
 
 const PREVIEW_LIMIT = 4
 
+/** Shared coloured header row for every widget */
+function WidgetHeader({
+  wId, title, badge, href,
+}: {
+  wId:    WidgetId
+  title:  string
+  badge?: number | null
+  href?:  string
+}) {
+  const def    = ALL_WIDGET_DEFS.find(w => w.id === wId)
+  const accent = widgetAccent(wId)
+  const Icon   = def?.icon
+  return (
+    <div className="mb-3 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        {Icon && (
+          <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${accent.icon}`}>
+            <Icon className={`h-3.5 w-3.5 ${accent.iconText}`} />
+          </div>
+        )}
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        {badge != null && badge > 0 && (
+          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${accent.label}`}>{badge}</span>
+        )}
+      </div>
+      {href && (
+        <Link href={href} className="text-xs font-medium text-slate-400 hover:text-blue-600 transition-colors">
+          View all →
+        </Link>
+      )}
+    </div>
+  )
+}
+
 function InterviewsWidget({ interviews }: { interviews: UpcomingInterview[] }) {
   const preview = interviews.slice(0, PREVIEW_LIMIT)
   const remaining = interviews.length - preview.length
   return (
     <div>
-      <div className="flex items-center justify-between px-1 mb-3">
-        <h2 className="text-sm font-semibold text-slate-900">
-          Interviews
-          {interviews.length > 0 && <span className="ml-1.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-600">{interviews.length}</span>}
-        </h2>
-        <Link href="/candidates" className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">
-          View all →
-        </Link>
-      </div>
+      <WidgetHeader wId="interviews" title="Interviews" badge={interviews.length} href="/candidates" />
 
       <div className="grid grid-cols-[2fr_2fr_1.2fr_1fr] gap-3 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
         <span>Stage</span><span>Candidate</span><span>Date</span><span>Role</span>
@@ -438,15 +477,7 @@ function TasksWidget({ tasks }: { tasks: DashboardData['tasks'] }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between px-1 mb-2">
-        <h2 className="text-sm font-semibold text-slate-900">
-          Tasks
-          {totalAll > 0 && <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600">{totalAll}</span>}
-        </h2>
-        <Link href="/candidates" className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">
-          View all →
-        </Link>
-      </div>
+      <WidgetHeader wId="tasks" title="Tasks" badge={totalAll} href="/candidates" />
 
       <div className="flex gap-0 border-b border-slate-100 mb-3 -mx-1 overflow-x-auto">
         {TABS.map(tab => (
@@ -507,7 +538,7 @@ function OverviewStatsWidget({ stats }: { stats: DashboardData['stats'] }) {
   ]
   return (
     <div>
-      <h2 className="mb-3 px-1 text-sm font-semibold text-slate-900">Overview</h2>
+      <WidgetHeader wId="overview_stats" title="Overview" />
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {CARDS.map(card => {
           const Icon = card.icon
@@ -534,7 +565,7 @@ function PipelineWidget({ breakdown }: { breakdown: StatusBreakdown[] }) {
   const total = breakdown.reduce((s, b) => s + b.count, 0)
   return (
     <div>
-      <h2 className="mb-3 px-1 text-sm font-semibold text-slate-900">Pipeline Overview</h2>
+      <WidgetHeader wId="pipeline" title="Pipeline Overview" />
       {total === 0 ? (
         <p className="text-sm text-slate-400">No candidate data yet.</p>
       ) : (
@@ -569,12 +600,7 @@ function JobsMiniWidget({ jobs }: { jobs: TopJob[] }) {
   const remaining = jobs.length - preview.length
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">Active Jobs
-          {jobs.length > 0 && <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{jobs.length}</span>}
-        </h2>
-        <Link href="/jobs" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
-      </div>
+      <WidgetHeader wId="jobs_mini" title="Active Jobs" badge={jobs.length} href="/jobs" />
       {jobs.length === 0 ? (
         <p className="text-xs text-slate-400">No open jobs. <Link href="/jobs" className="text-blue-500 hover:underline">Create one</Link></p>
       ) : (
@@ -643,10 +669,7 @@ function JobsByDeptWidget({ departments }: { departments: JobByDept[] }) {
   const max = Math.max(...departments.map(d => d.candidate_count), 1)
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">Jobs by Department</h2>
-        <Link href="/jobs" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
-      </div>
+      <WidgetHeader wId="jobs_by_dept" title="Jobs by Department" href="/jobs" />
       {departments.length === 0 ? (
         <p className="text-xs text-slate-400">No department data yet.</p>
       ) : (
@@ -685,13 +708,7 @@ function HmActionsWidget({ approvals }: { approvals: TaskApproval[] }) {
   const remaining = approvals.length - preview.length
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">
-          HM Actions
-          {approvals.length > 0 && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">{approvals.length}</span>}
-        </h2>
-        <Link href="/jobs" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
-      </div>
+      <WidgetHeader wId="hm_actions" title="HM Actions" badge={approvals.length} href="/jobs" />
       {approvals.length === 0 ? (
         <p className="text-xs text-slate-400">No pending HM actions — all JDs are live or in progress.</p>
       ) : (
@@ -727,13 +744,7 @@ function RecentApplicationsWidget({ applications }: { applications: RecentApplic
   const remaining = applications.length - preview.length
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">
-          Recent Applications
-          {applications.length > 0 && <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{applications.length}</span>}
-        </h2>
-        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
-      </div>
+      <WidgetHeader wId="recent_applications" title="Recent Applications" badge={applications.length} href="/candidates" />
       {applications.length === 0 ? (
         <p className="text-xs text-slate-400">No applications yet.</p>
       ) : (
@@ -782,10 +793,7 @@ function TopScoredWidget({ candidates }: { candidates: TopScored[] }) {
   const remaining = candidates.length - preview.length
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">Top AI-Scored</h2>
-        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
-      </div>
+      <WidgetHeader wId="top_scored" title="Top AI-Scored" href="/candidates" />
       {candidates.length === 0 ? (
         <p className="text-xs text-slate-400">No AI scores yet — candidates are scored automatically when added.</p>
       ) : (
@@ -833,7 +841,7 @@ function CandidateSourcesWidget({ sources }: { sources: CandidateSource[] }) {
   const total = sources.reduce((s, x) => s + x.count, 0)
   return (
     <div>
-      <h2 className="mb-4 px-1 text-sm font-semibold text-slate-900">Candidate Sources</h2>
+      <WidgetHeader wId="candidate_sources" title="Candidate Sources" />
       {total === 0 ? (
         <p className="text-sm text-slate-400">No source data yet.</p>
       ) : (
@@ -873,13 +881,7 @@ function OfferTrackerWidget({ offers }: { offers: OfferTrackerItem[] }) {
   const remaining = offers.length - preview.length
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">
-          Offer Tracker
-          {offers.length > 0 && <span className="ml-1.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-600">{offers.length}</span>}
-        </h2>
-        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
-      </div>
+      <WidgetHeader wId="offer_tracker" title="Offer Tracker" badge={offers.length} href="/candidates" />
       {offers.length === 0 ? (
         <p className="text-xs text-slate-400">No candidates at the offer stage right now.</p>
       ) : (
@@ -931,10 +933,7 @@ function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
   const remaining = activity.length - preview.length
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">Recent Activity</h2>
-        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
-      </div>
+      <WidgetHeader wId="recent_activity" title="Recent Activity" href="/candidates" />
       {activity.length === 0 ? (
         <p className="text-xs text-slate-400">No recent activity.</p>
       ) : (
@@ -981,10 +980,7 @@ function StageFunnelWidget({ funnel }: { funnel: StageFunnelItem[] }) {
   const max = Math.max(...funnel.map(s => s.count), 1)
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">Stage Funnel</h2>
-        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
-      </div>
+      <WidgetHeader wId="stage_funnel" title="Stage Funnel" href="/candidates" />
       {funnel.length === 0 ? (
         <p className="text-xs text-slate-400">No active candidates in the pipeline.</p>
       ) : (
@@ -1672,7 +1668,7 @@ export default function DashboardPage() {
   const ActiveIcon = VIEW_ICONS[activeView?.icon ?? 'home'] ?? Home
 
   return (
-    <div className="flex bg-white">
+    <div className="flex bg-slate-50">
 
       {/* Views sidebar */}
       <ViewsSidebar
@@ -1744,7 +1740,7 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={wId}
-                    className={`rounded-xl border border-slate-200 bg-white p-4 ${isWide ? 'lg:col-span-2' : ''} ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
+                    className={`rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 ${isWide ? 'lg:col-span-2' : ''} ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} />}
                     {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} />}
