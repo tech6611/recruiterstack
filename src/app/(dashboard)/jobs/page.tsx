@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Briefcase, Plus, Search, Clock, X, Mail, FileText, Send,
   CheckCircle, Copy, Check, Users, PenLine, Wand2, RefreshCw, Loader2, Sparkles, Paperclip,
-  ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft,
+  ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft, GripVertical, ChevronRight, Pencil,
 } from 'lucide-react'
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
 
@@ -575,6 +575,64 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Pipeline Funnel — stage definitions + count aggregation
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface FunnelStageDef {
+  id:       string
+  name:     string
+  keywords: string[]   // lowercase substrings to match against actual stage_name
+  accent: {
+    border: string   // border-t-* colour class
+    dot:    string   // bg-* for dot
+    badge:  string   // bg + text for count chip
+  }
+}
+
+const ALL_FUNNEL_DEFS: FunnelStageDef[] = [
+  { id: 'sourced',        name: 'Sourced',          keywords: ['source', 'lead', 'prospect', 'applied', 'application', 'new'],
+    accent: { border: 'border-t-slate-400',   dot: 'bg-slate-400',   badge: 'bg-slate-100 text-slate-600' } },
+  { id: 'screened',       name: 'Screened',         keywords: ['screen', 'phone', 'cv', 'resume', 'call'],
+    accent: { border: 'border-t-blue-400',    dot: 'bg-blue-500',    badge: 'bg-blue-100 text-blue-700' } },
+  { id: 'engaged',        name: 'Engaged',          keywords: ['engag', 'assess', 'task', 'test', 'challeng', 'assignment'],
+    accent: { border: 'border-t-violet-400',  dot: 'bg-violet-500',  badge: 'bg-violet-100 text-violet-700' } },
+  { id: 'interview',      name: 'Interview',        keywords: ['interview'],
+    accent: { border: 'border-t-amber-400',   dot: 'bg-amber-500',   badge: 'bg-amber-100 text-amber-700' } },
+  { id: 'offer_accepted', name: 'Offer Accepted',   keywords: ['accepted', 'accept', 'verbal'],
+    accent: { border: 'border-t-green-500',   dot: 'bg-green-500',   badge: 'bg-green-100 text-green-700' } },
+  { id: 'offer_out',      name: 'Offer Rolled Out', keywords: ['offer'],
+    accent: { border: 'border-t-emerald-500', dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' } },
+  { id: 'hired',          name: 'Hired',            keywords: ['hired', 'hire', 'won', 'closed'],
+    accent: { border: 'border-t-teal-500',    dot: 'bg-teal-500',    badge: 'bg-teal-100 text-teal-700' } },
+  { id: 'onboarded',      name: 'Onboarded',        keywords: ['onboard', 'start', 'join'],
+    accent: { border: 'border-t-indigo-500',  dot: 'bg-indigo-500',  badge: 'bg-indigo-100 text-indigo-700' } },
+]
+
+// Check most-specific stages first so "Offer Accepted" doesn't fall into "Offer Rolled Out"
+const FUNNEL_MATCH_PRIORITY = ['offer_accepted', 'hired', 'onboarded', 'offer_out', 'interview', 'engaged', 'screened', 'sourced']
+
+const LS_FUNNEL          = 'rs_jobs_funnel'
+const DEFAULT_FUNNEL_IDS = ALL_FUNNEL_DEFS.map(d => d.id)
+
+function computeFunnelCounts(jobs: JobListItem[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  ALL_FUNNEL_DEFS.forEach(d => counts.set(d.id, 0))
+  for (const job of jobs) {
+    for (const stage of job.stage_counts) {
+      const name = stage.stage_name.toLowerCase()
+      for (const fid of FUNNEL_MATCH_PRIORITY) {
+        const def = ALL_FUNNEL_DEFS.find(d => d.id === fid)!
+        if (def.keywords.some(kw => name.includes(kw))) {
+          counts.set(fid, (counts.get(fid) ?? 0) + stage.count)
+          break
+        }
+      }
+    }
+  }
+  return counts
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Jobs list helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -593,6 +651,289 @@ const STAGE_DOT: Record<StageColor, string> = {
   slate: 'bg-slate-400', blue: 'bg-blue-500', violet: 'bg-violet-500',
   amber: 'bg-amber-500', emerald: 'bg-emerald-500', green: 'bg-green-500',
   red: 'bg-red-500', pink: 'bg-pink-500',
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FunnelCustomizer — inline drag-to-reorder panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+function FunnelCustomizer({
+  activeIds, snapshot, onClose, onDiscard, onChange,
+}: {
+  activeIds: string[]
+  snapshot:  string[]
+  onClose:   () => void
+  onDiscard: () => void
+  onChange:  (ids: string[]) => void
+}) {
+  const [draggingId,    setDraggingId]    = useState<string | null>(null)
+  const [dragOverId,    setDragOverId]    = useState<string | null>(null)
+  const [showDiscard,   setShowDiscard]   = useState(false)
+
+  const hasChanges = JSON.stringify(activeIds) !== JSON.stringify(snapshot)
+  const available  = ALL_FUNNEL_DEFS.filter(d => !activeIds.includes(d.id))
+
+  function handleDragStart(id: string) { setDraggingId(id) }
+  function handleDragOver(e: React.DragEvent, id: string) { e.preventDefault(); setDragOverId(id) }
+  function handleDrop(targetId: string) {
+    if (!draggingId || draggingId === targetId) { setDraggingId(null); setDragOverId(null); return }
+    const from = activeIds.indexOf(draggingId)
+    const to   = activeIds.indexOf(targetId)
+    const next = [...activeIds]
+    next.splice(from, 1)
+    next.splice(to, 0, draggingId)
+    onChange(next)
+    setDraggingId(null); setDragOverId(null)
+  }
+  function handleDragEnd() { setDraggingId(null); setDragOverId(null) }
+
+  return (
+    <div className="border-b border-slate-100 bg-blue-50/40 px-4 py-4">
+      {/* Header */}
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-xs font-semibold text-slate-800">Customise funnel</p>
+        <div className="flex items-center gap-1.5">
+          {hasChanges && (
+            <button onClick={() => setShowDiscard(true)}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-500 hover:text-red-500 transition-colors">
+              Discard
+            </button>
+          )}
+          <button
+            onClick={() => { if (hasChanges) setShowDiscard(true); else onClose() }}
+            className="rounded-lg bg-blue-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-blue-700 transition-colors">
+            Done
+          </button>
+        </div>
+      </div>
+
+      <p className="mb-3 text-[10px] text-slate-400">Drag to reorder · click × to remove</p>
+
+      {/* Discard dialog */}
+      {showDiscard && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs font-semibold text-slate-800">Save changes?</p>
+          <div className="mt-2 flex gap-1.5">
+            <button onClick={() => setShowDiscard(false)}
+              className="flex-1 rounded-lg border border-slate-200 bg-white py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+              Keep editing
+            </button>
+            <button onClick={onDiscard}
+              className="flex-1 rounded-lg border border-red-200 bg-white py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors">
+              Discard
+            </button>
+            <button onClick={onClose}
+              className="flex-1 rounded-lg bg-blue-600 py-1 text-[11px] font-medium text-white hover:bg-blue-700 transition-colors">
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active stages */}
+      <div className="mb-4">
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Active stages</p>
+        <div className="flex flex-wrap gap-1.5">
+          {activeIds.map(id => {
+            const def = ALL_FUNNEL_DEFS.find(d => d.id === id)
+            if (!def) return null
+            const isDragging = draggingId === id
+            const isDragOver = dragOverId === id && draggingId !== id
+            return (
+              <div
+                key={id}
+                draggable
+                onDragStart={() => handleDragStart(id)}
+                onDragOver={e => handleDragOver(e, id)}
+                onDrop={() => handleDrop(id)}
+                onDragEnd={handleDragEnd}
+                className={`flex items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1.5 cursor-grab active:cursor-grabbing select-none transition-all ${
+                  isDragging ? 'opacity-40 scale-95 border-blue-300' :
+                  isDragOver ? 'border-blue-400 shadow-sm ring-1 ring-blue-300 -translate-y-0.5' :
+                  'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <GripVertical className="h-3 w-3 text-slate-300" />
+                <span className={`h-2 w-2 shrink-0 rounded-full ${def.accent.dot}`} />
+                <span className="text-xs font-medium text-slate-700">{def.name}</span>
+                <button
+                  onClick={() => onChange(activeIds.filter(x => x !== id))}
+                  className="ml-0.5 text-slate-300 hover:text-red-500 transition-colors">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )
+          })}
+          {activeIds.length === 0 && (
+            <p className="py-2 text-xs text-slate-400">No active stages. Add some below.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Available stages to add */}
+      {available.length > 0 && (
+        <div>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Add stages</p>
+          <div className="flex flex-wrap gap-1.5">
+            {available.map(def => (
+              <button
+                key={def.id}
+                onClick={() => onChange([...activeIds, def.id])}
+                className="flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+                {def.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PipelineFunnel — horizontal stage cards with arrows
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PipelineFunnel({ jobs }: { jobs: JobListItem[] }) {
+  const [stageIds,    setStageIds]    = useState<string[]>(DEFAULT_FUNNEL_IDS)
+  const [customizing, setCustomizing] = useState(false)
+  const [snapshot,    setSnapshot]    = useState<string[]>([])
+  const [hydrated,    setHydrated]    = useState(false)
+
+  // Drag state (for cards in the funnel view)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+
+  // Hydrate from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LS_FUNNEL)
+      if (saved) {
+        const parsed = JSON.parse(saved) as string[]
+        const validIds = new Set(ALL_FUNNEL_DEFS.map(d => d.id))
+        const valid = parsed.filter(id => validIds.has(id))
+        if (valid.length > 0) setStageIds(valid)
+      }
+    } catch {}
+    setHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
+    try { localStorage.setItem(LS_FUNNEL, JSON.stringify(stageIds)) } catch {}
+  }, [stageIds, hydrated])
+
+  const counts = useMemo(() => computeFunnelCounts(jobs), [jobs])
+
+  function openCustomizer() { setSnapshot(stageIds); setCustomizing(true) }
+
+  // Drag on the cards
+  function handleDragStart(id: string) { setDraggingId(id) }
+  function handleDragOver(e: React.DragEvent, id: string) { e.preventDefault(); setDragOverId(id) }
+  function handleDrop(targetId: string) {
+    if (!draggingId || draggingId === targetId) { setDraggingId(null); setDragOverId(null); return }
+    const from = stageIds.indexOf(draggingId)
+    const to   = stageIds.indexOf(targetId)
+    const next = [...stageIds]
+    next.splice(from, 1)
+    next.splice(to, 0, draggingId)
+    setStageIds(next)
+    setDraggingId(null); setDragOverId(null)
+  }
+  function handleDragEnd() { setDraggingId(null); setDragOverId(null) }
+
+  if (!hydrated) return null
+
+  const activeDefs = stageIds
+    .map(id => ALL_FUNNEL_DEFS.find(d => d.id === id))
+    .filter((d): d is FunnelStageDef => !!d)
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+
+      {/* Header row */}
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Hiring Funnel</span>
+        <button
+          onClick={customizing ? undefined : openCustomizer}
+          title="Customise funnel"
+          className={`flex items-center justify-center rounded-lg border p-1.5 transition-colors ${
+            customizing
+              ? 'border-blue-300 bg-blue-50 text-blue-600 cursor-default'
+              : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700'
+          }`}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Customizer */}
+      {customizing && (
+        <FunnelCustomizer
+          activeIds={stageIds}
+          snapshot={snapshot}
+          onClose={() => setCustomizing(false)}
+          onDiscard={() => { setStageIds(snapshot); setCustomizing(false) }}
+          onChange={setStageIds}
+        />
+      )}
+
+      {/* Funnel cards */}
+      {!customizing && (
+        <div className="flex items-stretch overflow-x-auto px-4 py-4 gap-0">
+          {activeDefs.map((def, idx) => {
+            const count     = counts.get(def.id) ?? 0
+            const isLast    = idx === activeDefs.length - 1
+            const isDragging = draggingId === def.id
+            const isDragOver = dragOverId === def.id && draggingId !== def.id
+
+            return (
+              <div key={def.id} className="flex items-center shrink-0">
+                {/* Stage card */}
+                <div
+                  draggable
+                  onDragStart={() => handleDragStart(def.id)}
+                  onDragOver={e => handleDragOver(e, def.id)}
+                  onDrop={() => handleDrop(def.id)}
+                  onDragEnd={handleDragEnd}
+                  className={`flex flex-col rounded-xl border border-t-2 bg-white px-4 py-3 min-w-[130px] select-none cursor-grab active:cursor-grabbing transition-all ${
+                    def.accent.border
+                  } ${
+                    isDragging  ? 'opacity-40 scale-95 shadow-none' :
+                    isDragOver  ? 'shadow-md ring-1 ring-blue-300 -translate-y-1' :
+                    'shadow-sm hover:shadow-md hover:-translate-y-0.5'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${def.accent.dot}`} />
+                    <span className="text-[11px] font-semibold text-slate-600 truncate leading-tight">{def.name}</span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-800 leading-none">{count}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">candidates</p>
+                </div>
+
+                {/* Arrow connector between cards */}
+                {!isLast && (
+                  <div className="flex items-center px-1 text-slate-300 shrink-0">
+                    <ChevronRight className="h-5 w-5" />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {activeDefs.length === 0 && (
+            <div className="flex-1 py-8 text-center text-xs text-slate-400">
+              No stages in the funnel.{' '}
+              <button onClick={openCustomizer} className="text-blue-500 hover:underline">Add some</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function PipelineBar({ stages }: { stages: JobListItem['stage_counts'] }) {
@@ -736,6 +1077,9 @@ export default function JobsPage() {
           ))}
         </div>
       )}
+
+      {/* Pipeline Funnel */}
+      <PipelineFunnel jobs={jobs} />
 
       {/* Filters */}
       <div className="flex items-center gap-3">
