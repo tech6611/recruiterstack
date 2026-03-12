@@ -334,33 +334,78 @@ const PREVIEW_LIMIT = 4
 
 /** Shared coloured header row for every widget */
 function WidgetHeader({
-  wId, title, badge, href,
+  wId, title, badge, href, searchable,
 }: {
-  wId:    WidgetId
-  title:  string
-  badge?: number | null
-  href?:  string
+  wId:         WidgetId
+  title:       string
+  badge?:      number | null
+  href?:       string
+  searchable?: boolean
 }) {
+  const [showSearch, setShowSearch] = useState(false)
+  const [query,      setQuery]      = useState('')
+
   const def    = ALL_WIDGET_DEFS.find(w => w.id === wId)
   const accent = widgetAccent(wId)
   const Icon   = def?.icon
+
+  function toggleSearch() {
+    setShowSearch(p => !p)
+    setQuery('')
+  }
+
   return (
-    <div className="mb-3 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        {Icon && (
-          <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${accent.icon}`}>
-            <Icon className={`h-3.5 w-3.5 ${accent.iconText}`} />
-          </div>
-        )}
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-        {badge != null && badge > 0 && (
-          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${accent.label}`}>{badge}</span>
-        )}
+    <div className="mb-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {Icon && (
+            <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${accent.icon}`}>
+              <Icon className={`h-3.5 w-3.5 ${accent.iconText}`} />
+            </div>
+          )}
+          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+          {badge != null && badge > 0 && (
+            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${accent.label}`}>{badge}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {searchable && (
+            <button
+              onClick={toggleSearch}
+              title="Search"
+              className={`flex items-center justify-center rounded p-0.5 transition-colors ${
+                showSearch ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'
+              }`}
+            >
+              <Search className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {href && (
+            <Link href={href} className="text-xs font-medium text-slate-400 hover:text-blue-600 transition-colors">
+              View all →
+            </Link>
+          )}
+        </div>
       </div>
-      {href && (
-        <Link href={href} className="text-xs font-medium text-slate-400 hover:text-blue-600 transition-colors">
-          View all →
-        </Link>
+
+      {/* Inline search input — shown when lens is toggled */}
+      {showSearch && (
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 focus-within:border-blue-300 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
+          <Search className="h-3 w-3 shrink-0 text-slate-400" />
+          <input
+            autoFocus
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder={`Search ${title.toLowerCase()}…`}
+            className="flex-1 min-w-0 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none"
+          />
+          {query && (
+            <button onClick={() => setQuery('')} className="shrink-0 text-slate-300 hover:text-slate-500 transition-colors">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
@@ -371,7 +416,7 @@ function InterviewsWidget({ interviews }: { interviews: UpcomingInterview[] }) {
   const remaining = interviews.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="interviews" title="Interviews" badge={interviews.length} href="/candidates" />
+      <WidgetHeader wId="interviews" title="Interviews" badge={interviews.length} href="/candidates" searchable />
 
       <div className="grid grid-cols-[2fr_2fr_1.2fr_1fr] gap-3 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
         <span>Stage</span><span>Candidate</span><span>Date</span><span>Role</span>
@@ -478,7 +523,7 @@ function TasksWidget({ tasks }: { tasks: DashboardData['tasks'] }) {
 
   return (
     <div>
-      <WidgetHeader wId="tasks" title="Tasks" badge={totalAll} href="/candidates" />
+      <WidgetHeader wId="tasks" title="Tasks" badge={totalAll} href="/candidates" searchable />
 
       <div className="flex gap-0 border-b border-slate-100 mb-3 -mx-1 overflow-x-auto">
         {TABS.map(tab => (
@@ -601,7 +646,7 @@ function JobsMiniWidget({ jobs }: { jobs: TopJob[] }) {
   const remaining = jobs.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="jobs_mini" title="Active Jobs" badge={jobs.length} href="/jobs" />
+      <WidgetHeader wId="jobs_mini" title="Active Jobs" badge={jobs.length} href="/jobs" searchable />
       {jobs.length === 0 ? (
         <p className="text-xs text-slate-400">No open jobs. <Link href="/jobs" className="text-blue-500 hover:underline">Create one</Link></p>
       ) : (
@@ -670,7 +715,7 @@ function JobsByDeptWidget({ departments }: { departments: JobByDept[] }) {
   const max = Math.max(...departments.map(d => d.candidate_count), 1)
   return (
     <div>
-      <WidgetHeader wId="jobs_by_dept" title="Jobs by Department" href="/jobs" />
+      <WidgetHeader wId="jobs_by_dept" title="Jobs by Department" href="/jobs" searchable />
       {departments.length === 0 ? (
         <p className="text-xs text-slate-400">No department data yet.</p>
       ) : (
@@ -709,7 +754,7 @@ function HmActionsWidget({ approvals }: { approvals: TaskApproval[] }) {
   const remaining = approvals.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="hm_actions" title="HM Actions" badge={approvals.length} href="/jobs" />
+      <WidgetHeader wId="hm_actions" title="HM Actions" badge={approvals.length} href="/jobs" searchable />
       {approvals.length === 0 ? (
         <p className="text-xs text-slate-400">No pending HM actions — all JDs are live or in progress.</p>
       ) : (
@@ -745,7 +790,7 @@ function RecentApplicationsWidget({ applications }: { applications: RecentApplic
   const remaining = applications.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="recent_applications" title="Recent Applications" badge={applications.length} href="/candidates" />
+      <WidgetHeader wId="recent_applications" title="Recent Applications" badge={applications.length} href="/candidates" searchable />
       {applications.length === 0 ? (
         <p className="text-xs text-slate-400">No applications yet.</p>
       ) : (
@@ -794,7 +839,7 @@ function TopScoredWidget({ candidates }: { candidates: TopScored[] }) {
   const remaining = candidates.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="top_scored" title="Top AI-Scored" href="/candidates" />
+      <WidgetHeader wId="top_scored" title="Top AI-Scored" href="/candidates" searchable />
       {candidates.length === 0 ? (
         <p className="text-xs text-slate-400">No AI scores yet — candidates are scored automatically when added.</p>
       ) : (
@@ -882,7 +927,7 @@ function OfferTrackerWidget({ offers }: { offers: OfferTrackerItem[] }) {
   const remaining = offers.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="offer_tracker" title="Offer Tracker" badge={offers.length} href="/candidates" />
+      <WidgetHeader wId="offer_tracker" title="Offer Tracker" badge={offers.length} href="/candidates" searchable />
       {offers.length === 0 ? (
         <p className="text-xs text-slate-400">No candidates at the offer stage right now.</p>
       ) : (
@@ -934,7 +979,7 @@ function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
   const remaining = activity.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="recent_activity" title="Recent Activity" href="/candidates" />
+      <WidgetHeader wId="recent_activity" title="Recent Activity" href="/candidates" searchable />
       {activity.length === 0 ? (
         <p className="text-xs text-slate-400">No recent activity.</p>
       ) : (
@@ -981,7 +1026,7 @@ function StageFunnelWidget({ funnel }: { funnel: StageFunnelItem[] }) {
   const max = Math.max(...funnel.map(s => s.count), 1)
   return (
     <div>
-      <WidgetHeader wId="stage_funnel" title="Stage Funnel" href="/candidates" />
+      <WidgetHeader wId="stage_funnel" title="Stage Funnel" href="/candidates" searchable />
       {funnel.length === 0 ? (
         <p className="text-xs text-slate-400">No active candidates in the pipeline.</p>
       ) : (
@@ -1525,8 +1570,6 @@ export default function DashboardPage() {
   const [rightPanelMode,      setRightPanelMode]      = useState(false)
   const [rightWidgetSnapshot, setRightWidgetSnapshot] = useState<WidgetId[]>([])
 
-  // Search
-  const [searchQuery, setSearchQuery] = useState('')
 
   // Hydrate localStorage — migrate old data that lacks `widgets`
   useEffect(() => {
@@ -1690,32 +1733,15 @@ export default function DashboardPage() {
       <div className="flex-1 min-w-0 divide-y divide-slate-100">
 
         {/* View header */}
-        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-200">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200">
           {/* View name */}
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex items-center gap-1.5">
             <ActiveIcon className="h-3.5 w-3.5 text-slate-400" />
             <span className="text-xs font-semibold text-slate-700">{activeView?.name}</span>
           </div>
 
-          {/* Search bar — always visible */}
-          <div className="flex flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-200 transition-all">
-            <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search candidates, jobs, activity…"
-              className="flex-1 min-w-0 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="shrink-0 text-slate-300 hover:text-slate-500 transition-colors">
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-
           {/* Actions */}
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex items-center gap-1">
             <button
               onClick={widgetMode ? undefined : handleOpenCustomizer}
               title="Customise view"
