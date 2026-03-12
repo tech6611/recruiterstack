@@ -1045,6 +1045,7 @@ function RankedView({
   onMoveToStage,
   selectedApps,
   onToggleSelect,
+  onBulkSelect,
   onScheduleApp,
   onRejectApp,
 }: {
@@ -1054,6 +1055,7 @@ function RankedView({
   onMoveToStage: (appId: string, stageId: string) => void
   selectedApps: Set<string>
   onToggleSelect: (id: string) => void
+  onBulkSelect: (ids: string[]) => void
   onScheduleApp: (app: Application) => void
   onRejectApp: (appId: string) => void
 }) {
@@ -1066,6 +1068,9 @@ function RankedView({
     return b.ai_score - a.ai_score
   })
 
+  const allSelected  = sorted.length > 0 && sorted.every(a => selectedApps.has(a.id))
+  const someSelected = !allSelected && sorted.some(a => selectedApps.has(a.id))
+
   let scoredRank = 0
 
   return (
@@ -1074,7 +1079,19 @@ function RankedView({
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60">
-              <th className="px-4 py-3 w-10" />
+              <th className="px-4 py-3 w-10">
+                <div
+                  onClick={() => onBulkSelect(allSelected ? [] : sorted.map(a => a.id))}
+                  className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
+                    allSelected  ? 'bg-blue-500 border-blue-500' :
+                    someSelected ? 'bg-blue-100 border-blue-400' :
+                    'border-slate-300 hover:border-blue-400 bg-white'
+                  }`}
+                >
+                  {allSelected  && <Check className="h-2.5 w-2.5 text-white" />}
+                  {someSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
+                </div>
+              </th>
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3 w-10">#</th>
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Candidate</th>
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Score</th>
@@ -1087,7 +1104,7 @@ function RankedView({
             </tr>
           </thead>
           <tbody>
-            {sorted.map(app => {
+            {sorted.map((app, rowIdx) => {
               const c = app.candidate!
               const stage = stages.find(s => s.id === app.stage_id)
               const rec = app.ai_recommendation ? AI_REC_CONFIG[app.ai_recommendation] : null
@@ -1100,6 +1117,9 @@ function RankedView({
                 ? stages[currentStageIdx + 1]
                 : null
               const isLastStage = currentStageIdx === stages.length - 1
+
+              // Open dropdown upward if in the bottom half of the list to avoid clipping
+              const openUp = rowIdx >= Math.ceil(sorted.length / 2)
 
               return (
                 <tr
@@ -1191,7 +1211,7 @@ function RankedView({
                       {openRowMenu === app.id && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setOpenRowMenu(null)} />
-                          <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-white border border-slate-200 rounded-xl shadow-xl py-1 overflow-hidden">
+                          <div className={`absolute right-0 z-50 w-52 bg-white border border-slate-200 rounded-xl shadow-xl py-1 overflow-hidden ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                             <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
                               {c.name}
                             </div>
@@ -2434,6 +2454,7 @@ export default function JobPipelinePage() {
           onMoveToStage={handleStageChange}
           selectedApps={selectedApps}
           onToggleSelect={toggleSelect}
+          onBulkSelect={ids => setSelectedApps(new Set(ids))}
           onScheduleApp={app => setScheduleModalApps([app])}
           onRejectApp={async appId => {
             await fetch(`/api/applications/${appId}`, {
