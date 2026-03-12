@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
-  Zap, Settings2, LayoutList, Kanban,
+  Zap, Settings2, LayoutList, Kanban, Filter, ArrowDownUp,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
@@ -180,10 +180,29 @@ function CandidateCard({
 
 // ── Stage column ──────────────────────────────────────────────────────────────
 
+const STAGE_ACTIONS = [
+  { id: 'score',              label: 'Score this stage',           icon: '⚡' },
+  { id: 'divider1',           label: '',                           icon: '' },
+  { id: 'schedule_interview', label: 'Schedule new interview',     icon: '📅' },
+  { id: 'self_schedule',      label: 'Create self-schedule invite',icon: '🔗' },
+  { id: 'send_message',       label: 'Send message to all',        icon: '✉️' },
+  { id: 'send_assessment',    label: 'Send assessment',            icon: '📋' },
+  { id: 'divider2',           label: '',                           icon: '' },
+  { id: 'move_next',          label: 'Move all to next stage',     icon: '→' },
+  { id: 'reject_all',         label: 'Reject all in stage',        icon: '✕' },
+] as const
+
+type StageActionId = typeof STAGE_ACTIONS[number]['id']
+
 function StageColumn({
   stage,
   apps,
   editMode,
+  isMenuOpen,
+  onMenuOpen,
+  onMenuClose,
+  onScoreStage,
+  onMoveAllNext,
   onDragStart,
   onDrop,
   onCardClick,
@@ -194,6 +213,11 @@ function StageColumn({
   stage: PipelineStage
   apps: Application[]
   editMode: boolean
+  isMenuOpen: boolean
+  onMenuOpen: () => void
+  onMenuClose: () => void
+  onScoreStage: () => void
+  onMoveAllNext: () => void
   onDragStart: (id: string) => void
   onDrop: (stageId: string) => void
   onCardClick: (app: Application) => void
@@ -212,9 +236,17 @@ function StageColumn({
     setEditing(false)
   }
 
+  const handleAction = (actionId: StageActionId) => {
+    onMenuClose()
+    if (actionId === 'score') { onScoreStage(); return }
+    if (actionId === 'move_next') { onMoveAllNext(); return }
+    // Other actions: open first candidate's slide-over, show toast, etc.
+    // Stubs for future implementation
+  }
+
   return (
     <div
-      className={`flex flex-col w-[240px] shrink-0 rounded-2xl border-2 transition-colors ${
+      className={`flex flex-col w-[260px] shrink-0 rounded-2xl border-2 transition-colors ${
         over ? `${style.border} shadow-md` : 'border-transparent'
       }`}
       onDragOver={e => { e.preventDefault(); setOver(true) }}
@@ -222,7 +254,7 @@ function StageColumn({
       onDrop={() => { setOver(false); onDrop(stage.id) }}
     >
       {/* Column header */}
-      <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${style.header}`}>
+      <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${style.header}`}>
         <div className="flex items-center gap-2 min-w-0">
           <button
             onClick={() => editMode && setShowColors(!showColors)}
@@ -241,12 +273,15 @@ function StageColumn({
             <span className="text-sm font-semibold text-slate-700 truncate">{stage.name}</span>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+
+        <div className="flex items-center gap-1 shrink-0">
           <span className="text-xs font-semibold text-slate-400 bg-white rounded-full px-2 py-0.5 border border-slate-200">
             {apps.length}
           </span>
+
+          {/* Edit-mode controls */}
           {editMode && !editing && (
-            <div className="flex items-center gap-0.5">
+            <>
               <button
                 onClick={() => setEditing(true)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-colors"
@@ -259,6 +294,54 @@ function StageColumn({
               >
                 <X className="h-3 w-3" />
               </button>
+            </>
+          )}
+
+          {/* ⋯ stage actions menu (always visible) */}
+          {!editing && (
+            <div className="relative">
+              <button
+                onClick={() => isMenuOpen ? onMenuClose() : onMenuOpen()}
+                className={`p-1 rounded-lg transition-colors ${
+                  isMenuOpen
+                    ? 'bg-slate-200 text-slate-700'
+                    : 'text-slate-400 hover:text-slate-700 hover:bg-white/70'
+                }`}
+                title="Stage actions"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+
+              {isMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={onMenuClose} />
+                  <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl py-1 overflow-hidden">
+                    <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+                      {stage.name}
+                    </div>
+                    {STAGE_ACTIONS.map((action, i) => {
+                      if (action.id === 'divider1' || action.id === 'divider2') {
+                        return <div key={i} className="my-1 border-t border-slate-100" />
+                      }
+                      const isDestructive = action.id === 'reject_all'
+                      return (
+                        <button
+                          key={action.id}
+                          onClick={() => handleAction(action.id as StageActionId)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors text-left ${
+                            isDestructive
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className="text-base leading-none w-4 text-center">{action.icon}</span>
+                          {action.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1249,6 +1332,12 @@ export default function JobPipelinePage() {
   // Autopilot drawer
   const [showAutopilot, setShowAutopilot] = useState(false)
 
+  // Kanban filter / sort state
+  const [filterSearch, setFilterSearch] = useState('')
+  const [filterSource, setFilterSource] = useState('all')
+  const [sortBy, setSortBy] = useState<'date' | 'score' | 'name'>('date')
+  const [openStageMenu, setOpenStageMenu] = useState<string | null>(null)
+
   // Scoring state
   const [scoring, setScoring] = useState(false)
   const [scoreProgress, setScoreProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 })
@@ -1287,6 +1376,29 @@ export default function JobPipelinePage() {
     return acc
   }, {})
   const unstaged = activeApps.filter(a => !a.stage_id)
+
+  // Filtered + sorted view of grouped (for kanban display)
+  const filteredGrouped = useMemo(() => {
+    const result: Record<string, Application[]> = {}
+    for (const [sid, apps] of Object.entries(grouped)) {
+      let filtered = apps
+      if (filterSearch.trim()) {
+        const q = filterSearch.toLowerCase()
+        filtered = filtered.filter(a => (a.candidate?.name ?? '').toLowerCase().includes(q))
+      }
+      if (filterSource !== 'all') {
+        filtered = filtered.filter(a => a.source === filterSource)
+      }
+      if (sortBy === 'score') {
+        filtered = [...filtered].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))
+      } else if (sortBy === 'name') {
+        filtered = [...filtered].sort((a, b) =>
+          (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? ''))
+      }
+      result[sid] = filtered
+    }
+    return result
+  }, [grouped, filterSearch, filterSource, sortBy])
 
   // ── Drag & Drop ──────────────────────────────────────────────────────────
   const handleDrop = async (newStageId: string) => {
@@ -1400,9 +1512,10 @@ export default function JobPipelinePage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const startScoring = async () => {
+  const startScoring = async (stageId?: string) => {
     if (scoring) return
-    const total = activeApps.length
+    const appsToScore = stageId ? (grouped[stageId] ?? []) : activeApps
+    const total = appsToScore.length
     if (total === 0) return
 
     scoringRef.current = true   // block load() for the duration of scoring
@@ -1412,7 +1525,11 @@ export default function JobPipelinePage() {
     setScoreProgress({ done: 0, total })
 
     try {
-      const res = await fetch(`/api/jobs/${id}/score`, { method: 'POST' })
+      const res = await fetch(`/api/jobs/${id}/score`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stageId ? { stage_id: stageId } : {}),
+      })
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}))
         setScoreError((j as { error?: string }).error ?? 'Scoring failed')
@@ -1594,18 +1711,6 @@ export default function JobPipelinePage() {
             )}
           </button>
 
-          {/* Score All */}
-          <button
-            onClick={startScoring}
-            disabled={scoring || activeApps.length === 0}
-            className="flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-60 shadow-sm"
-          >
-            {scoring
-              ? <><Loader2 className="h-4 w-4 animate-spin" /> Scoring {scoreProgress.done}/{scoreProgress.total}</>
-              : <><Zap className="h-4 w-4" /> Score All</>
-            }
-          </button>
-
           <button
             onClick={() => setEditMode(e => !e)}
             className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
@@ -1690,6 +1795,57 @@ export default function JobPipelinePage() {
         </div>
       )}
 
+      {/* Filter / sort bar */}
+      <div className="flex items-center gap-2 px-8 py-2.5 border-b border-slate-100 bg-white flex-wrap">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+          <input
+            value={filterSearch}
+            onChange={e => setFilterSearch(e.target.value)}
+            placeholder="Search candidates…"
+            className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg w-52 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 text-slate-500">
+          <Filter className="h-3.5 w-3.5" />
+          <select
+            value={filterSource}
+            onChange={e => setFilterSource(e.target.value)}
+            className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+          >
+            <option value="all">All sources</option>
+            <option value="applied">Applied</option>
+            <option value="sourced">Sourced</option>
+            <option value="referral">Referral</option>
+            <option value="manual">Added</option>
+            <option value="imported">Imported</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-slate-500">
+          <ArrowDownUp className="h-3.5 w-3.5" />
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as 'date' | 'score' | 'name')}
+            className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+          >
+            <option value="date">Date applied</option>
+            <option value="score">AI Score</option>
+            <option value="name">Name (A–Z)</option>
+          </select>
+        </div>
+
+        {(filterSearch || filterSource !== 'all') && (
+          <button
+            onClick={() => { setFilterSearch(''); setFilterSource('all') }}
+            className="text-xs text-slate-500 hover:text-slate-700 underline underline-offset-2"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
       {/* Ranked view */}
       {viewMode === 'ranked' && (
         <RankedView
@@ -1703,12 +1859,29 @@ export default function JobPipelinePage() {
       {/* Kanban */}
       {viewMode === 'kanban' && (
       <div className="flex gap-4 items-start overflow-x-auto px-8 py-6 flex-1">
-        {job.pipeline_stages.map(stage => (
+        {job.pipeline_stages.map((stage, stageIndex) => (
           <StageColumn
             key={stage.id}
             stage={stage}
-            apps={grouped[stage.id] ?? []}
+            apps={filteredGrouped[stage.id] ?? []}
             editMode={editMode}
+            isMenuOpen={openStageMenu === stage.id}
+            onMenuOpen={() => setOpenStageMenu(stage.id)}
+            onMenuClose={() => setOpenStageMenu(null)}
+            onScoreStage={() => startScoring(stage.id)}
+            onMoveAllNext={async () => {
+              const nextStage = job.pipeline_stages[stageIndex + 1]
+              if (!nextStage) return
+              const stageApps = grouped[stage.id] ?? []
+              await Promise.all(stageApps.map(app =>
+                fetch(`/api/applications/${app.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ stage_id: nextStage.id }),
+                })
+              ))
+              load()
+            }}
             onDragStart={id => { dragId.current = id }}
             onDrop={handleDrop}
             onCardClick={setSelectedApp}
