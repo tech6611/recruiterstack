@@ -1072,6 +1072,7 @@ function RankedView({
   onBulkSelect,
   activeStageId,
   onSetActiveStage,
+  onScoreApp,
   onScheduleApp,
   onRejectApp,
 }: {
@@ -1086,6 +1087,7 @@ function RankedView({
   activeStageId: string | null
   /** Activate or clear the stage filter for bulk selection */
   onSetActiveStage: (stageId: string | null) => void
+  onScoreApp: (app: Application) => void
   onScheduleApp: (app: Application) => void
   onRejectApp: (appId: string) => void
 }) {
@@ -1290,10 +1292,11 @@ function RankedView({
                       {openRowMenu === app.id && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setOpenRowMenu(null)} />
-                          <div className={`absolute right-0 z-50 w-52 bg-white border border-slate-200 rounded-xl shadow-xl py-1 overflow-hidden ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+                          <div className={`absolute right-0 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl py-1 overflow-hidden ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                             <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
                               {c.name}
                             </div>
+                            {/* View profile */}
                             <button
                               onClick={() => { setOpenRowMenu(null); onCardClick(app) }}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
@@ -1301,6 +1304,16 @@ function RankedView({
                               <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
                               View profile
                             </button>
+                            {/* Score */}
+                            <button
+                              onClick={() => { setOpenRowMenu(null); onScoreApp(app) }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                            >
+                              <span className="text-base leading-none w-3.5 text-center">⚡</span>
+                              Score this candidate
+                            </button>
+                            <div className="my-1 border-t border-slate-100" />
+                            {/* Schedule */}
                             <button
                               onClick={() => { setOpenRowMenu(null); onScheduleApp(app) }}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
@@ -1308,6 +1321,32 @@ function RankedView({
                               <span className="text-base leading-none w-3.5 text-center">📅</span>
                               Schedule interview
                             </button>
+                            {/* Self-schedule (stub) */}
+                            <button
+                              onClick={() => setOpenRowMenu(null)}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                            >
+                              <span className="text-base leading-none w-3.5 text-center">🔗</span>
+                              Create self-schedule invite
+                            </button>
+                            {/* Send message (stub) */}
+                            <button
+                              onClick={() => setOpenRowMenu(null)}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                            >
+                              <span className="text-base leading-none w-3.5 text-center">✉️</span>
+                              Send message
+                            </button>
+                            {/* Send assessment (stub) */}
+                            <button
+                              onClick={() => setOpenRowMenu(null)}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                            >
+                              <span className="text-base leading-none w-3.5 text-center">📋</span>
+                              Send assessment
+                            </button>
+                            <div className="my-1 border-t border-slate-100" />
+                            {/* Move to next stage */}
                             {nextStage && (
                               <button
                                 onClick={() => { setOpenRowMenu(null); onMoveToStage(app.id, nextStage.id) }}
@@ -1317,7 +1356,7 @@ function RankedView({
                                 Move to {nextStage.name}
                               </button>
                             )}
-                            <div className="my-1 border-t border-slate-100" />
+                            {/* Reject */}
                             <button
                               onClick={() => { setOpenRowMenu(null); onRejectApp(app.id) }}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
@@ -2169,9 +2208,11 @@ export default function JobPipelinePage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const startScoring = async (stageId?: string) => {
+  const startScoring = async (stageId?: string, applicationId?: string) => {
     if (scoring) return
-    const appsToScore = stageId ? (grouped[stageId] ?? []) : activeApps
+    const appsToScore = applicationId
+      ? activeApps.filter(a => a.id === applicationId)
+      : stageId ? (grouped[stageId] ?? []) : activeApps
     const total = appsToScore.length
     if (total === 0) return
 
@@ -2182,10 +2223,13 @@ export default function JobPipelinePage() {
     setScoreProgress({ done: 0, total })
 
     try {
+      const body = applicationId ? { application_id: applicationId }
+                 : stageId       ? { stage_id: stageId }
+                 : {}
       const res = await fetch(`/api/jobs/${id}/score`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(stageId ? { stage_id: stageId } : {}),
+        body: JSON.stringify(body),
       })
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}))
@@ -2563,6 +2607,7 @@ export default function JobPipelinePage() {
             setActiveStageForSelection(sid)
             if (!sid) setSelectedApps(new Set())
           }}
+          onScoreApp={app => startScoring(undefined, app.id)}
           onScheduleApp={app => setScheduleModalApps([app])}
           onRejectApp={async appId => {
             await fetch(`/api/applications/${appId}`, {

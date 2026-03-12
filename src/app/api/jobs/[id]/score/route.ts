@@ -29,11 +29,13 @@ export async function POST(
   const supabase = createAdminClient()
   const jobId = params.id
 
-  // Optional stage filter from request body
+  // Optional filters from request body
   let stageId: string | null = null
+  let applicationId: string | null = null
   try {
     const body = await req.json()
-    stageId = body?.stage_id ?? null
+    stageId       = body?.stage_id       ?? null
+    applicationId = body?.application_id ?? null
   } catch { /* no body — score all */ }
 
   // ── 1. Fetch job, stages, and active applications ──────────────────────────
@@ -61,8 +63,10 @@ export async function POST(
   const stages = stagesRes.data ?? []
   const allApps = appsRes.data ?? []
 
-  // Filter to a specific stage if requested
-  const apps = stageId ? allApps.filter(a => a.stage_id === stageId) : allApps
+  // Filter by application_id or stage_id if requested
+  let apps = allApps
+  if (applicationId) apps = allApps.filter(a => a.id === applicationId)
+  else if (stageId)  apps = allApps.filter(a => a.stage_id === stageId)
 
   if (apps.length === 0) {
     return NextResponse.json({ error: 'No active applications to score' }, { status: 400 })
