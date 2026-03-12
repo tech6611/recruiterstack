@@ -689,14 +689,6 @@ export default function JobsPage() {
     fetchJobs()
   }, [fetchJobs])
 
-  const closeJob = useCallback(async (jobId: string) => {
-    await fetch(`/api/jobs/${jobId}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'closed' }),
-    })
-    fetchJobs()
-  }, [fetchJobs])
-
   // ── Sort helpers ──────────────────────────────────────────────────────────
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -957,12 +949,6 @@ export default function JobsPage() {
                     Publish
                   </button>
                 )
-              )}
-              {job.status !== 'closed' && (
-                <button onClick={() => closeJob(job.id)} title="Close job"
-                  className="rounded-lg border border-slate-200 bg-white p-1 text-slate-400 hover:text-slate-600 transition-colors">
-                  <Archive className="h-3.5 w-3.5" />
-                </button>
               )}
             </div>
           </td>
