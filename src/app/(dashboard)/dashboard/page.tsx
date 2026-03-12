@@ -332,28 +332,37 @@ function ViewsSidebar({
 
 const PREVIEW_LIMIT = 4
 
+/** Per-widget search state + filter helper */
+function useWidgetSearch() {
+  const [showSearch, setShowSearch] = useState(false)
+  const [query,      setQuery]      = useState('')
+  function toggle() { setShowSearch(p => !p); setQuery('') }
+  function filterFn<T>(items: T[], getFields: (item: T) => string[]): T[] {
+    if (!query.trim()) return items
+    const q = query.toLowerCase()
+    return items.filter(item => getFields(item).some(f => f.toLowerCase().includes(q)))
+  }
+  return { showSearch, query, setQuery, toggle, filterFn }
+}
+
 /** Shared coloured header row for every widget */
 function WidgetHeader({
   wId, title, badge, href, searchable,
+  showSearch, onToggleSearch, query, onQueryChange,
 }: {
-  wId:         WidgetId
-  title:       string
-  badge?:      number | null
-  href?:       string
-  searchable?: boolean
+  wId:             WidgetId
+  title:           string
+  badge?:          number | null
+  href?:           string
+  searchable?:     boolean
+  showSearch?:     boolean
+  onToggleSearch?: () => void
+  query?:          string
+  onQueryChange?:  (q: string) => void
 }) {
-  const [showSearch, setShowSearch] = useState(false)
-  const [query,      setQuery]      = useState('')
-
   const def    = ALL_WIDGET_DEFS.find(w => w.id === wId)
   const accent = widgetAccent(wId)
   const Icon   = def?.icon
-
-  function toggleSearch() {
-    setShowSearch(p => !p)
-    setQuery('')
-  }
-
   return (
     <div className="mb-3">
       <div className="flex items-center justify-between">
@@ -369,9 +378,9 @@ function WidgetHeader({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {searchable && (
+          {searchable && onToggleSearch && (
             <button
-              onClick={toggleSearch}
+              onClick={onToggleSearch}
               title="Search"
               className={`flex items-center justify-center rounded p-0.5 transition-colors ${
                 showSearch ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'
@@ -387,21 +396,19 @@ function WidgetHeader({
           )}
         </div>
       </div>
-
-      {/* Inline search input — shown when lens is toggled */}
-      {showSearch && (
+      {showSearch && onQueryChange && (
         <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 focus-within:border-blue-300 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
           <Search className="h-3 w-3 shrink-0 text-slate-400" />
           <input
             autoFocus
             type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
+            value={query ?? ''}
+            onChange={e => onQueryChange(e.target.value)}
             placeholder={`Search ${title.toLowerCase()}…`}
             className="flex-1 min-w-0 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="shrink-0 text-slate-300 hover:text-slate-500 transition-colors">
+            <button onClick={() => onQueryChange('')} className="shrink-0 text-slate-300 hover:text-slate-500 transition-colors">
               <X className="h-3 w-3" />
             </button>
           )}
@@ -412,11 +419,14 @@ function WidgetHeader({
 }
 
 function InterviewsWidget({ interviews }: { interviews: UpcomingInterview[] }) {
-  const preview = interviews.slice(0, PREVIEW_LIMIT)
-  const remaining = interviews.length - preview.length
+  const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
+  const filtered  = filterFn(interviews, iv => [iv.candidate_name, iv.job_title, iv.stage_name])
+  const preview   = filtered.slice(0, PREVIEW_LIMIT)
+  const remaining = filtered.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="interviews" title="Interviews" badge={interviews.length} href="/candidates" searchable />
+      <WidgetHeader wId="interviews" title="Interviews" badge={interviews.length} href="/candidates"
+        searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
 
       <div className="grid grid-cols-[2fr_2fr_1.2fr_1fr] gap-3 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
         <span>Stage</span><span>Candidate</span><span>Date</span><span>Role</span>
@@ -469,6 +479,7 @@ function InterviewsWidget({ interviews }: { interviews: UpcomingInterview[] }) {
 type TaskTab = 'all' | 'approvals' | 'feedback' | 'followups' | 'mentions' | 'sequences'
 
 function TasksWidget({ tasks }: { tasks: DashboardData['tasks'] }) {
+  const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
   const [activeTab, setActiveTab] = useState<TaskTab>('all')
   const counts = {
     approvals: tasks.pending_approvals.length,
@@ -518,12 +529,14 @@ function TasksWidget({ tasks }: { tasks: DashboardData['tasks'] }) {
     : activeTab === 'followups' ? allItems.filter(i => i.type === 'followup')
     : []
 
-  const preview   = tabItems.slice(0, PREVIEW_LIMIT)
-  const remaining = tabItems.length - preview.length
+  const filteredTabItems = filterFn(tabItems, item => [item.title, item.sub])
+  const preview          = filteredTabItems.slice(0, PREVIEW_LIMIT)
+  const remaining        = filteredTabItems.length - preview.length
 
   return (
     <div>
-      <WidgetHeader wId="tasks" title="Tasks" badge={totalAll} href="/candidates" searchable />
+      <WidgetHeader wId="tasks" title="Tasks" badge={totalAll} href="/candidates"
+        searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
 
       <div className="flex gap-0 border-b border-slate-100 mb-3 -mx-1 overflow-x-auto">
         {TABS.map(tab => (
@@ -642,11 +655,14 @@ function PipelineWidget({ breakdown }: { breakdown: StatusBreakdown[] }) {
 }
 
 function JobsMiniWidget({ jobs }: { jobs: TopJob[] }) {
-  const preview   = jobs.slice(0, PREVIEW_LIMIT)
-  const remaining = jobs.length - preview.length
+  const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
+  const filtered  = filterFn(jobs, j => [j.position_title, j.department ?? '', j.location ?? ''])
+  const preview   = filtered.slice(0, PREVIEW_LIMIT)
+  const remaining = filtered.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="jobs_mini" title="Active Jobs" badge={jobs.length} href="/jobs" searchable />
+      <WidgetHeader wId="jobs_mini" title="Active Jobs" badge={jobs.length} href="/jobs"
+        searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
       {jobs.length === 0 ? (
         <p className="text-xs text-slate-400">No open jobs. <Link href="/jobs" className="text-blue-500 hover:underline">Create one</Link></p>
       ) : (
@@ -710,12 +726,15 @@ const RECO_CONFIG: Record<string, { label: string; bg: string; text: string }> =
 // ── JobsByDeptWidget ──────────────────────────────────────────────────────────
 
 function JobsByDeptWidget({ departments }: { departments: JobByDept[] }) {
-  const preview   = departments.slice(0, PREVIEW_LIMIT)
-  const remaining = departments.length - preview.length
+  const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
+  const filtered  = filterFn(departments, d => [d.department])
+  const preview   = filtered.slice(0, PREVIEW_LIMIT)
+  const remaining = filtered.length - preview.length
   const max = Math.max(...departments.map(d => d.candidate_count), 1)
   return (
     <div>
-      <WidgetHeader wId="jobs_by_dept" title="Jobs by Department" href="/jobs" searchable />
+      <WidgetHeader wId="jobs_by_dept" title="Jobs by Department" href="/jobs"
+        searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
       {departments.length === 0 ? (
         <p className="text-xs text-slate-400">No department data yet.</p>
       ) : (
@@ -750,11 +769,14 @@ function JobsByDeptWidget({ departments }: { departments: JobByDept[] }) {
 // ── HmActionsWidget ───────────────────────────────────────────────────────────
 
 function HmActionsWidget({ approvals }: { approvals: TaskApproval[] }) {
-  const preview   = approvals.slice(0, PREVIEW_LIMIT)
-  const remaining = approvals.length - preview.length
+  const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
+  const filtered  = filterFn(approvals, a => [a.title, a.department ?? '', a.location ?? ''])
+  const preview   = filtered.slice(0, PREVIEW_LIMIT)
+  const remaining = filtered.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="hm_actions" title="HM Actions" badge={approvals.length} href="/jobs" searchable />
+      <WidgetHeader wId="hm_actions" title="HM Actions" badge={approvals.length} href="/jobs"
+        searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
       {approvals.length === 0 ? (
         <p className="text-xs text-slate-400">No pending HM actions — all JDs are live or in progress.</p>
       ) : (
@@ -786,11 +808,14 @@ function HmActionsWidget({ approvals }: { approvals: TaskApproval[] }) {
 // ── RecentApplicationsWidget ──────────────────────────────────────────────────
 
 function RecentApplicationsWidget({ applications }: { applications: RecentApplication[] }) {
-  const preview   = applications.slice(0, PREVIEW_LIMIT)
-  const remaining = applications.length - preview.length
+  const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
+  const filtered  = filterFn(applications, a => [a.candidate_name, a.job_title, a.stage_name ?? '', a.source])
+  const preview   = filtered.slice(0, PREVIEW_LIMIT)
+  const remaining = filtered.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="recent_applications" title="Recent Applications" badge={applications.length} href="/candidates" searchable />
+      <WidgetHeader wId="recent_applications" title="Recent Applications" badge={applications.length} href="/candidates"
+        searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
       {applications.length === 0 ? (
         <p className="text-xs text-slate-400">No applications yet.</p>
       ) : (
@@ -835,11 +860,14 @@ function RecentApplicationsWidget({ applications }: { applications: RecentApplic
 // ── TopScoredWidget ───────────────────────────────────────────────────────────
 
 function TopScoredWidget({ candidates }: { candidates: TopScored[] }) {
-  const preview   = candidates.slice(0, PREVIEW_LIMIT)
-  const remaining = candidates.length - preview.length
+  const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
+  const filtered  = filterFn(candidates, c => [c.candidate_name, c.job_title])
+  const preview   = filtered.slice(0, PREVIEW_LIMIT)
+  const remaining = filtered.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="top_scored" title="Top AI-Scored" href="/candidates" searchable />
+      <WidgetHeader wId="top_scored" title="Top AI-Scored" href="/candidates"
+        searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
       {candidates.length === 0 ? (
         <p className="text-xs text-slate-400">No AI scores yet — candidates are scored automatically when added.</p>
       ) : (
@@ -923,11 +951,14 @@ function CandidateSourcesWidget({ sources }: { sources: CandidateSource[] }) {
 // ── OfferTrackerWidget ────────────────────────────────────────────────────────
 
 function OfferTrackerWidget({ offers }: { offers: OfferTrackerItem[] }) {
-  const preview   = offers.slice(0, PREVIEW_LIMIT)
-  const remaining = offers.length - preview.length
+  const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
+  const filtered  = filterFn(offers, o => [o.candidate_name, o.job_title, o.current_title ?? ''])
+  const preview   = filtered.slice(0, PREVIEW_LIMIT)
+  const remaining = filtered.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="offer_tracker" title="Offer Tracker" badge={offers.length} href="/candidates" searchable />
+      <WidgetHeader wId="offer_tracker" title="Offer Tracker" badge={offers.length} href="/candidates"
+        searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
       {offers.length === 0 ? (
         <p className="text-xs text-slate-400">No candidates at the offer stage right now.</p>
       ) : (
@@ -975,11 +1006,14 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
 }
 
 function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
-  const preview   = activity.slice(0, PREVIEW_LIMIT)
-  const remaining = activity.length - preview.length
+  const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
+  const filtered  = filterFn(activity, e => [e.candidate_name, e.job_title, e.to_stage ?? '', e.event_type])
+  const preview   = filtered.slice(0, PREVIEW_LIMIT)
+  const remaining = filtered.length - preview.length
   return (
     <div>
-      <WidgetHeader wId="recent_activity" title="Recent Activity" href="/candidates" searchable />
+      <WidgetHeader wId="recent_activity" title="Recent Activity" href="/candidates"
+        searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
       {activity.length === 0 ? (
         <p className="text-xs text-slate-400">No recent activity.</p>
       ) : (
@@ -1021,12 +1055,15 @@ function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
 // ── StageFunnelWidget ─────────────────────────────────────────────────────────
 
 function StageFunnelWidget({ funnel }: { funnel: StageFunnelItem[] }) {
-  const preview   = funnel.slice(0, PREVIEW_LIMIT)
-  const remaining = funnel.length - preview.length
+  const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
+  const filtered  = filterFn(funnel, s => [s.stage_name])
+  const preview   = filtered.slice(0, PREVIEW_LIMIT)
+  const remaining = filtered.length - preview.length
   const max = Math.max(...funnel.map(s => s.count), 1)
   return (
     <div>
-      <WidgetHeader wId="stage_funnel" title="Stage Funnel" href="/candidates" searchable />
+      <WidgetHeader wId="stage_funnel" title="Stage Funnel" href="/candidates"
+        searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
       {funnel.length === 0 ? (
         <p className="text-xs text-slate-400">No active candidates in the pipeline.</p>
       ) : (
