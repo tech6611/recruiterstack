@@ -19,7 +19,7 @@ import type { Candidate, HiringRequest } from '@/lib/types/database'
 export const maxDuration = 300 // 5 min — needed for large pipelines on Vercel
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   const authResult = await requireOrg()
@@ -28,6 +28,13 @@ export async function POST(
 
   const supabase = createAdminClient()
   const jobId = params.id
+
+  // Optional stage filter from request body
+  let stageId: string | null = null
+  try {
+    const body = await req.json()
+    stageId = body?.stage_id ?? null
+  } catch { /* no body — score all */ }
 
   // ── 1. Fetch job, stages, and active applications ──────────────────────────
   const [jobRes, stagesRes, appsRes] = await Promise.all([
@@ -52,7 +59,10 @@ export async function POST(
 
   const job    = jobRes.data as HiringRequest
   const stages = stagesRes.data ?? []
-  const apps   = appsRes.data  ?? []
+  const allApps = appsRes.data ?? []
+
+  // Filter to a specific stage if requested
+  const apps = stageId ? allApps.filter(a => a.stage_id === stageId) : allApps
 
   if (apps.length === 0) {
     return NextResponse.json({ error: 'No active applications to score' }, { status: 400 })
