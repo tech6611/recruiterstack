@@ -210,6 +210,87 @@ export interface Scorecard {
   created_at:       string
 }
 
+// ── Interviews ────────────────────────────────────────────────────────────────
+
+export type InterviewType   = 'video' | 'phone' | 'in_person' | 'panel' | 'technical' | 'assessment'
+export type InterviewStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled'
+
+export interface Interview {
+  id:                       string
+  org_id:                   string
+  application_id:           string
+  candidate_id:             string
+  hiring_request_id:        string
+  stage_id:                 string | null
+  interviewer_name:         string
+  interview_type:           InterviewType
+  scheduled_at:             string
+  duration_minutes:         number
+  location:                 string | null
+  notes:                    string | null
+  status:                   InterviewStatus
+  self_schedule_token:      string | null
+  self_schedule_expires_at: string | null
+  created_at:               string
+  updated_at:               string
+  candidate?:               Pick<Candidate, 'name' | 'email'>
+  hiring_request?:          Pick<HiringRequest, 'position_title' | 'ticket_number'>
+}
+
+export interface InterviewInsert extends Omit<Interview, 'id' | 'created_at' | 'updated_at' | 'candidate' | 'hiring_request'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface InterviewUpdate extends Partial<InterviewInsert> {}
+
+// ── Offers ────────────────────────────────────────────────────────────────────
+
+export type OfferStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'approved'
+  | 'sent'
+  | 'accepted'
+  | 'declined'
+  | 'withdrawn'
+  | 'expired'
+
+export interface Offer {
+  id:                string
+  org_id:            string
+  application_id:    string
+  candidate_id:      string
+  hiring_request_id: string
+  position_title:    string
+  base_salary:       number | null
+  bonus:             number | null
+  equity:            string | null
+  start_date:        string | null
+  expiry_date:       string | null
+  notes:             string | null
+  offer_letter_text: string | null
+  status:            OfferStatus
+  created_by:        string | null
+  approved_by:       string | null
+  approved_at:       string | null
+  sent_at:           string | null
+  responded_at:      string | null
+  created_at:        string
+  updated_at:        string
+  candidate?:        Pick<Candidate, 'name' | 'email'>
+  hiring_request?:   Pick<HiringRequest, 'position_title' | 'ticket_number'>
+}
+
+export interface OfferInsert extends Omit<Offer, 'id' | 'created_at' | 'updated_at' | 'candidate' | 'hiring_request'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface OfferUpdate extends Partial<OfferInsert> {}
+
 // ── Match ─────────────────────────────────────────────────────────────────
 
 export type MatchRecommendation = 'strong_yes' | 'yes' | 'maybe' | 'no'

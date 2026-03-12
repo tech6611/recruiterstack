@@ -634,6 +634,16 @@ export default function JobsPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  const togglePublish = useCallback(async (jobId: string, currentStatus: HiringRequestStatus) => {
+    const newStatus = currentStatus === 'posted' ? 'jd_approved' : 'posted'
+    await fetch(`/api/jobs/${jobId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    })
+    fetchJobs()
+  }, [fetchJobs])
+
   useEffect(() => { if (orgId) fetchJobs() }, [fetchJobs, orgId])
 
   // Refetch when the tab regains focus (e.g. after navigating back via browser Back)
@@ -843,12 +853,13 @@ export default function JobsPage() {
                 <th className={thCls} onClick={() => toggleSort('created_at')}>
                   <span className="flex items-center">Created <SortIcon col="created_at" /></span>
                 </th>
+                <th className={`${thCls} cursor-default hover:text-slate-500`}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">
+                  <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-400">
                     No results match your filters.
                   </td>
                 </tr>
@@ -885,6 +896,23 @@ export default function JobsPage() {
                     </td>
                     <td className="px-4 py-3.5 text-xs text-slate-400">
                       {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                      {job.status === 'posted' ? (
+                        <button
+                          onClick={() => togglePublish(job.id, job.status)}
+                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                        >
+                          Unpublish
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => togglePublish(job.id, job.status)}
+                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                        >
+                          Publish
+                        </button>
+                      )}
                     </td>
                   </tr>
                 )
