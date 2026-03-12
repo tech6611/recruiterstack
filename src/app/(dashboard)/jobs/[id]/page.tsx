@@ -221,6 +221,8 @@ function StageColumn({
   onDelete,
   selectedApps,
   onToggleSelect,
+  onScheduleInterview,
+  selectedInStage,
 }: {
   stage: PipelineStage
   apps: Application[]
@@ -238,6 +240,8 @@ function StageColumn({
   onDelete: (id: string) => void
   selectedApps: Set<string>
   onToggleSelect: (id: string) => void
+  onScheduleInterview: () => void
+  selectedInStage: number
 }) {
   const [over, setOver] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -254,6 +258,7 @@ function StageColumn({
     onMenuClose()
     if (actionId === 'score') { onScoreStage(); return }
     if (actionId === 'move_next') { onMoveAllNext(); return }
+    if (actionId === 'schedule_interview') { onScheduleInterview(); return }
     // Other actions: open first candidate's slide-over, show toast, etc.
     // Stubs for future implementation
   }
@@ -338,6 +343,14 @@ function StageColumn({
                         return <div key={i} className="my-1 border-t border-slate-100" />
                       }
                       const isDestructive = action.id === 'reject_all'
+                      let label: string = action.label
+                      if (action.id === 'schedule_interview') {
+                        label = selectedInStage > 0 ? `Schedule interview (${selectedInStage} selected)` : action.label
+                      } else if (action.id === 'move_next') {
+                        label = selectedInStage > 0 ? `Move to next stage (${selectedInStage} selected)` : action.label
+                      } else if (action.id === 'reject_all') {
+                        label = selectedInStage > 0 ? `Reject (${selectedInStage} selected)` : action.label
+                      }
                       return (
                         <button
                           key={action.id}
@@ -349,7 +362,7 @@ function StageColumn({
                           }`}
                         >
                           <span className="text-base leading-none w-4 text-center">{action.icon}</span>
-                          {action.label}
+                          {label}
                         </button>
                       )
                     })}
@@ -1353,6 +1366,275 @@ function AutopilotDrawer({
   )
 }
 
+// ── Schedule Interview Modal ───────────────────────────────────────────────────
+
+const INTERVIEW_TYPES = [
+  { value: 'video',      label: '🎥 Video call'     },
+  { value: 'phone',      label: '📞 Phone screen'   },
+  { value: 'in_person',  label: '🏢 In-person'      },
+  { value: 'panel',      label: '👥 Panel'           },
+  { value: 'technical',  label: '💻 Technical'       },
+  { value: 'assessment', label: '📋 Assessment'      },
+] as const
+
+const DURATION_OPTIONS = [
+  { value: 30,  label: '30 min' },
+  { value: 45,  label: '45 min' },
+  { value: 60,  label: '1 hour' },
+  { value: 90,  label: '90 min' },
+  { value: 120, label: '2 hours' },
+]
+
+function ScheduleInterviewModal({
+  apps,
+  job,
+  stages,
+  onClose,
+  onScheduled,
+}: {
+  apps: Application[]
+  job: JobWithPipeline
+  stages: PipelineStage[]
+  onClose: () => void
+  onScheduled: () => void
+}) {
+  const today = new Date()
+  const defaultDate = new Date(today.getTime() + 86400000) // tomorrow
+  const dateStr = defaultDate.toISOString().split('T')[0]
+
+  const [interviewType, setInterviewType] = useState<string>('video')
+  const [date, setDate] = useState(dateStr)
+  const [time, setTime] = useState('10:00')
+  const [duration, setDuration] = useState(60)
+  const [interviewer, setInterviewer] = useState(job.hiring_manager_name ?? '')
+  const [location, setLocation] = useState('')
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async () => {
+    if (!date || !time || !interviewer.trim()) {
+      setError('Date, time and interviewer are required.')
+      return
+    }
+    setSaving(true)
+    setError('')
+
+    const scheduled_at = new Date(`${date}T${time}:00`).toISOString()
+
+    try {
+      const results = await Promise.all(apps.map(app =>
+        fetch('/api/interviews', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            application_id:   app.id,
+            candidate_id:     app.candidate_id,
+            hiring_request_id: job.id,
+            stage_id:         app.stage_id ?? null,
+            interviewer_name: interviewer.trim(),
+            interview_type:   interviewType,
+            scheduled_at,
+            duration_minutes: duration,
+            location:         location.trim() || null,
+            notes:            notes.trim() || null,
+          }),
+        }).then(r => r.json())
+      ))
+
+      const hasError = results.some(r => r.error)
+      if (hasError) {
+        const firstErr = results.find(r => r.error)
+        setError(firstErr?.error ?? 'Failed to schedule some interviews')
+        setSaving(false)
+        return
+      }
+
+      setSaved(true)
+      setTimeout(() => { onScheduled(); onClose() }, 1200)
+    } catch {
+      setError('Network error. Please try again.')
+      setSaving(false)
+    }
+  }
+
+  const fmtDate = (d: string) => d
+    ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    : ''
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Schedule Interview</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {apps.length === 1
+                ? `Scheduling for ${apps[0].candidate?.name}`
+                : `Scheduling for ${apps.length} candidates`}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          {/* Candidates list */}
+          {apps.length > 1 && (
+            <div className="flex flex-wrap gap-1.5">
+              {apps.map(app => (
+                <span key={app.id} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                  <div className={`h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-bold ${avatarColor(app.candidate?.name ?? '')}`}>
+                    {initials(app.candidate?.name ?? '?')}
+                  </div>
+                  {app.candidate?.name}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Interview type */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Interview type</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {INTERVIEW_TYPES.map(t => (
+                <button
+                  key={t.value}
+                  onClick={() => setInterviewType(t.value)}
+                  className={`px-2.5 py-2 rounded-xl border text-xs font-medium transition-colors text-left ${
+                    interviewType === t.value
+                      ? 'border-blue-400 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Date + Time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Date</label>
+              <input
+                type="date"
+                value={date}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={e => setDate(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              {date && <p className="text-xs text-slate-400 mt-1">{fmtDate(date)}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Time</label>
+              <input
+                type="time"
+                value={time}
+                onChange={e => setTime(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+
+          {/* Duration */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Duration</label>
+            <div className="flex gap-1.5">
+              {DURATION_OPTIONS.map(d => (
+                <button
+                  key={d.value}
+                  onClick={() => setDuration(d.value)}
+                  className={`flex-1 px-2 py-2 rounded-xl border text-xs font-medium transition-colors ${
+                    duration === d.value
+                      ? 'border-blue-400 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Interviewer */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Interviewer</label>
+            <input
+              value={interviewer}
+              onChange={e => setInterviewer(e.target.value)}
+              placeholder="Hiring manager name"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+
+          {/* Location / Meeting link */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+              {interviewType === 'in_person' ? 'Location / Address' : 'Meeting link'}
+            </label>
+            <input
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              placeholder={interviewType === 'in_person' ? 'e.g. 4th floor, conference room B' : 'e.g. https://zoom.us/j/...'}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Notes <span className="font-normal text-slate-400">(optional)</span></label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Topics to cover, prep instructions…"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/60">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving || saved}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+              saved
+                ? 'bg-emerald-500 text-white'
+                : 'bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60'
+            }`}
+          >
+            {saved ? (
+              <><Check className="h-4 w-4" /> Scheduled!</>
+            ) : saving ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</>
+            ) : (
+              `Schedule ${apps.length > 1 ? `${apps.length} interviews` : 'interview'}`
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function JobPipelinePage() {
@@ -1392,6 +1674,7 @@ export default function JobPipelinePage() {
   })
   const clearSelection = () => setSelectedApps(new Set())
   const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [scheduleModalApps, setScheduleModalApps] = useState<Application[] | null>(null)
 
   // Scoring state
   const [scoring, setScoring] = useState(false)
@@ -1992,6 +2275,12 @@ export default function JobPipelinePage() {
             onDelete={handleDeleteStage}
             selectedApps={selectedApps}
             onToggleSelect={toggleSelect}
+            onScheduleInterview={() => {
+              const stageApps = grouped[stage.id] ?? []
+              const selected = stageApps.filter(a => selectedApps.has(a.id))
+              setScheduleModalApps(selected.length > 0 ? selected : stageApps)
+            }}
+            selectedInStage={(grouped[stage.id] ?? []).filter(a => selectedApps.has(a.id)).length}
           />
         ))}
 
@@ -2084,30 +2373,15 @@ export default function JobPipelinePage() {
         />
       )}
 
-      {/* Floating bulk-action bar */}
-      {selectedApps.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700">
-          <span className="text-sm font-medium">{selectedApps.size} selected</span>
-          <div className="h-4 w-px bg-slate-600" />
-          <button
-            onClick={() => { /* score selected */ }}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 transition-colors font-medium"
-          >
-            <span>⚡</span> Score
-          </button>
-          <button
-            onClick={() => { /* reject selected */ }}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 transition-colors font-medium"
-          >
-            <X className="h-3.5 w-3.5" /> Reject
-          </button>
-          <button
-            onClick={clearSelection}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors text-slate-300"
-          >
-            <X className="h-3.5 w-3.5" /> Clear
-          </button>
-        </div>
+      {/* Schedule Interview Modal */}
+      {scheduleModalApps && scheduleModalApps.length > 0 && (
+        <ScheduleInterviewModal
+          apps={scheduleModalApps}
+          job={job}
+          stages={job.pipeline_stages}
+          onClose={() => setScheduleModalApps(null)}
+          onScheduled={load}
+        />
       )}
     </div>
   )
