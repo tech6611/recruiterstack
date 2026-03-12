@@ -884,7 +884,7 @@ export default function JobsPage() {
             <span className={thLbl}>{col.label}</span>
           )}
 
-          {/* Filter icon (if filterable) */}
+          {/* Filter dropdown trigger (if filterable) */}
           {col.filterable && (colFilterOptions[col.id]?.length ?? 0) > 0 && (
             <button
               onClick={e => {
@@ -895,18 +895,18 @@ export default function JobsPage() {
                   prev?.colId === col.id ? null : { colId: col.id, top: rect.bottom + 4, left: rect.left }
                 )
               }}
-              className={`p-0.5 rounded transition-colors shrink-0 ${
-                activeFilter ? 'text-blue-500' : colDropdown?.colId === col.id ? 'text-blue-400' : 'text-slate-300 hover:text-slate-500'
+              className={`flex items-center gap-0.5 rounded px-1 py-0.5 transition-colors shrink-0 ${
+                activeFilter
+                  ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-200'
+                  : colDropdown?.colId === col.id
+                  ? 'bg-slate-100 text-slate-600'
+                  : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
               }`}
               title={`Filter by ${col.label}`}
             >
-              <Search className="h-3 w-3" />
+              <ChevronDown className={`h-3 w-3 transition-transform ${colDropdown?.colId === col.id ? 'rotate-180' : ''}`} />
+              {activeFilter && <span className="text-[10px] font-semibold">{colFilters[col.id]!.length}</span>}
             </button>
-          )}
-
-          {/* Active filter badge */}
-          {activeFilter && (
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
           )}
         </div>
       </th>
@@ -983,12 +983,6 @@ export default function JobsPage() {
         <div className="flex items-center gap-2">
           {/* Time filter icon */}
           <button
-            ref={node => {
-              if (node && showTimePicker) {
-                const rect = node.getBoundingClientRect()
-                setTimePickerPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-              }
-            }}
             onClick={e => {
               const rect = e.currentTarget.getBoundingClientRect()
               setTimePickerPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
