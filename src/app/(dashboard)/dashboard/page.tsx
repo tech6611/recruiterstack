@@ -15,7 +15,6 @@ import {
   Plus,
   Pencil,
   Trash2,
-  Search,
   ChevronRight,
   MapPin,
   CheckSquare,
