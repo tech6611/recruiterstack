@@ -558,12 +558,13 @@ interface ColDef {
   label: string
   sortKey?: SortKey
   filterable?: boolean
+  filterType?: 'checkbox' | 'text'
   required?: boolean
   defaultVisible: boolean
 }
 
 const ALL_COL_DEFS: ColDef[] = [
-  { id: 'ticket',     label: '#',              sortKey: 'ticket_number',       filterable: true,  required: false, defaultVisible: true  },
+  { id: 'ticket',     label: 'Req #',           sortKey: 'ticket_number',       filterable: true,  filterType: 'text', required: false, defaultVisible: true  },
   { id: 'position',   label: 'Position',        sortKey: 'position_title',      filterable: true,  required: true,  defaultVisible: true  },
   { id: 'pipeline',   label: 'Pipeline',                                         filterable: false, required: false, defaultVisible: true  },
   { id: 'manager',    label: 'Hiring Manager',  sortKey: 'hiring_manager_name', filterable: true,  required: false, defaultVisible: true  },
@@ -636,7 +637,6 @@ export default function JobsPage() {
   const [customFrom,  setCustomFrom]  = useState('')
   const [customTo,    setCustomTo]    = useState('')
   const [showTimePicker, setShowTimePicker] = useState(false)
-  const [timePickerPos, setTimePickerPos]   = useState<{ top: number; right: number }>({ top: 0, right: 0 })
 
   // ── Column filters (checkbox-based, one dropdown at a time) ───────────────
   const [colFilters,     setColFilters]     = useState<Record<string, string[]>>({})
@@ -805,7 +805,7 @@ export default function JobsPage() {
     if (colFilters.status?.length)     result = result.filter(j => colFilters.status!.includes(j.status))
     if (colFilters.position?.length)   result = result.filter(j => colFilters.position!.includes(j.position_title))
     if (colFilters.manager?.length)    result = result.filter(j => colFilters.manager!.includes(j.hiring_manager_name))
-    if (colFilters.ticket?.length)     result = result.filter(j => colFilters.ticket!.includes(j.ticket_number ?? ''))
+    if (colFilters.ticket?.length)     result = result.filter(j => (j.ticket_number ?? '').toLowerCase().includes((colFilters.ticket![0] ?? '').toLowerCase()))
     if (colFilters.department?.length) result = result.filter(j => colFilters.department!.includes(j.department ?? ''))
     if (colFilters.location?.length)   result = result.filter(j => colFilters.location!.includes(j.location ?? ''))
     if (colFilters.level?.length)      result = result.filter(j => colFilters.level!.includes(j.level ?? ''))
@@ -846,6 +846,10 @@ export default function JobsPage() {
   }
   const clearColFilter = (colId: string) =>
     setColFilters(p => { const cp = { ...p }; delete cp[colId]; return cp })
+  const selectAllInCol = (colId: string) => {
+    const opts = colFilterOptions[colId as ColId] ?? []
+    if (opts.length > 0) setColFilters(p => ({ ...p, [colId]: opts.map(o => o.value) }))
+  }
 
   // ── Shared th styles ───────────────────────────────────────────────────────
   const thBase = 'px-3 py-3 text-left align-top'
@@ -885,7 +889,7 @@ export default function JobsPage() {
           )}
 
           {/* Filter dropdown trigger (if filterable) */}
-          {col.filterable && (colFilterOptions[col.id]?.length ?? 0) > 0 && (
+          {col.filterable && (col.filterType === 'text' || (colFilterOptions[col.id]?.length ?? 0) > 0) && (
             <button
               onClick={e => {
                 e.stopPropagation()
@@ -981,23 +985,61 @@ export default function JobsPage() {
           <p className="text-sm text-slate-500 mt-0.5">Manage open roles and candidate pipelines</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Time filter icon */}
-          <button
-            onClick={e => {
-              const rect = e.currentTarget.getBoundingClientRect()
-              setTimePickerPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-              setShowTimePicker(p => !p)
-            }}
-            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
-              timeFilter !== 'all'
-                ? 'border-blue-300 bg-blue-50 text-blue-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
-            }`}
-            title="Time filter"
-          >
-            <CalendarDays className="h-4 w-4" />
-            {timeFilter !== 'all' && <span className="text-xs">{timeLabel}</span>}
-          </button>
+          {/* Time filter icon + dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowTimePicker(p => !p)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                timeFilter !== 'all'
+                  ? 'border-blue-300 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
+              }`}
+              title="Time filter"
+            >
+              <CalendarDays className="h-4 w-4" />
+              {timeFilter !== 'all' && <span className="text-xs">{timeLabel}</span>}
+            </button>
+            {showTimePicker && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 w-52">
+                  {TIME_OPTS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setTimeFilter(opt.value)
+                        if (opt.value !== 'custom') setShowTimePicker(false)
+                      }}
+                      className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                        timeFilter === opt.value ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {opt.label}
+                      {timeFilter === opt.value && <Check className="h-3 w-3 ml-auto shrink-0" />}
+                    </button>
+                  ))}
+                  {timeFilter === 'custom' && (
+                    <div className="px-2 pt-2 pb-1 border-t border-slate-100 mt-1 space-y-2">
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
+                        <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-blue-400 transition" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
+                        <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-blue-400 transition" />
+                      </div>
+                      <button onClick={() => setShowTimePicker(false)}
+                        className="w-full text-xs bg-blue-600 text-white rounded-lg py-1.5 hover:bg-blue-700 transition-colors font-semibold">
+                        Apply
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Customize columns */}
           <button
@@ -1060,18 +1102,18 @@ export default function JobsPage() {
         <div className="flex items-center gap-2 flex-wrap">
           {/* Active filter chips */}
           {Object.entries(colFilters).map(([colId, values]) => {
+            if (!values.length) return null
             const colDef = ALL_COL_DEFS.find(c => c.id === colId)
-            return values.map(v => {
-              const label = colId === 'status' ? STATUS_CONFIG[v]?.label ?? v : v
-              return (
-                <span key={`${colId}:${v}`} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700 font-medium">
-                  <span className="text-blue-400">{colDef?.label}:</span> {label}
-                  <button onClick={() => toggleColFilter(colId, v)} className="ml-0.5 hover:text-blue-900">
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )
-            })
+            const singleLabel = colId === 'status' ? (STATUS_CONFIG[values[0]]?.label ?? values[0]) : values[0]
+            const displayLabel = values.length === 1 ? singleLabel : `${values.length} selected`
+            return (
+              <span key={colId} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700 font-medium">
+                <span className="text-blue-400">{colDef?.label}:</span> {displayLabel}
+                <button onClick={() => clearColFilter(colId)} className="ml-0.5 hover:text-blue-900">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )
           })}
           {timeFilter !== 'all' && (
             <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700 font-medium">
@@ -1207,120 +1249,117 @@ export default function JobsPage() {
         </div>
       )}
 
-      {/* ── Time filter dropdown (fixed-positioned) ─────────────────────── */}
-      {showTimePicker && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
-          <div
-            className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 w-52"
-            style={{ top: timePickerPos.top, right: timePickerPos.right }}
-          >
-            {TIME_OPTS.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => {
-                  setTimeFilter(opt.value)
-                  if (opt.value !== 'custom') setShowTimePicker(false)
-                }}
-                className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  timeFilter === opt.value ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                {opt.label}
-                {timeFilter === opt.value && <Check className="h-3 w-3 ml-auto shrink-0" />}
-              </button>
-            ))}
-            {timeFilter === 'custom' && (
-              <div className="px-2 pt-2 pb-1 border-t border-slate-100 mt-1 space-y-2">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
-                  <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                    className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-blue-400 transition" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
-                  <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                    className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-blue-400 transition" />
-                </div>
-                <button onClick={() => setShowTimePicker(false)}
-                  className="w-full text-xs bg-blue-600 text-white rounded-lg py-1.5 hover:bg-blue-700 transition-colors font-semibold">
-                  Apply
-                </button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
       {/* ── Column filter dropdown (fixed-positioned) ───────────────────── */}
-      {colDropdown && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => { setColDropdown(null); setColFilterSearch('') }} />
-          <div
-            className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-xl flex flex-col"
-            style={{ top: colDropdown.top, left: colDropdown.left, width: 236, maxHeight: 340 }}
-          >
-            {/* Search within options */}
-            <div className="px-3 pt-2.5 pb-2 border-b border-slate-100">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
-                <input
-                  value={colFilterSearch}
-                  onChange={e => setColFilterSearch(e.target.value)}
-                  placeholder="Search…"
-                  autoFocus
-                  className="w-full pl-6 pr-2 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition"
-                />
-              </div>
-            </div>
+      {colDropdown && (() => {
+        const colDef     = ALL_COL_DEFS.find(c => c.id === colDropdown.colId)
+        const isText     = colDef?.filterType === 'text'
+        const opts       = colFilterOptions[colDropdown.colId as ColId] ?? []
+        const selCount   = colFilters[colDropdown.colId]?.length ?? 0
+        const allSel     = opts.length > 0 && selCount === opts.length
+        const visOpts    = opts.filter(o => o.label.toLowerCase().includes(colFilterSearch.toLowerCase()))
+        return (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => { setColDropdown(null); setColFilterSearch('') }} />
+            <div
+              className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-xl flex flex-col"
+              style={{ top: colDropdown.top, left: colDropdown.left, width: 240, maxHeight: 360 }}
+            >
+              {isText ? (
+                /* ── Text search filter (for Req #) ─────────────────── */
+                <div className="p-3 space-y-2">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Search {colDef?.label}</p>
+                  <input
+                    value={colFilters[colDropdown.colId]?.[0] ?? ''}
+                    onChange={e => {
+                      const v = e.target.value
+                      if (v) setColFilters(p => ({ ...p, [colDropdown.colId]: [v] }))
+                      else clearColFilter(colDropdown.colId)
+                    }}
+                    placeholder="e.g. RS-001…"
+                    autoFocus
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition"
+                  />
+                  {selCount > 0 && (
+                    <button onClick={() => clearColFilter(colDropdown.colId)} className="text-xs text-red-500 hover:text-red-700 transition-colors">
+                      Clear
+                    </button>
+                  )}
+                </div>
+              ) : (
+                /* ── Checkbox filter ────────────────────────────────── */
+                <>
+                  {/* Search input */}
+                  <div className="px-3 pt-2.5 pb-2 border-b border-slate-100">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                      <input
+                        value={colFilterSearch}
+                        onChange={e => setColFilterSearch(e.target.value)}
+                        placeholder="Search…"
+                        autoFocus
+                        className="w-full pl-6 pr-2 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition"
+                      />
+                    </div>
+                  </div>
 
-            {/* Options list */}
-            <div className="overflow-y-auto flex-1 p-1.5 space-y-0.5">
-              {(colFilterOptions[colDropdown.colId as ColId] ?? [])
-                .filter(opt => opt.label.toLowerCase().includes(colFilterSearch.toLowerCase()))
-                .map(opt => {
-                  const selected = colFilters[colDropdown.colId]?.includes(opt.value) ?? false
-                  return (
-                    <label
-                      key={opt.value}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer"
-                    >
+                  {/* Select all */}
+                  {opts.length > 0 && (
+                    <label className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 hover:bg-slate-50 cursor-pointer shrink-0">
                       <input
                         type="checkbox"
-                        checked={selected}
-                        onChange={() => toggleColFilter(colDropdown.colId, opt.value)}
+                        checked={allSel}
+                        onChange={() => allSel ? clearColFilter(colDropdown.colId) : selectAllInCol(colDropdown.colId)}
                         className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
                       />
-                      {colDropdown.colId === 'status' ? (
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_CONFIG[opt.value]?.color ?? ''}`}>
-                          {STATUS_CONFIG[opt.value]?.icon}
-                          {opt.label}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-700 truncate">{opt.label}</span>
+                      <span className="text-xs font-semibold text-slate-600">{allSel ? 'Deselect all' : 'Select all'}</span>
+                      {selCount > 0 && !allSel && (
+                        <span className="text-xs text-slate-400 ml-auto">{selCount}/{opts.length}</span>
                       )}
                     </label>
-                  )
-                })}
-              {(colFilterOptions[colDropdown.colId as ColId] ?? []).filter(opt =>
-                opt.label.toLowerCase().includes(colFilterSearch.toLowerCase())
-              ).length === 0 && (
-                <p className="px-2 py-3 text-xs text-slate-400 text-center">No options match</p>
+                  )}
+
+                  {/* Options list */}
+                  <div className="overflow-y-auto flex-1 p-1.5 space-y-0.5">
+                    {visOpts.map(opt => {
+                      const selected = colFilters[colDropdown.colId]?.includes(opt.value) ?? false
+                      return (
+                        <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleColFilter(colDropdown.colId, opt.value)}
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
+                          />
+                          {colDropdown.colId === 'status' ? (
+                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_CONFIG[opt.value]?.color ?? ''}`}>
+                              {STATUS_CONFIG[opt.value]?.icon}{opt.label}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-700 truncate">{opt.label}</span>
+                          )}
+                        </label>
+                      )
+                    })}
+                    {visOpts.length === 0 && (
+                      <p className="px-2 py-3 text-xs text-slate-400 text-center">No options match</p>
+                    )}
+                  </div>
+
+                  {/* Clear footer */}
+                  {selCount > 0 && (
+                    <div className="px-3 py-2 border-t border-slate-100 flex items-center justify-between shrink-0">
+                      <span className="text-xs text-slate-400">{selCount} selected</span>
+                      <button onClick={() => clearColFilter(colDropdown.colId)} className="text-xs text-red-500 hover:text-red-700 transition-colors">
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
-
-            {/* Clear footer */}
-            {(colFilters[colDropdown.colId]?.length ?? 0) > 0 && (
-              <div className="px-3 py-2 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-xs text-slate-400">{colFilters[colDropdown.colId]!.length} selected</span>
-                <button onClick={() => clearColFilter(colDropdown.colId)} className="text-xs text-red-500 hover:text-red-700 transition-colors">
-                  Clear
-                </button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+          </>
+        )
+      })()}
 
       {/* ── Column picker dropdown (fixed-positioned) ───────────────────── */}
       {showColPicker && (
