@@ -161,11 +161,11 @@ interface DashView {
 
 const DEFAULT_VIEWS: DashView[] = [
   { id: 'home',      name: 'Home',                icon: 'home',     widgets: ['interviews', 'tasks'] },
-  { id: 'recruiter', name: 'Recruiter Dashboard', icon: 'chart',    widgets: ['overview_stats', 'interviews', 'tasks'] },
-  { id: 'exec',      name: 'Exec Review',         icon: 'eye',      widgets: ['overview_stats', 'pipeline'] },
-  { id: 'dept',      name: 'Department View',     icon: 'layers',   widgets: ['overview_stats', 'jobs_mini', 'pipeline'] },
-  { id: 'pipeline',  name: 'Pipeline View',       icon: 'workflow', widgets: ['pipeline', 'overview_stats'] },
-  { id: 'data',      name: 'Data Quality',        icon: 'shield',   widgets: ['tasks', 'pipeline'] },
+  { id: 'recruiter', name: 'Recruiter Dashboard', icon: 'chart',    widgets: ['interviews', 'tasks', 'overview_stats'] },
+  { id: 'exec',      name: 'Exec Review',         icon: 'eye',      widgets: ['interviews', 'tasks', 'overview_stats', 'pipeline'] },
+  { id: 'dept',      name: 'Department View',     icon: 'layers',   widgets: ['interviews', 'tasks', 'overview_stats', 'jobs_mini', 'pipeline'] },
+  { id: 'pipeline',  name: 'Pipeline View',       icon: 'workflow', widgets: ['interviews', 'tasks', 'pipeline', 'overview_stats'] },
+  { id: 'data',      name: 'Data Quality',        icon: 'shield',   widgets: ['interviews', 'tasks', 'pipeline'] },
 ]
 
 const VIEW_ICONS: Record<string, React.FC<{ className?: string }>> = {
@@ -176,7 +176,7 @@ const VIEW_ICONS: Record<string, React.FC<{ className?: string }>> = {
 const LS_VIEWS   = 'rs_dashboard_views'
 const LS_ACTIVE  = 'rs_dashboard_active_view'
 const LS_VERSION = 'rs_dashboard_version'
-const CURRENT_VERSION = 'v3' // bump when DashView shape changes
+const CURRENT_VERSION = 'v4' // bump when DashView shape changes
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1090,21 +1090,35 @@ function ActivityPanel({
 
 function WidgetCustomizer({
   activeWidgets,
+  snapshotWidgets,
   onClose,
+  onDiscard,
   onReorder,
   onRemove,
   onAdd,
 }: {
-  activeWidgets: WidgetId[]
+  activeWidgets:   WidgetId[]
+  snapshotWidgets: WidgetId[]
   onClose:   () => void
+  onDiscard: () => void
   onReorder: (widgets: WidgetId[]) => void
   onRemove:  (id: WidgetId) => void
   onAdd:     (id: WidgetId) => void
 }) {
-  const [draggingId,  setDraggingId]  = useState<WidgetId | null>(null)
-  const [dragOverId,  setDragOverId]  = useState<WidgetId | null>(null)
+  const [draggingId,    setDraggingId]    = useState<WidgetId | null>(null)
+  const [dragOverId,    setDragOverId]    = useState<WidgetId | null>(null)
+  const [showExitDialog, setShowExitDialog] = useState(false)
 
+  const hasChanges = JSON.stringify(activeWidgets) !== JSON.stringify(snapshotWidgets)
   const availableToAdd = ALL_WIDGET_DEFS.filter(w => !activeWidgets.includes(w.id))
+
+  function handleDoneClick() {
+    if (hasChanges) {
+      setShowExitDialog(true)
+    } else {
+      onClose()
+    }
+  }
 
   function handleDragStart(id: WidgetId) {
     setDraggingId(id)
@@ -1144,14 +1158,57 @@ function WidgetCustomizer({
           <h3 className="text-sm font-semibold text-slate-900">Customize this view</h3>
           <p className="text-xs text-slate-500">Drag to reorder · click × to remove · add new widgets below</p>
         </div>
-        <button
-          onClick={onClose}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-        >
-          <X className="h-3.5 w-3.5" />
-          Done
-        </button>
+        <div className="flex items-center gap-2">
+          {hasChanges && (
+            <button
+              onClick={() => setShowExitDialog(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-red-500 transition-colors"
+            >
+              Discard
+            </button>
+          )}
+          <button
+            onClick={handleDoneClick}
+            className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            Done
+          </button>
+        </div>
       </div>
+
+      {/* Save / Discard confirmation dialog */}
+      {showExitDialog && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Save changes to this view?</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                You&apos;ve changed the widget layout. Do you want to keep or discard these changes?
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                onClick={() => setShowExitDialog(false)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Keep editing
+              </button>
+              <button
+                onClick={onDiscard}
+                className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+              >
+                Discard changes
+              </button>
+              <button
+                onClick={onClose}
+                className="rounded-lg border border-blue-200 bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Active widgets — drag to reorder */}
       <div className="mb-4 space-y-1.5">
@@ -1271,11 +1328,12 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false)
 
   // Views
-  const [views,        setViews]       = useState<DashView[]>(DEFAULT_VIEWS)
-  const [activeViewId, setActiveViewId] = useState('home')
-  const [viewEditMode, setViewEditMode] = useState(false)
-  const [widgetMode,   setWidgetMode]   = useState(false)
-  const [hydrated,     setHydrated]     = useState(false)
+  const [views,          setViews]         = useState<DashView[]>(DEFAULT_VIEWS)
+  const [activeViewId,   setActiveViewId]  = useState('home')
+  const [viewEditMode,   setViewEditMode]  = useState(false)
+  const [widgetMode,     setWidgetMode]    = useState(false)
+  const [widgetSnapshot, setWidgetSnapshot] = useState<WidgetId[]>([])
+  const [hydrated,       setHydrated]      = useState(false)
 
   // Hydrate localStorage — migrate old data that lacks `widgets`
   useEffect(() => {
@@ -1369,6 +1427,15 @@ export default function DashboardPage() {
     if (!view) return
     updateWidgets([...(view.widgets ?? []), id])
   }
+  function handleDiscardWidgets() {
+    updateWidgets(widgetSnapshot)
+    setWidgetMode(false)
+  }
+  function handleOpenCustomizer() {
+    const view = views.find(v => v.id === activeViewId)
+    setWidgetSnapshot(view?.widgets ?? [])
+    setWidgetMode(true)
+  }
 
   if (loading || !hydrated) return <DashboardSkeleton />
 
@@ -1410,10 +1477,10 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setWidgetMode(p => !p)}
+              onClick={widgetMode ? undefined : handleOpenCustomizer}
               className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 widgetMode
-                  ? 'border-blue-300 bg-blue-50 text-blue-700'
+                  ? 'border-blue-300 bg-blue-50 text-blue-700 cursor-default'
                   : 'border-slate-200 text-slate-500 hover:bg-slate-50'
               }`}
             >
@@ -1437,7 +1504,9 @@ export default function DashboardPage() {
           {widgetMode && (
             <WidgetCustomizer
               activeWidgets={activeView?.widgets ?? []}
+              snapshotWidgets={widgetSnapshot}
               onClose={() => setWidgetMode(false)}
+              onDiscard={handleDiscardWidgets}
               onReorder={updateWidgets}
               onRemove={handleRemoveWidget}
               onAdd={handleAddWidget}
