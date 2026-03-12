@@ -6,7 +6,7 @@ import {
   ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
-  Zap, Settings2, LayoutList, Kanban, Filter, ArrowDownUp,
+  Settings2, LayoutList, Kanban, Filter, ArrowDownUp,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
