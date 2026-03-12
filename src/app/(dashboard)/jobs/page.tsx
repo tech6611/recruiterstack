@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Briefcase, Plus, Search, Clock, X, Mail, FileText, Send,
   CheckCircle, Copy, Check, Users, PenLine, Wand2, RefreshCw, Loader2, Sparkles, Paperclip,
-  ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft,
+  ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft, GripVertical, Archive,
 } from 'lucide-react'
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
 
@@ -578,16 +578,25 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
 // Jobs list helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<HiringRequestStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  intake_pending:   { label: 'Awaiting HM',     color: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <Clock className="h-3 w-3" /> },
-  intake_submitted: { label: 'Intake Received', color: 'bg-blue-50 text-blue-700 border-blue-200',          icon: <FileText className="h-3 w-3" /> },
-  jd_generated:    { label: 'JD Generated',     color: 'bg-violet-50 text-violet-700 border-violet-200',    icon: <FileText className="h-3 w-3" /> },
-  jd_sent:         { label: 'JD Sent',          color: 'bg-indigo-50 text-indigo-700 border-indigo-200',    icon: <Mail className="h-3 w-3" /> },
-  jd_approved:     { label: 'JD Ready',         color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
-  posted:          { label: 'Posted',           color: 'bg-slate-100 text-slate-600 border-slate-200',      icon: <Send className="h-3 w-3" /> },
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  intake_pending:   { label: "Awaiting HM's Input",  color: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <Clock className="h-3 w-3" /> },
+  intake_submitted: { label: 'Intake Received',       color: 'bg-blue-50 text-blue-700 border-blue-200',          icon: <FileText className="h-3 w-3" /> },
+  jd_generated:    { label: 'JD Generated',           color: 'bg-violet-50 text-violet-700 border-violet-200',    icon: <FileText className="h-3 w-3" /> },
+  jd_sent:         { label: 'JD Sent',                color: 'bg-indigo-50 text-indigo-700 border-indigo-200',    icon: <Mail className="h-3 w-3" /> },
+  jd_approved:     { label: 'To be Published',        color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
+  posted:          { label: 'Active',                 color: 'bg-green-50 text-green-700 border-green-200',       icon: <Send className="h-3 w-3" /> },
+  closed:          { label: 'Closed',                 color: 'bg-slate-100 text-slate-500 border-slate-200',      icon: <Archive className="h-3 w-3" /> },
 }
 
 type SortKey = 'ticket_number' | 'position_title' | 'hiring_manager_name' | 'status' | 'created_at'
+type TimeFilter = '7d' | '30d' | '3m' | 'all'
+
+const TIME_OPTS: { value: TimeFilter; label: string }[] = [
+  { value: '7d',  label: '7 days' },
+  { value: '30d', label: '30 days' },
+  { value: '3m',  label: '3 months' },
+  { value: 'all', label: 'All time' },
+]
 
 const STAGE_DOT: Record<StageColor, string> = {
   slate: 'bg-slate-400', blue: 'bg-blue-500', violet: 'bg-violet-500',
@@ -616,16 +625,34 @@ function PipelineBar({ stages }: { stages: JobListItem['stage_counts'] }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function JobsPage() {
-  const router = useRouter()
+  const router  = useRouter()
   const { orgId } = useAuth()
-  const [jobs, setJobs] = useState<JobListItem[]>([])
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const [jobs, setJobs]       = useState<JobListItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+
+  // ── Filters ───────────────────────────────────────────────────────────────
   const [filterStatus, setFilterStatus] = useState<HiringRequestStatus | 'all'>('all')
+  const [timeFilter, setTimeFilter]     = useState<TimeFilter>('all')
+
+  // Per-column inline search
+  const [colOpen,  setColOpen]  = useState<Record<string, boolean>>({})
+  const [colQuery, setColQuery] = useState<Record<string, string>>({})
+
+  // ── Sort ──────────────────────────────────────────────────────────────────
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  // ── UI ────────────────────────────────────────────────────────────────────
   const [showDrawer, setShowDrawer] = useState(false)
 
+  // ── Drag-and-drop row reordering ──────────────────────────────────────────
+  const [dragId,      setDragId]      = useState<string | null>(null)
+  const [dragOverId,  setDragOverId]  = useState<string | null>(null)
+  const [manualOrder, setManualOrder] = useState<string[] | null>(null)
+
+  // ── Data fetch ────────────────────────────────────────────────────────────
   const fetchJobs = useCallback(() => {
     setLoading(true)
     fetch('/api/jobs')
@@ -634,6 +661,15 @@ export default function JobsPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => { if (orgId) fetchJobs() }, [fetchJobs, orgId])
+
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchJobs() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [fetchJobs])
+
+  // ── Actions ───────────────────────────────────────────────────────────────
   const togglePublish = useCallback(async (jobId: string, currentStatus: HiringRequestStatus) => {
     const newStatus = currentStatus === 'posted' ? 'jd_approved' : 'posted'
     await fetch(`/api/jobs/${jobId}`, {
@@ -644,46 +680,84 @@ export default function JobsPage() {
     fetchJobs()
   }, [fetchJobs])
 
-  useEffect(() => { if (orgId) fetchJobs() }, [fetchJobs, orgId])
-
-  // Refetch when the tab regains focus (e.g. after navigating back via browser Back)
-  useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') fetchJobs() }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+  const closeJob = useCallback(async (jobId: string) => {
+    await fetch(`/api/jobs/${jobId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'closed' }),
+    })
+    fetchJobs()
   }, [fetchJobs])
 
+  // ── Sort helpers ──────────────────────────────────────────────────────────
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
   }
 
   const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 text-slate-300 ml-1" />
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 text-slate-300 ml-1 shrink-0" />
     return sortDir === 'asc'
-      ? <ChevronUp className="h-3 w-3 text-blue-500 ml-1" />
-      : <ChevronDown className="h-3 w-3 text-blue-500 ml-1" />
+      ? <ChevronUp   className="h-3 w-3 text-blue-500 ml-1 shrink-0" />
+      : <ChevronDown className="h-3 w-3 text-blue-500 ml-1 shrink-0" />
   }
 
+  // ── Column search helpers ─────────────────────────────────────────────────
+  const toggleColSearch = (col: string) => {
+    setColOpen(prev => {
+      const next = !prev[col]
+      if (!next) setColQuery(p => { const copy = { ...p }; delete copy[col]; return copy })
+      return { ...prev, [col]: next }
+    })
+  }
+
+  // ── Counts (always from full jobs list, unaffected by filters) ────────────
   const counts = useMemo(() => ({
     total:    jobs.length,
     awaiting: jobs.filter(j => j.status === 'intake_pending').length,
     ready:    jobs.filter(j => j.status === 'jd_approved').length,
-    posted:   jobs.filter(j => j.status === 'posted').length,
+    active:   jobs.filter(j => j.status === 'posted').length,
+    closed:   jobs.filter(j => j.status === 'closed').length,
   }), [jobs])
 
+  // ── Filtered + sorted list ────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let result = [...jobs]
-    if (filterStatus !== 'all') result = result.filter(j => j.status === filterStatus)
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      result = result.filter(j =>
-        j.position_title.toLowerCase().includes(q) ||
-        j.hiring_manager_name.toLowerCase().includes(q) ||
-        j.ticket_number?.toLowerCase().includes(q) ||
-        j.department?.toLowerCase().includes(q)
-      )
+
+    // Time window
+    if (timeFilter !== 'all') {
+      const now = Date.now()
+      const ms  = timeFilter === '7d'  ? 7  * 86_400_000
+                : timeFilter === '30d' ? 30 * 86_400_000
+                :                        91 * 86_400_000   // ~3 months
+      result = result.filter(j => now - new Date(j.created_at).getTime() <= ms)
     }
+
+    // Status filter
+    if (filterStatus !== 'all') result = result.filter(j => j.status === filterStatus)
+
+    // Per-column searches
+    const qTicket = colQuery.ticket?.trim().toLowerCase()
+    if (qTicket) result = result.filter(j => j.ticket_number?.toLowerCase().includes(qTicket))
+
+    const qPos = colQuery.position?.trim().toLowerCase()
+    if (qPos) result = result.filter(j =>
+      j.position_title.toLowerCase().includes(qPos) ||
+      (j.department ?? '').toLowerCase().includes(qPos),
+    )
+
+    const qMgr = colQuery.manager?.trim().toLowerCase()
+    if (qMgr) result = result.filter(j =>
+      j.hiring_manager_name.toLowerCase().includes(qMgr) ||
+      (j.hiring_manager_email ?? '').toLowerCase().includes(qMgr),
+    )
+
+    const qStatus = colQuery.status?.trim().toLowerCase()
+    if (qStatus) result = result.filter(j =>
+      (STATUS_CONFIG[j.status]?.label ?? j.status).toLowerCase().includes(qStatus),
+    )
+
+    // Sort
     result.sort((a, b) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vA = String((a as any)[sortKey] ?? '')
@@ -692,33 +766,83 @@ export default function JobsPage() {
       const cmp = vA.localeCompare(vB, undefined, { numeric: true })
       return sortDir === 'asc' ? cmp : -cmp
     })
+
     return result
-  }, [jobs, filterStatus, search, sortKey, sortDir])
+  }, [jobs, filterStatus, timeFilter, colQuery, sortKey, sortDir])
 
-  const thCls = 'px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide select-none cursor-pointer hover:text-slate-800 transition-colors'
+  // Reset manual order whenever filter/sort changes
+  useEffect(() => { setManualOrder(null) }, [filterStatus, timeFilter, colQuery, sortKey, sortDir])
 
+  // Apply manual drag order on top of filtered list
+  const displayedJobs = useMemo(() => {
+    if (!manualOrder) return filtered
+    const map = new Map(filtered.map(j => [j.id, j]))
+    return manualOrder.filter(id => map.has(id)).map(id => map.get(id)!)
+  }, [filtered, manualOrder])
+
+  // ── Drag handlers ─────────────────────────────────────────────────────────
+  const handleDrop = (targetId: string) => {
+    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return }
+    const order = manualOrder ?? filtered.map(j => j.id)
+    const from  = order.indexOf(dragId)
+    const to    = order.indexOf(targetId)
+    if (from < 0 || to < 0) return
+    const next = [...order]
+    next.splice(from, 1)
+    next.splice(to, 0, dragId)
+    setManualOrder(next)
+    setDragId(null); setDragOverId(null)
+  }
+
+  const hasColFilters = Object.values(colQuery).some(v => v.trim())
+  const hasAnyFilter  = filterStatus !== 'all' || timeFilter !== 'all' || hasColFilters
+
+  // Shared th cell base — align top so col-search inputs don't shift neighbour columns
+  const thBase = 'px-3 py-3 text-left align-top'
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-8 max-w-6xl space-y-5">
+    <div className="p-6 w-full space-y-5">
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Jobs</h1>
           <p className="text-sm text-slate-500 mt-0.5">Manage open roles and candidate pipelines</p>
         </div>
-        <button
-          onClick={() => setShowDrawer(true)}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <Plus className="h-4 w-4" />
-          New Job
-        </button>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Time filter pills */}
+          <div className="flex items-center gap-0.5 rounded-xl border border-slate-200 bg-white p-1">
+            {TIME_OPTS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setTimeFilter(opt.value)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  timeFilter === opt.value
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setShowDrawer(true)}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            New Job
+          </button>
+        </div>
       </div>
 
-      {/* Stat cards */}
+      {/* ── Stat cards ──────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="grid grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-slate-200 bg-white p-3.5 animate-pulse">
               <div className="h-7 w-10 rounded bg-slate-200 mb-2" />
               <div className="h-3 w-20 rounded bg-slate-100" />
@@ -726,12 +850,13 @@ export default function JobsPage() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {([
-            { label: 'Total',       value: counts.total,    color: 'bg-slate-50 border-slate-200 text-slate-700',    filter: 'all'             },
-            { label: 'Awaiting HM', value: counts.awaiting, color: 'bg-amber-50 border-amber-200 text-amber-700',    filter: 'intake_pending'  },
-            { label: 'JD Ready',    value: counts.ready,    color: 'bg-emerald-50 border-emerald-200 text-emerald-700', filter: 'jd_approved'  },
-            { label: 'Posted',      value: counts.posted,   color: 'bg-blue-50 border-blue-200 text-blue-700',       filter: 'posted'          },
+            { label: 'Total',           value: counts.total,    color: 'bg-slate-50 border-slate-200 text-slate-700',      filter: 'all'            },
+            { label: "Awaiting Input",  value: counts.awaiting, color: 'bg-amber-50 border-amber-200 text-amber-700',      filter: 'intake_pending' },
+            { label: 'To be Published', value: counts.ready,    color: 'bg-emerald-50 border-emerald-200 text-emerald-700', filter: 'jd_approved'  },
+            { label: 'Active',          value: counts.active,   color: 'bg-green-50 border-green-200 text-green-700',      filter: 'posted'         },
+            { label: 'Closed',          value: counts.closed,   color: 'bg-slate-100 border-slate-200 text-slate-500',     filter: 'closed'         },
           ] as const).map(stat => (
             <button
               key={stat.label}
@@ -747,50 +872,52 @@ export default function JobsPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search position, manager, ticket…"
-            className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
-              <X className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600" />
-            </button>
-          )}
-        </div>
+      {/* ── Filter bar ──────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 flex-wrap">
         <select
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value as HiringRequestStatus | 'all')}
           className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
         >
           <option value="all">All statuses</option>
-          {(Object.keys(STATUS_CONFIG) as HiringRequestStatus[]).map(s => (
-            <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+          {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+            <option key={k} value={k}>{v.label}</option>
           ))}
         </select>
-        {(filterStatus !== 'all' || search) && (
+
+        {hasAnyFilter && (
           <button
-            onClick={() => { setFilterStatus('all'); setSearch('') }}
-            className="text-xs text-slate-500 hover:text-slate-800 transition-colors"
+            onClick={() => { setFilterStatus('all'); setTimeFilter('all'); setColQuery({}); setColOpen({}) }}
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 transition-colors"
           >
-            Clear filters
+            <X className="h-3 w-3" /> Clear filters
           </button>
+        )}
+
+        {manualOrder && (
+          <button
+            onClick={() => setManualOrder(null)}
+            className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+          >
+            Reset row order
+          </button>
+        )}
+
+        {hasColFilters && (
+          <span className="text-xs text-blue-600 bg-blue-50 rounded-full px-2 py-0.5 border border-blue-200">
+            Column filters active
+          </span>
         )}
       </div>
 
-      {/* Table */}
+      {/* ── Table ───────────────────────────────────────────────────────── */}
       {loading ? (
         <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
-                {['w-10', 'w-40', 'w-32', 'w-32', 'w-24', 'w-24'].map((w, i) => (
-                  <th key={i} className="px-4 py-3">
+                {['w-6', 'w-10', 'w-40', 'w-36', 'w-32', 'w-24', 'w-24', 'w-24'].map((w, i) => (
+                  <th key={i} className="px-3 py-3">
                     <div className={`h-3 ${w} rounded bg-slate-200 animate-pulse`} />
                   </th>
                 ))}
@@ -799,21 +926,23 @@ export default function JobsPage() {
             <tbody>
               {Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i} className="border-b border-slate-100 last:border-0">
-                  <td className="px-4 py-4"><div className="h-3 w-12 rounded bg-slate-100 animate-pulse" /></td>
-                  <td className="px-4 py-4">
+                  <td className="px-3 py-4"><div className="h-3 w-4 rounded bg-slate-100 animate-pulse" /></td>
+                  <td className="px-3 py-4"><div className="h-3 w-12 rounded bg-slate-100 animate-pulse" /></td>
+                  <td className="px-3 py-4">
                     <div className="h-3.5 w-40 rounded bg-slate-200 animate-pulse mb-2" />
                     <div className="h-2.5 w-24 rounded bg-slate-100 animate-pulse" />
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-3 py-4">
                     <div className="flex gap-1">
                       {Array.from({ length: 3 }).map((_, j) => (
                         <div key={j} className="h-5 w-10 rounded-full bg-slate-100 animate-pulse" />
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-4"><div className="h-3 w-28 rounded bg-slate-100 animate-pulse" /></td>
-                  <td className="px-4 py-4"><div className="h-5 w-20 rounded-full bg-slate-100 animate-pulse" /></td>
-                  <td className="px-4 py-4"><div className="h-3 w-20 rounded bg-slate-100 animate-pulse" /></td>
+                  <td className="px-3 py-4"><div className="h-3 w-28 rounded bg-slate-100 animate-pulse" /></td>
+                  <td className="px-3 py-4"><div className="h-5 w-20 rounded-full bg-slate-100 animate-pulse" /></td>
+                  <td className="px-3 py-4"><div className="h-3 w-20 rounded bg-slate-100 animate-pulse" /></td>
+                  <td className="px-3 py-4"><div className="h-7 w-20 rounded-lg bg-slate-100 animate-pulse" /></td>
                 </tr>
               ))}
             </tbody>
@@ -837,99 +966,266 @@ export default function JobsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
-                <th className={thCls} onClick={() => toggleSort('ticket_number')}>
-                  <span className="flex items-center"># <SortIcon col="ticket_number" /></span>
+
+                {/* Drag-handle column */}
+                <th className="w-8 px-3 py-3" aria-label="Reorder" />
+
+                {/* Ticket # */}
+                <th className={thBase}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleSort('ticket_number')}
+                      className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-800 transition-colors"
+                    >
+                      # <SortIcon col="ticket_number" />
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); toggleColSearch('ticket') }}
+                      title="Search ticket"
+                      className={`p-0.5 rounded transition-colors ${colOpen.ticket ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'}`}
+                    >
+                      <Search className="h-3 w-3" />
+                    </button>
+                  </div>
+                  {colOpen.ticket && (
+                    <div className="mt-1.5" onClick={e => e.stopPropagation()}>
+                      <input
+                        value={colQuery.ticket ?? ''}
+                        onChange={e => setColQuery(p => ({ ...p, ticket: e.target.value }))}
+                        placeholder="Filter…" autoFocus
+                        className="w-full min-w-[70px] rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-300 transition"
+                      />
+                    </div>
+                  )}
                 </th>
-                <th className={thCls} onClick={() => toggleSort('position_title')}>
-                  <span className="flex items-center">Position <SortIcon col="position_title" /></span>
+
+                {/* Position */}
+                <th className={thBase}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleSort('position_title')}
+                      className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-800 transition-colors"
+                    >
+                      Position <SortIcon col="position_title" />
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); toggleColSearch('position') }}
+                      title="Search position"
+                      className={`p-0.5 rounded transition-colors ${colOpen.position ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'}`}
+                    >
+                      <Search className="h-3 w-3" />
+                    </button>
+                  </div>
+                  {colOpen.position && (
+                    <div className="mt-1.5" onClick={e => e.stopPropagation()}>
+                      <input
+                        value={colQuery.position ?? ''}
+                        onChange={e => setColQuery(p => ({ ...p, position: e.target.value }))}
+                        placeholder="Filter…" autoFocus
+                        className="w-full min-w-[100px] rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-300 transition"
+                      />
+                    </div>
+                  )}
                 </th>
-                <th className={`${thCls} cursor-default hover:text-slate-500`}>Pipeline</th>
-                <th className={thCls} onClick={() => toggleSort('hiring_manager_name')}>
-                  <span className="flex items-center">Hiring Manager <SortIcon col="hiring_manager_name" /></span>
+
+                {/* Pipeline */}
+                <th className={`${thBase} text-xs font-semibold text-slate-500 uppercase tracking-wide`}>
+                  Pipeline
                 </th>
-                <th className={thCls} onClick={() => toggleSort('status')}>
-                  <span className="flex items-center">Status <SortIcon col="status" /></span>
+
+                {/* Hiring Manager */}
+                <th className={thBase}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleSort('hiring_manager_name')}
+                      className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-800 transition-colors whitespace-nowrap"
+                    >
+                      Hiring Manager <SortIcon col="hiring_manager_name" />
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); toggleColSearch('manager') }}
+                      title="Search manager"
+                      className={`p-0.5 rounded transition-colors ${colOpen.manager ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'}`}
+                    >
+                      <Search className="h-3 w-3" />
+                    </button>
+                  </div>
+                  {colOpen.manager && (
+                    <div className="mt-1.5" onClick={e => e.stopPropagation()}>
+                      <input
+                        value={colQuery.manager ?? ''}
+                        onChange={e => setColQuery(p => ({ ...p, manager: e.target.value }))}
+                        placeholder="Filter…" autoFocus
+                        className="w-full min-w-[100px] rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-300 transition"
+                      />
+                    </div>
+                  )}
                 </th>
-                <th className={thCls} onClick={() => toggleSort('created_at')}>
-                  <span className="flex items-center">Created <SortIcon col="created_at" /></span>
+
+                {/* Status */}
+                <th className={thBase}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleSort('status')}
+                      className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-800 transition-colors"
+                    >
+                      Status <SortIcon col="status" />
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); toggleColSearch('status') }}
+                      title="Search status"
+                      className={`p-0.5 rounded transition-colors ${colOpen.status ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'}`}
+                    >
+                      <Search className="h-3 w-3" />
+                    </button>
+                  </div>
+                  {colOpen.status && (
+                    <div className="mt-1.5" onClick={e => e.stopPropagation()}>
+                      <input
+                        value={colQuery.status ?? ''}
+                        onChange={e => setColQuery(p => ({ ...p, status: e.target.value }))}
+                        placeholder="Filter…" autoFocus
+                        className="w-full min-w-[80px] rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-300 transition"
+                      />
+                    </div>
+                  )}
                 </th>
-                <th className={`${thCls} cursor-default hover:text-slate-500`}>Actions</th>
+
+                {/* Created */}
+                <th className={thBase}>
+                  <button
+                    onClick={() => toggleSort('created_at')}
+                    className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-800 transition-colors"
+                  >
+                    Created <SortIcon col="created_at" />
+                  </button>
+                </th>
+
+                {/* Actions */}
+                <th className={`${thBase} text-xs font-semibold text-slate-500 uppercase tracking-wide`}>
+                  Actions
+                </th>
               </tr>
             </thead>
+
             <tbody>
-              {filtered.length === 0 ? (
+              {displayedJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-400">
+                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-400">
                     No results match your filters.
                   </td>
                 </tr>
-              ) : filtered.map(job => {
-                const s = STATUS_CONFIG[job.status]
+              ) : displayedJobs.map(job => {
+                const s = STATUS_CONFIG[job.status] ?? STATUS_CONFIG.closed
                 return (
                   <tr
                     key={job.id}
+                    draggable
+                    onDragStart={() => setDragId(job.id)}
+                    onDragOver={e => { e.preventDefault(); setDragOverId(job.id) }}
+                    onDrop={() => handleDrop(job.id)}
+                    onDragEnd={() => { setDragId(null); setDragOverId(null) }}
                     onClick={() => router.push(`/jobs/${job.id}`)}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer"
+                    className={`border-b border-slate-100 last:border-0 cursor-pointer transition-colors select-none ${
+                      dragId === job.id     ? 'opacity-40 bg-slate-50'
+                      : dragOverId === job.id ? 'bg-blue-50 border-blue-200'
+                      : 'hover:bg-slate-50'
+                    }`}
                   >
-                    <td className="px-4 py-3.5">
+                    {/* Drag handle */}
+                    <td className="px-3 py-3.5 w-8" onClick={e => e.stopPropagation()}>
+                      <GripVertical className="h-4 w-4 text-slate-300 cursor-grab active:cursor-grabbing" />
+                    </td>
+
+                    {/* Ticket */}
+                    <td className="px-3 py-3.5">
                       <span className="text-xs font-mono font-semibold text-slate-400">
                         {job.ticket_number ?? '—'}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5">
+
+                    {/* Position */}
+                    <td className="px-3 py-3.5">
                       <p className="font-semibold text-sm text-slate-900">{job.position_title}</p>
                       {job.department && <p className="text-xs text-slate-400 mt-0.5">{job.department}</p>}
                     </td>
-                    <td className="px-4 py-3.5">
+
+                    {/* Pipeline */}
+                    <td className="px-3 py-3.5">
                       <PipelineBar stages={job.stage_counts} />
                     </td>
-                    <td className="px-4 py-3.5">
+
+                    {/* Hiring Manager */}
+                    <td className="px-3 py-3.5">
                       <p className="text-sm text-slate-700">{job.hiring_manager_name}</p>
                       {job.hiring_manager_email && (
                         <p className="text-xs text-slate-400">{job.hiring_manager_email}</p>
                       )}
                     </td>
-                    <td className="px-4 py-3.5">
+
+                    {/* Status */}
+                    <td className="px-3 py-3.5">
                       <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${s.color}`}>
                         {s.icon}{s.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 text-xs text-slate-400">
+
+                    {/* Created */}
+                    <td className="px-3 py-3.5 text-xs text-slate-400 whitespace-nowrap">
                       {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </td>
-                    <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
-                      {job.status === 'posted' ? (
-                        <button
-                          onClick={() => togglePublish(job.id, job.status)}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                        >
-                          Unpublish
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => togglePublish(job.id, job.status)}
-                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
-                        >
-                          Publish
-                        </button>
-                      )}
+
+                    {/* Actions */}
+                    <td className="px-3 py-3.5" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-1.5">
+                        {job.status !== 'closed' && (
+                          job.status === 'posted' ? (
+                            <button
+                              onClick={() => togglePublish(job.id, job.status)}
+                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors whitespace-nowrap"
+                            >
+                              Unpublish
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => togglePublish(job.id, job.status)}
+                              className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors whitespace-nowrap"
+                            >
+                              Publish
+                            </button>
+                          )
+                        )}
+                        {job.status !== 'closed' && (
+                          <button
+                            onClick={() => closeJob(job.id)}
+                            title="Close / Archive job"
+                            className="rounded-lg border border-slate-200 bg-white p-1 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-colors"
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
-          {filtered.length > 0 && (
-            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50">
+
+          {displayedJobs.length > 0 && (
+            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
               <p className="text-xs text-slate-400">
-                Showing {filtered.length} of {jobs.length} job{jobs.length !== 1 ? 's' : ''}
+                Showing {displayedJobs.length} of {jobs.length} job{jobs.length !== 1 ? 's' : ''}
               </p>
+              {manualOrder && (
+                <p className="text-xs text-blue-500">Custom order active — drag rows to reorder</p>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {/* ── New Job Drawer ────────────────────────────────────────────────── */}
+      {/* ── New Job Drawer ───────────────────────────────────────────────── */}
       {showDrawer && (
         <div className="fixed inset-0 z-50 flex">
           {/* Backdrop */}
