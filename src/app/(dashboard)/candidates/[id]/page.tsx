@@ -6,11 +6,12 @@ import {
   ArrowLeft, Mail, Phone, MapPin, Briefcase, ExternalLink,
   FileText, Send, Clock, ChevronRight, Loader2, AlertCircle,
   Pencil, Check, X, Plus, Linkedin, Star, Trash2, ClipboardList,
-  Wand2, Copy, CheckCheck,
+  Wand2, Copy, CheckCheck, Calendar, DollarSign, Gift, BadgeCheck, Ban,
 } from 'lucide-react'
 import type {
   Candidate, Application, ApplicationEvent,
   Scorecard, ScorecardRecommendation, ScorecardScore,
+  Interview, Offer, OfferStatus,
 } from '@/lib/types/database'
 import { useSettings } from '@/lib/hooks/useSettings'
 
@@ -91,6 +92,61 @@ const EVENT_CONFIG: Record<string, { label: (e: ApplicationEvent) => string; ico
     label: e => `Status → ${e.to_stage ?? '?'}`,
     icon: <AlertCircle className="h-3.5 w-3.5" />,
     color: 'bg-slate-100 text-slate-600',
+  },
+  email_sent: {
+    label: () => 'Email sent',
+    icon: <Send className="h-3.5 w-3.5" />,
+    color: 'bg-blue-50 text-blue-600',
+  },
+  interview_scheduled: {
+    label: e => `Interview scheduled — ${e.note ? '' : 'see details'}`,
+    icon: <Calendar className="h-3.5 w-3.5" />,
+    color: 'bg-amber-50 text-amber-600',
+  },
+  interview_completed: {
+    label: () => 'Interview completed',
+    icon: <BadgeCheck className="h-3.5 w-3.5" />,
+    color: 'bg-emerald-50 text-emerald-600',
+  },
+  interview_cancelled: {
+    label: () => 'Interview cancelled',
+    icon: <Ban className="h-3.5 w-3.5" />,
+    color: 'bg-red-50 text-red-600',
+  },
+  offer_created: {
+    label: () => 'Offer created',
+    icon: <Gift className="h-3.5 w-3.5" />,
+    color: 'bg-violet-50 text-violet-600',
+  },
+  offer_approved: {
+    label: () => 'Offer approved',
+    icon: <BadgeCheck className="h-3.5 w-3.5" />,
+    color: 'bg-emerald-50 text-emerald-600',
+  },
+  offer_sent: {
+    label: () => 'Offer sent to candidate',
+    icon: <Send className="h-3.5 w-3.5" />,
+    color: 'bg-blue-50 text-blue-600',
+  },
+  offer_accepted: {
+    label: () => 'Offer accepted 🎉',
+    icon: <BadgeCheck className="h-3.5 w-3.5" />,
+    color: 'bg-emerald-100 text-emerald-700',
+  },
+  offer_declined: {
+    label: () => 'Offer declined',
+    icon: <Ban className="h-3.5 w-3.5" />,
+    color: 'bg-red-50 text-red-600',
+  },
+  assessment_sent: {
+    label: () => 'Assessment sent',
+    icon: <ClipboardList className="h-3.5 w-3.5" />,
+    color: 'bg-amber-50 text-amber-600',
+  },
+  rejected: {
+    label: e => `Rejected${e.note ? '' : ''}`,
+    icon: <Ban className="h-3.5 w-3.5" />,
+    color: 'bg-red-50 text-red-600',
   },
 }
 
@@ -547,6 +603,484 @@ function ScorecardCard({
   )
 }
 
+// ── Schedule Interview Drawer ─────────────────────────────────────────────────
+
+const INTERVIEW_TYPE_OPTS = [
+  { value: 'video',      label: 'Video Call' },
+  { value: 'phone',      label: 'Phone Screen' },
+  { value: 'in_person',  label: 'In Person' },
+  { value: 'panel',      label: 'Panel' },
+  { value: 'technical',  label: 'Technical' },
+  { value: 'assessment', label: 'Assessment' },
+]
+
+function ScheduleInterviewDrawer({
+  activeApps,
+  defaultAppId,
+  candidateId,
+  onClose,
+  onSaved,
+}: {
+  activeApps: CandidateWithPipeline['applications']
+  defaultAppId: string
+  candidateId: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [appId,           setAppId]           = useState(defaultAppId)
+  const [interviewer,     setInterviewer]     = useState('')
+  const [interviewType,   setInterviewType]   = useState('video')
+  const [scheduledAt,     setScheduledAt]     = useState('')
+  const [duration,        setDuration]        = useState(60)
+  const [location,        setLocation]        = useState('')
+  const [notes,           setNotes]           = useState('')
+  const [selfSchedule,    setSelfSchedule]    = useState(false)
+  const [saving,          setSaving]          = useState(false)
+  const [error,           setError]           = useState('')
+  const [selfSchedToken,  setSelfSchedToken]  = useState<string | null>(null)
+  const [copied,          setCopied]          = useState(false)
+
+  const selectedApp = activeApps.find(a => a.id === appId)
+
+  const submit = async () => {
+    if (!interviewer.trim() || !scheduledAt) {
+      setError('Interviewer name and date/time are required.')
+      return
+    }
+    setSaving(true); setError('')
+    const res = await fetch('/api/interviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        application_id:     appId,
+        candidate_id:       candidateId,
+        hiring_request_id:  selectedApp?.hiring_request_id ?? '',
+        stage_id:           selectedApp?.stage_id ?? null,
+        interviewer_name:   interviewer.trim(),
+        interview_type:     interviewType,
+        scheduled_at:       new Date(scheduledAt).toISOString(),
+        duration_minutes:   duration,
+        location:           location.trim() || null,
+        notes:              notes.trim() || null,
+        generate_self_schedule: selfSchedule,
+      }),
+    })
+    const json = await res.json()
+    setSaving(false)
+    if (!res.ok) { setError(json.error ?? 'Failed to schedule interview'); return }
+    if (json.data?.self_schedule_token) {
+      setSelfSchedToken(json.data.self_schedule_token)
+    } else {
+      onSaved()
+      onClose()
+    }
+  }
+
+  const copyToken = () => {
+    if (!selfSchedToken) return
+    navigator.clipboard.writeText(`${window.location.origin}/schedule/${selfSchedToken}`)
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (selfSchedToken) {
+    return (
+      <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => { onSaved(); onClose() }} />
+        <div className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
+          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-amber-500" />
+              <h2 className="text-base font-bold text-slate-900">Self-Schedule Link</h2>
+            </div>
+            <button onClick={() => { onSaved(); onClose() }} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 px-6 py-8 flex flex-col items-center justify-center gap-4 text-center">
+            <div className="h-14 w-14 rounded-full bg-amber-50 flex items-center justify-center">
+              <Calendar className="h-7 w-7 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-base font-bold text-slate-900 mb-1">Interview Scheduled!</p>
+              <p className="text-sm text-slate-500">Share this link so the candidate can confirm a time slot.</p>
+            </div>
+            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-left">
+              <p className="text-xs font-semibold text-slate-400 mb-1.5">Self-schedule link</p>
+              <p className="text-xs font-mono text-slate-600 break-all">{`${window.location.origin}/schedule/${selfSchedToken}`}</p>
+            </div>
+            <button
+              onClick={copyToken}
+              className={`flex items-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold transition-all ${
+                copied ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {copied ? <><CheckCheck className="h-4 w-4" />Copied!</> : <><Copy className="h-4 w-4" />Copy Link</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-amber-500" />
+            <h2 className="text-base font-bold text-slate-900">Schedule Interview</h2>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {/* Job selector */}
+          {activeApps.length > 1 && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">For Job</label>
+              <select
+                value={appId}
+                onChange={e => setAppId(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+              >
+                {activeApps.map(a => (
+                  <option key={a.id} value={a.id}>{a.hiring_requests?.position_title ?? a.id}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Interview type */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Interview Type</label>
+            <div className="flex flex-wrap gap-1.5">
+              {INTERVIEW_TYPE_OPTS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setInterviewType(opt.value)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all ${
+                    interviewType === opt.value
+                      ? 'border-amber-400 bg-amber-50 text-amber-700 ring-1 ring-amber-300'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Interviewer */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Interviewer Name *</label>
+            <input
+              value={interviewer}
+              onChange={e => setInterviewer(e.target.value)}
+              placeholder="e.g. Sarah Chen"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+            />
+          </div>
+
+          {/* Date/time + duration row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Date & Time *</label>
+              <input
+                type="datetime-local"
+                value={scheduledAt}
+                onChange={e => setScheduledAt(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Duration (min)</label>
+              <select
+                value={duration}
+                onChange={e => setDuration(Number(e.target.value))}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+              >
+                {[15, 30, 45, 60, 90, 120].map(d => <option key={d} value={d}>{d} min</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Location */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Location / Link</label>
+            <input
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              placeholder="Zoom link, office address, or phone number…"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+            />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Topics to cover, special instructions…"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 resize-none"
+            />
+          </div>
+
+          {/* Self-schedule toggle */}
+          <label className="flex items-center gap-3 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <input
+              type="checkbox"
+              checked={selfSchedule}
+              onChange={e => setSelfSchedule(e.target.checked)}
+              className="rounded text-amber-500 focus:ring-amber-400"
+            />
+            <div>
+              <p className="text-xs font-semibold text-slate-700">Generate self-schedule link</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">Candidate can confirm their preferred time slot</p>
+            </div>
+          </label>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2.5">
+              <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-200 shrink-0">
+          <button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 border border-slate-200">
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 transition-colors disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
+            Schedule Interview
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Create Offer Drawer ───────────────────────────────────────────────────────
+
+const OFFER_STATUS_CONFIG: Record<OfferStatus, { label: string; badge: string }> = {
+  draft:            { label: 'Draft',            badge: 'bg-slate-100 text-slate-600' },
+  pending_approval: { label: 'Pending Approval', badge: 'bg-amber-100 text-amber-700' },
+  approved:         { label: 'Approved',         badge: 'bg-emerald-100 text-emerald-700' },
+  sent:             { label: 'Sent',             badge: 'bg-blue-100 text-blue-700' },
+  accepted:         { label: 'Accepted ✓',       badge: 'bg-emerald-100 text-emerald-700' },
+  declined:         { label: 'Declined',         badge: 'bg-red-100 text-red-700' },
+  withdrawn:        { label: 'Withdrawn',        badge: 'bg-slate-100 text-slate-600' },
+  expired:          { label: 'Expired',          badge: 'bg-red-100 text-red-600' },
+}
+
+function CreateOfferDrawer({
+  activeApps,
+  defaultAppId,
+  candidateId,
+  onClose,
+  onSaved,
+}: {
+  activeApps: CandidateWithPipeline['applications']
+  defaultAppId: string
+  candidateId: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [appId,            setAppId]            = useState(defaultAppId)
+  const [baseSalary,       setBaseSalary]       = useState('')
+  const [bonus,            setBonus]            = useState('')
+  const [equity,           setEquity]           = useState('')
+  const [startDate,        setStartDate]        = useState('')
+  const [expiryDate,       setExpiryDate]       = useState('')
+  const [notes,            setNotes]            = useState('')
+  const [offerLetter,      setOfferLetter]      = useState('')
+  const [saving,           setSaving]           = useState(false)
+  const [error,            setError]            = useState('')
+
+  const selectedApp = activeApps.find(a => a.id === appId)
+  const posTitle = selectedApp?.hiring_requests?.position_title ?? 'Position'
+
+  const submit = async () => {
+    setSaving(true); setError('')
+    const res = await fetch('/api/offers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        application_id:    appId,
+        candidate_id:      candidateId,
+        hiring_request_id: selectedApp?.hiring_request_id ?? '',
+        position_title:    posTitle,
+        base_salary:       baseSalary ? Number(baseSalary) : null,
+        bonus:             bonus      ? Number(bonus)      : null,
+        equity:            equity.trim()      || null,
+        start_date:        startDate          || null,
+        expiry_date:       expiryDate         || null,
+        notes:             notes.trim()       || null,
+        offer_letter_text: offerLetter.trim() || null,
+      }),
+    })
+    const json = await res.json()
+    setSaving(false)
+    if (!res.ok) { setError(json.error ?? 'Failed to create offer'); return }
+    onSaved()
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
+          <div className="flex items-center gap-2">
+            <Gift className="h-5 w-5 text-emerald-500" />
+            <h2 className="text-base font-bold text-slate-900">Create Offer</h2>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {/* Job selector */}
+          {activeApps.length > 1 && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">For Job</label>
+              <select
+                value={appId}
+                onChange={e => setAppId(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              >
+                {activeApps.map(a => (
+                  <option key={a.id} value={a.id}>{a.hiring_requests?.position_title ?? a.id}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Position preview */}
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+            <p className="text-xs text-emerald-600 font-semibold">{posTitle}</p>
+          </div>
+
+          {/* Salary row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Base Salary (USD)</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <input
+                  type="number"
+                  value={baseSalary}
+                  onChange={e => setBaseSalary(e.target.value)}
+                  placeholder="120000"
+                  className="w-full pl-8 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Bonus (USD)</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <input
+                  type="number"
+                  value={bonus}
+                  onChange={e => setBonus(e.target.value)}
+                  placeholder="15000"
+                  className="w-full pl-8 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Equity */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Equity</label>
+            <input
+              value={equity}
+              onChange={e => setEquity(e.target.value)}
+              placeholder="e.g. 0.05% vested over 4 years"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+
+          {/* Start/Expiry dates */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Start Date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Offer Expiry</label>
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={e => setExpiryDate(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Notes</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Special terms, signing bonus, relocation…"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 resize-none"
+            />
+          </div>
+
+          {/* Offer letter */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Offer Letter (optional)</label>
+            <textarea
+              value={offerLetter}
+              onChange={e => setOfferLetter(e.target.value)}
+              rows={5}
+              placeholder="Paste or type the full offer letter text…"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 resize-none"
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2.5">
+              <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-200 shrink-0">
+          <button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 border border-slate-200">
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
+            Create Offer
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CandidateProfilePage() {
@@ -579,6 +1113,18 @@ export default function CandidateProfilePage() {
   // Email draft drawer
   const [emailDraftAppId, setEmailDraftAppId] = useState<string | null>(null)
 
+  // Interviews
+  const [interviews, setInterviews] = useState<Interview[]>([])
+  const [interviewsLoading, setInterviewsLoading] = useState(false)
+  const [showScheduleDrawer, setShowScheduleDrawer] = useState(false)
+  const [scheduleDefaultAppId, setScheduleDefaultAppId] = useState('')
+
+  // Offers
+  const [offers, setOffers] = useState<Offer[]>([])
+  const [offersLoading, setOffersLoading] = useState(false)
+  const [showOfferDrawer, setShowOfferDrawer] = useState(false)
+  const [offerDefaultAppId, setOfferDefaultAppId] = useState('')
+
   const load = useCallback(async () => {
     setLoading(true)
     const res = await fetch(`/api/candidates/${id}`)
@@ -603,7 +1149,25 @@ export default function CandidateProfilePage() {
     setScorecardsLoading(false)
   }, [])
 
+  const loadInterviews = useCallback(async () => {
+    setInterviewsLoading(true)
+    const res = await fetch(`/api/interviews?candidate_id=${id}`)
+    const json = await res.json()
+    setInterviews(json.data ?? [])
+    setInterviewsLoading(false)
+  }, [id])
+
+  const loadOffers = useCallback(async () => {
+    setOffersLoading(true)
+    const res = await fetch(`/api/offers?candidate_id=${id}`)
+    const json = await res.json()
+    setOffers(json.data ?? [])
+    setOffersLoading(false)
+  }, [id])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadInterviews() }, [loadInterviews])
+  useEffect(() => { loadOffers() }, [loadOffers])
 
   useEffect(() => {
     if (!candidate) return
@@ -960,6 +1524,230 @@ export default function CandidateProfilePage() {
             </div>
           )}
 
+          {/* Interviews */}
+          {activeApps.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-slate-800">Interviews</h2>
+                  {interviews.length > 0 && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+                      {interviews.length}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => { setScheduleDefaultAppId(activeApps[0].id); setShowScheduleDrawer(true) }}
+                  className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 transition-colors"
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                  Schedule
+                </button>
+              </div>
+              <div className="px-6 py-4">
+                {interviewsLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+                  </div>
+                ) : interviews.length === 0 ? (
+                  <div className="flex flex-col items-center py-8 text-center">
+                    <Calendar className="h-8 w-8 text-slate-200 mb-2" />
+                    <p className="text-sm text-slate-400">No interviews scheduled yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {interviews.map(iv => (
+                      <div key={iv.id} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          iv.status === 'completed' ? 'bg-emerald-100 text-emerald-600' :
+                          iv.status === 'cancelled' ? 'bg-red-100 text-red-600' :
+                          'bg-amber-100 text-amber-600'
+                        }`}>
+                          <Calendar className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-semibold text-slate-800 capitalize">
+                              {iv.interview_type.replace('_', ' ')} interview
+                            </p>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              iv.status === 'completed'  ? 'bg-emerald-100 text-emerald-700' :
+                              iv.status === 'cancelled'  ? 'bg-red-100 text-red-600' :
+                              iv.status === 'scheduled'  ? 'bg-amber-100 text-amber-700' :
+                              'bg-slate-100 text-slate-600'
+                            }`}>
+                              {iv.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {new Date(iv.scheduled_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            {' · '}{iv.duration_minutes} min
+                            {' · '}{iv.interviewer_name}
+                          </p>
+                          {iv.location && <p className="text-xs text-slate-400 mt-0.5 truncate">{iv.location}</p>}
+                        </div>
+                        {iv.status === 'scheduled' && (
+                          <button
+                            onClick={async () => {
+                              await fetch(`/api/interviews/${iv.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ status: 'cancelled' }),
+                              })
+                              await loadInterviews()
+                              await load()
+                            }}
+                            className="shrink-0 p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                            title="Cancel interview"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {iv.status === 'scheduled' && (
+                          <button
+                            onClick={async () => {
+                              await fetch(`/api/interviews/${iv.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ status: 'completed' }),
+                              })
+                              await loadInterviews()
+                              await load()
+                            }}
+                            className="shrink-0 p-1 rounded-lg text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                            title="Mark completed"
+                          >
+                            <BadgeCheck className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Offers */}
+          {activeApps.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-slate-800">Offers</h2>
+                  {offers.length > 0 && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                      {offers.length}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => { setOfferDefaultAppId(activeApps[0].id); setShowOfferDrawer(true) }}
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                >
+                  <Gift className="h-3.5 w-3.5" />
+                  New Offer
+                </button>
+              </div>
+              <div className="px-6 py-4">
+                {offersLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+                  </div>
+                ) : offers.length === 0 ? (
+                  <div className="flex flex-col items-center py-8 text-center">
+                    <Gift className="h-8 w-8 text-slate-200 mb-2" />
+                    <p className="text-sm text-slate-400">No offers created yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {offers.map(offer => {
+                      const cfg = OFFER_STATUS_CONFIG[offer.status]
+                      return (
+                        <div key={offer.id} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 space-y-2">
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${cfg.badge}`}>{cfg.label}</span>
+                              <p className="text-sm font-semibold text-slate-800">{offer.position_title}</p>
+                            </div>
+                            <p className="text-xs text-slate-400">{fmtDate(offer.created_at)}</p>
+                          </div>
+                          {(offer.base_salary || offer.equity) && (
+                            <div className="flex items-center gap-4 text-xs text-slate-500">
+                              {offer.base_salary && (
+                                <span className="flex items-center gap-1">
+                                  <DollarSign className="h-3 w-3" />
+                                  ${Number(offer.base_salary).toLocaleString()}/yr
+                                </span>
+                              )}
+                              {offer.bonus && (
+                                <span>+ ${Number(offer.bonus).toLocaleString()} bonus</span>
+                              )}
+                              {offer.equity && <span>{offer.equity}</span>}
+                            </div>
+                          )}
+                          {offer.start_date && (
+                            <p className="text-xs text-slate-400">Start: {offer.start_date}</p>
+                          )}
+                          {/* Approve / Send actions for pending offers */}
+                          {(offer.status === 'draft' || offer.status === 'pending_approval' || offer.status === 'approved') && (
+                            <div className="flex items-center gap-2 pt-1">
+                              {offer.status === 'draft' && (
+                                <button
+                                  onClick={async () => {
+                                    await fetch(`/api/offers/${offer.id}`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ status: 'pending_approval' }),
+                                    })
+                                    await loadOffers(); await load()
+                                  }}
+                                  className="rounded-lg border border-amber-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-50 transition-colors"
+                                >
+                                  Submit for Approval
+                                </button>
+                              )}
+                              {offer.status === 'pending_approval' && (
+                                <button
+                                  onClick={async () => {
+                                    await fetch(`/api/offers/${offer.id}`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ status: 'approved' }),
+                                    })
+                                    await loadOffers(); await load()
+                                  }}
+                                  className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                >
+                                  <BadgeCheck className="h-3 w-3 inline mr-1" />
+                                  Approve
+                                </button>
+                              )}
+                              {offer.status === 'approved' && (
+                                <button
+                                  onClick={async () => {
+                                    await fetch(`/api/offers/${offer.id}`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ status: 'sent' }),
+                                    })
+                                    await loadOffers(); await load()
+                                  }}
+                                  className="rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-blue-700 transition-colors"
+                                >
+                                  Mark as Sent
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Scorecards */}
           {activeApps.length > 0 && (
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -972,13 +1760,27 @@ export default function CandidateProfilePage() {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => setEmailDraftAppId(activeApps[0].id)}
                     className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                   >
                     <Wand2 className="h-3.5 w-3.5 text-violet-500" />
                     Draft Email
+                  </button>
+                  <button
+                    onClick={() => { setScheduleDefaultAppId(activeApps[0].id); setShowScheduleDrawer(true) }}
+                    className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+                  >
+                    <Calendar className="h-3.5 w-3.5" />
+                    Schedule Interview
+                  </button>
+                  <button
+                    onClick={() => { setOfferDefaultAppId(activeApps[0].id); setShowOfferDrawer(true) }}
+                    className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                  >
+                    <Gift className="h-3.5 w-3.5" />
+                    Create Offer
                   </button>
                   <button
                     onClick={() => openScorecardDrawer(activeApps[0].id)}
@@ -1155,6 +1957,28 @@ export default function CandidateProfilePage() {
           defaultAppId={drawerDefaultAppId}
           onClose={() => setShowScorecardDrawer(false)}
           onSaved={handleScorecardSaved}
+        />
+      )}
+
+      {/* ── Schedule Interview Drawer ─────────────────────────────────────── */}
+      {showScheduleDrawer && activeApps.length > 0 && (
+        <ScheduleInterviewDrawer
+          activeApps={activeApps}
+          defaultAppId={scheduleDefaultAppId || activeApps[0].id}
+          candidateId={candidate.id}
+          onClose={() => setShowScheduleDrawer(false)}
+          onSaved={async () => { await loadInterviews(); await load() }}
+        />
+      )}
+
+      {/* ── Create Offer Drawer ───────────────────────────────────────────── */}
+      {showOfferDrawer && activeApps.length > 0 && (
+        <CreateOfferDrawer
+          activeApps={activeApps}
+          defaultAppId={offerDefaultAppId || activeApps[0].id}
+          candidateId={candidate.id}
+          onClose={() => setShowOfferDrawer(false)}
+          onSaved={async () => { await loadOffers(); await load() }}
         />
       )}
 

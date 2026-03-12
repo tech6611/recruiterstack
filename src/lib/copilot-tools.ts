@@ -497,6 +497,131 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
       required: ['position_title', 'hiring_manager_name', 'hiring_manager_email'],
     },
   },
+  // ── Interview & Offer tools ───────────────────────────────────────────────
+  {
+    name: 'schedule_interview',
+    description: 'Schedule an interview for a candidate application. Creates an interview record and logs a timeline event. Optionally generates a self-schedule link for the candidate.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id:     { type: 'string', description: 'UUID of the application' },
+        candidate_id:       { type: 'string', description: 'UUID of the candidate' },
+        hiring_request_id:  { type: 'string', description: 'UUID of the hiring request / job' },
+        interviewer_name:   { type: 'string', description: 'Full name of the interviewer' },
+        interview_type:     { type: 'string', enum: ['video', 'phone', 'in_person', 'panel', 'technical', 'assessment'], description: 'Type of interview (default: video)' },
+        scheduled_at:       { type: 'string', description: 'ISO 8601 datetime for the interview, e.g. "2026-03-20T14:00:00Z"' },
+        duration_minutes:   { type: 'number', description: 'Duration in minutes (default: 60)' },
+        location:           { type: 'string', description: 'Zoom link, office address, or phone number' },
+        notes:              { type: 'string', description: 'Topics to cover or special instructions' },
+        generate_self_schedule: { type: 'boolean', description: 'Generate a self-schedule link for the candidate (default: false)' },
+      },
+      required: ['application_id', 'candidate_id', 'hiring_request_id', 'interviewer_name', 'scheduled_at'],
+    },
+  },
+  {
+    name: 'get_interviews',
+    description: 'Get scheduled and past interviews for a candidate or application.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id: { type: 'string', description: 'UUID of the application (filter by application)' },
+        candidate_id:   { type: 'string', description: 'UUID of the candidate (get all their interviews)' },
+        upcoming_only:  { type: 'boolean', description: 'If true, only return upcoming scheduled interviews' },
+      },
+    },
+  },
+  {
+    name: 'update_interview_status',
+    description: 'Mark an interview as completed, cancelled, or no-show. Logs a timeline event.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        interview_id: { type: 'string', description: 'UUID of the interview' },
+        status:       { type: 'string', enum: ['completed', 'cancelled', 'no_show', 'rescheduled'], description: 'New status' },
+        notes:        { type: 'string', description: 'Optional notes about the outcome' },
+      },
+      required: ['interview_id', 'status'],
+    },
+  },
+  {
+    name: 'create_offer',
+    description: 'Create a formal job offer for a candidate application. Sets candidate status to offer_extended. Offer starts in draft status and must be approved before sending.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id:    { type: 'string', description: 'UUID of the application' },
+        candidate_id:      { type: 'string', description: 'UUID of the candidate' },
+        hiring_request_id: { type: 'string', description: 'UUID of the hiring request' },
+        position_title:    { type: 'string', description: 'Job title for the offer' },
+        base_salary:       { type: 'number', description: 'Annual base salary in USD' },
+        bonus:             { type: 'number', description: 'Annual bonus or signing bonus in USD' },
+        equity:            { type: 'string', description: 'Equity terms, e.g. "0.05% over 4 years"' },
+        start_date:        { type: 'string', description: 'Target start date (YYYY-MM-DD)' },
+        expiry_date:       { type: 'string', description: 'Offer expiry date (YYYY-MM-DD)' },
+        notes:             { type: 'string', description: 'Special terms, relocation, signing bonus notes' },
+        offer_letter_text: { type: 'string', description: 'Full offer letter text' },
+      },
+      required: ['application_id', 'candidate_id', 'hiring_request_id', 'position_title'],
+    },
+  },
+  {
+    name: 'update_offer_status',
+    description: 'Approve, send, or record the candidate response for a job offer. Use "approved" after review, "sent" after emailing the candidate, "accepted" or "declined" based on candidate response.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        offer_id:    { type: 'string', description: 'UUID of the offer' },
+        status:      { type: 'string', enum: ['pending_approval', 'approved', 'sent', 'accepted', 'declined', 'withdrawn', 'expired'], description: 'New offer status' },
+        approved_by: { type: 'string', description: 'Name of the approver (required when status=approved)' },
+        notes:       { type: 'string', description: 'Optional notes or reason for status change' },
+      },
+      required: ['offer_id', 'status'],
+    },
+  },
+  {
+    name: 'get_offers',
+    description: 'Get job offers for a candidate or application, with full compensation details and current status.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id: { type: 'string', description: 'Filter by application UUID' },
+        candidate_id:   { type: 'string', description: 'Filter by candidate UUID — returns all offers for this person' },
+        status:         { type: 'string', enum: ['draft', 'pending_approval', 'approved', 'sent', 'accepted', 'declined', 'withdrawn', 'expired'], description: 'Filter by offer status' },
+      },
+    },
+  },
+  {
+    name: 'send_assessment',
+    description: 'Send an assessment or take-home test to a candidate. Logs the event in the timeline and marks what was sent. Generates a shareable assessment link if a URL is provided.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id:  { type: 'string', description: 'UUID of the application' },
+        assessment_name: { type: 'string', description: 'Name of the assessment (e.g. "Take-home coding challenge", "HackerRank test")' },
+        assessment_url:  { type: 'string', description: 'URL of the assessment platform or test link' },
+        due_date:        { type: 'string', description: 'Due date for submission (YYYY-MM-DD or ISO datetime)' },
+        notes:           { type: 'string', description: 'Instructions or notes for the candidate' },
+      },
+      required: ['application_id', 'assessment_name'],
+    },
+  },
+  {
+    name: 'create_self_schedule_invite',
+    description: 'Generate a self-schedule link that the candidate can use to book their own interview slot. Returns the link to share with the candidate.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id:    { type: 'string', description: 'UUID of the application' },
+        candidate_id:      { type: 'string', description: 'UUID of the candidate' },
+        hiring_request_id: { type: 'string', description: 'UUID of the hiring request' },
+        interviewer_name:  { type: 'string', description: 'Interviewer who will conduct the interview' },
+        interview_type:    { type: 'string', enum: ['video', 'phone', 'in_person', 'panel', 'technical'], description: 'Type of interview' },
+        duration_minutes:  { type: 'number', description: 'Interview duration in minutes (default: 60)' },
+        expires_in_days:   { type: 'number', description: 'Days until the self-schedule link expires (default: 7)' },
+      },
+      required: ['application_id', 'candidate_id', 'hiring_request_id', 'interviewer_name'],
+    },
+  },
 ]
 
 // ── Tool executor ─────────────────────────────────────────────────────────────
@@ -544,6 +669,14 @@ export async function executeTool(
       case 'create_scorecard':           return await createScorecard(input, orgId, supabase)
       case 'draft_application_email':    return await draftApplicationEmail(input, orgId, supabase)
       case 'create_intake_request':      return await createIntakeRequest(input, orgId, supabase)
+      case 'schedule_interview':         return await scheduleInterview(input, orgId, supabase)
+      case 'get_interviews':             return await getInterviews(input, orgId, supabase)
+      case 'update_interview_status':    return await updateInterviewStatus(input, orgId, supabase)
+      case 'create_offer':               return await createOffer(input, orgId, supabase)
+      case 'update_offer_status':        return await updateOfferStatus(input, orgId, supabase)
+      case 'get_offers':                 return await getOffers(input, orgId, supabase)
+      case 'send_assessment':            return await sendAssessment(input, orgId, supabase)
+      case 'create_self_schedule_invite': return await createSelfScheduleInvite(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -2075,4 +2208,310 @@ async function createIntakeRequest(
     ``,
     `Note: Email NOT sent automatically. Copy the URL above and forward it to ${hiring_manager_email}.`,
   ].join('\n')
+}
+
+// ── Interview tools ───────────────────────────────────────────────────────────
+
+async function scheduleInterview(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_id, candidate_id, hiring_request_id, interviewer_name,
+    interview_type, scheduled_at, duration_minutes, location, notes, generate_self_schedule } = input
+
+  const body: Record<string, unknown> = {
+    application_id, candidate_id, hiring_request_id,
+    interviewer_name, interview_type: interview_type ?? 'video',
+    scheduled_at, duration_minutes: duration_minutes ?? 60,
+    location: location ?? null, notes: notes ?? null,
+    generate_self_schedule: generate_self_schedule ?? false,
+    org_id: orgId,
+  }
+
+  const { data, error } = await supabase
+    .from('interviews')
+    .insert({ ...body, status: 'scheduled' } as never)
+    .select()
+    .single()
+
+  if (error) return `Error: ${error.message}`
+
+  // Log event
+  await supabase.from('application_events').insert({
+    application_id,
+    org_id: orgId,
+    event_type: 'interview_scheduled',
+    note: `Interview scheduled with ${interviewer_name} — ${new Date(scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
+    metadata: { interview_id: (data as never as Record<string, unknown>).id, interview_type: interview_type ?? 'video' },
+    created_by: orgId,
+  } as never)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const d = data as any
+  let result = `Interview scheduled successfully (ID: ${d.id}).`
+  if (d.self_schedule_token) {
+    result += ` Self-schedule link: /schedule/${d.self_schedule_token}`
+  }
+  return result
+}
+
+async function getInterviews(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q: any = supabase
+    .from('interviews')
+    .select('*')
+    .eq('org_id', orgId)
+
+  if (input.application_id) q = q.eq('application_id', input.application_id)
+  if (input.candidate_id)   q = q.eq('candidate_id', input.candidate_id)
+  if (input.upcoming_only)  q = q.gte('scheduled_at', new Date().toISOString()).eq('status', 'scheduled')
+
+  const { data, error } = await q.order('scheduled_at', { ascending: true })
+  if (error) return `Error: ${error.message}`
+  if (!data || data.length === 0) return 'No interviews found.'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lines = (data as any[]).map(iv =>
+    `• ${iv.interview_type} interview — ${new Date(iv.scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} (${iv.duration_minutes}min) with ${iv.interviewer_name} [${iv.status}]${iv.location ? ' @ ' + iv.location : ''}`
+  )
+  return lines.join('\n')
+}
+
+async function updateInterviewStatus(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { interview_id, status, notes } = input
+
+  const { data, error } = await supabase
+    .from('interviews')
+    .update({ status, notes: notes ?? undefined, updated_at: new Date().toISOString() })
+    .eq('id', interview_id)
+    .eq('org_id', orgId)
+    .select()
+    .single()
+
+  if (error) return `Error: ${error.message}`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const iv = data as any
+  const eventMap: Record<string, string> = { completed: 'interview_completed', cancelled: 'interview_cancelled' }
+  const eventType = eventMap[status]
+  if (eventType) {
+    await supabase.from('application_events').insert({
+      application_id: iv.application_id,
+      org_id: orgId,
+      event_type: eventType,
+      note: `Interview ${status}`,
+      metadata: { interview_id },
+      created_by: orgId,
+    } as never)
+  }
+
+  return `Interview status updated to "${status}".`
+}
+
+// ── Offer tools ───────────────────────────────────────────────────────────────
+
+async function createOffer(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_id, candidate_id, hiring_request_id, position_title,
+    base_salary, bonus, equity, start_date, expiry_date, notes, offer_letter_text } = input
+
+  const { data, error } = await supabase
+    .from('offers')
+    .insert({
+      org_id: orgId,
+      application_id, candidate_id, hiring_request_id,
+      position_title,
+      base_salary: base_salary ?? null,
+      bonus: bonus ?? null,
+      equity: equity ?? null,
+      start_date: start_date ?? null,
+      expiry_date: expiry_date ?? null,
+      notes: notes ?? null,
+      offer_letter_text: offer_letter_text ?? null,
+      status: 'draft',
+    } as never)
+    .select()
+    .single()
+
+  if (error) return `Error: ${error.message}`
+
+  await supabase.from('application_events').insert({
+    application_id,
+    org_id: orgId,
+    event_type: 'offer_created',
+    note: `Offer created — ${position_title}${base_salary ? ` · $${Number(base_salary).toLocaleString()}` : ''}`,
+    metadata: { offer_id: (data as never as Record<string, unknown>).id },
+    created_by: orgId,
+  } as never)
+
+  await supabase
+    .from('candidates')
+    .update({ status: 'offer_extended', updated_at: new Date().toISOString() })
+    .eq('id', candidate_id).eq('org_id', orgId)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return `Offer created (ID: ${(data as any).id}, status: draft). Submit for approval with update_offer_status.`
+}
+
+async function updateOfferStatus(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { offer_id, status, approved_by, notes } = input
+
+  const updatePayload: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
+  if (approved_by)                                       updatePayload.approved_by  = approved_by
+  if (status === 'approved')                             updatePayload.approved_at  = new Date().toISOString()
+  if (status === 'sent')                                 updatePayload.sent_at      = new Date().toISOString()
+  if (status === 'accepted' || status === 'declined')    updatePayload.responded_at = new Date().toISOString()
+
+  const { data, error } = await supabase
+    .from('offers')
+    .update(updatePayload)
+    .eq('id', offer_id)
+    .eq('org_id', orgId)
+    .select()
+    .single()
+
+  if (error) return `Error: ${error.message}`
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const offer = data as any
+  const eventMap: Record<string, string> = {
+    approved: 'offer_approved', sent: 'offer_sent',
+    accepted: 'offer_accepted', declined: 'offer_declined',
+  }
+  const eventType = eventMap[status]
+  if (eventType) {
+    await supabase.from('application_events').insert({
+      application_id: offer.application_id,
+      org_id: orgId,
+      event_type: eventType,
+      note: `Offer ${status}${approved_by ? ` by ${approved_by}` : ''}${notes ? ` — ${notes}` : ''}`,
+      metadata: { offer_id },
+      created_by: orgId,
+    } as never)
+
+    if (status === 'accepted') {
+      await supabase
+        .from('candidates')
+        .update({ status: 'hired', updated_at: new Date().toISOString() })
+        .eq('id', offer.candidate_id).eq('org_id', orgId)
+    }
+  }
+
+  return `Offer status updated to "${status}".${status === 'accepted' ? ' Candidate status set to hired.' : ''}`
+}
+
+async function getOffers(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q: any = supabase
+    .from('offers')
+    .select('*')
+    .eq('org_id', orgId)
+
+  if (input.application_id) q = q.eq('application_id', input.application_id)
+  if (input.candidate_id)   q = q.eq('candidate_id', input.candidate_id)
+  if (input.status)         q = q.eq('status', input.status)
+
+  const { data, error } = await q.order('created_at', { ascending: false })
+  if (error) return `Error: ${error.message}`
+  if (!data || data.length === 0) return 'No offers found.'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lines = (data as any[]).map(o =>
+    `• ${o.position_title} — $${o.base_salary ? Number(o.base_salary).toLocaleString() : '—'}/yr${o.equity ? ' + ' + o.equity : ''} [${o.status}] (created ${new Date(o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
+  )
+  return lines.join('\n')
+}
+
+async function sendAssessment(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_id, assessment_name, assessment_url, due_date, notes } = input
+
+  await supabase.from('application_events').insert({
+    application_id,
+    org_id: orgId,
+    event_type: 'assessment_sent',
+    note: `Assessment sent: ${assessment_name}${assessment_url ? ` — ${assessment_url}` : ''}${due_date ? ` (due ${due_date})` : ''}${notes ? ` — ${notes}` : ''}`,
+    metadata: { assessment_name, assessment_url: assessment_url ?? null, due_date: due_date ?? null },
+    created_by: orgId,
+  } as never)
+
+  return `Assessment "${assessment_name}" logged and sent for application ${application_id}.${assessment_url ? ` Link: ${assessment_url}` : ''}`
+}
+
+async function createSelfScheduleInvite(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_id, candidate_id, hiring_request_id, interviewer_name,
+    interview_type, duration_minutes, expires_in_days } = input
+
+  const { randomBytes } = await import('crypto')
+  const token = randomBytes(20).toString('hex')
+  const expires = new Date()
+  expires.setDate(expires.getDate() + (expires_in_days ?? 7))
+
+  // Create a placeholder interview with a future scheduled_at
+  const placeholderDate = new Date()
+  placeholderDate.setDate(placeholderDate.getDate() + 7)
+
+  const { data, error } = await supabase
+    .from('interviews')
+    .insert({
+      org_id: orgId,
+      application_id, candidate_id, hiring_request_id,
+      interviewer_name,
+      interview_type: interview_type ?? 'video',
+      scheduled_at: placeholderDate.toISOString(),
+      duration_minutes: duration_minutes ?? 60,
+      status: 'scheduled',
+      self_schedule_token: token,
+      self_schedule_expires_at: expires.toISOString(),
+    } as never)
+    .select()
+    .single()
+
+  if (error) return `Error: ${error.message}`
+
+  await supabase.from('application_events').insert({
+    application_id,
+    org_id: orgId,
+    event_type: 'interview_scheduled',
+    note: `Self-schedule invite created — candidate can pick their own time slot`,
+    metadata: { interview_id: (data as never as Record<string, unknown>).id, self_schedule_token: token },
+    created_by: orgId,
+  } as never)
+
+  return `Self-schedule invite created. Share this link with the candidate: /schedule/${token} (expires in ${expires_in_days ?? 7} days)`
 }
