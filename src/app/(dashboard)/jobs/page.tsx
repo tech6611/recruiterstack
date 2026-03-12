@@ -7,6 +7,7 @@ import {
   Briefcase, Plus, Search, Clock, X, Mail, FileText, Send,
   CheckCircle, Copy, Check, Users, PenLine, Wand2, RefreshCw, Loader2, Sparkles, Paperclip,
   ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft, GripVertical, Archive,
+  CalendarDays, SlidersHorizontal,
 } from 'lucide-react'
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
 
@@ -146,15 +147,11 @@ function FileImportButton({ onExtract, field }: { onExtract: (text: string) => v
 
 function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [mode, setMode] = useState<NewJobMode>(null)
-
-  // Shared fields
   const [positionTitle, setPositionTitle] = useState('')
   const [department, setDepartment] = useState('')
   const [hmName, setHmName] = useState('')
   const [hmEmail, setHmEmail] = useState('')
   const [hmSlack, setHmSlack] = useState('')
-
-  // Option B fields
   const [level, setLevel] = useState('')
   const [headcount, setHeadcount] = useState(1)
   const [location, setLocation] = useState('')
@@ -171,7 +168,6 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
   const [jdMode, setJdMode] = useState<'ai' | 'manual' | null>(null)
   const [generatingJD, setGeneratingJD] = useState(false)
   const [jdGenError, setJdGenError] = useState<string | null>(null)
-
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<{ ticketNumber: string; intakeUrl?: string; positionTitle: string } | null>(null)
@@ -208,13 +204,11 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true); setError(null)
-
     const body: Record<string, unknown> = {
       position_title: positionTitle,
       department: department || undefined,
       hiring_manager_name: hmName,
     }
-
     if (mode === 'send_to_hm') {
       body.hiring_manager_email = hmEmail
       body.hiring_manager_slack = hmSlack || undefined
@@ -236,7 +230,6 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
       body.additional_notes = notes || undefined
       body.generated_jd = jd
     }
-
     const res = await fetch('/api/hiring-requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -245,9 +238,8 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
     const json = await res.json()
     setLoading(false)
     if (!res.ok) { setError(json.error ?? 'Something went wrong'); return }
-
     setSuccess({ ticketNumber: json.data?.ticket_number ?? '', intakeUrl: json.intake_url, positionTitle })
-    onCreated() // refresh jobs list immediately
+    onCreated()
   }
 
   const copyIntakeUrl = () => {
@@ -256,10 +248,7 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
     setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
-  // ── Drawer inner content ────────────────────────────────────────────────────
-
   const innerContent = () => {
-    // Success screen
     if (success) {
       return (
         <div className="p-6">
@@ -267,9 +256,7 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
             <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto" />
             <div>
               <p className="text-xs font-mono text-emerald-600 font-semibold mb-1">{success.ticketNumber}</p>
-              <h2 className="text-xl font-bold text-emerald-900">
-                {mode === 'send_to_hm' ? 'Intake sent!' : 'Job created!'}
-              </h2>
+              <h2 className="text-xl font-bold text-emerald-900">{mode === 'send_to_hm' ? 'Intake sent!' : 'Job created!'}</h2>
               <p className="text-sm text-emerald-700 mt-2">
                 {mode === 'send_to_hm'
                   ? `An email and Slack message have been sent to ${hmName} with the intake form link.`
@@ -289,16 +276,12 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
               </div>
             )}
             <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => { setSuccess(null); setMode(null) }}
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-              >
+              <button onClick={() => { setSuccess(null); setMode(null) }}
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
                 New Job
               </button>
-              <button
-                onClick={onClose}
-                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
-              >
+              <button onClick={onClose}
+                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
                 Done
               </button>
             </div>
@@ -307,7 +290,6 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
       )
     }
 
-    // Mode selector
     if (mode === null) {
       return (
         <div className="p-6 space-y-6">
@@ -316,30 +298,22 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
             <p className="text-sm text-slate-500 mt-1">How would you like to create this request?</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
-              onClick={() => setMode('send_to_hm')}
-              className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-blue-400 hover:shadow-sm transition-all"
-            >
+            <button onClick={() => setMode('send_to_hm')}
+              className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-blue-400 hover:shadow-sm transition-all">
               <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
                 <Send className="h-5 w-5 text-blue-600" />
               </div>
               <h3 className="font-bold text-slate-900 text-sm mb-1">Send to Hiring Manager</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                You have the position title and HM details. They fill in requirements and write the JD on their form.
-              </p>
+              <p className="text-xs text-slate-500 leading-relaxed">You have the position title and HM details. They fill in requirements and write the JD on their form.</p>
               <p className="text-xs text-blue-600 font-medium mt-3">→ Sends intake link to HM</p>
             </button>
-            <button
-              onClick={() => setMode('fill_myself')}
-              className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-violet-400 hover:shadow-sm transition-all"
-            >
+            <button onClick={() => setMode('fill_myself')}
+              className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-violet-400 hover:shadow-sm transition-all">
               <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center mb-4 group-hover:bg-violet-100 transition-colors">
                 <Users className="h-5 w-5 text-violet-600" />
               </div>
               <h3 className="font-bold text-slate-900 text-sm mb-1">Fill Everything Myself</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                You have all the details ready. Fill requirements and generate or write the JD right now.
-              </p>
+              <p className="text-xs text-slate-500 leading-relaxed">You have all the details ready. Fill requirements and generate or write the JD right now.</p>
               <p className="text-xs text-violet-600 font-medium mt-3">→ No HM email sent</p>
             </button>
           </div>
@@ -347,7 +321,6 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
       )
     }
 
-    // Form
     return (
       <div className="p-6 space-y-5">
         <div>
@@ -358,18 +331,13 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
             {mode === 'send_to_hm' ? 'Send Intake to Hiring Manager' : 'Create Full Hiring Request'}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            {mode === 'send_to_hm'
-              ? "Fill in the basics — we'll email the intake form link to your hiring manager."
-              : 'Fill everything yourself — no email will be sent.'}
+            {mode === 'send_to_hm' ? "Fill in the basics — we'll email the intake form link to your hiring manager." : 'Fill everything yourself — no email will be sent.'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {error && (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
-          )}
+          {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-          {/* Position */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</p>
             <div>
@@ -382,7 +350,6 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
             </div>
           </div>
 
-          {/* Hiring Manager */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Hiring Manager</p>
             <div>
@@ -403,7 +370,6 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
             </div>
           </div>
 
-          {/* Option B: full form */}
           {mode === 'fill_myself' && (
             <>
               <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
@@ -487,21 +453,16 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
                 <FileImportButton onExtract={append(setNotes)} field="notes" />
               </div>
 
-              {/* JD Section */}
               <div className="rounded-xl border-2 border-violet-200 bg-white p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      Job Description <span className="text-red-500">*</span>
-                    </p>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Job Description <span className="text-red-500">*</span></p>
                     <p className="text-xs text-slate-400 mt-0.5">Generate with AI or write manually</p>
                   </div>
                   {jd && <span className="text-xs text-slate-400">{jd.trim().split(/\s+/).length} words</span>}
                 </div>
 
-                {jdGenError && (
-                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">{jdGenError}</div>
-                )}
+                {jdGenError && <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">{jdGenError}</div>}
 
                 {jdMode === null ? (
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -542,7 +503,6 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
             </>
           )}
 
-          {/* Option A info box */}
           {mode === 'send_to_hm' && (
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-700 space-y-1">
               <p className="font-semibold">What happens next:</p>
@@ -589,13 +549,42 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 }
 
 type SortKey = 'ticket_number' | 'position_title' | 'hiring_manager_name' | 'status' | 'created_at'
-type TimeFilter = '7d' | '30d' | '3m' | 'all'
+type TimeFilter = '7d' | '30d' | '3m' | 'all' | 'custom'
+type ColId = 'ticket' | 'position' | 'pipeline' | 'manager' | 'status' | 'created' | 'actions'
+           | 'department' | 'location' | 'level' | 'headcount'
+
+interface ColDef {
+  id: ColId
+  label: string
+  sortKey?: SortKey
+  filterable?: boolean
+  required?: boolean
+  defaultVisible: boolean
+}
+
+const ALL_COL_DEFS: ColDef[] = [
+  { id: 'ticket',     label: '#',              sortKey: 'ticket_number',       filterable: true,  required: false, defaultVisible: true  },
+  { id: 'position',   label: 'Position',        sortKey: 'position_title',      filterable: true,  required: true,  defaultVisible: true  },
+  { id: 'pipeline',   label: 'Pipeline',                                         filterable: false, required: false, defaultVisible: true  },
+  { id: 'manager',    label: 'Hiring Manager',  sortKey: 'hiring_manager_name', filterable: true,  required: false, defaultVisible: true  },
+  { id: 'status',     label: 'Status',          sortKey: 'status',              filterable: true,  required: false, defaultVisible: true  },
+  { id: 'created',    label: 'Created',         sortKey: 'created_at',          filterable: false, required: false, defaultVisible: true  },
+  { id: 'actions',    label: 'Actions',                                          filterable: false, required: true,  defaultVisible: true  },
+  { id: 'department', label: 'Department',                                       filterable: true,  required: false, defaultVisible: false },
+  { id: 'location',   label: 'Location',                                         filterable: true,  required: false, defaultVisible: false },
+  { id: 'level',      label: 'Level',                                             filterable: true,  required: false, defaultVisible: false },
+  { id: 'headcount',  label: 'Headcount',                                        filterable: false, required: false, defaultVisible: false },
+]
+
+const DEFAULT_VISIBLE_COLS: ColId[] = ALL_COL_DEFS.filter(c => c.defaultVisible).map(c => c.id)
+const LS_COLS = 'rs_jobs_cols'
 
 const TIME_OPTS: { value: TimeFilter; label: string }[] = [
-  { value: '7d',  label: '7 days' },
-  { value: '30d', label: '30 days' },
-  { value: '3m',  label: '3 months' },
-  { value: 'all', label: 'All time' },
+  { value: '7d',     label: 'Last 7 days'   },
+  { value: '30d',    label: 'Last 30 days'  },
+  { value: '3m',     label: 'Last 3 months' },
+  { value: 'all',    label: 'All time'      },
+  { value: 'custom', label: 'Custom range'  },
 ]
 
 const STAGE_DOT: Record<StageColor, string> = {
@@ -632,25 +621,47 @@ export default function JobsPage() {
   const [jobs, setJobs]       = useState<JobListItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  // ── Filters ───────────────────────────────────────────────────────────────
-  const [filterStatus, setFilterStatus] = useState<HiringRequestStatus | 'all'>('all')
-  const [timeFilter, setTimeFilter]     = useState<TimeFilter>('all')
-
-  // Per-column inline search
-  const [colOpen,  setColOpen]  = useState<Record<string, boolean>>({})
-  const [colQuery, setColQuery] = useState<Record<string, string>>({})
+  // ── Column visibility / order (persisted to LS) ───────────────────────────
+  const [visibleCols, setVisibleCols] = useState<ColId[]>(DEFAULT_VISIBLE_COLS)
+  const [showColPicker, setShowColPicker] = useState(false)
+  const colPickerBtnRef = useRef<HTMLButtonElement>(null)
+  const [colPickerPos, setColPickerPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 })
 
   // ── Sort ──────────────────────────────────────────────────────────────────
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  // ── Time filter ───────────────────────────────────────────────────────────
+  const [timeFilter, setTimeFilter]   = useState<TimeFilter>('all')
+  const [customFrom,  setCustomFrom]  = useState('')
+  const [customTo,    setCustomTo]    = useState('')
+  const [showTimePicker, setShowTimePicker] = useState(false)
+  const [timePickerPos, setTimePickerPos]   = useState<{ top: number; right: number }>({ top: 0, right: 0 })
+
+  // ── Column filters (checkbox-based, one dropdown at a time) ───────────────
+  const [colFilters,     setColFilters]     = useState<Record<string, string[]>>({})
+  const [colDropdown,    setColDropdown]    = useState<{ colId: string; top: number; left: number } | null>(null)
+  const [colFilterSearch, setColFilterSearch] = useState('')
+
   // ── UI ────────────────────────────────────────────────────────────────────
   const [showDrawer, setShowDrawer] = useState(false)
 
-  // ── Drag-and-drop row reordering ──────────────────────────────────────────
-  const [dragId,      setDragId]      = useState<string | null>(null)
-  const [dragOverId,  setDragOverId]  = useState<string | null>(null)
-  const [manualOrder, setManualOrder] = useState<string[] | null>(null)
+  // ── Drag-and-drop: rows ───────────────────────────────────────────────────
+  const [dragRowId,    setDragRowId]    = useState<string | null>(null)
+  const [dragOverRowId, setDragOverRowId] = useState<string | null>(null)
+  const [manualOrder,  setManualOrder]  = useState<string[] | null>(null)
+
+  // ── Drag-and-drop: columns ────────────────────────────────────────────────
+  const [dragColId,     setDragColId]     = useState<ColId | null>(null)
+  const [dragOverColId, setDragOverColId] = useState<ColId | null>(null)
+
+  // ── Load column layout from localStorage ──────────────────────────────────
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_COLS) ?? 'null')
+      if (Array.isArray(saved) && saved.length > 0) setVisibleCols(saved as ColId[])
+    } catch {}
+  }, [])
 
   // ── Data fetch ────────────────────────────────────────────────────────────
   const fetchJobs = useCallback(() => {
@@ -662,7 +673,6 @@ export default function JobsPage() {
   }, [])
 
   useEffect(() => { if (orgId) fetchJobs() }, [fetchJobs, orgId])
-
   useEffect(() => {
     const onVisible = () => { if (document.visibilityState === 'visible') fetchJobs() }
     document.addEventListener('visibilitychange', onVisible)
@@ -673,8 +683,7 @@ export default function JobsPage() {
   const togglePublish = useCallback(async (jobId: string, currentStatus: HiringRequestStatus) => {
     const newStatus = currentStatus === 'posted' ? 'jd_approved' : 'posted'
     await fetch(`/api/jobs/${jobId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     })
     fetchJobs()
@@ -682,8 +691,7 @@ export default function JobsPage() {
 
   const closeJob = useCallback(async (jobId: string) => {
     await fetch(`/api/jobs/${jobId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'closed' }),
     })
     fetchJobs()
@@ -694,7 +702,6 @@ export default function JobsPage() {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
   }
-
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 text-slate-300 ml-1 shrink-0" />
     return sortDir === 'asc'
@@ -702,16 +709,76 @@ export default function JobsPage() {
       : <ChevronDown className="h-3 w-3 text-blue-500 ml-1 shrink-0" />
   }
 
-  // ── Column search helpers ─────────────────────────────────────────────────
-  const toggleColSearch = (col: string) => {
-    setColOpen(prev => {
-      const next = !prev[col]
-      if (!next) setColQuery(p => { const copy = { ...p }; delete copy[col]; return copy })
-      return { ...prev, [col]: next }
+  // ── Column visibility helpers ─────────────────────────────────────────────
+  const toggleCol = (id: ColId) => {
+    const def = ALL_COL_DEFS.find(c => c.id === id)
+    if (def?.required) return
+    setVisibleCols(prev => {
+      const next = prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+      try { localStorage.setItem(LS_COLS, JSON.stringify(next)) } catch {}
+      return next
     })
   }
 
-  // ── Counts (always from full jobs list, unaffected by filters) ────────────
+  // ── Column drag handlers ───────────────────────────────────────────────────
+  const handleColDrop = (targetId: ColId) => {
+    if (!dragColId || dragColId === targetId) { setDragColId(null); setDragOverColId(null); return }
+    setVisibleCols(prev => {
+      const next = [...prev]
+      const from = next.indexOf(dragColId)
+      const to   = next.indexOf(targetId)
+      if (from < 0 || to < 0) return prev
+      next.splice(from, 1); next.splice(to, 0, dragColId)
+      try { localStorage.setItem(LS_COLS, JSON.stringify(next)) } catch {}
+      return next
+    })
+    setDragColId(null); setDragOverColId(null)
+  }
+
+  // ── Row drag handlers ──────────────────────────────────────────────────────
+  const handleRowDrop = (targetId: string) => {
+    if (!dragRowId || dragRowId === targetId) { setDragRowId(null); setDragOverRowId(null); return }
+    const order = manualOrder ?? filtered.map(j => j.id)
+    const from  = order.indexOf(dragRowId)
+    const to    = order.indexOf(targetId)
+    if (from < 0 || to < 0) return
+    const next = [...order]; next.splice(from, 1); next.splice(to, 0, dragRowId)
+    setManualOrder(next)
+    setDragRowId(null); setDragOverRowId(null)
+  }
+
+  // ── Stat card filter helpers ──────────────────────────────────────────────
+  const handleStatCard = (filter: HiringRequestStatus | 'all') => {
+    if (filter === 'all') {
+      setColFilters(p => { const cp = { ...p }; delete cp.status; return cp })
+    } else {
+      setColFilters(p => {
+        const current = p.status ?? []
+        if (current.length === 1 && current[0] === filter) {
+          const cp = { ...p }; delete cp.status; return cp
+        }
+        return { ...p, status: [filter] }
+      })
+    }
+  }
+  const isStatActive = (filter: HiringRequestStatus | 'all') =>
+    filter === 'all' ? !(colFilters.status?.length) : colFilters.status?.length === 1 && colFilters.status[0] === filter
+
+  // ── Column filter options (unique values from data) ───────────────────────
+  const colFilterOptions = useMemo<Partial<Record<ColId, { value: string; label: string }[]>>>(() => {
+    const uniq = <T,>(arr: T[]): T[] => Array.from(new Set(arr))
+    return {
+      ticket:     uniq(jobs.map(j => j.ticket_number).filter(Boolean) as string[]).sort().map(v => ({ value: v, label: v })),
+      position:   uniq(jobs.map(j => j.position_title)).sort().map(v => ({ value: v, label: v })),
+      manager:    uniq(jobs.map(j => j.hiring_manager_name)).sort().map(v => ({ value: v, label: v })),
+      status:     Object.entries(STATUS_CONFIG).map(([k, v]) => ({ value: k, label: v.label })),
+      department: uniq(jobs.map(j => j.department).filter(Boolean) as string[]).sort().map(v => ({ value: v, label: v })),
+      location:   uniq(jobs.map(j => j.location).filter(Boolean) as string[]).sort().map(v => ({ value: v, label: v })),
+      level:      uniq(jobs.map(j => j.level).filter(Boolean) as string[]).sort().map(v => ({ value: v, label: v })),
+    }
+  }, [jobs])
+
+  // ── Counts ────────────────────────────────────────────────────────────────
   const counts = useMemo(() => ({
     total:    jobs.length,
     awaiting: jobs.filter(j => j.status === 'intake_pending').length,
@@ -724,83 +791,186 @@ export default function JobsPage() {
   const filtered = useMemo(() => {
     let result = [...jobs]
 
-    // Time window
     if (timeFilter !== 'all') {
-      const now = Date.now()
-      const ms  = timeFilter === '7d'  ? 7  * 86_400_000
-                : timeFilter === '30d' ? 30 * 86_400_000
-                :                        91 * 86_400_000   // ~3 months
-      result = result.filter(j => now - new Date(j.created_at).getTime() <= ms)
+      if (timeFilter === 'custom') {
+        if (customFrom) result = result.filter(j => new Date(j.created_at) >= new Date(customFrom))
+        if (customTo)   result = result.filter(j => new Date(j.created_at) <= new Date(customTo + 'T23:59:59'))
+      } else {
+        const now = Date.now()
+        const ms  = timeFilter === '7d' ? 7 * 86_400_000 : timeFilter === '30d' ? 30 * 86_400_000 : 91 * 86_400_000
+        result = result.filter(j => now - new Date(j.created_at).getTime() <= ms)
+      }
     }
 
-    // Status filter
-    if (filterStatus !== 'all') result = result.filter(j => j.status === filterStatus)
+    if (colFilters.status?.length)     result = result.filter(j => colFilters.status!.includes(j.status))
+    if (colFilters.position?.length)   result = result.filter(j => colFilters.position!.includes(j.position_title))
+    if (colFilters.manager?.length)    result = result.filter(j => colFilters.manager!.includes(j.hiring_manager_name))
+    if (colFilters.ticket?.length)     result = result.filter(j => colFilters.ticket!.includes(j.ticket_number ?? ''))
+    if (colFilters.department?.length) result = result.filter(j => colFilters.department!.includes(j.department ?? ''))
+    if (colFilters.location?.length)   result = result.filter(j => colFilters.location!.includes(j.location ?? ''))
+    if (colFilters.level?.length)      result = result.filter(j => colFilters.level!.includes(j.level ?? ''))
 
-    // Per-column searches
-    const qTicket = colQuery.ticket?.trim().toLowerCase()
-    if (qTicket) result = result.filter(j => j.ticket_number?.toLowerCase().includes(qTicket))
-
-    const qPos = colQuery.position?.trim().toLowerCase()
-    if (qPos) result = result.filter(j =>
-      j.position_title.toLowerCase().includes(qPos) ||
-      (j.department ?? '').toLowerCase().includes(qPos),
-    )
-
-    const qMgr = colQuery.manager?.trim().toLowerCase()
-    if (qMgr) result = result.filter(j =>
-      j.hiring_manager_name.toLowerCase().includes(qMgr) ||
-      (j.hiring_manager_email ?? '').toLowerCase().includes(qMgr),
-    )
-
-    const qStatus = colQuery.status?.trim().toLowerCase()
-    if (qStatus) result = result.filter(j =>
-      (STATUS_CONFIG[j.status]?.label ?? j.status).toLowerCase().includes(qStatus),
-    )
-
-    // Sort
     result.sort((a, b) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vA = String((a as any)[sortKey] ?? '')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vB = String((b as any)[sortKey] ?? '')
-      const cmp = vA.localeCompare(vB, undefined, { numeric: true })
-      return sortDir === 'asc' ? cmp : -cmp
+      return (sortDir === 'asc' ? 1 : -1) * vA.localeCompare(vB, undefined, { numeric: true })
     })
-
     return result
-  }, [jobs, filterStatus, timeFilter, colQuery, sortKey, sortDir])
+  }, [jobs, timeFilter, customFrom, customTo, colFilters, sortKey, sortDir])
 
-  // Reset manual order whenever filter/sort changes
-  useEffect(() => { setManualOrder(null) }, [filterStatus, timeFilter, colQuery, sortKey, sortDir])
+  useEffect(() => { setManualOrder(null) }, [colFilters, timeFilter, customFrom, customTo, sortKey, sortDir])
 
-  // Apply manual drag order on top of filtered list
   const displayedJobs = useMemo(() => {
     if (!manualOrder) return filtered
     const map = new Map(filtered.map(j => [j.id, j]))
     return manualOrder.filter(id => map.has(id)).map(id => map.get(id)!)
   }, [filtered, manualOrder])
 
-  // ── Drag handlers ─────────────────────────────────────────────────────────
-  const handleDrop = (targetId: string) => {
-    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return }
-    const order = manualOrder ?? filtered.map(j => j.id)
-    const from  = order.indexOf(dragId)
-    const to    = order.indexOf(targetId)
-    if (from < 0 || to < 0) return
-    const next = [...order]
-    next.splice(from, 1)
-    next.splice(to, 0, dragId)
-    setManualOrder(next)
-    setDragId(null); setDragOverId(null)
+  // ── Derived filter state ───────────────────────────────────────────────────
+  const hasColFilters = Object.values(colFilters).some(v => v.length > 0)
+  const hasAnyFilter  = hasColFilters || timeFilter !== 'all'
+
+  const timeLabel = timeFilter === '7d' ? 'Last 7 days' : timeFilter === '30d' ? 'Last 30 days'
+    : timeFilter === '3m' ? 'Last 3 months' : timeFilter === 'custom' ? 'Custom range' : 'All time'
+
+  // ── Col filter toggle ──────────────────────────────────────────────────────
+  const toggleColFilter = (colId: string, value: string) => {
+    setColFilters(prev => {
+      const current = prev[colId] ?? []
+      const next    = current.includes(value) ? current.filter(v => v !== value) : [...current, value]
+      if (!next.length) { const cp = { ...prev }; delete cp[colId]; return cp }
+      return { ...prev, [colId]: next }
+    })
+  }
+  const clearColFilter = (colId: string) =>
+    setColFilters(p => { const cp = { ...p }; delete cp[colId]; return cp })
+
+  // ── Shared th styles ───────────────────────────────────────────────────────
+  const thBase = 'px-3 py-3 text-left align-top'
+  const thLbl  = 'text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap'
+
+  // ─── Render a column header cell ───────────────────────────────────────────
+  const renderColHeader = (col: ColDef) => {
+    const isFixed = col.id === 'actions' // fixed position columns
+    const activeFilter = (colFilters[col.id]?.length ?? 0) > 0
+
+    return (
+      <th
+        key={col.id}
+        draggable={!isFixed}
+        onDragStart={e => {
+          if ((e.target as HTMLElement).closest('button')) { e.preventDefault(); return }
+          setDragColId(col.id)
+        }}
+        onDragOver={e => { e.preventDefault(); if (!isFixed) setDragOverColId(col.id) }}
+        onDrop={() => handleColDrop(col.id)}
+        onDragEnd={() => { setDragColId(null); setDragOverColId(null) }}
+        className={`${thBase} transition-colors ${
+          dragColId === col.id ? 'opacity-40' : dragOverColId === col.id ? 'bg-blue-50' : ''
+        }`}
+      >
+        <div className="flex items-center gap-1">
+          {/* Sort trigger (if sortable) */}
+          {col.sortKey ? (
+            <button
+              onClick={() => toggleSort(col.sortKey!)}
+              className={`flex items-center ${thLbl} hover:text-slate-800 transition-colors`}
+            >
+              {col.label} <SortIcon col={col.sortKey} />
+            </button>
+          ) : (
+            <span className={thLbl}>{col.label}</span>
+          )}
+
+          {/* Filter icon (if filterable) */}
+          {col.filterable && (colFilterOptions[col.id]?.length ?? 0) > 0 && (
+            <button
+              onClick={e => {
+                e.stopPropagation()
+                const rect = e.currentTarget.getBoundingClientRect()
+                setColFilterSearch('')
+                setColDropdown(prev =>
+                  prev?.colId === col.id ? null : { colId: col.id, top: rect.bottom + 4, left: rect.left }
+                )
+              }}
+              className={`p-0.5 rounded transition-colors shrink-0 ${
+                activeFilter ? 'text-blue-500' : colDropdown?.colId === col.id ? 'text-blue-400' : 'text-slate-300 hover:text-slate-500'
+              }`}
+              title={`Filter by ${col.label}`}
+            >
+              <Search className="h-3 w-3" />
+            </button>
+          )}
+
+          {/* Active filter badge */}
+          {activeFilter && (
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+          )}
+        </div>
+      </th>
+    )
   }
 
-  const hasColFilters = Object.values(colQuery).some(v => v.trim())
-  const hasAnyFilter  = filterStatus !== 'all' || timeFilter !== 'all' || hasColFilters
+  // ─── Render a row cell ─────────────────────────────────────────────────────
+  const renderCell = (job: JobListItem, colId: ColId) => {
+    const s = STATUS_CONFIG[job.status] ?? STATUS_CONFIG.closed
+    switch (colId) {
+      case 'ticket':
+        return <td key={colId} className="px-3 py-3.5"><span className="text-xs font-mono font-semibold text-slate-400">{job.ticket_number ?? '—'}</span></td>
+      case 'position':
+        return <td key={colId} className="px-3 py-3.5"><p className="font-semibold text-sm text-slate-900">{job.position_title}</p>{job.department && <p className="text-xs text-slate-400 mt-0.5">{job.department}</p>}</td>
+      case 'pipeline':
+        return <td key={colId} className="px-3 py-3.5"><PipelineBar stages={job.stage_counts} /></td>
+      case 'manager':
+        return <td key={colId} className="px-3 py-3.5"><p className="text-sm text-slate-700">{job.hiring_manager_name}</p>{job.hiring_manager_email && <p className="text-xs text-slate-400">{job.hiring_manager_email}</p>}</td>
+      case 'status':
+        return <td key={colId} className="px-3 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${s.color}`}>{s.icon}{s.label}</span></td>
+      case 'created':
+        return <td key={colId} className="px-3 py-3.5 text-xs text-slate-400 whitespace-nowrap">{new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+      case 'department':
+        return <td key={colId} className="px-3 py-3.5 text-sm text-slate-600">{job.department ?? <span className="text-slate-300">—</span>}</td>
+      case 'location':
+        return <td key={colId} className="px-3 py-3.5 text-sm text-slate-600">{job.location ?? <span className="text-slate-300">—</span>}</td>
+      case 'level':
+        return <td key={colId} className="px-3 py-3.5 text-sm text-slate-600">{job.level ?? <span className="text-slate-300">—</span>}</td>
+      case 'headcount':
+        return <td key={colId} className="px-3 py-3.5 text-sm text-slate-600">{job.headcount ?? <span className="text-slate-300">—</span>}</td>
+      case 'actions':
+        return (
+          <td key={colId} className="px-3 py-3.5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-1.5">
+              {job.status !== 'closed' && (
+                job.status === 'posted' ? (
+                  <button onClick={() => togglePublish(job.id, job.status)}
+                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap">
+                    Unpublish
+                  </button>
+                ) : (
+                  <button onClick={() => togglePublish(job.id, job.status)}
+                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors whitespace-nowrap">
+                    Publish
+                  </button>
+                )
+              )}
+              {job.status !== 'closed' && (
+                <button onClick={() => closeJob(job.id)} title="Close job"
+                  className="rounded-lg border border-slate-200 bg-white p-1 text-slate-400 hover:text-slate-600 transition-colors">
+                  <Archive className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </td>
+        )
+      default:
+        return <td key={colId} className="px-3 py-3.5" />
+    }
+  }
 
-  // Shared th cell base — align top so col-search inputs don't shift neighbour columns
-  const thBase = 'px-3 py-3 text-left align-top'
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 w-full space-y-5">
 
@@ -810,24 +980,44 @@ export default function JobsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Jobs</h1>
           <p className="text-sm text-slate-500 mt-0.5">Manage open roles and candidate pipelines</p>
         </div>
+        <div className="flex items-center gap-2">
+          {/* Time filter icon */}
+          <button
+            ref={node => {
+              if (node && showTimePicker) {
+                const rect = node.getBoundingClientRect()
+                setTimePickerPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+              }
+            }}
+            onClick={e => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              setTimePickerPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+              setShowTimePicker(p => !p)
+            }}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+              timeFilter !== 'all'
+                ? 'border-blue-300 bg-blue-50 text-blue-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
+            }`}
+            title="Time filter"
+          >
+            <CalendarDays className="h-4 w-4" />
+            {timeFilter !== 'all' && <span className="text-xs">{timeLabel}</span>}
+          </button>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Time filter pills */}
-          <div className="flex items-center gap-0.5 rounded-xl border border-slate-200 bg-white p-1">
-            {TIME_OPTS.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => setTimeFilter(opt.value)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  timeFilter === opt.value
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          {/* Customize columns */}
+          <button
+            ref={colPickerBtnRef}
+            onClick={e => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              setColPickerPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+              setShowColPicker(p => !p)
+            }}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:border-slate-300 hover:text-slate-800 transition-colors"
+            title="Customize columns"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </button>
 
           <button
             onClick={() => setShowDrawer(true)}
@@ -844,8 +1034,7 @@ export default function JobsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-slate-200 bg-white p-3.5 animate-pulse">
-              <div className="h-7 w-10 rounded bg-slate-200 mb-2" />
-              <div className="h-3 w-20 rounded bg-slate-100" />
+              <div className="h-7 w-10 rounded bg-slate-200 mb-2" /><div className="h-3 w-20 rounded bg-slate-100" />
             </div>
           ))}
         </div>
@@ -860,9 +1049,9 @@ export default function JobsPage() {
           ] as const).map(stat => (
             <button
               key={stat.label}
-              onClick={() => setFilterStatus(filterStatus === stat.filter ? 'all' : stat.filter)}
+              onClick={() => handleStatCard(stat.filter)}
               className={`rounded-xl border p-3.5 text-left transition-all hover:shadow-sm ${stat.color} ${
-                filterStatus === stat.filter ? 'ring-2 ring-offset-1 ring-blue-400' : ''
+                isStatActive(stat.filter) ? 'ring-2 ring-offset-1 ring-blue-400' : ''
               }`}
             >
               <p className="text-2xl font-bold">{stat.value}</p>
@@ -873,42 +1062,46 @@ export default function JobsPage() {
       )}
 
       {/* ── Filter bar ──────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <select
-          value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value as HiringRequestStatus | 'all')}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
-        >
-          <option value="all">All statuses</option>
-          {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
-
-        {hasAnyFilter && (
-          <button
-            onClick={() => { setFilterStatus('all'); setTimeFilter('all'); setColQuery({}); setColOpen({}) }}
-            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 transition-colors"
-          >
-            <X className="h-3 w-3" /> Clear filters
-          </button>
-        )}
-
-        {manualOrder && (
-          <button
-            onClick={() => setManualOrder(null)}
-            className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
-          >
-            Reset row order
-          </button>
-        )}
-
-        {hasColFilters && (
-          <span className="text-xs text-blue-600 bg-blue-50 rounded-full px-2 py-0.5 border border-blue-200">
-            Column filters active
-          </span>
-        )}
-      </div>
+      {(hasAnyFilter || manualOrder) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Active filter chips */}
+          {Object.entries(colFilters).map(([colId, values]) => {
+            const colDef = ALL_COL_DEFS.find(c => c.id === colId)
+            return values.map(v => {
+              const label = colId === 'status' ? STATUS_CONFIG[v]?.label ?? v : v
+              return (
+                <span key={`${colId}:${v}`} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700 font-medium">
+                  <span className="text-blue-400">{colDef?.label}:</span> {label}
+                  <button onClick={() => toggleColFilter(colId, v)} className="ml-0.5 hover:text-blue-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )
+            })
+          })}
+          {timeFilter !== 'all' && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700 font-medium">
+              <CalendarDays className="h-3 w-3" /> {timeLabel}
+              <button onClick={() => setTimeFilter('all')} className="ml-0.5 hover:text-blue-900">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+          {hasAnyFilter && (
+            <button
+              onClick={() => { setColFilters({}); setTimeFilter('all'); setCustomFrom(''); setCustomTo('') }}
+              className="text-xs text-slate-500 hover:text-slate-800 transition-colors"
+            >
+              Clear all
+            </button>
+          )}
+          {manualOrder && (
+            <button onClick={() => setManualOrder(null)} className="text-xs text-blue-500 hover:text-blue-700 transition-colors">
+              Reset row order
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
       {loading ? (
@@ -917,9 +1110,7 @@ export default function JobsPage() {
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
                 {['w-6', 'w-10', 'w-40', 'w-36', 'w-32', 'w-24', 'w-24', 'w-24'].map((w, i) => (
-                  <th key={i} className="px-3 py-3">
-                    <div className={`h-3 ${w} rounded bg-slate-200 animate-pulse`} />
-                  </th>
+                  <th key={i} className="px-3 py-3"><div className={`h-3 ${w} rounded bg-slate-200 animate-pulse`} /></th>
                 ))}
               </tr>
             </thead>
@@ -928,17 +1119,8 @@ export default function JobsPage() {
                 <tr key={i} className="border-b border-slate-100 last:border-0">
                   <td className="px-3 py-4"><div className="h-3 w-4 rounded bg-slate-100 animate-pulse" /></td>
                   <td className="px-3 py-4"><div className="h-3 w-12 rounded bg-slate-100 animate-pulse" /></td>
-                  <td className="px-3 py-4">
-                    <div className="h-3.5 w-40 rounded bg-slate-200 animate-pulse mb-2" />
-                    <div className="h-2.5 w-24 rounded bg-slate-100 animate-pulse" />
-                  </td>
-                  <td className="px-3 py-4">
-                    <div className="flex gap-1">
-                      {Array.from({ length: 3 }).map((_, j) => (
-                        <div key={j} className="h-5 w-10 rounded-full bg-slate-100 animate-pulse" />
-                      ))}
-                    </div>
-                  </td>
+                  <td className="px-3 py-4"><div className="h-3.5 w-40 rounded bg-slate-200 animate-pulse mb-2" /><div className="h-2.5 w-24 rounded bg-slate-100 animate-pulse" /></td>
+                  <td className="px-3 py-4"><div className="flex gap-1">{[0,1,2].map(j => <div key={j} className="h-5 w-10 rounded-full bg-slate-100 animate-pulse" />)}</div></td>
                   <td className="px-3 py-4"><div className="h-3 w-28 rounded bg-slate-100 animate-pulse" /></td>
                   <td className="px-3 py-4"><div className="h-5 w-20 rounded-full bg-slate-100 animate-pulse" /></td>
                   <td className="px-3 py-4"><div className="h-3 w-20 rounded bg-slate-100 animate-pulse" /></td>
@@ -953,273 +1135,61 @@ export default function JobsPage() {
           <Briefcase className="h-10 w-10 text-slate-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-slate-500">No jobs yet</p>
           <p className="text-xs text-slate-400 mt-1 mb-4">Create your first job to get started</p>
-          <button
-            onClick={() => setShowDrawer(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New Job
+          <button onClick={() => setShowDrawer(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
+            <Plus className="h-3.5 w-3.5" />New Job
           </button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm" style={{ overflow: 'clip' }}>
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
-
-                {/* Drag-handle column */}
-                <th className="w-8 px-3 py-3" aria-label="Reorder" />
-
-                {/* Ticket # */}
-                <th className={thBase}>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => toggleSort('ticket_number')}
-                      className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-800 transition-colors"
-                    >
-                      # <SortIcon col="ticket_number" />
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); toggleColSearch('ticket') }}
-                      title="Search ticket"
-                      className={`p-0.5 rounded transition-colors ${colOpen.ticket ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'}`}
-                    >
-                      <Search className="h-3 w-3" />
-                    </button>
-                  </div>
-                  {colOpen.ticket && (
-                    <div className="mt-1.5" onClick={e => e.stopPropagation()}>
-                      <input
-                        value={colQuery.ticket ?? ''}
-                        onChange={e => setColQuery(p => ({ ...p, ticket: e.target.value }))}
-                        placeholder="Filter…" autoFocus
-                        className="w-full min-w-[70px] rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-300 transition"
-                      />
-                    </div>
-                  )}
-                </th>
-
-                {/* Position */}
-                <th className={thBase}>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => toggleSort('position_title')}
-                      className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-800 transition-colors"
-                    >
-                      Position <SortIcon col="position_title" />
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); toggleColSearch('position') }}
-                      title="Search position"
-                      className={`p-0.5 rounded transition-colors ${colOpen.position ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'}`}
-                    >
-                      <Search className="h-3 w-3" />
-                    </button>
-                  </div>
-                  {colOpen.position && (
-                    <div className="mt-1.5" onClick={e => e.stopPropagation()}>
-                      <input
-                        value={colQuery.position ?? ''}
-                        onChange={e => setColQuery(p => ({ ...p, position: e.target.value }))}
-                        placeholder="Filter…" autoFocus
-                        className="w-full min-w-[100px] rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-300 transition"
-                      />
-                    </div>
-                  )}
-                </th>
-
-                {/* Pipeline */}
-                <th className={`${thBase} text-xs font-semibold text-slate-500 uppercase tracking-wide`}>
-                  Pipeline
-                </th>
-
-                {/* Hiring Manager */}
-                <th className={thBase}>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => toggleSort('hiring_manager_name')}
-                      className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-800 transition-colors whitespace-nowrap"
-                    >
-                      Hiring Manager <SortIcon col="hiring_manager_name" />
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); toggleColSearch('manager') }}
-                      title="Search manager"
-                      className={`p-0.5 rounded transition-colors ${colOpen.manager ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'}`}
-                    >
-                      <Search className="h-3 w-3" />
-                    </button>
-                  </div>
-                  {colOpen.manager && (
-                    <div className="mt-1.5" onClick={e => e.stopPropagation()}>
-                      <input
-                        value={colQuery.manager ?? ''}
-                        onChange={e => setColQuery(p => ({ ...p, manager: e.target.value }))}
-                        placeholder="Filter…" autoFocus
-                        className="w-full min-w-[100px] rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-300 transition"
-                      />
-                    </div>
-                  )}
-                </th>
-
-                {/* Status */}
-                <th className={thBase}>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => toggleSort('status')}
-                      className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-800 transition-colors"
-                    >
-                      Status <SortIcon col="status" />
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); toggleColSearch('status') }}
-                      title="Search status"
-                      className={`p-0.5 rounded transition-colors ${colOpen.status ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'}`}
-                    >
-                      <Search className="h-3 w-3" />
-                    </button>
-                  </div>
-                  {colOpen.status && (
-                    <div className="mt-1.5" onClick={e => e.stopPropagation()}>
-                      <input
-                        value={colQuery.status ?? ''}
-                        onChange={e => setColQuery(p => ({ ...p, status: e.target.value }))}
-                        placeholder="Filter…" autoFocus
-                        className="w-full min-w-[80px] rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-blue-300 transition"
-                      />
-                    </div>
-                  )}
-                </th>
-
-                {/* Created */}
-                <th className={thBase}>
-                  <button
-                    onClick={() => toggleSort('created_at')}
-                    className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-800 transition-colors"
-                  >
-                    Created <SortIcon col="created_at" />
-                  </button>
-                </th>
-
-                {/* Actions */}
-                <th className={`${thBase} text-xs font-semibold text-slate-500 uppercase tracking-wide`}>
-                  Actions
-                </th>
+                {/* Fixed drag-handle header */}
+                <th className="w-8 px-3 py-3" />
+                {/* Dynamic columns */}
+                {visibleCols.map(colId => {
+                  const col = ALL_COL_DEFS.find(c => c.id === colId)
+                  return col ? renderColHeader(col) : null
+                })}
               </tr>
             </thead>
-
             <tbody>
               {displayedJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-400">
+                  <td colSpan={visibleCols.length + 1} className="px-5 py-10 text-center text-sm text-slate-400">
                     No results match your filters.
                   </td>
                 </tr>
-              ) : displayedJobs.map(job => {
-                const s = STATUS_CONFIG[job.status] ?? STATUS_CONFIG.closed
-                return (
-                  <tr
-                    key={job.id}
-                    draggable
-                    onDragStart={() => setDragId(job.id)}
-                    onDragOver={e => { e.preventDefault(); setDragOverId(job.id) }}
-                    onDrop={() => handleDrop(job.id)}
-                    onDragEnd={() => { setDragId(null); setDragOverId(null) }}
-                    onClick={() => router.push(`/jobs/${job.id}`)}
-                    className={`border-b border-slate-100 last:border-0 cursor-pointer transition-colors select-none ${
-                      dragId === job.id     ? 'opacity-40 bg-slate-50'
-                      : dragOverId === job.id ? 'bg-blue-50 border-blue-200'
-                      : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    {/* Drag handle */}
-                    <td className="px-3 py-3.5 w-8" onClick={e => e.stopPropagation()}>
-                      <GripVertical className="h-4 w-4 text-slate-300 cursor-grab active:cursor-grabbing" />
-                    </td>
-
-                    {/* Ticket */}
-                    <td className="px-3 py-3.5">
-                      <span className="text-xs font-mono font-semibold text-slate-400">
-                        {job.ticket_number ?? '—'}
-                      </span>
-                    </td>
-
-                    {/* Position */}
-                    <td className="px-3 py-3.5">
-                      <p className="font-semibold text-sm text-slate-900">{job.position_title}</p>
-                      {job.department && <p className="text-xs text-slate-400 mt-0.5">{job.department}</p>}
-                    </td>
-
-                    {/* Pipeline */}
-                    <td className="px-3 py-3.5">
-                      <PipelineBar stages={job.stage_counts} />
-                    </td>
-
-                    {/* Hiring Manager */}
-                    <td className="px-3 py-3.5">
-                      <p className="text-sm text-slate-700">{job.hiring_manager_name}</p>
-                      {job.hiring_manager_email && (
-                        <p className="text-xs text-slate-400">{job.hiring_manager_email}</p>
-                      )}
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-3 py-3.5">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${s.color}`}>
-                        {s.icon}{s.label}
-                      </span>
-                    </td>
-
-                    {/* Created */}
-                    <td className="px-3 py-3.5 text-xs text-slate-400 whitespace-nowrap">
-                      {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-3 py-3.5" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-1.5">
-                        {job.status !== 'closed' && (
-                          job.status === 'posted' ? (
-                            <button
-                              onClick={() => togglePublish(job.id, job.status)}
-                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors whitespace-nowrap"
-                            >
-                              Unpublish
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => togglePublish(job.id, job.status)}
-                              className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors whitespace-nowrap"
-                            >
-                              Publish
-                            </button>
-                          )
-                        )}
-                        {job.status !== 'closed' && (
-                          <button
-                            onClick={() => closeJob(job.id)}
-                            title="Close / Archive job"
-                            className="rounded-lg border border-slate-200 bg-white p-1 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-colors"
-                          >
-                            <Archive className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
+              ) : displayedJobs.map(job => (
+                <tr
+                  key={job.id}
+                  draggable
+                  onDragStart={() => setDragRowId(job.id)}
+                  onDragOver={e => { e.preventDefault(); setDragOverRowId(job.id) }}
+                  onDrop={() => handleRowDrop(job.id)}
+                  onDragEnd={() => { setDragRowId(null); setDragOverRowId(null) }}
+                  onClick={() => router.push(`/jobs/${job.id}`)}
+                  className={`border-b border-slate-100 last:border-0 cursor-pointer transition-colors select-none ${
+                    dragRowId === job.id ? 'opacity-40 bg-slate-50'
+                    : dragOverRowId === job.id ? 'bg-blue-50 border-blue-200'
+                    : 'hover:bg-slate-50'
+                  }`}
+                >
+                  {/* Row drag handle */}
+                  <td className="px-3 py-3.5 w-8" onClick={e => e.stopPropagation()}>
+                    <GripVertical className="h-4 w-4 text-slate-300 cursor-grab active:cursor-grabbing" />
+                  </td>
+                  {visibleCols.map(colId => renderCell(job, colId))}
+                </tr>
+              ))}
             </tbody>
           </table>
 
           {displayedJobs.length > 0 && (
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-              <p className="text-xs text-slate-400">
-                Showing {displayedJobs.length} of {jobs.length} job{jobs.length !== 1 ? 's' : ''}
-              </p>
-              {manualOrder && (
-                <p className="text-xs text-blue-500">Custom order active — drag rows to reorder</p>
-              )}
+              <p className="text-xs text-slate-400">Showing {displayedJobs.length} of {jobs.length} job{jobs.length !== 1 ? 's' : ''}</p>
+              {manualOrder && <p className="text-xs text-blue-500">Custom row order active</p>}
             </div>
           )}
         </div>
@@ -1228,32 +1198,176 @@ export default function JobsPage() {
       {/* ── New Job Drawer ───────────────────────────────────────────────── */}
       {showDrawer && (
         <div className="fixed inset-0 z-50 flex">
-          {/* Backdrop */}
-          <div
-            className="flex-1 bg-black/30 backdrop-blur-sm"
-            onClick={() => setShowDrawer(false)}
-          />
-          {/* Panel */}
+          <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={() => setShowDrawer(false)} />
           <div className="w-full max-w-2xl bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full">
-            {/* Sticky drawer header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
               <span className="text-sm font-semibold text-slate-500">New Job</span>
-              <button
-                onClick={() => setShowDrawer(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-              >
+              <button onClick={() => setShowDrawer(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {/* Scrollable form body */}
             <div className="flex-1 overflow-y-auto">
-              <NewJobDrawer
-                onClose={() => setShowDrawer(false)}
-                onCreated={fetchJobs}
-              />
+              <NewJobDrawer onClose={() => setShowDrawer(false)} onCreated={fetchJobs} />
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Time filter dropdown (fixed-positioned) ─────────────────────── */}
+      {showTimePicker && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
+          <div
+            className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 w-52"
+            style={{ top: timePickerPos.top, right: timePickerPos.right }}
+          >
+            {TIME_OPTS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  setTimeFilter(opt.value)
+                  if (opt.value !== 'custom') setShowTimePicker(false)
+                }}
+                className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  timeFilter === opt.value ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {opt.label}
+                {timeFilter === opt.value && <Check className="h-3 w-3 ml-auto shrink-0" />}
+              </button>
+            ))}
+            {timeFilter === 'custom' && (
+              <div className="px-2 pt-2 pb-1 border-t border-slate-100 mt-1 space-y-2">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
+                  <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                    className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-blue-400 transition" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
+                  <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                    className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-blue-400 transition" />
+                </div>
+                <button onClick={() => setShowTimePicker(false)}
+                  className="w-full text-xs bg-blue-600 text-white rounded-lg py-1.5 hover:bg-blue-700 transition-colors font-semibold">
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Column filter dropdown (fixed-positioned) ───────────────────── */}
+      {colDropdown && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => { setColDropdown(null); setColFilterSearch('') }} />
+          <div
+            className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-xl flex flex-col"
+            style={{ top: colDropdown.top, left: colDropdown.left, width: 236, maxHeight: 340 }}
+          >
+            {/* Search within options */}
+            <div className="px-3 pt-2.5 pb-2 border-b border-slate-100">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                <input
+                  value={colFilterSearch}
+                  onChange={e => setColFilterSearch(e.target.value)}
+                  placeholder="Search…"
+                  autoFocus
+                  className="w-full pl-6 pr-2 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition"
+                />
+              </div>
+            </div>
+
+            {/* Options list */}
+            <div className="overflow-y-auto flex-1 p-1.5 space-y-0.5">
+              {(colFilterOptions[colDropdown.colId as ColId] ?? [])
+                .filter(opt => opt.label.toLowerCase().includes(colFilterSearch.toLowerCase()))
+                .map(opt => {
+                  const selected = colFilters[colDropdown.colId]?.includes(opt.value) ?? false
+                  return (
+                    <label
+                      key={opt.value}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleColFilter(colDropdown.colId, opt.value)}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
+                      />
+                      {colDropdown.colId === 'status' ? (
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_CONFIG[opt.value]?.color ?? ''}`}>
+                          {STATUS_CONFIG[opt.value]?.icon}
+                          {opt.label}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-700 truncate">{opt.label}</span>
+                      )}
+                    </label>
+                  )
+                })}
+              {(colFilterOptions[colDropdown.colId as ColId] ?? []).filter(opt =>
+                opt.label.toLowerCase().includes(colFilterSearch.toLowerCase())
+              ).length === 0 && (
+                <p className="px-2 py-3 text-xs text-slate-400 text-center">No options match</p>
+              )}
+            </div>
+
+            {/* Clear footer */}
+            {(colFilters[colDropdown.colId]?.length ?? 0) > 0 && (
+              <div className="px-3 py-2 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs text-slate-400">{colFilters[colDropdown.colId]!.length} selected</span>
+                <button onClick={() => clearColFilter(colDropdown.colId)} className="text-xs text-red-500 hover:text-red-700 transition-colors">
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Column picker dropdown (fixed-positioned) ───────────────────── */}
+      {showColPicker && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowColPicker(false)} />
+          <div
+            className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-2 w-56"
+            style={{ top: colPickerPos.top, right: colPickerPos.right }}
+          >
+            <p className="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Columns</p>
+            {ALL_COL_DEFS.filter(c => c.id !== 'actions').map(col => (
+              <label
+                key={col.id}
+                className={`flex items-center gap-2 px-2 py-2 rounded-lg transition-colors ${
+                  col.required ? 'opacity-60 cursor-not-allowed' : 'hover:bg-slate-50 cursor-pointer'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleCols.includes(col.id)}
+                  disabled={col.required}
+                  onChange={() => toggleCol(col.id)}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 disabled:opacity-50"
+                />
+                <span className="text-sm text-slate-700">{col.label}</span>
+                {col.required && <span className="text-xs text-slate-300 ml-auto">required</span>}
+                {!col.defaultVisible && !visibleCols.includes(col.id) && (
+                  <span className="text-xs text-blue-400 ml-auto">+ add</span>
+                )}
+              </label>
+            ))}
+            <div className="border-t border-slate-100 mt-1 pt-1">
+              <button
+                onClick={() => { setVisibleCols(DEFAULT_VISIBLE_COLS); try { localStorage.removeItem(LS_COLS) } catch {} }}
+                className="w-full text-left px-2 py-1.5 text-xs text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                Reset to defaults
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
