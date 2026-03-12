@@ -73,6 +73,7 @@ export type HiringRequestStatus =
   | 'jd_sent'
   | 'jd_approved'
   | 'posted'
+  | 'closed'
 
 export interface HiringRequest {
   id: string
