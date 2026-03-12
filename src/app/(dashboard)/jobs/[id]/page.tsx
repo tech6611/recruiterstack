@@ -134,13 +134,15 @@ const AI_REC_CONFIG: Record<AiRecommendation, { label: string; cls: string }> = 
 // ── Candidate card ────────────────────────────────────────────────────────────
 
 function CandidateCard({
-  app, onDragStart, onClick, isSelected, onToggleSelect,
+  app, onDragStart, onClick, isSelected, onToggleSelect, showCheckbox,
 }: {
   app: Application
   onDragStart: (id: string) => void
   onClick: (app: Application) => void
   isSelected: boolean
   onToggleSelect: (id: string) => void
+  /** Whether the stage is in selection mode — shows checkbox, otherwise hidden */
+  showCheckbox: boolean
 }) {
   const c = app.candidate!
   return (
@@ -154,14 +156,17 @@ function CandidateCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          {/* Checkbox */}
+          {/* Checkbox — only visible when stage selection mode is active */}
           <div
-            onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
-            className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
-              isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'
+            onClick={e => { e.stopPropagation(); if (showCheckbox) onToggleSelect(app.id) }}
+            className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-all ${
+              showCheckbox
+                ? `cursor-pointer ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'}`
+                : 'opacity-0 pointer-events-none w-0 overflow-hidden'
             }`}
+            style={showCheckbox ? {} : { width: 0, padding: 0, margin: 0 }}
           >
-            {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
+            {isSelected && showCheckbox && <Check className="h-2.5 w-2.5 text-white" />}
           </div>
           <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${avatarColor(c.name)}`}>
             {initials(c.name)}
@@ -223,6 +228,8 @@ function StageColumn({
   onToggleSelect,
   onScheduleInterview,
   selectedInStage,
+  isSelectionActive,
+  onToggleSelectionStage,
 }: {
   stage: PipelineStage
   apps: Application[]
@@ -242,6 +249,10 @@ function StageColumn({
   onToggleSelect: (id: string) => void
   onScheduleInterview: () => void
   selectedInStage: number
+  /** Whether this stage is the currently active selection stage */
+  isSelectionActive: boolean
+  /** Toggle this stage as the active selection stage (clears cross-stage selections) */
+  onToggleSelectionStage: () => void
 }) {
   const [over, setOver] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -275,6 +286,18 @@ function StageColumn({
       {/* Column header */}
       <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${style.header}`}>
         <div className="flex items-center gap-2 min-w-0">
+          {/* Selection mode toggle — click to activate/deactivate bulk selection for this stage */}
+          <button
+            onClick={onToggleSelectionStage}
+            title={isSelectionActive ? 'Deactivate selection mode' : 'Activate selection mode for this stage'}
+            className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
+              isSelectionActive
+                ? 'bg-blue-500 border-blue-500'
+                : 'border-slate-300 bg-white/70 hover:border-blue-400'
+            }`}
+          >
+            {isSelectionActive && <Check className="h-2.5 w-2.5 text-white" />}
+          </button>
           <button
             onClick={() => editMode && setShowColors(!showColors)}
             className={`h-2.5 w-2.5 rounded-full shrink-0 ${style.dot} ${editMode ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-slate-400' : ''}`}
@@ -398,6 +421,7 @@ function StageColumn({
             onClick={onCardClick}
             isSelected={selectedApps.has(app.id)}
             onToggleSelect={onToggleSelect}
+            showCheckbox={isSelectionActive}
           />
         ))}
         {apps.length === 0 && (
@@ -1046,6 +1070,8 @@ function RankedView({
   selectedApps,
   onToggleSelect,
   onBulkSelect,
+  activeStageId,
+  onSetActiveStage,
   onScheduleApp,
   onRejectApp,
 }: {
@@ -1054,8 +1080,12 @@ function RankedView({
   onCardClick: (app: Application) => void
   onMoveToStage: (appId: string, stageId: string) => void
   selectedApps: Set<string>
-  onToggleSelect: (id: string) => void
+  onToggleSelect: (id: string, stageId: string) => void
   onBulkSelect: (ids: string[]) => void
+  /** The currently active stage for bulk selection (null = none) */
+  activeStageId: string | null
+  /** Activate or clear the stage filter for bulk selection */
+  onSetActiveStage: (stageId: string | null) => void
   onScheduleApp: (app: Application) => void
   onRejectApp: (appId: string) => void
 }) {
@@ -1068,28 +1098,57 @@ function RankedView({
     return b.ai_score - a.ai_score
   })
 
-  const allSelected  = sorted.length > 0 && sorted.every(a => selectedApps.has(a.id))
-  const someSelected = !allSelected && sorted.some(a => selectedApps.has(a.id))
+  // For select-all, only count apps in the active stage (if any)
+  const activeStageApps = activeStageId ? sorted.filter(a => a.stage_id === activeStageId) : sorted
+  const allActiveSelected  = activeStageApps.length > 0 && activeStageApps.every(a => selectedApps.has(a.id))
+  const someActiveSelected = !allActiveSelected && activeStageApps.some(a => selectedApps.has(a.id))
+  const activeStageName    = activeStageId ? (stages.find(s => s.id === activeStageId)?.name ?? '') : ''
 
   let scoredRank = 0
 
   return (
     <div className="px-8 py-6 flex-1">
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        {/* Active stage selection indicator */}
+        {activeStageId && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-blue-100">
+            <span className="text-xs text-blue-700 font-medium">Selecting from:</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 border border-blue-200 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+              {activeStageName}
+              <button
+                onClick={() => { onSetActiveStage(null); onBulkSelect([]) }}
+                className="ml-0.5 text-blue-500 hover:text-blue-700"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+            {selectedApps.size > 0 && (
+              <span className="text-xs text-blue-500">{selectedApps.size} selected</span>
+            )}
+          </div>
+        )}
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60">
               <th className="px-4 py-3 w-10">
                 <div
-                  onClick={() => onBulkSelect(allSelected ? [] : sorted.map(a => a.id))}
-                  className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
-                    allSelected  ? 'bg-blue-500 border-blue-500' :
-                    someSelected ? 'bg-blue-100 border-blue-400' :
-                    'border-slate-300 hover:border-blue-400 bg-white'
+                  onClick={() => {
+                    if (!activeStageId) return // need to click a row first to set a stage
+                    onBulkSelect(allActiveSelected ? [] : activeStageApps.map(a => a.id))
+                  }}
+                  title={activeStageId ? `Select / deselect all in ${activeStageName}` : 'Click a candidate row to start selecting by stage'}
+                  className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                    activeStageId
+                      ? `cursor-pointer ${
+                          allActiveSelected  ? 'bg-blue-500 border-blue-500' :
+                          someActiveSelected ? 'bg-blue-100 border-blue-400' :
+                          'border-slate-300 hover:border-blue-400 bg-white'
+                        }`
+                      : 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-40'
                   }`}
                 >
-                  {allSelected  && <Check className="h-2.5 w-2.5 text-white" />}
-                  {someSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
+                  {allActiveSelected  && <Check className="h-2.5 w-2.5 text-white" />}
+                  {someActiveSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
                 </div>
               </th>
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3 w-10">#</th>
@@ -1121,19 +1180,39 @@ function RankedView({
               // Open dropdown upward if in the bottom half of the list to avoid clipping
               const openUp = rowIdx >= Math.ceil(sorted.length / 2)
 
+              // Cross-stage dimming: if another stage is active, dim this row
+              const isSameStage  = !activeStageId || app.stage_id === activeStageId
+              const isCrossStage = !isSameStage
+
               return (
                 <tr
                   key={app.id}
                   onClick={() => onCardClick(app)}
                   className={`border-b border-slate-50 cursor-pointer transition-colors last:border-0 ${
-                    isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'
+                    isSelected         ? 'bg-blue-50' :
+                    isCrossStage       ? 'opacity-40 hover:opacity-70' :
+                    'hover:bg-slate-50'
                   }`}
                 >
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <div
-                      onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
+                      onClick={e => {
+                        e.stopPropagation()
+                        // Clicking a cross-stage row checkbox activates that stage and selects
+                        if (isCrossStage) {
+                          onSetActiveStage(app.stage_id ?? null)
+                          onBulkSelect([app.id])
+                          return
+                        }
+                        if (!activeStageId) onSetActiveStage(app.stage_id ?? null)
+                        onToggleSelect(app.id, app.stage_id ?? '')
+                      }}
                       className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'
+                        isSelected
+                          ? 'bg-blue-500 border-blue-500'
+                          : isCrossStage
+                            ? 'border-slate-200 bg-slate-50'
+                            : 'border-slate-300 hover:border-blue-400 bg-white'
                       }`}
                     >
                       {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
@@ -1884,11 +1963,35 @@ export default function JobPipelinePage() {
   const [sortBy, setSortBy] = useState<'date' | 'score' | 'name'>('date')
   const [openStageMenu, setOpenStageMenu] = useState<string | null>(null)
   const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set())
-  const toggleSelect = (appId: string) => setSelectedApps(prev => {
-    const next = new Set(prev)
-    if (next.has(appId)) next.delete(appId); else next.add(appId)
-    return next
-  })
+  // Which stage is currently "active" for bulk selection — only one at a time
+  const [activeStageForSelection, setActiveStageForSelection] = useState<string | null>(null)
+
+  // Toggle a stage as the active selection stage (clears any cross-stage selections)
+  const toggleSelectionStage = (stageId: string) => {
+    if (activeStageForSelection === stageId) {
+      setActiveStageForSelection(null)
+      setSelectedApps(new Set())
+    } else {
+      setActiveStageForSelection(stageId)
+      setSelectedApps(new Set())
+    }
+  }
+
+  // Stage-scoped individual toggle: auto-activates stage on first click, clears if switching stages
+  const toggleSelect = (appId: string, stageId: string) => {
+    if (activeStageForSelection !== null && activeStageForSelection !== stageId) {
+      // Switching to a new stage — clear old selection and start fresh
+      setActiveStageForSelection(stageId)
+      setSelectedApps(new Set([appId]))
+      return
+    }
+    if (!activeStageForSelection) setActiveStageForSelection(stageId)
+    setSelectedApps(prev => {
+      const next = new Set(prev)
+      if (next.has(appId)) next.delete(appId); else next.add(appId)
+      return next
+    })
+  }
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [scheduleModalApps, setScheduleModalApps] = useState<Application[] | null>(null)
 
@@ -2455,6 +2558,11 @@ export default function JobPipelinePage() {
           selectedApps={selectedApps}
           onToggleSelect={toggleSelect}
           onBulkSelect={ids => setSelectedApps(new Set(ids))}
+          activeStageId={activeStageForSelection}
+          onSetActiveStage={(sid) => {
+            setActiveStageForSelection(sid)
+            if (!sid) setSelectedApps(new Set())
+          }}
           onScheduleApp={app => setScheduleModalApps([app])}
           onRejectApp={async appId => {
             await fetch(`/api/applications/${appId}`, {
@@ -2500,13 +2608,15 @@ export default function JobPipelinePage() {
             onRecolor={handleRecolor}
             onDelete={handleDeleteStage}
             selectedApps={selectedApps}
-            onToggleSelect={toggleSelect}
+            onToggleSelect={(appId) => toggleSelect(appId, stage.id)}
             onScheduleInterview={() => {
               const stageApps = grouped[stage.id] ?? []
               const selected = stageApps.filter(a => selectedApps.has(a.id))
               setScheduleModalApps(selected.length > 0 ? selected : stageApps)
             }}
             selectedInStage={(grouped[stage.id] ?? []).filter(a => selectedApps.has(a.id)).length}
+            isSelectionActive={activeStageForSelection === stage.id}
+            onToggleSelectionStage={() => toggleSelectionStage(stage.id)}
           />
         ))}
 
@@ -2558,7 +2668,8 @@ export default function JobPipelinePage() {
                   onDragStart={i => { dragId.current = i }}
                   onClick={setSelectedApp}
                   isSelected={selectedApps.has(app.id)}
-                  onToggleSelect={toggleSelect}
+                  onToggleSelect={(appId) => toggleSelect(appId, '__unstaged__')}
+                  showCheckbox={activeStageForSelection === null || activeStageForSelection === '__unstaged__'}
                 />
               ))}
             </div>
