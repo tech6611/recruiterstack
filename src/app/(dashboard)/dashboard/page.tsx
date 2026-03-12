@@ -314,49 +314,44 @@ function ViewsSidebar({
 
 // ── Individual widget components ──────────────────────────────────────────────
 
+const PREVIEW_LIMIT = 4
+
 function InterviewsWidget({ interviews }: { interviews: UpcomingInterview[] }) {
+  const preview = interviews.slice(0, PREVIEW_LIMIT)
+  const remaining = interviews.length - preview.length
   return (
     <div>
       <div className="flex items-center justify-between px-1 mb-3">
-        <h2 className="text-sm font-semibold text-slate-900">Interviews</h2>
-        <div className="flex items-center gap-3">
-          <Link href="/candidates" className="text-xs text-slate-500 hover:text-slate-800 transition-colors">
-            Past Interviews
-          </Link>
-          <button className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
-            <Search className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <h2 className="text-sm font-semibold text-slate-900">
+          Interviews
+          {interviews.length > 0 && <span className="ml-1.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-600">{interviews.length}</span>}
+        </h2>
+        <Link href="/candidates" className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">
+          View all →
+        </Link>
       </div>
 
-      <div className="grid grid-cols-[2fr_2fr_1.5fr_1fr] gap-4 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-        <span>Interview</span><span>Candidate</span><span>Date</span><span>Your Role</span>
+      <div className="grid grid-cols-[2fr_2fr_1.2fr_1fr] gap-3 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        <span>Stage</span><span>Candidate</span><span>Date</span><span>Role</span>
       </div>
 
       {interviews.length === 0 ? (
-        <div className="py-8 text-center text-sm text-slate-400">
+        <div className="py-6 text-center text-xs text-slate-400">
           No upcoming interviews.{' '}
           <Link href="/candidates" className="text-blue-500 hover:underline">View candidates</Link>
         </div>
       ) : (
         <>
-          <div className="mt-3 mb-1 flex items-center gap-2">
-            <div className="h-px flex-1 bg-slate-100" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              Upcoming ({interviews.length})
-            </span>
-            <div className="h-px flex-1 bg-slate-100" />
-          </div>
-          {interviews.map(iv => (
+          {preview.map(iv => (
             <Link
               key={iv.id}
               href={`/candidates/${iv.candidate_id}`}
-              className="grid grid-cols-[2fr_2fr_1.5fr_1fr] items-center gap-4 rounded-sm border-b border-slate-50 py-2.5 hover:bg-slate-50 transition-colors"
+              className="grid grid-cols-[2fr_2fr_1.2fr_1fr] items-center gap-3 rounded-sm border-b border-slate-50 py-2 hover:bg-slate-50 transition-colors"
             >
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-slate-800">{iv.stage_name}</p>
                 <div className="mt-0.5 flex items-center gap-1">
-                  <Video className="h-3 w-3 text-slate-400" />
+                  <Video className="h-2.5 w-2.5 text-slate-400" />
                   <span className="text-[10px] text-slate-400">RecruiterStack</span>
                 </div>
               </div>
@@ -368,11 +363,16 @@ function InterviewsWidget({ interviews }: { interviews: UpcomingInterview[] }) {
                 <p className="text-[10px] text-slate-600">{fmtDate(iv.moved_at)}</p>
                 <p className="text-[10px] text-slate-400">{timeAgo(iv.moved_at)}</p>
               </div>
-              <span className="inline-block rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+              <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
                 Interviewer
               </span>
             </Link>
           ))}
+          {remaining > 0 && (
+            <Link href="/candidates" className="mt-2 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+              +{remaining} more interview{remaining !== 1 ? 's' : ''} →
+            </Link>
+          )}
         </>
       )}
     </div>
@@ -388,110 +388,108 @@ function TasksWidget({ tasks }: { tasks: DashboardData['tasks'] }) {
     feedback:  tasks.feedback_needed.length,
     followups: tasks.overdue_followups.length,
   }
+  const totalAll = counts.approvals + counts.feedback + counts.followups
+
+  // Flatten all items for the compact preview
+  const allItems: { type: 'approval' | 'feedback' | 'followup'; id: string; title: string; sub: string; href: string; time: string; color: string; icon: React.ReactNode }[] = [
+    ...tasks.pending_approvals.map(t => ({
+      type: 'approval' as const,
+      id: t.id, title: t.title, href: `/jobs/${t.id}`,
+      sub: `${t.department ?? 'No dept'}${t.location ? ` · ${t.location}` : ''}`,
+      time: timeAgo(t.created_at), color: 'bg-emerald-100 text-emerald-600',
+      icon: <CheckSquare className="h-3 w-3" />,
+    })),
+    ...tasks.feedback_needed.map(t => ({
+      type: 'feedback' as const,
+      id: t.id, title: t.candidate_name, href: `/candidates/${t.candidate_id}`,
+      sub: `Feedback · ${t.job_title}`,
+      time: timeAgo(t.moved_at), color: 'bg-amber-100 text-amber-600',
+      icon: <MessageSquare className="h-3 w-3" />,
+    })),
+    ...tasks.overdue_followups.map(t => ({
+      type: 'followup' as const,
+      id: t.id, title: t.candidate_name, href: `/candidates/${t.candidate_id}`,
+      sub: `Follow-up · ${t.job_title}`,
+      time: timeAgo(t.last_event_at), color: 'bg-red-100 text-red-500',
+      icon: <Bell className="h-3 w-3" />,
+    })),
+  ]
+
   const TABS: { key: TaskTab; label: string; count?: number }[] = [
-    { key: 'all',       label: 'All' },
+    { key: 'all',       label: 'All',       count: totalAll },
     { key: 'approvals', label: 'Approvals', count: counts.approvals },
     { key: 'feedback',  label: 'Feedback',  count: counts.feedback  },
     { key: 'followups', label: 'Followups', count: counts.followups },
     { key: 'mentions',  label: 'Mentions',  count: 0 },
     { key: 'sequences', label: 'Sequences', count: 0 },
   ]
-  const showApprovals = activeTab === 'all' || activeTab === 'approvals'
-  const showFeedback  = activeTab === 'all' || activeTab === 'feedback'
-  const showFollowups = activeTab === 'all' || activeTab === 'followups'
-  const totalAll = counts.approvals + counts.feedback + counts.followups
+
+  // Which items to show for current tab
+  const tabItems = activeTab === 'all' ? allItems
+    : activeTab === 'approvals' ? allItems.filter(i => i.type === 'approval')
+    : activeTab === 'feedback'  ? allItems.filter(i => i.type === 'feedback')
+    : activeTab === 'followups' ? allItems.filter(i => i.type === 'followup')
+    : []
+
+  const preview   = tabItems.slice(0, PREVIEW_LIMIT)
+  const remaining = tabItems.length - preview.length
 
   return (
     <div>
-      <div className="flex items-center justify-between px-1 mb-3">
-        <h2 className="text-sm font-semibold text-slate-900">Tasks</h2>
-        <button className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
-          <Search className="h-3.5 w-3.5" />
-        </button>
+      <div className="flex items-center justify-between px-1 mb-2">
+        <h2 className="text-sm font-semibold text-slate-900">
+          Tasks
+          {totalAll > 0 && <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600">{totalAll}</span>}
+        </h2>
+        <Link href="/candidates" className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">
+          View all →
+        </Link>
       </div>
 
-      <div className="flex gap-0 border-b border-slate-200 mb-4">
+      <div className="flex gap-0 border-b border-slate-100 mb-3 -mx-1 overflow-x-auto">
         {TABS.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
-              activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            className={`flex shrink-0 items-center gap-1 border-b-2 px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+              activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-700'
             }`}
           >
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
-                activeTab === tab.key ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold leading-none ${
+                activeTab === tab.key ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
               }`}>{tab.count}</span>
             )}
           </button>
         ))}
       </div>
 
-      {totalAll === 0 && activeTab === 'all' ? (
-        <p className="py-8 text-center text-sm text-slate-400">All caught up! No pending tasks.</p>
+      {preview.length === 0 ? (
+        <p className="py-5 text-center text-xs text-slate-400">
+          {activeTab === 'mentions' ? 'No mentions' : activeTab === 'sequences' ? 'No active sequences' : 'All caught up!'}
+        </p>
       ) : (
         <div className="space-y-0.5">
-          {showApprovals && tasks.pending_approvals.map(t => (
-            <Link key={t.id} href={`/jobs/${t.id}`}
-              className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-slate-50 transition-colors"
+          {preview.map(item => (
+            <Link key={`${item.type}-${item.id}`} href={item.href}
+              className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-slate-50 transition-colors"
             >
-              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-100">
-                <CheckSquare className="h-3 w-3 text-emerald-600" />
+              <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${item.color}`}>
+                {item.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-0.5">Approval</p>
-                <p className="text-sm font-medium text-slate-800 truncate">{t.title}</p>
-                <p className="text-xs text-slate-400">{t.department ?? 'No department'}{t.location ? ` · ${t.location}` : ''}</p>
+                <p className="text-xs font-medium text-slate-800 truncate">{item.title}</p>
+                <p className="text-[10px] text-slate-400 truncate">{item.sub}</p>
               </div>
-              <div className="shrink-0 text-right">
-                <span className="text-xs text-slate-400">Opening</span>
-                <p className="text-[10px] text-amber-500 font-medium">{timeAgo(t.created_at)}</p>
-              </div>
+              <span className="shrink-0 text-[10px] text-slate-400">{item.time}</span>
             </Link>
           ))}
-          {showFeedback && tasks.feedback_needed.map(t => (
-            <Link key={t.id} href={`/candidates/${t.candidate_id}`}
-              className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-slate-50 transition-colors"
-            >
-              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-amber-100">
-                <MessageSquare className="h-3 w-3 text-amber-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-0.5">Interview Feedback</p>
-                <p className="text-sm font-medium text-slate-800 truncate">{t.candidate_name}</p>
-                <p className="text-xs text-slate-400 truncate">{t.job_title} · {t.stage_name}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="text-xs text-slate-400">{fmtDate(t.moved_at)}</p>
-                <p className="text-[10px] text-amber-500 font-medium">{timeAgo(t.moved_at)}</p>
-              </div>
+          {remaining > 0 && (
+            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+              +{remaining} more task{remaining !== 1 ? 's' : ''} →
             </Link>
-          ))}
-          {showFollowups && tasks.overdue_followups.map(t => (
-            <Link key={t.id} href={`/candidates/${t.candidate_id}`}
-              className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-slate-50 transition-colors"
-            >
-              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-100">
-                <Bell className="h-3 w-3 text-red-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-0.5">Overdue Follow-up</p>
-                <p className="text-sm font-medium text-slate-800 truncate">{t.candidate_name}</p>
-                <p className="text-xs text-slate-400 truncate">{t.job_title}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="text-xs text-slate-400">{fmtDate(t.last_event_at)}</p>
-                <p className="text-[10px] text-red-500 font-medium">{timeAgo(t.last_event_at)}</p>
-              </div>
-            </Link>
-          ))}
-          {activeTab === 'mentions'  && <p className="py-6 text-center text-sm text-slate-400">No mentions</p>}
-          {activeTab === 'sequences' && <p className="py-6 text-center text-sm text-slate-400">No active sequences</p>}
-          {activeTab === 'approvals' && tasks.pending_approvals.length === 0 && <p className="py-6 text-center text-sm text-slate-400">No approvals pending</p>}
-          {activeTab === 'feedback'  && tasks.feedback_needed.length === 0   && <p className="py-6 text-center text-sm text-slate-400">No feedback needed</p>}
-          {activeTab === 'followups' && tasks.overdue_followups.length === 0 && <p className="py-6 text-center text-sm text-slate-400">No overdue follow-ups</p>}
+          )}
         </div>
       )}
     </div>
@@ -508,19 +506,19 @@ function OverviewStatsWidget({ stats }: { stats: DashboardData['stats'] }) {
   return (
     <div>
       <h2 className="mb-3 px-1 text-sm font-semibold text-slate-900">Overview</h2>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {CARDS.map(card => {
           const Icon = card.icon
           return (
             <Link key={card.label} href={card.href}
-              className={`flex items-center gap-3 rounded-xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow-sm ${card.color}`}
+              className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 transition-all hover:-translate-y-0.5 hover:shadow-sm ${card.color}`}
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/60">
-                <Icon className="h-4 w-4" />
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/60">
+                <Icon className="h-3.5 w-3.5" />
               </div>
               <div>
-                <p className="text-xl font-bold">{card.value}</p>
-                <p className="text-[10px] font-medium opacity-70">{card.label}</p>
+                <p className="text-lg font-bold leading-tight">{card.value}</p>
+                <p className="text-[10px] font-medium opacity-70 leading-tight">{card.label}</p>
               </div>
             </Link>
           )
@@ -565,34 +563,36 @@ function PipelineWidget({ breakdown }: { breakdown: StatusBreakdown[] }) {
 }
 
 function JobsMiniWidget({ jobs }: { jobs: TopJob[] }) {
+  const preview   = jobs.slice(0, PREVIEW_LIMIT)
+  const remaining = jobs.length - preview.length
   return (
     <div>
       <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">Active Jobs</h2>
-        <Link href="/jobs" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
-          View all
-        </Link>
+        <h2 className="text-sm font-semibold text-slate-900">Active Jobs
+          {jobs.length > 0 && <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{jobs.length}</span>}
+        </h2>
+        <Link href="/jobs" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
       </div>
       {jobs.length === 0 ? (
-        <p className="text-sm text-slate-400">No open jobs. <Link href="/jobs" className="text-blue-500 hover:underline">Create one</Link></p>
+        <p className="text-xs text-slate-400">No open jobs. <Link href="/jobs" className="text-blue-500 hover:underline">Create one</Link></p>
       ) : (
         <div className="space-y-1">
-          {jobs.map(job => (
+          {preview.map(job => (
             <Link key={job.id} href={`/jobs/${job.id}`}
-              className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 hover:bg-slate-100 transition-colors"
+              className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 hover:bg-slate-100 transition-colors"
             >
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-800">{job.position_title}</p>
+                <p className="truncate text-xs font-medium text-slate-800">{job.position_title}</p>
                 {job.location && (
                   <div className="flex items-center gap-1">
                     <MapPin className="h-2.5 w-2.5 text-slate-400" />
-                    <span className="text-xs text-slate-400">{job.location}</span>
+                    <span className="text-[10px] text-slate-400">{job.location}</span>
                   </div>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-700">{job.total_candidates}</span>
-                <div className="flex h-5 w-16 overflow-hidden rounded-full bg-slate-200 gap-px">
+                <span className="text-xs font-semibold text-slate-700">{job.total_candidates}</span>
+                <div className="flex h-4 w-14 overflow-hidden rounded-full bg-slate-200 gap-px">
                   {job.stage_counts.filter(s => s.count > 0).map(s => (
                     <div
                       key={s.stage_id}
@@ -605,6 +605,11 @@ function JobsMiniWidget({ jobs }: { jobs: TopJob[] }) {
               </div>
             </Link>
           ))}
+          {remaining > 0 && (
+            <Link href="/jobs" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+              +{remaining} more job{remaining !== 1 ? 's' : ''} →
+            </Link>
+          )}
         </div>
       )}
     </div>
@@ -631,23 +636,28 @@ const RECO_CONFIG: Record<string, { label: string; bg: string; text: string }> =
 // ── JobsByDeptWidget ──────────────────────────────────────────────────────────
 
 function JobsByDeptWidget({ departments }: { departments: JobByDept[] }) {
+  const preview   = departments.slice(0, PREVIEW_LIMIT)
+  const remaining = departments.length - preview.length
   const max = Math.max(...departments.map(d => d.candidate_count), 1)
   return (
     <div>
-      <h2 className="mb-4 px-1 text-sm font-semibold text-slate-900">Jobs by Department</h2>
+      <div className="mb-3 flex items-center justify-between px-1">
+        <h2 className="text-sm font-semibold text-slate-900">Jobs by Department</h2>
+        <Link href="/jobs" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
+      </div>
       {departments.length === 0 ? (
-        <p className="text-sm text-slate-400">No department data yet.</p>
+        <p className="text-xs text-slate-400">No department data yet.</p>
       ) : (
-        <div className="space-y-3">
-          {departments.map(d => (
+        <div className="space-y-2.5">
+          {preview.map(d => (
             <div key={d.department}>
               <div className="mb-1 flex items-center justify-between text-xs">
                 <span className="font-medium text-slate-700 truncate">{d.department}</span>
-                <span className="shrink-0 ml-2 text-slate-400">
-                  {d.job_count} job{d.job_count !== 1 ? 's' : ''} · {d.candidate_count} candidate{d.candidate_count !== 1 ? 's' : ''}
+                <span className="shrink-0 ml-2 text-[10px] text-slate-400">
+                  {d.job_count} job{d.job_count !== 1 ? 's' : ''} · {d.candidate_count}
                 </span>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-100">
+              <div className="h-1.5 w-full rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-blue-500 transition-all"
                   style={{ width: `${(d.candidate_count / max) * 100}%` }}
@@ -655,6 +665,11 @@ function JobsByDeptWidget({ departments }: { departments: JobByDept[] }) {
               </div>
             </div>
           ))}
+          {remaining > 0 && (
+            <Link href="/jobs" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+              +{remaining} more department{remaining !== 1 ? 's' : ''} →
+            </Link>
+          )}
         </div>
       )}
     </div>
@@ -664,29 +679,39 @@ function JobsByDeptWidget({ departments }: { departments: JobByDept[] }) {
 // ── HmActionsWidget ───────────────────────────────────────────────────────────
 
 function HmActionsWidget({ approvals }: { approvals: TaskApproval[] }) {
+  const preview   = approvals.slice(0, PREVIEW_LIMIT)
+  const remaining = approvals.length - preview.length
   return (
     <div>
       <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">HM Actions</h2>
-        <Link href="/jobs" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all</Link>
+        <h2 className="text-sm font-semibold text-slate-900">
+          HM Actions
+          {approvals.length > 0 && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">{approvals.length}</span>}
+        </h2>
+        <Link href="/jobs" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
       </div>
       {approvals.length === 0 ? (
-        <p className="text-sm text-slate-400">No pending HM actions — all JDs are live or in progress.</p>
+        <p className="text-xs text-slate-400">No pending HM actions — all JDs are live or in progress.</p>
       ) : (
         <div className="space-y-1.5">
-          {approvals.map(a => (
+          {preview.map(a => (
             <Link key={a.id} href={`/jobs/${a.id}`}
-              className="flex items-center justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5 hover:bg-amber-100 transition-colors"
+              className="flex items-center justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 hover:bg-amber-100 transition-colors"
             >
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-800">{a.title}</p>
-                <p className="text-xs text-slate-500">{a.department ?? 'No department'} · JD ready to post</p>
+                <p className="truncate text-xs font-medium text-slate-800">{a.title}</p>
+                <p className="text-[10px] text-slate-500">{a.department ?? 'No department'} · JD ready to post</p>
               </div>
-              <span className="shrink-0 rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              <span className="shrink-0 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
                 Approval
               </span>
             </Link>
           ))}
+          {remaining > 0 && (
+            <Link href="/jobs" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+              +{remaining} more action{remaining !== 1 ? 's' : ''} →
+            </Link>
+          )}
         </div>
       )}
     </div>
@@ -696,21 +721,26 @@ function HmActionsWidget({ approvals }: { approvals: TaskApproval[] }) {
 // ── RecentApplicationsWidget ──────────────────────────────────────────────────
 
 function RecentApplicationsWidget({ applications }: { applications: RecentApplication[] }) {
+  const preview   = applications.slice(0, PREVIEW_LIMIT)
+  const remaining = applications.length - preview.length
   return (
     <div>
       <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">Recent Applications</h2>
-        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all</Link>
+        <h2 className="text-sm font-semibold text-slate-900">
+          Recent Applications
+          {applications.length > 0 && <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{applications.length}</span>}
+        </h2>
+        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
       </div>
       {applications.length === 0 ? (
-        <p className="text-sm text-slate-400">No applications yet.</p>
+        <p className="text-xs text-slate-400">No applications yet.</p>
       ) : (
         <div className="space-y-0">
-          {applications.map(a => (
+          {preview.map(a => (
             <Link key={a.id} href={`/candidates/${a.candidate_id}`}
-              className="flex items-center gap-3 rounded-lg border-b border-slate-50 px-1 py-2.5 hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-3 rounded-lg border-b border-slate-50 px-1 py-2 hover:bg-slate-50 transition-colors"
             >
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">
                 {a.candidate_name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -724,7 +754,7 @@ function RecentApplicationsWidget({ applications }: { applications: RecentApplic
                 <span className="text-[10px] text-slate-500">{SOURCE_LABELS[a.source] ?? a.source}</span>
               </div>
               {a.ai_score !== null && (
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                   a.ai_score >= 80 ? 'bg-emerald-100 text-emerald-700' :
                   a.ai_score >= 60 ? 'bg-amber-100 text-amber-700' :
                   'bg-slate-100 text-slate-600'
@@ -732,6 +762,11 @@ function RecentApplicationsWidget({ applications }: { applications: RecentApplic
               )}
             </Link>
           ))}
+          {remaining > 0 && (
+            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+              +{remaining} more application{remaining !== 1 ? 's' : ''} →
+            </Link>
+          )}
         </div>
       )}
     </div>
@@ -741,33 +776,35 @@ function RecentApplicationsWidget({ applications }: { applications: RecentApplic
 // ── TopScoredWidget ───────────────────────────────────────────────────────────
 
 function TopScoredWidget({ candidates }: { candidates: TopScored[] }) {
+  const preview   = candidates.slice(0, PREVIEW_LIMIT)
+  const remaining = candidates.length - preview.length
   return (
     <div>
       <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">Top AI-Scored Candidates</h2>
-        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all</Link>
+        <h2 className="text-sm font-semibold text-slate-900">Top AI-Scored</h2>
+        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
       </div>
       {candidates.length === 0 ? (
-        <p className="text-sm text-slate-400">No AI scores yet — candidates are scored automatically when added.</p>
+        <p className="text-xs text-slate-400">No AI scores yet — candidates are scored automatically when added.</p>
       ) : (
         <div className="space-y-1">
-          {candidates.map((c, idx) => {
+          {preview.map((c, idx) => {
             const reco = RECO_CONFIG[c.ai_recommendation ?? '']
             return (
               <Link key={c.id} href={`/candidates/${c.candidate_id}`}
-                className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 hover:bg-slate-100 transition-colors"
+                className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 hover:bg-slate-100 transition-colors"
               >
-                <span className="w-5 shrink-0 text-center text-[10px] font-bold text-slate-400">#{idx + 1}</span>
+                <span className="w-4 shrink-0 text-center text-[10px] font-bold text-slate-400">#{idx + 1}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-800">{c.candidate_name}</p>
-                  <p className="truncate text-xs text-slate-400">{c.job_title}</p>
+                  <p className="truncate text-xs font-medium text-slate-800">{c.candidate_name}</p>
+                  <p className="truncate text-[10px] text-slate-400">{c.job_title}</p>
                 </div>
                 {reco && (
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${reco.bg} ${reco.text}`}>
+                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${reco.bg} ${reco.text}`}>
                     {reco.label}
                   </span>
                 )}
-                <div className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+                <div className={`shrink-0 flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${
                   c.ai_score >= 80 ? 'bg-emerald-100 text-emerald-700' :
                   c.ai_score >= 60 ? 'bg-amber-100 text-amber-700' :
                   'bg-slate-100 text-slate-600'
@@ -777,6 +814,11 @@ function TopScoredWidget({ candidates }: { candidates: TopScored[] }) {
               </Link>
             )
           })}
+          {remaining > 0 && (
+            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+              +{remaining} more candidate{remaining !== 1 ? 's' : ''} →
+            </Link>
+          )}
         </div>
       )}
     </div>
@@ -825,35 +867,42 @@ function CandidateSourcesWidget({ sources }: { sources: CandidateSource[] }) {
 // ── OfferTrackerWidget ────────────────────────────────────────────────────────
 
 function OfferTrackerWidget({ offers }: { offers: OfferTrackerItem[] }) {
+  const preview   = offers.slice(0, PREVIEW_LIMIT)
+  const remaining = offers.length - preview.length
   return (
     <div>
       <div className="mb-3 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-slate-900">Offer Tracker</h2>
-        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all</Link>
+        <h2 className="text-sm font-semibold text-slate-900">
+          Offer Tracker
+          {offers.length > 0 && <span className="ml-1.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-600">{offers.length}</span>}
+        </h2>
+        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
       </div>
       {offers.length === 0 ? (
-        <p className="text-sm text-slate-400">No candidates at the offer stage right now.</p>
+        <p className="text-xs text-slate-400">No candidates at the offer stage right now.</p>
       ) : (
         <div className="space-y-1.5">
-          {offers.map(o => (
+          {preview.map(o => (
             <Link key={o.candidate_id} href={`/candidates/${o.candidate_id}`}
-              className="flex items-center gap-3 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2.5 hover:bg-violet-100 transition-colors"
+              className="flex items-center gap-2.5 rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-2 hover:bg-violet-100 transition-colors"
             >
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-200 text-xs font-bold text-violet-700">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-200 text-[10px] font-bold text-violet-700">
                 {o.candidate_name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="truncate text-sm font-medium text-slate-800">{o.candidate_name}</p>
-                <p className="truncate text-xs text-slate-500">{o.job_title}</p>
-                {o.current_title && (
-                  <p className="text-[10px] text-slate-400">{o.current_title}</p>
-                )}
+                <p className="truncate text-xs font-medium text-slate-800">{o.candidate_name}</p>
+                <p className="truncate text-[10px] text-slate-500">{o.job_title}{o.current_title ? ` · ${o.current_title}` : ''}</p>
               </div>
-              <span className="shrink-0 rounded-full border border-violet-200 bg-violet-100 px-2.5 py-0.5 text-[10px] font-semibold text-violet-700">
+              <span className="shrink-0 rounded-full border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
                 Offer Out
               </span>
             </Link>
           ))}
+          {remaining > 0 && (
+            <Link href="/candidates" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+              +{remaining} more offer{remaining !== 1 ? 's' : ''} →
+            </Link>
+          )}
         </div>
       )}
     </div>
@@ -876,24 +925,29 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
 }
 
 function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
+  const preview   = activity.slice(0, PREVIEW_LIMIT)
+  const remaining = activity.length - preview.length
   return (
     <div>
-      <h2 className="mb-4 px-1 text-sm font-semibold text-slate-900">Recent Activity</h2>
+      <div className="mb-3 flex items-center justify-between px-1">
+        <h2 className="text-sm font-semibold text-slate-900">Recent Activity</h2>
+        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
+      </div>
       {activity.length === 0 ? (
-        <p className="text-sm text-slate-400">No recent activity.</p>
+        <p className="text-xs text-slate-400">No recent activity.</p>
       ) : (
         <div>
-          {activity.map((e, idx) => (
-            <div key={e.id} className="flex gap-3 py-2.5 border-b border-slate-50">
+          {preview.map((e, idx) => (
+            <div key={e.id} className="flex gap-2.5 py-2 border-b border-slate-50">
               <div className="flex flex-col items-center">
-                <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs shrink-0 ${EVENT_TYPE_COLORS[e.event_type] ?? 'bg-slate-100 text-slate-500'}`}>
+                <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${EVENT_TYPE_COLORS[e.event_type] ?? 'bg-slate-100 text-slate-500'}`}>
                   {EVENT_TYPE_ICONS[e.event_type] ?? '·'}
                 </div>
-                {idx < activity.length - 1 && (
+                {idx < preview.length - 1 && (
                   <div className="w-px flex-1 bg-slate-100 mt-1" />
                 )}
               </div>
-              <div className="flex-1 min-w-0 pb-1">
+              <div className="flex-1 min-w-0 pb-0.5">
                 <div className="flex items-baseline gap-1.5 flex-wrap">
                   <span className="text-xs font-medium text-slate-800">{e.candidate_name}</span>
                   <span className="text-[10px] text-slate-400">{EVENT_TYPE_LABELS[e.event_type] ?? e.event_type}</span>
@@ -902,13 +956,15 @@ function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
                   )}
                 </div>
                 <p className="text-[10px] text-slate-400 truncate">{e.job_title}</p>
-                {e.note && (
-                  <p className="mt-0.5 text-[10px] italic text-slate-500 truncate">&ldquo;{e.note}&rdquo;</p>
-                )}
-                <p className="mt-0.5 text-[10px] text-slate-300">{timeAgo(e.created_at)}</p>
+                <p className="text-[10px] text-slate-300">{timeAgo(e.created_at)}</p>
               </div>
             </div>
           ))}
+          {remaining > 0 && (
+            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+              +{remaining} more event{remaining !== 1 ? 's' : ''} →
+            </Link>
+          )}
         </div>
       )}
     </div>
@@ -918,27 +974,37 @@ function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
 // ── StageFunnelWidget ─────────────────────────────────────────────────────────
 
 function StageFunnelWidget({ funnel }: { funnel: StageFunnelItem[] }) {
+  const preview   = funnel.slice(0, PREVIEW_LIMIT)
+  const remaining = funnel.length - preview.length
   const max = Math.max(...funnel.map(s => s.count), 1)
   return (
     <div>
-      <h2 className="mb-4 px-1 text-sm font-semibold text-slate-900">Stage Funnel</h2>
+      <div className="mb-3 flex items-center justify-between px-1">
+        <h2 className="text-sm font-semibold text-slate-900">Stage Funnel</h2>
+        <Link href="/candidates" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">View all →</Link>
+      </div>
       {funnel.length === 0 ? (
-        <p className="text-sm text-slate-400">No active candidates in the pipeline.</p>
+        <p className="text-xs text-slate-400">No active candidates in the pipeline.</p>
       ) : (
-        <div className="space-y-2.5">
-          {funnel.map(s => (
-            <div key={s.stage_id} className="flex items-center gap-3">
-              <div className={`h-2.5 w-2.5 shrink-0 rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'}`} />
-              <span className="w-32 shrink-0 truncate text-xs text-slate-600">{s.stage_name}</span>
-              <div className="flex-1 h-4 overflow-hidden rounded-full bg-slate-100">
+        <div className="space-y-2">
+          {preview.map(s => (
+            <div key={s.stage_id} className="flex items-center gap-2.5">
+              <div className={`h-2 w-2 shrink-0 rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'}`} />
+              <span className="w-24 shrink-0 truncate text-xs text-slate-600">{s.stage_name}</span>
+              <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-100">
                 <div
                   className={`h-full rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'} transition-all`}
                   style={{ width: `${(s.count / max) * 100}%` }}
                 />
               </div>
-              <span className="w-6 shrink-0 text-right text-xs font-semibold text-slate-700">{s.count}</span>
+              <span className="w-5 shrink-0 text-right text-xs font-semibold text-slate-700">{s.count}</span>
             </div>
           ))}
+          {remaining > 0 && (
+            <Link href="/candidates" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+              +{remaining} more stage{remaining !== 1 ? 's' : ''} →
+            </Link>
+          )}
         </div>
       )}
     </div>
@@ -1499,46 +1565,57 @@ export default function DashboardPage() {
         </div>
 
         {/* Widget area */}
-        <div className="p-6 space-y-8">
+        <div className="p-4">
           {/* Customize panel */}
           {widgetMode && (
-            <WidgetCustomizer
-              activeWidgets={activeView?.widgets ?? []}
-              snapshotWidgets={widgetSnapshot}
-              onClose={() => setWidgetMode(false)}
-              onDiscard={handleDiscardWidgets}
-              onReorder={updateWidgets}
-              onRemove={handleRemoveWidget}
-              onAdd={handleAddWidget}
-            />
+            <div className="mb-4">
+              <WidgetCustomizer
+                activeWidgets={activeView?.widgets ?? []}
+                snapshotWidgets={widgetSnapshot}
+                onClose={() => setWidgetMode(false)}
+                onDiscard={handleDiscardWidgets}
+                onReorder={updateWidgets}
+                onRemove={handleRemoveWidget}
+                onAdd={handleAddWidget}
+              />
+            </div>
           )}
 
-          {/* Render widgets in order */}
-          {(activeView?.widgets ?? []).map(wId => (
-            <div key={wId} className={widgetMode ? 'opacity-50 pointer-events-none' : ''}>
-              {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} />}
-              {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} />}
-              {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
-              {wId === 'pipeline'           && <PipelineWidget           breakdown={data.candidate_breakdown} />}
-              {wId === 'jobs_mini'          && <JobsMiniWidget           jobs={data.top_jobs} />}
-              {wId === 'jobs_by_dept'       && <JobsByDeptWidget         departments={data.jobs_by_dept} />}
-              {wId === 'hm_actions'         && <HmActionsWidget          approvals={data.tasks.pending_approvals} />}
-              {wId === 'recent_applications'&& <RecentApplicationsWidget applications={data.recent_applications} />}
-              {wId === 'top_scored'         && <TopScoredWidget          candidates={data.top_scored} />}
-              {wId === 'candidate_sources'  && <CandidateSourcesWidget   sources={data.candidate_sources} />}
-              {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} />}
-              {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
-              {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
+          {/* Render widgets in 2-col grid */}
+          {(activeView?.widgets ?? []).length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {(activeView?.widgets ?? []).map(wId => {
+                // Interviews and Tasks span the full width — they have tabs/tables that need space
+                const isWide = ['interviews', 'tasks', 'overview_stats'].includes(wId)
+                return (
+                  <div
+                    key={wId}
+                    className={`rounded-xl border border-slate-200 bg-white p-4 ${isWide ? 'lg:col-span-2' : ''} ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} />}
+                    {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} />}
+                    {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
+                    {wId === 'pipeline'           && <PipelineWidget           breakdown={data.candidate_breakdown} />}
+                    {wId === 'jobs_mini'          && <JobsMiniWidget           jobs={data.top_jobs} />}
+                    {wId === 'jobs_by_dept'       && <JobsByDeptWidget         departments={data.jobs_by_dept} />}
+                    {wId === 'hm_actions'         && <HmActionsWidget          approvals={data.tasks.pending_approvals} />}
+                    {wId === 'recent_applications'&& <RecentApplicationsWidget applications={data.recent_applications} />}
+                    {wId === 'top_scored'         && <TopScoredWidget          candidates={data.top_scored} />}
+                    {wId === 'candidate_sources'  && <CandidateSourcesWidget   sources={data.candidate_sources} />}
+                    {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} />}
+                    {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
+                    {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
+                  </div>
+                )
+              })}
             </div>
-          ))}
-
-          {(activeView?.widgets ?? []).length === 0 && !widgetMode && (
+          ) : !widgetMode ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Settings2 className="mb-3 h-8 w-8 text-slate-300" />
               <p className="text-sm font-medium text-slate-600">This view has no widgets yet</p>
               <p className="mt-1 text-xs text-slate-400">Click <strong>Customize</strong> above to add some</p>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 

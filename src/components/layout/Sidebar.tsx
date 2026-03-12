@@ -59,12 +59,14 @@ export function Sidebar() {
       className={`relative flex h-screen flex-col border-r border-slate-200 bg-white transition-[width] duration-200 ease-in-out ${w} shrink-0`}
     >
       {/* Logo */}
-      <div className="flex h-14 items-center border-b border-slate-100 px-4">
+      <div className={`flex border-b border-slate-100 ${collapsed ? 'h-16 flex-col items-center justify-center gap-1 px-2' : 'h-14 items-center px-4'}`}>
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600">
           <Zap className="h-4 w-4 text-white" />
         </div>
-        {!collapsed && (
-          <span className="ml-2.5 truncate text-base font-bold tracking-tight text-slate-900">
+        {collapsed ? (
+          <span className="text-[7px] font-bold tracking-widest text-slate-300 uppercase select-none">RS</span>
+        ) : (
+          <span className="ml-2.5 truncate text-sm font-bold tracking-tight text-slate-900">
             RecruiterStack
           </span>
         )}
