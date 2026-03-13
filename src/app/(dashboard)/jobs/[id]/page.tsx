@@ -8,7 +8,7 @@ import {
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
   Settings2, LayoutList, Kanban, SlidersHorizontal,
-  ArrowUp, ArrowDown, ArrowDownUp, GripVertical,
+  ArrowUp, ArrowDown, ArrowDownUp, GripVertical, GripHorizontal,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
@@ -2076,6 +2076,30 @@ export default function JobPipelinePage() {
   const [copied, setCopied] = useState(false)
   const dragId      = useRef<string | null>(null)
   const dragStageId = useRef<string | null>(null)
+
+  // Split-pane: active (top) / rejected (bottom)
+  const [splitHeight, setSplitHeight] = useState<number | null>(null)
+  const splitDragRef  = useRef<{ startY: number; startH: number } | null>(null)
+  const activeAreaRef = useRef<HTMLDivElement>(null)
+
+  const handleSplitMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const h = activeAreaRef.current?.getBoundingClientRect().height ?? 400
+    splitDragRef.current = { startY: e.clientY, startH: h }
+    const onMove = (me: MouseEvent) => {
+      if (!splitDragRef.current) return
+      const delta = me.clientY - splitDragRef.current.startY
+      const next = Math.max(180, Math.min(window.innerHeight * 0.82, splitDragRef.current.startH + delta))
+      setSplitHeight(next)
+    }
+    const onUp = () => {
+      splitDragRef.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
   // Prevents load() from overwriting scored state with stale server data.
   // Set to true at scoring start; cleared 5 s after scoring ends so that
   // the visibilitychange / switchView refetch guards don't live forever.
@@ -2212,6 +2236,15 @@ export default function JobPipelinePage() {
     }
     return result
   }, [grouped, applyFilters])
+
+  // Rejected apps grouped by stage (for the bottom rejected pane)
+  const rejectedGrouped = useMemo(() =>
+    (job?.pipeline_stages ?? []).reduce<Record<string, Application[]>>((acc, s) => {
+      acc[s.id] = (job?.applications ?? []).filter(a => a.status === 'rejected' && a.stage_id === s.id)
+      return acc
+    }, {}),
+  [job])
+  const totalRejected = Object.values(rejectedGrouped).reduce((n, a) => n + a.length, 0)
 
   // ── Drag & Drop ──────────────────────────────────────────────────────────
   const handleDrop = async (newStageId: string) => {
@@ -2831,9 +2864,16 @@ export default function JobPipelinePage() {
 
       {/* Kanban */}
       {viewMode === 'kanban' && (
-      <div className={`flex items-stretch flex-1 min-w-0 px-6 py-6 divide-x transition-colors ${
-        editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-100 bg-transparent'
-      }`}>
+      <div className="flex flex-col flex-1 min-w-0">
+
+      {/* ── Active candidates ──────────────────────────────────────────── */}
+      <div
+        ref={activeAreaRef}
+        style={splitHeight !== null ? { height: splitHeight, flexShrink: 0 } : { minHeight: '55vh', flexShrink: 0 }}
+        className={`flex items-stretch overflow-x-auto overflow-y-hidden px-6 py-6 divide-x transition-colors ${
+          editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-100 bg-transparent'
+        }`}
+      >
         {job.pipeline_stages.map((stage, stageIndex) => (
           <div
             key={stage.id}
@@ -2929,7 +2969,7 @@ export default function JobPipelinePage() {
         )}
 
         {/* Edit Pipeline toggle — far right */}
-        <div className="shrink-0 flex items-start pl-4 pt-1">
+        <div className="shrink-0 flex flex-col gap-1.5 items-stretch pl-4 pt-1">
           <button
             onClick={() => setEditMode(e => !e)}
             className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -2943,6 +2983,14 @@ export default function JobPipelinePage() {
               : <><Pencil className="h-3.5 w-3.5" /> Edit</>
             }
           </button>
+          {editMode && (
+            <button
+              onClick={() => { setEditMode(false); setNewStageName(''); load() }}
+              className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-500 transition-colors"
+            >
+              <X className="h-3 w-3" /> Discard
+            </button>
+          )}
         </div>
 
         {/* Unstaged bucket */}
@@ -2968,6 +3016,57 @@ export default function JobPipelinePage() {
             </div>
           </div>
         )}
+      </div>
+      {/* ── end active candidates ── */}
+
+      {/* Draggable divider */}
+      <div
+        className="shrink-0 h-7 flex items-center cursor-row-resize select-none group relative"
+        onMouseDown={handleSplitMouseDown}
+      >
+        <div className="absolute inset-x-0 h-px bg-slate-200 group-hover:bg-violet-300 transition-colors" />
+        <div className="relative mx-auto flex items-center gap-1.5 bg-white border border-slate-200 group-hover:border-violet-300 group-hover:text-violet-500 rounded-full px-3 py-0.5 text-xs text-slate-400 transition-all shadow-sm z-10">
+          <GripHorizontal className="h-3 w-3" />
+          <span className="font-semibold text-red-400">Rejected</span>
+          {totalRejected > 0 && (
+            <span className="bg-red-100 text-red-500 rounded-full px-1.5 font-semibold">{totalRejected}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Rejected candidates ────────────────────────────────────────── */}
+      <div className="flex items-start overflow-x-auto overflow-y-auto px-6 py-4 divide-x divide-slate-100 min-h-[160px] bg-red-50/10 flex-1">
+        {job.pipeline_stages.map(stage => {
+          const rejApps = rejectedGrouped[stage.id] ?? []
+          const stStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
+          return (
+            <div key={stage.id} className="flex-1 min-w-[180px] max-w-[320px] px-3 shrink-0">
+              {/* Simplified header — no edit, no select-all */}
+              <div className="flex items-center gap-2 rounded-xl px-3 py-2 mb-2 bg-slate-50 border border-slate-100">
+                <div className={`h-2 w-2 rounded-full shrink-0 ${stStyle.dot}`} />
+                <span className="text-xs text-slate-500 font-medium flex-1 min-w-0 truncate">{stage.name}</span>
+                {rejApps.length > 0 && (
+                  <span className="text-xs font-semibold text-red-400 bg-red-50 border border-red-100 rounded-full px-1.5">{rejApps.length}</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                {rejApps.map(app => (
+                  <CandidateCard
+                    key={app.id}
+                    app={app}
+                    onDragStart={() => {}}
+                    onClick={setSelectedApp}
+                    isSelected={false}
+                    onToggleSelect={() => {}}
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {/* ── end rejected candidates ── */}
+
       </div>
       )} {/* end viewMode === 'kanban' */}
 
