@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 
   // Persist tokens in org_settings
   const supabase = createAdminClient()
-  await supabase
+  const { error: upsertError } = await supabase
     .from('org_settings')
     .upsert(
       {
@@ -84,6 +84,13 @@ export async function GET(request: NextRequest) {
       },
       { onConflict: 'org_id' }
     )
+
+  if (upsertError) {
+    console.error('[google-oauth] upsert failed:', upsertError)
+    return NextResponse.redirect(
+      `${appUrl}/settings?google=error&reason=db_${encodeURIComponent(upsertError.code ?? 'unknown')}`
+    )
+  }
 
   return NextResponse.redirect(`${appUrl}/settings?google=connected`)
 }
