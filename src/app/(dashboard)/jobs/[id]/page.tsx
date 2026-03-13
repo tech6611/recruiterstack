@@ -55,15 +55,15 @@ function fmtRelative(d: string) {
 
 // ── Stage colours ─────────────────────────────────────────────────────────────
 
-const STAGE_STYLES: Record<StageColor, { header: string; dot: string; border: string; bar: string }> = {
-  slate:   { header: 'bg-slate-100',   dot: 'bg-slate-400',   border: 'border-slate-300',   bar: 'border-y-4 border-slate-300'   },
-  blue:    { header: 'bg-blue-50',     dot: 'bg-blue-500',    border: 'border-blue-300',    bar: 'border-y-4 border-blue-300'    },
-  violet:  { header: 'bg-violet-50',   dot: 'bg-violet-500',  border: 'border-violet-300',  bar: 'border-y-4 border-violet-300'  },
-  amber:   { header: 'bg-amber-50',    dot: 'bg-amber-500',   border: 'border-amber-300',   bar: 'border-y-4 border-amber-300'   },
-  emerald: { header: 'bg-emerald-50',  dot: 'bg-emerald-500', border: 'border-emerald-300', bar: 'border-y-4 border-emerald-300' },
-  green:   { header: 'bg-green-50',    dot: 'bg-green-500',   border: 'border-green-300',   bar: 'border-y-4 border-green-300'   },
-  red:     { header: 'bg-red-50',      dot: 'bg-red-500',     border: 'border-red-300',     bar: 'border-y-4 border-red-300'     },
-  pink:    { header: 'bg-pink-50',     dot: 'bg-pink-500',    border: 'border-pink-300',    bar: 'border-y-4 border-pink-300'    },
+const STAGE_STYLES: Record<StageColor, { header: string; dot: string; border: string; bar: string; barTop: string; barBottom: string }> = {
+  slate:   { header: 'bg-slate-100',   dot: 'bg-slate-400',   border: 'border-slate-300',   bar: 'border-y-4 border-slate-300',   barTop: 'border-t-4 border-slate-300',   barBottom: 'border-b-4 border-slate-300'   },
+  blue:    { header: 'bg-blue-50',     dot: 'bg-blue-500',    border: 'border-blue-300',    bar: 'border-y-4 border-blue-300',    barTop: 'border-t-4 border-blue-300',    barBottom: 'border-b-4 border-blue-300'    },
+  violet:  { header: 'bg-violet-50',   dot: 'bg-violet-500',  border: 'border-violet-300',  bar: 'border-y-4 border-violet-300',  barTop: 'border-t-4 border-violet-300',  barBottom: 'border-b-4 border-violet-300'  },
+  amber:   { header: 'bg-amber-50',    dot: 'bg-amber-500',   border: 'border-amber-300',   bar: 'border-y-4 border-amber-300',   barTop: 'border-t-4 border-amber-300',   barBottom: 'border-b-4 border-amber-300'   },
+  emerald: { header: 'bg-emerald-50',  dot: 'bg-emerald-500', border: 'border-emerald-300', bar: 'border-y-4 border-emerald-300', barTop: 'border-t-4 border-emerald-300', barBottom: 'border-b-4 border-emerald-300' },
+  green:   { header: 'bg-green-50',    dot: 'bg-green-500',   border: 'border-green-300',   bar: 'border-y-4 border-green-300',   barTop: 'border-t-4 border-green-300',   barBottom: 'border-b-4 border-green-300'   },
+  red:     { header: 'bg-red-50',      dot: 'bg-red-500',     border: 'border-red-300',     bar: 'border-y-4 border-red-300',     barTop: 'border-t-4 border-red-300',     barBottom: 'border-b-4 border-red-300'     },
+  pink:    { header: 'bg-pink-50',     dot: 'bg-pink-500',    border: 'border-pink-300',    bar: 'border-y-4 border-pink-300',    barTop: 'border-t-4 border-pink-300',    barBottom: 'border-b-4 border-pink-300'    },
 }
 
 const COLOR_OPTIONS: { value: StageColor; label: string; dot: string }[] = [
@@ -322,8 +322,8 @@ function StageColumn({
           {showDragHandle && (
             <GripVertical className="h-4 w-4 text-slate-300 shrink-0 cursor-grab" />
           )}
-          {/* Select-all toggle — hidden in edit mode */}
-          {!editMode && (
+          {/* Select-all toggle — visible only in edit mode */}
+          {editMode && (
             <button
               onClick={() => onSelectAllInStage(apps.map(a => a.id), !allInStageSelected)}
               title={allInStageSelected ? 'Deselect all in this stage' : 'Select all in this stage'}
@@ -2898,10 +2898,10 @@ export default function JobPipelinePage() {
       >
         {/* Status column — sticky, not tied to stages */}
         <div
-          className="sticky left-0 z-10 shrink-0 flex flex-col border-y-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
+          className="sticky left-0 z-10 shrink-0 flex flex-col border-t-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
           style={{ width: statusColWidth }}
         >
-          <div className="rounded-xl bg-violet-50 border-2 border-violet-300 px-2.5 py-2 flex items-center gap-1.5 mb-1 min-w-0">
+          <div className="rounded-xl bg-violet-50 border-2 border-violet-300 px-2.5 py-2.5 flex items-center gap-1.5 mb-1 min-w-0">
             <div className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
             <span className="text-xs font-bold text-violet-700 flex-1 min-w-0 truncate">Active</span>
             <span className="text-xs font-bold text-violet-600 bg-white rounded-full px-1.5 border border-violet-200 shrink-0">{activeApps.length}</span>
@@ -2920,7 +2920,7 @@ export default function JobPipelinePage() {
           return (
           <div
             key={stage.id}
-            className={`flex-1 min-w-[180px] max-w-[320px] px-3 py-5 transition-colors ${stColStyle.bar} ${
+            className={`flex-1 min-w-[180px] max-w-[320px] px-3 py-5 transition-colors ${stColStyle.barTop} ${
               editMode ? 'cursor-grab active:cursor-grabbing' : ''
             }`}
             draggable={editMode}
@@ -3015,7 +3015,7 @@ export default function JobPipelinePage() {
         <div className="shrink-0 flex flex-col gap-1.5 items-stretch pl-4 pt-6">
           <button
             onClick={() => setEditMode(e => !e)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${
               editMode
                 ? 'border-violet-300 bg-violet-600 text-white hover:bg-violet-500 shadow-sm'
                 : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 bg-white'
@@ -3073,10 +3073,10 @@ export default function JobPipelinePage() {
       <div className="flex items-stretch overflow-x-auto overflow-y-auto divide-x divide-slate-100 min-h-[160px] bg-red-50/10 flex-1">
         {/* Status column — sticky, mirrors active section */}
         <div
-          className="sticky left-0 z-10 shrink-0 flex flex-col border-y-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
+          className="sticky left-0 z-10 shrink-0 flex flex-col border-b-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
           style={{ width: statusColWidth }}
         >
-          <div className="rounded-xl bg-red-50 border-2 border-red-300 px-2.5 py-2 flex items-center gap-1.5 min-w-0">
+          <div className="rounded-xl bg-red-50 border-2 border-red-300 px-2.5 py-2.5 flex items-center gap-1.5 min-w-0">
             <div className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
             <span className="text-xs font-bold text-red-700 flex-1 min-w-0 truncate">Rejected</span>
             <span className="text-xs font-bold text-red-600 bg-white rounded-full px-1.5 border border-red-200 shrink-0">{totalRejected}</span>
@@ -3093,7 +3093,7 @@ export default function JobPipelinePage() {
           const rejApps = rejectedGrouped[stage.id] ?? []
           const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
           return (
-            <div key={stage.id} className={`flex-1 min-w-[180px] max-w-[320px] px-3 py-4 ${stColStyle.bar}`}>
+            <div key={stage.id} className={`flex-1 min-w-[180px] max-w-[320px] px-3 py-4 ${stColStyle.barBottom}`}>
               {/* No column header — already shown in active section above */}
               <div className="flex flex-col gap-2">
                 {rejApps.map(app => (
