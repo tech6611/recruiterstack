@@ -7,7 +7,8 @@ import {
   ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
-  Settings2, LayoutList, Kanban, ArrowDownUp, SlidersHorizontal,
+  Settings2, LayoutList, Kanban, SlidersHorizontal,
+  ArrowUp, ArrowDown, ArrowDownUp,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
@@ -108,6 +109,16 @@ function initials(name: string) {
 
 function daysSince(dateStr: string) {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
+}
+
+// Suggested-action sort priority (module-level so RankedView can reference it)
+function actionSortKey(a: { ai_score: number | null; ai_recommendation: string | null }): number {
+  if (a.ai_score === null) return 4
+  if (a.ai_recommendation === 'strong_yes') return 0
+  if (a.ai_recommendation === 'yes')        return 1
+  if (a.ai_recommendation === 'maybe')      return 2
+  if (a.ai_recommendation === 'no')         return 3
+  return 4
 }
 
 // ── AI Score pill ─────────────────────────────────────────────────────────────
@@ -1106,16 +1117,81 @@ function RankedView({
 
   const closeMenu = () => { setOpenRowMenu(null); setRowMenuPos(null) }
 
-  const sorted = [...apps].sort((a, b) => {
-    if (a.ai_score === null && b.ai_score === null) return 0
-    if (a.ai_score === null) return 1
-    if (b.ai_score === null) return -1
-    return b.ai_score - a.ai_score
-  })
+  // Column sort state — null means default (score desc, unscored last)
+  type SortCol = 'score' | 'name' | 'signal' | 'stage' | 'source' | 'days' | 'action'
+  const [sortCol, setSortCol] = useState<SortCol | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  const handleSort = (col: SortCol) => {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortCol(col)
+      setSortDir(col === 'name' || col === 'stage' || col === 'source' || col === 'days' ? 'asc' : 'desc')
+    }
+  }
+
+  const sortedApps = useMemo(() => {
+    if (sortCol === null) {
+      // Default: scored candidates first by score desc, unscored at end
+      return [...apps].sort((a, b) => {
+        if (a.ai_score === null && b.ai_score === null) return 0
+        if (a.ai_score === null) return 1
+        if (b.ai_score === null) return -1
+        return b.ai_score - a.ai_score
+      })
+    }
+    return [...apps].sort((a, b) => {
+      let cmp = 0
+      if (sortCol === 'score') {
+        if (a.ai_score === null && b.ai_score === null) cmp = 0
+        else if (a.ai_score === null) cmp = 1
+        else if (b.ai_score === null) cmp = -1
+        else cmp = a.ai_score - b.ai_score
+      } else if (sortCol === 'name') {
+        cmp = (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? '')
+      } else if (sortCol === 'signal') {
+        const o: Record<string, number> = { strong_yes: 0, yes: 1, maybe: 2, no: 3 }
+        cmp = (o[a.ai_recommendation ?? ''] ?? 4) - (o[b.ai_recommendation ?? ''] ?? 4)
+      } else if (sortCol === 'stage') {
+        cmp = stages.findIndex(s => s.id === a.stage_id) - stages.findIndex(s => s.id === b.stage_id)
+      } else if (sortCol === 'source') {
+        cmp = (a.source ?? '').localeCompare(b.source ?? '')
+      } else if (sortCol === 'days') {
+        cmp = daysSince(a.applied_at) - daysSince(b.applied_at)
+      } else if (sortCol === 'action') {
+        cmp = actionSortKey(a) - actionSortKey(b)
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [apps, sortCol, sortDir, stages])
+
+  // Reusable sortable header cell
+  const SortTh = ({ col, children, className = '' }: { col: SortCol; children: React.ReactNode; className?: string }) => {
+    const active = sortCol === col
+    return (
+      <th
+        onClick={() => handleSort(col)}
+        className={`text-left text-xs font-semibold px-4 py-3 cursor-pointer select-none group transition-colors ${
+          active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
+        } ${className}`}
+      >
+        <div className="flex items-center gap-1">
+          {children}
+          {active
+            ? sortDir === 'asc'
+              ? <ArrowUp className="h-3 w-3 text-blue-500 shrink-0" />
+              : <ArrowDown className="h-3 w-3 text-blue-500 shrink-0" />
+            : <ArrowDownUp className="h-3 w-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+          }
+        </div>
+      </th>
+    )
+  }
 
   // Select-all state for header checkbox (all visible rows)
-  const allSelected  = sorted.length > 0 && sorted.every(a => selectedApps.has(a.id))
-  const someSelected = !allSelected && sorted.some(a => selectedApps.has(a.id))
+  const allSelected  = sortedApps.length > 0 && sortedApps.every(a => selectedApps.has(a.id))
+  const someSelected = !allSelected && sortedApps.some(a => selectedApps.has(a.id))
 
   let scoredRank = 0
 
@@ -1127,7 +1203,7 @@ function RankedView({
             <tr className="border-b border-slate-100 bg-slate-50/60">
               <th className="px-4 py-3 w-10">
                 <div
-                  onClick={() => onBulkSelect(allSelected || someSelected ? [] : sorted.map(a => a.id))}
+                  onClick={() => onBulkSelect(allSelected || someSelected ? [] : sortedApps.map(a => a.id))}
                   title={allSelected || someSelected ? 'Deselect all' : 'Select all visible candidates'}
                   className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
                     allSelected  ? 'bg-blue-500 border-blue-500' :
@@ -1139,19 +1215,19 @@ function RankedView({
                   {someSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
                 </div>
               </th>
-              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3 w-10">#</th>
-              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Candidate</th>
-              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Score</th>
-              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">AI Signal</th>
-              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Stage</th>
-              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Source</th>
-              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Days</th>
-              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3 w-48">Suggested Action</th>
+              <SortTh col="score" className="w-10">#</SortTh>
+              <SortTh col="name">Candidate</SortTh>
+              <SortTh col="score">Score</SortTh>
+              <SortTh col="signal">AI Signal</SortTh>
+              <SortTh col="stage">Stage</SortTh>
+              <SortTh col="source">Source</SortTh>
+              <SortTh col="days">Days</SortTh>
+              <SortTh col="action" className="w-48">Suggested Action</SortTh>
               <th className="px-4 py-3 w-12" />
             </tr>
           </thead>
           <tbody>
-            {sorted.map((app) => {
+            {sortedApps.map((app) => {
               const c = app.candidate!
               const stage = stages.find(s => s.id === app.stage_id)
               const rec = app.ai_recommendation ? AI_REC_CONFIG[app.ai_recommendation] : null
@@ -1352,7 +1428,7 @@ function RankedView({
             })}
           </tbody>
         </table>
-        {sorted.length === 0 && (
+        {sortedApps.length === 0 && (
           <div className="py-16 text-center text-sm text-slate-400">No active candidates</div>
         )}
       </div>
@@ -1988,7 +2064,6 @@ export default function JobPipelinePage() {
     filterSource !== 'all', filterStage !== 'all', filterScore !== 'all',
     filterSignal !== 'all', filterAction !== 'all',
   ].filter(Boolean).length
-  const [sortBy,        setSortBy]        = useState<'date' | 'score' | 'name' | 'stage' | 'action'>('date')
   const [openStageMenu, setOpenStageMenu] = useState<string | null>(null)
   const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set())
 
@@ -2089,39 +2164,17 @@ export default function JobPipelinePage() {
     return filtered
   }, [filterSearch, filterSource, filterStage, filterScore, filterSignal, filterAction, job])
 
-  // Filtered + sorted flat list (for Ranked view)
-  // Suggested-action sort priority: strong_yes → yes → maybe → no → unscored
-  const actionSortKey = (a: Application) => {
-    if (a.ai_score === null) return 4
-    if (a.ai_recommendation === 'strong_yes') return 0
-    if (a.ai_recommendation === 'yes')        return 1
-    if (a.ai_recommendation === 'maybe')      return 2
-    if (a.ai_recommendation === 'no')         return 3
-    return 4
-  }
+  // Filtered flat list for Ranked view (sort happens inside RankedView via column headers)
+  const filteredApps = useMemo(() => applyFilters(activeApps), [activeApps, applyFilters])
 
-  const filteredApps = useMemo(() => {
-    const stages = job?.pipeline_stages ?? []
-    let apps = applyFilters(activeApps)
-    if (sortBy === 'score')  apps = [...apps].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))
-    if (sortBy === 'name')   apps = [...apps].sort((a, b) => (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? ''))
-    if (sortBy === 'stage')  apps = [...apps].sort((a, b) => stages.findIndex(s => s.id === a.stage_id) - stages.findIndex(s => s.id === b.stage_id))
-    if (sortBy === 'action') apps = [...apps].sort((a, b) => actionSortKey(a) - actionSortKey(b))
-    return apps
-  }, [activeApps, applyFilters, sortBy, job])
-
-  // Filtered + sorted view of grouped (for Kanban — stage sort excluded since cards are already in columns)
+  // Filtered grouped for Kanban (no column-level sort — cards kept in natural order)
   const filteredGrouped = useMemo(() => {
     const result: Record<string, Application[]> = {}
     for (const [sid, apps] of Object.entries(grouped)) {
-      let filtered = applyFilters(apps)
-      if (sortBy === 'score')  filtered = [...filtered].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))
-      else if (sortBy === 'name')   filtered = [...filtered].sort((a, b) => (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? ''))
-      else if (sortBy === 'action') filtered = [...filtered].sort((a, b) => actionSortKey(a) - actionSortKey(b))
-      result[sid] = filtered
+      result[sid] = applyFilters(apps)
     }
     return result
-  }, [grouped, applyFilters, sortBy])
+  }, [grouped, applyFilters])
 
   // ── Drag & Drop ──────────────────────────────────────────────────────────
   const handleDrop = async (newStageId: string) => {
@@ -2696,24 +2749,16 @@ export default function JobPipelinePage() {
           )}
         </div>
 
-        <div className="w-px h-5 bg-slate-200" />
-
-        {/* Sort by */}
-        <div className="flex items-center gap-1.5 text-slate-500">
-          <ArrowDownUp className="h-3.5 w-3.5" />
-          <span className="text-sm text-slate-400">Sort by</span>
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as 'date' | 'score' | 'name' | 'stage' | 'action')}
-            className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+        {/* Selected-apps chip — explicit deselect all */}
+        {selectedApps.size > 0 && (
+          <button
+            onClick={() => setSelectedApps(new Set())}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors font-medium"
           >
-            <option value="date">Date applied</option>
-            <option value="score">AI Score</option>
-            <option value="name">Name (A–Z)</option>
-            <option value="stage">Stage</option>
-            <option value="action">Suggested Action</option>
-          </select>
-        </div>
+            {selectedApps.size} selected
+            <X className="h-3 w-3" />
+          </button>
+        )}
 
         {(filterSearch || activeFilterCount > 0) && (
           <button
@@ -2723,7 +2768,7 @@ export default function JobPipelinePage() {
             }}
             className="text-xs text-violet-600 hover:text-violet-800 underline underline-offset-2 font-medium"
           >
-            Clear all
+            Clear filters
           </button>
         )}
       </div>
