@@ -145,16 +145,6 @@ const AI_REC_CONFIG: Record<AiRecommendation, { label: string; cls: string }> = 
 
 // ── Candidate card ────────────────────────────────────────────────────────────
 
-const SIGNAL_ACCENT: Record<string, string> = {
-  strong_yes: '#10b981', yes: '#3b82f6', maybe: '#f59e0b', no: '#ef4444',
-}
-const SIGNAL_BADGE: Record<string, { label: string; cls: string }> = {
-  strong_yes: { label: 'Strong Yes', cls: 'bg-emerald-100 text-emerald-700' },
-  yes:        { label: 'Yes',        cls: 'bg-blue-100 text-blue-700'       },
-  maybe:      { label: 'Maybe',      cls: 'bg-amber-100 text-amber-700'     },
-  no:         { label: 'No',         cls: 'bg-red-100 text-red-700'         },
-}
-
 function CandidateCard({
   app, onDragStart, onClick, isSelected, onToggleSelect,
 }: {
