@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Plus, Minus, Link2, Users, Pencil, Check, X,
+  ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
   Settings2, LayoutList, Kanban, SlidersHorizontal,
@@ -2062,7 +2062,6 @@ export default function JobPipelinePage() {
   const [job, setJob] = useState<JobWithPipeline | null>(null)
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
-  const [addStageOpen, setAddStageOpen] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [newStageName, setNewStageName] = useState('')
   const [addingStage, setAddingStage] = useState(false)
