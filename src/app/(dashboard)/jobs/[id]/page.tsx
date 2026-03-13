@@ -7,7 +7,7 @@ import {
   ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
-  Settings2, LayoutList, Kanban, Filter, ArrowDownUp,
+  Settings2, LayoutList, Kanban, ArrowDownUp,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
@@ -2024,9 +2024,13 @@ export default function JobPipelinePage() {
   const [showAutopilot, setShowAutopilot] = useState(false)
 
   // Kanban filter / sort state
-  const [filterSearch, setFilterSearch] = useState('')
-  const [filterSource, setFilterSource] = useState('all')
-  const [sortBy, setSortBy] = useState<'date' | 'score' | 'name'>('date')
+  const [filterSearch,  setFilterSearch]  = useState('')
+  const [filterSource,  setFilterSource]  = useState('all')
+  const [filterStage,   setFilterStage]   = useState('all')
+  const [filterScore,   setFilterScore]   = useState('all')   // 'all' | 'scored' | 'unscored'
+  const [filterSignal,  setFilterSignal]  = useState('all')   // 'all' | 'strong_yes' | 'yes' | 'maybe' | 'no'
+  const [filterAction,  setFilterAction]  = useState('all')   // 'all' | 'score_needed' | 'advance' | 'reject'
+  const [sortBy,        setSortBy]        = useState<'date' | 'score' | 'name'>('date')
   const [openStageMenu, setOpenStageMenu] = useState<string | null>(null)
   const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set())
   // Which stage is currently "active" for bulk selection — only one at a time
@@ -2100,28 +2104,51 @@ export default function JobPipelinePage() {
   }, {})
   const unstaged = activeApps.filter(a => !a.stage_id)
 
-  // Filtered + sorted view of grouped (for kanban display)
+  // Helper: apply all active filters to a flat array of applications
+  const applyFilters = useCallback((apps: Application[]) => {
+    let filtered = apps
+    const q = filterSearch.trim().toLowerCase()
+    if (q)                       filtered = filtered.filter(a => (a.candidate?.name ?? '').toLowerCase().includes(q))
+    if (filterSource !== 'all')  filtered = filtered.filter(a => a.source === filterSource)
+    if (filterStage  !== 'all')  filtered = filtered.filter(a => a.stage_id === filterStage)
+    if (filterScore  === 'scored')   filtered = filtered.filter(a => a.ai_score !== null)
+    if (filterScore  === 'unscored') filtered = filtered.filter(a => a.ai_score === null)
+    if (filterSignal !== 'all')  filtered = filtered.filter(a => a.ai_recommendation === filterSignal)
+    if (filterAction !== 'all') {
+      const stages = job?.pipeline_stages ?? []
+      filtered = filtered.filter(a => {
+        const idx        = stages.findIndex(s => s.id === a.stage_id)
+        const isLast     = idx === stages.length - 1
+        const hasNext    = idx >= 0 && !isLast && stages.length > 1
+        if (filterAction === 'score_needed') return a.ai_score === null
+        if (filterAction === 'reject')       return a.ai_recommendation === 'no'
+        if (filterAction === 'advance')      return a.ai_recommendation !== 'no' && hasNext && a.ai_score !== null
+        return true
+      })
+    }
+    return filtered
+  }, [filterSearch, filterSource, filterStage, filterScore, filterSignal, filterAction, job])
+
+  // Filtered + sorted flat list (for Ranked view)
+  const filteredApps = useMemo(() => {
+    let apps = applyFilters(activeApps)
+    if (sortBy === 'score') apps = [...apps].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))
+    if (sortBy === 'name')  apps = [...apps].sort((a, b) => (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? ''))
+    return apps
+  }, [activeApps, applyFilters, sortBy])
+
+  // Filtered + sorted view of grouped (for Kanban — stage filter excluded since stages are columns)
   const filteredGrouped = useMemo(() => {
     const result: Record<string, Application[]> = {}
     for (const [sid, apps] of Object.entries(grouped)) {
-      let filtered = apps
-      if (filterSearch.trim()) {
-        const q = filterSearch.toLowerCase()
-        filtered = filtered.filter(a => (a.candidate?.name ?? '').toLowerCase().includes(q))
-      }
-      if (filterSource !== 'all') {
-        filtered = filtered.filter(a => a.source === filterSource)
-      }
-      if (sortBy === 'score') {
-        filtered = [...filtered].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))
-      } else if (sortBy === 'name') {
-        filtered = [...filtered].sort((a, b) =>
-          (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? ''))
-      }
+      let filtered = applyFilters(apps)
+      if (sortBy === 'score') filtered = [...filtered].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))
+      else if (sortBy === 'name') filtered = [...filtered].sort((a, b) =>
+        (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? ''))
       result[sid] = filtered
     }
     return result
-  }, [grouped, filterSearch, filterSource, sortBy])
+  }, [grouped, applyFilters, sortBy])
 
   // ── Drag & Drop ──────────────────────────────────────────────────────────
   const handleDrop = async (newStageId: string) => {
@@ -2570,32 +2597,84 @@ export default function JobPipelinePage() {
 
       {/* Filter / sort bar */}
       <div className="flex items-center gap-2 px-8 py-2.5 border-b border-slate-100 bg-white flex-wrap">
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
           <input
             value={filterSearch}
             onChange={e => setFilterSearch(e.target.value)}
             placeholder="Search candidates…"
-            className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg w-52 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+            className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg w-48 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
           />
         </div>
 
-        <div className="flex items-center gap-1.5 text-slate-500">
-          <Filter className="h-3.5 w-3.5" />
-          <select
-            value={filterSource}
-            onChange={e => setFilterSource(e.target.value)}
-            className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-          >
-            <option value="all">All sources</option>
-            <option value="applied">Applied</option>
-            <option value="sourced">Sourced</option>
-            <option value="referral">Referral</option>
-            <option value="manual">Added</option>
-            <option value="imported">Imported</option>
-          </select>
-        </div>
+        <div className="w-px h-5 bg-slate-200" />
 
+        {/* Source */}
+        <select
+          value={filterSource}
+          onChange={e => setFilterSource(e.target.value)}
+          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+        >
+          <option value="all">All sources</option>
+          <option value="applied">Applied</option>
+          <option value="sourced">Sourced</option>
+          <option value="referral">Referral</option>
+          <option value="manual">Added</option>
+          <option value="imported">Imported</option>
+        </select>
+
+        {/* Stage */}
+        <select
+          value={filterStage}
+          onChange={e => setFilterStage(e.target.value)}
+          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+        >
+          <option value="all">All stages</option>
+          {job.pipeline_stages.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+
+        {/* Score */}
+        <select
+          value={filterScore}
+          onChange={e => setFilterScore(e.target.value)}
+          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+        >
+          <option value="all">All scores</option>
+          <option value="scored">Scored</option>
+          <option value="unscored">Not scored</option>
+        </select>
+
+        {/* AI Signal */}
+        <select
+          value={filterSignal}
+          onChange={e => setFilterSignal(e.target.value)}
+          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+        >
+          <option value="all">All signals</option>
+          <option value="strong_yes">Strong Yes</option>
+          <option value="yes">Yes</option>
+          <option value="maybe">Maybe</option>
+          <option value="no">No</option>
+        </select>
+
+        {/* Suggested Action */}
+        <select
+          value={filterAction}
+          onChange={e => setFilterAction(e.target.value)}
+          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+        >
+          <option value="all">All actions</option>
+          <option value="score_needed">Score needed</option>
+          <option value="advance">Move forward</option>
+          <option value="reject">Reject</option>
+        </select>
+
+        <div className="w-px h-5 bg-slate-200" />
+
+        {/* Sort */}
         <div className="flex items-center gap-1.5 text-slate-500">
           <ArrowDownUp className="h-3.5 w-3.5" />
           <select
@@ -2609,10 +2688,14 @@ export default function JobPipelinePage() {
           </select>
         </div>
 
-        {(filterSearch || filterSource !== 'all') && (
+        {(filterSearch || filterSource !== 'all' || filterStage !== 'all' ||
+          filterScore !== 'all' || filterSignal !== 'all' || filterAction !== 'all') && (
           <button
-            onClick={() => { setFilterSearch(''); setFilterSource('all') }}
-            className="text-xs text-slate-500 hover:text-slate-700 underline underline-offset-2"
+            onClick={() => {
+              setFilterSearch(''); setFilterSource('all'); setFilterStage('all')
+              setFilterScore('all'); setFilterSignal('all'); setFilterAction('all')
+            }}
+            className="text-xs text-violet-600 hover:text-violet-800 underline underline-offset-2 font-medium"
           >
             Clear filters
           </button>
@@ -2622,7 +2705,7 @@ export default function JobPipelinePage() {
       {/* Ranked view */}
       {viewMode === 'ranked' && (
         <RankedView
-          apps={activeApps}
+          apps={filteredApps}
           stages={job.pipeline_stages}
           onCardClick={setSelectedApp}
           onMoveToStage={handleStageChange}
