@@ -145,6 +145,16 @@ const AI_REC_CONFIG: Record<AiRecommendation, { label: string; cls: string }> = 
 
 // ── Candidate card ────────────────────────────────────────────────────────────
 
+const SIGNAL_ACCENT: Record<string, string> = {
+  strong_yes: '#10b981', yes: '#3b82f6', maybe: '#f59e0b', no: '#ef4444',
+}
+const SIGNAL_BADGE: Record<string, { label: string; cls: string }> = {
+  strong_yes: { label: 'Strong Yes', cls: 'bg-emerald-100 text-emerald-700' },
+  yes:        { label: 'Yes',        cls: 'bg-blue-100 text-blue-700'       },
+  maybe:      { label: 'Maybe',      cls: 'bg-amber-100 text-amber-700'     },
+  no:         { label: 'No',         cls: 'bg-red-100 text-red-700'         },
+}
+
 function CandidateCard({
   app, onDragStart, onClick, isSelected, onToggleSelect,
 }: {
@@ -155,18 +165,24 @@ function CandidateCard({
   onToggleSelect: (id: string) => void
 }) {
   const c = app.candidate!
+  const signalBadge = app.ai_recommendation ? SIGNAL_BADGE[app.ai_recommendation] : null
+  const accentColor = app.ai_score !== null && app.ai_recommendation
+    ? SIGNAL_ACCENT[app.ai_recommendation]
+    : undefined
+
   return (
     <div
       draggable
       onDragStart={() => onDragStart(app.id)}
       onClick={() => onClick(app)}
-      className={`group cursor-pointer rounded-xl border bg-white px-4 py-3 shadow-sm hover:shadow-md transition-all select-none ${
+      style={accentColor ? { borderLeftColor: accentColor, borderLeftWidth: '3px' } : undefined}
+      className={`group cursor-pointer rounded-xl border bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all select-none ${
         isSelected ? 'border-blue-400 ring-2 ring-blue-200' : 'border-slate-200 hover:border-blue-200'
       }`}
     >
+      {/* Header row: checkbox + avatar + name */}
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          {/* Checkbox — always visible for cross-stage free selection */}
+        <div className="flex items-center gap-2 min-w-0">
           <div
             onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
             className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
@@ -175,25 +191,32 @@ function CandidateCard({
           >
             {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
           </div>
-          <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${avatarColor(c.name)}`}>
+          <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold ${avatarColor(c.name)}`}>
             {initials(c.name)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900 truncate">{c.name}</p>
+            <p className="text-sm font-semibold text-slate-900 truncate leading-tight">{c.name}</p>
             {c.current_title && (
-              <p className="text-xs text-slate-400 truncate">{c.current_title}</p>
+              <p className="text-[11px] text-slate-400 truncate leading-tight mt-0.5">{c.current_title}</p>
             )}
           </div>
         </div>
-        <MoreHorizontal className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-opacity" />
+        <MoreHorizontal className="h-3.5 w-3.5 text-slate-300 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-opacity" />
       </div>
-      <div className="flex items-center justify-between mt-2.5">
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${SOURCE_COLORS[app.source] ?? SOURCE_COLORS.manual}`}>
+
+      {/* Footer row: source · signal · score · days */}
+      <div className="flex items-center justify-between mt-2.5 gap-1">
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${SOURCE_COLORS[app.source] ?? SOURCE_COLORS.manual}`}>
           {SOURCE_LABELS[app.source] ?? app.source}
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 flex-wrap justify-end">
+          {signalBadge && (
+            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${signalBadge.cls}`}>
+              {signalBadge.label}
+            </span>
+          )}
           {app.ai_score !== null && <ScorePill score={app.ai_score} />}
-          <span className="text-xs text-slate-400">{daysSince(app.applied_at)}d</span>
+          <span className="text-[11px] text-slate-400">{daysSince(app.applied_at)}d</span>
         </div>
       </div>
     </div>
@@ -283,7 +306,7 @@ function StageColumn({
 
   return (
     <div
-      className={`flex flex-col w-[260px] shrink-0 rounded-2xl border-2 transition-colors ${
+      className={`flex flex-col rounded-2xl border-2 transition-colors ${
         over ? `${style.border} shadow-md` : 'border-transparent'
       }`}
       onDragOver={e => { e.preventDefault(); setOver(true) }}
@@ -2799,57 +2822,58 @@ export default function JobPipelinePage() {
 
       {/* Kanban */}
       {viewMode === 'kanban' && (
-      <div className="flex gap-4 items-start overflow-x-auto px-8 py-6 flex-1">
+      <div className="flex gap-3 items-start px-8 py-6 flex-1 min-w-0">
         {job.pipeline_stages.map((stage, stageIndex) => (
-          <StageColumn
-            key={stage.id}
-            stage={stage}
-            apps={filteredGrouped[stage.id] ?? []}
-            editMode={editMode}
-            isMenuOpen={openStageMenu === stage.id}
-            onMenuOpen={() => setOpenStageMenu(stage.id)}
-            onMenuClose={() => setOpenStageMenu(null)}
-            onScoreStage={() => startScoring(stage.id)}
-            onMoveAllNext={async () => {
-              const nextStage = job.pipeline_stages[stageIndex + 1]
-              if (!nextStage) return
-              const stageApps = grouped[stage.id] ?? []
-              await Promise.all(stageApps.map(app =>
-                fetch(`/api/applications/${app.id}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ stage_id: nextStage.id }),
+          <div key={stage.id} className="flex-1 min-w-[180px] max-w-[320px]">
+            <StageColumn
+              stage={stage}
+              apps={filteredGrouped[stage.id] ?? []}
+              editMode={editMode}
+              isMenuOpen={openStageMenu === stage.id}
+              onMenuOpen={() => setOpenStageMenu(stage.id)}
+              onMenuClose={() => setOpenStageMenu(null)}
+              onScoreStage={() => startScoring(stage.id)}
+              onMoveAllNext={async () => {
+                const nextStage = job.pipeline_stages[stageIndex + 1]
+                if (!nextStage) return
+                const stageApps = grouped[stage.id] ?? []
+                await Promise.all(stageApps.map(app =>
+                  fetch(`/api/applications/${app.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stage_id: nextStage.id }),
+                  })
+                ))
+                load()
+              }}
+              onDragStart={id => { dragId.current = id }}
+              onDrop={handleDrop}
+              onCardClick={setSelectedApp}
+              onRename={handleRename}
+              onRecolor={handleRecolor}
+              onDelete={handleDeleteStage}
+              selectedApps={selectedApps}
+              onToggleSelect={toggleSelect}
+              onScheduleInterview={() => {
+                const stageApps = grouped[stage.id] ?? []
+                const selected = stageApps.filter(a => selectedApps.has(a.id))
+                setScheduleModalApps(selected.length > 0 ? selected : stageApps)
+              }}
+              selectedInStage={(grouped[stage.id] ?? []).filter(a => selectedApps.has(a.id)).length}
+              onSelectAllInStage={(ids, select) => {
+                setSelectedApps(prev => {
+                  const next = new Set(prev)
+                  ids.forEach(id => select ? next.add(id) : next.delete(id))
+                  return next
                 })
-              ))
-              load()
-            }}
-            onDragStart={id => { dragId.current = id }}
-            onDrop={handleDrop}
-            onCardClick={setSelectedApp}
-            onRename={handleRename}
-            onRecolor={handleRecolor}
-            onDelete={handleDeleteStage}
-            selectedApps={selectedApps}
-            onToggleSelect={toggleSelect}
-            onScheduleInterview={() => {
-              const stageApps = grouped[stage.id] ?? []
-              const selected = stageApps.filter(a => selectedApps.has(a.id))
-              setScheduleModalApps(selected.length > 0 ? selected : stageApps)
-            }}
-            selectedInStage={(grouped[stage.id] ?? []).filter(a => selectedApps.has(a.id)).length}
-            onSelectAllInStage={(ids, select) => {
-              setSelectedApps(prev => {
-                const next = new Set(prev)
-                ids.forEach(id => select ? next.add(id) : next.delete(id))
-                return next
-              })
-            }}
-          />
+              }}
+            />
+          </div>
         ))}
 
         {/* Add stage column */}
         {editMode ? (
-          <div className="w-[240px] shrink-0">
+          <div className="flex-1 min-w-[160px] max-w-[240px]">
             <div className="rounded-2xl border-2 border-dashed border-slate-200 p-3">
               <input
                 value={newStageName}
@@ -2871,16 +2895,16 @@ export default function JobPipelinePage() {
         ) : (
           <button
             onClick={() => setEditMode(true)}
-            className="w-[200px] shrink-0 h-20 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center gap-2 text-sm text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-colors"
+            className="shrink-0 w-10 h-10 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-colors self-start mt-1"
+            title="Add Stage"
           >
             <Plus className="h-4 w-4" />
-            Add Stage
           </button>
         )}
 
         {/* Unstaged bucket */}
         {unstaged.length > 0 && (
-          <div className="w-[240px] shrink-0">
+          <div className="flex-1 min-w-[180px] max-w-[260px]">
             <div className="flex items-center justify-between rounded-xl px-4 py-3 bg-slate-50">
               <span className="text-sm font-semibold text-slate-400 italic">Unstaged</span>
               <span className="text-xs font-semibold text-slate-400 bg-white rounded-full px-2 py-0.5 border border-slate-200">
