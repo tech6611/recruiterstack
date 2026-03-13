@@ -7,7 +7,7 @@ import {
   ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
-  Settings2, LayoutList, Kanban, ArrowDownUp,
+  Settings2, LayoutList, Kanban, ArrowDownUp, SlidersHorizontal,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
@@ -135,15 +135,13 @@ const AI_REC_CONFIG: Record<AiRecommendation, { label: string; cls: string }> = 
 // ── Candidate card ────────────────────────────────────────────────────────────
 
 function CandidateCard({
-  app, onDragStart, onClick, isSelected, onToggleSelect, showCheckbox,
+  app, onDragStart, onClick, isSelected, onToggleSelect,
 }: {
   app: Application
   onDragStart: (id: string) => void
   onClick: (app: Application) => void
   isSelected: boolean
   onToggleSelect: (id: string) => void
-  /** Whether the stage is in selection mode — shows checkbox, otherwise hidden */
-  showCheckbox: boolean
 }) {
   const c = app.candidate!
   return (
@@ -157,17 +155,14 @@ function CandidateCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          {/* Checkbox — only visible when stage selection mode is active */}
+          {/* Checkbox — always visible for cross-stage free selection */}
           <div
-            onClick={e => { e.stopPropagation(); if (showCheckbox) onToggleSelect(app.id) }}
-            className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-all ${
-              showCheckbox
-                ? `cursor-pointer ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'}`
-                : 'opacity-0 pointer-events-none w-0 overflow-hidden'
+            onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
+            className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
+              isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'
             }`}
-            style={showCheckbox ? {} : { width: 0, padding: 0, margin: 0 }}
           >
-            {isSelected && showCheckbox && <Check className="h-2.5 w-2.5 text-white" />}
+            {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
           </div>
           <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${avatarColor(c.name)}`}>
             {initials(c.name)}
@@ -229,8 +224,7 @@ function StageColumn({
   onToggleSelect,
   onScheduleInterview,
   selectedInStage,
-  isSelectionActive,
-  onToggleSelectionStage,
+  onSelectAllInStage,
 }: {
   stage: PipelineStage
   apps: Application[]
@@ -250,16 +244,17 @@ function StageColumn({
   onToggleSelect: (id: string) => void
   onScheduleInterview: () => void
   selectedInStage: number
-  /** Whether this stage is the currently active selection stage */
-  isSelectionActive: boolean
-  /** Toggle this stage as the active selection stage (clears cross-stage selections) */
-  onToggleSelectionStage: () => void
+  /** Select or deselect all apps in this stage (add/remove from global selection) */
+  onSelectAllInStage: (ids: string[], select: boolean) => void
 }) {
   const [over, setOver] = useState(false)
   const [editing, setEditing] = useState(false)
   const [nameVal, setNameVal] = useState(stage.name)
   const [showColors, setShowColors] = useState(false)
   const style = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
+
+  const allInStageSelected  = apps.length > 0 && apps.every(a => selectedApps.has(a.id))
+  const someInStageSelected = !allInStageSelected && apps.some(a => selectedApps.has(a.id))
 
   const saveRename = () => {
     if (nameVal.trim() && nameVal !== stage.name) onRename(stage.id, nameVal.trim())
@@ -287,17 +282,20 @@ function StageColumn({
       {/* Column header */}
       <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${style.header}`}>
         <div className="flex items-center gap-2 min-w-0">
-          {/* Selection mode toggle — click to activate/deactivate bulk selection for this stage */}
+          {/* Select-all toggle for this stage */}
           <button
-            onClick={onToggleSelectionStage}
-            title={isSelectionActive ? 'Deactivate selection mode' : 'Activate selection mode for this stage'}
+            onClick={() => onSelectAllInStage(apps.map(a => a.id), !allInStageSelected)}
+            title={allInStageSelected ? 'Deselect all in this stage' : 'Select all in this stage'}
             className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
-              isSelectionActive
+              allInStageSelected
                 ? 'bg-blue-500 border-blue-500'
-                : 'border-slate-300 bg-white/70 hover:border-blue-400'
+                : someInStageSelected
+                  ? 'bg-blue-100 border-blue-400'
+                  : 'border-slate-300 bg-white/70 hover:border-blue-400'
             }`}
           >
-            {isSelectionActive && <Check className="h-2.5 w-2.5 text-white" />}
+            {allInStageSelected  && <Check className="h-2.5 w-2.5 text-white" />}
+            {someInStageSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
           </button>
           <button
             onClick={() => editMode && setShowColors(!showColors)}
@@ -422,7 +420,6 @@ function StageColumn({
             onClick={onCardClick}
             isSelected={selectedApps.has(app.id)}
             onToggleSelect={onToggleSelect}
-            showCheckbox={isSelectionActive}
           />
         ))}
         {apps.length === 0 && (
@@ -1071,8 +1068,7 @@ function RankedView({
   selectedApps,
   onToggleSelect,
   onBulkSelect,
-  activeStageId,
-  onSetActiveStage,
+  isMultiStageSelection,
   onScoreApp,
   onScheduleApp,
   onRejectApp,
@@ -1082,12 +1078,10 @@ function RankedView({
   onCardClick: (app: Application) => void
   onMoveToStage: (appId: string, stageId: string) => void
   selectedApps: Set<string>
-  onToggleSelect: (id: string, stageId: string) => void
+  onToggleSelect: (id: string) => void
   onBulkSelect: (ids: string[]) => void
-  /** The currently active stage for bulk selection (null = none) */
-  activeStageId: string | null
-  /** Activate or clear the stage filter for bulk selection */
-  onSetActiveStage: (stageId: string | null) => void
+  /** True when selected apps span multiple pipeline stages — greys Suggested Action */
+  isMultiStageSelection: boolean
   onScoreApp: (app: Application) => void
   onScheduleApp: (app: Application) => void
   onRejectApp: (appId: string) => void
@@ -1119,57 +1113,30 @@ function RankedView({
     return b.ai_score - a.ai_score
   })
 
-  // For select-all, only count apps in the active stage (if any)
-  const activeStageApps = activeStageId ? sorted.filter(a => a.stage_id === activeStageId) : sorted
-  const allActiveSelected  = activeStageApps.length > 0 && activeStageApps.every(a => selectedApps.has(a.id))
-  const someActiveSelected = !allActiveSelected && activeStageApps.some(a => selectedApps.has(a.id))
-  const activeStageName    = activeStageId ? (stages.find(s => s.id === activeStageId)?.name ?? '') : ''
+  // Select-all state for header checkbox (all visible rows)
+  const allSelected  = sorted.length > 0 && sorted.every(a => selectedApps.has(a.id))
+  const someSelected = !allSelected && sorted.some(a => selectedApps.has(a.id))
 
   let scoredRank = 0
 
   return (
     <div className="px-8 py-6 flex-1">
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        {/* Active stage selection indicator */}
-        {activeStageId && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b border-blue-100">
-            <span className="text-xs text-blue-700 font-medium">Selecting from:</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 border border-blue-200 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
-              {activeStageName}
-              <button
-                onClick={() => { onSetActiveStage(null); onBulkSelect([]) }}
-                className="ml-0.5 text-blue-500 hover:text-blue-700"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-            {selectedApps.size > 0 && (
-              <span className="text-xs text-blue-500">{selectedApps.size} selected</span>
-            )}
-          </div>
-        )}
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60">
               <th className="px-4 py-3 w-10">
                 <div
-                  onClick={() => {
-                    if (!activeStageId) return // need to click a row first to set a stage
-                    onBulkSelect(allActiveSelected ? [] : activeStageApps.map(a => a.id))
-                  }}
-                  title={activeStageId ? `Select / deselect all in ${activeStageName}` : 'Click a candidate row to start selecting by stage'}
-                  className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                    activeStageId
-                      ? `cursor-pointer ${
-                          allActiveSelected  ? 'bg-blue-500 border-blue-500' :
-                          someActiveSelected ? 'bg-blue-100 border-blue-400' :
-                          'border-slate-300 hover:border-blue-400 bg-white'
-                        }`
-                      : 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-40'
+                  onClick={() => onBulkSelect(allSelected ? [] : sorted.map(a => a.id))}
+                  title="Select / deselect all visible candidates"
+                  className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
+                    allSelected  ? 'bg-blue-500 border-blue-500' :
+                    someSelected ? 'bg-blue-100 border-blue-400' :
+                    'border-slate-300 hover:border-blue-400 bg-white'
                   }`}
                 >
-                  {allActiveSelected  && <Check className="h-2.5 w-2.5 text-white" />}
-                  {someActiveSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
+                  {allSelected  && <Check className="h-2.5 w-2.5 text-white" />}
+                  {someSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
                 </div>
               </th>
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3 w-10">#</th>
@@ -1198,39 +1165,19 @@ function RankedView({
                 : null
               const isLastStage = currentStageIdx === stages.length - 1
 
-              // Cross-stage dimming: if another stage is active, dim this row
-              const isSameStage  = !activeStageId || app.stage_id === activeStageId
-              const isCrossStage = !isSameStage
-
               return (
                 <tr
                   key={app.id}
                   onClick={() => onCardClick(app)}
                   className={`border-b border-slate-50 cursor-pointer transition-colors last:border-0 ${
-                    isSelected         ? 'bg-blue-50' :
-                    isCrossStage       ? 'opacity-40 hover:opacity-70' :
-                    'hover:bg-slate-50'
+                    isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'
                   }`}
                 >
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <div
-                      onClick={e => {
-                        e.stopPropagation()
-                        // Clicking a cross-stage row checkbox activates that stage and selects
-                        if (isCrossStage) {
-                          onSetActiveStage(app.stage_id ?? null)
-                          onBulkSelect([app.id])
-                          return
-                        }
-                        if (!activeStageId) onSetActiveStage(app.stage_id ?? null)
-                        onToggleSelect(app.id, app.stage_id ?? '')
-                      }}
+                      onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
                       className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
-                        isSelected
-                          ? 'bg-blue-500 border-blue-500'
-                          : isCrossStage
-                            ? 'border-slate-200 bg-slate-50'
-                            : 'border-slate-300 hover:border-blue-400 bg-white'
+                        isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'
                       }`}
                     >
                       {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
@@ -1275,9 +1222,13 @@ function RankedView({
                   <td className="px-4 py-3 text-xs text-slate-400">
                     {daysSince(app.applied_at)}d
                   </td>
-                  {/* Suggested Action column — copilot-driven */}
+                  {/* Suggested Action column — copilot-driven; greyed when multi-stage selection active */}
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                    {app.ai_score === null ? (
+                    {isMultiStageSelection && isSelected ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-400 whitespace-nowrap">
+                        — Mixed stages
+                      </span>
+                    ) : app.ai_score === null ? (
                       /* No score yet → prompt to score */
                       <button
                         onClick={() => onScoreApp(app)}
@@ -2030,32 +1981,19 @@ export default function JobPipelinePage() {
   const [filterScore,   setFilterScore]   = useState('all')   // 'all' | 'scored' | 'unscored'
   const [filterSignal,  setFilterSignal]  = useState('all')   // 'all' | 'strong_yes' | 'yes' | 'maybe' | 'no'
   const [filterAction,  setFilterAction]  = useState('all')   // 'all' | 'score_needed' | 'advance' | 'reject'
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false)
+  const filterPanelRef = useRef<HTMLDivElement>(null)
+  // Count of non-default filter dropdowns (not counting search)
+  const activeFilterCount = [
+    filterSource !== 'all', filterStage !== 'all', filterScore !== 'all',
+    filterSignal !== 'all', filterAction !== 'all',
+  ].filter(Boolean).length
   const [sortBy,        setSortBy]        = useState<'date' | 'score' | 'name'>('date')
   const [openStageMenu, setOpenStageMenu] = useState<string | null>(null)
   const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set())
-  // Which stage is currently "active" for bulk selection — only one at a time
-  const [activeStageForSelection, setActiveStageForSelection] = useState<string | null>(null)
 
-  // Toggle a stage as the active selection stage (clears any cross-stage selections)
-  const toggleSelectionStage = (stageId: string) => {
-    if (activeStageForSelection === stageId) {
-      setActiveStageForSelection(null)
-      setSelectedApps(new Set())
-    } else {
-      setActiveStageForSelection(stageId)
-      setSelectedApps(new Set())
-    }
-  }
-
-  // Stage-scoped individual toggle: auto-activates stage on first click, clears if switching stages
-  const toggleSelect = (appId: string, stageId: string) => {
-    if (activeStageForSelection !== null && activeStageForSelection !== stageId) {
-      // Switching to a new stage — clear old selection and start fresh
-      setActiveStageForSelection(stageId)
-      setSelectedApps(new Set([appId]))
-      return
-    }
-    if (!activeStageForSelection) setActiveStageForSelection(stageId)
+  // Free cross-stage toggle — no stage restrictions
+  const toggleSelect = (appId: string) => {
     setSelectedApps(prev => {
       const next = new Set(prev)
       if (next.has(appId)) next.delete(appId); else next.add(appId)
@@ -2096,7 +2034,29 @@ export default function JobPipelinePage() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [load])
 
+  // Close filter panel when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (filterPanelRef.current && !filterPanelRef.current.contains(e.target as Node)) {
+        setFilterPanelOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   const activeApps = job?.applications.filter(a => a.status === 'active') ?? []
+
+  // Determine if selection spans multiple stages (to grey Suggested Action column)
+  const selectedStageIds = useMemo(() => {
+    const ids = new Set<string>()
+    Array.from(selectedApps).forEach(appId => {
+      const app = activeApps.find(a => a.id === appId)
+      if (app) ids.add(app.stage_id ?? '__unstaged__')
+    })
+    return ids
+  }, [selectedApps, activeApps])
+  const isMultiStageSelection = selectedApps.size > 0 && selectedStageIds.size > 1
 
   const grouped = (job?.pipeline_stages ?? []).reduce<Record<string, Application[]>>((acc, s) => {
     acc[s.id] = activeApps.filter(a => a.stage_id === s.id)
@@ -2604,73 +2564,124 @@ export default function JobPipelinePage() {
             value={filterSearch}
             onChange={e => setFilterSearch(e.target.value)}
             placeholder="Search candidates…"
-            className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg w-48 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+            className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg w-52 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
           />
         </div>
 
-        <div className="w-px h-5 bg-slate-200" />
+        {/* Unified Filters button + dropdown panel */}
+        <div className="relative" ref={filterPanelRef}>
+          <button
+            onClick={() => setFilterPanelOpen(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+              activeFilterCount > 0
+                ? 'border-violet-300 bg-violet-50 text-violet-700 font-medium'
+                : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
+            }`}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
 
-        {/* Source */}
-        <select
-          value={filterSource}
-          onChange={e => setFilterSource(e.target.value)}
-          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-        >
-          <option value="all">All sources</option>
-          <option value="applied">Applied</option>
-          <option value="sourced">Sourced</option>
-          <option value="referral">Referral</option>
-          <option value="manual">Added</option>
-          <option value="imported">Imported</option>
-        </select>
+          {filterPanelOpen && (
+            <div className="absolute left-0 top-full mt-1 z-50 w-72 bg-white border border-slate-200 rounded-xl shadow-xl p-4 space-y-3">
+              {/* Source */}
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">Source</label>
+                <select
+                  value={filterSource}
+                  onChange={e => setFilterSource(e.target.value)}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                >
+                  <option value="all">All sources</option>
+                  <option value="applied">Applied</option>
+                  <option value="sourced">Sourced</option>
+                  <option value="referral">Referral</option>
+                  <option value="manual">Added</option>
+                  <option value="imported">Imported</option>
+                </select>
+              </div>
 
-        {/* Stage */}
-        <select
-          value={filterStage}
-          onChange={e => setFilterStage(e.target.value)}
-          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-        >
-          <option value="all">All stages</option>
-          {job.pipeline_stages.map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
+              {/* Stage */}
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">Stage</label>
+                <select
+                  value={filterStage}
+                  onChange={e => setFilterStage(e.target.value)}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                >
+                  <option value="all">All stages</option>
+                  {job.pipeline_stages.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
 
-        {/* Score */}
-        <select
-          value={filterScore}
-          onChange={e => setFilterScore(e.target.value)}
-          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-        >
-          <option value="all">All scores</option>
-          <option value="scored">Scored</option>
-          <option value="unscored">Not scored</option>
-        </select>
+              {/* Score */}
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">Score</label>
+                <select
+                  value={filterScore}
+                  onChange={e => setFilterScore(e.target.value)}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                >
+                  <option value="all">All scores</option>
+                  <option value="scored">Scored</option>
+                  <option value="unscored">Not scored</option>
+                </select>
+              </div>
 
-        {/* AI Signal */}
-        <select
-          value={filterSignal}
-          onChange={e => setFilterSignal(e.target.value)}
-          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-        >
-          <option value="all">All signals</option>
-          <option value="strong_yes">Strong Yes</option>
-          <option value="yes">Yes</option>
-          <option value="maybe">Maybe</option>
-          <option value="no">No</option>
-        </select>
+              {/* AI Signal */}
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">AI Signal</label>
+                <select
+                  value={filterSignal}
+                  onChange={e => setFilterSignal(e.target.value)}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                >
+                  <option value="all">All signals</option>
+                  <option value="strong_yes">Strong Yes</option>
+                  <option value="yes">Yes</option>
+                  <option value="maybe">Maybe</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
 
-        {/* Suggested Action */}
-        <select
-          value={filterAction}
-          onChange={e => setFilterAction(e.target.value)}
-          className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-        >
-          <option value="all">All actions</option>
-          <option value="score_needed">Score needed</option>
-          <option value="advance">Move forward</option>
-          <option value="reject">Reject</option>
-        </select>
+              {/* Suggested Action */}
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">Suggested Action</label>
+                <select
+                  value={filterAction}
+                  onChange={e => setFilterAction(e.target.value)}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                >
+                  <option value="all">All actions</option>
+                  <option value="score_needed">Score needed</option>
+                  <option value="advance">Move forward</option>
+                  <option value="reject">Reject</option>
+                </select>
+              </div>
+
+              {/* Clear all filters */}
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => {
+                    setFilterSource('all'); setFilterStage('all'); setFilterScore('all')
+                    setFilterSignal('all'); setFilterAction('all')
+                    setFilterPanelOpen(false)
+                  }}
+                  className="w-full text-xs text-violet-600 hover:text-violet-800 font-medium py-1.5 border border-violet-200 rounded-lg hover:bg-violet-50 transition-colors"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="w-px h-5 bg-slate-200" />
 
@@ -2688,8 +2699,7 @@ export default function JobPipelinePage() {
           </select>
         </div>
 
-        {(filterSearch || filterSource !== 'all' || filterStage !== 'all' ||
-          filterScore !== 'all' || filterSignal !== 'all' || filterAction !== 'all') && (
+        {(filterSearch || activeFilterCount > 0) && (
           <button
             onClick={() => {
               setFilterSearch(''); setFilterSource('all'); setFilterStage('all')
@@ -2697,7 +2707,7 @@ export default function JobPipelinePage() {
             }}
             className="text-xs text-violet-600 hover:text-violet-800 underline underline-offset-2 font-medium"
           >
-            Clear filters
+            Clear all
           </button>
         )}
       </div>
@@ -2712,11 +2722,7 @@ export default function JobPipelinePage() {
           selectedApps={selectedApps}
           onToggleSelect={toggleSelect}
           onBulkSelect={ids => setSelectedApps(new Set(ids))}
-          activeStageId={activeStageForSelection}
-          onSetActiveStage={(sid) => {
-            setActiveStageForSelection(sid)
-            if (!sid) setSelectedApps(new Set())
-          }}
+          isMultiStageSelection={isMultiStageSelection}
           onScoreApp={app => startScoring(undefined, app.id)}
           onScheduleApp={app => setScheduleModalApps([app])}
           onRejectApp={async appId => {
@@ -2763,15 +2769,20 @@ export default function JobPipelinePage() {
             onRecolor={handleRecolor}
             onDelete={handleDeleteStage}
             selectedApps={selectedApps}
-            onToggleSelect={(appId) => toggleSelect(appId, stage.id)}
+            onToggleSelect={toggleSelect}
             onScheduleInterview={() => {
               const stageApps = grouped[stage.id] ?? []
               const selected = stageApps.filter(a => selectedApps.has(a.id))
               setScheduleModalApps(selected.length > 0 ? selected : stageApps)
             }}
             selectedInStage={(grouped[stage.id] ?? []).filter(a => selectedApps.has(a.id)).length}
-            isSelectionActive={activeStageForSelection === stage.id}
-            onToggleSelectionStage={() => toggleSelectionStage(stage.id)}
+            onSelectAllInStage={(ids, select) => {
+              setSelectedApps(prev => {
+                const next = new Set(prev)
+                ids.forEach(id => select ? next.add(id) : next.delete(id))
+                return next
+              })
+            }}
           />
         ))}
 
@@ -2823,8 +2834,7 @@ export default function JobPipelinePage() {
                   onDragStart={i => { dragId.current = i }}
                   onClick={setSelectedApp}
                   isSelected={selectedApps.has(app.id)}
-                  onToggleSelect={(appId) => toggleSelect(appId, '__unstaged__')}
-                  showCheckbox={activeStageForSelection === null || activeStageForSelection === '__unstaged__'}
+                  onToggleSelect={toggleSelect}
                 />
               ))}
             </div>
