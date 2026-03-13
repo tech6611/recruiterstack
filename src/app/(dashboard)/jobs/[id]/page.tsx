@@ -8,7 +8,7 @@ import {
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
   Settings2, LayoutList, Kanban, SlidersHorizontal,
-  ArrowUp, ArrowDown, ArrowDownUp,
+  ArrowUp, ArrowDown, ArrowDownUp, GripVertical,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
@@ -259,6 +259,7 @@ function StageColumn({
   onScheduleInterview,
   selectedInStage,
   onSelectAllInStage,
+  showDragHandle = false,
 }: {
   stage: PipelineStage
   apps: Application[]
@@ -280,6 +281,8 @@ function StageColumn({
   selectedInStage: number
   /** Select or deselect all apps in this stage (add/remove from global selection) */
   onSelectAllInStage: (ids: string[], select: boolean) => void
+  /** Show drag handle in the column header (edit mode) */
+  showDragHandle?: boolean
 }) {
   const [over, setOver] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -316,6 +319,9 @@ function StageColumn({
       {/* Column header */}
       <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${style.header}`}>
         <div className="flex items-center gap-2 min-w-0">
+          {showDragHandle && (
+            <GripVertical className="h-4 w-4 text-slate-300 shrink-0 cursor-grab" />
+          )}
           {/* Select-all toggle for this stage */}
           <button
             onClick={() => onSelectAllInStage(apps.map(a => a.id), !allInStageSelected)}
@@ -2062,7 +2068,8 @@ export default function JobPipelinePage() {
   const [addingStage, setAddingStage] = useState(false)
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
   const [copied, setCopied] = useState(false)
-  const dragId    = useRef<string | null>(null)
+  const dragId      = useRef<string | null>(null)
+  const dragStageId = useRef<string | null>(null)
   // Prevents load() from overwriting scored state with stale server data.
   // Set to true at scoring start; cleared 5 s after scoring ends so that
   // the visibilitychange / switchView refetch guards don't live forever.
@@ -2273,6 +2280,20 @@ export default function JobPipelinePage() {
       applications: prev.applications.map(a => a.stage_id === stageId ? { ...a, stage_id: null } : a),
     } : prev)
     await callStagesApi({ action: 'delete', id: stageId })
+  }
+
+  const handleStageReorder = async (targetStageId: string) => {
+    const srcId = dragStageId.current
+    if (!srcId || srcId === targetStageId || !job) return
+    const stages = [...job.pipeline_stages]
+    const fromIdx = stages.findIndex(s => s.id === srcId)
+    const toIdx   = stages.findIndex(s => s.id === targetStageId)
+    if (fromIdx === -1 || toIdx === -1) return
+    const [moved] = stages.splice(fromIdx, 1)
+    stages.splice(toIdx, 0, moved)
+    dragStageId.current = null
+    setJob(prev => prev ? { ...prev, pipeline_stages: stages } : prev)
+    await callStagesApi({ action: 'reorder', stages: stages.map((s, i) => ({ id: s.id, order_index: i })) })
   }
 
   // ── Stage change from slide-over ──────────────────────────────────────────
@@ -2804,13 +2825,36 @@ export default function JobPipelinePage() {
 
       {/* Kanban */}
       {viewMode === 'kanban' && (
-      <div className="flex gap-3 items-start px-8 py-6 flex-1 min-w-0">
+      <div className={`flex items-stretch flex-1 min-w-0 px-6 py-6 divide-x transition-colors ${
+        editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-100 bg-transparent'
+      }`}>
         {job.pipeline_stages.map((stage, stageIndex) => (
-          <div key={stage.id} className="flex-1 min-w-[180px] max-w-[320px]">
+          <div
+            key={stage.id}
+            className={`flex-1 min-w-[180px] max-w-[320px] px-3 transition-colors ${
+              editMode ? 'cursor-grab active:cursor-grabbing' : ''
+            }`}
+            draggable={editMode}
+            onDragStart={e => {
+              if (!editMode) return
+              dragStageId.current = stage.id
+              e.dataTransfer.effectAllowed = 'move'
+              e.stopPropagation()
+            }}
+            onDragEnd={() => { dragStageId.current = null }}
+            onDragOver={e => { if (editMode) e.preventDefault() }}
+            onDrop={e => {
+              if (editMode && dragStageId.current) {
+                e.stopPropagation()
+                handleStageReorder(stage.id)
+              }
+            }}
+          >
             <StageColumn
               stage={stage}
               apps={filteredGrouped[stage.id] ?? []}
               editMode={editMode}
+              showDragHandle={editMode}
               isMenuOpen={openStageMenu === stage.id}
               onMenuOpen={() => setOpenStageMenu(stage.id)}
               onMenuClose={() => setOpenStageMenu(null)}
@@ -2828,7 +2872,7 @@ export default function JobPipelinePage() {
                 ))
                 load()
               }}
-              onDragStart={id => { dragId.current = id }}
+              onDragStart={id => { if (!editMode) dragId.current = id }}
               onDrop={handleDrop}
               onCardClick={setSelectedApp}
               onRename={handleRename}
@@ -2853,71 +2897,52 @@ export default function JobPipelinePage() {
           </div>
         ))}
 
-        {/* Inline add-stage panel (shown when addStageOpen) */}
-        {addStageOpen && (
-          <div className="flex-1 min-w-[160px] max-w-[240px]">
-            <div className="rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/30 p-3">
+        {/* Add-stage panel — always visible in edit mode */}
+        {editMode && (
+          <div className="flex-1 min-w-[160px] max-w-[220px] px-3 flex flex-col">
+            <div className="rounded-2xl border-2 border-dashed border-violet-200 bg-white p-3 flex flex-col gap-2">
+              <p className="text-xs font-semibold text-violet-500">New stage</p>
               <input
                 autoFocus
                 value={newStageName}
                 onChange={e => setNewStageName(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { handleAddStage(); setAddStageOpen(false) }
-                  if (e.key === 'Escape') setAddStageOpen(false)
-                }}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddStage() }}
                 placeholder="Stage name…"
-                className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2"
+                className="w-full rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300"
               />
-              <div className="flex gap-1.5">
-                <button
-                  onClick={() => { handleAddStage(); setAddStageOpen(false) }}
-                  disabled={addingStage || !newStageName.trim()}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
-                >
-                  {addingStage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                  Add
-                </button>
-                <button
-                  onClick={() => setAddStageOpen(false)}
-                  className="rounded-xl border border-slate-200 px-2.5 py-2 text-xs text-slate-500 hover:bg-slate-50 transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
+              <button
+                onClick={handleAddStage}
+                disabled={addingStage || !newStageName.trim()}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-500 transition-colors disabled:opacity-50"
+              >
+                {addingStage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Add Stage
+              </button>
             </div>
           </div>
         )}
 
-        {/* Stage controls: [-] delete mode · [+] add stage */}
-        <div className="shrink-0 flex flex-row gap-1.5 self-start mt-1">
+        {/* Edit Pipeline toggle — far right */}
+        <div className="shrink-0 flex items-start pl-4 pt-1">
           <button
-            onClick={() => { setEditMode(e => !e); setAddStageOpen(false) }}
-            title={editMode ? 'Done editing stages' : 'Delete or rename a stage'}
-            className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-colors ${
+            onClick={() => setEditMode(e => !e)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
               editMode
-                ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100'
-                : 'border-dashed border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+                ? 'border-violet-300 bg-violet-600 text-white hover:bg-violet-500 shadow-sm'
+                : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 bg-white'
             }`}
           >
-            <Minus className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => { setAddStageOpen(o => !o); setEditMode(false) }}
-            title={addStageOpen ? 'Cancel' : 'Add a stage'}
-            className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-colors ${
-              addStageOpen
-                ? 'border-blue-300 bg-blue-50 text-blue-500 hover:bg-blue-100'
-                : 'border-dashed border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
-            }`}
-          >
-            <Plus className="h-3.5 w-3.5" />
+            {editMode
+              ? <><Check className="h-3.5 w-3.5" /> Done</>
+              : <><Pencil className="h-3.5 w-3.5" /> Edit</>
+            }
           </button>
         </div>
 
         {/* Unstaged bucket */}
         {unstaged.length > 0 && (
-          <div className="flex-1 min-w-[180px] max-w-[260px]">
-            <div className="flex items-center justify-between rounded-xl px-4 py-3 bg-slate-50">
+          <div className="flex-1 min-w-[180px] max-w-[260px] px-3">
+            <div className="flex items-center justify-between rounded-xl px-4 py-3 bg-slate-50 border border-slate-100">
               <span className="text-sm font-semibold text-slate-400 italic">Unstaged</span>
               <span className="text-xs font-semibold text-slate-400 bg-white rounded-full px-2 py-0.5 border border-slate-200">
                 {unstaged.length}
