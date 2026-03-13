@@ -51,6 +51,8 @@ export async function POST(request: NextRequest) {
     target_start_date?: string
     additional_notes?: string
     generated_jd?: string
+    // Custom pipeline stages (optional — overrides DB-trigger defaults)
+    pipeline_stages?: { name: string; color: string }[]
   }
   try {
     body = await request.json()
@@ -114,6 +116,25 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+
+  // Replace DB-trigger-created default stages with user-configured pipeline stages
+  if (body.pipeline_stages?.length) {
+    const validStages = body.pipeline_stages.filter(s => s.name.trim())
+    if (validStages.length > 0) {
+      // Delete auto-created defaults from the trigger
+      await supabase.from('pipeline_stages').delete().eq('hiring_request_id', req.id)
+      // Insert the user's custom stages
+      await supabase.from('pipeline_stages').insert(
+        validStages.map((s, i) => ({
+          hiring_request_id: req.id,
+          name: s.name.trim(),
+          color: s.color,
+          order_index: i,
+          org_id: orgId,
+        }))
+      )
+    }
+  }
 
   // Option B — no email/Slack, return immediately
   if (isOptionB) {

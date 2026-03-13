@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
+  ArrowLeft, Plus, Minus, Link2, Users, Pencil, Check, X,
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
   Settings2, LayoutList, Kanban, SlidersHorizontal,
@@ -2056,6 +2056,7 @@ export default function JobPipelinePage() {
   const [job, setJob] = useState<JobWithPipeline | null>(null)
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
+  const [addStageOpen, setAddStageOpen] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [newStageName, setNewStageName] = useState('')
   const [addingStage, setAddingStage] = useState(false)
@@ -2515,18 +2516,6 @@ export default function JobPipelinePage() {
             )}
           </button>
 
-          {/* Edit Stages — inline on xl+ */}
-          <button
-            onClick={() => setEditMode(e => !e)}
-            className={`hidden xl:flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-              editMode
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            {editMode ? <><Check className="h-4 w-4" /> Done</> : <><Pencil className="h-4 w-4" /> Edit Stages</>}
-          </button>
-
           {/* Apply Link — inline on xl+ */}
           <button
             onClick={copyApplyLink}
@@ -2556,13 +2545,6 @@ export default function JobPipelinePage() {
                     {(job.auto_advance_score !== null || job.auto_reject_score !== null) && (
                       <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500" />
                     )}
-                  </button>
-                  <button
-                    onClick={() => { setEditMode(e => !e); setShowMoreMenu(false) }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    <Pencil className="h-4 w-4 text-slate-400" />
-                    {editMode ? 'Done editing' : 'Edit Stages'}
                   </button>
                   <button
                     onClick={() => { copyApplyLink(); setShowMoreMenu(false) }}
@@ -2871,36 +2853,66 @@ export default function JobPipelinePage() {
           </div>
         ))}
 
-        {/* Add stage column */}
-        {editMode ? (
+        {/* Inline add-stage panel (shown when addStageOpen) */}
+        {addStageOpen && (
           <div className="flex-1 min-w-[160px] max-w-[240px]">
-            <div className="rounded-2xl border-2 border-dashed border-slate-200 p-3">
+            <div className="rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/30 p-3">
               <input
+                autoFocus
                 value={newStageName}
                 onChange={e => setNewStageName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAddStage()}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { handleAddStage(); setAddStageOpen(false) }
+                  if (e.key === 'Escape') setAddStageOpen(false)
+                }}
                 placeholder="Stage name…"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2"
               />
-              <button
-                onClick={handleAddStage}
-                disabled={addingStage || !newStageName.trim()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
-              >
-                {addingStage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Add Stage
-              </button>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => { handleAddStage(); setAddStageOpen(false) }}
+                  disabled={addingStage || !newStageName.trim()}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+                >
+                  {addingStage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                  Add
+                </button>
+                <button
+                  onClick={() => setAddStageOpen(false)}
+                  className="rounded-xl border border-slate-200 px-2.5 py-2 text-xs text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           </div>
-        ) : (
-          <button
-            onClick={() => setEditMode(true)}
-            className="shrink-0 w-10 h-10 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-colors self-start mt-1"
-            title="Add Stage"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
         )}
+
+        {/* Stage controls: [-] delete mode · [+] add stage */}
+        <div className="shrink-0 flex flex-col gap-1.5 self-start mt-1">
+          <button
+            onClick={() => { setEditMode(e => !e); setAddStageOpen(false) }}
+            title={editMode ? 'Done editing stages' : 'Delete or rename a stage'}
+            className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-colors ${
+              editMode
+                ? 'border-red-300 bg-red-50 text-red-500 hover:bg-red-100'
+                : 'border-dashed border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+            }`}
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => { setAddStageOpen(o => !o); setEditMode(false) }}
+            title={addStageOpen ? 'Cancel' : 'Add a stage'}
+            className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-colors ${
+              addStageOpen
+                ? 'border-blue-300 bg-blue-50 text-blue-500 hover:bg-blue-100'
+                : 'border-dashed border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
+            }`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
         {/* Unstaged bucket */}
         {unstaged.length > 0 && (
