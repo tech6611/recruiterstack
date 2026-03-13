@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     !!(orgSettings?.google_oauth_access_token && orgSettings?.google_oauth_refresh_token)
 
   // ── Availability check (optional) ────────────────────────────────────────
-  let availabilityConflicts: { email: string; conflicts: { start: string; end: string }[] }[] = []
+  const availabilityConflicts: { email: string; conflicts: { start: string; end: string }[] }[] = []
 
   if (check_availability && googleConnected && interviewer_email?.trim()) {
     try {
