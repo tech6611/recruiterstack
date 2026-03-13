@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
@@ -1092,6 +1093,24 @@ function RankedView({
   onRejectApp: (appId: string) => void
 }) {
   const [openRowMenu, setOpenRowMenu] = useState<string | null>(null)
+  // Position of the open dropdown — stored from getBoundingClientRect() so we can
+  // render via a portal outside the overflow-hidden table container
+  const [rowMenuPos, setRowMenuPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null)
+
+  const openMenuForApp = (appId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation()
+    if (openRowMenu === appId) { setOpenRowMenu(null); setRowMenuPos(null); return }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    setRowMenuPos(
+      spaceBelow >= 300
+        ? { top: rect.bottom + 4,                       right: window.innerWidth - rect.right }
+        : { bottom: window.innerHeight - rect.top + 4,  right: window.innerWidth - rect.right }
+    )
+    setOpenRowMenu(appId)
+  }
+
+  const closeMenu = () => { setOpenRowMenu(null); setRowMenuPos(null) }
 
   const sorted = [...apps].sort((a, b) => {
     if (a.ai_score === null && b.ai_score === null) return 0
@@ -1160,7 +1179,7 @@ function RankedView({
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Stage</th>
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Source</th>
               <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3">Days</th>
-              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3 w-44">Suggestion</th>
+              <th className="text-left text-xs font-semibold text-slate-400 px-4 py-3 w-48">Suggested Action</th>
               <th className="px-4 py-3 w-12" />
             </tr>
           </thead>
@@ -1178,10 +1197,6 @@ function RankedView({
                 ? stages[currentStageIdx + 1]
                 : null
               const isLastStage = currentStageIdx === stages.length - 1
-
-              // Open dropdown upward for any row that isn't the very first,
-              // since the table container clips overflow at the bottom
-              const openUp = rowIdx > 0
 
               // Cross-stage dimming: if another stage is active, dim this row
               const isSameStage  = !activeStageId || app.stage_id === activeStageId
@@ -1260,18 +1275,34 @@ function RankedView({
                   <td className="px-4 py-3 text-xs text-slate-400">
                     {daysSince(app.applied_at)}d
                   </td>
+                  {/* Suggested Action column — copilot-driven */}
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     {app.ai_score === null ? (
-                      <span className="text-xs text-slate-400 italic">Score to unlock suggestion</span>
+                      /* No score yet → prompt to score */
+                      <button
+                        onClick={() => onScoreApp(app)}
+                        className="flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors whitespace-nowrap"
+                      >
+                        ⚡ Score candidate
+                      </button>
                     ) : isLastStage ? (
                       <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700">
                         🏁 Final stage
                       </span>
+                    ) : app.ai_recommendation === 'no' ? (
+                      /* Copilot says no → suggest rejection */
+                      <button
+                        onClick={() => onRejectApp(app.id)}
+                        className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors whitespace-nowrap"
+                      >
+                        ✕ Reject candidate
+                      </button>
                     ) : nextStage ? (
+                      /* Copilot says yes/maybe/strong_yes → advance */
                       <button
                         onClick={() => onMoveToStage(app.id, nextStage.id)}
                         className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
-                          (app.ai_score ?? 0) >= 70
+                          app.ai_recommendation === 'strong_yes' || app.ai_recommendation === 'yes'
                             ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
                             : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
@@ -1280,87 +1311,90 @@ function RankedView({
                       </button>
                     ) : null}
                   </td>
+                  {/* ⋯ row menu — rendered via portal to escape overflow-hidden */}
                   <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
-                    <div className="relative">
-                      <button
-                        onClick={e => { e.stopPropagation(); setOpenRowMenu(openRowMenu === app.id ? null : app.id) }}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          openRowMenu === app.id ? 'bg-slate-200 text-slate-700' : 'text-slate-300 hover:text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
-                      {openRowMenu === app.id && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setOpenRowMenu(null)} />
-                          <div className={`absolute right-0 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl py-1 overflow-hidden ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
-                            <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
-                              {c.name}
-                            </div>
-                            {/* 1. Score — matches Kanban position 1 */}
-                            <button
-                              onClick={() => { setOpenRowMenu(null); onScoreApp(app) }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                            >
-                              <span className="text-base leading-none w-3.5 text-center">⚡</span>
-                              Score this candidate
-                            </button>
-                            <div className="my-1 border-t border-slate-100" />
-                            {/* 2. Schedule interview */}
-                            <button
-                              onClick={() => { setOpenRowMenu(null); onScheduleApp(app) }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                            >
-                              <span className="text-base leading-none w-3.5 text-center">📅</span>
-                              Schedule interview
-                            </button>
-                            {/* 3. Self-schedule (stub) */}
-                            <button
-                              onClick={() => setOpenRowMenu(null)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                            >
-                              <span className="text-base leading-none w-3.5 text-center">🔗</span>
-                              Create self-schedule invite
-                            </button>
-                            {/* 4. Send message (stub) */}
-                            <button
-                              onClick={() => setOpenRowMenu(null)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                            >
-                              <span className="text-base leading-none w-3.5 text-center">✉️</span>
-                              Send message
-                            </button>
-                            {/* 5. Send assessment (stub) */}
-                            <button
-                              onClick={() => setOpenRowMenu(null)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                            >
-                              <span className="text-base leading-none w-3.5 text-center">📋</span>
-                              Send assessment
-                            </button>
-                            <div className="my-1 border-t border-slate-100" />
-                            {/* 6. Move to next stage */}
-                            {nextStage && (
-                              <button
-                                onClick={() => { setOpenRowMenu(null); onMoveToStage(app.id, nextStage.id) }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                              >
-                                <span className="text-base leading-none w-3.5 text-center">→</span>
-                                Move to {nextStage.name}
-                              </button>
-                            )}
-                            {/* 7. Reject */}
-                            <button
-                              onClick={() => { setOpenRowMenu(null); onRejectApp(app.id) }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                              Reject candidate
-                            </button>
+                    <button
+                      onClick={e => openMenuForApp(app.id, e)}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        openRowMenu === app.id ? 'bg-slate-200 text-slate-700' : 'text-slate-300 hover:text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                    {openRowMenu === app.id && rowMenuPos && createPortal(
+                      <>
+                        <div className="fixed inset-0 z-[9998]" onClick={closeMenu} />
+                        <div
+                          className="fixed z-[9999] w-56 bg-white border border-slate-200 rounded-xl shadow-xl py-1 overflow-hidden"
+                          style={{ top: rowMenuPos.top, bottom: rowMenuPos.bottom, right: rowMenuPos.right }}
+                        >
+                          <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+                            {c.name}
                           </div>
-                        </>
-                      )}
-                    </div>
+                          {/* 1. Score */}
+                          <button
+                            onClick={() => { closeMenu(); onScoreApp(app) }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <span className="text-base leading-none w-3.5 text-center">⚡</span>
+                            Score this candidate
+                          </button>
+                          <div className="my-1 border-t border-slate-100" />
+                          {/* 2. Schedule interview */}
+                          <button
+                            onClick={() => { closeMenu(); onScheduleApp(app) }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <span className="text-base leading-none w-3.5 text-center">📅</span>
+                            Schedule interview
+                          </button>
+                          {/* 3. Self-schedule (stub) */}
+                          <button
+                            onClick={closeMenu}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <span className="text-base leading-none w-3.5 text-center">🔗</span>
+                            Create self-schedule invite
+                          </button>
+                          {/* 4. Send message (stub) */}
+                          <button
+                            onClick={closeMenu}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <span className="text-base leading-none w-3.5 text-center">✉️</span>
+                            Send message
+                          </button>
+                          {/* 5. Send assessment (stub) */}
+                          <button
+                            onClick={closeMenu}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <span className="text-base leading-none w-3.5 text-center">📋</span>
+                            Send assessment
+                          </button>
+                          <div className="my-1 border-t border-slate-100" />
+                          {/* 6. Move to next stage */}
+                          {nextStage && (
+                            <button
+                              onClick={() => { closeMenu(); onMoveToStage(app.id, nextStage.id) }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                            >
+                              <span className="text-base leading-none w-3.5 text-center">→</span>
+                              Move to {nextStage.name}
+                            </button>
+                          )}
+                          {/* 7. Reject */}
+                          <button
+                            onClick={() => { closeMenu(); onRejectApp(app.id) }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            Reject candidate
+                          </button>
+                        </div>
+                      </>,
+                      document.body
+                    )}
                   </td>
                 </tr>
               )
