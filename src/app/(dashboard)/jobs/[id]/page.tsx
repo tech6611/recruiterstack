@@ -318,25 +318,27 @@ function StageColumn({
     >
       {/* Column header */}
       <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${style.header}`}>
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {showDragHandle && (
             <GripVertical className="h-4 w-4 text-slate-300 shrink-0 cursor-grab" />
           )}
-          {/* Select-all toggle for this stage */}
-          <button
-            onClick={() => onSelectAllInStage(apps.map(a => a.id), !allInStageSelected)}
-            title={allInStageSelected ? 'Deselect all in this stage' : 'Select all in this stage'}
-            className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
-              allInStageSelected
-                ? 'bg-blue-500 border-blue-500'
-                : someInStageSelected
-                  ? 'bg-blue-100 border-blue-400'
-                  : 'border-slate-300 bg-white/70 hover:border-blue-400'
-            }`}
-          >
-            {allInStageSelected  && <Check className="h-2.5 w-2.5 text-white" />}
-            {someInStageSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
-          </button>
+          {/* Select-all toggle — hidden in edit mode */}
+          {!editMode && (
+            <button
+              onClick={() => onSelectAllInStage(apps.map(a => a.id), !allInStageSelected)}
+              title={allInStageSelected ? 'Deselect all in this stage' : 'Select all in this stage'}
+              className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
+                allInStageSelected
+                  ? 'bg-blue-500 border-blue-500'
+                  : someInStageSelected
+                    ? 'bg-blue-100 border-blue-400'
+                    : 'border-slate-300 bg-white/70 hover:border-blue-400'
+              }`}
+            >
+              {allInStageSelected  && <Check className="h-2.5 w-2.5 text-white" />}
+              {someInStageSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
+            </button>
+          )}
           <button
             onClick={() => editMode && setShowColors(!showColors)}
             className={`h-2.5 w-2.5 rounded-full shrink-0 ${style.dot} ${editMode ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-slate-400' : ''}`}
@@ -351,14 +353,19 @@ function StageColumn({
               className="text-sm font-semibold text-slate-700 bg-transparent border-b border-slate-400 outline-none w-full"
             />
           ) : (
-            <span className="text-sm font-semibold text-slate-700 truncate">{stage.name}</span>
+            <span className={`${editMode ? 'text-xs text-slate-600' : 'text-sm font-semibold text-slate-700'} flex-1 min-w-0 truncate`}>
+              {stage.name}
+            </span>
           )}
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <span className="text-xs font-semibold text-slate-400 bg-white rounded-full px-2 py-0.5 border border-slate-200">
-            {apps.length}
-          </span>
+          {/* Count badge — hidden in edit mode */}
+          {!editMode && (
+            <span className="text-xs font-semibold text-slate-400 bg-white rounded-full px-2 py-0.5 border border-slate-200">
+              {apps.length}
+            </span>
+          )}
 
           {/* Edit-mode controls */}
           {editMode && !editing && (
@@ -378,8 +385,8 @@ function StageColumn({
             </>
           )}
 
-          {/* ⋯ stage actions menu (always visible) */}
-          {!editing && (
+          {/* ⋯ stage actions menu — hidden in edit mode */}
+          {!editing && !editMode && (
             <div className="relative">
               <button
                 onClick={() => isMenuOpen ? onMenuClose() : onMenuOpen()}
