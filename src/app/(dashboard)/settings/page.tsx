@@ -36,18 +36,25 @@ export default function SettingsPage() {
   }, [loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load Slack + Google settings from server
+  // Capture URL params at mount time so the closure doesn't go stale
   useEffect(() => {
+    const freshGoogleOAuth = searchParams.get('google') === 'connected'
+    const freshSlackOAuth  = searchParams.get('slack')  === 'connected'
     fetch('/api/org-settings')
       .then(r => r.json())
       .then(({ data }) => {
         if (data?.slack_webhook_url) setSlackUrl(data.slack_webhook_url)
-        setSlackConnected(!!data?.slack_connected)
         setSlackTeamName(data?.slack_team_name ?? null)
-        setGoogleConnected(!!data?.google_connected)
-        setGoogleEmail(data?.google_connected_email ?? null)
+        // Don't override optimistic `true` set by the URL-param effects — those
+        // effects run synchronously before this async fetch resolves, so if we
+        // just came back from an OAuth redirect we keep the optimistic state
+        // and let the server value win only when we're on a plain page load.
+        if (!freshSlackOAuth)  setSlackConnected(!!data?.slack_connected)
+        if (!freshGoogleOAuth) setGoogleConnected(!!data?.google_connected)
+        if (!freshGoogleOAuth) setGoogleEmail(data?.google_connected_email ?? null)
       })
       .catch(() => {})
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show toast if redirected back from Slack OAuth
   useEffect(() => {
