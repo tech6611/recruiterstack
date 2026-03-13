@@ -2222,7 +2222,10 @@ export default function JobPipelinePage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const activeApps = job?.applications.filter(a => a.status === 'active') ?? []
+  const activeApps = useMemo(
+    () => job?.applications.filter(a => a.status === 'active') ?? [],
+    [job]
+  )
 
   // Determine if selection spans multiple stages (to grey Suggested Action column)
   const selectedStageIds = useMemo(() => {
