@@ -1184,7 +1184,7 @@ function RankedView({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((app, rowIdx) => {
+            {sorted.map((app) => {
               const c = app.candidate!
               const stage = stages.find(s => s.id === app.stage_id)
               const rec = app.ai_recommendation ? AI_REC_CONFIG[app.ai_recommendation] : null
