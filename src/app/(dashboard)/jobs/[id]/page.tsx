@@ -2889,7 +2889,7 @@ export default function JobPipelinePage() {
         )}
 
         {/* Stage controls: [-] delete mode · [+] add stage */}
-        <div className="shrink-0 flex flex-col gap-1.5 self-start mt-1">
+        <div className="shrink-0 flex flex-row gap-1.5 self-start mt-1">
           <button
             onClick={() => { setEditMode(e => !e); setAddStageOpen(false) }}
             title={editMode ? 'Done editing stages' : 'Delete or rename a stage'}
