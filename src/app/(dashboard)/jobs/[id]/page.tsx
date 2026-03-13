@@ -2443,31 +2443,31 @@ export default function JobPipelinePage() {
   return (
     <div className="flex flex-col min-h-full">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-8 py-5 border-b border-slate-200 bg-white sticky top-0 z-30">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between px-8 py-4 border-b border-violet-100 bg-gradient-to-r from-violet-50 via-slate-50 to-white sticky top-0 z-30">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => router.push('/jobs')}
-            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 transition-colors shadow-sm"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5" />
             Jobs
           </button>
           <div className="h-5 w-px bg-slate-200" />
           <div>
-            <h1 className="text-lg font-bold text-slate-900 leading-tight">{job.position_title}</h1>
+            <h1 className="text-xl font-bold text-slate-900 leading-tight">{job.position_title}</h1>
             {(job.department || job.location) && (
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5 font-medium">
                 {[job.department, job.location].filter(Boolean).join(' · ')}
               </p>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-              <Users className="h-3.5 w-3.5" />
+            <span className="flex items-center gap-1.5 rounded-full bg-white border border-slate-200 shadow-sm px-3 py-1 text-xs font-semibold text-slate-600">
+              <Users className="h-3.5 w-3.5 text-violet-500" />
               {activeApps.length} in pipeline
             </span>
             {job.ticket_number && (
-              <span className="font-mono text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+              <span className="font-mono text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-1">
                 {job.ticket_number}
               </span>
             )}
@@ -2645,7 +2645,7 @@ export default function JobPipelinePage() {
       )}
 
       {/* Filter / sort bar */}
-      <div className="flex items-center gap-2 px-8 py-2.5 border-b border-slate-100 bg-white flex-wrap">
+      <div className="flex items-center gap-2 px-8 py-2.5 border-b border-slate-100 bg-slate-50/70 flex-wrap">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
