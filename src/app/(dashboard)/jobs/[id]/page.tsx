@@ -2892,10 +2892,12 @@ export default function JobPipelinePage() {
       <div
         ref={activeAreaRef}
         style={splitHeight !== null ? { height: splitHeight, flexShrink: 0 } : { minHeight: '55vh', flexShrink: 0 }}
-        className={`flex items-stretch overflow-x-auto overflow-y-hidden divide-x transition-colors ${
-          editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-100 bg-transparent'
-        }`}
+        className="flex flex-row items-stretch"
       >
+      {/* Scrollable kanban columns */}
+      <div className={`flex items-stretch overflow-x-auto overflow-y-hidden divide-x flex-1 transition-colors ${
+        editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-100 bg-transparent'
+      }`}>
         {/* Status column — sticky, not tied to stages */}
         <div
           className="sticky left-0 z-10 shrink-0 flex flex-col border-t-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
@@ -2920,7 +2922,7 @@ export default function JobPipelinePage() {
           return (
           <div
             key={stage.id}
-            className={`flex-1 min-w-[180px] max-w-[320px] px-3 py-5 transition-colors ${stColStyle.barTop} ${
+            className={`flex-1 min-w-[180px] max-w-[320px] px-3 pt-[18px] pb-5 transition-colors ${stColStyle.barTop} ${
               editMode ? 'cursor-grab active:cursor-grabbing' : ''
             }`}
             draggable={editMode}
@@ -3011,31 +3013,6 @@ export default function JobPipelinePage() {
           </div>
         )}
 
-        {/* Edit Pipeline toggle — far right */}
-        <div className="shrink-0 flex flex-col gap-1.5 items-stretch pl-4 pt-6">
-          <button
-            onClick={() => setEditMode(e => !e)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${
-              editMode
-                ? 'border-violet-300 bg-violet-600 text-white hover:bg-violet-500 shadow-sm'
-                : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 bg-white'
-            }`}
-          >
-            {editMode
-              ? <><Check className="h-3.5 w-3.5" /> Done</>
-              : <><Pencil className="h-3.5 w-3.5" /> Edit</>
-            }
-          </button>
-          {editMode && (
-            <button
-              onClick={() => { setEditMode(false); setNewStageName(''); load() }}
-              className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-500 transition-colors"
-            >
-              <X className="h-3 w-3" /> Discard
-            </button>
-          )}
-        </div>
-
         {/* Unstaged bucket */}
         {unstaged.length > 0 && (
           <div className="flex-1 min-w-[180px] max-w-[260px] px-3">
@@ -3059,6 +3036,33 @@ export default function JobPipelinePage() {
             </div>
           </div>
         )}
+      </div>
+      {/* Edit Pipeline toggle — outside scroll div so position never shifts when New Stage panel appears */}
+      <div className={`shrink-0 flex flex-col gap-1.5 items-stretch px-3 pt-5 border-t-4 ${
+        editMode ? 'border-violet-200 bg-violet-50/20' : 'border-slate-200 bg-transparent'
+      }`}>
+        <button
+          onClick={() => setEditMode(e => !e)}
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${
+            editMode
+              ? 'border-violet-300 bg-violet-600 text-white hover:bg-violet-500 shadow-sm'
+              : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 bg-white'
+          }`}
+        >
+          {editMode
+            ? <><Check className="h-3.5 w-3.5" /> Done</>
+            : <><Pencil className="h-3.5 w-3.5" /> Edit</>
+          }
+        </button>
+        {editMode && (
+          <button
+            onClick={() => { setEditMode(false); setNewStageName(''); load() }}
+            className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-500 transition-colors"
+          >
+            <X className="h-3 w-3" /> Discard
+          </button>
+        )}
+      </div>
       </div>
       {/* ── end active candidates ── */}
 
