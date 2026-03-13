@@ -165,58 +165,32 @@ function CandidateCard({
   onToggleSelect: (id: string) => void
 }) {
   const c = app.candidate!
-  const signalBadge = app.ai_recommendation ? SIGNAL_BADGE[app.ai_recommendation] : null
-  const accentColor = app.ai_score !== null && app.ai_recommendation
-    ? SIGNAL_ACCENT[app.ai_recommendation]
-    : undefined
 
   return (
     <div
       draggable
       onDragStart={() => onDragStart(app.id)}
       onClick={() => onClick(app)}
-      style={accentColor ? { borderLeftColor: accentColor, borderLeftWidth: '3px' } : undefined}
-      className={`group cursor-pointer rounded-xl border bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all select-none ${
+      className={`cursor-pointer rounded-xl border bg-white px-3 py-2.5 shadow-sm hover:shadow-md transition-all select-none ${
         isSelected ? 'border-blue-400 ring-2 ring-blue-200' : 'border-slate-200 hover:border-blue-200'
       }`}
     >
-      {/* Header row: checkbox + avatar + name */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div
-            onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
-            className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
-              isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'
-            }`}
-          >
-            {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
-          </div>
-          <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold ${avatarColor(c.name)}`}>
-            {initials(c.name)}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900 truncate leading-tight">{c.name}</p>
-            {c.current_title && (
-              <p className="text-[11px] text-slate-400 truncate leading-tight mt-0.5">{c.current_title}</p>
-            )}
-          </div>
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Checkbox */}
+        <div
+          onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
+          className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
+            isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'
+          }`}
+        >
+          {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
         </div>
-        <MoreHorizontal className="h-3.5 w-3.5 text-slate-300 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-opacity" />
-      </div>
-
-      {/* Footer row: source · signal · score · days */}
-      <div className="flex items-center justify-between mt-2.5 gap-1">
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${SOURCE_COLORS[app.source] ?? SOURCE_COLORS.manual}`}>
-          {SOURCE_LABELS[app.source] ?? app.source}
-        </span>
-        <div className="flex items-center gap-1 flex-wrap justify-end">
-          {signalBadge && (
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${signalBadge.cls}`}>
-              {signalBadge.label}
-            </span>
+        {/* Name + company */}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-slate-900 truncate leading-tight">{c.name}</p>
+          {c.current_title && (
+            <p className="text-[11px] text-slate-400 truncate leading-tight mt-0.5">{c.current_title}</p>
           )}
-          {app.ai_score !== null && <ScorePill score={app.ai_score} />}
-          <span className="text-[11px] text-slate-400">{daysSince(app.applied_at)}d</span>
         </div>
       </div>
     </div>
