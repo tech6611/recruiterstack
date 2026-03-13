@@ -14,6 +14,7 @@ import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
   Scorecard, ScorecardRecommendation, ScorecardScore, AiRecommendation,
 } from '@/lib/types/database'
+import { useSettings } from '@/lib/hooks/useSettings'
 
 // ── Scorecard config (shared) ─────────────────────────────────────────────────
 
@@ -145,44 +146,90 @@ const AI_REC_CONFIG: Record<AiRecommendation, { label: string; cls: string }> = 
 
 // ── Candidate card ────────────────────────────────────────────────────────────
 
+const SIGNAL_ACCENT: Record<string, string> = {
+  strong_yes: '#10b981', yes: '#3b82f6', maybe: '#f59e0b', no: '#ef4444',
+}
+const SIGNAL_BADGE: Record<string, { label: string; cls: string }> = {
+  strong_yes: { label: 'Strong Yes', cls: 'bg-emerald-100 text-emerald-700' },
+  yes:        { label: 'Yes',        cls: 'bg-blue-100 text-blue-700'       },
+  maybe:      { label: 'Maybe',      cls: 'bg-amber-100 text-amber-700'     },
+  no:         { label: 'No',         cls: 'bg-red-100 text-red-700'         },
+}
+
 function CandidateCard({
-  app, onDragStart, onClick, isSelected, onToggleSelect,
+  app, onDragStart, onClick, isSelected, onToggleSelect, cardFields,
 }: {
   app: Application
   onDragStart: (id: string) => void
   onClick: (app: Application) => void
   isSelected: boolean
   onToggleSelect: (id: string) => void
+  cardFields: string[]
 }) {
   const c = app.candidate!
+  const show = (field: string) => cardFields.includes(field)
+
+  const signalBadge = show('ai_signal') && app.ai_recommendation
+    ? SIGNAL_BADGE[app.ai_recommendation] : null
+  const accentColor = show('ai_signal') && app.ai_score !== null && app.ai_recommendation
+    ? SIGNAL_ACCENT[app.ai_recommendation] : undefined
+
+  // Whether any footer-row field is active
+  const hasFooter = show('source') || signalBadge || (show('ai_score') && app.ai_score !== null) || show('days')
 
   return (
     <div
       draggable
       onDragStart={() => onDragStart(app.id)}
       onClick={() => onClick(app)}
-      className={`cursor-pointer rounded-xl border bg-white px-3 py-2.5 shadow-sm hover:shadow-md transition-all select-none ${
+      style={accentColor ? { borderLeftColor: accentColor, borderLeftWidth: '3px' } : undefined}
+      className={`cursor-pointer rounded-xl border bg-white px-3 py-2 shadow-sm hover:shadow-md transition-all select-none ${
         isSelected ? 'border-blue-400 ring-2 ring-blue-200' : 'border-slate-200 hover:border-blue-200'
       }`}
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-1.5 min-w-0">
         {/* Checkbox */}
         <div
           onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
-          className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
+          className={`h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
             isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'
           }`}
         >
-          {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
+          {isSelected && <Check className="h-2 w-2 text-white" />}
         </div>
         {/* Name + company */}
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-slate-900 truncate leading-tight">{c.name}</p>
-          {c.current_title && (
-            <p className="text-[11px] text-slate-400 truncate leading-tight mt-0.5">{c.current_title}</p>
+          <p className="text-xs font-semibold text-slate-900 truncate leading-snug">{c.name}</p>
+          {show('company') && c.current_title && (
+            <p className="text-[10px] text-slate-400 truncate leading-tight">{c.current_title}</p>
+          )}
+          {show('location') && c.location && (
+            <p className="text-[10px] text-slate-400 truncate leading-tight">{c.location}</p>
           )}
         </div>
       </div>
+
+      {/* Footer row: optional fields */}
+      {hasFooter && (
+        <div className="flex items-center justify-between mt-1.5 gap-1 flex-wrap">
+          {show('source') && (
+            <span className={`rounded-full px-1.5 py-px text-[9px] font-medium ${SOURCE_COLORS[app.source] ?? SOURCE_COLORS.manual}`}>
+              {SOURCE_LABELS[app.source] ?? app.source}
+            </span>
+          )}
+          <div className="flex items-center gap-1 flex-wrap justify-end ml-auto">
+            {signalBadge && (
+              <span className={`rounded-full px-1.5 py-px text-[9px] font-semibold ${signalBadge.cls}`}>
+                {signalBadge.label}
+              </span>
+            )}
+            {show('ai_score') && app.ai_score !== null && <ScorePill score={app.ai_score} />}
+            {show('days') && (
+              <span className="text-[9px] text-slate-400">{daysSince(app.applied_at)}d</span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -224,6 +271,7 @@ function StageColumn({
   selectedInStage,
   onSelectAllInStage,
   showDragHandle = false,
+  cardFields,
 }: {
   stage: PipelineStage
   apps: Application[]
@@ -247,6 +295,8 @@ function StageColumn({
   onSelectAllInStage: (ids: string[], select: boolean) => void
   /** Show drag handle in the column header (edit mode) */
   showDragHandle?: boolean
+  /** Which fields to render on each candidate card */
+  cardFields: string[]
 }) {
   const [over, setOver] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -431,6 +481,7 @@ function StageColumn({
             onClick={onCardClick}
             isSelected={selectedApps.has(app.id)}
             onToggleSelect={onToggleSelect}
+            cardFields={cardFields}
           />
         ))}
         {apps.length === 0 && (
@@ -2030,6 +2081,10 @@ export default function JobPipelinePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
 
+  // Card field preferences from settings
+  const { settings } = useSettings()
+  const cardFields = settings.kanban_card_fields ?? ['company']
+
   const [job, setJob] = useState<JobWithPipeline | null>(null)
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
@@ -2948,6 +3003,7 @@ export default function JobPipelinePage() {
                   return next
                 })
               }}
+              cardFields={cardFields}
             />
           </div>
         )})}
@@ -2995,6 +3051,7 @@ export default function JobPipelinePage() {
                   onClick={setSelectedApp}
                   isSelected={selectedApps.has(app.id)}
                   onToggleSelect={toggleSelect}
+                  cardFields={cardFields}
                 />
               ))}
             </div>
@@ -3072,6 +3129,7 @@ export default function JobPipelinePage() {
                     onClick={setSelectedApp}
                     isSelected={false}
                     onToggleSelect={() => {}}
+                    cardFields={cardFields}
                   />
                 ))}
               </div>

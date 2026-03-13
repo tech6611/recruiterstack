@@ -8,6 +8,8 @@ export interface AppSettings {
   recruiter_name: string
   recruiter_email: string
   recruiter_title: string
+  /** Field IDs shown on each kanban candidate card (user-configurable) */
+  kanban_card_fields: string[]
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -16,7 +18,18 @@ export const DEFAULT_SETTINGS: AppSettings = {
   recruiter_name: '',
   recruiter_email: '',
   recruiter_title: '',
+  kanban_card_fields: ['company'],
 }
+
+/** All configurable kanban card field definitions */
+export const KANBAN_CARD_FIELD_OPTIONS = [
+  { id: 'company',   label: 'Title / Company',      description: 'Current role & employer shown below name' },
+  { id: 'source',    label: 'Source',               description: 'How the candidate entered the pipeline'  },
+  { id: 'ai_signal', label: 'AI Signal',            description: 'AI recommendation (Strong Yes / No…)'   },
+  { id: 'ai_score',  label: 'AI Score',             description: 'Numeric AI compatibility score'          },
+  { id: 'days',      label: 'Days in Pipeline',     description: 'Time elapsed since application'          },
+  { id: 'location',  label: 'Location',             description: 'Candidate location'                      },
+] as const
 
 const STORAGE_KEY = 'recruiterstack_settings'
 

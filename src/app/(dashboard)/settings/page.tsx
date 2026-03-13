@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle, Building2, User, Sparkles, Database, Bell, Plug } from 'lucide-react'
-import { useSettings } from '@/lib/hooks/useSettings'
+import { CheckCircle, Check, Building2, User, Sparkles, Database, Bell, Plug, LayoutList } from 'lucide-react'
+import { useSettings, KANBAN_CARD_FIELD_OPTIONS } from '@/lib/hooks/useSettings'
 import type { AppSettings } from '@/lib/hooks/useSettings'
 
 export default function SettingsPage() {
@@ -62,6 +62,14 @@ export default function SettingsPage() {
 
   const set = (key: keyof AppSettings, value: string) =>
     setForm(f => ({ ...f, [key]: value }))
+
+  const toggleCardField = (fieldId: string) => {
+    const curr = form.kanban_card_fields ?? ['company']
+    const next = curr.includes(fieldId)
+      ? curr.filter(f => f !== fieldId)
+      : [...curr, fieldId]
+    setForm(f => ({ ...f, kanban_card_fields: next }))
+  }
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
@@ -206,6 +214,61 @@ export default function SettingsPage() {
                 className={inputCls}
               />
             </div>
+          </div>
+        </div>
+
+        {/* Kanban Card Fields */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50">
+              <LayoutList className="h-4 w-4 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-800">Kanban Card Fields</h2>
+              <p className="text-xs text-slate-400">Choose what appears on each candidate card in the pipeline view</p>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            {/* Name — always required, not toggleable */}
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
+              <div className="h-4 w-4 rounded bg-slate-300 flex items-center justify-center shrink-0">
+                <Check className="h-2.5 w-2.5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-500">Candidate Name</p>
+                <p className="text-[10px] text-slate-400">Always visible · cannot be hidden</p>
+              </div>
+            </div>
+
+            {/* Configurable fields */}
+            {KANBAN_CARD_FIELD_OPTIONS.map(field => {
+              const active = (form.kanban_card_fields ?? ['company']).includes(field.id)
+              return (
+                <button
+                  key={field.id}
+                  type="button"
+                  onClick={() => toggleCardField(field.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                    active
+                      ? 'bg-indigo-50 border-indigo-200'
+                      : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-all ${
+                    active ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300 bg-white'
+                  }`}>
+                    {active && <Check className="h-2.5 w-2.5 text-white" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`text-xs font-semibold ${active ? 'text-indigo-700' : 'text-slate-700'}`}>
+                      {field.label}
+                    </p>
+                    <p className="text-[10px] text-slate-400">{field.description}</p>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 
