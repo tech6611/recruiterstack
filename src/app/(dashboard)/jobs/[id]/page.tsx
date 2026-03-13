@@ -1708,14 +1708,25 @@ function ScheduleInterviewModal({
   const [time, setTime] = useState('10:00')
   const [duration, setDuration] = useState(60)
   const [interviewer, setInterviewer] = useState(job.hiring_manager_name ?? '')
+  const [interviewerEmail, setInterviewerEmail] = useState('')
   const [location, setLocation] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [scheduledAt, setScheduledAt] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [googleConnected, setGoogleConnected] = useState(false)
+  const [autoMeetLink, setAutoMeetLink] = useState<string | null>(null)
 
   const hmEmail = (job as unknown as { hiring_manager_email?: string }).hiring_manager_email ?? null
+
+  // Fetch Google Calendar connection status
+  useEffect(() => {
+    fetch('/api/org-settings')
+      .then(r => r.json())
+      .then(({ data }) => setGoogleConnected(!!data?.google_connected))
+      .catch(() => {})
+  }, [])
 
   const MEETING_INTEGRATIONS = [
     { id: 'gmeet',    label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
@@ -1728,6 +1739,8 @@ function ScheduleInterviewModal({
 
   const openIntegration = (platform: typeof MEETING_INTEGRATIONS[number]) => {
     setActivePlatform(platform.id)
+    // Google Meet: when org has Calendar connected, link is auto-created on submit — no new tab
+    if (platform.id === 'gmeet' && googleConnected) return
     window.open(platform.url, '_blank', 'noopener')
   }
 
@@ -1768,6 +1781,7 @@ function ScheduleInterviewModal({
             hiring_request_id: job.id,
             stage_id:          app.stage_id ?? null,
             interviewer_name:  interviewer.trim(),
+            interviewer_email: interviewerEmail.trim() || null,
             interview_type:    interviewType,
             scheduled_at:      scheduled,
             duration_minutes:  duration,
@@ -1785,6 +1799,8 @@ function ScheduleInterviewModal({
       }
 
       setScheduledAt(scheduled)
+      const firstMeetLink = results[0]?.data?.meet_link ?? null
+      if (firstMeetLink) setAutoMeetLink(firstMeetLink)
       setSaved(true)
     } catch {
       setError('Network error. Please try again.')
@@ -1817,15 +1833,35 @@ function ScheduleInterviewModal({
           )}
 
           <div className="flex flex-col gap-2.5 mb-5">
+            {/* Auto-created Meet link banner */}
+            {autoMeetLink && (
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-green-500">✓</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-green-700">Google Meet created</p>
+                    <p className="text-[11px] text-green-600 truncate">{autoMeetLink}</p>
+                  </div>
+                </div>
+                <a
+                  href={autoMeetLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 text-xs font-medium text-green-700 underline hover:text-green-900"
+                >
+                  Join
+                </a>
+              </div>
+            )}
             <a
               href={buildGCalLink()}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              <span>📅</span> Add to Google Calendar
+              <span>📅</span> {autoMeetLink ? 'View in Google Calendar' : 'Add to Google Calendar'}
             </a>
-            {location && (
+            {location && !autoMeetLink && (
               <a
                 href={location}
                 target="_blank"
@@ -1963,14 +1999,28 @@ function ScheduleInterviewModal({
           </div>
 
           {/* Interviewer */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Interviewer</label>
-            <input
-              value={interviewer}
-              onChange={e => setInterviewer(e.target.value)}
-              placeholder="Hiring manager name"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Interviewer</label>
+              <input
+                value={interviewer}
+                onChange={e => setInterviewer(e.target.value)}
+                placeholder="Hiring manager name"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                Interviewer Email <span className="font-normal text-slate-400">(for invite)</span>
+              </label>
+              <input
+                type="email"
+                value={interviewerEmail}
+                onChange={e => setInterviewerEmail(e.target.value)}
+                placeholder="interviewer@company.com"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
           </div>
 
           {/* Meeting platform + link */}
@@ -1995,21 +2045,36 @@ function ScheduleInterviewModal({
                   </button>
                 ))}
               </div>
-              {activePlatform && (
-                <p className="text-xs text-slate-400 mb-1.5">
-                  {activePlatform === 'calendly' ? 'Paste your Calendly link below' : 'Copy the link from the new tab and paste it below'}
-                </p>
+              {/* Google Meet + Calendar connected → auto-create banner */}
+              {activePlatform === 'gmeet' && googleConnected ? (
+                <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
+                  <span className="text-green-500 text-base">✓</span>
+                  <div>
+                    <p className="text-xs font-semibold text-green-700">Google Meet link will be auto-created</p>
+                    <p className="text-[11px] text-green-600">Calendar invites sent to candidate &amp; interviewer on schedule</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {activePlatform && activePlatform !== 'gmeet' && (
+                    <p className="text-xs text-slate-400 mb-1.5">
+                      {activePlatform === 'calendly' ? 'Paste your Calendly link below' : 'Copy the link from the new tab and paste it below'}
+                    </p>
+                  )}
+                  {(!activePlatform || activePlatform !== 'gmeet') && (
+                    <input
+                      value={location}
+                      onChange={e => setLocation(e.target.value)}
+                      placeholder={
+                        activePlatform
+                          ? MEETING_INTEGRATIONS.find(p => p.id === activePlatform)?.placeholder ?? 'Paste meeting link...'
+                          : 'Paste meeting link (Zoom, Meet, Teams, Calendly…)'
+                      }
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  )}
+                </>
               )}
-              <input
-                value={location}
-                onChange={e => setLocation(e.target.value)}
-                placeholder={
-                  activePlatform
-                    ? MEETING_INTEGRATIONS.find(p => p.id === activePlatform)?.placeholder ?? 'Paste meeting link...'
-                    : 'Paste meeting link (Zoom, Meet, Teams, Calendly…)'
-                }
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
             </div>
           )}
 
