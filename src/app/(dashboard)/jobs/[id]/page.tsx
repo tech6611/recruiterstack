@@ -1179,8 +1179,9 @@ function RankedView({
                 : null
               const isLastStage = currentStageIdx === stages.length - 1
 
-              // Open dropdown upward if in the bottom half of the list to avoid clipping
-              const openUp = rowIdx >= Math.ceil(sorted.length / 2)
+              // Open dropdown upward for any row that isn't the very first,
+              // since the table container clips overflow at the bottom
+              const openUp = rowIdx > 0
 
               // Cross-stage dimming: if another stage is active, dim this row
               const isSameStage  = !activeStageId || app.stage_id === activeStageId
@@ -1296,15 +1297,7 @@ function RankedView({
                             <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
                               {c.name}
                             </div>
-                            {/* View profile */}
-                            <button
-                              onClick={() => { setOpenRowMenu(null); onCardClick(app) }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
-                              View profile
-                            </button>
-                            {/* Score */}
+                            {/* 1. Score — matches Kanban position 1 */}
                             <button
                               onClick={() => { setOpenRowMenu(null); onScoreApp(app) }}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
@@ -1313,7 +1306,7 @@ function RankedView({
                               Score this candidate
                             </button>
                             <div className="my-1 border-t border-slate-100" />
-                            {/* Schedule */}
+                            {/* 2. Schedule interview */}
                             <button
                               onClick={() => { setOpenRowMenu(null); onScheduleApp(app) }}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
@@ -1321,7 +1314,7 @@ function RankedView({
                               <span className="text-base leading-none w-3.5 text-center">📅</span>
                               Schedule interview
                             </button>
-                            {/* Self-schedule (stub) */}
+                            {/* 3. Self-schedule (stub) */}
                             <button
                               onClick={() => setOpenRowMenu(null)}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
@@ -1329,7 +1322,7 @@ function RankedView({
                               <span className="text-base leading-none w-3.5 text-center">🔗</span>
                               Create self-schedule invite
                             </button>
-                            {/* Send message (stub) */}
+                            {/* 4. Send message (stub) */}
                             <button
                               onClick={() => setOpenRowMenu(null)}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
@@ -1337,7 +1330,7 @@ function RankedView({
                               <span className="text-base leading-none w-3.5 text-center">✉️</span>
                               Send message
                             </button>
-                            {/* Send assessment (stub) */}
+                            {/* 5. Send assessment (stub) */}
                             <button
                               onClick={() => setOpenRowMenu(null)}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
@@ -1346,7 +1339,7 @@ function RankedView({
                               Send assessment
                             </button>
                             <div className="my-1 border-t border-slate-100" />
-                            {/* Move to next stage */}
+                            {/* 6. Move to next stage */}
                             {nextStage && (
                               <button
                                 onClick={() => { setOpenRowMenu(null); onMoveToStage(app.id, nextStage.id) }}
@@ -1356,7 +1349,7 @@ function RankedView({
                                 Move to {nextStage.name}
                               </button>
                             )}
-                            {/* Reject */}
+                            {/* 7. Reject */}
                             <button
                               onClick={() => { setOpenRowMenu(null); onRejectApp(app.id) }}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
