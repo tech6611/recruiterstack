@@ -56,14 +56,14 @@ function fmtRelative(d: string) {
 // ── Stage colours ─────────────────────────────────────────────────────────────
 
 const STAGE_STYLES: Record<StageColor, { header: string; dot: string; border: string; bar: string }> = {
-  slate:   { header: 'bg-slate-100',   dot: 'bg-slate-400',   border: 'border-slate-300',   bar: 'border-y-2 border-slate-200'   },
-  blue:    { header: 'bg-blue-50',     dot: 'bg-blue-500',    border: 'border-blue-300',    bar: 'border-y-2 border-blue-200'    },
-  violet:  { header: 'bg-violet-50',   dot: 'bg-violet-500',  border: 'border-violet-300',  bar: 'border-y-2 border-violet-200'  },
-  amber:   { header: 'bg-amber-50',    dot: 'bg-amber-500',   border: 'border-amber-300',   bar: 'border-y-2 border-amber-200'   },
-  emerald: { header: 'bg-emerald-50',  dot: 'bg-emerald-500', border: 'border-emerald-300', bar: 'border-y-2 border-emerald-200' },
-  green:   { header: 'bg-green-50',    dot: 'bg-green-500',   border: 'border-green-300',   bar: 'border-y-2 border-green-200'   },
-  red:     { header: 'bg-red-50',      dot: 'bg-red-500',     border: 'border-red-300',     bar: 'border-y-2 border-red-200'     },
-  pink:    { header: 'bg-pink-50',     dot: 'bg-pink-500',    border: 'border-pink-300',    bar: 'border-y-2 border-pink-200'    },
+  slate:   { header: 'bg-slate-100',   dot: 'bg-slate-400',   border: 'border-slate-300',   bar: 'border-y-4 border-slate-300'   },
+  blue:    { header: 'bg-blue-50',     dot: 'bg-blue-500',    border: 'border-blue-300',    bar: 'border-y-4 border-blue-300'    },
+  violet:  { header: 'bg-violet-50',   dot: 'bg-violet-500',  border: 'border-violet-300',  bar: 'border-y-4 border-violet-300'  },
+  amber:   { header: 'bg-amber-50',    dot: 'bg-amber-500',   border: 'border-amber-300',   bar: 'border-y-4 border-amber-300'   },
+  emerald: { header: 'bg-emerald-50',  dot: 'bg-emerald-500', border: 'border-emerald-300', bar: 'border-y-4 border-emerald-300' },
+  green:   { header: 'bg-green-50',    dot: 'bg-green-500',   border: 'border-green-300',   bar: 'border-y-4 border-green-300'   },
+  red:     { header: 'bg-red-50',      dot: 'bg-red-500',     border: 'border-red-300',     bar: 'border-y-4 border-red-300'     },
+  pink:    { header: 'bg-pink-50',     dot: 'bg-pink-500',    border: 'border-pink-300',    bar: 'border-y-4 border-pink-300'    },
 }
 
 const COLOR_OPTIONS: { value: StageColor; label: string; dot: string }[] = [
@@ -317,7 +317,7 @@ function StageColumn({
       onDrop={() => { setOver(false); onDrop(stage.id) }}
     >
       {/* Column header */}
-      <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${style.header}`}>
+      <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${style.header} border-2 ${style.border}`}>
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {showDragHandle && (
             <GripVertical className="h-4 w-4 text-slate-300 shrink-0 cursor-grab" />
@@ -2875,11 +2875,11 @@ export default function JobPipelinePage() {
         }`}
       >
         {/* Status column — sticky, not tied to stages */}
-        <div className="sticky left-0 z-10 shrink-0 w-[130px] flex flex-col border-y-2 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)]">
-          <div className="rounded-xl bg-violet-50 border border-violet-200 px-2.5 py-2 flex items-center gap-1.5 mb-1">
+        <div className="sticky left-0 z-10 shrink-0 w-[165px] flex flex-col border-y-4 border-violet-300 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)]">
+          <div className="rounded-xl bg-violet-50 border-2 border-violet-300 px-2.5 py-2 flex items-center gap-1.5 mb-1">
             <div className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
-            <span className="text-sm font-semibold text-violet-700 flex-1 min-w-0">Active</span>
-            <span className="text-xs font-bold text-violet-600 bg-white rounded-full px-1.5 border border-violet-100">{activeApps.length}</span>
+            <span className="text-xs font-bold text-violet-700 flex-1 min-w-0">Active</span>
+            <span className="text-xs font-bold text-violet-600 bg-white rounded-full px-1.5 border border-violet-200 shrink-0">{activeApps.length}</span>
           </div>
           <p className="text-[10px] text-slate-400 px-0.5 mt-1 leading-tight">Status from HM intake form</p>
         </div>
@@ -2981,7 +2981,7 @@ export default function JobPipelinePage() {
         )}
 
         {/* Edit Pipeline toggle — far right */}
-        <div className="shrink-0 flex flex-col gap-1.5 items-stretch pl-4 pt-1">
+        <div className="shrink-0 flex flex-col gap-1.5 items-stretch pl-4 pt-5">
           <button
             onClick={() => setEditMode(e => !e)}
             className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -3033,7 +3033,7 @@ export default function JobPipelinePage() {
 
       {/* Draggable fill-line divider — same visual language as column bar borders */}
       <div
-        className="shrink-0 h-[3px] bg-slate-200 hover:bg-violet-300 cursor-row-resize transition-colors select-none"
+        className="shrink-0 h-[4px] bg-slate-300 hover:bg-violet-400 cursor-row-resize transition-colors select-none"
         onMouseDown={handleSplitMouseDown}
         title="Drag to resize"
       />
@@ -3041,11 +3041,11 @@ export default function JobPipelinePage() {
       {/* ── Rejected candidates ────────────────────────────────────────── */}
       <div className="flex items-stretch overflow-x-auto overflow-y-auto divide-x divide-slate-100 min-h-[160px] bg-red-50/10 flex-1">
         {/* Status column — sticky, mirrors active section */}
-        <div className="sticky left-0 z-10 shrink-0 w-[130px] flex flex-col border-y-2 border-red-200 bg-white px-3 py-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)]">
-          <div className="rounded-xl bg-red-50 border border-red-200 px-2.5 py-2 flex items-center gap-1.5">
+        <div className="sticky left-0 z-10 shrink-0 w-[165px] flex flex-col border-y-4 border-red-300 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)]">
+          <div className="rounded-xl bg-red-50 border-2 border-red-300 px-2.5 py-2 flex items-center gap-1.5">
             <div className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
-            <span className="text-sm font-semibold text-red-700 flex-1 min-w-0">Rejected</span>
-            <span className="text-xs font-bold text-red-600 bg-white rounded-full px-1.5 border border-red-100">{totalRejected}</span>
+            <span className="text-xs font-bold text-red-700 flex-1 min-w-0">Rejected</span>
+            <span className="text-xs font-bold text-red-600 bg-white rounded-full px-1.5 border border-red-200 shrink-0">{totalRejected}</span>
           </div>
         </div>
 
