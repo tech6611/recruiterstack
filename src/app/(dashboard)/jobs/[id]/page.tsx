@@ -1127,8 +1127,8 @@ function RankedView({
             <tr className="border-b border-slate-100 bg-slate-50/60">
               <th className="px-4 py-3 w-10">
                 <div
-                  onClick={() => onBulkSelect(allSelected ? [] : sorted.map(a => a.id))}
-                  title="Select / deselect all visible candidates"
+                  onClick={() => onBulkSelect(allSelected || someSelected ? [] : sorted.map(a => a.id))}
+                  title={allSelected || someSelected ? 'Deselect all' : 'Select all visible candidates'}
                   className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
                     allSelected  ? 'bg-blue-500 border-blue-500' :
                     someSelected ? 'bg-blue-100 border-blue-400' :
@@ -1988,7 +1988,7 @@ export default function JobPipelinePage() {
     filterSource !== 'all', filterStage !== 'all', filterScore !== 'all',
     filterSignal !== 'all', filterAction !== 'all',
   ].filter(Boolean).length
-  const [sortBy,        setSortBy]        = useState<'date' | 'score' | 'name'>('date')
+  const [sortBy,        setSortBy]        = useState<'date' | 'score' | 'name' | 'stage' | 'action'>('date')
   const [openStageMenu, setOpenStageMenu] = useState<string | null>(null)
   const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set())
 
@@ -2090,21 +2090,34 @@ export default function JobPipelinePage() {
   }, [filterSearch, filterSource, filterStage, filterScore, filterSignal, filterAction, job])
 
   // Filtered + sorted flat list (for Ranked view)
-  const filteredApps = useMemo(() => {
-    let apps = applyFilters(activeApps)
-    if (sortBy === 'score') apps = [...apps].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))
-    if (sortBy === 'name')  apps = [...apps].sort((a, b) => (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? ''))
-    return apps
-  }, [activeApps, applyFilters, sortBy])
+  // Suggested-action sort priority: strong_yes → yes → maybe → no → unscored
+  const actionSortKey = (a: Application) => {
+    if (a.ai_score === null) return 4
+    if (a.ai_recommendation === 'strong_yes') return 0
+    if (a.ai_recommendation === 'yes')        return 1
+    if (a.ai_recommendation === 'maybe')      return 2
+    if (a.ai_recommendation === 'no')         return 3
+    return 4
+  }
 
-  // Filtered + sorted view of grouped (for Kanban — stage filter excluded since stages are columns)
+  const filteredApps = useMemo(() => {
+    const stages = job?.pipeline_stages ?? []
+    let apps = applyFilters(activeApps)
+    if (sortBy === 'score')  apps = [...apps].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))
+    if (sortBy === 'name')   apps = [...apps].sort((a, b) => (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? ''))
+    if (sortBy === 'stage')  apps = [...apps].sort((a, b) => stages.findIndex(s => s.id === a.stage_id) - stages.findIndex(s => s.id === b.stage_id))
+    if (sortBy === 'action') apps = [...apps].sort((a, b) => actionSortKey(a) - actionSortKey(b))
+    return apps
+  }, [activeApps, applyFilters, sortBy, job])
+
+  // Filtered + sorted view of grouped (for Kanban — stage sort excluded since cards are already in columns)
   const filteredGrouped = useMemo(() => {
     const result: Record<string, Application[]> = {}
     for (const [sid, apps] of Object.entries(grouped)) {
       let filtered = applyFilters(apps)
-      if (sortBy === 'score') filtered = [...filtered].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))
-      else if (sortBy === 'name') filtered = [...filtered].sort((a, b) =>
-        (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? ''))
+      if (sortBy === 'score')  filtered = [...filtered].sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))
+      else if (sortBy === 'name')   filtered = [...filtered].sort((a, b) => (a.candidate?.name ?? '').localeCompare(b.candidate?.name ?? ''))
+      else if (sortBy === 'action') filtered = [...filtered].sort((a, b) => actionSortKey(a) - actionSortKey(b))
       result[sid] = filtered
     }
     return result
@@ -2685,17 +2698,20 @@ export default function JobPipelinePage() {
 
         <div className="w-px h-5 bg-slate-200" />
 
-        {/* Sort */}
+        {/* Sort by */}
         <div className="flex items-center gap-1.5 text-slate-500">
           <ArrowDownUp className="h-3.5 w-3.5" />
+          <span className="text-sm text-slate-400">Sort by</span>
           <select
             value={sortBy}
-            onChange={e => setSortBy(e.target.value as 'date' | 'score' | 'name')}
+            onChange={e => setSortBy(e.target.value as 'date' | 'score' | 'name' | 'stage' | 'action')}
             className="text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
           >
             <option value="date">Date applied</option>
             <option value="score">AI Score</option>
             <option value="name">Name (A–Z)</option>
+            <option value="stage">Stage</option>
+            <option value="action">Suggested Action</option>
           </select>
         </div>
 
