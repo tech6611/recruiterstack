@@ -8,7 +8,7 @@ import {
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
   Settings2, LayoutList, Kanban, SlidersHorizontal,
-  ArrowUp, ArrowDown, ArrowDownUp, GripVertical, GripHorizontal,
+  ArrowUp, ArrowDown, ArrowDownUp, GripVertical,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
@@ -55,15 +55,15 @@ function fmtRelative(d: string) {
 
 // ── Stage colours ─────────────────────────────────────────────────────────────
 
-const STAGE_STYLES: Record<StageColor, { header: string; dot: string; border: string }> = {
-  slate:   { header: 'bg-slate-100',   dot: 'bg-slate-400',   border: 'border-slate-300' },
-  blue:    { header: 'bg-blue-50',     dot: 'bg-blue-500',    border: 'border-blue-300'  },
-  violet:  { header: 'bg-violet-50',   dot: 'bg-violet-500',  border: 'border-violet-300'},
-  amber:   { header: 'bg-amber-50',    dot: 'bg-amber-500',   border: 'border-amber-300' },
-  emerald: { header: 'bg-emerald-50',  dot: 'bg-emerald-500', border: 'border-emerald-300'},
-  green:   { header: 'bg-green-50',    dot: 'bg-green-500',   border: 'border-green-300' },
-  red:     { header: 'bg-red-50',      dot: 'bg-red-500',     border: 'border-red-300'   },
-  pink:    { header: 'bg-pink-50',     dot: 'bg-pink-500',    border: 'border-pink-300'  },
+const STAGE_STYLES: Record<StageColor, { header: string; dot: string; border: string; bar: string }> = {
+  slate:   { header: 'bg-slate-100',   dot: 'bg-slate-400',   border: 'border-slate-300',   bar: 'border-y-2 border-slate-200'   },
+  blue:    { header: 'bg-blue-50',     dot: 'bg-blue-500',    border: 'border-blue-300',    bar: 'border-y-2 border-blue-200'    },
+  violet:  { header: 'bg-violet-50',   dot: 'bg-violet-500',  border: 'border-violet-300',  bar: 'border-y-2 border-violet-200'  },
+  amber:   { header: 'bg-amber-50',    dot: 'bg-amber-500',   border: 'border-amber-300',   bar: 'border-y-2 border-amber-200'   },
+  emerald: { header: 'bg-emerald-50',  dot: 'bg-emerald-500', border: 'border-emerald-300', bar: 'border-y-2 border-emerald-200' },
+  green:   { header: 'bg-green-50',    dot: 'bg-green-500',   border: 'border-green-300',   bar: 'border-y-2 border-green-200'   },
+  red:     { header: 'bg-red-50',      dot: 'bg-red-500',     border: 'border-red-300',     bar: 'border-y-2 border-red-200'     },
+  pink:    { header: 'bg-pink-50',     dot: 'bg-pink-500',    border: 'border-pink-300',    bar: 'border-y-2 border-pink-200'    },
 }
 
 const COLOR_OPTIONS: { value: StageColor; label: string; dot: string }[] = [
@@ -2870,14 +2870,26 @@ export default function JobPipelinePage() {
       <div
         ref={activeAreaRef}
         style={splitHeight !== null ? { height: splitHeight, flexShrink: 0 } : { minHeight: '55vh', flexShrink: 0 }}
-        className={`flex items-stretch overflow-x-auto overflow-y-hidden px-6 py-6 divide-x transition-colors ${
+        className={`flex items-stretch overflow-x-auto overflow-y-hidden divide-x transition-colors ${
           editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-100 bg-transparent'
         }`}
       >
-        {job.pipeline_stages.map((stage, stageIndex) => (
+        {/* Status column — sticky, not tied to stages */}
+        <div className="sticky left-0 z-10 shrink-0 w-[130px] flex flex-col border-y-2 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)]">
+          <div className="rounded-xl bg-violet-50 border border-violet-200 px-2.5 py-2 flex items-center gap-1.5 mb-1">
+            <div className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
+            <span className="text-sm font-semibold text-violet-700 flex-1 min-w-0">Active</span>
+            <span className="text-xs font-bold text-violet-600 bg-white rounded-full px-1.5 border border-violet-100">{activeApps.length}</span>
+          </div>
+          <p className="text-[10px] text-slate-400 px-0.5 mt-1 leading-tight">Status from HM intake form</p>
+        </div>
+
+        {job.pipeline_stages.map((stage, stageIndex) => {
+          const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
+          return (
           <div
             key={stage.id}
-            className={`flex-1 min-w-[180px] max-w-[320px] px-3 transition-colors ${
+            className={`flex-1 min-w-[180px] max-w-[320px] px-3 py-5 transition-colors ${stColStyle.bar} ${
               editMode ? 'cursor-grab active:cursor-grabbing' : ''
             }`}
             draggable={editMode}
@@ -2941,7 +2953,7 @@ export default function JobPipelinePage() {
               }}
             />
           </div>
-        ))}
+        )})}
 
         {/* Add-stage panel — always visible in edit mode */}
         {editMode && (
@@ -3019,36 +3031,30 @@ export default function JobPipelinePage() {
       </div>
       {/* ── end active candidates ── */}
 
-      {/* Draggable divider */}
+      {/* Draggable fill-line divider — same visual language as column bar borders */}
       <div
-        className="shrink-0 h-7 flex items-center cursor-row-resize select-none group relative"
+        className="shrink-0 h-[3px] bg-slate-200 hover:bg-violet-300 cursor-row-resize transition-colors select-none"
         onMouseDown={handleSplitMouseDown}
-      >
-        <div className="absolute inset-x-0 h-px bg-slate-200 group-hover:bg-violet-300 transition-colors" />
-        <div className="relative mx-auto flex items-center gap-1.5 bg-white border border-slate-200 group-hover:border-violet-300 group-hover:text-violet-500 rounded-full px-3 py-0.5 text-xs text-slate-400 transition-all shadow-sm z-10">
-          <GripHorizontal className="h-3 w-3" />
-          <span className="font-semibold text-red-400">Rejected</span>
-          {totalRejected > 0 && (
-            <span className="bg-red-100 text-red-500 rounded-full px-1.5 font-semibold">{totalRejected}</span>
-          )}
-        </div>
-      </div>
+        title="Drag to resize"
+      />
 
       {/* ── Rejected candidates ────────────────────────────────────────── */}
-      <div className="flex items-start overflow-x-auto overflow-y-auto px-6 py-4 divide-x divide-slate-100 min-h-[160px] bg-red-50/10 flex-1">
+      <div className="flex items-stretch overflow-x-auto overflow-y-auto divide-x divide-slate-100 min-h-[160px] bg-red-50/10 flex-1">
+        {/* Status column — sticky, mirrors active section */}
+        <div className="sticky left-0 z-10 shrink-0 w-[130px] flex flex-col border-y-2 border-red-200 bg-white px-3 py-5 shadow-[2px_0_6px_-2px_rgba(0,0,0,0.06)]">
+          <div className="rounded-xl bg-red-50 border border-red-200 px-2.5 py-2 flex items-center gap-1.5">
+            <div className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+            <span className="text-sm font-semibold text-red-700 flex-1 min-w-0">Rejected</span>
+            <span className="text-xs font-bold text-red-600 bg-white rounded-full px-1.5 border border-red-100">{totalRejected}</span>
+          </div>
+        </div>
+
         {job.pipeline_stages.map(stage => {
           const rejApps = rejectedGrouped[stage.id] ?? []
-          const stStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
+          const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
           return (
-            <div key={stage.id} className="flex-1 min-w-[180px] max-w-[320px] px-3 shrink-0">
-              {/* Simplified header — no edit, no select-all */}
-              <div className="flex items-center gap-2 rounded-xl px-3 py-2 mb-2 bg-slate-50 border border-slate-100">
-                <div className={`h-2 w-2 rounded-full shrink-0 ${stStyle.dot}`} />
-                <span className="text-xs text-slate-500 font-medium flex-1 min-w-0 truncate">{stage.name}</span>
-                {rejApps.length > 0 && (
-                  <span className="text-xs font-semibold text-red-400 bg-red-50 border border-red-100 rounded-full px-1.5">{rejApps.length}</span>
-                )}
-              </div>
+            <div key={stage.id} className={`flex-1 min-w-[180px] max-w-[320px] px-3 py-4 ${stColStyle.bar}`}>
+              {/* No column header — already shown in active section above */}
               <div className="flex flex-col gap-2">
                 {rejApps.map(app => (
                   <CandidateCard
