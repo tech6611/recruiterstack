@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Send, CheckCircle, Copy, Check, Users, PenLine,
-  Wand2, RefreshCw, Loader2, Sparkles, Paperclip, X,
+  Wand2, RefreshCw, Loader2, Sparkles, Paperclip, X, Plus, GripVertical,
 } from 'lucide-react'
+import type { StageColor } from '@/lib/types/database'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -45,6 +46,33 @@ const CITIES = [
   'Amsterdam, Netherlands', 'Paris, France', 'Zurich, Switzerland', 'Tel Aviv, Israel',
   'Hong Kong', 'Tokyo, Japan', 'São Paulo, Brazil',
 ]
+
+// ─── Pipeline builder constants ───────────────────────────────────────────────
+const DEFAULT_PIPELINE_STAGES: { name: string; color: StageColor }[] = [
+  { name: 'Applied',      color: 'slate'   },
+  { name: 'Screening',    color: 'blue'    },
+  { name: 'Phone Screen', color: 'violet'  },
+  { name: 'Interview',    color: 'amber'   },
+  { name: 'Offer',        color: 'emerald' },
+  { name: 'Hired',        color: 'green'   },
+]
+
+const PIPELINE_COLORS: { value: StageColor; dot: string }[] = [
+  { value: 'slate',   dot: 'bg-slate-400'   },
+  { value: 'blue',    dot: 'bg-blue-500'    },
+  { value: 'violet',  dot: 'bg-violet-500'  },
+  { value: 'amber',   dot: 'bg-amber-500'   },
+  { value: 'emerald', dot: 'bg-emerald-500' },
+  { value: 'green',   dot: 'bg-green-500'   },
+  { value: 'red',     dot: 'bg-red-500'     },
+  { value: 'pink',    dot: 'bg-pink-500'    },
+]
+
+const PIPELINE_DOT: Record<StageColor, string> = {
+  slate: 'bg-slate-400', blue: 'bg-blue-500', violet: 'bg-violet-500',
+  amber: 'bg-amber-500', emerald: 'bg-emerald-500', green: 'bg-green-500',
+  red: 'bg-red-500', pink: 'bg-pink-500',
+}
 
 type Mode = 'send_to_hm' | 'fill_myself' | null
 
@@ -183,6 +211,11 @@ export default function NewHiringRequestPage() {
   const [generatingJD, setGeneratingJD] = useState(false)
   const [jdGenError, setJdGenError] = useState<string | null>(null)
 
+  // ── Pipeline builder ──
+  const [pipelineStages, setPipelineStages] = useState<{ name: string; color: StageColor }[]>(DEFAULT_PIPELINE_STAGES)
+  const [stageDragIdx, setStageDragIdx] = useState<number | null>(null)
+  const [colorPickerIdx, setColorPickerIdx] = useState<number | null>(null)
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<{ ticketNumber: string; intakeUrl?: string; positionTitle: string } | null>(null)
@@ -251,6 +284,10 @@ export default function NewHiringRequestPage() {
       body.additional_notes = notes || undefined
       body.generated_jd = jd
     }
+
+    // Always send the configured pipeline stages
+    const validStages = pipelineStages.filter(s => s.name.trim())
+    if (validStages.length > 0) body.pipeline_stages = validStages
 
     const res = await fetch('/api/hiring-requests', {
       method: 'POST',
@@ -576,6 +613,88 @@ export default function NewHiringRequestPage() {
             <p>4. They submit the ticket — you get notified and pick it up from here</p>
           </div>
         )}
+
+        {/* ── Pipeline Builder ─────────────────────────────────────────────── */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Hiring Pipeline</p>
+              <p className="text-xs text-slate-400 mt-0.5">Drag to reorder · click the dot to change colour · click a name to rename</p>
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+            {pipelineStages.map((stage, i) => (
+              <div
+                key={i}
+                draggable
+                onDragStart={() => setStageDragIdx(i)}
+                onDragOver={e => e.preventDefault()}
+                onDrop={() => {
+                  if (stageDragIdx === null || stageDragIdx === i) return
+                  const next = [...pipelineStages]
+                  const [moved] = next.splice(stageDragIdx, 1)
+                  next.splice(i, 0, moved)
+                  setPipelineStages(next)
+                  setStageDragIdx(null)
+                }}
+                onDragEnd={() => setStageDragIdx(null)}
+                className={`flex items-center gap-2.5 px-3 py-2.5 bg-white hover:bg-slate-50 transition-colors group ${stageDragIdx === i ? 'opacity-40' : ''}`}
+              >
+                <GripVertical className="h-4 w-4 text-slate-300 cursor-grab shrink-0" />
+                {/* Color dot + inline picker */}
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setColorPickerIdx(colorPickerIdx === i ? null : i)}
+                    className={`h-3.5 w-3.5 rounded-full ${PIPELINE_DOT[stage.color]} ring-2 ring-offset-1 ring-transparent hover:ring-slate-200 transition-all`}
+                  />
+                  {colorPickerIdx === i && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setColorPickerIdx(null)} />
+                      <div className="absolute left-0 top-6 z-20 flex gap-1 bg-white border border-slate-200 rounded-lg p-1.5 shadow-lg">
+                        {PIPELINE_COLORS.map(c => (
+                          <button
+                            key={c.value}
+                            type="button"
+                            onClick={() => {
+                              setPipelineStages(prev => prev.map((s, j) => j === i ? { ...s, color: c.value } : s))
+                              setColorPickerIdx(null)
+                            }}
+                            className={`h-4 w-4 rounded-full ${c.dot} hover:scale-110 transition-transform ${stage.color === c.value ? 'ring-2 ring-offset-1 ring-slate-400' : ''}`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+                {/* Editable name */}
+                <input
+                  value={stage.name}
+                  onChange={e => setPipelineStages(prev => prev.map((s, j) => j === i ? { ...s, name: e.target.value } : s))}
+                  className="flex-1 text-sm text-slate-800 bg-transparent focus:outline-none min-w-0"
+                />
+                {/* Stage order badge */}
+                <span className="text-[10px] font-semibold text-slate-300 tabular-nums shrink-0">{i + 1}</span>
+                {/* Delete */}
+                <button
+                  type="button"
+                  onClick={() => setPipelineStages(prev => prev.filter((_, j) => j !== i))}
+                  className="opacity-0 group-hover:opacity-100 h-5 w-5 rounded flex items-center justify-center text-slate-300 hover:text-red-400 transition-all shrink-0"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setPipelineStages(prev => [...prev, { name: '', color: 'blue' }])}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-violet-600 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add stage
+          </button>
+        </div>
 
         <button
           type="submit"
