@@ -360,9 +360,9 @@ function StageColumn({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {/* Count badge — hidden in edit mode */}
+          {/* Count — compact, hidden in edit mode */}
           {!editMode && (
-            <span className="text-xs font-semibold text-slate-400 bg-white rounded-full px-2 py-0.5 border border-slate-200">
+            <span className="text-[11px] font-bold text-slate-400 tabular-nums shrink-0 leading-none">
               {apps.length}
             </span>
           )}
@@ -2082,6 +2082,28 @@ export default function JobPipelinePage() {
   const splitDragRef  = useRef<{ startY: number; startH: number } | null>(null)
   const activeAreaRef = useRef<HTMLDivElement>(null)
 
+  // Status column resizable width
+  const [statusColWidth, setStatusColWidth] = useState(165)
+  const statusDragRef = useRef<{ startX: number; startW: number } | null>(null)
+
+  const handleStatusColMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    statusDragRef.current = { startX: e.clientX, startW: statusColWidth }
+    const onMove = (me: MouseEvent) => {
+      if (!statusDragRef.current) return
+      const delta = me.clientX - statusDragRef.current.startX
+      setStatusColWidth(Math.max(90, Math.min(280, statusDragRef.current.startW + delta)))
+    }
+    const onUp = () => {
+      statusDragRef.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
   const handleSplitMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
     const h = activeAreaRef.current?.getBoundingClientRect().height ?? 400
@@ -2875,13 +2897,22 @@ export default function JobPipelinePage() {
         }`}
       >
         {/* Status column — sticky, not tied to stages */}
-        <div className="sticky left-0 z-10 shrink-0 w-[165px] flex flex-col border-y-4 border-violet-300 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)]">
-          <div className="rounded-xl bg-violet-50 border-2 border-violet-300 px-2.5 py-2 flex items-center gap-1.5 mb-1">
+        <div
+          className="sticky left-0 z-10 shrink-0 flex flex-col border-y-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
+          style={{ width: statusColWidth }}
+        >
+          <div className="rounded-xl bg-violet-50 border-2 border-violet-300 px-2.5 py-2 flex items-center gap-1.5 mb-1 min-w-0">
             <div className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
-            <span className="text-xs font-bold text-violet-700 flex-1 min-w-0">Active</span>
+            <span className="text-xs font-bold text-violet-700 flex-1 min-w-0 truncate">Active</span>
             <span className="text-xs font-bold text-violet-600 bg-white rounded-full px-1.5 border border-violet-200 shrink-0">{activeApps.length}</span>
           </div>
-          <p className="text-[10px] text-slate-400 px-0.5 mt-1 leading-tight">Status from HM intake form</p>
+          <p className="text-[10px] text-slate-400 px-0.5 mt-1 leading-tight truncate">Status from HM intake form</p>
+          {/* Resize handle — right edge */}
+          <div
+            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-violet-300 active:bg-violet-400 transition-colors z-20"
+            onMouseDown={handleStatusColMouseDown}
+            title="Drag to resize"
+          />
         </div>
 
         {job.pipeline_stages.map((stage, stageIndex) => {
@@ -2981,7 +3012,7 @@ export default function JobPipelinePage() {
         )}
 
         {/* Edit Pipeline toggle — far right */}
-        <div className="shrink-0 flex flex-col gap-1.5 items-stretch pl-4 pt-5">
+        <div className="shrink-0 flex flex-col gap-1.5 items-stretch pl-4 pt-6">
           <button
             onClick={() => setEditMode(e => !e)}
             className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -3041,12 +3072,21 @@ export default function JobPipelinePage() {
       {/* ── Rejected candidates ────────────────────────────────────────── */}
       <div className="flex items-stretch overflow-x-auto overflow-y-auto divide-x divide-slate-100 min-h-[160px] bg-red-50/10 flex-1">
         {/* Status column — sticky, mirrors active section */}
-        <div className="sticky left-0 z-10 shrink-0 w-[165px] flex flex-col border-y-4 border-red-300 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)]">
-          <div className="rounded-xl bg-red-50 border-2 border-red-300 px-2.5 py-2 flex items-center gap-1.5">
+        <div
+          className="sticky left-0 z-10 shrink-0 flex flex-col border-y-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
+          style={{ width: statusColWidth }}
+        >
+          <div className="rounded-xl bg-red-50 border-2 border-red-300 px-2.5 py-2 flex items-center gap-1.5 min-w-0">
             <div className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
-            <span className="text-xs font-bold text-red-700 flex-1 min-w-0">Rejected</span>
+            <span className="text-xs font-bold text-red-700 flex-1 min-w-0 truncate">Rejected</span>
             <span className="text-xs font-bold text-red-600 bg-white rounded-full px-1.5 border border-red-200 shrink-0">{totalRejected}</span>
           </div>
+          {/* Resize handle — right edge */}
+          <div
+            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-red-300 active:bg-red-400 transition-colors z-20"
+            onMouseDown={handleStatusColMouseDown}
+            title="Drag to resize"
+          />
         </div>
 
         {job.pipeline_stages.map(stage => {
