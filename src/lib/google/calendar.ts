@@ -158,6 +158,24 @@ export async function createMeetEvent(
   }
 }
 
+// ── Connected Account Email ───────────────────────────────────────────────────
+
+/**
+ * Returns the email address of the Google account associated with the access token.
+ * Used to auto-include the connected account in freebusy queries so its calendar
+ * always shows — even when panel member emails differ from the Google account email.
+ */
+export async function getConnectedEmail(accessToken: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return null
+    const { email } = await res.json()
+    return (email as string | undefined) ?? null
+  } catch { return null }
+}
+
 // ── Free/Busy Query ──────────────────────────────────────────────────────────
 
 export interface FreeBusySlot {

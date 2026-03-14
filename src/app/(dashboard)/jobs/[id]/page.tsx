@@ -1747,6 +1747,7 @@ function ScheduleInterviewModal({
   const [availLoading,    setAvailLoading]    = useState(false)
   const [availNoData,     setAvailNoData]     = useState(false)
   const [gridExpanded,    setGridExpanded]    = useState(false)
+  const [connectedGCalEmail, setConnectedGCalEmail] = useState<string | null>(null)
 
   // ── Availability helpers ────────────────────────────────────────────────────
 
@@ -1823,12 +1824,13 @@ function ScheduleInterviewModal({
           `/api/google/availability?emails=${encodeURIComponent(emails.join(','))}&time_min=${minDt.toISOString()}&time_max=${maxDt.toISOString()}&timezone=${encodeURIComponent(tz)}`
         )
         if (!res.ok) { if (!cancelled) { setBusyRanges([]); setAvailNoData(true) }; return }
-        const { data } = await res.json()
+        const json = await res.json()
         if (!cancelled) {
-          // Flatten busy ranges from ALL panel members
-          const allRanges: { start: string; end: string }[] = Object.values(data ?? {}).flat() as { start: string; end: string }[]
+          setConnectedGCalEmail(json.connected_email ?? null)
+          // Flatten busy ranges from ALL calendar entries (panel + connected account auto-added by server)
+          const allRanges: { start: string; end: string }[] = Object.values(json.data ?? {}).flat() as { start: string; end: string }[]
           setBusyRanges(allRanges)
-          setAvailNoData(!data || Object.keys(data).length === 0)
+          setAvailNoData(!json.data || Object.keys(json.data).length === 0)
         }
       } catch { if (!cancelled) { setBusyRanges([]); setAvailNoData(true) } }
       finally  { if (!cancelled) setAvailLoading(false) }
@@ -2257,6 +2259,15 @@ function ScheduleInterviewModal({
                 </div>
               </div>
 
+              {/* Connected account info — visible when the connected Google account is auto-added (not a panel member) */}
+              {connectedGCalEmail && !panel.some(m => m.email.trim().toLowerCase() === connectedGCalEmail.toLowerCase()) && (
+                <div className="px-3 py-1.5 bg-blue-50 border-b border-blue-100 flex items-center gap-1.5">
+                  <span className="text-[10px] text-blue-600">
+                    📅 Also showing <span className="font-medium">{connectedGCalEmail}</span> (connected account)
+                  </span>
+                </div>
+              )}
+
               {availLoading ? (
                 /* Skeleton */
                 <div className="p-3 grid grid-cols-6 gap-1 animate-pulse">
@@ -2497,6 +2508,15 @@ function ScheduleInterviewModal({
               </button>
             </div>
           </div>
+
+          {/* Connected account info (popup) */}
+          {connectedGCalEmail && !panel.some(m => m.email.trim().toLowerCase() === connectedGCalEmail.toLowerCase()) && (
+            <div className="px-5 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2 shrink-0">
+              <span className="text-xs text-blue-600">
+                📅 Also showing <span className="font-medium">{connectedGCalEmail}</span> (connected Google account) — their busy slots are included automatically
+              </span>
+            </div>
+          )}
 
           {/* Popup grid body */}
           <div className="flex-1 overflow-y-auto">
