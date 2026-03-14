@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const {
     application_id, candidate_id, hiring_request_id, stage_id,
     interviewer_name, interviewer_email, interview_type, scheduled_at, duration_minutes,
-    location, notes, generate_self_schedule,
+    location, notes, generate_self_schedule, timezone,
   } = body
 
   if (!application_id || !candidate_id || !hiring_request_id || !interviewer_name?.trim() || !scheduled_at) {
@@ -119,6 +119,7 @@ export async function POST(req: NextRequest) {
           duration_minutes: duration_minutes ?? 60,
           organizer_email:  orgSettings.google_connected_email ?? '',
           attendees,
+          timezone:         timezone ?? 'UTC',
         })
 
         calendar_event_id = created.calendar_event_id
