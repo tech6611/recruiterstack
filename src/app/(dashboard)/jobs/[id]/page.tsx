@@ -1750,23 +1750,22 @@ function ScheduleInterviewModal({
 
   // ── Availability helpers ────────────────────────────────────────────────────
 
-  // Return Mon–Fri for the week `offset` weeks from the SELECTED date.
-  // Weekend dates (Sat/Sun) snap forward to the NEXT Monday so the selected
-  // date is always in a visible weekday range.
+  // Return Mon–Sun (7 days) for the ISO week containing anchorDate, shifted by offset weeks.
+  // Always anchors BACK to Monday so weekends are visible (e.g. selecting Sat shows Mon–Sun of same week).
   const getWeekDays = (anchorDate: string, offset: number): Date[] => {
     const base = new Date(anchorDate + 'T00:00:00')
     const dow = base.getDay() // 0=Sun 1=Mon … 6=Sat
-    // Days until the nearest Monday: weekdays → back to this week's Mon; weekend → next Mon
-    const daysToMon = dow === 0 ? 1 : dow === 6 ? 2 : -(dow - 1)
+    const daysToMon = dow === 0 ? -6 : -(dow - 1) // always go back to Monday of this ISO week
     const monday = new Date(base)
     monday.setDate(base.getDate() + daysToMon + offset * 7)
     monday.setHours(0, 0, 0, 0)
-    return Array.from({ length: 5 }, (_, i) => {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday); d.setDate(monday.getDate() + i); return d
     })
   }
 
-  const weekDays = getWeekDays(date, availWeekOffset)
+  const weekDays = getWeekDays(date, availWeekOffset) // 7 days Mon–Sun
+  const inlineWeekDays = weekDays.slice(0, 5)         // Mon–Fri for compact inline grid
 
   // 8 AM–6 PM in 30-min slots  →  ["08:00","08:30",…,"17:30"]
   const HOUR_SLOTS: string[] = Array.from({ length: 20 }, (_, i) => {
@@ -1810,7 +1809,7 @@ function ScheduleInterviewModal({
 
   // Fetch free/busy for ALL panel members when panel or week offset changes
   useEffect(() => {
-    const emails = panel.map(m => m.email.trim()).filter(Boolean)
+    const emails = panel.map(m => m.email.trim().toLowerCase()).filter(Boolean)
     if (!emails.length || !googleConnected) return
     let cancelled = false
     const timer = setTimeout(async () => {
@@ -1819,7 +1818,7 @@ function ScheduleInterviewModal({
       try {
         const days  = getWeekDays(date, availWeekOffset)
         const minDt = new Date(days[0]); minDt.setHours(0, 0, 0, 0)
-        const maxDt = new Date(days[4]); maxDt.setHours(23, 59, 59, 999)
+        const maxDt = new Date(days[6]); maxDt.setHours(23, 59, 59, 999) // full 7-day window
         const tz    = Intl.DateTimeFormat().resolvedOptions().timeZone
         const res   = await fetch(
           `/api/google/availability?emails=${encodeURIComponent(emails.join(','))}&time_min=${minDt.toISOString()}&time_max=${maxDt.toISOString()}&timezone=${encodeURIComponent(tz)}`
@@ -2272,7 +2271,7 @@ function ScheduleInterviewModal({
                     <thead className="sticky top-0 bg-white z-10">
                       <tr>
                         <th className="w-12 px-2 py-1.5 text-left text-slate-400 font-normal border-b border-slate-100 bg-white" />
-                        {weekDays.map(d => (
+                        {inlineWeekDays.map(d => (
                           <th key={d.toISOString()} className="px-1 py-1.5 text-center text-slate-500 font-semibold border-b border-slate-100 whitespace-nowrap bg-white">
                             {d.toLocaleDateString('en-US', { weekday: 'short' })} {d.getDate()}
                           </th>
@@ -2285,7 +2284,7 @@ function ScheduleInterviewModal({
                           <td className="px-2 py-0 text-slate-300 text-right whitespace-nowrap leading-none">
                             {slot.endsWith(':00') ? fmtSlotLabel(slot) : ''}
                           </td>
-                          {weekDays.map(day => {
+                          {inlineWeekDays.map(day => {
                             const key = slotKey(day, slot)
                             const busy = isBusy(key)
                             const isSelected = date === toLocalDateStr(day) && time === slot
@@ -2474,7 +2473,7 @@ function ScheduleInterviewModal({
                 className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
               >‹</button>
               <span className="text-xs font-medium text-slate-600 px-2 whitespace-nowrap">
-                {weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {weekDays[4].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </span>
               <button
                 onClick={() => setAvailWeekOffset(o => o + 1)}
@@ -2510,11 +2509,14 @@ function ScheduleInterviewModal({
                 <thead className="sticky top-0 bg-white z-10">
                   <tr>
                     <th className="w-16 px-3 py-2 text-left text-slate-400 font-normal border-b border-slate-100 bg-white" />
-                    {weekDays.map(d => (
-                      <th key={d.toISOString()} className="px-2 py-2 text-center text-slate-600 font-semibold border-b border-slate-100 whitespace-nowrap bg-white">
-                        {d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                      </th>
-                    ))}
+                    {weekDays.map(d => {
+                      const isWeekend = d.getDay() === 0 || d.getDay() === 6
+                      return (
+                        <th key={d.toISOString()} className={`px-2 py-2 text-center font-semibold border-b border-slate-100 whitespace-nowrap ${isWeekend ? 'bg-slate-50 text-slate-400' : 'bg-white text-slate-600'}`}>
+                          {d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </th>
+                      )
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -2527,8 +2529,9 @@ function ScheduleInterviewModal({
                         const key = slotKey(day, slot)
                         const busy = isBusy(key)
                         const isSelected = date === toLocalDateStr(day) && time === slot
+                        const isWeekend = day.getDay() === 0 || day.getDay() === 6
                         return (
-                          <td key={key} className="px-1 py-0.5">
+                          <td key={key} className={`px-1 py-0.5 ${isWeekend ? 'bg-slate-50/60' : ''}`}>
                             <button
                               disabled={busy}
                               onClick={() => {
@@ -2542,6 +2545,8 @@ function ScheduleInterviewModal({
                                   ? 'bg-blue-500'
                                   : busy
                                   ? 'bg-red-100 cursor-not-allowed'
+                                  : isWeekend
+                                  ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                   : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                               }`}
                               title={busy ? 'Busy' : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
