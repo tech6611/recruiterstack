@@ -8,7 +8,7 @@ import {
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
   Settings2, LayoutList, Kanban, SlidersHorizontal,
-  ArrowUp, ArrowDown, ArrowDownUp, GripVertical,
+  ArrowUp, ArrowDown, ArrowDownUp, GripVertical, FileUp,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
@@ -520,8 +520,8 @@ function StageColumn({
         </div>
       )}
 
-      {/* Cards */}
-      <div className={`flex flex-col gap-2 p-2 min-h-[100px] ${over ? 'bg-slate-50/60 rounded-xl' : ''}`}>
+      {/* Cards — no horizontal padding so cards span full column width like the header */}
+      <div className={`flex flex-col gap-1.5 pt-1 pb-2 min-h-[100px] ${over ? 'bg-slate-50/60 rounded-xl' : ''}`}>
         {apps.map(app => {
           // Compute suggested action for this card
           let sa: { label: string; variant: 'score' | 'reject' | 'move' | 'final'; onClick: (e: React.MouseEvent) => void } | undefined
@@ -586,6 +586,51 @@ function AddCandidateModal({
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+
+  // CV / LinkedIn import
+  const [importLoading, setImportLoading] = useState(false)
+  const [importError, setImportError] = useState('')
+  const [showLinkedIn, setShowLinkedIn] = useState(false)
+  const [linkedInText, setLinkedInText] = useState('')
+  const cvInputRef = useRef<HTMLInputElement>(null)
+
+  const handleCvImport = async (file: File) => {
+    setImportLoading(true); setImportError('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/sourcing/parse-cv', { method: 'POST', body: fd })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to parse CV')
+      const c = json.candidate ?? {}
+      if (c.name)  setName(c.name)
+      if (c.email) setEmail(c.email)
+      if (c.phone) setPhone(c.phone)
+    } catch (e: unknown) {
+      setImportError(e instanceof Error ? e.message : 'Failed to parse CV')
+    } finally { setImportLoading(false) }
+  }
+
+  const handleLinkedInImport = async () => {
+    if (!linkedInText.trim()) return
+    setImportLoading(true); setImportError('')
+    try {
+      const res = await fetch('/api/sourcing/parse-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: linkedInText }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to parse profile')
+      const c = json.candidate ?? {}
+      if (c.name)  setName(c.name)
+      if (c.email) setEmail(c.email)
+      if (c.phone) setPhone(c.phone)
+      setShowLinkedIn(false)
+    } catch (e: unknown) {
+      setImportError(e instanceof Error ? e.message : 'Failed to parse profile')
+    } finally { setImportLoading(false) }
+  }
 
   // Search existing
   const [query, setQuery] = useState('')
@@ -684,6 +729,61 @@ function AddCandidateModal({
 
           {tab === 'new' && (
             <>
+              {/* ── Auto-fill from CV or LinkedIn ── */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Auto-fill from</label>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => cvInputRef.current?.click()}
+                    disabled={importLoading}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                  >
+                    {importLoading && !showLinkedIn ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
+                    Resume / CV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowLinkedIn(v => !v)}
+                    disabled={importLoading}
+                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 ${
+                      showLinkedIn ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    LinkedIn / Bio
+                  </button>
+                  <input
+                    ref={cvInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleCvImport(f) }}
+                  />
+                </div>
+                {showLinkedIn && (
+                  <div className="mt-2 space-y-2">
+                    <textarea
+                      value={linkedInText}
+                      onChange={e => setLinkedInText(e.target.value)}
+                      placeholder="Paste LinkedIn profile text, bio, or resume text here…"
+                      rows={4}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleLinkedInImport}
+                      disabled={importLoading || !linkedInText.trim()}
+                      className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                      {importLoading && showLinkedIn && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      Extract Details
+                    </button>
+                  </div>
+                )}
+                {importError && <p className="mt-1.5 text-xs text-red-600">{importError}</p>}
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">Name *</label>
                 <input
@@ -735,7 +835,7 @@ function AddCandidateModal({
                 <input
                   value={query}
                   onChange={e => setQuery(e.target.value)}
-                  placeholder="Search by name or email…"
+                  placeholder="Search by name, email, phone, title…"
                   className="w-full rounded-xl border border-slate-200 pl-9 pr-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 animate-spin" />}
@@ -752,9 +852,14 @@ function AddCandidateModal({
                       <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${avatarColor(c.name)}`}>
                         {initials(c.name)}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-slate-800 truncate">{c.name}</p>
-                        <p className="text-xs text-slate-400 truncate">{c.email}</p>
+                        <p className="text-xs text-slate-400 truncate">
+                          {c.email}
+                          {c.current_title && <span className="ml-1.5 text-slate-300">·</span>}
+                          {c.current_title && <span className="ml-1.5">{c.current_title}</span>}
+                        </p>
+                        {c.phone && <p className="text-xs text-slate-400 truncate">{c.phone}</p>}
                       </div>
                       {saving && <Loader2 className="h-4 w-4 text-slate-400 animate-spin ml-auto" />}
                     </button>
@@ -2818,9 +2923,6 @@ export default function JobPipelinePage() {
   const [copied, setCopied] = useState(false)
   const dragId      = useRef<string | null>(null)
   const dragStageId = useRef<string | null>(null)
-  // Scroll sync: active kanban ↔ rejected kanban keep same scrollLeft
-  const activeKanbanRef   = useRef<HTMLDivElement>(null)
-  const rejectedKanbanRef = useRef<HTMLDivElement>(null)
 
   // Split-pane: active (top) / rejected (bottom)
   const [splitHeight, setSplitHeight] = useState<number | null>(null)
@@ -3398,14 +3500,14 @@ export default function JobPipelinePage() {
           <div className="relative hidden xl:block">
             <button
               onClick={() => setShowJobMenu(m => !m)}
-              title="Job settings"
+              title="Copy apply link & more"
               className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
                 showJobMenu
                   ? 'border-slate-300 bg-slate-100 text-slate-700'
                   : 'border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
             >
-              <Settings2 className="h-4 w-4" />
+              <Link2 className="h-4 w-4" />
             </button>
             {showJobMenu && (
               <>
@@ -3705,21 +3807,16 @@ export default function JobPipelinePage() {
       {viewMode === 'kanban' && (
       <div className="flex flex-col flex-1 min-w-0">
 
+      {/* ── Single horizontal scroll — Active + Rejected share same container ── */}
+      <div className="flex flex-row flex-1 items-stretch min-h-0">
+      <div className="flex flex-col flex-1 overflow-x-auto">
+
       {/* ── Active candidates ──────────────────────────────────────────── */}
       <div
         ref={activeAreaRef}
         style={splitHeight !== null ? { height: splitHeight, flexShrink: 0 } : { minHeight: '55vh', flexShrink: 0 }}
-        className="flex flex-row items-stretch"
-      >
-      {/* Scrollable kanban columns */}
-      <div
-        ref={activeKanbanRef}
-        onScroll={() => {
-          if (rejectedKanbanRef.current && activeKanbanRef.current)
-            rejectedKanbanRef.current.scrollLeft = activeKanbanRef.current.scrollLeft
-        }}
-        className={`flex items-stretch overflow-x-auto overflow-y-hidden divide-x flex-1 transition-colors ${
-          editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-100 bg-transparent'
+        className={`flex items-stretch shrink-0 divide-x transition-colors ${
+          editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-300 bg-transparent'
         }`}
       >
         {/* Status column — sticky, not tied to stages */}
@@ -3912,33 +4009,6 @@ export default function JobPipelinePage() {
           </div>
         )}
       </div>
-      {/* Edit Pipeline toggle — outside scroll div so position never shifts when New Stage panel appears */}
-      <div className={`shrink-0 flex flex-col gap-1.5 items-stretch px-3 pt-5 border-t-4 ${
-        editMode ? 'border-violet-200 bg-violet-50/20' : 'border-slate-200 bg-transparent'
-      }`}>
-        <button
-          onClick={() => setEditMode(e => !e)}
-          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${
-            editMode
-              ? 'border-violet-300 bg-violet-600 text-white hover:bg-violet-500 shadow-sm'
-              : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 bg-white'
-          }`}
-        >
-          {editMode
-            ? <><Check className="h-3.5 w-3.5" /> Done</>
-            : <><Pencil className="h-3.5 w-3.5" /> Edit</>
-          }
-        </button>
-        {editMode && (
-          <button
-            onClick={() => { setEditMode(false); setNewStageName(''); load() }}
-            className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-500 transition-colors"
-          >
-            <X className="h-3 w-3" /> Discard
-          </button>
-        )}
-      </div>
-      </div>
       {/* ── end active candidates ── */}
 
       {/* Draggable fill-line divider — same visual language as column bar borders */}
@@ -3949,14 +4019,7 @@ export default function JobPipelinePage() {
       />
 
       {/* ── Rejected candidates ────────────────────────────────────────── */}
-      <div
-        ref={rejectedKanbanRef}
-        onScroll={() => {
-          if (activeKanbanRef.current && rejectedKanbanRef.current)
-            activeKanbanRef.current.scrollLeft = rejectedKanbanRef.current.scrollLeft
-        }}
-        className="flex items-stretch overflow-x-auto overflow-y-auto divide-x divide-slate-100 min-h-[160px] bg-red-50/10 flex-1"
-      >
+      <div className="flex items-stretch divide-x divide-slate-300 min-h-[160px] bg-red-50/10 flex-1 overflow-y-auto">
         {/* Status column — sticky, mirrors active section */}
         <div
           className="sticky left-0 z-10 shrink-0 flex flex-col border-b-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
@@ -3999,6 +4062,37 @@ export default function JobPipelinePage() {
         })}
       </div>
       {/* ── end rejected candidates ── */}
+
+      </div>{/* end shared scroll container (flex flex-col flex-1 overflow-x-auto) */}
+
+      {/* Edit Pipeline toggle — outside scroll, spans full height of Active + Rejected */}
+      <div className={`shrink-0 flex flex-col gap-1.5 items-stretch px-3 pt-5 border-t-4 ${
+        editMode ? 'border-violet-200 bg-violet-50/20' : 'border-slate-200 bg-transparent'
+      }`}>
+        <button
+          onClick={() => setEditMode(e => !e)}
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${
+            editMode
+              ? 'border-violet-300 bg-violet-600 text-white hover:bg-violet-500 shadow-sm'
+              : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 bg-white'
+          }`}
+        >
+          {editMode
+            ? <><Check className="h-3.5 w-3.5" /> Done</>
+            : <><Pencil className="h-3.5 w-3.5" /> Edit</>
+          }
+        </button>
+        {editMode && (
+          <button
+            onClick={() => { setEditMode(false); setNewStageName(''); load() }}
+            className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-500 transition-colors"
+          >
+            <X className="h-3 w-3" /> Discard
+          </button>
+        )}
+      </div>
+
+      </div>{/* end outer flex-row wrapper (flex flex-row flex-1 items-stretch min-h-0) */}
 
       </div>
       )} {/* end viewMode === 'kanban' */}

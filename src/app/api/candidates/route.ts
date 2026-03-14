@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   if (status) query = query.eq('status', status)
   if (search) {
     query = query.or(
-      `name.ilike.%${search}%,email.ilike.%${search}%,current_title.ilike.%${search}%`,
+      `name.ilike.%${search}%,email.ilike.%${search}%,current_title.ilike.%${search}%,phone.ilike.%${search}%,location.ilike.%${search}%`,
     )
   }
 
