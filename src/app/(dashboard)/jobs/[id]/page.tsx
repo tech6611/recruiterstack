@@ -1732,22 +1732,23 @@ function ScheduleInterviewModal({
   const [busyRanges,      setBusyRanges]      = useState<{ start: string; end: string }[]>([])
   const [availLoading,    setAvailLoading]    = useState(false)
   const [availNoData,     setAvailNoData]     = useState(false)
+  const [gridExpanded,    setGridExpanded]    = useState(false)
 
   // ── Availability helpers ────────────────────────────────────────────────────
 
-  // Return Mon–Fri for the week `offset` weeks from today
-  const getWeekDays = (offset: number): Date[] => {
-    const today = new Date()
-    const monday = new Date(today)
-    const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1 // Mon=0…Sun=6
-    monday.setDate(today.getDate() - dayOfWeek + offset * 7)
+  // Return Mon–Fri for the week `offset` weeks from the SELECTED date (not today)
+  const getWeekDays = (anchorDate: string, offset: number): Date[] => {
+    const base = new Date(anchorDate + 'T00:00:00')
+    const dayOfWeek = base.getDay() === 0 ? 6 : base.getDay() - 1 // Mon=0…Sun=6
+    const monday = new Date(base)
+    monday.setDate(base.getDate() - dayOfWeek + offset * 7)
     monday.setHours(0, 0, 0, 0)
     return Array.from({ length: 5 }, (_, i) => {
       const d = new Date(monday); d.setDate(monday.getDate() + i); return d
     })
   }
 
-  const weekDays = getWeekDays(availWeekOffset)
+  const weekDays = getWeekDays(date, availWeekOffset)
 
   // 8 AM–6 PM in 30-min slots  →  ["08:00","08:30",…,"17:30"]
   const HOUR_SLOTS: string[] = Array.from({ length: 20 }, (_, i) => {
@@ -1788,7 +1789,7 @@ function ScheduleInterviewModal({
       setAvailLoading(true)
       setAvailNoData(false)
       try {
-        const days  = getWeekDays(availWeekOffset)
+        const days  = getWeekDays(date, availWeekOffset)
         const minDt = new Date(days[0]); minDt.setHours(0, 0, 0, 0)
         const maxDt = new Date(days[4]); maxDt.setHours(23, 59, 59, 999)
         const tz    = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -1807,7 +1808,7 @@ function ScheduleInterviewModal({
       finally  { if (!cancelled) setAvailLoading(false) }
     }, 600)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [panel, availWeekOffset, googleConnected]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [panel, date, availWeekOffset, googleConnected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const MEETING_INTEGRATIONS = [
     { id: 'gmeet',    label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
@@ -2024,18 +2025,26 @@ function ScheduleInterviewModal({
                     <p className="text-[11px] text-slate-400 truncate">{member.email}</p>
                   )}
                 </div>
-                {/* Select this member as the scheduled interviewer */}
-                <button
-                  onClick={() => { setInterviewer(member.name); setInterviewerEmail(member.email) }}
-                  className={`text-[10px] font-medium rounded-full px-2 py-0.5 border transition-colors ${
-                    interviewer === member.name && interviewerEmail === member.email
-                      ? 'bg-blue-50 text-blue-600 border-blue-200'
-                      : 'text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600 bg-white'
-                  }`}
-                  title="Set as primary interviewer"
-                >
-                  {i === 0 ? 'HM' : 'Select'}
-                </button>
+                {/* Role badge (HM only) + Invite pill */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {i === 0 && (
+                    <span className="text-[9px] font-semibold text-slate-400 bg-slate-100 rounded-full px-1.5 py-0.5">HM</span>
+                  )}
+                  <button
+                    onClick={() => { if (member.email) { setInterviewer(member.name); setInterviewerEmail(member.email) } }}
+                    disabled={!member.email}
+                    className={`text-[10px] font-medium rounded-full px-2 py-0.5 border transition-colors ${
+                      interviewer === member.name && interviewerEmail === member.email
+                        ? 'bg-blue-50 text-blue-600 border-blue-200'
+                        : member.email
+                        ? 'text-slate-400 border-slate-200 hover:border-blue-200 hover:text-blue-600 hover:bg-blue-50 bg-white'
+                        : 'text-slate-300 border-slate-100 bg-white cursor-not-allowed'
+                    }`}
+                    title={member.email ? 'Set as primary interviewer (receives calendar invite)' : 'Add email to send invite'}
+                  >
+                    ✉ {interviewer === member.name && interviewerEmail === member.email ? 'Invite ✓' : 'Invite'}
+                  </button>
+                </div>
                 {/* Remove — always enabled; tooltip explains for the HM row */}
                 <button
                   onClick={() => {
@@ -2128,7 +2137,7 @@ function ScheduleInterviewModal({
                 type="date"
                 value={date}
                 min={new Date().toISOString().split('T')[0]}
-                onChange={e => setDate(e.target.value)}
+                onChange={e => { setDate(e.target.value); setAvailWeekOffset(0) }}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
               {date && <p className="text-xs text-slate-400 mt-1">{fmtDate(date)}</p>}
@@ -2161,31 +2170,6 @@ function ScheduleInterviewModal({
                   {d.label}
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Interviewer */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Interviewer</label>
-              <input
-                value={interviewer}
-                onChange={e => setInterviewer(e.target.value)}
-                placeholder="Hiring manager name"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                Interviewer Email <span className="font-normal text-slate-400">(for invite)</span>
-              </label>
-              <input
-                type="email"
-                value={interviewerEmail}
-                onChange={e => setInterviewerEmail(e.target.value)}
-                placeholder="interviewer@company.com"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
             </div>
           </div>
 
@@ -2224,6 +2208,14 @@ function ScheduleInterviewModal({
                     onClick={() => setAvailWeekOffset(o => o + 1)}
                     className="h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors text-xs"
                   >›</button>
+                  {/* Expand / collapse toggle */}
+                  <button
+                    onClick={() => setGridExpanded(e => !e)}
+                    title={gridExpanded ? 'Collapse grid' : 'Expand grid'}
+                    className="h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors text-xs ml-0.5"
+                  >
+                    {gridExpanded ? '⤡' : '⤢'}
+                  </button>
                 </div>
               </div>
 
@@ -2231,7 +2223,7 @@ function ScheduleInterviewModal({
                 /* Skeleton */
                 <div className="p-3 grid grid-cols-6 gap-1 animate-pulse">
                   {Array.from({ length: 30 }).map((_, i) => (
-                    <div key={i} className="h-5 rounded bg-slate-100" />
+                    <div key={i} className={`rounded bg-slate-100 ${gridExpanded ? 'h-6' : 'h-4'}`} />
                   ))}
                 </div>
               ) : availNoData ? (
@@ -2239,13 +2231,13 @@ function ScheduleInterviewModal({
                   No calendar data — {panel.filter(m => m.email.trim()).length > 1 ? 'panel members may be' : 'interviewer may be'} outside your Google Workspace domain
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className={`overflow-x-auto ${gridExpanded ? 'max-h-80 overflow-y-auto' : ''}`}>
                   <table className="w-full text-[10px]">
-                    <thead>
+                    <thead className="sticky top-0 bg-white z-10">
                       <tr>
-                        <th className="w-12 px-2 py-1.5 text-left text-slate-400 font-normal border-b border-slate-100" />
+                        <th className="w-12 px-2 py-1.5 text-left text-slate-400 font-normal border-b border-slate-100 bg-white" />
                         {weekDays.map(d => (
-                          <th key={d.toISOString()} className="px-1 py-1.5 text-center text-slate-500 font-semibold border-b border-slate-100 whitespace-nowrap">
+                          <th key={d.toISOString()} className="px-1 py-1.5 text-center text-slate-500 font-semibold border-b border-slate-100 whitespace-nowrap bg-white">
                             {d.toLocaleDateString('en-US', { weekday: 'short' })} {d.getDate()}
                           </th>
                         ))}
@@ -2255,14 +2247,15 @@ function ScheduleInterviewModal({
                       {HOUR_SLOTS.map(slot => (
                         <tr key={slot} className="border-t border-slate-50">
                           <td className="px-2 py-0 text-slate-300 text-right whitespace-nowrap leading-none">
-                            {slot.endsWith(':00') ? slot.replace(/^0/, '').replace(':00', '') + ' ' + (parseInt(slot) < 12 ? 'AM' : 'PM') : ''}
+                            {/* Compact: every hour  |  Expanded: every 30 min */}
+                            {(gridExpanded || slot.endsWith(':00'))
+                              ? slot.replace(/^0/, '').replace(':00', '').replace(':30', ':30') + ' ' + (parseInt(slot) < 12 ? 'AM' : 'PM')
+                              : ''}
                           </td>
                           {weekDays.map(day => {
                             const key = slotKey(day, slot)
                             const busy = isBusy(key)
-                            const selDate = date
-                            const selTime = time
-                            const isSelected = selDate === day.toISOString().split('T')[0] && selTime === slot
+                            const isSelected = date === day.toISOString().split('T')[0] && time === slot
                             return (
                               <td key={key} className="px-0.5 py-0.5">
                                 <button
@@ -2270,8 +2263,9 @@ function ScheduleInterviewModal({
                                   onClick={() => {
                                     setDate(day.toISOString().split('T')[0])
                                     setTime(slot)
+                                    setAvailWeekOffset(0)
                                   }}
-                                  className={`w-full h-4 rounded transition-colors ${
+                                  className={`w-full rounded transition-colors ${gridExpanded ? 'h-5' : 'h-3'} ${
                                     isSelected
                                       ? 'bg-blue-500'
                                       : busy
