@@ -2117,7 +2117,10 @@ function ScheduleInterviewModal({
                   placeholder="Email"
                   onKeyDown={e => {
                     if (e.key === 'Enter' && newMemberName.trim()) {
-                      setPanel(p => [...p, { name: newMemberName.trim(), email: newMemberEmail.trim() }])
+                      const nm = { name: newMemberName.trim(), email: newMemberEmail.trim() }
+                      setPanel(p => [...p, nm])
+                      // Auto-select as interviewer if no one is currently selected
+                      if (!interviewer.trim()) { setInterviewer(nm.name); setInterviewerEmail(nm.email) }
                       setAddingMember(false)
                     }
                     if (e.key === 'Escape') setAddingMember(false)
@@ -2127,7 +2130,10 @@ function ScheduleInterviewModal({
                 <button
                   onClick={() => {
                     if (!newMemberName.trim()) return
-                    setPanel(p => [...p, { name: newMemberName.trim(), email: newMemberEmail.trim() }])
+                    const nm = { name: newMemberName.trim(), email: newMemberEmail.trim() }
+                    setPanel(p => [...p, nm])
+                    // Auto-select as interviewer if no one is currently selected
+                    if (!interviewer.trim()) { setInterviewer(nm.name); setInterviewerEmail(nm.email) }
                     setAddingMember(false)
                   }}
                   disabled={!newMemberName.trim()}
@@ -2165,6 +2171,26 @@ function ScheduleInterviewModal({
             </div>
           </div>
 
+          {/* Duration */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Duration</label>
+            <div className="flex gap-1.5">
+              {DURATION_OPTIONS.map(d => (
+                <button
+                  key={d.value}
+                  onClick={() => setDuration(d.value)}
+                  className={`flex-1 px-2 py-2 rounded-xl border text-xs font-medium transition-colors ${
+                    duration === d.value
+                      ? 'border-blue-400 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Date + Time */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -2186,26 +2212,6 @@ function ScheduleInterviewModal({
                 onChange={e => setTime(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
-            </div>
-          </div>
-
-          {/* Duration */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Duration</label>
-            <div className="flex gap-1.5">
-              {DURATION_OPTIONS.map(d => (
-                <button
-                  key={d.value}
-                  onClick={() => setDuration(d.value)}
-                  className={`flex-1 px-2 py-2 rounded-xl border text-xs font-medium transition-colors ${
-                    duration === d.value
-                      ? 'border-blue-400 bg-blue-50 text-blue-700'
-                      : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  {d.label}
-                </button>
-              ))}
             </div>
           </div>
 
