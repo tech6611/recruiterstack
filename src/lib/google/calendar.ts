@@ -128,7 +128,11 @@ export async function createMeetEvent(
   }
 
   const res = await fetch(
-    'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all',
+    // sendUpdates=none — suppress Google's own invite emails so neither candidate nor
+    // interviewer receives a calendar invite email from Google.  Their calendars still
+    // get the event (and their time is blocked); we send our own clean confirmation
+    // email via SendGrid instead, avoiding the "(user@domain)" Gmail subject annotation.
+    'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=none',
     {
       method:  'POST',
       headers: {

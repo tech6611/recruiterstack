@@ -117,10 +117,13 @@ export async function POST(req: NextRequest) {
           .eq('id', hiring_request_id)
           .single()
 
-        // Only invite the candidate — the interviewer scheduled the meeting themselves and doesn't
-        // need a redundant calendar invite arriving in their inbox with their own email in the subject.
+        // Both candidate and interviewer are attendees so both calendars are blocked.
+        // Google's invite emails are suppressed (sendUpdates=none) so neither person
+        // gets the GCal invite email with "(admin@…)" in the subject — our SendGrid
+        // emails serve as the clean confirmation instead.
         const attendees: string[] = []
-        if (candidate?.email) attendees.push(candidate.email)
+        if (candidate?.email)          attendees.push(candidate.email)
+        if (interviewer_email?.trim()) attendees.push(interviewer_email.trim())
 
         const created = await createMeetEvent(access_token, {
           summary:          `Interview: ${candidate?.name ?? 'Candidate'} — ${hiringReq?.position_title ?? 'Position'}`,
@@ -206,7 +209,7 @@ export async function POST(req: NextRequest) {
         location:            resolvedLocation,
         meetLink:            meetLink,
         notes:               notes?.trim() || null,
-        calendarInviteSent:  !!meetLink,   // skip SendGrid when GCal already sent invites
+        calendarInviteSent:  false,  // GCal invite emails suppressed; SendGrid always fires
         recruiterName:       'RecruiterStack',
         recruiterEmail:      process.env.SENDGRID_FROM_EMAIL ?? '',
       })

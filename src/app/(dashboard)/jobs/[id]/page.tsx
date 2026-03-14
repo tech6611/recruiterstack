@@ -158,7 +158,7 @@ const SIGNAL_BADGE: Record<string, { label: string; cls: string }> = {
 }
 
 function CandidateCard({
-  app, onDragStart, onClick, isSelected, onToggleSelect, cardFields,
+  app, onDragStart, onClick, isSelected, onToggleSelect, cardFields, suggestedAction,
 }: {
   app: Application
   onDragStart: (id: string) => void
@@ -166,6 +166,7 @@ function CandidateCard({
   isSelected: boolean
   onToggleSelect: (id: string) => void
   cardFields: string[]
+  suggestedAction?: { label: string; variant: 'score' | 'reject' | 'move' | 'final'; onClick: (e: React.MouseEvent) => void }
 }) {
   const c = app.candidate!
   const show = (field: string) => cardFields.includes(field)
@@ -231,6 +232,24 @@ function CandidateCard({
           </div>
         </div>
       )}
+
+      {/* Suggested action button */}
+      {suggestedAction && (() => {
+        const actionCls = {
+          score:  'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
+          reject: 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100',
+          final:  'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+          move:   'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
+        }[suggestedAction.variant]
+        return (
+          <button
+            onClick={suggestedAction.onClick}
+            className={`mt-1.5 w-full rounded-lg border px-2 py-0.5 text-[9px] font-semibold text-center transition-colors truncate ${actionCls}`}
+          >
+            {suggestedAction.label}
+          </button>
+        )
+      })()}
     </div>
   )
 }
@@ -269,10 +288,16 @@ function StageColumn({
   selectedApps,
   onToggleSelect,
   onScheduleInterview,
+  onRejectAll,
   selectedInStage,
   onSelectAllInStage,
   showDragHandle = false,
   cardFields,
+  nextStage,
+  isLastStage = false,
+  onScoreApp,
+  onRejectApp,
+  onMoveApp,
 }: {
   stage: PipelineStage
   apps: Application[]
@@ -291,6 +316,8 @@ function StageColumn({
   selectedApps: Set<string>
   onToggleSelect: (id: string) => void
   onScheduleInterview: () => void
+  /** Reject all (or selected) candidates in this stage */
+  onRejectAll: () => void
   selectedInStage: number
   /** Select or deselect all apps in this stage (add/remove from global selection) */
   onSelectAllInStage: (ids: string[], select: boolean) => void
@@ -298,11 +325,20 @@ function StageColumn({
   showDragHandle?: boolean
   /** Which fields to render on each candidate card */
   cardFields: string[]
+  /** Next pipeline stage (null if last) */
+  nextStage?: PipelineStage | null
+  /** True when this is the final stage */
+  isLastStage?: boolean
+  /** Card suggested-action callbacks */
+  onScoreApp: (app: Application) => void
+  onRejectApp: (app: Application) => void
+  onMoveApp: (app: Application, stageId: string) => void
 }) {
   const [over, setOver] = useState(false)
   const [editing, setEditing] = useState(false)
   const [nameVal, setNameVal] = useState(stage.name)
   const [showColors, setShowColors] = useState(false)
+  const [comingSoonMsg, setComingSoonMsg] = useState<string | null>(null)
   const style = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
 
   const allInStageSelected  = apps.length > 0 && apps.every(a => selectedApps.has(a.id))
@@ -315,11 +351,16 @@ function StageColumn({
 
   const handleAction = (actionId: StageActionId) => {
     onMenuClose()
-    if (actionId === 'score') { onScoreStage(); return }
-    if (actionId === 'move_next') { onMoveAllNext(); return }
+    if (actionId === 'score')              { onScoreStage();       return }
+    if (actionId === 'move_next')          { onMoveAllNext();      return }
     if (actionId === 'schedule_interview') { onScheduleInterview(); return }
-    // Other actions: open first candidate's slide-over, show toast, etc.
-    // Stubs for future implementation
+    if (actionId === 'reject_all')         { onRejectAll();        return }
+    // Unimplemented actions — show a brief "coming soon" banner
+    const action = STAGE_ACTIONS.find(a => a.id === actionId)
+    if (action && action.label) {
+      setComingSoonMsg(action.label)
+      setTimeout(() => setComingSoonMsg(null), 3000)
+    }
   }
 
   return (
@@ -472,19 +513,40 @@ function StageColumn({
         </div>
       )}
 
+      {/* Coming-soon banner (3-second auto-dismiss) */}
+      {comingSoonMsg && (
+        <div className="mx-1 mt-1 rounded-lg bg-amber-50 border border-amber-200 px-2 py-1.5 text-[11px] text-amber-700 text-center">
+          ⏳ <span className="font-medium">{comingSoonMsg}</span> — coming soon
+        </div>
+      )}
+
       {/* Cards */}
       <div className={`flex flex-col gap-2 p-2 min-h-[100px] ${over ? 'bg-slate-50/60 rounded-xl' : ''}`}>
-        {apps.map(app => (
-          <CandidateCard
-            key={app.id}
-            app={app}
-            onDragStart={onDragStart}
-            onClick={onCardClick}
-            isSelected={selectedApps.has(app.id)}
-            onToggleSelect={onToggleSelect}
-            cardFields={cardFields}
-          />
-        ))}
+        {apps.map(app => {
+          // Compute suggested action for this card
+          let sa: { label: string; variant: 'score' | 'reject' | 'move' | 'final'; onClick: (e: React.MouseEvent) => void } | undefined
+          if (app.ai_score === null) {
+            sa = { label: '⚡ Score', variant: 'score', onClick: e => { e.stopPropagation(); onScoreApp(app) } }
+          } else if (app.ai_recommendation === 'no') {
+            sa = { label: '✕ Reject', variant: 'reject', onClick: e => { e.stopPropagation(); onRejectApp(app) } }
+          } else if (isLastStage || !nextStage) {
+            sa = { label: '🏁 Final Stage', variant: 'final', onClick: e => { e.stopPropagation() } }
+          } else {
+            sa = { label: `→ ${nextStage.name}`, variant: 'move', onClick: e => { e.stopPropagation(); onMoveApp(app, nextStage.id) } }
+          }
+          return (
+            <CandidateCard
+              key={app.id}
+              app={app}
+              onDragStart={onDragStart}
+              onClick={onCardClick}
+              isSelected={selectedApps.has(app.id)}
+              onToggleSelect={onToggleSelect}
+              cardFields={cardFields}
+              suggestedAction={sa}
+            />
+          )
+        })}
         {apps.length === 0 && (
           <div className={`flex-1 rounded-xl border-2 border-dashed min-h-[80px] transition-colors ${
             over ? style.border : 'border-slate-100'
@@ -2756,6 +2818,9 @@ export default function JobPipelinePage() {
   const [copied, setCopied] = useState(false)
   const dragId      = useRef<string | null>(null)
   const dragStageId = useRef<string | null>(null)
+  // Scroll sync: active kanban ↔ rejected kanban keep same scrollLeft
+  const activeKanbanRef   = useRef<HTMLDivElement>(null)
+  const rejectedKanbanRef = useRef<HTMLDivElement>(null)
 
   // Split-pane: active (top) / rejected (bottom)
   const [splitHeight, setSplitHeight] = useState<number | null>(null)
@@ -2841,6 +2906,7 @@ export default function JobPipelinePage() {
     })
   }
   const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [showJobMenu,  setShowJobMenu]  = useState(false)
   const [scheduleModalApps, setScheduleModalApps] = useState<Application[] | null>(null)
 
   // Scoring state
@@ -2996,20 +3062,27 @@ export default function JobPipelinePage() {
     const appId = dragId.current
     if (!appId) return
     const app = job?.applications.find(a => a.id === appId)
-    if (!app || app.stage_id === newStageId) { dragId.current = null; return }
+    const wasRejected = app?.status === 'rejected'
+    // Allow drop if stage changes OR if a rejected card is being restored to active
+    if (!app || (app.stage_id === newStageId && !wasRejected)) { dragId.current = null; return }
+
+    const updates: Record<string, unknown> = { stage_id: newStageId }
+    if (wasRejected) updates.status = 'active'
 
     // Optimistic update
     setJob(prev => prev ? {
       ...prev,
       applications: prev.applications.map(a =>
-        a.id === appId ? { ...a, stage_id: newStageId } : a
+        a.id === appId
+          ? { ...a, stage_id: newStageId, ...(wasRejected ? { status: 'active' as Application['status'] } : {}) }
+          : a
       ),
     } : prev)
 
     await fetch(`/api/applications/${appId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stage_id: newStageId }),
+      body: JSON.stringify(updates),
     })
 
     dragId.current = null
@@ -3321,13 +3394,34 @@ export default function JobPipelinePage() {
             )}
           </button>
 
-          {/* Apply Link — inline on xl+ */}
-          <button
-            onClick={copyApplyLink}
-            className="hidden xl:flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            {copied ? <><Check className="h-4 w-4 text-emerald-500" /> Copied!</> : <><Link2 className="h-4 w-4" /> Apply Link</>}
-          </button>
+          {/* Job settings (Apply Link, etc.) — inline on xl+ */}
+          <div className="relative hidden xl:block">
+            <button
+              onClick={() => setShowJobMenu(m => !m)}
+              title="Job settings"
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                showJobMenu
+                  ? 'border-slate-300 bg-slate-100 text-slate-700'
+                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Settings2 className="h-4 w-4" />
+            </button>
+            {showJobMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowJobMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 w-48 bg-white border border-slate-200 rounded-xl shadow-xl py-1">
+                  <button
+                    onClick={() => { copyApplyLink(); setShowJobMenu(false) }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <Link2 className="h-4 w-4 text-slate-400" />
+                    {copied ? 'Link Copied!' : 'Copy Apply Link'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* ⋯ More — visible below xl, collapses Autopilot/Edit/Apply */}
           <div className="relative xl:hidden">
@@ -3618,9 +3712,16 @@ export default function JobPipelinePage() {
         className="flex flex-row items-stretch"
       >
       {/* Scrollable kanban columns */}
-      <div className={`flex items-stretch overflow-x-auto overflow-y-hidden divide-x flex-1 transition-colors ${
-        editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-100 bg-transparent'
-      }`}>
+      <div
+        ref={activeKanbanRef}
+        onScroll={() => {
+          if (rejectedKanbanRef.current && activeKanbanRef.current)
+            rejectedKanbanRef.current.scrollLeft = activeKanbanRef.current.scrollLeft
+        }}
+        className={`flex items-stretch overflow-x-auto overflow-y-hidden divide-x flex-1 transition-colors ${
+          editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-100 bg-transparent'
+        }`}
+      >
         {/* Status column — sticky, not tied to stages */}
         <div
           className="sticky left-0 z-10 shrink-0 flex flex-col border-t-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
@@ -3677,13 +3778,33 @@ export default function JobPipelinePage() {
                 const nextStage = job.pipeline_stages[stageIndex + 1]
                 if (!nextStage) return
                 const stageApps = grouped[stage.id] ?? []
-                await Promise.all(stageApps.map(app =>
+                const selected  = stageApps.filter(a => selectedApps.has(a.id))
+                const toMove    = selected.length > 0 ? selected : stageApps
+                await Promise.all(toMove.map(app =>
                   fetch(`/api/applications/${app.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ stage_id: nextStage.id }),
                   })
                 ))
+                load()
+              }}
+              onRejectAll={async () => {
+                const stageApps = grouped[stage.id] ?? []
+                const selected  = stageApps.filter(a => selectedApps.has(a.id))
+                const toReject  = selected.length > 0 ? selected : stageApps
+                await Promise.all(toReject.map(app =>
+                  fetch(`/api/applications/${app.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'rejected' }),
+                  })
+                ))
+                setSelectedApps(prev => {
+                  const next = new Set(prev)
+                  toReject.forEach(a => next.delete(a.id))
+                  return next
+                })
                 load()
               }}
               onDragStart={id => { if (!editMode) dragId.current = id }}
@@ -3708,6 +3829,35 @@ export default function JobPipelinePage() {
                 })
               }}
               cardFields={cardFields}
+              nextStage={job.pipeline_stages[stageIndex + 1] ?? null}
+              isLastStage={stageIndex === job.pipeline_stages.length - 1}
+              onScoreApp={app => startScoring(undefined, app.id)}
+              onRejectApp={async app => {
+                setJob(prev => prev ? {
+                  ...prev,
+                  applications: prev.applications.map(a =>
+                    a.id === app.id ? { ...a, status: 'rejected' as Application['status'] } : a
+                  ),
+                } : prev)
+                await fetch(`/api/applications/${app.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: 'rejected' }),
+                })
+              }}
+              onMoveApp={async (app, stageId) => {
+                setJob(prev => prev ? {
+                  ...prev,
+                  applications: prev.applications.map(a =>
+                    a.id === app.id ? { ...a, stage_id: stageId } : a
+                  ),
+                } : prev)
+                await fetch(`/api/applications/${app.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ stage_id: stageId }),
+                })
+              }}
             />
           </div>
         )})}
@@ -3799,7 +3949,14 @@ export default function JobPipelinePage() {
       />
 
       {/* ── Rejected candidates ────────────────────────────────────────── */}
-      <div className="flex items-stretch overflow-x-auto overflow-y-auto divide-x divide-slate-100 min-h-[160px] bg-red-50/10 flex-1">
+      <div
+        ref={rejectedKanbanRef}
+        onScroll={() => {
+          if (activeKanbanRef.current && rejectedKanbanRef.current)
+            activeKanbanRef.current.scrollLeft = rejectedKanbanRef.current.scrollLeft
+        }}
+        className="flex items-stretch overflow-x-auto overflow-y-auto divide-x divide-slate-100 min-h-[160px] bg-red-50/10 flex-1"
+      >
         {/* Status column — sticky, mirrors active section */}
         <div
           className="sticky left-0 z-10 shrink-0 flex flex-col border-b-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
@@ -3829,7 +3986,7 @@ export default function JobPipelinePage() {
                   <CandidateCard
                     key={app.id}
                     app={app}
-                    onDragStart={() => {}}
+                    onDragStart={id => { dragId.current = id }}
                     onClick={setSelectedApp}
                     isSelected={false}
                     onToggleSelect={() => {}}
