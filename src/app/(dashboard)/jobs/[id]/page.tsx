@@ -1736,12 +1736,16 @@ function ScheduleInterviewModal({
 
   // ── Availability helpers ────────────────────────────────────────────────────
 
-  // Return Mon–Fri for the week `offset` weeks from the SELECTED date (not today)
+  // Return Mon–Fri for the week `offset` weeks from the SELECTED date.
+  // Weekend dates (Sat/Sun) snap forward to the NEXT Monday so the selected
+  // date is always in a visible weekday range.
   const getWeekDays = (anchorDate: string, offset: number): Date[] => {
     const base = new Date(anchorDate + 'T00:00:00')
-    const dayOfWeek = base.getDay() === 0 ? 6 : base.getDay() - 1 // Mon=0…Sun=6
+    const dow = base.getDay() // 0=Sun 1=Mon … 6=Sat
+    // Days until the nearest Monday: weekdays → back to this week's Mon; weekend → next Mon
+    const daysToMon = dow === 0 ? 1 : dow === 6 ? 2 : -(dow - 1)
     const monday = new Date(base)
-    monday.setDate(base.getDate() - dayOfWeek + offset * 7)
+    monday.setDate(base.getDate() + daysToMon + offset * 7)
     monday.setHours(0, 0, 0, 0)
     return Array.from({ length: 5 }, (_, i) => {
       const d = new Date(monday); d.setDate(monday.getDate() + i); return d
@@ -1760,6 +1764,16 @@ function ScheduleInterviewModal({
   // Build "YYYY-MM-DDTHH:MM" key for a day + slot
   const slotKey = (day: Date, slot: string) =>
     `${day.toISOString().split('T')[0]}T${slot}`
+
+  // Format a 24h "HH:MM" slot to 12h label e.g. "08:00"→"8 AM", "13:30"→"1:30 PM"
+  const fmtSlotLabel = (slot: string) => {
+    const [hStr, mStr] = slot.split(':')
+    const h = parseInt(hStr, 10)
+    const m = parseInt(mStr, 10)
+    const period = h < 12 ? 'AM' : 'PM'
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+    return `${h12}${m > 0 ? ':' + String(m).padStart(2, '0') : ''} ${period}`
+  }
 
   // Check if a 30-min slot (start) overlaps any busy range
   const isBusy = (key: string): boolean => {
@@ -2247,10 +2261,8 @@ function ScheduleInterviewModal({
                       {HOUR_SLOTS.map(slot => (
                         <tr key={slot} className="border-t border-slate-50">
                           <td className="px-2 py-0 text-slate-300 text-right whitespace-nowrap leading-none">
-                            {/* Compact: every hour  |  Expanded: every 30 min */}
-                            {(gridExpanded || slot.endsWith(':00'))
-                              ? slot.replace(/^0/, '').replace(':00', '').replace(':30', ':30') + ' ' + (parseInt(slot) < 12 ? 'AM' : 'PM')
-                              : ''}
+                            {/* Compact: every hour only  |  Expanded: every 30 min */}
+                            {(gridExpanded || slot.endsWith(':00')) ? fmtSlotLabel(slot) : ''}
                           </td>
                           {weekDays.map(day => {
                             const key = slotKey(day, slot)
