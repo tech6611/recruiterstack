@@ -84,16 +84,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Use the connected email stored in org_settings (captured at OAuth connect time).
-    // Auto-add it to the freebusy query so the token owner's calendar always shows —
-    // even when panel member emails differ from the connected Google account address.
+    // Only query the emails explicitly requested (the actual panel members).
+    // The connected Google account is NOT auto-added — it should only contribute to
+    // availability when it is explicitly part of the interview panel.
     const connectedEmail = (settings.google_connected_email as string | null) ?? null
-    const emailsToQuery  = [...emails]
-    if (connectedEmail && !emailsToQuery.includes(connectedEmail.toLowerCase())) {
-      emailsToQuery.push(connectedEmail.toLowerCase())
-    }
 
-    const busyMap = await queryFreeBusy(accessToken, emailsToQuery, timeMin, timeMax, timezone)
+    const busyMap = await queryFreeBusy(accessToken, emails, timeMin, timeMax, timezone)
     return NextResponse.json(
       { data: busyMap, connected_email: connectedEmail },
       { headers: { 'Cache-Control': 'no-store' } }   // never cache — GCal events change in real-time

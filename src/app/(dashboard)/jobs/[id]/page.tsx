@@ -1761,12 +1761,11 @@ function ScheduleInterviewModal({
   const [googleMeetError, setGoogleMeetError] = useState<string | null>(null)
 
   // Availability grid state
-  const [availWeekOffset,    setAvailWeekOffset]    = useState(0)
-  const [busyRangesByEmail, setBusyRangesByEmail]  = useState<Record<string, { start: string; end: string }[]>>({})
-  const [availLoading,      setAvailLoading]        = useState(false)
-  const [availNoData,     setAvailNoData]     = useState(false)
-  const [gridExpanded,    setGridExpanded]    = useState(false)
-  const [connectedGCalEmail, setConnectedGCalEmail] = useState<string | null>(null)
+  const [availWeekOffset,   setAvailWeekOffset]  = useState(0)
+  const [busyRangesByEmail, setBusyRangesByEmail] = useState<Record<string, { start: string; end: string }[]>>({})
+  const [availLoading,      setAvailLoading]      = useState(false)
+  const [availNoData,       setAvailNoData]       = useState(false)
+  const [gridExpanded,      setGridExpanded]      = useState(false)
   // Scroll refs — auto-scroll to 8 AM (slot index 16) when grid renders
   const inlineGridRef = useRef<HTMLDivElement>(null)
   const popupGridRef  = useRef<HTMLDivElement>(null)
@@ -1810,8 +1809,8 @@ function ScheduleInterviewModal({
     return `${h12}${m > 0 ? ':' + String(m).padStart(2, '0') : ''} ${period}`
   }
 
-  // Returns the list of emails (panel members + connected account) that are busy
-  // during the given 30-min slot.  key = "YYYY-MM-DDTHH:MM" in LOCAL time.
+  // Returns the list of panel member emails that are busy during the given 30-min slot.
+  // key = "YYYY-MM-DDTHH:MM" in LOCAL time.
   // Returns an empty array when the slot is free.
   const getBusyEmails = (key: string): string[] => {
     const [datePart, timePart] = key.split('T')
@@ -1857,7 +1856,6 @@ function ScheduleInterviewModal({
         if (!res.ok) { if (!cancelled) { setBusyRangesByEmail({}); setAvailNoData(true) }; return }
         const json = await res.json()
         if (!cancelled) {
-          setConnectedGCalEmail(json.connected_email ?? null)
           // Store per-email busy ranges — keeps attribution so tooltips can show which person is busy
           setBusyRangesByEmail(json.data ?? {})
           setAvailNoData(!json.data || Object.keys(json.data).length === 0)
@@ -2340,15 +2338,6 @@ function ScheduleInterviewModal({
                 </div>
               </div>
 
-              {/* Connected account info — visible when the connected Google account is auto-added (not a panel member) */}
-              {connectedGCalEmail && !panel.some(m => m.email.trim().toLowerCase() === connectedGCalEmail.toLowerCase()) && (
-                <div className="px-3 py-1.5 bg-blue-50 border-b border-blue-100 flex items-center gap-1.5">
-                  <span className="text-[10px] text-blue-600">
-                    📅 Also showing <span className="font-medium">{connectedGCalEmail}</span> (connected account)
-                  </span>
-                </div>
-              )}
-
               {availLoading ? (
                 /* Skeleton */
                 <div className="p-3 grid grid-cols-6 gap-1 animate-pulse">
@@ -2623,15 +2612,6 @@ function ScheduleInterviewModal({
               </button>
             </div>
           </div>
-
-          {/* Connected account info (popup) */}
-          {connectedGCalEmail && !panel.some(m => m.email.trim().toLowerCase() === connectedGCalEmail.toLowerCase()) && (
-            <div className="px-5 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2 shrink-0">
-              <span className="text-xs text-blue-600">
-                📅 Also showing <span className="font-medium">{connectedGCalEmail}</span> (connected Google account) — their busy slots are included automatically
-              </span>
-            </div>
-          )}
 
           {/* Popup grid body */}
           <div ref={popupGridRef} className="flex-1 overflow-y-auto">
