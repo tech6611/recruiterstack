@@ -5,6 +5,15 @@ import { randomBytes } from 'crypto'
 import { getValidAccessToken, createMeetEvent } from '@/lib/google/calendar'
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
 
+// Strip HTML tags → plain text (for Google Calendar event descriptions)
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<\/li>/gi, '\n')
+    .replace(/<\/h[1-6]>/gi, '\n').replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/\n{3,}/g, '\n\n').trim()
+}
+
 export async function GET(req: NextRequest) {
   const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
@@ -108,13 +117,14 @@ export async function POST(req: NextRequest) {
           .eq('id', hiring_request_id)
           .single()
 
+        // Only invite the candidate — the interviewer scheduled the meeting themselves and doesn't
+        // need a redundant calendar invite arriving in their inbox with their own email in the subject.
         const attendees: string[] = []
-        if (candidate?.email)     attendees.push(candidate.email)
-        if (interviewer_email?.trim()) attendees.push(interviewer_email.trim())
+        if (candidate?.email) attendees.push(candidate.email)
 
         const created = await createMeetEvent(access_token, {
           summary:          `Interview: ${candidate?.name ?? 'Candidate'} — ${hiringReq?.position_title ?? 'Position'}`,
-          description:      notes?.trim() || undefined,
+          description:      notes?.trim() ? stripHtml(notes) : undefined,
           start_at:         scheduled_at,
           duration_minutes: duration_minutes ?? 60,
           organizer_email:  orgSettings.google_connected_email ?? '',
