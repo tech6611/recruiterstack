@@ -194,6 +194,7 @@ export async function POST(req: NextRequest) {
         interviewType:    interview_type ?? 'video',
         location:         resolvedLocation,
         meetLink:         meetLink,
+        notes:            notes?.trim() || null,
         recruiterName:    'RecruiterStack',
         recruiterEmail:   process.env.SENDGRID_FROM_EMAIL ?? '',
       })
