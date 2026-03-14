@@ -587,12 +587,40 @@ function AddCandidateModal({
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
 
-  // CV / LinkedIn import
+  // CV / LinkedIn / Drive import
   const [importLoading, setImportLoading] = useState(false)
-  const [importError, setImportError] = useState('')
-  const [showLinkedIn, setShowLinkedIn] = useState(false)
-  const [linkedInText, setLinkedInText] = useState('')
+  const [importError, setImportError]     = useState('')
+  const [showLinkedIn, setShowLinkedIn]   = useState(false)
+  const [linkedInText, setLinkedInText]   = useState('')
+  const [showDriveUrl, setShowDriveUrl]   = useState(false)
+  const [driveUrl, setDriveUrl]           = useState('')
   const cvInputRef = useRef<HTMLInputElement>(null)
+
+  // Extended profile fields — auto-filled from any import, always editable
+  const [currentTitle,      setCurrentTitle]      = useState('')
+  const [candidateLocation, setCandidateLocation] = useState('')
+  const [expYears,          setExpYears]          = useState('')
+  const [skillsRaw,         setSkillsRaw]         = useState('')   // comma-separated
+  const [linkedinUrl,       setLinkedinUrl]       = useState('')
+  const [showImportedFields, setShowImportedFields] = useState(false)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fillFromParsed = (c: Record<string, any>) => {
+    if (c.name)             setName(c.name)
+    if (c.email)            setEmail(c.email)
+    if (c.phone)            setPhone(c.phone)
+    if (c.current_title)    setCurrentTitle(c.current_title)
+    if (c.location)         setCandidateLocation(c.location)
+    if (c.experience_years) setExpYears(String(c.experience_years))
+    if (Array.isArray(c.skills) && c.skills.length)
+      setSkillsRaw((c.skills as string[]).join(', '))
+    if (c.linkedin_url)     setLinkedinUrl(c.linkedin_url)
+    // Reveal the extended fields section when any rich field is present
+    if (c.current_title || c.location || c.experience_years ||
+        (Array.isArray(c.skills) && c.skills.length) || c.linkedin_url) {
+      setShowImportedFields(true)
+    }
+  }
 
   const handleCvImport = async (file: File) => {
     setImportLoading(true); setImportError('')
@@ -602,10 +630,7 @@ function AddCandidateModal({
       const res = await fetch('/api/sourcing/parse-cv', { method: 'POST', body: fd })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Failed to parse CV')
-      const c = json.candidate ?? {}
-      if (c.name)  setName(c.name)
-      if (c.email) setEmail(c.email)
-      if (c.phone) setPhone(c.phone)
+      fillFromParsed(json.candidate ?? {})
     } catch (e: unknown) {
       setImportError(e instanceof Error ? e.message : 'Failed to parse CV')
     } finally { setImportLoading(false) }
@@ -622,13 +647,28 @@ function AddCandidateModal({
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Failed to parse profile')
-      const c = json.candidate ?? {}
-      if (c.name)  setName(c.name)
-      if (c.email) setEmail(c.email)
-      if (c.phone) setPhone(c.phone)
+      fillFromParsed(json.candidate ?? {})
       setShowLinkedIn(false)
     } catch (e: unknown) {
       setImportError(e instanceof Error ? e.message : 'Failed to parse profile')
+    } finally { setImportLoading(false) }
+  }
+
+  const handleDriveImport = async () => {
+    if (!driveUrl.trim()) return
+    setImportLoading(true); setImportError('')
+    try {
+      const res = await fetch('/api/sourcing/parse-drive-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: driveUrl }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to parse Drive file')
+      fillFromParsed(json.candidate ?? {})
+      setShowDriveUrl(false)
+    } catch (e: unknown) {
+      setImportError(e instanceof Error ? e.message : 'Failed to parse Drive file')
     } finally { setImportLoading(false) }
   }
 
@@ -661,7 +701,18 @@ function AddCandidateModal({
         hiring_request_id: jobId,
         stage_id: stageId || undefined,
         source,
-        candidate_data: { name: name.trim(), email: email.trim(), phone: phone.trim() || undefined },
+        candidate_data: {
+            name:             name.trim(),
+            email:            email.trim(),
+            phone:            phone.trim()            || undefined,
+            current_title:    currentTitle.trim()     || undefined,
+            location:         candidateLocation.trim()|| undefined,
+            experience_years: expYears ? Number(expYears) : undefined,
+            skills:           skillsRaw.trim()
+              ? skillsRaw.split(',').map(s => s.trim()).filter(Boolean)
+              : undefined,
+            linkedin_url:     linkedinUrl.trim()      || undefined,
+          },
       }),
     })
     const json = await res.json()
@@ -688,7 +739,7 @@ function AddCandidateModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
           <h2 className="text-base font-bold text-slate-900">Add Candidate</h2>
@@ -714,7 +765,7 @@ function AddCandidateModal({
           ))}
         </div>
 
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
           {/* Stage picker (both tabs) */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1.5">Add to Stage</label>
@@ -744,7 +795,7 @@ function AddCandidateModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowLinkedIn(v => !v)}
+                    onClick={() => { setShowLinkedIn(v => !v); setShowDriveUrl(false) }}
                     disabled={importLoading}
                     className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 ${
                       showLinkedIn ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -752,6 +803,17 @@ function AddCandidateModal({
                   >
                     <Link2 className="h-3.5 w-3.5" />
                     LinkedIn / Bio
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowDriveUrl(v => !v); setShowLinkedIn(false) }}
+                    disabled={importLoading}
+                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 ${
+                      showDriveUrl ? 'border-green-300 bg-green-50 text-green-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Google Drive
                   </button>
                   <input
                     ref={cvInputRef}
@@ -761,6 +823,8 @@ function AddCandidateModal({
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleCvImport(f) }}
                   />
                 </div>
+
+                {/* LinkedIn / Bio textarea */}
                 {showLinkedIn && (
                   <div className="mt-2 space-y-2">
                     <textarea
@@ -781,6 +845,29 @@ function AddCandidateModal({
                     </button>
                   </div>
                 )}
+
+                {/* Google Drive URL input */}
+                {showDriveUrl && (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs text-slate-400">Paste a publicly shared Google Drive link to a PDF resume.</p>
+                    <input
+                      value={driveUrl}
+                      onChange={e => setDriveUrl(e.target.value)}
+                      placeholder="https://drive.google.com/file/d/…/view"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleDriveImport}
+                      disabled={importLoading || !driveUrl.trim()}
+                      className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                      {importLoading && showDriveUrl && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      Import from Drive
+                    </button>
+                  </div>
+                )}
+
                 {importError && <p className="mt-1.5 text-xs text-red-600">{importError}</p>}
               </div>
 
@@ -824,6 +911,76 @@ function AddCandidateModal({
                   <option value="referral">Referral</option>
                   <option value="imported">Imported</option>
                 </select>
+              </div>
+
+              {/* ── Imported / Extended Details ── */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowImportedFields(v => !v)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
+                >
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showImportedFields ? 'rotate-0' : '-rotate-90'}`} />
+                  Additional Details
+                  {showImportedFields && <span className="ml-1 text-[10px] font-medium text-blue-600 bg-blue-50 rounded px-1.5 py-0.5">auto-filled</span>}
+                </button>
+
+                {showImportedFields && (
+                  <div className="mt-2 space-y-3 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Current Title</label>
+                        <input
+                          value={currentTitle}
+                          onChange={e => setCurrentTitle(e.target.value)}
+                          placeholder="e.g. Senior Engineer"
+                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Location</label>
+                        <input
+                          value={candidateLocation}
+                          onChange={e => setCandidateLocation(e.target.value)}
+                          placeholder="e.g. New York, US"
+                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Years of Exp.</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={50}
+                          value={expYears}
+                          onChange={e => setExpYears(e.target.value)}
+                          placeholder="e.g. 5"
+                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">LinkedIn URL</label>
+                        <input
+                          value={linkedinUrl}
+                          onChange={e => setLinkedinUrl(e.target.value)}
+                          placeholder="linkedin.com/in/…"
+                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Skills <span className="font-normal text-slate-400">(comma-separated)</span></label>
+                      <input
+                        value={skillsRaw}
+                        onChange={e => setSkillsRaw(e.target.value)}
+                        placeholder="e.g. React, TypeScript, Node.js"
+                        className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
