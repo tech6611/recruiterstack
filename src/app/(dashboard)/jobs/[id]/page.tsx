@@ -1739,7 +1739,8 @@ function ScheduleInterviewModal({
   const [scheduledAt, setScheduledAt] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [googleConnected, setGoogleConnected] = useState(false)
-  const [autoMeetLink, setAutoMeetLink] = useState<string | null>(null)
+  const [autoMeetLink,    setAutoMeetLink]    = useState<string | null>(null)
+  const [googleMeetError, setGoogleMeetError] = useState<string | null>(null)
 
   // Availability grid state
   const [availWeekOffset, setAvailWeekOffset] = useState(0)
@@ -1852,6 +1853,14 @@ function ScheduleInterviewModal({
     return () => window.removeEventListener('keydown', handler)
   }, [gridExpanded])
 
+  // Escape dismisses the success screen too
+  useEffect(() => {
+    if (!saved) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') { onScheduled(); onClose() } }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [saved]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const MEETING_INTEGRATIONS = [
     { id: 'gmeet',    label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
     { id: 'zoom',     label: 'Zoom',        color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://zoom.us/start/videomeeting',        placeholder: 'https://zoom.us/j/...' },
@@ -1889,6 +1898,11 @@ function ScheduleInterviewModal({
       setError('Date, time and interviewer are required.')
       return
     }
+    // Guard against booking a slot already marked busy in the availability grid
+    if (isBusy(`${date}T${time}`)) {
+      setError('This time slot is busy. Please pick a free slot from the calendar below.')
+      return
+    }
     setSaving(true)
     setError('')
 
@@ -1923,8 +1937,10 @@ function ScheduleInterviewModal({
       }
 
       setScheduledAt(scheduled)
-      const firstMeetLink = results[0]?.data?.meet_link ?? null
-      if (firstMeetLink) setAutoMeetLink(firstMeetLink)
+      const firstMeetLink  = results[0]?.data?.meet_link        ?? null
+      const firstMeetError = results[0]?.data?.google_meet_error ?? null
+      if (firstMeetLink)  setAutoMeetLink(firstMeetLink)
+      if (firstMeetError) setGoogleMeetError(firstMeetError)
       setSaved(true)
     } catch {
       setError('Network error. Please try again.')
@@ -1957,6 +1973,14 @@ function ScheduleInterviewModal({
           )}
 
           <div className="flex flex-col gap-2.5 mb-5">
+            {/* Google Meet error banner — visible when Meet creation failed so user can act */}
+            {googleMeetError && !autoMeetLink && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 text-left">
+                <p className="text-xs font-semibold text-amber-700 mb-0.5">Calendar invite not sent automatically</p>
+                <p className="text-[11px] text-amber-600 break-all">{googleMeetError}</p>
+                <p className="text-[11px] text-amber-500 mt-1">Use "Add to Google Calendar" below to invite manually, or reconnect Google Calendar in Settings → Integrations.</p>
+              </div>
+            )}
             {/* Auto-created Meet link banner */}
             {autoMeetLink && (
               <div className="flex items-center justify-between gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
