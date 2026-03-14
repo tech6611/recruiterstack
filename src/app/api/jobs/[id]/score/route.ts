@@ -72,6 +72,15 @@ export async function POST(
     return NextResponse.json({ error: 'No active applications to score' }, { status: 400 })
   }
 
+  // Skip already-scored apps unless a specific applicationId was given (manual re-score)
+  // This prevents duplicate Claude API calls when "Score this stage" is clicked again
+  if (!applicationId) {
+    apps = apps.filter(a => !a.ai_scored_at)
+    if (apps.length === 0) {
+      return NextResponse.json({ error: 'All applications in this selection have already been scored' }, { status: 400 })
+    }
+  }
+
   // ── 2. Stream SSE response ─────────────────────────────────────────────────
   const stream = new ReadableStream({
     async start(controller) {

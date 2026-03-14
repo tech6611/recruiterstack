@@ -269,8 +269,8 @@ function CandidateCard({
         )
       })()}
 
-      {/* AI Analysis panel — only on rejected cards that have been scored */}
-      {app.status === 'rejected' && app.ai_score !== null && (
+      {/* AI Analysis panel — any scored candidate */}
+      {app.ai_score !== null && (
         <div className="mt-1.5">
           <button
             type="button"
@@ -1331,6 +1331,58 @@ function CandidateSlideOver({
 
           {tab === 'scorecards' && (
             <div className="px-6 py-5 space-y-4">
+
+              {/* ── AI Analysis (stored, no extra API call) ── */}
+              {app.ai_score !== null && (
+                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-blue-700">🤖 AI Analysis</span>
+                      {app.ai_scored_at && (
+                        <span className="text-[10px] text-blue-400">{fmtRelative(app.ai_scored_at)}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <ScorePill score={app.ai_score} />
+                      {app.ai_recommendation && (() => {
+                        const badge = SIGNAL_BADGE[app.ai_recommendation as keyof typeof SIGNAL_BADGE]
+                        return badge ? (
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
+                            {badge.label}
+                          </span>
+                        ) : null
+                      })()}
+                    </div>
+                  </div>
+
+                  {(app.ai_strengths ?? []).length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-emerald-600 mb-1">✅ Strengths</p>
+                      <ul className="space-y-0.5">
+                        {(app.ai_strengths ?? []).map((s, i) => (
+                          <li key={i} className="text-xs text-slate-600 flex gap-1.5">
+                            <span className="text-emerald-400 shrink-0">•</span>{s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(app.ai_gaps ?? []).length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-red-500 mb-1">⚠️ Gaps</p>
+                      <ul className="space-y-0.5">
+                        {(app.ai_gaps ?? []).map((g, i) => (
+                          <li key={i} className="text-xs text-slate-600 flex gap-1.5">
+                            <span className="text-red-400 shrink-0">•</span>{g}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Add Scorecard button / form toggle */}
               {!showAddForm && (
                 <button
