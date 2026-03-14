@@ -15,7 +15,6 @@ import type {
   Scorecard, ScorecardRecommendation, ScorecardScore, AiRecommendation,
 } from '@/lib/types/database'
 import { useSettings } from '@/lib/hooks/useSettings'
-import EditHMModal from '@/components/EditHMModal'
 
 // ── Scorecard config (shared) ─────────────────────────────────────────────────
 
@@ -1708,8 +1707,17 @@ function ScheduleInterviewModal({
   const [date, setDate] = useState(dateStr)
   const [time, setTime] = useState('10:00')
   const [duration, setDuration] = useState(60)
-  const [interviewer, setInterviewer] = useState(job.hiring_manager_name ?? '')
-  const [interviewerEmail, setInterviewerEmail] = useState('')
+  // ── Interview panel — list of interviewers for this session ─────────────────
+  const _hmName  = (job as unknown as { hiring_manager_name?:  string }).hiring_manager_name  ?? ''
+  const _hmEmail = (job as unknown as { hiring_manager_email?: string }).hiring_manager_email ?? ''
+  type PanelMember = { name: string; email: string }
+  const [panel, setPanel] = useState<PanelMember[]>([{ name: _hmName, email: _hmEmail }])
+  const [addingMember,   setAddingMember]   = useState(false)
+  const [newMemberName,  setNewMemberName]  = useState('')
+  const [newMemberEmail, setNewMemberEmail] = useState('')
+
+  const [interviewer, setInterviewer] = useState(_hmName)
+  const [interviewerEmail, setInterviewerEmail] = useState(_hmEmail)   // pre-fill from HM
   const [location, setLocation] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
@@ -1719,18 +1727,11 @@ function ScheduleInterviewModal({
   const [googleConnected, setGoogleConnected] = useState(false)
   const [autoMeetLink, setAutoMeetLink] = useState<string | null>(null)
 
-  // Local editable copies of HM info (so pencil edits reflect in modal without refetch)
-  const [localHMName,  setLocalHMName]  = useState((job as unknown as { hiring_manager_name?: string }).hiring_manager_name ?? '')
-  const [localHMEmail, setLocalHMEmail] = useState((job as unknown as { hiring_manager_email?: string }).hiring_manager_email ?? '')
-  const [editHMOpen,   setEditHMOpen]   = useState(false)
-
   // Availability grid state
   const [availWeekOffset, setAvailWeekOffset] = useState(0)
   const [busyRanges,      setBusyRanges]      = useState<{ start: string; end: string }[]>([])
   const [availLoading,    setAvailLoading]    = useState(false)
   const [availNoData,     setAvailNoData]     = useState(false)
-
-  const hmEmail = localHMEmail || ((job as unknown as { hiring_manager_email?: string }).hiring_manager_email ?? null)
 
   // ── Availability helpers ────────────────────────────────────────────────────
 
@@ -1778,34 +1779,35 @@ function ScheduleInterviewModal({
       .catch(() => {})
   }, [])
 
-  // Fetch interviewer free/busy when email or week offset changes
+  // Fetch free/busy for ALL panel members when panel or week offset changes
   useEffect(() => {
-    const email = interviewerEmail.trim()
-    if (!email || !googleConnected) return
+    const emails = panel.map(m => m.email.trim()).filter(Boolean)
+    if (!emails.length || !googleConnected) return
     let cancelled = false
     const timer = setTimeout(async () => {
       setAvailLoading(true)
       setAvailNoData(false)
       try {
-        const days   = getWeekDays(availWeekOffset)
-        const minDt  = new Date(days[0]); minDt.setHours(0, 0, 0, 0)
-        const maxDt  = new Date(days[4]); maxDt.setHours(23, 59, 59, 999)
-        const tz     = Intl.DateTimeFormat().resolvedOptions().timeZone
-        const res    = await fetch(
-          `/api/google/availability?emails=${encodeURIComponent(email)}&time_min=${minDt.toISOString()}&time_max=${maxDt.toISOString()}&timezone=${encodeURIComponent(tz)}`
+        const days  = getWeekDays(availWeekOffset)
+        const minDt = new Date(days[0]); minDt.setHours(0, 0, 0, 0)
+        const maxDt = new Date(days[4]); maxDt.setHours(23, 59, 59, 999)
+        const tz    = Intl.DateTimeFormat().resolvedOptions().timeZone
+        const res   = await fetch(
+          `/api/google/availability?emails=${encodeURIComponent(emails.join(','))}&time_min=${minDt.toISOString()}&time_max=${maxDt.toISOString()}&timezone=${encodeURIComponent(tz)}`
         )
         if (!res.ok) { if (!cancelled) { setBusyRanges([]); setAvailNoData(true) }; return }
         const { data } = await res.json()
         if (!cancelled) {
-          const ranges: { start: string; end: string }[] = data?.[email] ?? []
-          setBusyRanges(ranges)
-          setAvailNoData(ranges.length === 0 && !!data && Object.keys(data).length > 0 ? false : !data?.[email])
+          // Flatten busy ranges from ALL panel members
+          const allRanges: { start: string; end: string }[] = Object.values(data ?? {}).flat() as { start: string; end: string }[]
+          setBusyRanges(allRanges)
+          setAvailNoData(!data || Object.keys(data).length === 0)
         }
       } catch { if (!cancelled) { setBusyRanges([]); setAvailNoData(true) } }
       finally  { if (!cancelled) setAvailLoading(false) }
     }, 600)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [interviewerEmail, availWeekOffset, googleConnected]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [panel, availWeekOffset, googleConnected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const MEETING_INTEGRATIONS = [
     { id: 'gmeet',    label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
@@ -1835,7 +1837,7 @@ function ScheduleInterviewModal({
       location ? `Link: ${location}` : '',
       notes ? `Notes: ${notes}` : '',
     ].filter(Boolean).join('\n'))
-    const add = hmEmail ? `&add=${encodeURIComponent(hmEmail)}` : ''
+    const add = interviewerEmail ? `&add=${encodeURIComponent(interviewerEmail)}` : ''
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${fmt(start)}/${fmt(end)}&details=${details}${add}`
   }
 
@@ -1907,8 +1909,8 @@ function ScheduleInterviewModal({
             {apps.length === 1 ? 'Interview scheduled!' : `${apps.length} interviews scheduled!`}
           </h2>
           <p className="text-sm text-slate-500 mb-1">{fmtScheduled}</p>
-          {hmEmail && (
-            <p className="text-xs text-slate-400 mb-6">Interviewer: {interviewer} ({hmEmail})</p>
+          {interviewerEmail && (
+            <p className="text-xs text-slate-400 mb-6">Interviewer: {interviewer} ({interviewerEmail})</p>
           )}
 
           <div className="flex flex-col gap-2.5 mb-5">
@@ -1997,28 +1999,107 @@ function ScheduleInterviewModal({
             </div>
           )}
 
-          {/* HM info banner */}
-          {(localHMName || hmEmail) && (
-            <div className="group flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
-              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(localHMName || 'HM')}`}>
-                {initials(localHMName || 'HM')}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-slate-700">{localHMName}</p>
-                {hmEmail && (
-                  <a href={`mailto:${hmEmail}`} className="text-xs text-blue-600 hover:underline truncate block">{hmEmail}</a>
-                )}
-              </div>
+          {/* ── Interview Panel ──────────────────────────────────────────── */}
+          <div className="rounded-xl border border-slate-200 overflow-visible">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
+              <span className="text-xs font-semibold text-slate-600">Interview Panel</span>
               <button
-                onClick={() => setEditHMOpen(true)}
-                className="opacity-0 group-hover:opacity-100 h-6 w-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all"
-                title="Edit hiring manager"
+                onClick={() => { setAddingMember(true); setNewMemberName(''); setNewMemberEmail('') }}
+                className="flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
               >
-                <Pencil className="h-3 w-3" />
+                <Plus className="h-3 w-3" /> Add interviewer
               </button>
-              <span className="text-[10px] font-medium text-slate-400 bg-white border border-slate-200 rounded-full px-2 py-0.5">HM</span>
             </div>
-          )}
+
+            {/* Panel members list */}
+            {panel.map((member, i) => (
+              <div key={i} className="flex items-center gap-2.5 px-3 py-2.5 border-b border-slate-100 last:border-b-0">
+                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${avatarColor(member.name || '?')}`}>
+                  {initials(member.name || '?')}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-700 leading-snug">{member.name || <span className="text-slate-400 italic">No name</span>}</p>
+                  {member.email && (
+                    <p className="text-[11px] text-slate-400 truncate">{member.email}</p>
+                  )}
+                </div>
+                {/* Select this member as the scheduled interviewer */}
+                <button
+                  onClick={() => { setInterviewer(member.name); setInterviewerEmail(member.email) }}
+                  className={`text-[10px] font-medium rounded-full px-2 py-0.5 border transition-colors ${
+                    interviewer === member.name && interviewerEmail === member.email
+                      ? 'bg-blue-50 text-blue-600 border-blue-200'
+                      : 'text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-600 bg-white'
+                  }`}
+                  title="Set as primary interviewer"
+                >
+                  {i === 0 ? 'HM' : 'Select'}
+                </button>
+                {/* Remove — can't remove the last member */}
+                <button
+                  onClick={() => {
+                    const next = panel.filter((_, j) => j !== i)
+                    setPanel(next)
+                    // If the removed member was the selected interviewer, fall back to first
+                    if (interviewer === member.name && interviewerEmail === member.email && next.length) {
+                      setInterviewer(next[0].name)
+                      setInterviewerEmail(next[0].email)
+                    }
+                  }}
+                  disabled={panel.length === 1}
+                  className="h-5 w-5 flex items-center justify-center rounded text-slate-300 hover:text-red-400 hover:bg-red-50 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                  title="Remove from panel"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+
+            {/* Add member inline form */}
+            {addingMember && (
+              <div className="flex items-center gap-2 px-3 py-2.5 border-t border-slate-100 bg-slate-50">
+                <input
+                  autoFocus
+                  value={newMemberName}
+                  onChange={e => setNewMemberName(e.target.value)}
+                  placeholder="Name"
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+                <input
+                  type="email"
+                  value={newMemberEmail}
+                  onChange={e => setNewMemberEmail(e.target.value)}
+                  placeholder="Email"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newMemberName.trim()) {
+                      setPanel(p => [...p, { name: newMemberName.trim(), email: newMemberEmail.trim() }])
+                      setAddingMember(false)
+                    }
+                    if (e.key === 'Escape') setAddingMember(false)
+                  }}
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+                <button
+                  onClick={() => {
+                    if (!newMemberName.trim()) return
+                    setPanel(p => [...p, { name: newMemberName.trim(), email: newMemberEmail.trim() }])
+                    setAddingMember(false)
+                  }}
+                  disabled={!newMemberName.trim()}
+                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                >
+                  Add
+                </button>
+                <button
+                  onClick={() => setAddingMember(false)}
+                  className="shrink-0 h-6 w-6 flex items-center justify-center rounded text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Interview type */}
           <div>
@@ -2099,25 +2180,13 @@ function ScheduleInterviewModal({
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                 Interviewer Email <span className="font-normal text-slate-400">(for invite)</span>
               </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  value={interviewerEmail}
-                  onChange={e => setInterviewerEmail(e.target.value)}
-                  placeholder={localHMEmail || 'interviewer@company.com'}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-                {/* Quick-fill from HM email */}
-                {!interviewerEmail && localHMEmail && (
-                  <button
-                    onClick={() => setInterviewerEmail(localHMEmail)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 rounded px-1.5 py-0.5 transition-colors"
-                    title="Use HM email"
-                  >
-                    Use HM
-                  </button>
-                )}
-              </div>
+              <input
+                type="email"
+                value={interviewerEmail}
+                onChange={e => setInterviewerEmail(e.target.value)}
+                placeholder="interviewer@company.com"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
             </div>
           </div>
 
@@ -2210,26 +2279,6 @@ function ScheduleInterviewModal({
                 </div>
               )}
             </div>
-          )}
-
-          {/* Edit HM modal (triggered from banner pencil) */}
-          {editHMOpen && (
-            <EditHMModal
-              requestId={job.id}
-              initial={{
-                name:  localHMName,
-                email: localHMEmail || null,
-                slack: (job as unknown as { hiring_manager_slack?: string }).hiring_manager_slack ?? null,
-              }}
-              onClose={() => setEditHMOpen(false)}
-              onSaved={({ name, email }) => {
-                setLocalHMName(name)
-                setLocalHMEmail(email ?? '')
-                setInterviewer(name)
-                if (email && !interviewerEmail) setInterviewerEmail(email)
-                setEditHMOpen(false)
-              }}
-            />
           )}
 
           {/* Meeting platform + link */}
