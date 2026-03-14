@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
-import { getValidAccessToken, queryFreeBusy, type GoogleTokens } from '@/lib/google/calendar'
+import { getValidAccessToken, queryFreeBusy, getConnectedEmail, type GoogleTokens } from '@/lib/google/calendar'
 
 /**
  * GET /api/google/availability
@@ -14,7 +14,11 @@ import { getValidAccessToken, queryFreeBusy, type GoogleTokens } from '@/lib/goo
  *   time_max — ISO datetime (end of window, defaults to now + 7 days)
  *   timezone — IANA timezone name (defaults to UTC)
  *
- * Response: { data: { [email]: [{ start, end }] } }
+ * Response: { data: { [email]: [{ start, end }] }, connected_email: string | null }
+ *
+ * The connected_email is the Google account that owns the OAuth token.
+ * It is automatically added to the freebusy query so the connected account's
+ * calendar always shows regardless of what panel emails are provided.
  *
  * Returns 409 if Google is not connected for this org.
  */
@@ -42,7 +46,7 @@ export async function GET(req: NextRequest) {
   // Parse query params
   const { searchParams } = req.nextUrl
   const emailsParam = searchParams.get('emails') ?? ''
-  const emails      = emailsParam.split(',').map(e => e.trim()).filter(Boolean)
+  const emails      = emailsParam.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
   const timeMin     = searchParams.get('time_min') ?? new Date().toISOString()
   const timeMax     = searchParams.get('time_max') ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
   const timezone    = searchParams.get('timezone') ?? 'UTC'
@@ -79,8 +83,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const busyMap = await queryFreeBusy(accessToken, emails, timeMin, timeMax, timezone)
-    return NextResponse.json({ data: busyMap })
+    // Fetch the connected Google account email.
+    // Auto-add it to the freebusy query so the token owner's calendar always shows —
+    // even when panel member emails use a work address different from the Google account.
+    const connectedEmail = await getConnectedEmail(accessToken)
+    const emailsToQuery  = [...emails]
+    if (connectedEmail && !emailsToQuery.includes(connectedEmail.toLowerCase())) {
+      emailsToQuery.push(connectedEmail.toLowerCase())
+    }
+
+    const busyMap = await queryFreeBusy(accessToken, emailsToQuery, timeMin, timeMax, timezone)
+    return NextResponse.json({ data: busyMap, connected_email: connectedEmail })
   } catch (e) {
     console.error('[google-availability] free/busy query failed:', e)
     return NextResponse.json({ error: 'Failed to query availability' }, { status: 500 })
