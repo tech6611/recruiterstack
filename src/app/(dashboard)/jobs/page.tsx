@@ -7,9 +7,10 @@ import {
   Briefcase, Plus, Search, Clock, X, Mail, FileText, Send,
   CheckCircle, Copy, Check, Users, PenLine, Wand2, RefreshCw, Loader2, Sparkles, Paperclip,
   ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft, GripVertical, Archive,
-  CalendarDays, SlidersHorizontal,
+  CalendarDays, SlidersHorizontal, Pencil,
 } from 'lucide-react'
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
+import EditHMModal from '@/components/EditHMModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -621,6 +622,7 @@ export default function JobsPage() {
   // ── Data ──────────────────────────────────────────────────────────────────
   const [jobs, setJobs]       = useState<JobListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [editHMJob, setEditHMJob] = useState<JobListItem | null>(null)
 
   // ── Column visibility / order (persisted to LS) ───────────────────────────
   const [visibleCols, setVisibleCols] = useState<ColId[]>(DEFAULT_VISIBLE_COLS)
@@ -920,7 +922,23 @@ export default function JobsPage() {
       case 'pipeline':
         return <td key={colId} className="px-3 py-3.5"><PipelineBar stages={job.stage_counts} /></td>
       case 'manager':
-        return <td key={colId} className="px-3 py-3.5"><p className="text-sm text-slate-700">{job.hiring_manager_name}</p>{job.hiring_manager_email && <p className="text-xs text-slate-400">{job.hiring_manager_email}</p>}</td>
+        return (
+          <td key={colId} className="px-3 py-3.5" onClick={e => e.stopPropagation()}>
+            <div className="group flex items-start gap-1.5">
+              <div className="min-w-0">
+                <p className="text-sm text-slate-700">{job.hiring_manager_name}</p>
+                {job.hiring_manager_email && <p className="text-xs text-slate-400">{job.hiring_manager_email}</p>}
+              </div>
+              <button
+                onClick={() => setEditHMJob(job)}
+                className="mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+                title="Edit hiring manager"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            </div>
+          </td>
+        )
       case 'status':
         return <td key={colId} className="px-3 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${s.color}`}>{s.icon}{s.label}</span></td>
       case 'created':
@@ -1387,6 +1405,27 @@ export default function JobsPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Edit HM modal */}
+      {editHMJob && (
+        <EditHMModal
+          requestId={editHMJob.id}
+          initial={{
+            name:  editHMJob.hiring_manager_name ?? '',
+            email: editHMJob.hiring_manager_email ?? null,
+            slack: editHMJob.hiring_manager_slack ?? null,
+          }}
+          onClose={() => setEditHMJob(null)}
+          onSaved={({ name, email, slack }) => {
+            setJobs(prev => prev.map(j =>
+              j.id === editHMJob.id
+                ? { ...j, hiring_manager_name: name, hiring_manager_email: email, hiring_manager_slack: slack }
+                : j
+            ))
+            setEditHMJob(null)
+          }}
+        />
       )}
     </div>
   )
