@@ -25,14 +25,18 @@ export interface InterviewNotificationPayload {
   // Position
   positionTitle:    string
   // Timing
-  scheduledAt:      string   // ISO UTC
+  scheduledAt:      string         // ISO UTC
   durationMinutes:  number
+  timezone:         string | null  // IANA timezone from the booking client, e.g. "Asia/Kolkata"
   // Platform
   interviewType:    string   // 'video' | 'phone' | 'in_person' | etc.
   location:         string | null   // Zoom/Meet URL or office address
   meetLink:         string | null   // Resolved Google Meet link (may differ from location)
   // Extra context
   notes:            string | null   // Recruiter notes / prep instructions for the interview
+  // If true, Google Calendar already sent calendar invites — skip SendGrid emails to avoid
+  // duplicate confirmations. Slack notification still fires regardless.
+  calendarInviteSent?: boolean
   // Recruiter
   recruiterName:    string
   recruiterEmail:   string
@@ -40,15 +44,16 @@ export interface InterviewNotificationPayload {
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
-function formatDateTime(iso: string): string {
+function formatDateTime(iso: string, timezone?: string | null): string {
   return new Date(iso).toLocaleString('en-US', {
-    weekday: 'long',
-    month:   'long',
-    day:     'numeric',
-    year:    'numeric',
-    hour:    '2-digit',
-    minute:  '2-digit',
+    weekday:      'long',
+    month:        'long',
+    day:          'numeric',
+    year:         'numeric',
+    hour:         '2-digit',
+    minute:       '2-digit',
     timeZoneName: 'short',
+    ...(timezone ? { timeZone: timezone } : {}),
   })
 }
 
@@ -78,7 +83,7 @@ async function sendCandidateEmail(p: InterviewNotificationPayload): Promise<void
 
   sgMail.setApiKey(apiKey)
 
-  const dateStr = formatDateTime(p.scheduledAt)
+  const dateStr = formatDateTime(p.scheduledAt, p.timezone)
   const details = meetingDetails(p)
   const link    = p.meetLink ?? p.location
 
@@ -135,7 +140,7 @@ async function sendInterviewerEmail(p: InterviewNotificationPayload): Promise<vo
 
   sgMail.setApiKey(apiKey)
 
-  const dateStr = formatDateTime(p.scheduledAt)
+  const dateStr = formatDateTime(p.scheduledAt, p.timezone)
   const link    = p.meetLink ?? p.location
 
   const text = [
@@ -209,17 +214,21 @@ async function sendSlackNotifications(p: InterviewNotificationPayload): Promise<
 
 /**
  * Dispatches all interview-related notifications (emails + Slack) concurrently.
+ * When calendarInviteSent is true, Google Calendar has already emailed all
+ * attendees its own invite, so we skip the SendGrid emails to avoid duplicates.
+ * The Slack notification always fires regardless.
  * Never throws — swallows all errors so the caller's main flow isn't broken.
  */
 export async function notifyInterviewScheduled(
   p: InterviewNotificationPayload
 ): Promise<void> {
   try {
-    await Promise.allSettled([
-      sendCandidateEmail(p),
-      sendInterviewerEmail(p),
-      sendSlackNotifications(p),
-    ])
+    const tasks = [sendSlackNotifications(p)]
+    if (!p.calendarInviteSent) {
+      tasks.push(sendCandidateEmail(p))
+      tasks.push(sendInterviewerEmail(p))
+    }
+    await Promise.allSettled(tasks)
   } catch (e) {
     console.error('[interview-notify] unexpected error:', e)
   }

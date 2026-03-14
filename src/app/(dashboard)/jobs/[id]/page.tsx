@@ -1761,9 +1761,9 @@ function ScheduleInterviewModal({
   const [googleMeetError, setGoogleMeetError] = useState<string | null>(null)
 
   // Availability grid state
-  const [availWeekOffset, setAvailWeekOffset] = useState(0)
-  const [busyRanges,      setBusyRanges]      = useState<{ start: string; end: string }[]>([])
-  const [availLoading,    setAvailLoading]    = useState(false)
+  const [availWeekOffset,    setAvailWeekOffset]    = useState(0)
+  const [busyRangesByEmail, setBusyRangesByEmail]  = useState<Record<string, { start: string; end: string }[]>>({})
+  const [availLoading,      setAvailLoading]        = useState(false)
   const [availNoData,     setAvailNoData]     = useState(false)
   const [gridExpanded,    setGridExpanded]    = useState(false)
   const [connectedGCalEmail, setConnectedGCalEmail] = useState<string | null>(null)
@@ -1810,22 +1810,24 @@ function ScheduleInterviewModal({
     return `${h12}${m > 0 ? ':' + String(m).padStart(2, '0') : ''} ${period}`
   }
 
-  // Check if a 30-min slot (start) overlaps any busy range.
-  // key = "YYYY-MM-DDTHH:MM" in LOCAL time.
-  // We use the multi-arg Date constructor so the slot is always treated as
-  // local time regardless of how the runtime interprets bare ISO strings.
-  const isBusy = (key: string): boolean => {
+  // Returns the list of emails (panel members + connected account) that are busy
+  // during the given 30-min slot.  key = "YYYY-MM-DDTHH:MM" in LOCAL time.
+  // Returns an empty array when the slot is free.
+  const getBusyEmails = (key: string): string[] => {
     const [datePart, timePart] = key.split('T')
     const [y, mo, d]           = datePart.split('-').map(Number)
     const [h, m]               = timePart.split(':').map(Number)
     const slotStart = new Date(y, mo - 1, d, h, m, 0, 0).getTime() // local time, unambiguous
     const slotEnd   = slotStart + 30 * 60 * 1000
-    return busyRanges.some(r => {
-      const bStart = new Date(r.start).getTime() // offset string → unambiguous
-      const bEnd   = new Date(r.end).getTime()
-      return bStart < slotEnd && bEnd > slotStart
-    })
+    return Object.entries(busyRangesByEmail)
+      .filter(([, ranges]) => ranges.some(r => {
+        const bStart = new Date(r.start).getTime()
+        const bEnd   = new Date(r.end).getTime()
+        return bStart < slotEnd && bEnd > slotStart
+      }))
+      .map(([email]) => email)
   }
+  const isBusy = (key: string) => getBusyEmails(key).length > 0
 
   // Fetch Google Calendar connection status
   useEffect(() => {
@@ -1852,16 +1854,15 @@ function ScheduleInterviewModal({
           `/api/google/availability?emails=${encodeURIComponent(emails.join(','))}&time_min=${minDt.toISOString()}&time_max=${maxDt.toISOString()}&timezone=${encodeURIComponent(tz)}`,
           { cache: 'no-store' }   // always fetch fresh — stale GCal events must not linger
         )
-        if (!res.ok) { if (!cancelled) { setBusyRanges([]); setAvailNoData(true) }; return }
+        if (!res.ok) { if (!cancelled) { setBusyRangesByEmail({}); setAvailNoData(true) }; return }
         const json = await res.json()
         if (!cancelled) {
           setConnectedGCalEmail(json.connected_email ?? null)
-          // Flatten busy ranges from ALL calendar entries (panel + connected account auto-added by server)
-          const allRanges: { start: string; end: string }[] = Object.values(json.data ?? {}).flat() as { start: string; end: string }[]
-          setBusyRanges(allRanges)
+          // Store per-email busy ranges — keeps attribution so tooltips can show which person is busy
+          setBusyRangesByEmail(json.data ?? {})
           setAvailNoData(!json.data || Object.keys(json.data).length === 0)
         }
-      } catch { if (!cancelled) { setBusyRanges([]); setAvailNoData(true) } }
+      } catch { if (!cancelled) { setBusyRangesByEmail({}); setAvailNoData(true) } }
       finally  { if (!cancelled) setAvailLoading(false) }
     }, 600)
     return () => { cancelled = true; clearTimeout(timer) }
@@ -2383,7 +2384,8 @@ function ScheduleInterviewModal({
                           </td>
                           {weekDays.map(day => {
                             const key = slotKey(day, slot)
-                            const busy = isBusy(key)
+                            const busyEmails = getBusyEmails(key)
+                            const busy = busyEmails.length > 0
                             const isSelected = date === toLocalDateStr(day) && time === slot
                             const isWeekend = day.getDay() === 0 || day.getDay() === 6
                             // Shade all 30-min cells that fall within [selectedTime, selectedTime + duration)
@@ -2433,7 +2435,7 @@ function ScheduleInterviewModal({
                                       ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                       : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                                   }`}
-                                  title={busy ? (isSelected ? 'Busy — pick another slot' : 'Busy') : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
+                                  title={busy ? `Busy: ${busyEmails.join(', ')}` : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
                                 />
                               </td>
                             )
@@ -2669,7 +2671,8 @@ function ScheduleInterviewModal({
                       </td>
                       {weekDays.map(day => {
                         const key = slotKey(day, slot)
-                        const busy = isBusy(key)
+                        const busyEmails = getBusyEmails(key)
+                        const busy = busyEmails.length > 0
                         const isSelected = date === toLocalDateStr(day) && time === slot
                         const isWeekend = day.getDay() === 0 || day.getDay() === 6
                         // Shade all 30-min cells that fall within [selectedTime, selectedTime + duration)
@@ -2719,7 +2722,7 @@ function ScheduleInterviewModal({
                                   ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                   : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                               }`}
-                              title={busy ? (isSelected ? 'Busy — pick another slot' : 'Busy') : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
+                              title={busy ? `Busy: ${busyEmails.join(', ')}` : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
                             />
                           </td>
                         )

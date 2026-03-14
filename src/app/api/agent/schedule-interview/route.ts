@@ -261,14 +261,16 @@ export async function POST(req: NextRequest) {
         interviewerName:  interviewer_name.trim(),
         interviewerEmail: interviewer_email?.trim() || null,
         positionTitle:    hiringReq.position_title,
-        scheduledAt:      scheduled_at,
-        durationMinutes:  duration_minutes,
-        interviewType:    interview_type,
-        location:         resolvedLocation,
+        scheduledAt:         scheduled_at,
+        durationMinutes:     duration_minutes,
+        timezone:            null,
+        interviewType:       interview_type,
+        location:            resolvedLocation,
         meetLink,
-        notes:            null,
-        recruiterName:    'RecruiterStack',
-        recruiterEmail:   process.env.SENDGRID_FROM_EMAIL ?? '',
+        notes:               null,
+        calendarInviteSent:  !!meetLink,
+        recruiterName:       'RecruiterStack',
+        recruiterEmail:      process.env.SENDGRID_FROM_EMAIL ?? '',
       })
     } catch (e) {
       console.error('[agent-schedule] notification dispatch failed:', e)

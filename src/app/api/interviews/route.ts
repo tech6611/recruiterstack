@@ -189,14 +189,16 @@ export async function POST(req: NextRequest) {
         interviewerName:  interviewer_name.trim(),
         interviewerEmail: interviewer_email?.trim() || null,
         positionTitle:    hiringReqRes.data?.position_title ?? 'Position',
-        scheduledAt:      scheduled_at,
-        durationMinutes:  duration_minutes ?? 60,
-        interviewType:    interview_type ?? 'video',
-        location:         resolvedLocation,
-        meetLink:         meetLink,
-        notes:            notes?.trim() || null,
-        recruiterName:    'RecruiterStack',
-        recruiterEmail:   process.env.SENDGRID_FROM_EMAIL ?? '',
+        scheduledAt:         scheduled_at,
+        durationMinutes:     duration_minutes ?? 60,
+        timezone:            timezone ?? null,
+        interviewType:       interview_type ?? 'video',
+        location:            resolvedLocation,
+        meetLink:            meetLink,
+        notes:               notes?.trim() || null,
+        calendarInviteSent:  !!meetLink,   // skip SendGrid when GCal already sent invites
+        recruiterName:       'RecruiterStack',
+        recruiterEmail:      process.env.SENDGRID_FROM_EMAIL ?? '',
       })
     } catch (e) {
       console.error('[interviews] notification dispatch failed:', e)
