@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Plus, Link2, Users, Pencil, Check, X,
   UserPlus, Search, ChevronDown, MoreHorizontal,
@@ -1749,6 +1749,9 @@ function ScheduleInterviewModal({
   const [availNoData,     setAvailNoData]     = useState(false)
   const [gridExpanded,    setGridExpanded]    = useState(false)
   const [connectedGCalEmail, setConnectedGCalEmail] = useState<string | null>(null)
+  // Scroll refs — auto-scroll to 8 AM (slot index 16) when grid renders
+  const inlineGridRef = useRef<HTMLDivElement>(null)
+  const popupGridRef  = useRef<HTMLDivElement>(null)
 
   // ── Availability helpers ────────────────────────────────────────────────────
 
@@ -1769,11 +1772,11 @@ function ScheduleInterviewModal({
   const weekDays = getWeekDays(date, availWeekOffset) // 7 days Mon–Sun
 
   // 8 AM–6 PM in 30-min slots  →  ["08:00","08:30",…,"17:30"]
-  const HOUR_SLOTS: string[] = Array.from({ length: 23 }, (_, i) => {
-    const h = Math.floor(i / 2) + 8
+  const HOUR_SLOTS: string[] = Array.from({ length: 48 }, (_, i) => {
+    const h = Math.floor(i / 2)
     const m = i % 2 === 0 ? '00' : '30'
     return `${String(h).padStart(2, '0')}:${m}`
-  }) // 08:00 → 19:00 (8 AM – 7 PM)
+  }) // 00:00 → 23:30 (full 24 h)
 
   // Build "YYYY-MM-DDTHH:MM" key for a day + slot (local date — avoids UTC shift)
   const slotKey = (day: Date, slot: string) =>
@@ -1861,11 +1864,24 @@ function ScheduleInterviewModal({
     return () => window.removeEventListener('keydown', handler)
   }, [saved]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-scroll inline grid to 8 AM (slot index 16, each slot 20px tall)
+  useEffect(() => {
+    if (!availLoading && !availNoData && inlineGridRef.current) {
+      inlineGridRef.current.scrollTop = 16 * 20
+    }
+  }, [availLoading, availNoData])
+
+  // Auto-scroll popup grid to 8 AM when opened
+  useEffect(() => {
+    if (gridExpanded && !availLoading && !availNoData && popupGridRef.current) {
+      popupGridRef.current.scrollTop = 16 * 28  // popup cells are h-7 (28px)
+    }
+  }, [gridExpanded, availLoading, availNoData])
+
   const MEETING_INTEGRATIONS = [
-    { id: 'gmeet',    label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
-    { id: 'zoom',     label: 'Zoom',        color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://zoom.us/start/videomeeting',        placeholder: 'https://zoom.us/j/...' },
-    { id: 'teams',    label: 'MS Teams',    color: 'hover:bg-violet-50 hover:border-violet-300',   url: 'https://teams.microsoft.com/l/meeting/new', placeholder: 'https://teams.microsoft.com/l/...' },
-    { id: 'calendly', label: 'Calendly',    color: 'hover:bg-emerald-50 hover:border-emerald-300', url: 'https://calendly.com',                      placeholder: 'https://calendly.com/yourname/...' },
+    { id: 'gmeet',  label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',     url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
+    { id: 'zoom',   label: 'Zoom',        color: 'hover:bg-blue-50 hover:border-blue-300',     url: 'https://zoom.us/start/videomeeting',        placeholder: 'https://zoom.us/j/...' },
+    { id: 'teams',  label: 'MS Teams',    color: 'hover:bg-violet-50 hover:border-violet-300', url: 'https://teams.microsoft.com/l/meeting/new', placeholder: 'https://teams.microsoft.com/l/...' },
   ] as const
 
   const [activePlatform, setActivePlatform] = useState<string | null>(null)
@@ -1925,6 +1941,7 @@ function ScheduleInterviewModal({
             duration_minutes:  duration,
             location:          location.trim() || null,
             notes:             notes.trim() || null,
+            timezone:          Intl.DateTimeFormat().resolvedOptions().timeZone,
           }),
         }).then(r => r.json())
       ))
@@ -2316,7 +2333,7 @@ function ScheduleInterviewModal({
                   No calendar data — {panel.filter(m => m.email.trim()).length > 1 ? 'panel members may be' : 'interviewer may be'} outside your Google Workspace domain
                 </div>
               ) : (
-                <div className="overflow-x-auto overflow-y-auto max-h-[220px]">
+                <div ref={inlineGridRef} className="overflow-x-auto overflow-y-auto max-h-[280px]">
                   <table className="w-full text-[10px]">
                     <thead className="sticky top-0 bg-white z-10">
                       <tr>
@@ -2333,8 +2350,8 @@ function ScheduleInterviewModal({
                     </thead>
                     <tbody>
                       {HOUR_SLOTS.map(slot => (
-                        <tr key={slot} className="border-t border-slate-50">
-                          <td className="px-1 py-0 text-slate-300 text-right whitespace-nowrap leading-none text-[10px]">
+                        <tr key={slot} className={slot.endsWith(':00') ? 'border-t border-slate-200' : 'border-t border-slate-50'}>
+                          <td className="px-1 py-0 text-slate-300 text-right whitespace-nowrap leading-none text-[10px]" style={{ height: 20 }}>
                             {slot.endsWith(':00') ? fmtSlotLabel(slot) : ''}
                           </td>
                           {weekDays.map(day => {
@@ -2351,8 +2368,23 @@ function ScheduleInterviewModal({
                               const slMin  = slH * 60 + slM
                               return slMin >= selMin && slMin < selMin + duration
                             })()
+                            // Last slot in the duration block (for bottom rounding)
+                            const isLastOfBlock = isInBlock && (() => {
+                              if (!date || !time || date !== toLocalDateStr(day)) return false
+                              const [selH, selM] = time.split(':').map(Number)
+                              const [slH, slM]   = slot.split(':').map(Number)
+                              const selMin = selH * 60 + selM
+                              const slMin  = slH * 60 + slM
+                              return slMin + 30 >= selMin + duration
+                            })()
+                            // Google-Calendar-style connected block rounding
+                            const blockRound = !isInBlock ? 'rounded'
+                              : isSelected && isLastOfBlock ? 'rounded'
+                              : isSelected  ? 'rounded-t'
+                              : isLastOfBlock ? 'rounded-b'
+                              : 'rounded-none'
                             return (
-                              <td key={key} className={`px-0.5 py-0.5 ${isWeekend ? 'bg-slate-50/60' : ''}`}>
+                              <td key={key} className={`px-0.5 ${isInBlock ? 'py-0' : 'py-px'} ${isWeekend ? 'bg-slate-50/60' : ''}`}>
                                 <button
                                   disabled={busy}
                                   onClick={() => {
@@ -2360,7 +2392,8 @@ function ScheduleInterviewModal({
                                     setTime(slot)
                                     setAvailWeekOffset(0)
                                   }}
-                                  className={`w-full h-3 rounded transition-colors ${
+                                  style={{ height: 20 }}
+                                  className={`w-full transition-colors ${blockRound} ${
                                     busy
                                       ? (isSelected || isInBlock)
                                         ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed'
@@ -2397,7 +2430,7 @@ function ScheduleInterviewModal({
           {interviewType !== 'in_person' && interviewType !== 'phone' && (
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">Meeting platform</label>
-              <div className="grid grid-cols-4 gap-1.5 mb-2">
+              <div className="grid grid-cols-3 gap-1.5 mb-2">
                 {MEETING_INTEGRATIONS.map(p => (
                   <button
                     key={p.id}
@@ -2409,7 +2442,7 @@ function ScheduleInterviewModal({
                     }`}
                   >
                     <span className="text-base">
-                      {p.id === 'gmeet' ? '🎥' : p.id === 'zoom' ? '💻' : p.id === 'teams' ? '🟦' : '🗓️'}
+                      {p.id === 'gmeet' ? '🎥' : p.id === 'zoom' ? '💻' : '🟦'}
                     </span>
                     {p.label}
                   </button>
@@ -2428,7 +2461,7 @@ function ScheduleInterviewModal({
                 <>
                   {activePlatform && activePlatform !== 'gmeet' && (
                     <p className="text-xs text-slate-400 mb-1.5">
-                      {activePlatform === 'calendly' ? 'Paste your Calendly link below' : 'Copy the link from the new tab and paste it below'}
+                      Copy the link from the new tab and paste it below
                     </p>
                   )}
                   {(!activePlatform || activePlatform !== 'gmeet') && (
@@ -2438,7 +2471,7 @@ function ScheduleInterviewModal({
                       placeholder={
                         activePlatform
                           ? MEETING_INTEGRATIONS.find(p => p.id === activePlatform)?.placeholder ?? 'Paste meeting link...'
-                          : 'Paste meeting link (Zoom, Meet, Teams, Calendly…)'
+                          : 'Paste meeting link (Zoom, Meet, Teams…)'
                       }
                       className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
                     />
@@ -2569,7 +2602,7 @@ function ScheduleInterviewModal({
           )}
 
           {/* Popup grid body */}
-          <div className="flex-1 overflow-y-auto">
+          <div ref={popupGridRef} className="flex-1 overflow-y-auto">
             {availLoading ? (
               <div className="p-4 grid grid-cols-6 gap-1.5 animate-pulse">
                 {Array.from({ length: 60 }).map((_, i) => (
@@ -2600,9 +2633,9 @@ function ScheduleInterviewModal({
                 </thead>
                 <tbody>
                   {HOUR_SLOTS.map(slot => (
-                    <tr key={slot} className="border-t border-slate-50">
-                      <td className="px-3 py-0 text-slate-300 text-right whitespace-nowrap leading-none text-[11px]">
-                        {fmtSlotLabel(slot)}
+                    <tr key={slot} className={slot.endsWith(':00') ? 'border-t border-slate-200' : 'border-t border-slate-50'}>
+                      <td className="px-3 py-0 text-slate-300 text-right whitespace-nowrap leading-none text-[11px]" style={{ height: 28 }}>
+                        {slot.endsWith(':00') ? fmtSlotLabel(slot) : ''}
                       </td>
                       {weekDays.map(day => {
                         const key = slotKey(day, slot)
@@ -2618,8 +2651,22 @@ function ScheduleInterviewModal({
                           const slMin  = slH * 60 + slM
                           return slMin >= selMin && slMin < selMin + duration
                         })()
+                        // Last slot in the duration block (for bottom rounding)
+                        const isLastOfBlock = isInBlock && (() => {
+                          if (!date || !time || date !== toLocalDateStr(day)) return false
+                          const [selH, selM] = time.split(':').map(Number)
+                          const [slH, slM]   = slot.split(':').map(Number)
+                          const selMin = selH * 60 + selM
+                          const slMin  = slH * 60 + slM
+                          return slMin + 30 >= selMin + duration
+                        })()
+                        const blockRound = !isInBlock ? 'rounded'
+                          : isSelected && isLastOfBlock ? 'rounded'
+                          : isSelected    ? 'rounded-t'
+                          : isLastOfBlock ? 'rounded-b'
+                          : 'rounded-none'
                         return (
-                          <td key={key} className={`px-1 py-0.5 ${isWeekend ? 'bg-slate-50/60' : ''}`}>
+                          <td key={key} className={`px-1 ${isInBlock ? 'py-0' : 'py-px'} ${isWeekend ? 'bg-slate-50/60' : ''}`}>
                             <button
                               disabled={busy}
                               onClick={() => {
@@ -2628,7 +2675,8 @@ function ScheduleInterviewModal({
                                 setAvailWeekOffset(0)
                                 setGridExpanded(false)
                               }}
-                              className={`w-full h-6 rounded transition-colors ${
+                              style={{ height: 28 }}
+                              className={`w-full transition-colors ${blockRound} ${
                                 busy
                                   ? (isSelected || isInBlock)
                                     ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed'
@@ -2656,13 +2704,16 @@ function ScheduleInterviewModal({
           {/* Legend */}
           <div className="flex items-center gap-4 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 shrink-0">
             <span className="flex items-center gap-1.5 text-xs text-slate-400">
-              <span className="inline-block h-3 w-5 rounded bg-emerald-100 border border-emerald-200" /> Free — click to select
+              <span className="inline-block h-3 w-5 rounded bg-emerald-100 border border-emerald-200" /> Free
             </span>
             <span className="flex items-center gap-1.5 text-xs text-slate-400">
               <span className="inline-block h-3 w-5 rounded bg-red-100" /> Busy
             </span>
             <span className="flex items-center gap-1.5 text-xs text-slate-400">
-              <span className="inline-block h-3 w-5 rounded bg-blue-500" /> Selected
+              <span className="inline-block h-3 w-5 rounded bg-blue-600" /> Start
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span className="inline-block h-3 w-5 rounded bg-blue-200" /> Duration block
             </span>
             <span className="ml-auto text-xs text-slate-400">Esc to close</span>
           </div>
@@ -2677,6 +2728,7 @@ function ScheduleInterviewModal({
 export default function JobPipelinePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // Card field preferences from settings
   const { settings } = useSettings()
@@ -2743,8 +2795,10 @@ export default function JobPipelinePage() {
   // the visibilitychange / switchView refetch guards don't live forever.
   const scoringRef = useRef(false)
 
-  // View mode
-  const [viewMode, setViewMode] = useState<'kanban' | 'ranked'>('kanban')
+  // View mode — initialised from URL ?view= so hard refresh preserves it
+  const [viewMode, setViewMode] = useState<'kanban' | 'ranked'>(
+    searchParams.get('view') === 'ranked' ? 'ranked' : 'kanban'
+  )
 
   // Autopilot drawer
   const [showAutopilot, setShowAutopilot] = useState(false)
@@ -2807,6 +2861,44 @@ export default function JobPipelinePage() {
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [load])
+
+  // ── URL state persistence: restore selectedApp once job is loaded ──────────
+  // When a user hard-refreshes /jobs/[id]?app=<applicationId>, re-open that
+  // application's panel automatically so the view is exactly as they left it.
+  const restoredAppRef = useRef(false)
+  useEffect(() => {
+    if (!job || restoredAppRef.current) return
+    restoredAppRef.current = true
+    const appId = searchParams.get('app')
+    if (appId) {
+      const app = job.applications.find(a => a.id === appId)
+      if (app) setSelectedApp(app)
+    }
+  }, [job, searchParams])
+
+  // Sync selectedApp → URL ?app= param (replace so Back button still works)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (selectedApp) {
+      params.set('app', selectedApp.id)
+    } else {
+      params.delete('app')
+    }
+    const next = params.toString() ? `?${params.toString()}` : ''
+    router.replace(`/jobs/${id}${next}`, { scroll: false })
+  }, [selectedApp, id, router]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync viewMode → URL ?view= param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (viewMode === 'ranked') {
+      params.set('view', 'ranked')
+    } else {
+      params.delete('view')
+    }
+    const next = params.toString() ? `?${params.toString()}` : ''
+    router.replace(`/jobs/${id}${next}`, { scroll: false })
+  }, [viewMode, id, router]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close filter panel when clicking outside
   useEffect(() => {
