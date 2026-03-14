@@ -5,9 +5,10 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Loader2, CheckCircle, Clock, Copy, Check,
   ExternalLink, MapPin, Users, Calendar, FileText,
-  Globe, Briefcase,
+  Globe, Briefcase, Pencil,
 } from 'lucide-react'
 import type { HiringRequest } from '@/lib/types/database'
+import EditHMModal from '@/components/EditHMModal'
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   intake_pending:   { label: 'Awaiting HM',      color: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -38,6 +39,7 @@ export default function HiringRequestDetailPage() {
   const [copiedJD, setCopiedJD] = useState(false)
   const [markingPosted, setMarkingPosted] = useState(false)
   const [connectingBoard, setConnectingBoard] = useState<string | null>(null)
+  const [editHMOpen, setEditHMOpen] = useState(false)
 
   useEffect(() => {
     fetch(`/api/hiring-requests/${id}`)
@@ -125,8 +127,25 @@ export default function HiringRequestDetailPage() {
 
       {/* Overview cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Hiring Manager card — with edit pencil */}
+        <div className="group rounded-xl border border-slate-200 bg-white p-3.5">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <Users className="h-4 w-4" /><span className="text-xs">Hiring Manager</span>
+            </div>
+            <button
+              onClick={() => setEditHMOpen(true)}
+              className="opacity-0 group-hover:opacity-100 h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+              title="Edit hiring manager"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          </div>
+          <p className="text-sm font-semibold text-slate-800 leading-snug">{request.hiring_manager_name}</p>
+          {request.hiring_manager_email && <p className="text-xs text-slate-400 mt-0.5">{request.hiring_manager_email}</p>}
+        </div>
+
         {[
-          { icon: <Users className="h-4 w-4" />, label: 'Hiring Manager', value: request.hiring_manager_name },
           { icon: <MapPin className="h-4 w-4" />, label: 'Location', value: request.location ? `${request.location}${request.remote_ok ? ' · Remote OK' : ''}` : request.remote_ok ? 'Remote' : '—' },
           { icon: <Briefcase className="h-4 w-4" />, label: 'Openings', value: `${request.headcount} ${request.headcount === 1 ? 'opening' : 'openings'}${request.level ? ` · ${request.level}` : ''}` },
           { icon: <Calendar className="h-4 w-4" />, label: 'Created', value: new Date(request.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) },
@@ -137,6 +156,27 @@ export default function HiringRequestDetailPage() {
           </div>
         ))}
       </div>
+
+      {editHMOpen && (
+        <EditHMModal
+          requestId={request.id}
+          initial={{
+            name:  request.hiring_manager_name ?? '',
+            email: request.hiring_manager_email ?? null,
+            slack: request.hiring_manager_slack ?? null,
+          }}
+          onClose={() => setEditHMOpen(false)}
+          onSaved={({ name, email, slack }) => {
+            setRequest(r => r ? {
+              ...r,
+              hiring_manager_name:  name,
+              hiring_manager_email: email,
+              hiring_manager_slack: slack,
+            } : r)
+            setEditHMOpen(false)
+          }}
+        />
+      )}
 
       {/* Compensation */}
       {(request.budget_min || request.budget_max || request.target_start_date) && (

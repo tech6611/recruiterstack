@@ -15,6 +15,7 @@ import type {
   Scorecard, ScorecardRecommendation, ScorecardScore, AiRecommendation,
 } from '@/lib/types/database'
 import { useSettings } from '@/lib/hooks/useSettings'
+import EditHMModal from '@/components/EditHMModal'
 
 // ── Scorecard config (shared) ─────────────────────────────────────────────────
 
@@ -1718,7 +1719,56 @@ function ScheduleInterviewModal({
   const [googleConnected, setGoogleConnected] = useState(false)
   const [autoMeetLink, setAutoMeetLink] = useState<string | null>(null)
 
-  const hmEmail = (job as unknown as { hiring_manager_email?: string }).hiring_manager_email ?? null
+  // Local editable copies of HM info (so pencil edits reflect in modal without refetch)
+  const [localHMName,  setLocalHMName]  = useState((job as unknown as { hiring_manager_name?: string }).hiring_manager_name ?? '')
+  const [localHMEmail, setLocalHMEmail] = useState((job as unknown as { hiring_manager_email?: string }).hiring_manager_email ?? '')
+  const [editHMOpen,   setEditHMOpen]   = useState(false)
+
+  // Availability grid state
+  const [availWeekOffset, setAvailWeekOffset] = useState(0)
+  const [busyRanges,      setBusyRanges]      = useState<{ start: string; end: string }[]>([])
+  const [availLoading,    setAvailLoading]    = useState(false)
+  const [availNoData,     setAvailNoData]     = useState(false)
+
+  const hmEmail = localHMEmail || ((job as unknown as { hiring_manager_email?: string }).hiring_manager_email ?? null)
+
+  // ── Availability helpers ────────────────────────────────────────────────────
+
+  // Return Mon–Fri for the week `offset` weeks from today
+  const getWeekDays = (offset: number): Date[] => {
+    const today = new Date()
+    const monday = new Date(today)
+    const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1 // Mon=0…Sun=6
+    monday.setDate(today.getDate() - dayOfWeek + offset * 7)
+    monday.setHours(0, 0, 0, 0)
+    return Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(monday); d.setDate(monday.getDate() + i); return d
+    })
+  }
+
+  const weekDays = getWeekDays(availWeekOffset)
+
+  // 8 AM–6 PM in 30-min slots  →  ["08:00","08:30",…,"17:30"]
+  const HOUR_SLOTS: string[] = Array.from({ length: 20 }, (_, i) => {
+    const h = Math.floor(i / 2) + 8
+    const m = i % 2 === 0 ? '00' : '30'
+    return `${String(h).padStart(2, '0')}:${m}`
+  })
+
+  // Build "YYYY-MM-DDTHH:MM" key for a day + slot
+  const slotKey = (day: Date, slot: string) =>
+    `${day.toISOString().split('T')[0]}T${slot}`
+
+  // Check if a 30-min slot (start) overlaps any busy range
+  const isBusy = (key: string): boolean => {
+    const slotStart = new Date(key).getTime()
+    const slotEnd   = slotStart + 30 * 60 * 1000
+    return busyRanges.some(r => {
+      const bStart = new Date(r.start).getTime()
+      const bEnd   = new Date(r.end).getTime()
+      return bStart < slotEnd && bEnd > slotStart
+    })
+  }
 
   // Fetch Google Calendar connection status
   useEffect(() => {
@@ -1727,6 +1777,35 @@ function ScheduleInterviewModal({
       .then(({ data }) => setGoogleConnected(!!data?.google_connected))
       .catch(() => {})
   }, [])
+
+  // Fetch interviewer free/busy when email or week offset changes
+  useEffect(() => {
+    const email = interviewerEmail.trim()
+    if (!email || !googleConnected) return
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      setAvailLoading(true)
+      setAvailNoData(false)
+      try {
+        const days   = getWeekDays(availWeekOffset)
+        const minDt  = new Date(days[0]); minDt.setHours(0, 0, 0, 0)
+        const maxDt  = new Date(days[4]); maxDt.setHours(23, 59, 59, 999)
+        const tz     = Intl.DateTimeFormat().resolvedOptions().timeZone
+        const res    = await fetch(
+          `/api/google/availability?emails=${encodeURIComponent(email)}&time_min=${minDt.toISOString()}&time_max=${maxDt.toISOString()}&timezone=${encodeURIComponent(tz)}`
+        )
+        if (!res.ok) { if (!cancelled) { setBusyRanges([]); setAvailNoData(true) }; return }
+        const { data } = await res.json()
+        if (!cancelled) {
+          const ranges: { start: string; end: string }[] = data?.[email] ?? []
+          setBusyRanges(ranges)
+          setAvailNoData(ranges.length === 0 && !!data && Object.keys(data).length > 0 ? false : !data?.[email])
+        }
+      } catch { if (!cancelled) { setBusyRanges([]); setAvailNoData(true) } }
+      finally  { if (!cancelled) setAvailLoading(false) }
+    }, 600)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [interviewerEmail, availWeekOffset, googleConnected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const MEETING_INTEGRATIONS = [
     { id: 'gmeet',    label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
@@ -1919,18 +1998,25 @@ function ScheduleInterviewModal({
           )}
 
           {/* HM info banner */}
-          {(job.hiring_manager_name || hmEmail) && (
-            <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
-              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(job.hiring_manager_name ?? 'HM')}`}>
-                {initials(job.hiring_manager_name ?? 'HM')}
+          {(localHMName || hmEmail) && (
+            <div className="group flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor(localHMName || 'HM')}`}>
+                {initials(localHMName || 'HM')}
               </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-700">{job.hiring_manager_name}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-slate-700">{localHMName}</p>
                 {hmEmail && (
                   <a href={`mailto:${hmEmail}`} className="text-xs text-blue-600 hover:underline truncate block">{hmEmail}</a>
                 )}
               </div>
-              <span className="ml-auto text-[10px] font-medium text-slate-400 bg-white border border-slate-200 rounded-full px-2 py-0.5">HM</span>
+              <button
+                onClick={() => setEditHMOpen(true)}
+                className="opacity-0 group-hover:opacity-100 h-6 w-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all"
+                title="Edit hiring manager"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+              <span className="text-[10px] font-medium text-slate-400 bg-white border border-slate-200 rounded-full px-2 py-0.5">HM</span>
             </div>
           )}
 
@@ -2013,15 +2099,138 @@ function ScheduleInterviewModal({
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                 Interviewer Email <span className="font-normal text-slate-400">(for invite)</span>
               </label>
-              <input
-                type="email"
-                value={interviewerEmail}
-                onChange={e => setInterviewerEmail(e.target.value)}
-                placeholder="interviewer@company.com"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
+              <div className="relative">
+                <input
+                  type="email"
+                  value={interviewerEmail}
+                  onChange={e => setInterviewerEmail(e.target.value)}
+                  placeholder={localHMEmail || 'interviewer@company.com'}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                {/* Quick-fill from HM email */}
+                {!interviewerEmail && localHMEmail && (
+                  <button
+                    onClick={() => setInterviewerEmail(localHMEmail)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 rounded px-1.5 py-0.5 transition-colors"
+                    title="Use HM email"
+                  >
+                    Use HM
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* ── Availability grid ──────────────────────────────────────────── */}
+          {googleConnected && interviewerEmail.trim() && (
+            <div className="rounded-xl border border-slate-200 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
+                <span className="text-xs font-semibold text-slate-600">Interviewer Availability</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setAvailWeekOffset(o => o - 1)}
+                    className="h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors text-xs"
+                  >‹</button>
+                  <span className="text-[10px] text-slate-500 px-1 whitespace-nowrap">
+                    {weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {weekDays[4].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                  <button
+                    onClick={() => setAvailWeekOffset(o => o + 1)}
+                    className="h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors text-xs"
+                  >›</button>
+                </div>
+              </div>
+
+              {availLoading ? (
+                /* Skeleton */
+                <div className="p-3 grid grid-cols-6 gap-1 animate-pulse">
+                  {Array.from({ length: 30 }).map((_, i) => (
+                    <div key={i} className="h-5 rounded bg-slate-100" />
+                  ))}
+                </div>
+              ) : availNoData ? (
+                <div className="px-3 py-4 text-center text-xs text-slate-400">
+                  Calendar not visible — interviewer may be outside your Google Workspace domain
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[10px]">
+                    <thead>
+                      <tr>
+                        <th className="w-12 px-2 py-1.5 text-left text-slate-400 font-normal border-b border-slate-100" />
+                        {weekDays.map(d => (
+                          <th key={d.toISOString()} className="px-1 py-1.5 text-center text-slate-500 font-semibold border-b border-slate-100 whitespace-nowrap">
+                            {d.toLocaleDateString('en-US', { weekday: 'short' })} {d.getDate()}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {HOUR_SLOTS.map(slot => (
+                        <tr key={slot} className="border-t border-slate-50">
+                          <td className="px-2 py-0 text-slate-300 text-right whitespace-nowrap leading-none">
+                            {slot.endsWith(':00') ? slot.replace(/^0/, '').replace(':00', '') + ' ' + (parseInt(slot) < 12 ? 'AM' : 'PM') : ''}
+                          </td>
+                          {weekDays.map(day => {
+                            const key = slotKey(day, slot)
+                            const busy = isBusy(key)
+                            const selDate = date
+                            const selTime = time
+                            const isSelected = selDate === day.toISOString().split('T')[0] && selTime === slot
+                            return (
+                              <td key={key} className="px-0.5 py-0.5">
+                                <button
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setDate(day.toISOString().split('T')[0])
+                                    setTime(slot)
+                                  }}
+                                  className={`w-full h-4 rounded transition-colors ${
+                                    isSelected
+                                      ? 'bg-blue-500'
+                                      : busy
+                                      ? 'bg-red-100 cursor-not-allowed'
+                                      : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
+                                  }`}
+                                  title={busy ? 'Busy' : `Schedule at ${slot}`}
+                                />
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="flex items-center gap-3 px-3 py-1.5 border-t border-slate-100 bg-slate-50">
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-100 border border-emerald-200" /> Free — click to select</span>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-red-100" /> Busy</span>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-blue-500" /> Selected</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Edit HM modal (triggered from banner pencil) */}
+          {editHMOpen && (
+            <EditHMModal
+              requestId={job.id}
+              initial={{
+                name:  localHMName,
+                email: localHMEmail || null,
+                slack: (job as unknown as { hiring_manager_slack?: string }).hiring_manager_slack ?? null,
+              }}
+              onClose={() => setEditHMOpen(false)}
+              onSaved={({ name, email }) => {
+                setLocalHMName(name)
+                setLocalHMEmail(email ?? '')
+                setInterviewer(name)
+                if (email && !interviewerEmail) setInterviewerEmail(email)
+                setEditHMOpen(false)
+              }}
+            />
+          )}
 
           {/* Meeting platform + link */}
           {interviewType !== 'in_person' && interviewType !== 'phone' && (
