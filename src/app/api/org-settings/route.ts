@@ -9,11 +9,16 @@ export async function GET() {
   const { orgId } = authResult
 
   const supabase = createAdminClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('org_settings')
     .select('slack_webhook_url, slack_bot_token, slack_team_name, google_oauth_access_token, google_connected_email')
     .eq('org_id', orgId)
     .single()
+
+  if (error && error.code !== 'PGRST116') {
+    // PGRST116 = no rows found (normal for new orgs); anything else is a real problem
+    console.error('[org-settings] GET query failed — missing DB column or schema mismatch:', error)
+  }
 
   // Never expose raw tokens to the client
   return NextResponse.json({
