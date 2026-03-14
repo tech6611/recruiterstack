@@ -21,11 +21,13 @@ export async function GET() {
   //   calendar.events — create/read/update events
   //   calendar.readonly — read-only free/busy (for availability checks)
   //   userinfo.email — identify the connected account
+  //   drive.readonly — read files from Google Drive (CV import)
   const scopes = encodeURIComponent(
     [
       'https://www.googleapis.com/auth/calendar.events',
       'https://www.googleapis.com/auth/calendar.readonly',
       'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/drive.readonly',
     ].join(' ')
   )
 

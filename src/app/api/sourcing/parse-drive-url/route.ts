@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { requireOrg } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getValidAccessToken } from '@/lib/google/calendar'
 
 export const maxDuration = 30
 
 // POST /api/sourcing/parse-drive-url
-// Body: { url: string }  — must be a publicly-shared Google Drive PDF
+// Body: { url: string }  — any Google Drive link (public or shared-with-connected-account)
 // Returns: { candidate: ParsedCandidate }
+//
+// Uses the org's connected Google OAuth token (drive.readonly scope) to download
+// the file via Drive API v3, so no need for the file to be publicly shared.
 
 function extractDriveFileId(url: string): string | null {
   // https://drive.google.com/file/d/FILE_ID/view
@@ -24,6 +29,7 @@ function extractDriveFileId(url: string): string | null {
 export async function POST(request: NextRequest) {
   const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
 
   let body: { url: string }
   try {
@@ -40,35 +46,109 @@ export async function POST(request: NextRequest) {
   const fileId = extractDriveFileId(url.trim())
   if (!fileId) {
     return NextResponse.json(
-      { error: 'Could not find a Google Drive file ID in this URL. Make sure it is a valid Drive share link.' },
+      { error: 'Could not find a Google Drive file ID in this URL.' },
       { status: 400 },
     )
   }
 
-  // Direct download URL for publicly shared files
-  const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`
+  // ── Get org's stored Google OAuth token ─────────────────────────────────────
+  const supabase = createAdminClient()
+  const { data: settings } = await supabase
+    .from('org_settings')
+    .select('google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry')
+    .eq('org_id', orgId)
+    .single()
 
-  let arrayBuffer: ArrayBuffer
-  try {
-    const fileRes = await fetch(downloadUrl, { redirect: 'follow' })
-    if (!fileRes.ok) {
-      return NextResponse.json(
-        { error: 'Could not download the file. Make sure the file is publicly shared ("Anyone with the link can view").' },
-        { status: 400 },
-      )
-    }
-    const contentType = fileRes.headers.get('content-type') ?? ''
-    if (!contentType.includes('pdf')) {
-      return NextResponse.json(
-        { error: 'Only PDF files are supported from Google Drive. Please export your resume as a PDF first.' },
-        { status: 400 },
-      )
-    }
-    arrayBuffer = await fileRes.arrayBuffer()
-  } catch {
-    return NextResponse.json({ error: 'Failed to download from Google Drive' }, { status: 500 })
+  if (!settings?.google_oauth_access_token || !settings?.google_oauth_refresh_token) {
+    return NextResponse.json(
+      { error: 'Google Drive is not connected. Go to Settings → Integrations and connect Google.' },
+      { status: 400 },
+    )
   }
 
+  // Refresh token if expired
+  let accessToken: string
+  try {
+    const result = await getValidAccessToken({
+      access_token:  settings.google_oauth_access_token,
+      refresh_token: settings.google_oauth_refresh_token,
+      token_expiry:  settings.google_oauth_token_expiry ?? null,
+    })
+    accessToken = result.access_token
+
+    // Persist refreshed tokens if they changed
+    if (result.tokens.access_token !== settings.google_oauth_access_token) {
+      await supabase
+        .from('org_settings')
+        .update({
+          google_oauth_access_token: result.tokens.access_token,
+          google_oauth_token_expiry: result.tokens.token_expiry,
+        })
+        .eq('org_id', orgId)
+    }
+  } catch {
+    return NextResponse.json(
+      { error: 'Failed to refresh Google token. Please reconnect Google in Settings.' },
+      { status: 400 },
+    )
+  }
+
+  // ── Check file metadata (type + name) via Drive API v3 ──────────────────────
+  const metaRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=name,mimeType`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+
+  if (!metaRes.ok) {
+    if (metaRes.status === 403) {
+      return NextResponse.json(
+        {
+          error:
+            'Google Drive access denied. Make sure you have reconnected Google with Drive access ' +
+            '(Settings → Integrations → Reconnect Google).',
+        },
+        { status: 403 },
+      )
+    }
+    if (metaRes.status === 404) {
+      return NextResponse.json(
+        { error: 'File not found. Check that the link is correct and the file exists in your Drive.' },
+        { status: 404 },
+      )
+    }
+    return NextResponse.json(
+      { error: `Google Drive returned an error (${metaRes.status})` },
+      { status: 400 },
+    )
+  }
+
+  const meta = await metaRes.json()
+  if (meta.mimeType !== 'application/pdf') {
+    return NextResponse.json(
+      {
+        error: `Only PDF files are supported (got: ${meta.mimeType ?? 'unknown type'}). ` +
+          'Please export your resume as a PDF from Google Docs or Word.',
+      },
+      { status: 400 },
+    )
+  }
+
+  // ── Download the actual PDF bytes ────────────────────────────────────────────
+  const fileRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+
+  if (!fileRes.ok) {
+    return NextResponse.json(
+      { error: 'Failed to download the file from Google Drive.' },
+      { status: 500 },
+    )
+  }
+
+  const arrayBuffer = await fileRes.arrayBuffer()
+
+  // ── Parse with Claude ────────────────────────────────────────────────────────
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 })
