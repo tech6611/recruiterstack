@@ -15,6 +15,7 @@ import type {
   Scorecard, ScorecardRecommendation, ScorecardScore, AiRecommendation,
 } from '@/lib/types/database'
 import { useSettings } from '@/lib/hooks/useSettings'
+import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
 
 // ── Scorecard config (shared) ─────────────────────────────────────────────────
 
@@ -1929,7 +1930,7 @@ function ScheduleInterviewModal({
       `Job: ${job.position_title}`,
       `Interviewer: ${interviewer}`,
       location ? `Link: ${location}` : '',
-      notes ? `Notes: ${notes}` : '',
+      !isHtmlEmpty(notes) ? `Notes: ${stripHtml(notes)}` : '',
     ].filter(Boolean).join('\n'))
     const add = interviewerEmail ? `&add=${encodeURIComponent(interviewerEmail)}` : ''
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${fmt(start)}/${fmt(end)}&details=${details}${add}`
@@ -1966,7 +1967,7 @@ function ScheduleInterviewModal({
             scheduled_at:      scheduled,
             duration_minutes:  duration,
             location:          location.trim() || null,
-            notes:             notes.trim() || null,
+            notes:             isHtmlEmpty(notes) ? null : notes,
             timezone:          Intl.DateTimeFormat().resolvedOptions().timeZone,
           }),
         }).then(r => r.json())
@@ -2522,12 +2523,10 @@ function ScheduleInterviewModal({
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">
               Notes <span className="font-normal text-slate-400">(optional)</span>
             </label>
-            <textarea
+            <RichTextEditor
               value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={2}
+              onChange={setNotes}
               placeholder="Topics to cover, prep instructions…"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
             />
           </div>
 

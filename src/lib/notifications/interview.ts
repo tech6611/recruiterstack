@@ -44,6 +44,27 @@ export interface InterviewNotificationPayload {
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
+/** Strip HTML tags from rich-text notes → plain text for email text body / GCal description */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi,      '\n')
+    .replace(/<\/li>/gi,     '\n')
+    .replace(/<\/h[1-6]>/gi, '\n')
+    .replace(/<[^>]+>/g,     '')
+    .replace(/&amp;/g,  '&')
+    .replace(/&lt;/g,   '<')
+    .replace(/&gt;/g,   '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g,  "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function isHtmlEmpty(html: string | null | undefined): boolean {
+  return !html || stripHtml(html).trim() === ''
+}
+
 function formatDateTime(iso: string, timezone?: string | null): string {
   return new Date(iso).toLocaleString('en-US', {
     weekday:      'long',
@@ -76,17 +97,21 @@ function meetingDetails(p: InterviewNotificationPayload): string {
 // ── Email: Candidate ──────────────────────────────────────────────────────────
 
 async function sendCandidateEmail(p: InterviewNotificationPayload): Promise<void> {
-  const apiKey   = process.env.SENDGRID_API_KEY
+  const apiKey    = process.env.SENDGRID_API_KEY
   const fromEmail = process.env.SENDGRID_FROM_EMAIL
 
   if (!apiKey || !fromEmail) return
 
   sgMail.setApiKey(apiKey)
 
-  const dateStr = formatDateTime(p.scheduledAt, p.timezone)
-  const details = meetingDetails(p)
-  const link    = p.meetLink ?? p.location
+  const dateStr    = formatDateTime(p.scheduledAt, p.timezone)
+  const details    = meetingDetails(p)
+  const link       = p.meetLink ?? p.location
+  const hasNotes   = !isHtmlEmpty(p.notes)
+  const notesPlain = hasNotes ? stripHtml(p.notes!) : ''
+  const notesHtml  = hasNotes ? p.notes! : ''
 
+  // Plain-text version
   const text = [
     `Hi ${p.candidateName},`,
     '',
@@ -99,20 +124,28 @@ async function sendCandidateEmail(p: InterviewNotificationPayload): Promise<void
     details,
     '',
     link ? `To join your interview, use this link:\n${link}` : '',
-    '',
-    p.notes?.trim() ? `Notes from the recruiter:\n${p.notes.trim()}` : '',
+    hasNotes ? `\nNotes from the recruiter:\n${notesPlain}` : '',
     '',
     `If you have any questions or need to reschedule, please reply to this email.`,
     '',
     `Best of luck!`,
     `${p.recruiterName}`,
-  ].filter(l => l !== undefined).join('\n')
+  ].filter(Boolean).join('\n')
 
-  const html = text
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br>')
-    .replace(/^/, '<p>')
-    .replace(/$/, '</p>')
+  // HTML version — notes injected as rich HTML, rest as formatted paragraphs
+  const html = `
+    <p>Hi ${p.candidateName},</p>
+    <p>Your interview for the <strong>${p.positionTitle}</strong> role has been confirmed.</p>
+    <p>
+      <strong>Date &amp; Time:</strong> ${dateStr}<br>
+      <strong>Duration:</strong> ${p.durationMinutes} minutes<br>
+      <strong>Interviewer:</strong> ${p.interviewerName}
+    </p>
+    ${link ? `<p><a href="${link}">Join your interview →</a></p>` : ''}
+    ${hasNotes ? `<p><strong>Notes from the recruiter:</strong></p>${notesHtml}` : ''}
+    <p>If you have any questions or need to reschedule, please reply to this email.</p>
+    <p>Best of luck!<br>${p.recruiterName}</p>
+  `.trim()
 
   try {
     await sgMail.send({
@@ -140,9 +173,13 @@ async function sendInterviewerEmail(p: InterviewNotificationPayload): Promise<vo
 
   sgMail.setApiKey(apiKey)
 
-  const dateStr = formatDateTime(p.scheduledAt, p.timezone)
-  const link    = p.meetLink ?? p.location
+  const dateStr    = formatDateTime(p.scheduledAt, p.timezone)
+  const link       = p.meetLink ?? p.location
+  const hasNotes   = !isHtmlEmpty(p.notes)
+  const notesPlain = hasNotes ? stripHtml(p.notes!) : ''
+  const notesHtml  = hasNotes ? p.notes! : ''
 
+  // Plain-text version
   const text = [
     `Hi ${p.interviewerName},`,
     '',
@@ -153,19 +190,27 @@ async function sendInterviewerEmail(p: InterviewNotificationPayload): Promise<vo
     `Candidate:   ${p.candidateName} <${p.candidateEmail}>`,
     '',
     link ? `Join link: ${link}` : '',
-    '',
-    p.notes?.trim() ? `Recruiter notes:\n${p.notes.trim()}` : '',
+    hasNotes ? `\nNotes:\n${notesPlain}` : '',
     '',
     `A calendar invite has been sent to your email.`,
     '',
     `— ${p.recruiterName} via RecruiterStack`,
-  ].filter(l => l !== undefined).join('\n')
+  ].filter(Boolean).join('\n')
 
-  const html = text
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br>')
-    .replace(/^/, '<p>')
-    .replace(/$/, '</p>')
+  // HTML version
+  const html = `
+    <p>Hi ${p.interviewerName},</p>
+    <p>You have an interview scheduled with <strong>${p.candidateName}</strong> for the <strong>${p.positionTitle}</strong> role.</p>
+    <p>
+      <strong>Date &amp; Time:</strong> ${dateStr}<br>
+      <strong>Duration:</strong> ${p.durationMinutes} minutes<br>
+      <strong>Candidate:</strong> ${p.candidateName} &lt;${p.candidateEmail}&gt;
+    </p>
+    ${link ? `<p><strong>Join link:</strong> <a href="${link}">${link}</a></p>` : ''}
+    ${hasNotes ? `<p><strong>Notes:</strong></p>${notesHtml}` : ''}
+    <p>A calendar invite has been sent to your email.</p>
+    <p>— ${p.recruiterName} via RecruiterStack</p>
+  `.trim()
 
   try {
     await sgMail.send({
