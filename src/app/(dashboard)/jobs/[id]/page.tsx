@@ -1765,7 +1765,6 @@ function ScheduleInterviewModal({
   }
 
   const weekDays = getWeekDays(date, availWeekOffset) // 7 days Mon–Sun
-  const inlineWeekDays = weekDays.slice(0, 5)         // Mon–Fri for compact inline grid
 
   // 8 AM–6 PM in 30-min slots  →  ["08:00","08:30",…,"17:30"]
   const HOUR_SLOTS: string[] = Array.from({ length: 20 }, (_, i) => {
