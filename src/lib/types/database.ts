@@ -66,6 +66,16 @@ export interface RoleUpdate extends Partial<RoleInsert> {}
 
 // ── Hiring Request ────────────────────────────────────────────────────────
 
+// ── Scoring Criteria ──────────────────────────────────────────────────────────
+// Stored as JSONB on hiring_requests.scoring_criteria
+// All weights should be integers (%) that sum to 100.
+export interface ScoringCriterion {
+  id:          string         // stable identifier (nanoid / slug)
+  name:        string         // e.g. "Technical Skills"
+  weight:      number         // integer 1–100; sum across all criteria = 100
+  description: string | null  // optional hint shown to interviewers
+}
+
 export type HiringRequestStatus =
   | 'intake_pending'
   | 'intake_submitted'
@@ -112,6 +122,8 @@ export interface HiringRequest {
   auto_email_rejection:     boolean
   autopilot_recruiter_name: string | null
   autopilot_company_name:   string | null
+  // Weighted scoring rubric (migration 017)
+  scoring_criteria:         ScoringCriterion[] | null
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────

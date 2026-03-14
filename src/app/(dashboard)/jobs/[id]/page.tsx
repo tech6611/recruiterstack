@@ -13,6 +13,7 @@ import {
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
   Scorecard, ScorecardRecommendation, ScorecardScore, AiRecommendation,
+  ScoringCriterion,
 } from '@/lib/types/database'
 import { useSettings } from '@/lib/hooks/useSettings'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
@@ -1126,12 +1127,14 @@ function AddCandidateModal({
 function CandidateSlideOver({
   app,
   stages,
+  scoringCriteria,
   onClose,
   onStageChange,
   onStatusChange,
 }: {
   app: Application
   stages: PipelineStage[]
+  scoringCriteria?: ScoringCriterion[] | null
   onClose: () => void
   onStageChange: (appId: string, stageId: string) => void
   onStatusChange: (appId: string, status: string) => void
@@ -1154,8 +1157,13 @@ function CandidateSlideOver({
   const [scInterviewer, setScInterviewer]   = useState('')
   const [scRound, setScRound]               = useState('')
   const [scRec, setScRec]                   = useState<ScorecardRecommendation | ''>('')
+  // Use job's weighted criteria if available, fall back to defaults
+  const activeCriteria = scoringCriteria?.length
+    ? scoringCriteria.map(c => c.name)
+    : DEFAULT_CRITERIA
+
   const [scScores, setScScores]             = useState(
-    DEFAULT_CRITERIA.map(c => ({ criterion: c, rating: 0 as 0 | 1 | 2 | 3 | 4 }))
+    activeCriteria.map(c => ({ criterion: c, rating: 0 as 0 | 1 | 2 | 3 | 4 }))
   )
   const [scNotes, setScNotes]               = useState('')
   const [scSaving, setScSaving]             = useState(false)
@@ -1208,7 +1216,7 @@ function CandidateSlideOver({
     if (!res.ok) { const j = await res.json(); setScError(j.error ?? 'Failed'); return }
     // Reset form
     setScInterviewer(''); setScRound(''); setScRec(''); setScNotes('')
-    setScScores(DEFAULT_CRITERIA.map(c => ({ criterion: c, rating: 0 as 0 | 1 | 2 | 3 | 4 })))
+    setScScores(activeCriteria.map(c => ({ criterion: c, rating: 0 as 0 | 1 | 2 | 3 | 4 })))
     setShowAddForm(false)
     await loadScorecards()
   }
@@ -1431,7 +1439,13 @@ function CandidateSlideOver({
                     {scScores.map((s, idx) => (
                       <div key={s.criterion}>
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-slate-600">{s.criterion}</span>
+                          <span className="text-xs text-slate-600">
+                            {s.criterion}
+                            {(() => {
+                              const w = scoringCriteria?.find(c => c.name === s.criterion)?.weight
+                              return w != null ? <span className="ml-1 text-[10px] text-slate-400">({w}%)</span> : null
+                            })()}
+                          </span>
                           {s.rating > 0 && (
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${RATING_CONFIG[s.rating - 1].active}`}>
                               {RATING_CONFIG[s.rating - 1].label}
@@ -4412,6 +4426,7 @@ export default function JobPipelinePage() {
         <CandidateSlideOver
           app={selectedApp}
           stages={job.pipeline_stages}
+          scoringCriteria={job.scoring_criteria}
           onClose={() => setSelectedApp(null)}
           onStageChange={handleStageChange}
           onStatusChange={handleStatusChange}
