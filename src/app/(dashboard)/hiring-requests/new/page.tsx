@@ -7,7 +7,7 @@ import {
   ArrowLeft, Send, CheckCircle, Copy, Check, Users, PenLine,
   Wand2, RefreshCw, Loader2, Sparkles, Paperclip, X, Plus, GripVertical,
 } from 'lucide-react'
-import type { StageColor } from '@/lib/types/database'
+import type { StageColor, ScoringCriterion } from '@/lib/types/database'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -45,6 +45,14 @@ const CITIES = [
   'Toronto, Canada', 'Vancouver, Canada', 'Sydney, Australia', 'Berlin, Germany',
   'Amsterdam, Netherlands', 'Paris, France', 'Zurich, Switzerland', 'Tel Aviv, Israel',
   'Hong Kong', 'Tokyo, Japan', 'São Paulo, Brazil',
+]
+
+// ─── Scoring criteria defaults ────────────────────────────────────────────────
+const DEFAULT_SCORING_CRITERIA: ScoringCriterion[] = [
+  { id: 'technical',     name: 'Technical Skills',  weight: 35, description: 'Relevant technical expertise and depth' },
+  { id: 'experience',    name: 'Domain Experience', weight: 25, description: 'Industry or role-specific background' },
+  { id: 'communication', name: 'Communication',     weight: 20, description: 'Clarity, articulation, professional presence' },
+  { id: 'culture',       name: 'Culture Fit',       weight: 20, description: 'Alignment with team values and ways of working' },
 ]
 
 // ─── Pipeline builder constants ───────────────────────────────────────────────
@@ -216,6 +224,10 @@ export default function NewHiringRequestPage() {
   const [stageDragIdx, setStageDragIdx] = useState<number | null>(null)
   const [colorPickerIdx, setColorPickerIdx] = useState<number | null>(null)
 
+  // ── Scoring criteria builder ──
+  const [scoringCriteria, setScoringCriteria] = useState<ScoringCriterion[]>(DEFAULT_SCORING_CRITERIA)
+  const [critDragIdx, setCritDragIdx] = useState<number | null>(null)
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<{ ticketNumber: string; intakeUrl?: string; positionTitle: string } | null>(null)
@@ -288,6 +300,10 @@ export default function NewHiringRequestPage() {
     // Always send the configured pipeline stages
     const validStages = pipelineStages.filter(s => s.name.trim())
     if (validStages.length > 0) body.pipeline_stages = validStages
+
+    // Always send scoring criteria (only valid non-empty named ones)
+    const validCriteria = scoringCriteria.filter(c => c.name.trim() && c.weight > 0)
+    if (validCriteria.length > 0) body.scoring_criteria = validCriteria
 
     const res = await fetch('/api/hiring-requests', {
       method: 'POST',
@@ -693,6 +709,91 @@ export default function NewHiringRequestPage() {
           >
             <Plus className="h-3.5 w-3.5" />
             Add stage
+          </button>
+        </div>
+
+        {/* ── Scoring Criteria Builder ────────────────────────────────────── */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Scoring Criteria</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Drag to reorder · weights must add up to 100% · used by AI scoring and interview scorecards
+              </p>
+            </div>
+            {/* Running weight total */}
+            {(() => {
+              const total = scoringCriteria.reduce((s, c) => s + (Number(c.weight) || 0), 0)
+              return (
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                  total === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
+                }`}>
+                  {total}%
+                </span>
+              )
+            })()}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+            {scoringCriteria.map((crit, i) => (
+              <div
+                key={crit.id}
+                draggable
+                onDragStart={() => setCritDragIdx(i)}
+                onDragOver={e => e.preventDefault()}
+                onDrop={() => {
+                  if (critDragIdx === null || critDragIdx === i) return
+                  const next = [...scoringCriteria]
+                  const [moved] = next.splice(critDragIdx, 1)
+                  next.splice(i, 0, moved)
+                  setScoringCriteria(next)
+                  setCritDragIdx(null)
+                }}
+                onDragEnd={() => setCritDragIdx(null)}
+                className={`flex items-center gap-2 px-3 py-2.5 bg-white hover:bg-slate-50 transition-colors group ${critDragIdx === i ? 'opacity-40' : ''}`}
+              >
+                <GripVertical className="h-4 w-4 text-slate-300 cursor-grab shrink-0" />
+                {/* Factor name */}
+                <input
+                  value={crit.name}
+                  onChange={e => setScoringCriteria(prev => prev.map((c, j) => j === i ? { ...c, name: e.target.value } : c))}
+                  placeholder="Factor name"
+                  className="flex-1 text-sm text-slate-800 bg-transparent focus:outline-none min-w-0"
+                />
+                {/* Weight % */}
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={crit.weight}
+                    onChange={e => setScoringCriteria(prev => prev.map((c, j) => j === i ? { ...c, weight: Number(e.target.value) || 0 } : c))}
+                    className="w-10 text-right text-sm font-semibold text-slate-700 bg-transparent focus:outline-none"
+                  />
+                  <span className="text-xs text-slate-400">%</span>
+                </div>
+                {/* Delete */}
+                <button
+                  type="button"
+                  onClick={() => setScoringCriteria(prev => prev.filter((_, j) => j !== i))}
+                  className="opacity-0 group-hover:opacity-100 h-5 w-5 rounded flex items-center justify-center text-slate-300 hover:text-red-400 transition-all shrink-0"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setScoringCriteria(prev => [
+              ...prev,
+              { id: `crit_${Date.now()}`, name: '', weight: 0, description: null },
+            ])}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-violet-600 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add factor
           </button>
         </div>
 

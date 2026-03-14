@@ -26,6 +26,15 @@ Score calibration (be honest, don't inflate):
   0–39   → Poor fit: major misalignment on requirements, level, or location
 `.trim()
 
+function buildScoringCriteriaSection(job: HiringRequest): string {
+  const criteria = job.scoring_criteria
+  if (!criteria || criteria.length === 0) return ''
+  const lines = criteria.map(c =>
+    `  - ${c.name} (${c.weight}%)${c.description ? `: ${c.description}` : ''}`,
+  )
+  return `\nSCORING CRITERIA (weighted rubric for this role — respect these proportions when evaluating):\n${lines.join('\n')}\n`
+}
+
 function buildPrompt(candidate: Candidate, job: HiringRequest): string {
   const budget =
     job.budget_min && job.budget_max
@@ -61,7 +70,7 @@ CANDIDATE PROFILE:
 - Location: ${candidate.location ?? 'Not provided'}
 
 ${SCORE_ANCHORS}
-
+${buildScoringCriteriaSection(job)}
 Evaluate how well this candidate fits the job. Focus primarily on the Key Requirements. Be honest about gaps — recruiters need accurate scoring, not inflated ones.
 
 Respond with ONLY valid JSON (no markdown, no extra text):

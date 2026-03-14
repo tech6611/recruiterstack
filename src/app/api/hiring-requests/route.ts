@@ -53,6 +53,8 @@ export async function POST(request: NextRequest) {
     generated_jd?: string
     // Custom pipeline stages (optional — overrides DB-trigger defaults)
     pipeline_stages?: { name: string; color: string }[]
+    // Weighted scoring rubric (optional — from criteria builder)
+    scoring_criteria?: { id: string; name: string; weight: number; description: string | null }[]
   }
   try {
     body = await request.json()
@@ -87,6 +89,8 @@ export async function POST(request: NextRequest) {
     status: isOptionB ? 'jd_approved' : 'intake_pending',
     intake_sent_at: isOptionB ? null : new Date().toISOString(),
     org_id: orgId,
+    // Weighted scoring rubric — always saved regardless of mode
+    scoring_criteria: body.scoring_criteria ?? null,
   }
 
   if (isOptionB) {
