@@ -94,7 +94,10 @@ export async function GET(req: NextRequest) {
     }
 
     const busyMap = await queryFreeBusy(accessToken, emailsToQuery, timeMin, timeMax, timezone)
-    return NextResponse.json({ data: busyMap, connected_email: connectedEmail })
+    return NextResponse.json(
+      { data: busyMap, connected_email: connectedEmail },
+      { headers: { 'Cache-Control': 'no-store' } }   // never cache — GCal events change in real-time
+    )
   } catch (e) {
     console.error('[google-availability] free/busy query failed:', e)
     return NextResponse.json({ error: 'Failed to query availability' }, { status: 500 })

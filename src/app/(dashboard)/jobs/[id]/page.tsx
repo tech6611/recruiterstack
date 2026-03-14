@@ -1831,7 +1831,8 @@ function ScheduleInterviewModal({
         const maxDt = new Date(days[6]); maxDt.setHours(23, 59, 59, 999) // full 7-day window
         const tz    = Intl.DateTimeFormat().resolvedOptions().timeZone
         const res   = await fetch(
-          `/api/google/availability?emails=${encodeURIComponent(emails.join(','))}&time_min=${minDt.toISOString()}&time_max=${maxDt.toISOString()}&timezone=${encodeURIComponent(tz)}`
+          `/api/google/availability?emails=${encodeURIComponent(emails.join(','))}&time_min=${minDt.toISOString()}&time_max=${maxDt.toISOString()}&timezone=${encodeURIComponent(tz)}`,
+          { cache: 'no-store' }   // always fetch fresh — stale GCal events must not linger
         )
         if (!res.ok) { if (!cancelled) { setBusyRanges([]); setAvailNoData(true) }; return }
         const json = await res.json()
