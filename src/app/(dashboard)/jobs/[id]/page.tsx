@@ -1788,12 +1788,18 @@ function ScheduleInterviewModal({
     return `${h12}${m > 0 ? ':' + String(m).padStart(2, '0') : ''} ${period}`
   }
 
-  // Check if a 30-min slot (start) overlaps any busy range
+  // Check if a 30-min slot (start) overlaps any busy range.
+  // key = "YYYY-MM-DDTHH:MM" in LOCAL time.
+  // We use the multi-arg Date constructor so the slot is always treated as
+  // local time regardless of how the runtime interprets bare ISO strings.
   const isBusy = (key: string): boolean => {
-    const slotStart = new Date(key).getTime()
+    const [datePart, timePart] = key.split('T')
+    const [y, mo, d]           = datePart.split('-').map(Number)
+    const [h, m]               = timePart.split(':').map(Number)
+    const slotStart = new Date(y, mo - 1, d, h, m, 0, 0).getTime() // local time, unambiguous
     const slotEnd   = slotStart + 30 * 60 * 1000
     return busyRanges.some(r => {
-      const bStart = new Date(r.start).getTime()
+      const bStart = new Date(r.start).getTime() // offset string → unambiguous
       const bEnd   = new Date(r.end).getTime()
       return bStart < slotEnd && bEnd > slotStart
     })
@@ -2322,15 +2328,17 @@ function ScheduleInterviewModal({
                                     setAvailWeekOffset(0)
                                   }}
                                   className={`w-full h-3 rounded transition-colors ${
-                                    isSelected
+                                    busy
+                                      ? isSelected
+                                        ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed'   // busy AND selected → red + blue outline
+                                        : 'bg-red-100 cursor-not-allowed'
+                                      : isSelected
                                       ? 'bg-blue-500'
-                                      : busy
-                                      ? 'bg-red-100 cursor-not-allowed'
                                       : isWeekend
                                       ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                       : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                                   }`}
-                                  title={busy ? 'Busy' : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
+                                  title={busy ? (isSelected ? 'Busy — pick another slot' : 'Busy') : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
                                 />
                               </td>
                             )
@@ -2576,15 +2584,17 @@ function ScheduleInterviewModal({
                                 setGridExpanded(false)
                               }}
                               className={`w-full h-6 rounded transition-colors ${
-                                isSelected
+                                busy
+                                  ? isSelected
+                                    ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed'
+                                    : 'bg-red-100 cursor-not-allowed'
+                                  : isSelected
                                   ? 'bg-blue-500'
-                                  : busy
-                                  ? 'bg-red-100 cursor-not-allowed'
                                   : isWeekend
                                   ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                   : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                               }`}
-                              title={busy ? 'Busy' : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
+                              title={busy ? (isSelected ? 'Busy — pick another slot' : 'Busy') : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
                             />
                           </td>
                         )
