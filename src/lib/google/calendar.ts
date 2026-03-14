@@ -199,8 +199,11 @@ export async function queryFreeBusy(
   const data = await res.json()
   const result: Record<string, FreeBusySlot[]> = {}
 
+  // Google may return keys in a different case than what was sent — normalise with case-insensitive lookup
+  const calendarKeys = Object.keys(data.calendars ?? {})
   for (const email of emails) {
-    result[email] = (data.calendars?.[email]?.busy ?? []) as FreeBusySlot[]
+    const matchedKey = calendarKeys.find(k => k.toLowerCase() === email.toLowerCase()) ?? email
+    result[email] = (data.calendars?.[matchedKey]?.busy ?? []) as FreeBusySlot[]
   }
 
   return result

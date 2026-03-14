@@ -2004,7 +2004,7 @@ function ScheduleInterviewModal({
   // ── Form ───────────────────────────────────────────────────────────────────
   return (<>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
@@ -2220,16 +2220,20 @@ function ScheduleInterviewModal({
                     {panel.filter(m => m.email.trim()).map((m, i) => (
                       <div
                         key={i}
-                        title={`${m.name} (${m.email})`}
+                        title={`${m.name}\n${m.email}`}
                         className={`h-4 w-4 rounded-full border border-white flex items-center justify-center text-[8px] font-bold shrink-0 ${avatarColor(m.name || '?')}`}
                       >
                         {initials(m.name || '?')}
                       </div>
                     ))}
                   </div>
-                  {panel.filter(m => m.email.trim()).length > 1 && (
-                    <span className="text-[10px] text-slate-400 shrink-0">combined</span>
-                  )}
+                  {/* Queried emails — visible so users can verify the right account is checked */}
+                  <span
+                    className="text-[9px] text-slate-400 truncate max-w-[140px]"
+                    title={panel.filter(m => m.email.trim()).map(m => m.email).join(', ')}
+                  >
+                    {panel.filter(m => m.email.trim()).map(m => m.email.split('@')[0]).join(', ')}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
@@ -2237,7 +2241,7 @@ function ScheduleInterviewModal({
                     className="h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors text-xs"
                   >‹</button>
                   <span className="text-[10px] text-slate-500 px-1 whitespace-nowrap">
-                    {weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {weekDays[4].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
                   <button
                     onClick={() => setAvailWeekOffset(o => o + 1)}
@@ -2270,26 +2274,30 @@ function ScheduleInterviewModal({
                   <table className="w-full text-[10px]">
                     <thead className="sticky top-0 bg-white z-10">
                       <tr>
-                        <th className="w-12 px-2 py-1.5 text-left text-slate-400 font-normal border-b border-slate-100 bg-white" />
-                        {inlineWeekDays.map(d => (
-                          <th key={d.toISOString()} className="px-1 py-1.5 text-center text-slate-500 font-semibold border-b border-slate-100 whitespace-nowrap bg-white">
-                            {d.toLocaleDateString('en-US', { weekday: 'short' })} {d.getDate()}
-                          </th>
-                        ))}
+                        <th className="w-10 px-1 py-1.5 text-left text-slate-400 font-normal border-b border-slate-100 bg-white" />
+                        {weekDays.map(d => {
+                          const isWeekend = d.getDay() === 0 || d.getDay() === 6
+                          return (
+                            <th key={d.toISOString()} className={`px-0.5 py-1.5 text-center font-semibold border-b border-slate-100 whitespace-nowrap text-[10px] ${isWeekend ? 'bg-slate-50 text-slate-400' : 'bg-white text-slate-500'}`}>
+                              {d.toLocaleDateString('en-US', { weekday: 'short' })} {d.getDate()}
+                            </th>
+                          )
+                        })}
                       </tr>
                     </thead>
                     <tbody>
                       {HOUR_SLOTS.map(slot => (
                         <tr key={slot} className="border-t border-slate-50">
-                          <td className="px-2 py-0 text-slate-300 text-right whitespace-nowrap leading-none">
+                          <td className="px-1 py-0 text-slate-300 text-right whitespace-nowrap leading-none text-[10px]">
                             {slot.endsWith(':00') ? fmtSlotLabel(slot) : ''}
                           </td>
-                          {inlineWeekDays.map(day => {
+                          {weekDays.map(day => {
                             const key = slotKey(day, slot)
                             const busy = isBusy(key)
                             const isSelected = date === toLocalDateStr(day) && time === slot
+                            const isWeekend = day.getDay() === 0 || day.getDay() === 6
                             return (
-                              <td key={key} className="px-0.5 py-0.5">
+                              <td key={key} className={`px-0.5 py-0.5 ${isWeekend ? 'bg-slate-50/60' : ''}`}>
                                 <button
                                   disabled={busy}
                                   onClick={() => {
@@ -2302,9 +2310,11 @@ function ScheduleInterviewModal({
                                       ? 'bg-blue-500'
                                       : busy
                                       ? 'bg-red-100 cursor-not-allowed'
+                                      : isWeekend
+                                      ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                       : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                                   }`}
-                                  title={busy ? 'Busy' : `Schedule at ${slot}`}
+                                  title={busy ? 'Busy' : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
                                 />
                               </td>
                             )
