@@ -61,9 +61,10 @@ export async function POST(req: NextRequest) {
   const self_schedule_expires_at = generate_self_schedule ? expires.toISOString() : null
 
   // ── Google Meet: create calendar event if org has Google connected ─────────
-  let resolvedLocation = location?.trim() || null
+  let resolvedLocation  = location?.trim() || null
   let calendar_event_id: string | null = null
-  let meetLink: string | null = null
+  let meetLink:          string | null = null
+  let googleMeetError:   string | null = null
 
   if (interview_type === 'video' || interview_type === 'panel' || interview_type === 'technical') {
     try {
@@ -129,7 +130,9 @@ export async function POST(req: NextRequest) {
       }
     } catch (e) {
       // Non-fatal: log and continue without a Meet link
-      console.error('[interviews] Google Meet creation failed:', e)
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error('[interviews] Google Meet creation failed:', msg)
+      googleMeetError = msg
     }
   }
 
@@ -198,5 +201,5 @@ export async function POST(req: NextRequest) {
     }
   })()
 
-  return NextResponse.json({ data: { ...data, meet_link: meetLink } }, { status: 201 })
+  return NextResponse.json({ data: { ...data, meet_link: meetLink, google_meet_error: googleMeetError } }, { status: 201 })
 }
