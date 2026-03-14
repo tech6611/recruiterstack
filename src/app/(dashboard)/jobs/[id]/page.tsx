@@ -157,6 +157,23 @@ const SIGNAL_BADGE: Record<string, { label: string; cls: string }> = {
   no:         { label: 'No',         cls: 'bg-red-100 text-red-700'         },
 }
 
+// ── Builds a plain-text note summarising Claude's analysis at rejection time ──
+function buildAiAnalysisNote(app: Application): string {
+  const recMap: Record<string, string> = { strong_yes: 'Strong Yes', yes: 'Yes', maybe: 'Maybe', no: 'No' }
+  const rec = app.ai_recommendation ? recMap[app.ai_recommendation] : null
+  const lines = [
+    `🤖 AI Analysis at time of rejection:`,
+    `Score: ${app.ai_score}/100${rec ? ` · Recommendation: ${rec}` : ''}`,
+  ]
+  if ((app.ai_strengths ?? []).length) {
+    lines.push(`\n✅ Strengths:\n${(app.ai_strengths ?? []).map(s => `  • ${s}`).join('\n')}`)
+  }
+  if ((app.ai_gaps ?? []).length) {
+    lines.push(`\n⚠️ Gaps:\n${(app.ai_gaps ?? []).map(g => `  • ${g}`).join('\n')}`)
+  }
+  return lines.join('\n')
+}
+
 function CandidateCard({
   app, onDragStart, onClick, isSelected, onToggleSelect, cardFields, suggestedAction,
 }: {
@@ -169,6 +186,7 @@ function CandidateCard({
   suggestedAction?: { label: string; variant: 'score' | 'reject' | 'move' | 'final'; onClick: (e: React.MouseEvent) => void }
 }) {
   const c = app.candidate!
+  const [showAnalysis, setShowAnalysis] = useState(false)
   const show = (field: string) => cardFields.includes(field)
 
   const signalBadge = show('ai_signal') && app.ai_recommendation
@@ -250,6 +268,51 @@ function CandidateCard({
           </button>
         )
       })()}
+
+      {/* AI Analysis panel — only on rejected cards that have been scored */}
+      {app.status === 'rejected' && app.ai_score !== null && (
+        <div className="mt-1.5">
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); setShowAnalysis(v => !v) }}
+            className="w-full flex items-center justify-center gap-1 text-[9px] text-slate-400 hover:text-slate-600 py-0.5 rounded border border-transparent hover:border-slate-200 transition-colors"
+          >
+            <ChevronDown className={`h-2.5 w-2.5 transition-transform ${showAnalysis ? '' : '-rotate-90'}`} />
+            AI Analysis
+          </button>
+          {showAnalysis && (
+            <div
+              onClick={e => e.stopPropagation()}
+              className="mt-1 rounded-lg bg-slate-50 border border-slate-100 p-2 space-y-1.5"
+            >
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <ScorePill score={app.ai_score} />
+                {app.ai_recommendation && signalBadge && (
+                  <span className={`rounded-full px-1.5 py-px text-[9px] font-semibold ${signalBadge.cls}`}>
+                    {signalBadge.label}
+                  </span>
+                )}
+              </div>
+              {(app.ai_strengths ?? []).length > 0 && (
+                <div>
+                  <p className="text-[9px] font-semibold text-emerald-600 mb-0.5">✅ Strengths</p>
+                  {(app.ai_strengths ?? []).map((s, i) => (
+                    <p key={i} className="text-[9px] text-slate-600 leading-snug">• {s}</p>
+                  ))}
+                </div>
+              )}
+              {(app.ai_gaps ?? []).length > 0 && (
+                <div>
+                  <p className="text-[9px] font-semibold text-red-500 mb-0.5">⚠️ Gaps</p>
+                  {(app.ai_gaps ?? []).map((g, i) => (
+                    <p key={i} className="text-[9px] text-slate-600 leading-snug">• {g}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -3950,11 +4013,19 @@ export default function JobPipelinePage() {
           onScoreApp={app => startScoring(undefined, app.id)}
           onScheduleApp={app => setScheduleModalApps([app])}
           onRejectApp={async appId => {
+            const appData = (job?.applications ?? []).find(a => a.id === appId)
             await fetch(`/api/applications/${appId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ status: 'rejected' }),
             })
+            if (appData && appData.ai_score !== null && appData.ai_score !== undefined) {
+              void fetch(`/api/applications/${appId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note: buildAiAnalysisNote(appData), created_by: '🤖 AI Analysis' }),
+              })
+            }
             load()
           }}
         />
@@ -4054,6 +4125,16 @@ export default function JobPipelinePage() {
                     body: JSON.stringify({ status: 'rejected' }),
                   })
                 ))
+                // Fire-and-forget: save AI analysis notes for scored apps
+                toReject.forEach(app => {
+                  if (app.ai_score !== null && app.ai_score !== undefined) {
+                    void fetch(`/api/applications/${app.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ note: buildAiAnalysisNote(app), created_by: '🤖 AI Analysis' }),
+                    })
+                  }
+                })
                 setSelectedApps(prev => {
                   const next = new Set(prev)
                   toReject.forEach(a => next.delete(a.id))
@@ -4098,6 +4179,14 @@ export default function JobPipelinePage() {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ status: 'rejected' }),
                 })
+                // Auto-save AI analysis as a timeline comment if the app was scored
+                if (app.ai_score !== null && app.ai_score !== undefined) {
+                  void fetch(`/api/applications/${app.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ note: buildAiAnalysisNote(app), created_by: '🤖 AI Analysis' }),
+                  })
+                }
               }}
               onMoveApp={async (app, stageId) => {
                 setJob(prev => prev ? {
