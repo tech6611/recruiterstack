@@ -513,6 +513,12 @@ function AddCandidateModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   // New candidate
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -746,6 +752,12 @@ function CandidateSlideOver({
   const [tab, setTab]   = useState<'details' | 'scorecards'>('details')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
 
   // Scorecards tab state
   const [scorecards, setScorecards]         = useState<Scorecard[]>([])
@@ -1509,6 +1521,12 @@ function AutopilotDrawer({
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState('')
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
   const isActive = job.auto_advance_score !== null || job.auto_reject_score !== null
 
   const save = async () => {
@@ -1864,6 +1882,14 @@ function ScheduleInterviewModal({
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [saved]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Escape closes the main modal when no sub-view (popup / success screen) is active
+  useEffect(() => {
+    if (saved || gridExpanded) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [saved, gridExpanded, onClose])
 
   // Auto-scroll inline grid to 8 AM (slot index 16, each slot 20px tall)
   useEffect(() => {
@@ -2446,6 +2472,9 @@ function ScheduleInterviewModal({
                       {p.id === 'gmeet' ? '🎥' : p.id === 'zoom' ? '💻' : '🟦'}
                     </span>
                     {p.label}
+                    {p.id !== 'gmeet' && (
+                      <span className="text-[9px] font-normal text-slate-400 leading-none">Coming soon</span>
+                    )}
                   </button>
                 ))}
               </div>

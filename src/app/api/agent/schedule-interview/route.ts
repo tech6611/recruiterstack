@@ -266,6 +266,7 @@ export async function POST(req: NextRequest) {
         interviewType:    interview_type,
         location:         resolvedLocation,
         meetLink,
+        notes:            null,
         recruiterName:    'RecruiterStack',
         recruiterEmail:   process.env.SENDGRID_FROM_EMAIL ?? '',
       })

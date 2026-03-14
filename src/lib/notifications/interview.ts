@@ -31,6 +31,8 @@ export interface InterviewNotificationPayload {
   interviewType:    string   // 'video' | 'phone' | 'in_person' | etc.
   location:         string | null   // Zoom/Meet URL or office address
   meetLink:         string | null   // Resolved Google Meet link (may differ from location)
+  // Extra context
+  notes:            string | null   // Recruiter notes / prep instructions for the interview
   // Recruiter
   recruiterName:    string
   recruiterEmail:   string
@@ -93,6 +95,8 @@ async function sendCandidateEmail(p: InterviewNotificationPayload): Promise<void
     '',
     link ? `To join your interview, use this link:\n${link}` : '',
     '',
+    p.notes?.trim() ? `Notes from the recruiter:\n${p.notes.trim()}` : '',
+    '',
     `If you have any questions or need to reschedule, please reply to this email.`,
     '',
     `Best of luck!`,
@@ -144,6 +148,8 @@ async function sendInterviewerEmail(p: InterviewNotificationPayload): Promise<vo
     `Candidate:   ${p.candidateName} <${p.candidateEmail}>`,
     '',
     link ? `Join link: ${link}` : '',
+    '',
+    p.notes?.trim() ? `Recruiter notes:\n${p.notes.trim()}` : '',
     '',
     `A calendar invite has been sent to your email.`,
     '',
