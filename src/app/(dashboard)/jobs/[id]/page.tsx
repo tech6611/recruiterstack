@@ -1700,8 +1700,14 @@ function ScheduleInterviewModal({
   onScheduled: () => void
 }) {
   const today = new Date()
-  const defaultDate = new Date(today.getTime() + 86400000)
-  const dateStr = defaultDate.toISOString().split('T')[0]
+  // Default to tomorrow — but skip over weekend: Sat → Mon (+2), Sun → Mon (+1)
+  const dateStr = (() => {
+    const d = new Date(today.getTime() + 86400000)
+    const dow = d.getDay()
+    if (dow === 0) d.setDate(d.getDate() + 1)       // Sun → Mon
+    else if (dow === 6) d.setDate(d.getDate() + 2)  // Sat → Mon
+    return d.toISOString().split('T')[0]
+  })()
 
   const [interviewType, setInterviewType] = useState<string>('video')
   const [date, setDate] = useState(dateStr)
@@ -1823,6 +1829,14 @@ function ScheduleInterviewModal({
     }, 600)
     return () => { cancelled = true; clearTimeout(timer) }
   }, [panel, date, availWeekOffset, googleConnected]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close the popup overlay when Escape is pressed
+  useEffect(() => {
+    if (!gridExpanded) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setGridExpanded(false) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [gridExpanded])
 
   const MEETING_INTEGRATIONS = [
     { id: 'gmeet',    label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',       url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
@@ -1981,7 +1995,7 @@ function ScheduleInterviewModal({
   }
 
   // ── Form ───────────────────────────────────────────────────────────────────
-  return (
+  return (<>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
         {/* Header */}
@@ -2222,13 +2236,13 @@ function ScheduleInterviewModal({
                     onClick={() => setAvailWeekOffset(o => o + 1)}
                     className="h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors text-xs"
                   >›</button>
-                  {/* Expand / collapse toggle */}
+                  {/* Open full-calendar popup */}
                   <button
-                    onClick={() => setGridExpanded(e => !e)}
-                    title={gridExpanded ? 'Collapse grid' : 'Expand grid'}
+                    onClick={() => setGridExpanded(true)}
+                    title="Open full calendar"
                     className="h-5 w-5 rounded flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors text-xs ml-0.5"
                   >
-                    {gridExpanded ? '⤡' : '⤢'}
+                    ⤢
                   </button>
                 </div>
               </div>
@@ -2237,7 +2251,7 @@ function ScheduleInterviewModal({
                 /* Skeleton */
                 <div className="p-3 grid grid-cols-6 gap-1 animate-pulse">
                   {Array.from({ length: 30 }).map((_, i) => (
-                    <div key={i} className={`rounded bg-slate-100 ${gridExpanded ? 'h-6' : 'h-4'}`} />
+                    <div key={i} className="rounded bg-slate-100 h-4" />
                   ))}
                 </div>
               ) : availNoData ? (
@@ -2245,7 +2259,7 @@ function ScheduleInterviewModal({
                   No calendar data — {panel.filter(m => m.email.trim()).length > 1 ? 'panel members may be' : 'interviewer may be'} outside your Google Workspace domain
                 </div>
               ) : (
-                <div className={`overflow-x-auto ${gridExpanded ? 'max-h-80 overflow-y-auto' : ''}`}>
+                <div className="overflow-x-auto">
                   <table className="w-full text-[10px]">
                     <thead className="sticky top-0 bg-white z-10">
                       <tr>
@@ -2261,8 +2275,7 @@ function ScheduleInterviewModal({
                       {HOUR_SLOTS.map(slot => (
                         <tr key={slot} className="border-t border-slate-50">
                           <td className="px-2 py-0 text-slate-300 text-right whitespace-nowrap leading-none">
-                            {/* Compact: every hour only  |  Expanded: every 30 min */}
-                            {(gridExpanded || slot.endsWith(':00')) ? fmtSlotLabel(slot) : ''}
+                            {slot.endsWith(':00') ? fmtSlotLabel(slot) : ''}
                           </td>
                           {weekDays.map(day => {
                             const key = slotKey(day, slot)
@@ -2277,7 +2290,7 @@ function ScheduleInterviewModal({
                                     setTime(slot)
                                     setAvailWeekOffset(0)
                                   }}
-                                  className={`w-full rounded transition-colors ${gridExpanded ? 'h-5' : 'h-3'} ${
+                                  className={`w-full h-3 rounded transition-colors ${
                                     isSelected
                                       ? 'bg-blue-500'
                                       : busy
@@ -2417,7 +2430,141 @@ function ScheduleInterviewModal({
         </div>
       </div>
     </div>
-  )
+
+    {/* ── Full-screen Panel Availability Popup ─────────────────────────────── */}
+    {gridExpanded && (
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        onClick={() => setGridExpanded(false)}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-[800px] max-w-[95vw] max-h-[85vh] flex flex-col overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Popup header */}
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/60 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <span className="text-sm font-semibold text-slate-700">Panel Availability</span>
+              <div className="flex items-center -space-x-1">
+                {panel.filter(m => m.email.trim()).map((m, i) => (
+                  <div
+                    key={i}
+                    title={`${m.name} (${m.email})`}
+                    className={`h-5 w-5 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-bold shrink-0 ${avatarColor(m.name || '?')}`}
+                  >
+                    {initials(m.name || '?')}
+                  </div>
+                ))}
+              </div>
+              {panel.filter(m => m.email.trim()).length > 1 && (
+                <span className="text-[10px] text-slate-400">combined</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setAvailWeekOffset(o => o - 1)}
+                className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+              >‹</button>
+              <span className="text-xs font-medium text-slate-600 px-2 whitespace-nowrap">
+                {weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {weekDays[4].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+              <button
+                onClick={() => setAvailWeekOffset(o => o + 1)}
+                className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+              >›</button>
+              <button
+                onClick={() => setGridExpanded(false)}
+                className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors ml-2"
+                title="Close (Esc)"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Popup grid body */}
+          <div className="flex-1 overflow-y-auto">
+            {availLoading ? (
+              <div className="p-4 grid grid-cols-6 gap-1.5 animate-pulse">
+                {Array.from({ length: 60 }).map((_, i) => (
+                  <div key={i} className="rounded bg-slate-100 h-7" />
+                ))}
+              </div>
+            ) : availNoData ? (
+              <div className="flex flex-col items-center justify-center h-48 gap-2 text-slate-400">
+                <span className="text-2xl">📅</span>
+                <span className="text-sm text-center px-8">
+                  No calendar data — {panel.filter(m => m.email.trim()).length > 1 ? 'panel members may be' : 'interviewer may be'} outside your Google Workspace domain
+                </span>
+              </div>
+            ) : (
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr>
+                    <th className="w-16 px-3 py-2 text-left text-slate-400 font-normal border-b border-slate-100 bg-white" />
+                    {weekDays.map(d => (
+                      <th key={d.toISOString()} className="px-2 py-2 text-center text-slate-600 font-semibold border-b border-slate-100 whitespace-nowrap bg-white">
+                        {d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {HOUR_SLOTS.map(slot => (
+                    <tr key={slot} className="border-t border-slate-50">
+                      <td className="px-3 py-0 text-slate-300 text-right whitespace-nowrap leading-none text-[11px]">
+                        {fmtSlotLabel(slot)}
+                      </td>
+                      {weekDays.map(day => {
+                        const key = slotKey(day, slot)
+                        const busy = isBusy(key)
+                        const isSelected = date === day.toISOString().split('T')[0] && time === slot
+                        return (
+                          <td key={key} className="px-1 py-0.5">
+                            <button
+                              disabled={busy}
+                              onClick={() => {
+                                setDate(day.toISOString().split('T')[0])
+                                setTime(slot)
+                                setAvailWeekOffset(0)
+                                setGridExpanded(false)
+                              }}
+                              className={`w-full h-6 rounded transition-colors ${
+                                isSelected
+                                  ? 'bg-blue-500'
+                                  : busy
+                                  ? 'bg-red-100 cursor-not-allowed'
+                                  : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
+                              }`}
+                              title={busy ? 'Busy' : `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${fmtSlotLabel(slot)}`}
+                            />
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-4 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 shrink-0">
+            <span className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span className="inline-block h-3 w-5 rounded bg-emerald-100 border border-emerald-200" /> Free — click to select
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span className="inline-block h-3 w-5 rounded bg-red-100" /> Busy
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span className="inline-block h-3 w-5 rounded bg-blue-500" /> Selected
+            </span>
+            <span className="ml-auto text-xs text-slate-400">Esc to close</span>
+          </div>
+        </div>
+      </div>
+    )}
+  </>)
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
