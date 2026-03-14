@@ -1769,11 +1769,11 @@ function ScheduleInterviewModal({
   const weekDays = getWeekDays(date, availWeekOffset) // 7 days Mon–Sun
 
   // 8 AM–6 PM in 30-min slots  →  ["08:00","08:30",…,"17:30"]
-  const HOUR_SLOTS: string[] = Array.from({ length: 20 }, (_, i) => {
+  const HOUR_SLOTS: string[] = Array.from({ length: 23 }, (_, i) => {
     const h = Math.floor(i / 2) + 8
     const m = i % 2 === 0 ? '00' : '30'
     return `${String(h).padStart(2, '0')}:${m}`
-  })
+  }) // 08:00 → 19:00 (8 AM – 7 PM)
 
   // Build "YYYY-MM-DDTHH:MM" key for a day + slot (local date — avoids UTC shift)
   const slotKey = (day: Date, slot: string) =>
@@ -2316,7 +2316,7 @@ function ScheduleInterviewModal({
                   No calendar data — {panel.filter(m => m.email.trim()).length > 1 ? 'panel members may be' : 'interviewer may be'} outside your Google Workspace domain
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overflow-y-auto max-h-[220px]">
                   <table className="w-full text-[10px]">
                     <thead className="sticky top-0 bg-white z-10">
                       <tr>
@@ -2342,6 +2342,15 @@ function ScheduleInterviewModal({
                             const busy = isBusy(key)
                             const isSelected = date === toLocalDateStr(day) && time === slot
                             const isWeekend = day.getDay() === 0 || day.getDay() === 6
+                            // Shade all 30-min cells that fall within [selectedTime, selectedTime + duration)
+                            const isInBlock = (() => {
+                              if (!date || !time || date !== toLocalDateStr(day)) return false
+                              const [selH, selM] = time.split(':').map(Number)
+                              const [slH, slM]   = slot.split(':').map(Number)
+                              const selMin = selH * 60 + selM
+                              const slMin  = slH * 60 + slM
+                              return slMin >= selMin && slMin < selMin + duration
+                            })()
                             return (
                               <td key={key} className={`px-0.5 py-0.5 ${isWeekend ? 'bg-slate-50/60' : ''}`}>
                                 <button
@@ -2353,11 +2362,13 @@ function ScheduleInterviewModal({
                                   }}
                                   className={`w-full h-3 rounded transition-colors ${
                                     busy
-                                      ? isSelected
-                                        ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed'   // busy AND selected → red + blue outline
+                                      ? (isSelected || isInBlock)
+                                        ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed'
                                         : 'bg-red-100 cursor-not-allowed'
                                       : isSelected
-                                      ? 'bg-blue-500'
+                                      ? 'bg-blue-600'
+                                      : isInBlock
+                                      ? 'bg-blue-200 hover:bg-blue-300 cursor-pointer'
                                       : isWeekend
                                       ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                       : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
@@ -2371,10 +2382,11 @@ function ScheduleInterviewModal({
                       ))}
                     </tbody>
                   </table>
-                  <div className="flex items-center gap-3 px-3 py-1.5 border-t border-slate-100 bg-slate-50">
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-100 border border-emerald-200" /> Free — click to select</span>
+                  <div className="flex items-center gap-3 px-3 py-1.5 border-t border-slate-100 bg-slate-50 flex-wrap">
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-100 border border-emerald-200" /> Free</span>
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-red-100" /> Busy</span>
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-blue-500" /> Selected</span>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-blue-600" /> Start</span>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-blue-200" /> Duration block</span>
                   </div>
                 </div>
               )}
@@ -2597,6 +2609,15 @@ function ScheduleInterviewModal({
                         const busy = isBusy(key)
                         const isSelected = date === toLocalDateStr(day) && time === slot
                         const isWeekend = day.getDay() === 0 || day.getDay() === 6
+                        // Shade all 30-min cells that fall within [selectedTime, selectedTime + duration)
+                        const isInBlock = (() => {
+                          if (!date || !time || date !== toLocalDateStr(day)) return false
+                          const [selH, selM] = time.split(':').map(Number)
+                          const [slH, slM]   = slot.split(':').map(Number)
+                          const selMin = selH * 60 + selM
+                          const slMin  = slH * 60 + slM
+                          return slMin >= selMin && slMin < selMin + duration
+                        })()
                         return (
                           <td key={key} className={`px-1 py-0.5 ${isWeekend ? 'bg-slate-50/60' : ''}`}>
                             <button
@@ -2609,11 +2630,13 @@ function ScheduleInterviewModal({
                               }}
                               className={`w-full h-6 rounded transition-colors ${
                                 busy
-                                  ? isSelected
+                                  ? (isSelected || isInBlock)
                                     ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed'
                                     : 'bg-red-100 cursor-not-allowed'
                                   : isSelected
-                                  ? 'bg-blue-500'
+                                  ? 'bg-blue-600'
+                                  : isInBlock
+                                  ? 'bg-blue-200 hover:bg-blue-300 cursor-pointer'
                                   : isWeekend
                                   ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                   : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
