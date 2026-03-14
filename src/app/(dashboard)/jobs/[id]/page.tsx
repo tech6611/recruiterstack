@@ -1700,13 +1700,21 @@ function ScheduleInterviewModal({
   onScheduled: () => void
 }) {
   const today = new Date()
-  // Default to tomorrow — but skip over weekend: Sat → Mon (+2), Sun → Mon (+1)
+  // Local-time date string — avoids UTC shift (toISOString rolls back midnight IST dates to prev UTC day)
+  const toLocalDateStr = (d: Date): string => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
+  // Default to tomorrow (local) — skip over weekend: Sat → Mon (+2), Sun → Mon (+1)
   const dateStr = (() => {
-    const d = new Date(today.getTime() + 86400000)
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
     const dow = d.getDay()
     if (dow === 0) d.setDate(d.getDate() + 1)       // Sun → Mon
     else if (dow === 6) d.setDate(d.getDate() + 2)  // Sat → Mon
-    return d.toISOString().split('T')[0]
+    return toLocalDateStr(d)
   })()
 
   const [interviewType, setInterviewType] = useState<string>('video')
@@ -1767,9 +1775,9 @@ function ScheduleInterviewModal({
     return `${String(h).padStart(2, '0')}:${m}`
   })
 
-  // Build "YYYY-MM-DDTHH:MM" key for a day + slot
+  // Build "YYYY-MM-DDTHH:MM" key for a day + slot (local date — avoids UTC shift)
   const slotKey = (day: Date, slot: string) =>
-    `${day.toISOString().split('T')[0]}T${slot}`
+    `${toLocalDateStr(day)}T${slot}`
 
   // Format a 24h "HH:MM" slot to 12h label e.g. "08:00"→"8 AM", "13:30"→"1:30 PM"
   const fmtSlotLabel = (slot: string) => {
@@ -2164,7 +2172,7 @@ function ScheduleInterviewModal({
               <input
                 type="date"
                 value={date}
-                min={new Date().toISOString().split('T')[0]}
+                min={toLocalDateStr(new Date())}
                 onChange={e => { setDate(e.target.value); setAvailWeekOffset(0) }}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
@@ -2280,13 +2288,13 @@ function ScheduleInterviewModal({
                           {weekDays.map(day => {
                             const key = slotKey(day, slot)
                             const busy = isBusy(key)
-                            const isSelected = date === day.toISOString().split('T')[0] && time === slot
+                            const isSelected = date === toLocalDateStr(day) && time === slot
                             return (
                               <td key={key} className="px-0.5 py-0.5">
                                 <button
                                   disabled={busy}
                                   onClick={() => {
-                                    setDate(day.toISOString().split('T')[0])
+                                    setDate(toLocalDateStr(day))
                                     setTime(slot)
                                     setAvailWeekOffset(0)
                                   }}
@@ -2518,13 +2526,13 @@ function ScheduleInterviewModal({
                       {weekDays.map(day => {
                         const key = slotKey(day, slot)
                         const busy = isBusy(key)
-                        const isSelected = date === day.toISOString().split('T')[0] && time === slot
+                        const isSelected = date === toLocalDateStr(day) && time === slot
                         return (
                           <td key={key} className="px-1 py-0.5">
                             <button
                               disabled={busy}
                               onClick={() => {
-                                setDate(day.toISOString().split('T')[0])
+                                setDate(toLocalDateStr(day))
                                 setTime(slot)
                                 setAvailWeekOffset(0)
                                 setGridExpanded(false)
