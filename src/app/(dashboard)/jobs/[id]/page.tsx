@@ -2036,20 +2036,19 @@ function ScheduleInterviewModal({
                 >
                   {i === 0 ? 'HM' : 'Select'}
                 </button>
-                {/* Remove — can't remove the last member */}
+                {/* Remove — always enabled; tooltip explains for the HM row */}
                 <button
                   onClick={() => {
                     const next = panel.filter((_, j) => j !== i)
                     setPanel(next)
-                    // If the removed member was the selected interviewer, fall back to first
-                    if (interviewer === member.name && interviewerEmail === member.email && next.length) {
-                      setInterviewer(next[0].name)
-                      setInterviewerEmail(next[0].email)
+                    // If the removed member was the selected interviewer, fall back to first remaining
+                    if (interviewer === member.name && interviewerEmail === member.email) {
+                      setInterviewer(next[0]?.name ?? '')
+                      setInterviewerEmail(next[0]?.email ?? '')
                     }
                   }}
-                  disabled={panel.length === 1}
-                  className="h-5 w-5 flex items-center justify-center rounded text-slate-300 hover:text-red-400 hover:bg-red-50 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-                  title="Remove from panel"
+                  className="h-5 w-5 flex items-center justify-center rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                  title={i === 0 ? 'Remove hiring manager from panel' : 'Remove from panel'}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -2191,11 +2190,28 @@ function ScheduleInterviewModal({
           </div>
 
           {/* ── Availability grid ──────────────────────────────────────────── */}
-          {googleConnected && interviewerEmail.trim() && (
+          {googleConnected && panel.some(m => m.email.trim()) && (
             <div className="rounded-xl border border-slate-200 overflow-hidden">
               {/* Header */}
               <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
-                <span className="text-xs font-semibold text-slate-600">Interviewer Availability</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs font-semibold text-slate-600 shrink-0">Panel Availability</span>
+                  {/* Member avatar chips — shows whose calendars are being queried */}
+                  <div className="flex items-center -space-x-1">
+                    {panel.filter(m => m.email.trim()).map((m, i) => (
+                      <div
+                        key={i}
+                        title={`${m.name} (${m.email})`}
+                        className={`h-4 w-4 rounded-full border border-white flex items-center justify-center text-[8px] font-bold shrink-0 ${avatarColor(m.name || '?')}`}
+                      >
+                        {initials(m.name || '?')}
+                      </div>
+                    ))}
+                  </div>
+                  {panel.filter(m => m.email.trim()).length > 1 && (
+                    <span className="text-[10px] text-slate-400 shrink-0">combined</span>
+                  )}
+                </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setAvailWeekOffset(o => o - 1)}
@@ -2220,7 +2236,7 @@ function ScheduleInterviewModal({
                 </div>
               ) : availNoData ? (
                 <div className="px-3 py-4 text-center text-xs text-slate-400">
-                  Calendar not visible — interviewer may be outside your Google Workspace domain
+                  No calendar data — {panel.filter(m => m.email.trim()).length > 1 ? 'panel members may be' : 'interviewer may be'} outside your Google Workspace domain
                 </div>
               ) : (
                 <div className="overflow-x-auto">
