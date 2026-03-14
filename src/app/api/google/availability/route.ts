@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
-import { getValidAccessToken, queryFreeBusy, getConnectedEmail, type GoogleTokens } from '@/lib/google/calendar'
+import { getValidAccessToken, queryFreeBusy, type GoogleTokens } from '@/lib/google/calendar'
 
 /**
  * GET /api/google/availability
@@ -16,7 +16,8 @@ import { getValidAccessToken, queryFreeBusy, getConnectedEmail, type GoogleToken
  *
  * Response: { data: { [email]: [{ start, end }] }, connected_email: string | null }
  *
- * The connected_email is the Google account that owns the OAuth token.
+ * The connected_email is the Google account that owns the OAuth token (stored in
+ * org_settings.google_connected_email at connection time).
  * It is automatically added to the freebusy query so the connected account's
  * calendar always shows regardless of what panel emails are provided.
  *
@@ -29,10 +30,10 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // Load stored Google tokens
+  // Load stored Google tokens + connected account email (set at OAuth callback time)
   const { data: settings } = await supabase
     .from('org_settings')
-    .select('google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry')
+    .select('google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry, google_connected_email')
     .eq('org_id', orgId)
     .single()
 
@@ -83,10 +84,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch the connected Google account email.
+    // Use the connected email stored in org_settings (captured at OAuth connect time).
     // Auto-add it to the freebusy query so the token owner's calendar always shows —
-    // even when panel member emails use a work address different from the Google account.
-    const connectedEmail = await getConnectedEmail(accessToken)
+    // even when panel member emails differ from the connected Google account address.
+    const connectedEmail = (settings.google_connected_email as string | null) ?? null
     const emailsToQuery  = [...emails]
     if (connectedEmail && !emailsToQuery.includes(connectedEmail.toLowerCase())) {
       emailsToQuery.push(connectedEmail.toLowerCase())
