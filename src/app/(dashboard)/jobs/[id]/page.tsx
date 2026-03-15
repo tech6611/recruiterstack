@@ -1137,7 +1137,6 @@ function ScoringCriteriaModal({
   candidateName,
   latestScorecard,
   aiScore,
-  aiRecommendation,
   onClose,
   onSaved,
 }: {
