@@ -1374,9 +1374,22 @@ function ScoringCriteriaModal({
 
                 {/* Footer note */}
                 {hasManual || hasAI ? (
-                  <p className={`text-[9px] ${hasManual ? 'text-slate-400' : 'text-blue-400'}`}>
-                    Wtg × Rating = (Rating ÷ 4) × Weightage. Updates live as you adjust weights.
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={`text-[9px] ${hasManual ? 'text-slate-400' : 'text-blue-400'}`}>
+                      Wtg × Rating = (Rating ÷ 4) × Weightage. Updates live as you adjust weights.
+                    </p>
+                    {/* Re-score button stays visible even after scores appear */}
+                    {!hasManual && hasScore && onRescore && (
+                      <button
+                        onClick={onRescore}
+                        disabled={rescoring}
+                        className="shrink-0 text-[9px] font-semibold text-blue-500 hover:text-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                      >
+                        <Loader2 className={`h-2.5 w-2.5 ${rescoring ? 'animate-spin' : ''}`} />
+                        {rescoring ? 'Rescoring…' : 'Re-score'}
+                      </button>
+                    )}
+                  </div>
                 ) : hasScore && onRescore ? (
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[9px] text-blue-400">
