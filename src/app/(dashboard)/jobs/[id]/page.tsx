@@ -22,6 +22,13 @@ import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEdi
 
 const DEFAULT_CRITERIA = ['Technical Skills', 'Communication', 'Problem Solving', 'Culture Fit']
 
+const DEFAULT_SCORING_CRITERIA_OBJ: ScoringCriterion[] = [
+  { id: 'technical',     name: 'Technical Skills',  weight: 35, description: 'Relevant technical expertise and depth' },
+  { id: 'experience',    name: 'Domain Experience', weight: 25, description: 'Industry or role-specific background' },
+  { id: 'communication', name: 'Communication',     weight: 20, description: 'Clarity, articulation, professional presence' },
+  { id: 'culture',       name: 'Culture Fit',       weight: 20, description: 'Alignment with team values and ways of working' },
+]
+
 const RECOMMENDATION_CONFIG: Record<ScorecardRecommendation, { label: string; badge: string; active: string; btn: string }> = {
   strong_yes: { label: 'Strong Yes', badge: 'bg-emerald-100 text-emerald-700', active: 'bg-emerald-600 text-white border-emerald-600', btn: 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
   yes:        { label: 'Yes',        badge: 'bg-blue-100 text-blue-700',       active: 'bg-blue-600 text-white border-blue-600',       btn: 'border border-blue-200 text-blue-700 hover:bg-blue-50'       },
@@ -1122,6 +1129,189 @@ function AddCandidateModal({
   )
 }
 
+// ── Scoring Criteria Edit Modal ───────────────────────────────────────────────
+
+function ScoringCriteriaModal({
+  criteria,
+  jobId,
+  onClose,
+  onSaved,
+}: {
+  criteria: ScoringCriterion[] | null | undefined
+  jobId: string
+  onClose: () => void
+  onSaved: (updated: ScoringCriterion[]) => void
+}) {
+  const initial = criteria && criteria.length > 0 ? criteria : DEFAULT_SCORING_CRITERIA_OBJ
+  const [items, setItems]     = useState<ScoringCriterion[]>(initial)
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState('')
+
+  const total = items.reduce((s, c) => s + c.weight, 0)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const handleSave = async () => {
+    if (total !== 100) { setError(`Weights must sum to 100% (currently ${total}%)`); return }
+    const valid = items.filter(c => c.name.trim())
+    if (valid.length === 0) { setError('Add at least one criterion'); return }
+    setSaving(true); setError('')
+    const res = await fetch(`/api/hiring-requests/${jobId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ scoring_criteria: valid }),
+    })
+    setSaving(false)
+    if (!res.ok) { const j = await res.json(); setError(j.error ?? 'Save failed'); return }
+    onSaved(valid)
+  }
+
+  const previewItems = items.slice(0, 3)
+  const previewTotal = previewItems.reduce((s, c) => s + (3 / 4) * c.weight, 0)
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[92vh]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Scoring Criteria</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Drag to reorder · weights must sum to 100%</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 px-5 pb-2 space-y-3">
+
+          {/* Criteria rows */}
+          <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+            {items.map((c, i) => (
+              <div
+                key={c.id}
+                draggable
+                onDragStart={() => setDragIdx(i)}
+                onDragOver={e => e.preventDefault()}
+                onDrop={() => {
+                  if (dragIdx === null || dragIdx === i) return
+                  const next = [...items]
+                  const [moved] = next.splice(dragIdx, 1)
+                  next.splice(i, 0, moved)
+                  setItems(next)
+                  setDragIdx(null)
+                }}
+                className="flex items-center gap-2 px-3 py-2.5 bg-white hover:bg-slate-50 transition-colors group"
+              >
+                <GripVertical className="h-4 w-4 text-slate-300 cursor-grab shrink-0" />
+                <input
+                  value={c.name}
+                  onChange={e => setItems(prev => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                  placeholder="Criterion name"
+                  className="flex-1 text-sm text-slate-800 bg-transparent focus:outline-none min-w-0"
+                />
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setItems(prev => prev.map((x, j) => j === i ? { ...x, weight: Math.max(0, x.weight - 5) } : x))}
+                    className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 text-sm font-bold transition-colors"
+                  >−</button>
+                  <span className={`text-xs font-semibold w-9 text-center ${total === 100 ? 'text-slate-700' : 'text-amber-600'}`}>
+                    {c.weight}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setItems(prev => prev.map((x, j) => j === i ? { ...x, weight: Math.min(100, x.weight + 5) } : x))}
+                    className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 text-sm font-bold transition-colors"
+                  >+</button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setItems(prev => prev.filter((_, j) => j !== i))}
+                  className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 transition-all"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Add criterion */}
+          <button
+            type="button"
+            onClick={() => setItems(prev => [...prev, { id: `c_${Date.now()}`, name: 'New Criterion', weight: 0, description: null }])}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add criterion
+          </button>
+
+          {/* Math formula */}
+          <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">📐 How the score is calculated</p>
+            <p className="text-xs font-mono text-slate-600">Score = Σ (Rating ÷ 4 × Weight%)</p>
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              Each criterion is rated 1–4 (Poor → Excellent). Dividing by 4 gives a 0–100% efficiency
+              multiplied by the factor weight, then summed across all criteria.
+            </p>
+            {/* Live example preview */}
+            <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 space-y-1">
+              <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Example — rated "Good (3/4)"</p>
+              {previewItems.map(item => (
+                <div key={item.id} className="flex items-center justify-between text-[10px] text-slate-400">
+                  <span className="truncate max-w-[160px]">
+                    {item.name || '—'} <span className="text-slate-300">({item.weight}%)</span>
+                  </span>
+                  <span className="font-medium text-slate-500 shrink-0">{((3 / 4) * item.weight).toFixed(1)} pts</span>
+                </div>
+              ))}
+              {items.length > 3 && (
+                <div className="text-[9px] text-slate-300 text-center">+ {items.length - 3} more…</div>
+              )}
+              <div className="border-t border-slate-100 pt-1 flex justify-between text-[10px] font-semibold text-slate-600">
+                <span>Weighted total (example)</span>
+                <span>{previewTotal.toFixed(1)} / {previewItems.reduce((s, c) => s + c.weight, 0)} pts</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 pb-5 pt-3 shrink-0 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-slate-500">Total weight</span>
+            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+              total === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-600'
+            }`}>
+              {total}% {total === 100 ? '✓' : `(${100 - total > 0 ? '+' : ''}${100 - total} needed)`}
+            </span>
+          </div>
+          {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+            >Cancel</button>
+            <button
+              onClick={handleSave}
+              disabled={saving || total !== 100}
+              className="flex-1 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >{saving ? 'Saving…' : 'Save'}</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 // ── Candidate Slide-Over ──────────────────────────────────────────────────────
 
 function CandidateSlideOver({
@@ -1131,6 +1321,7 @@ function CandidateSlideOver({
   onClose,
   onStageChange,
   onStatusChange,
+  onCriteriaUpdated,
 }: {
   app: Application
   stages: PipelineStage[]
@@ -1138,6 +1329,7 @@ function CandidateSlideOver({
   onClose: () => void
   onStageChange: (appId: string, stageId: string) => void
   onStatusChange: (appId: string, status: string) => void
+  onCriteriaUpdated?: (c: ScoringCriterion[]) => void
 }) {
   const c = app.candidate!
   const [tab, setTab]   = useState<'details' | 'scorecards'>('details')
@@ -1157,9 +1349,12 @@ function CandidateSlideOver({
   const [scInterviewer, setScInterviewer]   = useState('')
   const [scRound, setScRound]               = useState('')
   const [scRec, setScRec]                   = useState<ScorecardRecommendation | ''>('')
+  // Local copy of criteria — updated optimistically when the edit modal saves
+  const [localCriteria, setLocalCriteria]   = useState<ScoringCriterion[] | null | undefined>(scoringCriteria)
+  const [editCriteriaOpen, setEditCriteriaOpen] = useState(false)
   // Use job's weighted criteria if available, fall back to defaults
-  const activeCriteria = scoringCriteria?.length
-    ? scoringCriteria.map(c => c.name)
+  const activeCriteria = localCriteria?.length
+    ? localCriteria.map(c => c.name)
     : DEFAULT_CRITERIA
 
   const [scScores, setScScores]             = useState(
@@ -1340,6 +1535,25 @@ function CandidateSlideOver({
           {tab === 'scorecards' && (
             <div className="px-6 py-5 space-y-4">
 
+              {/* ── Scoring criteria header with edit pencil ── */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-wrap gap-1">
+                  {(localCriteria ?? DEFAULT_SCORING_CRITERIA_OBJ).map(c => (
+                    <span key={c.id} className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium">
+                      {c.name} {c.weight}%
+                    </span>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setEditCriteriaOpen(true)}
+                  title="Edit scoring criteria"
+                  className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-violet-600 transition-colors ml-2 shrink-0"
+                >
+                  <Pencil className="h-2.5 w-2.5" />
+                  Edit
+                </button>
+              </div>
+
               {/* ── AI Analysis (stored, no extra API call) ── */}
               {app.ai_score !== null && (
                 <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2.5">
@@ -1386,6 +1600,20 @@ function CandidateSlideOver({
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+
+                  {/* Scored-on basis */}
+                  {localCriteria && localCriteria.length > 0 && (
+                    <div className="pt-2 border-t border-blue-100">
+                      <p className="text-[9px] font-semibold text-blue-400 uppercase tracking-wide mb-1.5">📊 Scored on</p>
+                      <div className="flex flex-wrap gap-1">
+                        {localCriteria.map(c => (
+                          <span key={c.id} className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium">
+                            {c.name} {c.weight}%
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1435,7 +1663,17 @@ function CandidateSlideOver({
 
                   {/* Criteria */}
                   <div className="space-y-3">
-                    <p className="text-xs font-semibold text-slate-500">Criteria *</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-slate-500">Criteria *</p>
+                      <button
+                        type="button"
+                        onClick={() => setEditCriteriaOpen(true)}
+                        title="Edit scoring criteria"
+                        className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-violet-600 transition-colors"
+                      >
+                        <Pencil className="h-2.5 w-2.5" /> Edit criteria
+                      </button>
+                    </div>
                     {scScores.map((s, idx) => (
                       <div key={s.criterion}>
                         <div className="flex items-center justify-between mb-1">
@@ -1548,13 +1786,47 @@ function CandidateSlideOver({
                           </button>
                         </div>
                         {sc.scores.length > 0 && (
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                            {sc.scores.map(s => (
-                              <div key={s.criterion} className="flex items-center justify-between gap-1">
-                                <span className="text-xs text-slate-500 truncate">{s.criterion}</span>
-                                <RatingDots rating={s.rating} />
-                              </div>
-                            ))}
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                              {sc.scores.map(s => (
+                                <div key={s.criterion} className="flex items-center justify-between gap-1">
+                                  <span className="text-xs text-slate-500 truncate">{s.criterion}</span>
+                                  <RatingDots rating={s.rating} />
+                                </div>
+                              ))}
+                            </div>
+                            {/* Weighted score math breakdown */}
+                            {(() => {
+                              const criteria = localCriteria ?? []
+                              const rows = sc.scores
+                                .map(s => {
+                                  const crit = criteria.find(c => c.name === s.criterion)
+                                  return crit && s.rating > 0
+                                    ? { name: s.criterion, weight: crit.weight, rating: s.rating, pts: (s.rating / 4) * crit.weight }
+                                    : null
+                                })
+                                .filter(Boolean) as { name: string; weight: number; rating: number; pts: number }[]
+                              if (rows.length === 0) return null
+                              const total = rows.reduce((s, r) => s + r.pts, 0)
+                              return (
+                                <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 space-y-1">
+                                  <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide">Weighted breakdown</p>
+                                  {rows.map(r => (
+                                    <div key={r.name} className="flex items-center justify-between text-[10px] text-slate-400">
+                                      <span className="truncate">
+                                        {r.name} <span className="text-slate-300">({r.weight}%)</span>
+                                        {' · '}{RATING_CONFIG[r.rating - 1]?.label}
+                                      </span>
+                                      <span className="font-semibold text-slate-500 shrink-0 ml-2">{r.pts.toFixed(1)} pts</span>
+                                    </div>
+                                  ))}
+                                  <div className="border-t border-slate-100 pt-1 flex items-center justify-between text-[10px] font-bold text-slate-600">
+                                    <span>Weighted Score</span>
+                                    <span>{Math.round(total)} / 100</span>
+                                  </div>
+                                </div>
+                              )
+                            })()}
                           </div>
                         )}
                         {sc.overall_notes && (
@@ -1582,6 +1854,21 @@ function CandidateSlideOver({
           </a>
         </div>
       </div>
+
+      {/* Scoring criteria edit modal */}
+      {editCriteriaOpen && (
+        <ScoringCriteriaModal
+          criteria={localCriteria}
+          jobId={app.hiring_request_id}
+          onClose={() => setEditCriteriaOpen(false)}
+          onSaved={newCriteria => {
+            setLocalCriteria(newCriteria)
+            setScScores(newCriteria.map(c => ({ criterion: c.name, rating: 0 as 0 | 1 | 2 | 3 | 4 })))
+            setEditCriteriaOpen(false)
+            onCriteriaUpdated?.(newCriteria)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -4430,6 +4717,7 @@ export default function JobPipelinePage() {
           onClose={() => setSelectedApp(null)}
           onStageChange={handleStageChange}
           onStatusChange={handleStatusChange}
+          onCriteriaUpdated={c => setJob(j => j ? { ...j, scoring_criteria: c } : j)}
         />
       )}
 
