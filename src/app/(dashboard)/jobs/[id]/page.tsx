@@ -1153,7 +1153,7 @@ function ScoringCriteriaModal({
   aiCriterionScores?: { name: string; rating: number; weight: number }[] | null
   onClose: () => void
   onSaved: (updated: ScoringCriterion[]) => void
-  onRescore?: () => void
+  onRescore?: (currentItems: ScoringCriterion[]) => void
   rescoring?: boolean
 }) {
   const initial = criteria && criteria.length > 0 ? criteria : DEFAULT_SCORING_CRITERIA_OBJ
@@ -1378,10 +1378,10 @@ function ScoringCriteriaModal({
                     <p className={`text-[9px] ${hasManual ? 'text-slate-400' : 'text-blue-400'}`}>
                       Wtg × Rating = (Rating ÷ 4) × Weightage. Updates live as you adjust weights.
                     </p>
-                    {/* Re-score button stays visible even after scores appear */}
+                    {/* Re-score button — passes current (possibly unsaved) items */}
                     {!hasManual && hasScore && onRescore && (
                       <button
-                        onClick={onRescore}
+                        onClick={() => onRescore(items)}
                         disabled={rescoring}
                         className="shrink-0 text-[9px] font-semibold text-blue-500 hover:text-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                       >
@@ -1398,7 +1398,7 @@ function ScoringCriteriaModal({
                         : `No per-criterion breakdown yet for ${candidateName ?? 'this candidate'}.`}
                     </p>
                     <button
-                      onClick={onRescore}
+                      onClick={() => onRescore(items)}
                       disabled={rescoring}
                       className="shrink-0 text-[9px] font-semibold text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors rounded-md px-2 py-1 flex items-center gap-1"
                     >
@@ -1513,17 +1513,17 @@ function CandidateSlideOver({
   }, [app.id])
 
   // Re-score this application via SSE stream (triggered after criteria change)
-  const handleRescore = useCallback(async () => {
+  const handleRescore = useCallback(async (criteriaOverride?: ScoringCriterion[]) => {
     setRescoring(true)
     try {
       const res = await fetch(`/api/jobs/${app.hiring_request_id}/score`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Pass the criteria visible in the modal (falling back to defaults if the
-        // job has none saved yet) so the scorer always has criteria to work with.
+        // Use criteria passed directly from the modal's current items state
+        // (may include unsaved changes), falling back to localCriteria or defaults.
         body:    JSON.stringify({
           application_id:   app.id,
-          scoring_criteria: localCriteria ?? DEFAULT_SCORING_CRITERIA_OBJ,
+          scoring_criteria: criteriaOverride ?? localCriteria ?? DEFAULT_SCORING_CRITERIA_OBJ,
         }),
       })
       if (!res.ok || !res.body) return
@@ -2065,9 +2065,9 @@ function CandidateSlideOver({
             setScScores(newCriteria.map(cr => ({ criterion: cr.name, rating: 0 as 0 | 1 | 2 | 3 | 4 })))
             setEditCriteriaOpen(false)
             onCriteriaUpdated?.(newCriteria)
-            // Auto-rescore if candidate has an AI score (new criteria = new rubric)
+            // Auto-rescore with the just-saved criteria (new criteria = new rubric)
             if (app.ai_score !== null && app.ai_score !== undefined) {
-              void handleRescore()
+              void handleRescore(newCriteria)
             }
           }}
         />
