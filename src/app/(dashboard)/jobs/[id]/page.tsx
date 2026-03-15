@@ -1140,6 +1140,8 @@ function ScoringCriteriaModal({
   aiCriterionScores,
   onClose,
   onSaved,
+  onRescore,
+  rescoring,
 }: {
   criteria: ScoringCriterion[] | null | undefined
   jobId: string
@@ -1150,6 +1152,8 @@ function ScoringCriteriaModal({
   aiCriterionScores?: { name: string; rating: number; weight: number }[] | null
   onClose: () => void
   onSaved: (updated: ScoringCriterion[]) => void
+  onRescore?: () => void
+  rescoring?: boolean
 }) {
   const initial = criteria && criteria.length > 0 ? criteria : DEFAULT_SCORING_CRITERIA_OBJ
   const [items, setItems]     = useState<ScoringCriterion[]>(initial)
@@ -1368,13 +1372,33 @@ function ScoringCriteriaModal({
                 </div>
 
                 {/* Footer note */}
-                <p className={`text-[9px] ${hasManual || hasAI ? (hasManual ? 'text-slate-400' : 'text-blue-400') : 'text-slate-400'}`}>
-                  {hasManual || hasAI
-                    ? 'Wtg × Rating = (Rating ÷ 4) × Weightage. Updates live as you adjust weights.'
-                    : hasScore
+                {hasManual || hasAI ? (
+                  <p className={`text-[9px] ${hasManual ? 'text-slate-400' : 'text-blue-400'}`}>
+                    Wtg × Rating = (Rating ÷ 4) × Weightage. Updates live as you adjust weights.
+                  </p>
+                ) : hasScore && onRescore ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[9px] text-blue-400">
+                      {rescoring
+                        ? `Rescoring ${candidateName ?? 'candidate'}…`
+                        : `No per-criterion breakdown yet for ${candidateName ?? 'this candidate'}.`}
+                    </p>
+                    <button
+                      onClick={onRescore}
+                      disabled={rescoring}
+                      className="shrink-0 text-[9px] font-semibold text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors rounded-md px-2 py-1 flex items-center gap-1"
+                    >
+                      <Loader2 className={`h-2.5 w-2.5 ${rescoring ? 'animate-spin' : ''}`} />
+                      {rescoring ? 'Rescoring…' : 'Re-score now'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[9px] text-slate-400">
+                    {hasScore
                       ? `Re-score ${candidateName ?? 'this candidate'} to see a per-criterion breakdown.`
                       : 'Score a candidate to see their breakdown here.'}
-                </p>
+                  </p>
+                )}
               </div>
             )
           })()}
@@ -2015,6 +2039,8 @@ function CandidateSlideOver({
           aiRecommendation={app.ai_recommendation}
           aiCriterionScores={app.ai_criterion_scores ?? null}
           onClose={() => setEditCriteriaOpen(false)}
+          onRescore={app.ai_score !== null && app.ai_score !== undefined ? handleRescore : undefined}
+          rescoring={rescoring}
           onSaved={newCriteria => {
             setLocalCriteria(newCriteria)
             setScScores(newCriteria.map(cr => ({ criterion: cr.name, rating: 0 as 0 | 1 | 2 | 3 | 4 })))
