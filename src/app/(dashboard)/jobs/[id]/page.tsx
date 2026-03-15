@@ -1171,8 +1171,6 @@ function ScoringCriteriaModal({
     onSaved(valid)
   }
 
-  const previewItems = items.slice(0, 3)
-  const previewTotal = previewItems.reduce((s, c) => s + (3 / 4) * c.weight, 0)
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm">
@@ -1223,9 +1221,20 @@ function ScoringCriteriaModal({
                     onClick={() => setItems(prev => prev.map((x, j) => j === i ? { ...x, weight: Math.max(0, x.weight - 5) } : x))}
                     className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 text-sm font-bold transition-colors"
                   >−</button>
-                  <span className={`text-xs font-semibold w-9 text-center ${total === 100 ? 'text-slate-700' : 'text-amber-600'}`}>
-                    {c.weight}%
-                  </span>
+                  <div className="flex items-center">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={c.weight}
+                      onChange={e => {
+                        const v = Math.max(0, Math.min(100, parseInt(e.target.value) || 0))
+                        setItems(prev => prev.map((x, j) => j === i ? { ...x, weight: v } : x))
+                      }}
+                      className={`w-9 text-xs font-semibold text-center rounded border bg-transparent focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-300 border-transparent hover:border-slate-200 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${total === 100 ? 'text-slate-700' : 'text-amber-600'}`}
+                    />
+                    <span className={`text-xs font-semibold ${total === 100 ? 'text-slate-700' : 'text-amber-600'}`}>%</span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setItems(prev => prev.map((x, j) => j === i ? { ...x, weight: Math.min(100, x.weight + 5) } : x))}
@@ -1252,33 +1261,57 @@ function ScoringCriteriaModal({
             <Plus className="h-3.5 w-3.5" /> Add criterion
           </button>
 
-          {/* Math formula */}
+          {/* Score table */}
           <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">📐 How the score is calculated</p>
-            <p className="text-xs font-mono text-slate-600">Score = Σ (Rating ÷ 4 × Weight%)</p>
-            <p className="text-[10px] text-slate-400 leading-relaxed">
-              Each criterion is rated 1–4 (Poor → Excellent). Dividing by 4 gives a 0–100% efficiency
-              multiplied by the factor weight, then summed across all criteria.
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">📐 How ratings become scores</p>
+            <p className="text-[10px] text-slate-400">
+              Each criterion is rated 1–4. The rating maps to an efficiency (25 → 100%) which is multiplied by the weight. All criteria sum to the final score out of 100.
             </p>
-            {/* Live example preview */}
-            <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 space-y-1">
-              <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Example — rated &ldquo;Good (3/4)&rdquo;</p>
-              {previewItems.map(item => (
-                <div key={item.id} className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span className="truncate max-w-[160px]">
-                    {item.name || '—'} <span className="text-slate-300">({item.weight}%)</span>
-                  </span>
-                  <span className="font-medium text-slate-500 shrink-0">{((3 / 4) * item.weight).toFixed(1)} pts</span>
-                </div>
-              ))}
-              {items.length > 3 && (
-                <div className="text-[9px] text-slate-300 text-center">+ {items.length - 3} more…</div>
-              )}
-              <div className="border-t border-slate-100 pt-1 flex justify-between text-[10px] font-semibold text-slate-600">
-                <span>Weighted total (example)</span>
-                <span>{previewTotal.toFixed(1)} / {previewItems.reduce((s, c) => s + c.weight, 0)} pts</span>
-              </div>
+            <div className="rounded-lg overflow-hidden border border-slate-200">
+              <table className="w-full text-[10px] border-collapse">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="text-left px-2 py-1.5 text-slate-500 font-semibold">Criterion</th>
+                    <th className="px-2 py-1.5 text-slate-500 font-semibold text-center w-10">Wt.</th>
+                    <th className="px-2 py-1.5 text-red-400 font-semibold text-center">Poor</th>
+                    <th className="px-2 py-1.5 text-amber-500 font-semibold text-center">Fair</th>
+                    <th className="px-2 py-1.5 text-blue-500 font-semibold text-center">Good</th>
+                    <th className="px-2 py-1.5 text-emerald-500 font-semibold text-center">Excel.</th>
+                  </tr>
+                  <tr className="bg-white border-b border-slate-200">
+                    <td className="px-2 py-1 text-slate-400 text-[9px] italic">Rating efficiency</td>
+                    <td className="px-2 py-1 text-center text-slate-300">—</td>
+                    <td className="px-2 py-1 text-center text-red-400 font-semibold">25%</td>
+                    <td className="px-2 py-1 text-center text-amber-500 font-semibold">50%</td>
+                    <td className="px-2 py-1 text-center text-blue-500 font-semibold">75%</td>
+                    <td className="px-2 py-1 text-center text-emerald-500 font-semibold">100%</td>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {items.map(c => (
+                    <tr key={c.id} className="bg-white">
+                      <td className="px-2 py-1.5 text-slate-600 font-medium max-w-[100px] truncate">{c.name || '—'}</td>
+                      <td className="px-2 py-1.5 text-center text-slate-400">{c.weight}%</td>
+                      <td className="px-2 py-1.5 text-center text-slate-400">{(0.25 * c.weight).toFixed(1)}</td>
+                      <td className="px-2 py-1.5 text-center text-slate-400">{(0.50 * c.weight).toFixed(1)}</td>
+                      <td className="px-2 py-1.5 text-center text-slate-500 font-medium">{(0.75 * c.weight).toFixed(1)}</td>
+                      <td className="px-2 py-1.5 text-center text-slate-600 font-semibold">{c.weight}.0</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-slate-100 border-t-2 border-slate-200">
+                    <td className="px-2 py-1.5 font-bold text-slate-600">Max total</td>
+                    <td className={`px-2 py-1.5 text-center font-bold ${total === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>{total}%</td>
+                    <td className="px-2 py-1.5 text-center font-bold text-red-500">{Math.round(0.25 * total)}</td>
+                    <td className="px-2 py-1.5 text-center font-bold text-amber-500">{Math.round(0.50 * total)}</td>
+                    <td className="px-2 py-1.5 text-center font-bold text-blue-500">{Math.round(0.75 * total)}</td>
+                    <td className="px-2 py-1.5 text-center font-bold text-emerald-500">{Math.round(1.00 * total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
+            <p className="text-[9px] text-slate-400">Values in the table are points. All criteria summed = final score out of 100.</p>
           </div>
 
         </div>
