@@ -103,20 +103,28 @@ export async function POST(
         try {
           const result = await scoreApplicationForJob(candidate, job)
 
-          // Write score back to applications
+          // Write core score fields — always required
           const { error: updateErr } = await supabase
             .from('applications')
             .update({
-              ai_score:            result.score,
-              ai_recommendation:   result.recommendation,
-              ai_strengths:        result.strengths,
-              ai_gaps:             result.gaps,
-              ai_criterion_scores: result.criterion_scores ?? null,
-              ai_scored_at:        new Date().toISOString(),
+              ai_score:          result.score,
+              ai_recommendation: result.recommendation,
+              ai_strengths:      result.strengths,
+              ai_gaps:           result.gaps,
+              ai_scored_at:      new Date().toISOString(),
             } as never)
             .eq('id', app.id)
 
           if (updateErr) throw new Error(`DB write failed: ${updateErr.message}`)
+
+          // Write per-criterion scores separately — non-fatal if column missing
+          if (result.criterion_scores && result.criterion_scores.length > 0) {
+            await supabase
+              .from('applications')
+              .update({ ai_criterion_scores: result.criterion_scores } as never)
+              .eq('id', app.id)
+            // ignore error: column may not exist yet (migration 018 pending)
+          }
 
           scored++ // only count if DB write succeeded
 
