@@ -162,7 +162,8 @@ export interface Application {
   ai_recommendation: AiRecommendation | null
   ai_strengths:      string[]
   ai_gaps:           string[]
-  ai_scored_at:      string | null
+  ai_scored_at:           string | null
+  ai_criterion_scores:    { name: string; rating: number; weight: number }[] | null
   // Joined
   candidate?: Candidate
   stage?: PipelineStage
