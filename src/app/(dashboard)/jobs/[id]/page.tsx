@@ -4073,11 +4073,14 @@ export default function JobPipelinePage() {
       const body: Record<string, unknown> = applicationId ? { application_id: applicationId }
                  : stageId       ? { stage_id: stageId }
                  : {}
-      // Always pass page-state criteria so the scorer uses the latest (even if
-      // the DB row hasn't updated yet from a recent criteria save).
-      if (job?.scoring_criteria && job.scoring_criteria.length > 0) {
-        body.scoring_criteria = job.scoring_criteria
-      }
+      // Always pass criteria — use the job's saved criteria if available,
+      // otherwise fall back to the same defaults shown in the modal.
+      // This ensures criterion_scores are always returned from the scorer,
+      // even when the user hasn't explicitly saved criteria for this job yet.
+      body.scoring_criteria =
+        job?.scoring_criteria && job.scoring_criteria.length > 0
+          ? job.scoring_criteria
+          : DEFAULT_SCORING_CRITERIA_OBJ
       const res = await fetch(`/api/jobs/${id}/score`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
