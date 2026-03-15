@@ -1262,7 +1262,7 @@ function ScoringCriteriaModal({
             </p>
             {/* Live example preview */}
             <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 space-y-1">
-              <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Example — rated "Good (3/4)"</p>
+              <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Example — rated &ldquo;Good (3/4)&rdquo;</p>
               {previewItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between text-[10px] text-slate-400">
                   <span className="truncate max-w-[160px]">
