@@ -1506,11 +1506,11 @@ function CandidateSlideOver({
       const res = await fetch(`/api/jobs/${app.hiring_request_id}/score`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Pass localCriteria so the scorer always has criteria to work with,
-        // even if job.scoring_criteria hasn't been saved to the DB yet.
+        // Pass the criteria visible in the modal (falling back to defaults if the
+        // job has none saved yet) so the scorer always has criteria to work with.
         body:    JSON.stringify({
           application_id:   app.id,
-          scoring_criteria: localCriteria ?? undefined,
+          scoring_criteria: localCriteria ?? DEFAULT_SCORING_CRITERIA_OBJ,
         }),
       })
       if (!res.ok || !res.body) return
@@ -4070,9 +4070,14 @@ export default function JobPipelinePage() {
     setScoreProgress({ done: 0, total })
 
     try {
-      const body = applicationId ? { application_id: applicationId }
+      const body: Record<string, unknown> = applicationId ? { application_id: applicationId }
                  : stageId       ? { stage_id: stageId }
                  : {}
+      // Always pass page-state criteria so the scorer uses the latest (even if
+      // the DB row hasn't updated yet from a recent criteria save).
+      if (job?.scoring_criteria && job.scoring_criteria.length > 0) {
+        body.scoring_criteria = job.scoring_criteria
+      }
       const res = await fetch(`/api/jobs/${id}/score`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
