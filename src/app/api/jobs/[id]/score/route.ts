@@ -32,10 +32,12 @@ export async function POST(
   // Optional filters from request body
   let stageId: string | null = null
   let applicationId: string | null = null
+  let scoringCriteriaOverride: unknown[] | null = null
   try {
     const body = await req.json()
-    stageId       = body?.stage_id       ?? null
-    applicationId = body?.application_id ?? null
+    stageId                 = body?.stage_id        ?? null
+    applicationId           = body?.application_id  ?? null
+    scoringCriteriaOverride = Array.isArray(body?.scoring_criteria) ? body.scoring_criteria : null
   } catch { /* no body — score all */ }
 
   // ── 1. Fetch job, stages, and active applications ──────────────────────────
@@ -101,7 +103,12 @@ export async function POST(
         if (!candidate) continue
 
         try {
-          const result = await scoreApplicationForJob(candidate, job)
+          // Allow caller to inject scoring_criteria (e.g. from the UI's localCriteria)
+          // when the DB job row may not have them yet (newly added or not saved)
+          const jobForScoring = scoringCriteriaOverride
+            ? { ...job, scoring_criteria: scoringCriteriaOverride } as HiringRequest
+            : job
+          const result = await scoreApplicationForJob(candidate, jobForScoring)
 
           // Write core score fields — always required
           const { error: updateErr } = await supabase

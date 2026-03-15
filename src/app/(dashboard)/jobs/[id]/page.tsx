@@ -15,6 +15,7 @@ import type {
   Scorecard, ScorecardRecommendation, ScorecardScore, AiRecommendation,
   ScoringCriterion,
 } from '@/lib/types/database'
+import type { CriterionScore } from '@/lib/ai/job-scorer'
 import { useSettings } from '@/lib/hooks/useSettings'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
 
@@ -1505,7 +1506,12 @@ function CandidateSlideOver({
       const res = await fetch(`/api/jobs/${app.hiring_request_id}/score`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ application_id: app.id }),
+        // Pass localCriteria so the scorer always has criteria to work with,
+        // even if job.scoring_criteria hasn't been saved to the DB yet.
+        body:    JSON.stringify({
+          application_id:   app.id,
+          scoring_criteria: localCriteria ?? undefined,
+        }),
       })
       if (!res.ok || !res.body) return
       const reader  = res.body.getReader()
@@ -1536,7 +1542,7 @@ function CandidateSlideOver({
       }
     } catch { /* non-fatal — scoring may still have succeeded */ }
     finally { setRescoring(false) }
-  }, [app.hiring_request_id, app.id, onAppUpdated])
+  }, [app.hiring_request_id, app.id, localCriteria, onAppUpdated])
 
   useEffect(() => {
     if (tab === 'scorecards') loadScorecards()
@@ -4104,8 +4110,9 @@ export default function JobPipelinePage() {
               const score  = evt.score          as number
               const rec    = evt.recommendation as Application['ai_recommendation']
               const action = evt.action         as 'advanced' | 'rejected' | 'none'
-              const strengths = (evt.strengths as string[] | undefined) ?? []
-              const gaps      = (evt.gaps      as string[] | undefined) ?? []
+              const strengths       = (evt.strengths        as string[]          | undefined) ?? []
+              const gaps            = (evt.gaps             as string[]          | undefined) ?? []
+              const criterionScores = (evt.criterion_scores as CriterionScore[]  | undefined) ?? null
 
               // Patch everything directly into React state — no server refetch needed.
               // This is the only reliable approach: the SSE event IS the ground truth
@@ -4119,11 +4126,12 @@ export default function JobPipelinePage() {
                     if (a.id !== appId) return a
                     const updated: Application = {
                       ...a,
-                      ai_score:          score,
-                      ai_recommendation: rec,
-                      ai_strengths:      strengths,
-                      ai_gaps:           gaps,
-                      ai_scored_at:      new Date().toISOString(),
+                      ai_score:            score,
+                      ai_recommendation:   rec,
+                      ai_strengths:        strengths,
+                      ai_gaps:             gaps,
+                      ai_criterion_scores: criterionScores,
+                      ai_scored_at:        new Date().toISOString(),
                     }
                     if (action === 'advanced' && prev.auto_advance_stage_id) {
                       updated.stage_id = prev.auto_advance_stage_id
@@ -4135,6 +4143,20 @@ export default function JobPipelinePage() {
                   }),
                 }
               })
+              // Also sync selectedApp if it's the one being scored (slide-over is open)
+              setSelectedApp(prev =>
+                prev?.id === appId
+                  ? {
+                      ...prev,
+                      ai_score:            score,
+                      ai_recommendation:   rec,
+                      ai_strengths:        strengths,
+                      ai_gaps:             gaps,
+                      ai_criterion_scores: criterionScores,
+                      ai_scored_at:        new Date().toISOString(),
+                    }
+                  : prev,
+              )
             } else if (evt.type === 'complete') {
               setScoreResult({
                 scored:        (evt.scored        as number) ?? 0,
