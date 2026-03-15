@@ -48,10 +48,12 @@ function buildScoringCriteriaSection(job: HiringRequest): string {
 function buildCriterionScoresTemplate(job: HiringRequest): string {
   const criteria = job.scoring_criteria
   if (!criteria || criteria.length === 0) return ''
-  const template = criteria
-    .map(c => `    {"name": ${JSON.stringify(c.name)}, "rating": <1-4>, "weight": ${c.weight}}`)
+  // Use integer 0 as a placeholder — never output angle-bracket syntax in JSON
+  // (Claude echoes <...> literally, breaking JSON.parse)
+  const rows = criteria
+    .map(c => `    {"name": ${JSON.stringify(c.name)}, "rating": 0, "weight": ${c.weight}}`)
     .join(',\n')
-  return `,\n  "criterion_scores": [\n${template}\n  ]`
+  return `,\n  "criterion_scores": [\n${rows}\n  ]`
 }
 
 function buildPrompt(candidate: Candidate, job: HiringRequest): string {
@@ -101,12 +103,18 @@ ${SCORE_ANCHORS}
 ${buildScoringCriteriaSection(job)}${criterionInstruction}
 Evaluate how well this candidate fits the job. Focus primarily on the Key Requirements. Be honest about gaps — recruiters need accurate scoring, not inflated ones.
 
-Respond with ONLY valid JSON (no markdown, no extra text):
+Respond with ONLY a valid JSON object (no markdown, no extra text, no comments).
+Replace every example value below with your actual assessment:
+  score        → integer 0-100
+  recommendation → one of: strong_yes | yes | maybe | no
+  strengths    → array of 2-4 specific strengths for THIS job
+  gaps         → array of 0-3 specific gaps (empty array if strong match)${(job.scoring_criteria?.length ?? 0) > 0 ? '\n  criterion_scores → replace each "rating" with your 1-4 rating for that criterion' : ''}
+
 {
-  "score": <integer 0-100>,
-  "recommendation": "<strong_yes|yes|maybe|no>",
-  "strengths": [<2-4 specific strengths relevant to THIS job>],
-  "gaps": [<0-3 specific gaps — empty array [] if strong match>]${buildCriterionScoresTemplate(job)}
+  "score": 75,
+  "recommendation": "yes",
+  "strengths": ["strength one", "strength two"],
+  "gaps": ["gap one"]${buildCriterionScoresTemplate(job)}
 }`
 }
 
