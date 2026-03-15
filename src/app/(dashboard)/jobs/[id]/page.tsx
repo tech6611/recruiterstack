@@ -1270,156 +1270,114 @@ function ScoringCriteriaModal({
             <Plus className="h-3.5 w-3.5" /> Add criterion
           </button>
 
-          {/* Candidate scoring section — live-updates as weights change */}
-          {latestScorecard && latestScorecard.length > 0 ? (
-            // ── Manual scorecard: show actual per-criterion breakdown ──────────
-            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
-                📋 {candidateName ? `${candidateName}'s` : 'Latest'} scorecard — live breakdown
-              </p>
-              <div className="rounded-lg overflow-hidden border border-slate-200">
-                <table className="w-full text-[10px] border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100">
-                      <th className="text-left px-2 py-1.5 text-slate-500 font-semibold">Criterion</th>
-                      <th className="px-2 py-1.5 text-slate-500 font-semibold text-center">Weight</th>
-                      <th className="px-2 py-1.5 text-slate-500 font-semibold text-center">Rating</th>
-                      <th className="px-2 py-1.5 text-slate-500 font-semibold text-center">Pts</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {latestScorecard.map(s => {
-                      const crit = items.find(c => c.name === s.criterion)
-                      const pts  = crit && s.rating > 0 ? (s.rating / 4) * crit.weight : null
-                      const rLabel = s.rating > 0 ? RATING_CONFIG[s.rating - 1]?.label : '—'
-                      return (
-                        <tr key={s.criterion} className="bg-white">
-                          <td className="px-2 py-1.5 text-slate-600 font-medium">{s.criterion}</td>
-                          <td className="px-2 py-1.5 text-center text-slate-400">{crit?.weight ?? '—'}%</td>
-                          <td className={`px-2 py-1.5 text-center font-medium ${s.rating === 1 ? 'text-red-500' : s.rating === 2 ? 'text-amber-500' : s.rating === 3 ? 'text-blue-500' : s.rating === 4 ? 'text-emerald-500' : 'text-slate-300'}`}>{rLabel}</td>
-                          <td className="px-2 py-1.5 text-center font-semibold text-slate-600">{pts?.toFixed(1) ?? '—'}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-slate-100 border-t-2 border-slate-200">
-                      <td colSpan={3} className="px-2 py-1.5 font-bold text-slate-600">Weighted Score</td>
-                      <td className="px-2 py-1.5 text-center font-bold text-violet-600">
-                        {latestScorecard.reduce((sum, s) => {
-                          const crit = items.find(c => c.name === s.criterion)
-                          return sum + (crit && s.rating > 0 ? (s.rating / 4) * crit.weight : 0)
-                        }, 0).toFixed(1)} / 100
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-              <p className="text-[9px] text-slate-400">Pts = Rating ÷ 4 × Weight. Updates live as you adjust weights above.</p>
-            </div>
-          ) : aiScore !== null && aiScore !== undefined ? (
-            // ── AI score — show per-criterion breakdown if available, otherwise max-pts reference ──
-            <div className="rounded-xl bg-blue-50/50 border border-blue-100 p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide">🤖 AI Analysis</p>
-                <ScorePill score={aiScore} />
-              </div>
-              <div className="rounded-lg overflow-hidden border border-blue-100">
-                <table className="w-full text-[10px] border-collapse">
-                  <thead>
-                    <tr className="bg-blue-50">
-                      <th className="text-left px-2 py-1.5 text-blue-500 font-semibold">Criterion</th>
-                      <th className="px-2 py-1.5 text-blue-500 font-semibold text-center">Weight</th>
-                      {aiCriterionScores && aiCriterionScores.length > 0 && (
-                        <>
-                          <th className="px-2 py-1.5 text-blue-500 font-semibold text-center">Rating</th>
-                          <th className="px-2 py-1.5 text-blue-500 font-semibold text-center">Pts</th>
-                        </>
-                      )}
-                      <th className="px-2 py-1.5 text-blue-500 font-semibold text-center">Max</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-blue-50">
-                    {items.map(c => {
-                      const cs  = aiCriterionScores?.find(x => x.name === c.name)
-                      const pts = cs ? ((cs.rating / 4) * c.weight) : null
-                      const rLabel = cs
-                        ? (cs.rating === 1 ? 'Poor' : cs.rating === 2 ? 'Fair' : cs.rating === 3 ? 'Good' : 'Excellent')
-                        : null
-                      return (
-                        <tr key={c.id} className="bg-white">
-                          <td className="px-2 py-1.5 text-slate-600 font-medium">{c.name || '—'}</td>
-                          <td className="px-2 py-1.5 text-center text-slate-400">{c.weight}%</td>
-                          {aiCriterionScores && aiCriterionScores.length > 0 && (
-                            <>
-                              <td className={`px-2 py-1.5 text-center font-medium ${
-                                cs?.rating === 1 ? 'text-red-500' :
-                                cs?.rating === 2 ? 'text-amber-500' :
-                                cs?.rating === 3 ? 'text-blue-500' :
-                                cs?.rating === 4 ? 'text-emerald-500' : 'text-slate-300'
-                              }`}>{rLabel ?? '—'}</td>
-                              <td className="px-2 py-1.5 text-center font-semibold text-slate-600">{pts?.toFixed(1) ?? '—'}</td>
-                            </>
-                          )}
-                          <td className="px-2 py-1.5 text-center text-slate-400">{c.weight}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-blue-50 border-t-2 border-blue-100">
-                      <td colSpan={aiCriterionScores && aiCriterionScores.length > 0 ? 3 : 2}
-                          className="px-2 py-1.5 font-bold text-slate-600">
-                        {aiCriterionScores && aiCriterionScores.length > 0 ? 'Weighted Score' : 'Total'}
-                      </td>
-                      {aiCriterionScores && aiCriterionScores.length > 0 ? (
-                        <td className="px-2 py-1.5 text-center font-bold text-violet-600">
-                          {aiCriterionScores.reduce((sum, cs) => {
-                            const crit = items.find(c => c.name === cs.name)
-                            return sum + (crit ? (cs.rating / 4) * crit.weight : 0)
-                          }, 0).toFixed(1)} / 100
-                        </td>
-                      ) : null}
-                      <td className={`px-2 py-1.5 text-center font-bold ${total === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>{total}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-              {aiCriterionScores && aiCriterionScores.length > 0 ? (
-                <p className="text-[9px] text-blue-400">Pts = Rating ÷ 4 × Weight. Updates live as you adjust weights above.</p>
-              ) : (
-                <p className="text-[9px] text-blue-400">
-                  Re-score {candidateName ?? 'this candidate'} to see a per-criterion breakdown.
-                </p>
-              )}
-            </div>
-          ) : (
-            // ── No scoring data yet — show weight reference only ──────────────
-            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">📐 Weight reference</p>
-              <div className="rounded-lg overflow-hidden border border-slate-200">
-                <table className="w-full text-[10px] border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100">
-                      <th className="text-left px-2 py-1.5 text-slate-500 font-semibold">Criterion</th>
-                      <th className="px-2 py-1.5 text-slate-500 font-semibold text-center">Weight</th>
-                      <th className="px-2 py-1.5 text-slate-500 font-semibold text-center">Max pts</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {items.map(c => (
-                      <tr key={c.id} className="bg-white">
-                        <td className="px-2 py-1.5 text-slate-600 font-medium">{c.name || '—'}</td>
-                        <td className="px-2 py-1.5 text-center text-slate-400">{c.weight}%</td>
-                        <td className="px-2 py-1.5 text-center font-semibold text-slate-600">{c.weight}</td>
+          {/* ── Unified scoring breakdown table — same 4-column layout for all states ── */}
+          {(() => {
+            // Determine data source: manual scorecard > AI criterion scores > nothing
+            const hasManual = latestScorecard && latestScorecard.length > 0
+            const hasAI     = aiCriterionScores && aiCriterionScores.length > 0
+            const hasScore  = aiScore !== null && aiScore !== undefined
+
+            // Per-criterion lookup: returns { rating, pts } or nulls
+            const getRating = (name: string): { rating: number; pts: number } | null => {
+              if (hasManual) {
+                const s = latestScorecard!.find(x => x.criterion === name)
+                if (s && s.rating > 0) return { rating: s.rating, pts: (s.rating / 4) * (items.find(c => c.name === name)?.weight ?? 0) }
+              } else if (hasAI) {
+                const cs = aiCriterionScores!.find(x => x.name === name)
+                if (cs) return { rating: cs.rating, pts: (cs.rating / 4) * (items.find(c => c.name === name)?.weight ?? 0) }
+              }
+              return null
+            }
+
+            const RATING_LABEL: Record<number, string> = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Excellent' }
+            const RATING_COLOR: Record<number, string> = {
+              1: 'text-red-500', 2: 'text-amber-500', 3: 'text-blue-500', 4: 'text-emerald-500',
+            }
+
+            const weightedTotal = items.reduce((sum, c) => {
+              const r = getRating(c.name)
+              return sum + (r ? r.pts : 0)
+            }, 0)
+
+            const headerCls  = hasManual ? 'bg-slate-100'   : hasScore ? 'bg-blue-50'   : 'bg-slate-100'
+            const thCls      = hasManual ? 'text-slate-500' : hasScore ? 'text-blue-500' : 'text-slate-500'
+            const dividerCls = hasManual ? 'divide-slate-100' : hasScore ? 'divide-blue-50' : 'divide-slate-100'
+            const footerCls  = hasManual ? 'bg-slate-100 border-slate-200' : hasScore ? 'bg-blue-50 border-blue-100' : 'bg-slate-100 border-slate-200'
+            const borderCls  = hasManual ? 'border-slate-200' : hasScore ? 'border-blue-100' : 'border-slate-200'
+            const wrapCls    = hasManual
+              ? 'rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2'
+              : hasScore
+                ? 'rounded-xl bg-blue-50/50 border border-blue-100 p-3 space-y-2'
+                : 'rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2'
+
+            return (
+              <div className={wrapCls}>
+                {/* Header row */}
+                <div className="flex items-center justify-between">
+                  {hasManual ? (
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                      📋 {candidateName ? `${candidateName}'s` : 'Latest'} scorecard
+                    </p>
+                  ) : hasScore ? (
+                    <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide">🤖 AI Analysis</p>
+                  ) : (
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">📐 Scoring breakdown</p>
+                  )}
+                  {hasScore && <ScorePill score={aiScore!} />}
+                </div>
+
+                {/* Table */}
+                <div className={`rounded-lg overflow-hidden border ${borderCls}`}>
+                  <table className="w-full text-[10px] border-collapse">
+                    <thead>
+                      <tr className={headerCls}>
+                        <th className={`text-left px-2 py-1.5 font-semibold ${thCls}`}>Criterion</th>
+                        <th className={`px-2 py-1.5 font-semibold text-center ${thCls}`}>Weightage</th>
+                        <th className={`px-2 py-1.5 font-semibold text-center ${thCls}`}>Rating</th>
+                        <th className={`px-2 py-1.5 font-semibold text-center ${thCls}`}>Wtg × Rating</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className={`divide-y ${dividerCls}`}>
+                      {items.map(c => {
+                        const r = getRating(c.name)
+                        return (
+                          <tr key={c.id} className="bg-white">
+                            <td className="px-2 py-1.5 text-slate-600 font-medium">{c.name || '—'}</td>
+                            <td className="px-2 py-1.5 text-center text-slate-400">{c.weight}%</td>
+                            <td className={`px-2 py-1.5 text-center font-medium ${r ? (RATING_COLOR[r.rating] ?? 'text-slate-600') : 'text-slate-300'}`}>
+                              {r
+                                ? `${RATING_LABEL[r.rating] ?? r.rating} (${r.rating}/4)`
+                                : '—'}
+                            </td>
+                            <td className="px-2 py-1.5 text-center font-semibold text-slate-600">
+                              {r ? r.pts.toFixed(1) : '—'}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className={`border-t-2 ${footerCls}`}>
+                        <td colSpan={3} className="px-2 py-1.5 font-bold text-slate-600">Total</td>
+                        <td className={`px-2 py-1.5 text-center font-bold ${(hasManual || hasAI) ? 'text-violet-600' : (total === 100 ? 'text-emerald-600' : 'text-amber-600')}`}>
+                          {(hasManual || hasAI) ? `${weightedTotal.toFixed(1)} / 100` : `${total}`}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Footer note */}
+                <p className={`text-[9px] ${hasManual || hasAI ? (hasManual ? 'text-slate-400' : 'text-blue-400') : 'text-slate-400'}`}>
+                  {hasManual || hasAI
+                    ? 'Wtg × Rating = (Rating ÷ 4) × Weightage. Updates live as you adjust weights.'
+                    : hasScore
+                      ? `Re-score ${candidateName ?? 'this candidate'} to see a per-criterion breakdown.`
+                      : 'Score a candidate to see their breakdown here.'}
+                </p>
               </div>
-              <p className="text-[9px] text-slate-400">Score a candidate or add a scorecard to see their breakdown here.</p>
-            </div>
-          )}
+            )
+          })()}
 
         </div>
 
