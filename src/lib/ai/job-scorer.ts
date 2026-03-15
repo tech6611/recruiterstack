@@ -4,16 +4,26 @@
  * Scores a candidate (0–100) against a specific job's requirements.
  * Uses Claude Haiku for speed and cost efficiency during bulk scoring.
  * Separate from src/lib/ai/matcher.ts which scores against generic Role objects.
+ *
+ * When the job has scoring_criteria, Claude also returns a per-criterion rating
+ * (0–4 scale, matching the manual scorecard scale) stored as ai_criterion_scores.
  */
 
 import Anthropic from '@anthropic-ai/sdk'
 import type { Candidate, HiringRequest, AiRecommendation } from '@/lib/types/database'
 
+export interface CriterionScore {
+  name:   string  // matches criterion name from scoring_criteria
+  rating: number  // 0–4  (0=N/A, 1=Poor, 2=Fair, 3=Good, 4=Excellent)
+  weight: number  // echoed back for reference
+}
+
 export interface JobScoreResult {
-  score:          number          // 0–100 integer
-  recommendation: AiRecommendation
-  strengths:      string[]        // 2–4 concrete points relevant to THIS job
-  gaps:           string[]        // 0–3 specific gaps (empty if strong match)
+  score:             number          // 0–100 integer
+  recommendation:    AiRecommendation
+  strengths:         string[]        // 2–4 concrete points relevant to THIS job
+  gaps:              string[]        // 0–3 specific gaps (empty if strong match)
+  criterion_scores?: CriterionScore[] // present only when job has scoring_criteria
 }
 
 // Score calibration anchors — embedded in every prompt for consistency
@@ -35,6 +45,15 @@ function buildScoringCriteriaSection(job: HiringRequest): string {
   return `\nSCORING CRITERIA (weighted rubric for this role — respect these proportions when evaluating):\n${lines.join('\n')}\n`
 }
 
+function buildCriterionScoresTemplate(job: HiringRequest): string {
+  const criteria = job.scoring_criteria
+  if (!criteria || criteria.length === 0) return ''
+  const template = criteria
+    .map(c => `    {"name": ${JSON.stringify(c.name)}, "rating": <1-4>, "weight": ${c.weight}}`)
+    .join(',\n')
+  return `,\n  "criterion_scores": [\n${template}\n  ]`
+}
+
 function buildPrompt(candidate: Candidate, job: HiringRequest): string {
   const budget =
     job.budget_min && job.budget_max
@@ -50,6 +69,15 @@ function buildPrompt(candidate: Candidate, job: HiringRequest): string {
     : job.remote_ok
       ? 'Remote'
       : 'Not specified'
+
+  const hasCriteria = job.scoring_criteria && job.scoring_criteria.length > 0
+  const criterionInstruction = hasCriteria
+    ? `\nFor each criterion in SCORING CRITERIA, also assign a rating 1–4:
+  1 = Poor  (candidate clearly lacks this)
+  2 = Fair  (partial match, noticeable gap)
+  3 = Good  (solid match, meets expectations)
+  4 = Excellent (exceeds expectations, strong signal)\n`
+    : ''
 
   return `You are a senior technical recruiter performing a structured candidate evaluation.
 
@@ -70,7 +98,7 @@ CANDIDATE PROFILE:
 - Location: ${candidate.location ?? 'Not provided'}
 
 ${SCORE_ANCHORS}
-${buildScoringCriteriaSection(job)}
+${buildScoringCriteriaSection(job)}${criterionInstruction}
 Evaluate how well this candidate fits the job. Focus primarily on the Key Requirements. Be honest about gaps — recruiters need accurate scoring, not inflated ones.
 
 Respond with ONLY valid JSON (no markdown, no extra text):
@@ -78,7 +106,7 @@ Respond with ONLY valid JSON (no markdown, no extra text):
   "score": <integer 0-100>,
   "recommendation": "<strong_yes|yes|maybe|no>",
   "strengths": [<2-4 specific strengths relevant to THIS job>],
-  "gaps": [<0-3 specific gaps — empty array [] if strong match>]
+  "gaps": [<0-3 specific gaps — empty array [] if strong match>]${buildCriterionScoresTemplate(job)}
 }`
 }
 
@@ -90,7 +118,7 @@ export async function scoreApplicationForJob(
 
   const message = await client.messages.create({
     model:      'claude-haiku-4-5-20251001',
-    max_tokens: 512,
+    max_tokens: 600,
     messages:   [{ role: 'user', content: buildPrompt(candidate, job) }],
   })
 
@@ -115,6 +143,17 @@ export async function scoreApplicationForJob(
     .includes(result.recommendation)
     ? result.recommendation
     : 'maybe'
+
+  // Validate per-criterion ratings if present
+  if (Array.isArray(result.criterion_scores)) {
+    result.criterion_scores = result.criterion_scores.map(cs => ({
+      name:   cs.name,
+      rating: Math.max(1, Math.min(4, Math.round(cs.rating ?? 2))),
+      weight: cs.weight,
+    }))
+  } else {
+    result.criterion_scores = undefined
+  }
 
   return result
 }

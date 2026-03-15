@@ -107,11 +107,12 @@ export async function POST(
           const { error: updateErr } = await supabase
             .from('applications')
             .update({
-              ai_score:          result.score,
-              ai_recommendation: result.recommendation,
-              ai_strengths:      result.strengths,
-              ai_gaps:           result.gaps,
-              ai_scored_at:      new Date().toISOString(),
+              ai_score:            result.score,
+              ai_recommendation:   result.recommendation,
+              ai_strengths:        result.strengths,
+              ai_gaps:             result.gaps,
+              ai_criterion_scores: result.criterion_scores ?? null,
+              ai_scored_at:        new Date().toISOString(),
             } as never)
             .eq('id', app.id)
 
@@ -222,13 +223,14 @@ export async function POST(
 
           // ── Send progress event ────────────────────────────────────────────
           send({
-            type:           'progress',
-            application_id: app.id,
-            candidate_name: candidate.name,
-            score:          result.score,
-            recommendation: result.recommendation,
-            strengths:      result.strengths,
-            gaps:           result.gaps,
+            type:             'progress',
+            application_id:   app.id,
+            candidate_name:   candidate.name,
+            score:            result.score,
+            recommendation:   result.recommendation,
+            strengths:        result.strengths,
+            gaps:             result.gaps,
+            criterion_scores: result.criterion_scores ?? null,
             action,
           })
 
