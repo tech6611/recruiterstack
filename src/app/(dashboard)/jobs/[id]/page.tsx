@@ -1134,11 +1134,19 @@ function AddCandidateModal({
 function ScoringCriteriaModal({
   criteria,
   jobId,
+  candidateName,
+  latestScorecard,
+  aiScore,
+  aiRecommendation,
   onClose,
   onSaved,
 }: {
   criteria: ScoringCriterion[] | null | undefined
   jobId: string
+  candidateName?: string
+  latestScorecard?: ScorecardScore[] | null
+  aiScore?: number | null
+  aiRecommendation?: AiRecommendation | null
   onClose: () => void
   onSaved: (updated: ScoringCriterion[]) => void
 }) {
@@ -1261,58 +1269,118 @@ function ScoringCriteriaModal({
             <Plus className="h-3.5 w-3.5" /> Add criterion
           </button>
 
-          {/* Score table */}
-          <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">📐 How ratings become scores</p>
-            <p className="text-[10px] text-slate-400">
-              Each criterion is rated 1–4. The rating maps to an efficiency (25 → 100%) which is multiplied by the weight. All criteria sum to the final score out of 100.
-            </p>
-            <div className="rounded-lg overflow-hidden border border-slate-200">
-              <table className="w-full text-[10px] border-collapse">
-                <thead>
-                  <tr className="bg-slate-100">
-                    <th className="text-left px-2 py-1.5 text-slate-500 font-semibold">Criterion</th>
-                    <th className="px-2 py-1.5 text-slate-500 font-semibold text-center w-10">Wt.</th>
-                    <th className="px-2 py-1.5 text-red-400 font-semibold text-center">Poor</th>
-                    <th className="px-2 py-1.5 text-amber-500 font-semibold text-center">Fair</th>
-                    <th className="px-2 py-1.5 text-blue-500 font-semibold text-center">Good</th>
-                    <th className="px-2 py-1.5 text-emerald-500 font-semibold text-center">Excel.</th>
-                  </tr>
-                  <tr className="bg-white border-b border-slate-200">
-                    <td className="px-2 py-1 text-slate-400 text-[9px] italic">Rating efficiency</td>
-                    <td className="px-2 py-1 text-center text-slate-300">—</td>
-                    <td className="px-2 py-1 text-center text-red-400 font-semibold">25%</td>
-                    <td className="px-2 py-1 text-center text-amber-500 font-semibold">50%</td>
-                    <td className="px-2 py-1 text-center text-blue-500 font-semibold">75%</td>
-                    <td className="px-2 py-1 text-center text-emerald-500 font-semibold">100%</td>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.map(c => (
-                    <tr key={c.id} className="bg-white">
-                      <td className="px-2 py-1.5 text-slate-600 font-medium max-w-[100px] truncate">{c.name || '—'}</td>
-                      <td className="px-2 py-1.5 text-center text-slate-400">{c.weight}%</td>
-                      <td className="px-2 py-1.5 text-center text-slate-400">{(0.25 * c.weight).toFixed(1)}</td>
-                      <td className="px-2 py-1.5 text-center text-slate-400">{(0.50 * c.weight).toFixed(1)}</td>
-                      <td className="px-2 py-1.5 text-center text-slate-500 font-medium">{(0.75 * c.weight).toFixed(1)}</td>
-                      <td className="px-2 py-1.5 text-center text-slate-600 font-semibold">{c.weight}.0</td>
+          {/* Candidate scoring section — live-updates as weights change */}
+          {latestScorecard && latestScorecard.length > 0 ? (
+            // ── Manual scorecard: show actual per-criterion breakdown ──────────
+            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                📋 {candidateName ? `${candidateName}'s` : 'Latest'} scorecard — live breakdown
+              </p>
+              <div className="rounded-lg overflow-hidden border border-slate-200">
+                <table className="w-full text-[10px] border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100">
+                      <th className="text-left px-2 py-1.5 text-slate-500 font-semibold">Criterion</th>
+                      <th className="px-2 py-1.5 text-slate-500 font-semibold text-center">Weight</th>
+                      <th className="px-2 py-1.5 text-slate-500 font-semibold text-center">Rating</th>
+                      <th className="px-2 py-1.5 text-slate-500 font-semibold text-center">Pts</th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-slate-100 border-t-2 border-slate-200">
-                    <td className="px-2 py-1.5 font-bold text-slate-600">Max total</td>
-                    <td className={`px-2 py-1.5 text-center font-bold ${total === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>{total}%</td>
-                    <td className="px-2 py-1.5 text-center font-bold text-red-500">{Math.round(0.25 * total)}</td>
-                    <td className="px-2 py-1.5 text-center font-bold text-amber-500">{Math.round(0.50 * total)}</td>
-                    <td className="px-2 py-1.5 text-center font-bold text-blue-500">{Math.round(0.75 * total)}</td>
-                    <td className="px-2 py-1.5 text-center font-bold text-emerald-500">{Math.round(1.00 * total)}</td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {latestScorecard.map(s => {
+                      const crit = items.find(c => c.name === s.criterion)
+                      const pts  = crit && s.rating > 0 ? (s.rating / 4) * crit.weight : null
+                      const rLabel = s.rating > 0 ? RATING_CONFIG[s.rating - 1]?.label : '—'
+                      return (
+                        <tr key={s.criterion} className="bg-white">
+                          <td className="px-2 py-1.5 text-slate-600 font-medium">{s.criterion}</td>
+                          <td className="px-2 py-1.5 text-center text-slate-400">{crit?.weight ?? '—'}%</td>
+                          <td className={`px-2 py-1.5 text-center font-medium ${s.rating === 1 ? 'text-red-500' : s.rating === 2 ? 'text-amber-500' : s.rating === 3 ? 'text-blue-500' : s.rating === 4 ? 'text-emerald-500' : 'text-slate-300'}`}>{rLabel}</td>
+                          <td className="px-2 py-1.5 text-center font-semibold text-slate-600">{pts?.toFixed(1) ?? '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-100 border-t-2 border-slate-200">
+                      <td colSpan={3} className="px-2 py-1.5 font-bold text-slate-600">Weighted Score</td>
+                      <td className="px-2 py-1.5 text-center font-bold text-violet-600">
+                        {latestScorecard.reduce((sum, s) => {
+                          const crit = items.find(c => c.name === s.criterion)
+                          return sum + (crit && s.rating > 0 ? (s.rating / 4) * crit.weight : 0)
+                        }, 0).toFixed(1)} / 100
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <p className="text-[9px] text-slate-400">Pts = Rating ÷ 4 × Weight. Updates live as you adjust weights above.</p>
             </div>
-            <p className="text-[9px] text-slate-400">Values in the table are points. All criteria summed = final score out of 100.</p>
-          </div>
+          ) : aiScore !== null && aiScore !== undefined ? (
+            // ── AI score only — show per-criterion max pts reference + score note ──
+            <div className="rounded-xl bg-blue-50/50 border border-blue-100 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide">🤖 AI Analysis</p>
+                <ScorePill score={aiScore} />
+              </div>
+              <div className="rounded-lg overflow-hidden border border-blue-100">
+                <table className="w-full text-[10px] border-collapse">
+                  <thead>
+                    <tr className="bg-blue-50">
+                      <th className="text-left px-2 py-1.5 text-blue-500 font-semibold">Criterion</th>
+                      <th className="px-2 py-1.5 text-blue-500 font-semibold text-center">Weight</th>
+                      <th className="px-2 py-1.5 text-blue-500 font-semibold text-center">Max pts</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-blue-50">
+                    {items.map(c => (
+                      <tr key={c.id} className="bg-white">
+                        <td className="px-2 py-1.5 text-slate-600 font-medium">{c.name || '—'}</td>
+                        <td className="px-2 py-1.5 text-center text-slate-400">{c.weight}%</td>
+                        <td className="px-2 py-1.5 text-center font-semibold text-slate-600">{c.weight}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-blue-50 border-t-2 border-blue-100">
+                      <td className="px-2 py-1.5 font-bold text-slate-600">Total</td>
+                      <td className={`px-2 py-1.5 text-center font-bold ${total === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>{total}%</td>
+                      <td className={`px-2 py-1.5 text-center font-bold ${total === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>{total}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <p className="text-[9px] text-blue-400">
+                AI gives a holistic score — per-criterion breakdown isn&apos;t available. Save new criteria to re-score {candidateName ?? 'this candidate'} automatically.
+              </p>
+            </div>
+          ) : (
+            // ── No scoring data yet — show weight reference only ──────────────
+            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">📐 Weight reference</p>
+              <div className="rounded-lg overflow-hidden border border-slate-200">
+                <table className="w-full text-[10px] border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100">
+                      <th className="text-left px-2 py-1.5 text-slate-500 font-semibold">Criterion</th>
+                      <th className="px-2 py-1.5 text-slate-500 font-semibold text-center">Weight</th>
+                      <th className="px-2 py-1.5 text-slate-500 font-semibold text-center">Max pts</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {items.map(c => (
+                      <tr key={c.id} className="bg-white">
+                        <td className="px-2 py-1.5 text-slate-600 font-medium">{c.name || '—'}</td>
+                        <td className="px-2 py-1.5 text-center text-slate-400">{c.weight}%</td>
+                        <td className="px-2 py-1.5 text-center font-semibold text-slate-600">{c.weight}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[9px] text-slate-400">Score a candidate or add a scorecard to see their breakdown here.</p>
+            </div>
+          )}
 
         </div>
 
@@ -1355,6 +1423,7 @@ function CandidateSlideOver({
   onStageChange,
   onStatusChange,
   onCriteriaUpdated,
+  onAppUpdated,
 }: {
   app: Application
   stages: PipelineStage[]
@@ -1363,11 +1432,14 @@ function CandidateSlideOver({
   onStageChange: (appId: string, stageId: string) => void
   onStatusChange: (appId: string, status: string) => void
   onCriteriaUpdated?: (c: ScoringCriterion[]) => void
+  onAppUpdated?: (updates: Partial<Application>) => void
 }) {
   const c = app.candidate!
   const [tab, setTab]   = useState<'details' | 'scorecards'>('details')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  // Re-scoring state (triggered after criteria are edited)
+  const [rescoring, setRescoring] = useState(false)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -1404,6 +1476,45 @@ function CandidateSlideOver({
     setScorecards(json.data ?? [])
     setScLoading(false)
   }, [app.id])
+
+  // Re-score this application via SSE stream (triggered after criteria change)
+  const handleRescore = useCallback(async () => {
+    setRescoring(true)
+    try {
+      const res = await fetch(`/api/jobs/${app.hiring_request_id}/score`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ application_id: app.id }),
+      })
+      if (!res.ok || !res.body) return
+      const reader  = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6))
+            if (event.type === 'progress' && event.application_id === app.id) {
+              onAppUpdated?.({
+                ai_score:          event.score,
+                ai_recommendation: event.recommendation,
+                ai_strengths:      event.strengths ?? [],
+                ai_gaps:           event.gaps ?? [],
+                ai_scored_at:      new Date().toISOString(),
+              })
+            }
+          } catch { /* skip malformed SSE line */ }
+        }
+      }
+    } catch { /* non-fatal — scoring may still have succeeded */ }
+    finally { setRescoring(false) }
+  }, [app.hiring_request_id, app.id, onAppUpdated])
 
   useEffect(() => {
     if (tab === 'scorecards') loadScorecards()
@@ -1588,18 +1699,25 @@ function CandidateSlideOver({
               </div>
 
               {/* ── AI Analysis (stored, no extra API call) ── */}
-              {app.ai_score !== null && (
+              {(app.ai_score !== null || rescoring) && (
                 <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2.5">
+                  {/* Rescoring banner */}
+                  {rescoring && (
+                    <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-100 rounded-lg px-3 py-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                      <span>Rescoring with new criteria…</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-blue-700">🤖 AI Analysis</span>
-                      {app.ai_scored_at && (
+                      {app.ai_scored_at && !rescoring && (
                         <span className="text-[10px] text-blue-400">{fmtRelative(app.ai_scored_at)}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <ScorePill score={app.ai_score} />
-                      {app.ai_recommendation && (() => {
+                      {app.ai_score !== null && <ScorePill score={app.ai_score} />}
+                      {!rescoring && app.ai_recommendation && (() => {
                         const badge = SIGNAL_BADGE[app.ai_recommendation as keyof typeof SIGNAL_BADGE]
                         return badge ? (
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
@@ -1893,12 +2011,20 @@ function CandidateSlideOver({
         <ScoringCriteriaModal
           criteria={localCriteria}
           jobId={app.hiring_request_id}
+          candidateName={c.name}
+          latestScorecard={scorecards[0]?.scores ?? null}
+          aiScore={app.ai_score}
+          aiRecommendation={app.ai_recommendation}
           onClose={() => setEditCriteriaOpen(false)}
           onSaved={newCriteria => {
             setLocalCriteria(newCriteria)
-            setScScores(newCriteria.map(c => ({ criterion: c.name, rating: 0 as 0 | 1 | 2 | 3 | 4 })))
+            setScScores(newCriteria.map(cr => ({ criterion: cr.name, rating: 0 as 0 | 1 | 2 | 3 | 4 })))
             setEditCriteriaOpen(false)
             onCriteriaUpdated?.(newCriteria)
+            // Auto-rescore if candidate has an AI score (new criteria = new rubric)
+            if (app.ai_score !== null && app.ai_score !== undefined) {
+              void handleRescore()
+            }
           }}
         />
       )}
@@ -4751,6 +4877,7 @@ export default function JobPipelinePage() {
           onStageChange={handleStageChange}
           onStatusChange={handleStatusChange}
           onCriteriaUpdated={c => setJob(j => j ? { ...j, scoring_criteria: c } : j)}
+          onAppUpdated={updates => setSelectedApp(a => a ? { ...a, ...updates } : a)}
         />
       )}
 
