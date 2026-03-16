@@ -273,7 +273,10 @@ export default function CandidateProfilePage() {
       {emailDraftAppId && (
         <EmailDraftDrawer
           appId={emailDraftAppId}
+          candidateEmail={candidate.email}
+          candidateName={candidate.name}
           onClose={() => setEmailDraftAppId(null)}
+          onSent={load}
         />
       )}
 
