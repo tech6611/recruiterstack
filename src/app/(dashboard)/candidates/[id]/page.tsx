@@ -64,8 +64,7 @@ export default function CandidateProfilePage() {
   const [emailDraftAppId, setEmailDraftAppId] = useState<string | null>(null)
 
   // Interviews
-  const [showScheduleDrawer, setShowScheduleDrawer]     = useState(false)
-  const [scheduleDefaultAppId, setScheduleDefaultAppId] = useState('')
+  const [showScheduleDrawer, setShowScheduleDrawer] = useState(false)
 
   // Offers
   const [showOfferDrawer, setShowOfferDrawer]   = useState(false)
@@ -245,10 +244,7 @@ export default function CandidateProfilePage() {
           onTaskAdded={task => setTasks(prev => [...prev, task])}
           onTaskUpdated={task => setTasks(prev => prev.map(t => t.id === task.id ? task : t))}
           onTaskDeleted={taskId => setTasks(prev => prev.filter(t => t.id !== taskId))}
-          onScheduleInterview={() => {
-            setScheduleDefaultAppId(activeApps[0]?.id ?? '')
-            setShowScheduleDrawer(true)
-          }}
+          onScheduleInterview={() => setShowScheduleDrawer(true)}
           onDraftEmail={() => setEmailDraftAppId(activeApps[0]?.id ?? null)}
           onCreateOffer={() => {
             setOfferDefaultAppId(activeApps[0]?.id ?? '')
