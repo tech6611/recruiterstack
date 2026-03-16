@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { X, Loader2, ClipboardList, AlertCircle } from 'lucide-react'
-import type { ScorecardRecommendation, ScorecardScore, Scorecard } from '@/lib/types/database'
+import type { ScorecardRecommendation, ScorecardScore } from '@/lib/types/database'
 import type { Application, HiringRequest } from '@/lib/types/database'
 import { RECOMMENDATION_CONFIG, RATING_CONFIG } from './ScorecardCard'
 

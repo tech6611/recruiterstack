@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   Mail, Phone, MapPin, Briefcase, ExternalLink, FileText,
-  Linkedin, Pencil, Check, X, Plus,
+  Linkedin, Pencil, Check, X,
 } from 'lucide-react'
 import type { Candidate, CandidateTag, Application, HiringRequest } from '@/lib/types/database'
 import TagInput from './TagInput'

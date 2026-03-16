@@ -8,7 +8,7 @@ interface SummaryTabProps {
   onCandidateUpdated: (updated: Partial<Candidate>) => void
 }
 
-export default function SummaryTab({ candidate, onCandidateUpdated }: SummaryTabProps) {
+export default function SummaryTab({ candidate }: Pick<SummaryTabProps, 'candidate'>) {
   const [summary, setSummary] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState('')
