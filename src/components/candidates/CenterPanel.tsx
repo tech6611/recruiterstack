@@ -22,7 +22,6 @@ interface CenterPanelProps {
   onTaskAdded: (task: CandidateTask) => void
   onTaskUpdated: (task: CandidateTask) => void
   onTaskDeleted: (taskId: string) => void
-  onCandidateUpdated: (updated: Partial<Candidate>) => void
   onScheduleInterview: () => void
   onDraftEmail: () => void
   onCreateOffer: () => void
@@ -37,7 +36,6 @@ export default function CenterPanel({
   onTaskAdded,
   onTaskUpdated,
   onTaskDeleted,
-  onCandidateUpdated,
   onScheduleInterview,
   onDraftEmail,
   onCreateOffer,
@@ -121,7 +119,6 @@ export default function CenterPanel({
         {activeTab === 'Summary' && (
           <SummaryTab
             candidate={candidate}
-            onCandidateUpdated={onCandidateUpdated}
           />
         )}
       </div>

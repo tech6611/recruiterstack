@@ -245,7 +245,6 @@ export default function CandidateProfilePage() {
           onTaskAdded={task => setTasks(prev => [...prev, task])}
           onTaskUpdated={task => setTasks(prev => prev.map(t => t.id === task.id ? task : t))}
           onTaskDeleted={taskId => setTasks(prev => prev.filter(t => t.id !== taskId))}
-          onCandidateUpdated={updated => setCandidate(prev => prev ? { ...prev, ...updated } : prev)}
           onScheduleInterview={() => {
             setScheduleDefaultAppId(activeApps[0]?.id ?? '')
             setShowScheduleDrawer(true)

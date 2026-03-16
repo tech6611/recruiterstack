@@ -5,10 +5,9 @@ import type { Candidate } from '@/lib/types/database'
 
 interface SummaryTabProps {
   candidate: Candidate
-  onCandidateUpdated: (updated: Partial<Candidate>) => void
 }
 
-export default function SummaryTab({ candidate }: Pick<SummaryTabProps, 'candidate'>) {
+export default function SummaryTab({ candidate }: SummaryTabProps) {
   const [summary, setSummary] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState('')
