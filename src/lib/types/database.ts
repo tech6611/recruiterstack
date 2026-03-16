@@ -164,6 +164,8 @@ export interface Application {
   ai_gaps:           string[]
   ai_scored_at:           string | null
   ai_criterion_scores:    { name: string; rating: number; weight: number }[] | null
+  // Attribution (migration 019)
+  credited_to:            string | null
   // Joined
   candidate?: Candidate
   stage?: PipelineStage
@@ -304,6 +306,46 @@ export interface OfferInsert extends Omit<Offer, 'id' | 'created_at' | 'updated_
 }
 
 export interface OfferUpdate extends Partial<OfferInsert> {}
+
+// ── Candidate Tasks ───────────────────────────────────────────────────────────
+// Added in migration 019
+
+export interface CandidateTask {
+  id:             string
+  org_id:         string
+  candidate_id:   string
+  application_id: string | null
+  title:          string
+  description:    string | null
+  due_date:       string | null  // DATE stored as ISO string YYYY-MM-DD
+  assignee_name:  string | null
+  completed_at:   string | null
+  created_by:     string
+  created_at:     string
+}
+
+// ── Candidate Tags ─────────────────────────────────────────────────────────────
+
+export interface CandidateTag {
+  id:           string
+  org_id:       string
+  candidate_id: string
+  tag:          string
+  created_at:   string
+}
+
+// ── Candidate Referrals ────────────────────────────────────────────────────────
+
+export interface CandidateReferral {
+  id:             string
+  org_id:         string
+  candidate_id:   string
+  application_id: string | null
+  referrer_name:  string
+  referrer_email: string | null
+  note:           string | null
+  created_at:     string
+}
 
 // ── Match ─────────────────────────────────────────────────────────────────
 

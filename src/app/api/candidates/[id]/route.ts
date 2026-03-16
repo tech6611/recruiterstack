@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import type { CandidateUpdate } from '@/lib/types/database'
 
-// GET /api/candidates/:id — candidate + all applications (with job + stage) + all events
+// GET /api/candidates/:id — candidate + all applications (with job + stage) + all events + tags + tasks + referrals
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
@@ -12,14 +12,34 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const supabase = createAdminClient()
   const { id } = params
 
-  const [candRes, appsRes] = await Promise.all([
+  const [candRes, appsRes, tagsRes, tasksRes, referralsRes] = await Promise.all([
     supabase.from('candidates').select('*').eq('id', id).eq('org_id', orgId).single(),
     supabase
       .from('applications')
-      .select('*, pipeline_stages(name, color), hiring_requests(id, position_title, department)')
+      .select('*, pipeline_stages(name, color), hiring_requests(id, position_title, department, ticket_number)')
       .eq('candidate_id', id)
       .eq('org_id', orgId)
       .order('applied_at', { ascending: false }),
+    supabase
+      .from('candidate_tags')
+      .select('*')
+      .eq('candidate_id', id)
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('candidate_tasks')
+      .select('*')
+      .eq('candidate_id', id)
+      .eq('org_id', orgId)
+      .order('completed_at', { ascending: true, nullsFirst: true })
+      .order('due_date',     { ascending: true, nullsFirst: false })
+      .order('created_at',   { ascending: false }),
+    supabase
+      .from('candidate_referrals')
+      .select('*')
+      .eq('candidate_id', id)
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false }),
   ])
 
   if (candRes.error) {
@@ -41,7 +61,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     data: {
       ...candRes.data,
       applications: appsRes.data ?? [],
-      events: events ?? [],
+      events:       events        ?? [],
+      tags:         tagsRes.data  ?? [],
+      tasks:        tasksRes.data ?? [],
+      referrals:    referralsRes.data ?? [],
     },
   })
 }
