@@ -49,7 +49,7 @@ export async function POST(
     .from('applications')
     .select(`
       id, status,
-      candidate:candidates(full_name, email),
+      candidate:candidates(name, email),
       job:hiring_requests(position_title, department),
       stage:pipeline_stages(name)
     `)
@@ -62,13 +62,13 @@ export async function POST(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const candidate   = app.candidate as any as { full_name: string; email: string } | null
+  const candidate   = app.candidate as any as { name: string; email: string } | null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const job         = app.job       as any as { position_title: string; department: string | null } | null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stage       = app.stage     as any as { name: string } | null
 
-  const firstName   = candidate?.full_name?.split(' ')[0] ?? 'there'
+  const firstName   = candidate?.name?.split(' ')[0] ?? 'there'
   const jobTitle    = job?.position_title ?? 'the position'
   const department  = job?.department
   const stageName   = stage?.name ?? 'Applied'

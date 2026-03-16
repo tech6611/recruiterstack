@@ -14,7 +14,7 @@ import CenterPanel from '@/components/candidates/CenterPanel'
 import RightPanel from '@/components/candidates/RightPanel'
 import EmailDraftDrawer from '@/components/candidates/EmailDraftDrawer'
 import ScorecardDrawer from '@/components/candidates/ScorecardDrawer'
-import ScheduleInterviewDrawer from '@/components/candidates/ScheduleInterviewDrawer'
+import ScheduleInterviewModal from '@/components/ScheduleInterviewModal'
 import CreateOfferDrawer from '@/components/candidates/CreateOfferDrawer'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ import CreateOfferDrawer from '@/components/candidates/CreateOfferDrawer'
 interface CandidateWithPipeline extends Candidate {
   applications: (Application & {
     pipeline_stages: { name: string; color: string } | null
-    hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number' | 'key_requirements' | 'nice_to_haves' | 'team_context'> | null
+    hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number' | 'key_requirements' | 'nice_to_haves' | 'team_context' | 'hiring_manager_name' | 'hiring_manager_email'> | null
   })[]
   events: (ApplicationEvent & { application_id: string })[]
 }
@@ -290,14 +290,21 @@ export default function CandidateProfilePage() {
         />
       )}
 
-      {/* ── Schedule Interview Drawer ───────────────────────────────────── */}
+      {/* ── Schedule Interview Modal ────────────────────────────────────── */}
       {showScheduleDrawer && activeApps.length > 0 && (
-        <ScheduleInterviewDrawer
-          activeApps={activeApps}
-          defaultAppId={scheduleDefaultAppId || activeApps[0].id}
-          candidateId={candidate.id}
+        <ScheduleInterviewModal
+          apps={activeApps.map(a => ({
+            id:                 a.id,
+            candidate_id:       a.candidate_id,
+            stage_id:           a.stage_id ?? null,
+            hiring_request_id:  a.hiring_request_id,
+            candidate:          { name: candidate.name },
+          }))}
+          positionTitle={activeApps[0].hiring_requests?.position_title ?? 'Interview'}
+          hmName={activeApps[0].hiring_requests?.hiring_manager_name ?? ''}
+          hmEmail={activeApps[0].hiring_requests?.hiring_manager_email ?? ''}
           onClose={() => setShowScheduleDrawer(false)}
-          onSaved={load}
+          onScheduled={load}
         />
       )}
 

@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     supabase.from('candidates').select('*').eq('id', id).eq('org_id', orgId).single(),
     supabase
       .from('applications')
-      .select('*, pipeline_stages(name, color), hiring_requests(id, position_title, department, ticket_number)')
+      .select('*, pipeline_stages(name, color), hiring_requests(id, position_title, department, ticket_number, hiring_manager_name, hiring_manager_email)')
       .eq('candidate_id', id)
       .eq('org_id', orgId)
       .order('applied_at', { ascending: false }),
