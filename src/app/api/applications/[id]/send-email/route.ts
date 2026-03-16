@@ -25,7 +25,7 @@ export async function POST(
     return NextResponse.json({ error: 'SENDGRID_FROM_EMAIL is not configured. Add it to your environment variables.' }, { status: 503 })
   }
 
-  let body: { subject: string; body: string; from_name?: string }
+  let body: { subject: string; body: string; body_html?: string; from_name?: string }
   try { body = await request.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
@@ -62,7 +62,7 @@ export async function POST(
       from:    { email: fromEmail, name: body.from_name || 'RecruiterStack' },
       subject: body.subject.trim(),
       text:    body.body.trim(),
-      html:    body.body.trim().replace(/\n/g, '<br>'),
+      html:    body.body_html?.trim() ?? body.body.trim().replace(/\n/g, '<br>'),
     })
   } catch (err: unknown) {
     const e = err as { response?: { body?: { errors?: { message: string }[] } }; message?: string }
@@ -82,6 +82,7 @@ export async function POST(
       metadata: {
         subject:    body.subject.trim(),
         body:       body.body.trim(),
+        body_html:  body.body_html?.trim() ?? null,
         to_email:   candidate.email,
         to_name:    candidate.name,
         from_email: fromEmail,

@@ -135,10 +135,10 @@ export default function ScheduleInterviewModal({
 
   const weekDays = getWeekDays(date, availWeekOffset)
 
-  const HOUR_SLOTS: string[] = Array.from({ length: 48 }, (_, i) => {
-    const h = Math.floor(i / 2)
-    const m = i % 2 === 0 ? '00' : '30'
-    return `${String(h).padStart(2, '0')}:${m}`
+  const HOUR_SLOTS: string[] = Array.from({ length: 96 }, (_, i) => {
+    const h = Math.floor(i / 4)
+    const m = (i % 4) * 15
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
   })
 
   const slotKey = (day: Date, slot: string) => `${toLocalDateStr(day)}T${slot}`
@@ -157,7 +157,7 @@ export default function ScheduleInterviewModal({
     const [y, mo, d]           = datePart.split('-').map(Number)
     const [h, m]               = timePart.split(':').map(Number)
     const slotStart = new Date(y, mo - 1, d, h, m, 0, 0).getTime()
-    const slotEnd   = slotStart + 30 * 60 * 1000
+    const slotEnd   = slotStart + 15 * 60 * 1000
     return Object.entries(busyRangesByEmail)
       .filter(([, ranges]) => ranges.some(r => {
         const bStart = new Date(r.start).getTime()
@@ -228,13 +228,13 @@ export default function ScheduleInterviewModal({
 
   useEffect(() => {
     if (!availLoading && !availNoData && inlineGridRef.current) {
-      inlineGridRef.current.scrollTop = 16 * 20
+      inlineGridRef.current.scrollTop = 32 * 14
     }
   }, [availLoading, availNoData])
 
   useEffect(() => {
     if (gridExpanded && !availLoading && !availNoData && popupGridRef.current) {
-      popupGridRef.current.scrollTop = 16 * 28
+      popupGridRef.current.scrollTop = 32 * 20
     }
   }, [gridExpanded, availLoading, availNoData])
 
@@ -333,6 +333,11 @@ export default function ScheduleInterviewModal({
     ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     : ''
 
+  // Deduplicate apps by candidate_id so we don't show "2 candidates" for 1 person with 2 applications
+  const uniqueCandidates = Array.from(
+    new Map(apps.map(a => [a.candidate_id, a.candidate])).values()
+  )
+
   // ── Success screen ───────────────────────────────────────────────────────────
 
   if (saved && scheduledAt) {
@@ -347,7 +352,7 @@ export default function ScheduleInterviewModal({
             <Check className="h-7 w-7 text-emerald-600" />
           </div>
           <h2 className="text-lg font-bold text-slate-900 mb-1">
-            {apps.length === 1 ? 'Interview scheduled!' : `${apps.length} interviews scheduled!`}
+            {uniqueCandidates.length === 1 ? 'Interview scheduled!' : `${apps.length} interviews scheduled!`}
           </h2>
           <p className="text-sm text-slate-500 mb-1">{fmtScheduled}</p>
           {interviewerEmail && (
@@ -414,11 +419,11 @@ export default function ScheduleInterviewModal({
           <div>
             <h2 className="text-base font-bold text-slate-900">Schedule Interview</h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              {apps.length === 1
-                ? apps[0].candidate?.name
-                  ? `Scheduling for ${apps[0].candidate.name}`
+              {uniqueCandidates.length === 1
+                ? uniqueCandidates[0]?.name
+                  ? `Scheduling for ${uniqueCandidates[0].name}`
                   : `For ${positionTitle}`
-                : `Scheduling for ${apps.length} candidates`}
+                : `Scheduling for ${uniqueCandidates.length} candidates`}
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
@@ -427,15 +432,15 @@ export default function ScheduleInterviewModal({
         </div>
 
         <div className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
-          {/* Candidates chips (multi-candidate) */}
-          {apps.length > 1 && (
+          {/* Candidates chips (shown only when truly multiple distinct candidates) */}
+          {uniqueCandidates.length > 1 && (
             <div className="flex flex-wrap gap-1.5">
-              {apps.map(app => (
-                <span key={app.id} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                  <div className={`h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-bold ${avatarColor(app.candidate?.name ?? '')}`}>
-                    {initials(app.candidate?.name ?? '?')}
+              {uniqueCandidates.map((candidate, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                  <div className={`h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-bold ${avatarColor(candidate?.name ?? '')}`}>
+                    {initials(candidate?.name ?? '?')}
                   </div>
-                  {app.candidate?.name}
+                  {candidate?.name}
                 </span>
               ))}
             </div>
@@ -668,8 +673,8 @@ export default function ScheduleInterviewModal({
                     </thead>
                     <tbody>
                       {HOUR_SLOTS.map(slot => (
-                        <tr key={slot} className={slot.endsWith(':00') ? 'border-t border-slate-200' : 'border-t border-slate-50'}>
-                          <td className="px-1 py-0 text-slate-300 text-right whitespace-nowrap leading-none text-[10px]" style={{ height: 20 }}>
+                        <tr key={slot} className={slot.endsWith(':00') ? 'border-t border-slate-200' : slot.endsWith(':30') ? 'border-t border-slate-100' : 'border-t border-slate-50'}>
+                          <td className="px-1 py-0 text-slate-300 text-right whitespace-nowrap leading-none text-[10px]" style={{ height: 14 }}>
                             {slot.endsWith(':00') ? fmtSlotLabel(slot) : ''}
                           </td>
                           {weekDays.map(day => {
@@ -692,7 +697,7 @@ export default function ScheduleInterviewModal({
                               const [slH, slM]   = slot.split(':').map(Number)
                               const selMin = selH * 60 + selM
                               const slMin  = slH * 60 + slM
-                              return slMin + 30 >= selMin + duration
+                              return slMin + 15 >= selMin + duration
                             })()
                             const blockRound = !isInBlock ? 'rounded'
                               : isSelected && isLastOfBlock ? 'rounded'
@@ -704,7 +709,7 @@ export default function ScheduleInterviewModal({
                                 <button
                                   disabled={busy}
                                   onClick={() => { setDate(toLocalDateStr(day)); setTime(slot); setAvailWeekOffset(0) }}
-                                  style={{ height: 20 }}
+                                  style={{ height: 14 }}
                                   className={`w-full transition-colors ${blockRound} ${
                                     busy
                                       ? (isSelected || isInBlock) ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed' : 'bg-red-100 cursor-not-allowed'
@@ -817,7 +822,7 @@ export default function ScheduleInterviewModal({
             {saving ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</>
             ) : (
-              `Schedule ${apps.length > 1 ? `${apps.length} interviews` : 'interview'}`
+              `Schedule ${uniqueCandidates.length > 1 ? `${apps.length} interviews` : 'interview'}`
             )}
           </button>
         </div>
@@ -889,9 +894,9 @@ export default function ScheduleInterviewModal({
                 </thead>
                 <tbody>
                   {HOUR_SLOTS.map(slot => (
-                    <tr key={slot} className={slot.endsWith(':00') ? 'border-t border-slate-200' : 'border-t border-slate-50'}>
-                      <td className="px-3 py-0 text-slate-300 text-right whitespace-nowrap leading-none text-[11px]" style={{ height: 28 }}>
-                        {slot.endsWith(':00') ? fmtSlotLabel(slot) : ''}
+                    <tr key={slot} className={slot.endsWith(':00') ? 'border-t border-slate-200' : slot.endsWith(':30') ? 'border-t border-slate-100' : 'border-t border-slate-50'}>
+                      <td className="px-3 py-0 text-slate-300 text-right whitespace-nowrap leading-none text-[11px]" style={{ height: 20 }}>
+                        {slot.endsWith(':00') ? fmtSlotLabel(slot) : slot.endsWith(':30') ? fmtSlotLabel(slot) : ''}
                       </td>
                       {weekDays.map(day => {
                         const key = slotKey(day, slot)
@@ -909,7 +914,7 @@ export default function ScheduleInterviewModal({
                           if (!date || !time || date !== toLocalDateStr(day)) return false
                           const [selH, selM] = time.split(':').map(Number)
                           const [slH, slM]   = slot.split(':').map(Number)
-                          return (slH * 60 + slM) + 30 >= (selH * 60 + selM) + duration
+                          return (slH * 60 + slM) + 15 >= (selH * 60 + selM) + duration
                         })()
                         const blockRound = !isInBlock ? 'rounded'
                           : isSelected && isLastOfBlock ? 'rounded'
@@ -921,7 +926,7 @@ export default function ScheduleInterviewModal({
                             <button
                               disabled={busy}
                               onClick={() => { setDate(toLocalDateStr(day)); setTime(slot); setAvailWeekOffset(0); setGridExpanded(false) }}
-                              style={{ height: 28 }}
+                              style={{ height: 20 }}
                               className={`w-full transition-colors ${blockRound} ${
                                 busy
                                   ? (isSelected || isInBlock) ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed' : 'bg-red-100 cursor-not-allowed'

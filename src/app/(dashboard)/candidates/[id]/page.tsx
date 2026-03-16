@@ -275,6 +275,7 @@ export default function CandidateProfilePage() {
           appId={emailDraftAppId}
           candidateEmail={candidate.email}
           candidateName={candidate.name}
+          positionTitle={activeApps[0]?.hiring_requests?.position_title ?? ''}
           onClose={() => setEmailDraftAppId(null)}
           onSent={load}
         />

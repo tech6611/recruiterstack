@@ -24,6 +24,7 @@ function fmtDate(d: string) {
 interface EmailMeta {
   subject?:    string
   body?:       string
+  body_html?:  string
   to_email?:   string
   to_name?:    string
   from_email?: string
@@ -35,7 +36,9 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
   const meta = (event.metadata ?? {}) as EmailMeta
 
   const subject   = meta.subject   || event.note  || 'Email'
-  const body      = meta.body      || null
+  const bodyHtml  = meta.body_html || null
+  const bodyText  = meta.body      || null
+  const hasBody   = !!(bodyHtml || bodyText)
   const fromName  = meta.from_name || event.created_by || 'Recruiter'
   const fromEmail = meta.from_email || null
   const toEmail   = meta.to_email  || null
@@ -46,7 +49,7 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
       {/* Email header row */}
       <button
         className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
-        onClick={() => body && setExpanded(e => !e)}
+        onClick={() => hasBody && setExpanded(e => !e)}
       >
         <div className="flex items-start gap-3">
           {/* Mail icon */}
@@ -65,7 +68,7 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
               </p>
               <div className="flex items-center gap-1 shrink-0">
                 <span className="text-[10px] text-slate-400 whitespace-nowrap">{fmtDate(event.created_at)}</span>
-                {body && (
+                {hasBody && (
                   expanded
                     ? <ChevronUp className="h-3 w-3 text-slate-400" />
                     : <ChevronDown className="h-3 w-3 text-slate-400" />
@@ -87,9 +90,20 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
       </button>
 
       {/* Body (expandable) */}
-      {expanded && body && (
+      {expanded && hasBody && (
         <div className="border-t border-slate-100 px-4 py-4 bg-white">
-          <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{body}</p>
+          {bodyHtml ? (
+            <div
+              className="text-sm text-slate-700 leading-relaxed prose prose-sm max-w-none
+                [&_p]:my-1 [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4
+                [&_li]:my-0.5 [&_strong]:font-semibold [&_em]:italic [&_u]:underline
+                [&_s]:line-through [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold
+                [&_a]:text-blue-600 [&_a]:underline"
+              dangerouslySetInnerHTML={{ __html: bodyHtml }}
+            />
+          ) : (
+            <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{bodyText}</p>
+          )}
         </div>
       )}
     </div>
