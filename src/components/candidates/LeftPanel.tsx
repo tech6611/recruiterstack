@@ -49,6 +49,7 @@ interface LeftPanelProps {
   onTagRemoved: (tagId: string) => void
   onLinkedinSaved: (url: string | null) => void
   onSkillsUpdated: (skills: string[]) => void
+  onDraftEmail: () => void
 }
 
 export default function LeftPanel({
@@ -59,6 +60,7 @@ export default function LeftPanel({
   onTagRemoved,
   onLinkedinSaved,
   onSkillsUpdated,
+  onDraftEmail,
 }: LeftPanelProps) {
   const [editLinkedin, setEditLinkedin] = useState(false)
   const [linkedinInput, setLinkedinInput] = useState('')
@@ -127,13 +129,23 @@ export default function LeftPanel({
 
         {/* Contact */}
         <div className="space-y-2.5 text-sm">
-          <a
-            href={`mailto:${candidate.email}`}
-            className="flex items-center gap-2.5 text-blue-600 hover:text-blue-800 transition-colors"
-          >
+          <div className="flex items-center gap-2.5 group">
             <Mail className="h-4 w-4 shrink-0 text-slate-400" />
-            <span className="truncate">{candidate.email}</span>
-          </a>
+            <button
+              onClick={onDraftEmail}
+              className="flex-1 min-w-0 text-left text-blue-600 hover:text-blue-800 transition-colors truncate text-sm"
+              title="Draft AI email to candidate"
+            >
+              {candidate.email}
+            </button>
+            <a
+              href={`mailto:${candidate.email}`}
+              title="Open in mail client"
+              className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-600"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
           {candidate.phone && (
             <div className="flex items-center gap-2.5 text-slate-600">
               <Phone className="h-4 w-4 shrink-0 text-slate-400" />

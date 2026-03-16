@@ -234,6 +234,7 @@ export default function CandidateProfilePage() {
           onTagRemoved={tagId => setTags(prev => prev.filter(t => t.id !== tagId))}
           onLinkedinSaved={url => setCandidate(prev => prev ? { ...prev, linkedin_url: url } : prev)}
           onSkillsUpdated={skills => setCandidate(prev => prev ? { ...prev, skills } : prev)}
+          onDraftEmail={() => setEmailDraftAppId(activeApps[0]?.id ?? null)}
         />
 
         <CenterPanel
