@@ -222,6 +222,7 @@ export default function EmailDraftDrawer({
   const [addingTpl,  setAddingTpl]  = useState(false)
   const [newTplName, setNewTplName] = useState('')
   const [tplSaving,  setTplSaving]  = useState(false)
+  const [tplError,   setTplError]   = useState('')
 
   // Inline rename for My Templates
   const [renamingId,   setRenamingId]   = useState<string | null>(null)
@@ -235,6 +236,9 @@ export default function EmailDraftDrawer({
   const [showBcc,   setShowBcc]   = useState(false)
   const [subject,   setSubject]   = useState('')
   const [body,      setBody]      = useState('')
+  // Incrementing this key forces Tiptap to remount (re-read `value`) when
+  // a template or AI draft replaces the body — Tiptap is uncontrolled after mount.
+  const [editorKey, setEditorKey] = useState(0)
 
   // Schedule send
   const [scheduled, setScheduled] = useState(false)
@@ -294,6 +298,7 @@ export default function EmailDraftDrawer({
     setSubject(resolvePlaceholders(tpl.subject, vars))
     const resolved = resolvePlaceholders(tpl.body, vars)
     setBody(tpl.kind === 'saved' ? resolved : textToHtml(resolved))
+    setEditorKey(k => k + 1) // force Tiptap remount with new content
   }
 
   // ── Generate with AI (fills subject + body via API) ───────────────────────
@@ -315,13 +320,14 @@ export default function EmailDraftDrawer({
     if (!res.ok) { setGenError(json.error ?? 'Generation failed'); return }
     setSubject(json.data.subject)
     setBody(textToHtml(json.data.body))
+    setEditorKey(k => k + 1) // force Tiptap remount with new content
   }
 
   // ── Save current compose as a new "My Template" ───────────────────────────
 
   const addTemplate = async () => {
     if (!newTplName.trim()) return
-    setTplSaving(true)
+    setTplSaving(true); setTplError('')
     const res = await fetch('/api/email-templates', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -329,7 +335,7 @@ export default function EmailDraftDrawer({
     })
     const json = await res.json()
     setTplSaving(false)
-    if (!res.ok) return
+    if (!res.ok) { setTplError(json.error ?? 'Failed to save template'); return }
     setSavedTemplates(prev => [...prev, json.data])
     setNewTplName('')
     setAddingTpl(false)
@@ -504,10 +510,10 @@ export default function EmailDraftDrawer({
                             <input
                               autoFocus
                               value={newTplName}
-                              onChange={e => setNewTplName(e.target.value)}
+                              onChange={e => { setNewTplName(e.target.value); setTplError('') }}
                               onKeyDown={e => {
                                 if (e.key === 'Enter')  addTemplate()
-                                if (e.key === 'Escape') { setAddingTpl(false); setNewTplName('') }
+                                if (e.key === 'Escape') { setAddingTpl(false); setNewTplName(''); setTplError('') }
                               }}
                               placeholder="Template name…"
                               className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400 bg-white"
@@ -520,6 +526,9 @@ export default function EmailDraftDrawer({
                               {tplSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                             </button>
                           </div>
+                          {tplError && (
+                            <p className="text-[10px] text-red-500 mt-1.5">{tplError}</p>
+                          )}
                         </div>
                       )}
 
@@ -677,6 +686,7 @@ export default function EmailDraftDrawer({
               {/* Body */}
               <div className="px-5 py-4">
                 <RichTextEditor
+                  key={editorKey}
                   value={body}
                   onChange={setBody}
                   placeholder="Compose your message… or pick a template above to get started."
