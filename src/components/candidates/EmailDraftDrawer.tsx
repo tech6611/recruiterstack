@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, KeyboardEvent } from 'react'
 import {
-  Wand2, X, Send, Loader2, Check, ChevronLeft,
-  Plus, Trash2, Clock, Calendar,
+  Wand2, X, Send, Loader2, Check, ChevronDown,
+  Plus, Trash2, Clock, Calendar, Pencil,
 } from 'lucide-react'
 import { useSettings } from '@/lib/hooks/useSettings'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
@@ -95,7 +95,7 @@ Best regards,
 {{company_name}}`,
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function resolvePlaceholders(text: string, vars: Record<string, string>): string {
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) => {
@@ -106,9 +106,8 @@ function resolvePlaceholders(text: string, vars: Record<string, string>): string
 }
 
 function textToHtml(text: string): string {
-  const lines = text.split('\n')
   let html = ''
-  for (const line of lines) {
+  for (const line of text.split('\n')) {
     html += line.trim() === '' ? '<p></p>' : `<p>${line}</p>`
   }
   return html
@@ -136,25 +135,20 @@ function EmailTagsInput({
 
   const addEmail = (raw: string) => {
     const trimmed = raw.trim().toLowerCase()
-    if (isEmail(trimmed) && !emails.includes(trimmed)) {
-      onChange([...emails, trimmed])
-    }
+    if (isEmail(trimmed) && !emails.includes(trimmed)) onChange([...emails, trimmed])
     setInput('')
   }
 
   const handleKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if ((e.key === 'Enter' || e.key === ',' || e.key === ' ') && input.trim()) {
-      e.preventDefault()
-      addEmail(input)
+      e.preventDefault(); addEmail(input)
     }
-    if (e.key === 'Backspace' && !input && emails.length > 0) {
-      onChange(emails.slice(0, -1))
-    }
+    if (e.key === 'Backspace' && !input && emails.length > 0) onChange(emails.slice(0, -1))
   }
 
   return (
     <div
-      className="flex flex-wrap gap-1 px-2 py-1.5 min-h-[36px] rounded-lg border border-slate-200 bg-white focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 cursor-text"
+      className="flex flex-wrap gap-1 px-2 py-1.5 min-h-[34px] rounded-lg border border-slate-200 bg-white focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 cursor-text"
       onClick={() => inputRef.current?.focus()}
     >
       {emails.map(email => (
@@ -194,7 +188,7 @@ interface EmailDraftDrawerProps {
   onSent?: () => void
 }
 
-type Step = 'pick' | 'compose' | 'sent' | 'save_template'
+type Step = 'compose' | 'sent'
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -208,10 +202,30 @@ export default function EmailDraftDrawer({
 }: EmailDraftDrawerProps) {
   const { settings } = useSettings()
 
-  const [step,           setStep]           = useState<Step>('pick')
-  const [selectedTpl,    setSelectedTpl]    = useState<AnyTemplate | null>(null)
+  const [step, setStep] = useState<Step>('compose')
+
+  // Saved templates
   const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([])
   const [tplLoading,     setTplLoading]     = useState(true)
+
+  // Dropdown open states
+  const [builtInOpen, setBuiltInOpen] = useState(false)
+  const [myTplOpen,   setMyTplOpen]   = useState(false)
+  const [aiOpen,      setAiOpen]      = useState(false)
+
+  // Refs for outside-click dismissal
+  const builtInRef = useRef<HTMLDivElement>(null)
+  const myTplRef   = useRef<HTMLDivElement>(null)
+  const aiRef      = useRef<HTMLDivElement>(null)
+
+  // Inline "save current email as template" form (inside My Templates dropdown)
+  const [addingTpl,  setAddingTpl]  = useState(false)
+  const [newTplName, setNewTplName] = useState('')
+  const [tplSaving,  setTplSaving]  = useState(false)
+
+  // Inline rename for My Templates
+  const [renamingId,   setRenamingId]   = useState<string | null>(null)
+  const [renamingName, setRenamingName] = useState('')
 
   // Compose fields
   const [toEmails,  setToEmails]  = useState<string[]>([candidateEmail].filter(Boolean))
@@ -223,23 +237,22 @@ export default function EmailDraftDrawer({
   const [body,      setBody]      = useState('')
 
   // Schedule send
-  const [scheduled,   setScheduled]   = useState(false)
-  const [schedDate,   setSchedDate]   = useState('')
-  const [schedTime,   setSchedTime]   = useState('09:00')
+  const [scheduled, setScheduled] = useState(false)
+  const [schedDate, setSchedDate] = useState('')
+  const [schedTime, setSchedTime] = useState('09:00')
 
-  // Save-template form
-  const [tplName,     setTplName]     = useState('')
-  const [tplSaving,   setTplSaving]   = useState(false)
+  // AI generation
+  const [generating, setGenerating] = useState(false)
+  const [genError,   setGenError]   = useState('')
 
-  // Generation / sending
-  const [generating,  setGenerating]  = useState(false)
-  const [genError,    setGenError]    = useState('')
+  // Send
   const [sending,     setSending]     = useState(false)
   const [sendError,   setSendError]   = useState('')
   const [sentSubject, setSentSubject] = useState('')
   const [sentSched,   setSentSched]   = useState<string | null>(null)
 
-  // Load saved templates
+  // ── Load saved templates ──────────────────────────────────────────────────
+
   useEffect(() => {
     fetch('/api/email-templates')
       .then(r => r.json())
@@ -248,7 +261,24 @@ export default function EmailDraftDrawer({
       .finally(() => setTplLoading(false))
   }, [])
 
-  // ── Vars for placeholder resolution ─────────────────────────────────────────
+  // ── Close all dropdowns on outside click ──────────────────────────────────
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (builtInRef.current && !builtInRef.current.contains(e.target as Node)) setBuiltInOpen(false)
+      if (aiRef.current      && !aiRef.current.contains(e.target as Node))      setAiOpen(false)
+      if (myTplRef.current   && !myTplRef.current.contains(e.target as Node)) {
+        setMyTplOpen(false)
+        setAddingTpl(false)
+        setNewTplName('')
+        setRenamingId(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // ── Placeholder vars ──────────────────────────────────────────────────────
 
   const vars: Record<string, string> = {
     first_name:      candidateName.split(' ')[0] || candidateName,
@@ -258,23 +288,18 @@ export default function EmailDraftDrawer({
     recruiter_title: settings.recruiter_title     || '',
   }
 
-  // ── Apply template (use template button) ────────────────────────────────────
+  // ── Apply template (fills subject + body immediately) ─────────────────────
 
   const applyTemplate = (tpl: AnyTemplate) => {
-    const resolvedSubject = resolvePlaceholders(tpl.subject, vars)
-    const rawBody = tpl.kind === 'saved' ? tpl.body : tpl.body   // both HTML for saved, plain-text for built-in
-    const resolvedBody = resolvePlaceholders(rawBody, vars)
-    setSubject(resolvedSubject)
-    // Built-in bodies are plain text; saved templates are HTML (from the editor)
-    setBody(tpl.kind === 'saved' ? resolvedBody : textToHtml(resolvedBody))
-    setSelectedTpl(tpl)
-    setStep('compose')
+    setSubject(resolvePlaceholders(tpl.subject, vars))
+    const resolved = resolvePlaceholders(tpl.body, vars)
+    setBody(tpl.kind === 'saved' ? resolved : textToHtml(resolved))
   }
 
-  // ── Generate with AI ────────────────────────────────────────────────────────
+  // ── Generate with AI (fills subject + body via API) ───────────────────────
 
   const generateWithAI = async (tplId: string) => {
-    setGenerating(true); setGenError('')
+    setGenerating(true); setGenError(''); setAiOpen(false)
     const res = await fetch(`/api/applications/${appId}/email-draft`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -290,38 +315,52 @@ export default function EmailDraftDrawer({
     if (!res.ok) { setGenError(json.error ?? 'Generation failed'); return }
     setSubject(json.data.subject)
     setBody(textToHtml(json.data.body))
-    setStep('compose')
   }
 
-  // ── Save current draft as template ──────────────────────────────────────────
+  // ── Save current compose as a new "My Template" ───────────────────────────
 
-  const saveTemplate = async () => {
-    if (!tplName.trim() || !subject.trim() || isHtmlEmpty(body)) return
+  const addTemplate = async () => {
+    if (!newTplName.trim()) return
     setTplSaving(true)
     const res = await fetch('/api/email-templates', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: tplName.trim(), subject: subject.trim(), body }),
+      body: JSON.stringify({ name: newTplName.trim(), subject: subject.trim() || '(no subject)', body }),
     })
     const json = await res.json()
     setTplSaving(false)
-    if (!res.ok) { return }
+    if (!res.ok) return
     setSavedTemplates(prev => [...prev, json.data])
-    setTplName('')
-    setStep('compose')
+    setNewTplName('')
+    setAddingTpl(false)
   }
+
+  // ── Rename a saved template inline ────────────────────────────────────────
+
+  const renameTemplate = async (id: string, name: string) => {
+    if (!name.trim()) { setRenamingId(null); return }
+    await fetch(`/api/email-templates/${id}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim() }),
+    })
+    setSavedTemplates(prev => prev.map(t => t.id === id ? { ...t, name: name.trim() } : t))
+    setRenamingId(null)
+  }
+
+  // ── Delete a saved template ───────────────────────────────────────────────
 
   const deleteTemplate = async (id: string) => {
     await fetch(`/api/email-templates/${id}`, { method: 'DELETE' })
     setSavedTemplates(prev => prev.filter(t => t.id !== id))
   }
 
-  // ── Send email ─────────────────────────────────────────────────────────────
+  // ── Send email ────────────────────────────────────────────────────────────
 
   const send = async () => {
-    if (toEmails.length === 0) { setSendError('Add at least one recipient.'); return }
-    if (!subject.trim() || isHtmlEmpty(body)) { setSendError('Subject and body are required.'); return }
-    if (scheduled && !schedDate) { setSendError('Pick a date to schedule the send.'); return }
+    if (toEmails.length === 0)                     { setSendError('Add at least one recipient.'); return }
+    if (!subject.trim() || isHtmlEmpty(body))      { setSendError('Subject and body are required.'); return }
+    if (scheduled && !schedDate)                   { setSendError('Pick a date to schedule the send.'); return }
 
     setSending(true); setSendError('')
 
@@ -331,19 +370,18 @@ export default function EmailDraftDrawer({
       sendAt = Math.floor(dt.getTime() / 1000)
     }
 
-    const plainText = stripHtml(body)
     const res = await fetch(`/api/applications/${appId}/send-email`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        subject:   subject.trim(),
-        body:      plainText,
-        body_html: body,
-        from_name: settings.recruiter_name || undefined,
-        to_emails: toEmails,
-        cc_emails: ccEmails.length > 0 ? ccEmails : undefined,
+        subject:    subject.trim(),
+        body:       stripHtml(body),
+        body_html:  body,
+        from_name:  settings.recruiter_name || undefined,
+        to_emails:  toEmails,
+        cc_emails:  ccEmails.length  > 0 ? ccEmails  : undefined,
         bcc_emails: bccEmails.length > 0 ? bccEmails : undefined,
-        send_at:   sendAt,
+        send_at:    sendAt,
       }),
     })
     const json = await res.json()
@@ -355,37 +393,22 @@ export default function EmailDraftDrawer({
     onSent?.()
   }
 
-  const fromName  = settings.recruiter_name || 'RecruiterStack'
+  const fromName = settings.recruiter_name || 'RecruiterStack'
+  const minDate  = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0] })()
 
-  // ── Min date for schedule (tomorrow) ────────────────────────────────────────
-  const minDate = (() => {
-    const d = new Date(); d.setDate(d.getDate() + 1)
-    return d.toISOString().split('T')[0]
-  })()
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
       <div className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
 
-        {/* Header */}
+        {/* ── Header ───────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 shrink-0">
           <div className="flex items-center gap-2">
-            {(step === 'compose' || step === 'save_template') && (
-              <button
-                onClick={() => step === 'save_template' ? setStep('compose') : setStep('pick')}
-                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-            )}
             <Wand2 className="h-4 w-4 text-violet-500" />
             <h2 className="text-sm font-bold text-slate-900">
-              {step === 'sent'          ? 'Email Sent'
-                : step === 'save_template' ? 'Save Template'
-                : 'Draft Email'}
+              {step === 'sent' ? 'Email Sent' : 'Draft Email'}
             </h2>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
@@ -393,177 +416,262 @@ export default function EmailDraftDrawer({
           </button>
         </div>
 
-        {/* ── STEP: Pick template ───────────────────────────────────────────── */}
-        {step === 'pick' && (
-          <div className="flex-1 overflow-y-auto">
-
-            {/* To (editable here too so user sees who they're emailing) */}
-            <div className="px-5 pt-4 pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-6 shrink-0">To</span>
-                <EmailTagsInput
-                  emails={toEmails}
-                  onChange={setToEmails}
-                  placeholder="Recipient email…"
-                />
-              </div>
-            </div>
-
-            <div className="px-5 py-4 space-y-4">
-              {/* BUILT-IN templates */}
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Built-in templates</p>
-                <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                  {BUILT_IN_META.map(m => {
-                    const tpl: AnyTemplate = {
-                      kind: 'builtin', id: m.id, name: m.name, emoji: m.emoji,
-                      subject: BUILT_IN_SUBJECTS[m.id], body: BUILT_IN_BODIES[m.id],
-                    }
-                    const active = selectedTpl?.id === m.id && selectedTpl?.kind === 'builtin'
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => setSelectedTpl(active ? null : tpl)}
-                        className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${active ? 'bg-violet-50' : 'hover:bg-slate-50'}`}
-                      >
-                        <span className="text-base shrink-0">{m.emoji}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-semibold ${active ? 'text-violet-700' : 'text-slate-700'}`}>{m.name}</p>
-                          <p className="text-[10px] text-slate-400 truncate">{m.desc}</p>
-                        </div>
-                        {active && <Check className="h-3.5 w-3.5 text-violet-500 shrink-0" />}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* MY templates */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">My templates</p>
-                </div>
-                {tplLoading ? (
-                  <div className="rounded-xl border border-slate-100 px-4 py-3 text-xs text-slate-400 animate-pulse">Loading…</div>
-                ) : savedTemplates.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">No saved templates yet.</p>
-                ) : (
-                  <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                    {savedTemplates.map(t => {
-                      const tpl: AnyTemplate = { kind: 'saved', id: t.id, name: t.name, emoji: '📋', subject: t.subject, body: t.body }
-                      const active = selectedTpl?.id === t.id && selectedTpl?.kind === 'saved'
-                      return (
-                        <div key={t.id} className={`flex items-center gap-2 px-3.5 py-2.5 transition-colors ${active ? 'bg-violet-50' : 'hover:bg-slate-50'}`}>
-                          <button className="flex-1 flex items-center gap-3 text-left min-w-0" onClick={() => setSelectedTpl(active ? null : tpl)}>
-                            <span className="text-base shrink-0">📋</span>
-                            <div className="min-w-0">
-                              <p className={`text-xs font-semibold truncate ${active ? 'text-violet-700' : 'text-slate-700'}`}>{t.name}</p>
-                              <p className="text-[10px] text-slate-400 truncate">{t.subject}</p>
-                            </div>
-                            {active && <Check className="h-3.5 w-3.5 text-violet-500 shrink-0" />}
-                          </button>
-                          <button
-                            onClick={() => deleteTemplate(t.id)}
-                            className="p-1 rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors shrink-0"
-                            title="Delete template"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {genError && (
-                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{genError}</div>
-              )}
-            </div>
-
-            {/* Footer actions */}
-            <div className="px-5 pb-5 space-y-2 border-t border-slate-100 pt-4">
-              <button
-                onClick={() => selectedTpl ? applyTemplate(selectedTpl) : undefined}
-                disabled={!selectedTpl}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Use Template
-              </button>
-              <button
-                onClick={() => selectedTpl ? generateWithAI(selectedTpl.id) : generateWithAI('interview_invite')}
-                disabled={generating}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60 transition-colors"
-              >
-                {generating
-                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</>
-                  : <><Wand2 className="h-3.5 w-3.5 text-violet-500" /> Generate with AI</>}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── STEP: Compose (full CRM view) ─────────────────────────────────── */}
+        {/* ── COMPOSE ──────────────────────────────────────────────────────── */}
         {step === 'compose' && (
           <>
             <div className="flex-1 overflow-y-auto">
 
-              {/* From / To / CC / BCC header */}
-              <div className="border-b border-slate-100 divide-y divide-slate-100">
-                {/* From */}
-                <div className="flex items-center gap-3 px-5 py-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0">From</span>
-                  <span className="text-xs text-slate-500 truncate">{fromName}</span>
+              {/* ── Row 1: To ──────────────────────────────────────────────── */}
+              <div className="flex items-start gap-3 px-5 py-2.5 border-b border-slate-100">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0 pt-1.5">To</span>
+                <div className="flex-1 min-w-0">
+                  <EmailTagsInput emails={toEmails} onChange={setToEmails} placeholder="Add recipient…" />
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 pt-1">
+                  {!showCc  && <button onClick={() => setShowCc(true)}  className="text-[10px] font-medium text-slate-400 hover:text-violet-600 transition-colors">Cc</button>}
+                  {!showBcc && <button onClick={() => setShowBcc(true)} className="text-[10px] font-medium text-slate-400 hover:text-violet-600 transition-colors">Bcc</button>}
+                </div>
+              </div>
+
+              {/* ── Row 2: Template toolbar ────────────────────────────────── */}
+              <div className="flex items-center gap-2 px-5 py-2.5 border-b border-slate-100 flex-wrap">
+
+                {/* Built-in Templates dropdown */}
+                <div ref={builtInRef} className="relative">
+                  <button
+                    onClick={() => { setBuiltInOpen(o => !o); setMyTplOpen(false); setAiOpen(false) }}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors ${
+                      builtInOpen
+                        ? 'border-violet-400 bg-violet-50 text-violet-700'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    📧 Built-in Templates <ChevronDown className="h-3 w-3 opacity-60" />
+                  </button>
+
+                  {builtInOpen && (
+                    <div className="absolute top-full left-0 mt-1.5 z-30 w-60 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
+                      {BUILT_IN_META.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => {
+                            applyTemplate({ kind: 'builtin', id: m.id, name: m.name, emoji: m.emoji, subject: BUILT_IN_SUBJECTS[m.id], body: BUILT_IN_BODIES[m.id] })
+                            setBuiltInOpen(false)
+                          }}
+                          className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-violet-50 transition-colors"
+                        >
+                          <span className="text-base shrink-0">{m.emoji}</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-700">{m.name}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{m.desc}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {/* To */}
-                <div className="flex items-start gap-3 px-5 py-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0 pt-1.5">To</span>
+                {/* My Templates dropdown + (+) add button */}
+                <div ref={myTplRef} className="relative flex items-center gap-1">
+                  <button
+                    onClick={() => { setMyTplOpen(o => !o); setBuiltInOpen(false); setAiOpen(false) }}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors ${
+                      myTplOpen
+                        ? 'border-violet-400 bg-violet-50 text-violet-700'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    📋 My Templates <ChevronDown className="h-3 w-3 opacity-60" />
+                  </button>
+
+                  {/* (+) saves current compose as a new template */}
+                  <button
+                    onClick={() => { setAddingTpl(true); setMyTplOpen(true); setBuiltInOpen(false); setAiOpen(false) }}
+                    className="flex items-center justify-center w-6 h-6 rounded-lg border border-slate-200 text-slate-500 hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+                    title="Save current email as a template"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+
+                  {myTplOpen && (
+                    <div className="absolute top-full left-0 mt-1.5 z-30 w-72 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
+
+                      {/* Inline "save current email as template" form */}
+                      {addingTpl && (
+                        <div className="px-3 py-2.5 bg-violet-50/60 border-b border-violet-100">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600 mb-1.5">Save as template</p>
+                          <div className="flex gap-1.5">
+                            <input
+                              autoFocus
+                              value={newTplName}
+                              onChange={e => setNewTplName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter')  addTemplate()
+                                if (e.key === 'Escape') { setAddingTpl(false); setNewTplName('') }
+                              }}
+                              placeholder="Template name…"
+                              className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400 bg-white"
+                            />
+                            <button
+                              onClick={addTemplate}
+                              disabled={tplSaving || !newTplName.trim()}
+                              className="flex items-center justify-center w-8 shrink-0 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                            >
+                              {tplSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Saved templates list */}
+                      {tplLoading ? (
+                        <div className="px-4 py-3 text-xs text-slate-400 animate-pulse">Loading…</div>
+                      ) : savedTemplates.length === 0 ? (
+                        <div className="px-4 py-4 text-center">
+                          <p className="text-xs text-slate-400 italic">No templates saved yet.</p>
+                          <p className="text-[10px] text-slate-300 mt-0.5">Compose an email and click (+) to save it here.</p>
+                        </div>
+                      ) : (
+                        <div className="max-h-64 overflow-y-auto divide-y divide-slate-50">
+                          {savedTemplates.map(t => (
+                            <div key={t.id} className="flex items-center gap-1 px-3 py-2.5 hover:bg-slate-50 group transition-colors">
+                              {renamingId === t.id ? (
+                                /* Inline rename input */
+                                <>
+                                  <input
+                                    autoFocus
+                                    value={renamingName}
+                                    onChange={e => setRenamingName(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter')  renameTemplate(t.id, renamingName)
+                                      if (e.key === 'Escape') setRenamingId(null)
+                                    }}
+                                    onBlur={() => renameTemplate(t.id, renamingName)}
+                                    className="flex-1 text-xs border border-violet-300 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-violet-300 bg-white"
+                                  />
+                                  <button
+                                    onClick={() => setRenamingId(null)}
+                                    className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </>
+                              ) : (
+                                /* Template row */
+                                <>
+                                  <button
+                                    className="flex-1 text-left min-w-0"
+                                    onClick={() => {
+                                      applyTemplate({ kind: 'saved', id: t.id, name: t.name, emoji: '📋', subject: t.subject, body: t.body })
+                                      setMyTplOpen(false)
+                                    }}
+                                  >
+                                    <p className="text-xs font-semibold text-slate-700 truncate">{t.name}</p>
+                                    <p className="text-[10px] text-slate-400 truncate">{t.subject}</p>
+                                  </button>
+                                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={e => { e.stopPropagation(); setRenamingId(t.id); setRenamingName(t.name) }}
+                                      className="p-1 rounded text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                                      title="Rename"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      onClick={e => { e.stopPropagation(); deleteTemplate(t.id) }}
+                                      className="p-1 rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Draft dropdown — right-aligned */}
+                <div ref={aiRef} className="relative ml-auto">
+                  <button
+                    onClick={() => { setAiOpen(o => !o); setBuiltInOpen(false); setMyTplOpen(false) }}
+                    disabled={generating}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors disabled:opacity-50 ${
+                      aiOpen
+                        ? 'border-violet-400 bg-violet-50 text-violet-700'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    {generating
+                      ? <><Loader2 className="h-3 w-3 animate-spin" /> Generating…</>
+                      : <><Wand2 className="h-3 w-3 text-violet-500" /> AI Draft <ChevronDown className="h-3 w-3 opacity-60" /></>}
+                  </button>
+
+                  {aiOpen && (
+                    <div className="absolute top-full right-0 mt-1.5 z-30 w-52 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
+                      <p className="px-3.5 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Generate with AI</p>
+                      {BUILT_IN_META.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => generateWithAI(m.id)}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left hover:bg-violet-50 transition-colors"
+                        >
+                          <span className="text-sm shrink-0">{m.emoji}</span>
+                          <p className="text-xs font-medium text-slate-700">{m.name}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Row 3+: Full compose interface ─────────────────────────── */}
+
+              {/* Cc */}
+              {showCc && (
+                <div className="flex items-start gap-3 px-5 py-2 border-b border-slate-100">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0 pt-1.5">Cc</span>
                   <div className="flex-1 min-w-0">
-                    <EmailTagsInput emails={toEmails} onChange={setToEmails} placeholder="Add recipient…" autoFocus={false} />
+                    <EmailTagsInput emails={ccEmails} onChange={setCcEmails} placeholder="Add CC…" />
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0 pt-1">
-                    {!showCc  && <button onClick={() => setShowCc(true)}  className="text-[10px] font-medium text-slate-400 hover:text-slate-700 transition-colors">Cc</button>}
-                    {!showBcc && <button onClick={() => setShowBcc(true)} className="text-[10px] font-medium text-slate-400 hover:text-slate-700 transition-colors">Bcc</button>}
-                  </div>
+                  <button onClick={() => { setShowCc(false); setCcEmails([]) }} className="shrink-0 pt-1.5 text-slate-300 hover:text-red-400 transition-colors">
+                    <X className="h-3 w-3" />
+                  </button>
                 </div>
+              )}
 
-                {/* CC */}
-                {showCc && (
-                  <div className="flex items-start gap-3 px-5 py-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0 pt-1.5">Cc</span>
-                    <div className="flex-1 min-w-0">
-                      <EmailTagsInput emails={ccEmails} onChange={setCcEmails} placeholder="Add CC…" />
-                    </div>
-                    <button onClick={() => { setShowCc(false); setCcEmails([]) }} className="shrink-0 pt-1.5 text-slate-300 hover:text-red-400 transition-colors">
-                      <X className="h-3 w-3" />
-                    </button>
+              {/* Bcc */}
+              {showBcc && (
+                <div className="flex items-start gap-3 px-5 py-2 border-b border-slate-100">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0 pt-1.5">Bcc</span>
+                  <div className="flex-1 min-w-0">
+                    <EmailTagsInput emails={bccEmails} onChange={setBccEmails} placeholder="Add BCC…" />
                   </div>
-                )}
-
-                {/* BCC */}
-                {showBcc && (
-                  <div className="flex items-start gap-3 px-5 py-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0 pt-1.5">Bcc</span>
-                    <div className="flex-1 min-w-0">
-                      <EmailTagsInput emails={bccEmails} onChange={setBccEmails} placeholder="Add BCC…" />
-                    </div>
-                    <button onClick={() => { setShowBcc(false); setBccEmails([]) }} className="shrink-0 pt-1.5 text-slate-300 hover:text-red-400 transition-colors">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Subject */}
-                <div className="flex items-center gap-3 px-5 py-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0">Re</span>
-                  <input
-                    value={subject}
-                    onChange={e => setSubject(e.target.value)}
-                    placeholder="Subject line…"
-                    className="flex-1 text-sm font-medium text-slate-800 outline-none bg-transparent placeholder-slate-300"
-                  />
+                  <button onClick={() => { setShowBcc(false); setBccEmails([]) }} className="shrink-0 pt-1.5 text-slate-300 hover:text-red-400 transition-colors">
+                    <X className="h-3 w-3" />
+                  </button>
                 </div>
+              )}
+
+              {/* From (read-only) */}
+              <div className="flex items-center gap-3 px-5 py-2 border-b border-slate-100">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0">From</span>
+                <span className="text-xs text-slate-500 truncate">{fromName}</span>
+              </div>
+
+              {/* Subject */}
+              <div className="flex items-center gap-3 px-5 py-2 border-b border-slate-100">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0">Re</span>
+                <input
+                  value={subject}
+                  onChange={e => setSubject(e.target.value)}
+                  placeholder="Subject line…"
+                  className="flex-1 text-sm font-medium text-slate-800 outline-none bg-transparent placeholder-slate-300"
+                />
               </div>
 
               {/* Body */}
@@ -571,37 +679,23 @@ export default function EmailDraftDrawer({
                 <RichTextEditor
                   value={body}
                   onChange={setBody}
-                  placeholder="Compose your message…"
-                  minHeight={240}
+                  placeholder="Compose your message… or pick a template above to get started."
+                  minHeight={260}
                 />
               </div>
 
-              {/* Schedule send */}
-              <div className="px-5 pb-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setScheduled(s => !s)}
-                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors ${scheduled ? 'border-violet-400 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}
-                  >
-                    <Clock className="h-3 w-3" /> Schedule send
-                  </button>
-                  {selectedTpl && (
-                    <button
-                      onClick={() => { setTplName(selectedTpl.name + ' (copy)'); setStep('save_template') }}
-                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-colors"
-                    >
-                      <Plus className="h-3 w-3" /> Save as template
-                    </button>
-                  )}
-                  {!selectedTpl && (
-                    <button
-                      onClick={() => { setTplName(''); setStep('save_template') }}
-                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-colors"
-                    >
-                      <Plus className="h-3 w-3" /> Save as template
-                    </button>
-                  )}
-                </div>
+              {/* Schedule send + errors */}
+              <div className="px-5 pb-5 space-y-2">
+                <button
+                  onClick={() => setScheduled(s => !s)}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors ${
+                    scheduled
+                      ? 'border-violet-400 bg-violet-50 text-violet-700'
+                      : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <Clock className="h-3 w-3" /> Schedule send
+                </button>
 
                 {scheduled && (
                   <div className="flex items-center gap-2 p-3 rounded-xl bg-violet-50 border border-violet-200">
@@ -623,20 +717,13 @@ export default function EmailDraftDrawer({
                   </div>
                 )}
 
-                {sendError && (
-                  <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{sendError}</div>
-                )}
+                {genError  && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{genError}</div>}
+                {sendError && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{sendError}</div>}
               </div>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-2.5 px-5 py-3.5 border-t border-slate-100 bg-slate-50/60 shrink-0">
-              <button
-                onClick={() => setStep('pick')}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-white transition-colors"
-              >
-                Back
-              </button>
+            <div className="flex items-center px-5 py-3.5 border-t border-slate-100 bg-slate-50/60 shrink-0">
               <button
                 onClick={send}
                 disabled={sending || toEmails.length === 0 || !subject.trim() || isHtmlEmpty(body)}
@@ -645,54 +732,14 @@ export default function EmailDraftDrawer({
                 {sending
                   ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>
                   : scheduled && schedDate
-                    ? <><Clock className="h-4 w-4" /> Schedule</>
+                    ? <><Clock className="h-4 w-4" /> Schedule Email</>
                     : <><Send className="h-4 w-4" /> Send Email</>}
               </button>
             </div>
           </>
         )}
 
-        {/* ── STEP: Save template ───────────────────────────────────────────── */}
-        {step === 'save_template' && (
-          <>
-            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Save this draft as a reusable template. Placeholders like{' '}
-                <code className="bg-slate-100 px-1 rounded text-slate-700">{'{{first_name}}'}</code> will be
-                resolved automatically when you next use it.
-              </p>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Template name</label>
-                <input
-                  autoFocus
-                  value={tplName}
-                  onChange={e => setTplName(e.target.value)}
-                  placeholder="e.g. Interview Invite — Tech Roles"
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400 transition-colors"
-                />
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Preview</p>
-                <p className="text-xs font-medium text-slate-700 truncate">{subject || '(no subject)'}</p>
-                <p className="text-[11px] text-slate-400 line-clamp-2">{stripHtml(body) || '(no body)'}</p>
-              </div>
-            </div>
-            <div className="flex gap-2.5 px-5 py-3.5 border-t border-slate-100 bg-slate-50/60 shrink-0">
-              <button onClick={() => setStep('compose')} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-white transition-colors">
-                Cancel
-              </button>
-              <button
-                onClick={saveTemplate}
-                disabled={tplSaving || !tplName.trim()}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
-              >
-                {tplSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</> : 'Save Template'}
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* ── STEP: Sent confirmation ───────────────────────────────────────── */}
+        {/* ── SENT confirmation ─────────────────────────────────────────────── */}
         {step === 'sent' && (
           <div className="flex-1 flex flex-col items-center justify-center px-8 text-center gap-5">
             <div className="h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center">
