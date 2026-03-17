@@ -26,9 +26,13 @@ interface EmailMeta {
   body?:       string
   body_html?:  string
   to_email?:   string
+  to_emails?:  string[]
   to_name?:    string
+  cc_emails?:  string[]
+  bcc_emails?: string[]
   from_email?: string
   from_name?:  string
+  scheduled?:  string | null
 }
 
 function EmailCard({ event }: { event: ApplicationEvent }) {
@@ -41,8 +45,10 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
   const hasBody   = !!(bodyHtml || bodyText)
   const fromName  = meta.from_name || event.created_by || 'Recruiter'
   const fromEmail = meta.from_email || null
-  const toEmail   = meta.to_email  || null
+  const toList    = meta.to_emails?.length ? meta.to_emails : (meta.to_email ? [meta.to_email] : [])
   const toName    = meta.to_name   || null
+  const ccList    = meta.cc_emails  || []
+  const scheduled = meta.scheduled  || null
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -76,11 +82,17 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
               </div>
             </div>
 
-            {/* To */}
-            {(toEmail || toName) && (
+            {/* To + CC + Scheduled badge */}
+            {toList.length > 0 && (
               <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                to: {toName ? `${toName} <${toEmail}>` : toEmail}
+                to: {toName && toList.length === 1 ? `${toName} <${toList[0]}>` : toList.join(', ')}
+                {ccList.length > 0 && <span className="ml-2">cc: {ccList.join(', ')}</span>}
               </p>
+            )}
+            {scheduled && (
+              <span className="inline-flex items-center gap-0.5 mt-0.5 rounded-full bg-violet-50 border border-violet-200 px-1.5 py-0.5 text-[9px] font-semibold text-violet-600">
+                🕐 Scheduled · {new Date(scheduled).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </span>
             )}
 
             {/* Subject */}
