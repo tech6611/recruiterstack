@@ -248,26 +248,6 @@ export default function EmailDraftDrawer({
       .finally(() => setTplLoading(false))
   }, [])
 
-  // Build all-templates list for the picker
-  const allTemplates: AnyTemplate[] = [
-    ...BUILT_IN_META.map(m => ({
-      kind:    'builtin' as const,
-      id:      m.id,
-      name:    m.name,
-      emoji:   m.emoji,
-      subject: BUILT_IN_SUBJECTS[m.id],
-      body:    BUILT_IN_BODIES[m.id],
-    })),
-    ...savedTemplates.map(t => ({
-      kind:    'saved' as const,
-      id:      t.id,
-      name:    t.name,
-      emoji:   '📋',
-      subject: t.subject,
-      body:    t.body,
-    })),
-  ]
-
   // ── Vars for placeholder resolution ─────────────────────────────────────────
 
   const vars: Record<string, string> = {
