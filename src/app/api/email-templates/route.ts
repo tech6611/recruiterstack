@@ -16,7 +16,11 @@ export async function GET() {
     .eq('org_id', orgId)
     .order('created_at', { ascending: true })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // PGRST205 = table not found (migration not yet applied) → return empty list gracefully
+  if (error) {
+    if ((error as { code?: string }).code === 'PGRST205') return NextResponse.json({ data: [] })
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   return NextResponse.json({ data })
 }
 
@@ -49,6 +53,11 @@ export async function POST(request: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    if ((error as { code?: string }).code === 'PGRST205') {
+      return NextResponse.json({ error: 'email_templates table not yet created. Run the migration in your Supabase dashboard.' }, { status: 503 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   return NextResponse.json({ data }, { status: 201 })
 }
