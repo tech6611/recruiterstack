@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, KeyboardEvent } from 'react'
+import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react'
 import {
   Wand2, X, Send, Loader2, Check, ChevronDown,
   Plus, Trash2, Clock, Calendar, Pencil,
@@ -240,6 +240,16 @@ export default function EmailDraftDrawer({
   // a template or AI draft replaces the body — Tiptap is uncontrolled after mount.
   const [editorKey, setEditorKey] = useState(0)
 
+  // Drawer resize (drag left edge)
+  const [drawerWidth, setDrawerWidth] = useState(560)
+  const isDragging   = useRef(false)
+  const dragStartX   = useRef(0)
+  const dragStartW   = useRef(0)
+
+  // Draft auto-save status
+  const [draftStatus,    setDraftStatus]    = useState<'idle' | 'saving' | 'saved'>('idle')
+  const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Schedule send
   const [scheduled, setScheduled] = useState(false)
   const [schedDate, setSchedDate] = useState('')
@@ -281,6 +291,68 @@ export default function EmailDraftDrawer({
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // ── Drag-to-resize handler ────────────────────────────────────────────────
+
+  const onDragHandleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    isDragging.current  = true
+    dragStartX.current  = e.clientX
+    dragStartW.current  = drawerWidth
+    const onMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return
+      const delta  = dragStartX.current - ev.clientX
+      const clamped = Math.min(Math.max(dragStartW.current + delta, 440), window.innerWidth * 0.85)
+      setDrawerWidth(clamped)
+    }
+    const onUp = () => {
+      isDragging.current = false
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup',   onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup',   onUp)
+  }, [drawerWidth])
+
+  // ── Load existing draft on mount ──────────────────────────────────────────
+
+  useEffect(() => {
+    fetch(`/api/applications/${appId}/draft`)
+      .then(r => r.json())
+      .then(json => {
+        if (!json.data) return
+        const d = json.data
+        if (d.to_emails?.length)  setToEmails(d.to_emails)
+        if (d.cc_emails?.length)  { setCcEmails(d.cc_emails); setShowCc(true) }
+        if (d.bcc_emails?.length) { setBccEmails(d.bcc_emails); setShowBcc(true) }
+        if (d.subject) setSubject(d.subject)
+        if (d.body)    { setBody(d.body); setEditorKey(k => k + 1) }
+      })
+      .catch(() => {})
+  }, [appId])
+
+  // ── Debounced auto-save whenever compose fields change ────────────────────
+
+  useEffect(() => {
+    // Don't auto-save if nothing has been typed yet (only default recipient)
+    if (!subject && isHtmlEmpty(body) && toEmails.length <= 1 && ccEmails.length === 0 && bccEmails.length === 0) return
+    if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current)
+    setDraftStatus('saving')
+    draftSaveTimer.current = setTimeout(async () => {
+      try {
+        await fetch(`/api/applications/${appId}/draft`, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to_emails: toEmails, cc_emails: ccEmails, bcc_emails: bccEmails, subject, body }),
+        })
+        setDraftStatus('saved')
+        setTimeout(() => setDraftStatus('idle'), 3000)
+      } catch {
+        setDraftStatus('idle')
+      }
+    }, 1500)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject, body, toEmails, ccEmails, bccEmails])
 
   // ── Placeholder vars ──────────────────────────────────────────────────────
 
@@ -397,6 +469,8 @@ export default function EmailDraftDrawer({
     setSentSched(scheduled && schedDate ? `${schedDate}T${schedTime}` : null)
     setStep('sent')
     onSent?.()
+    // Delete the auto-saved draft since email was sent
+    fetch(`/api/applications/${appId}/draft`, { method: 'DELETE' }).catch(() => {})
   }
 
   const fromName = settings.recruiter_name || 'RecruiterStack'
@@ -407,7 +481,13 @@ export default function EmailDraftDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
+      <div className="relative flex h-full flex-col bg-white shadow-2xl" style={{ width: drawerWidth }}>
+          {/* Drag handle — grab left edge to resize */}
+          <div
+            onMouseDown={onDragHandleMouseDown}
+            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-violet-400/40 active:bg-violet-400/60 transition-colors z-20"
+            title="Drag to resize"
+          />
 
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 shrink-0">
@@ -416,6 +496,8 @@ export default function EmailDraftDrawer({
             <h2 className="text-sm font-bold text-slate-900">
               {step === 'sent' ? 'Email Sent' : 'Draft Email'}
             </h2>
+            {draftStatus === 'saving' && <span className="text-[10px] text-slate-400">Saving draft…</span>}
+            {draftStatus === 'saved'  && <span className="text-[10px] text-emerald-500">✓ Draft saved</span>}
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
             <X className="h-4 w-4" />
