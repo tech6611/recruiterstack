@@ -13,10 +13,13 @@ import StarterKit   from '@tiptap/starter-kit'
 import Underline    from '@tiptap/extension-underline'
 import TextAlign    from '@tiptap/extension-text-align'
 import Placeholder  from '@tiptap/extension-placeholder'
+import Link         from '@tiptap/extension-link'
+import Image        from '@tiptap/extension-image'
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   Heading1, Heading2, List, ListOrdered,
   AlignLeft, AlignCenter, AlignRight,
+  Link2, Image as ImageIcon, Link2Off,
 } from 'lucide-react'
 
 // ── Toolbar helpers ────────────────────────────────────────────────────────
@@ -94,6 +97,8 @@ export function RichTextEditor({
       Underline,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Placeholder.configure({ placeholder }),
+      Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-blue-600 underline cursor-pointer' } }),
+      Image.configure({ HTMLAttributes: { class: 'max-w-full rounded-lg my-2' } }),
     ],
     content: value || '',
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -159,6 +164,33 @@ export function RichTextEditor({
         </ToolbarBtn>
         <ToolbarBtn title="Align right"         active={editor.isActive({ textAlign: 'right' })}  onClick={() => editor.chain().focus().setTextAlign('right').run()}>
           <AlignRight size={sz} />
+        </ToolbarBtn>
+
+        <Divider />
+
+        {/* Link — click to set, click again to remove */}
+        <ToolbarBtn
+          title={editor.isActive('link') ? 'Remove link' : 'Insert link'}
+          active={editor.isActive('link')}
+          onClick={() => {
+            if (editor.isActive('link')) { editor.chain().focus().unsetLink().run(); return }
+            const url = window.prompt('Link URL:', 'https://')
+            if (url) editor.chain().focus().setLink({ href: url }).run()
+          }}
+        >
+          {editor.isActive('link') ? <Link2Off size={sz} /> : <Link2 size={sz} />}
+        </ToolbarBtn>
+
+        {/* Image — insert by URL */}
+        <ToolbarBtn
+          title="Insert image"
+          active={false}
+          onClick={() => {
+            const url = window.prompt('Image URL:', 'https://')
+            if (url) editor.chain().focus().setImage({ src: url }).run()
+          }}
+        >
+          <ImageIcon size={sz} />
         </ToolbarBtn>
       </div>
 

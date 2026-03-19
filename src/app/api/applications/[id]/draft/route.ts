@@ -10,7 +10,7 @@ function isMissingTable(error: unknown): boolean {
   return !!(error && typeof error === 'object' && (error as { code?: string }).code === 'PGRST205')
 }
 
-// ── GET /api/applications/[id]/draft — load saved draft ──────────────────────
+// ── GET /api/applications/[id]/draft — list all saved drafts ─────────────────
 export async function GET(
   _request: NextRequest,
   { params }: RouteContext
@@ -25,17 +25,17 @@ export async function GET(
     .select('*')
     .eq('application_id', params.id)
     .eq('org_id', orgId)
-    .maybeSingle()
+    .order('updated_at', { ascending: false })
 
   if (error) {
-    if (isMissingTable(error)) return NextResponse.json({ data: null })
+    if (isMissingTable(error)) return NextResponse.json({ data: [] })
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  return NextResponse.json({ data })
+  return NextResponse.json({ data: data ?? [] })
 }
 
-// ── PUT /api/applications/[id]/draft — upsert (auto-save) ────────────────────
-export async function PUT(
+// ── POST /api/applications/[id]/draft — create a new draft ───────────────────
+export async function POST(
   request: NextRequest,
   { params }: RouteContext
 ) {
@@ -46,6 +46,7 @@ export async function PUT(
   const { userId } = await auth()
 
   let body: {
+    name?: string
     to_emails?: string[]
     cc_emails?: string[]
     bcc_emails?: string[]
@@ -59,20 +60,18 @@ export async function PUT(
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('email_drafts')
-    .upsert(
-      {
-        org_id:         orgId,
-        application_id: params.id,
-        to_emails:      body.to_emails  ?? [],
-        cc_emails:      body.cc_emails  ?? [],
-        bcc_emails:     body.bcc_emails ?? [],
-        subject:        body.subject    ?? '',
-        body:           body.body       ?? '',
-        created_by:     userId ?? 'recruiter',
-        updated_at:     new Date().toISOString(),
-      },
-      { onConflict: 'application_id,org_id' }
-    )
+    .insert({
+      org_id:         orgId,
+      application_id: params.id,
+      name:           body.name       ?? '',
+      to_emails:      body.to_emails  ?? [],
+      cc_emails:      body.cc_emails  ?? [],
+      bcc_emails:     body.bcc_emails ?? [],
+      subject:        body.subject    ?? '',
+      body:           body.body       ?? '',
+      created_by:     userId ?? 'recruiter',
+      updated_at:     new Date().toISOString(),
+    })
     .select()
     .single()
 
@@ -83,21 +82,76 @@ export async function PUT(
   return NextResponse.json({ data })
 }
 
-// ── DELETE /api/applications/[id]/draft — remove after send ──────────────────
-export async function DELETE(
-  _request: NextRequest,
+// ── PUT /api/applications/[id]/draft?draft_id=X — update a specific draft ────
+export async function PUT(
+  request: NextRequest,
   { params }: RouteContext
 ) {
   const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 
+  const draftId = request.nextUrl.searchParams.get('draft_id')
+  if (!draftId) return NextResponse.json({ error: 'draft_id is required' }, { status: 400 })
+
+  let body: {
+    name?: string
+    to_emails?: string[]
+    cc_emails?: string[]
+    bcc_emails?: string[]
+    subject?: string
+    body?: string
+  }
+  try { body = await request.json() } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
   const supabase = createAdminClient()
-  const { error } = await supabase
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (body.name       !== undefined) update.name       = body.name
+  if (body.to_emails  !== undefined) update.to_emails  = body.to_emails
+  if (body.cc_emails  !== undefined) update.cc_emails  = body.cc_emails
+  if (body.bcc_emails !== undefined) update.bcc_emails = body.bcc_emails
+  if (body.subject    !== undefined) update.subject    = body.subject
+  if (body.body       !== undefined) update.body       = body.body
+
+  const { data, error } = await supabase
+    .from('email_drafts')
+    .update(update)
+    .eq('id', draftId)
+    .eq('org_id', orgId)
+    .select()
+    .single()
+
+  if (error) {
+    if (isMissingTable(error)) return NextResponse.json({ success: true, data: null })
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  return NextResponse.json({ data })
+}
+
+// ── DELETE /api/applications/[id]/draft?draft_id=X — delete a specific draft ─
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteContext
+) {
+  const authResult = await requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
+  const draftId = request.nextUrl.searchParams.get('draft_id')
+
+  const supabase = createAdminClient()
+  let q = supabase
     .from('email_drafts')
     .delete()
     .eq('application_id', params.id)
     .eq('org_id', orgId)
+
+  // If a specific draft_id is given, only delete that one; otherwise delete all (post-send cleanup)
+  if (draftId) q = (q as typeof q).eq('id', draftId)
+
+  const { error } = await q
 
   if (error && !isMissingTable(error))
     return NextResponse.json({ error: error.message }, { status: 500 })

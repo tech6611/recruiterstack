@@ -246,6 +246,15 @@ export default function EmailDraftDrawer({
   const dragStartX   = useRef(0)
   const dragStartW   = useRef(0)
 
+  // Multi-draft support (Gmail-style)
+  interface EmailDraftRecord {
+    id: string; name: string; subject: string; body: string
+    updated_at: string; to_emails: string[]; cc_emails: string[]; bcc_emails: string[]
+  }
+  const currentDraftIdRef = useRef<string | null>(null)
+  const [allDrafts,       setAllDrafts]       = useState<EmailDraftRecord[]>([])
+  const [showDraftsPanel, setShowDraftsPanel] = useState(false)
+
   // Draft auto-save status
   const [draftStatus,    setDraftStatus]    = useState<'idle' | 'saving' | 'saved'>('idle')
   const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -274,6 +283,14 @@ export default function EmailDraftDrawer({
       .catch(() => {})
       .finally(() => setTplLoading(false))
   }, [])
+
+  // ── Escape key closes the drawer ─────────────────────────────────────────
+
+  useEffect(() => {
+    const handler = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
 
   // ── Close all dropdowns on outside click ──────────────────────────────────
 
@@ -314,14 +331,17 @@ export default function EmailDraftDrawer({
     document.addEventListener('mouseup',   onUp)
   }, [drawerWidth])
 
-  // ── Load existing draft on mount ──────────────────────────────────────────
+  // ── Load all drafts on mount — restore most recent ───────────────────────
 
   useEffect(() => {
     fetch(`/api/applications/${appId}/draft`)
       .then(r => r.json())
       .then(json => {
-        if (!json.data) return
-        const d = json.data
+        const drafts: EmailDraftRecord[] = json.data ?? []
+        setAllDrafts(drafts)
+        if (drafts.length === 0) return
+        const d = drafts[0] // most-recent first (API sorts by updated_at desc)
+        currentDraftIdRef.current = d.id
         if (d.to_emails?.length)  setToEmails(d.to_emails)
         if (d.cc_emails?.length)  { setCcEmails(d.cc_emails); setShowCc(true) }
         if (d.bcc_emails?.length) { setBccEmails(d.bcc_emails); setShowBcc(true) }
@@ -329,6 +349,7 @@ export default function EmailDraftDrawer({
         if (d.body)    { setBody(d.body); setEditorKey(k => k + 1) }
       })
       .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appId])
 
   // ── Debounced auto-save whenever compose fields change ────────────────────
@@ -340,11 +361,32 @@ export default function EmailDraftDrawer({
     setDraftStatus('saving')
     draftSaveTimer.current = setTimeout(async () => {
       try {
-        await fetch(`/api/applications/${appId}/draft`, {
-          method:  'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to_emails: toEmails, cc_emails: ccEmails, bcc_emails: bccEmails, subject, body }),
-        })
+        const payload = { to_emails: toEmails, cc_emails: ccEmails, bcc_emails: bccEmails, subject, body }
+        const draftId = currentDraftIdRef.current
+
+        let savedDraft: EmailDraftRecord | null = null
+        if (draftId) {
+          // Update existing draft
+          const res = await fetch(`/api/applications/${appId}/draft?draft_id=${draftId}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          savedDraft = (await res.json()).data ?? null
+        } else {
+          // Create new draft and remember its ID
+          const res = await fetch(`/api/applications/${appId}/draft`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          savedDraft = (await res.json()).data ?? null
+          if (savedDraft?.id) {
+            currentDraftIdRef.current = savedDraft.id
+            setAllDrafts(prev => [savedDraft!, ...prev])
+          }
+        }
+        if (savedDraft) {
+          setAllDrafts(prev => prev.map(d => d.id === savedDraft!.id ? savedDraft! : d))
+        }
         setDraftStatus('saved')
         setTimeout(() => setDraftStatus('idle'), 3000)
       } catch {
@@ -469,8 +511,11 @@ export default function EmailDraftDrawer({
     setSentSched(scheduled && schedDate ? `${schedDate}T${schedTime}` : null)
     setStep('sent')
     onSent?.()
-    // Delete the auto-saved draft since email was sent
-    fetch(`/api/applications/${appId}/draft`, { method: 'DELETE' }).catch(() => {})
+    // Delete the specific draft that was just sent
+    const sentDraftId = currentDraftIdRef.current
+    if (sentDraftId) {
+      fetch(`/api/applications/${appId}/draft?draft_id=${sentDraftId}`, { method: 'DELETE' }).catch(() => {})
+    }
   }
 
   const fromName = settings.recruiter_name || 'RecruiterStack'
@@ -499,14 +544,79 @@ export default function EmailDraftDrawer({
             {draftStatus === 'saving' && <span className="text-[10px] text-slate-400">Saving draft…</span>}
             {draftStatus === 'saved'  && <span className="text-[10px] text-emerald-500">✓ Draft saved</span>}
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {step === 'compose' && allDrafts.length > 0 && (
+              <button
+                onClick={() => setShowDraftsPanel(p => !p)}
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  showDraftsPanel
+                    ? 'bg-violet-100 text-violet-700'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                }`}
+              >
+                📄 {allDrafts.length} draft{allDrafts.length > 1 ? 's' : ''}
+                <ChevronDown className={`h-2.5 w-2.5 transition-transform ${showDraftsPanel ? 'rotate-180' : ''}`} />
+              </button>
+            )}
+            <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* ── COMPOSE ──────────────────────────────────────────────────────── */}
         {step === 'compose' && (
           <>
+            {/* ── Drafts panel ─────────────────────────────────────────────── */}
+            {showDraftsPanel && (
+              <div className="shrink-0 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Saved Drafts</span>
+                  <button
+                    onClick={() => {
+                      // Start a fresh draft — clear compose + reset ID
+                      currentDraftIdRef.current = null
+                      setToEmails([candidateEmail].filter(Boolean))
+                      setCcEmails([]); setBccEmails([]); setShowCc(false); setShowBcc(false)
+                      setSubject(''); setBody(''); setEditorKey(k => k + 1)
+                      setShowDraftsPanel(false)
+                    }}
+                    className="flex items-center gap-0.5 text-[10px] font-semibold text-violet-600 hover:text-violet-800 transition-colors"
+                  >
+                    <Plus className="h-2.5 w-2.5" /> New Draft
+                  </button>
+                </div>
+                <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
+                  {allDrafts.map(d => {
+                    const isActive = currentDraftIdRef.current === d.id
+                    return (
+                      <button
+                        key={d.id}
+                        onClick={() => {
+                          currentDraftIdRef.current = d.id
+                          setToEmails(d.to_emails?.length ? d.to_emails : [candidateEmail].filter(Boolean))
+                          if (d.cc_emails?.length)  { setCcEmails(d.cc_emails);  setShowCc(true)  } else { setCcEmails([]);  setShowCc(false)  }
+                          if (d.bcc_emails?.length) { setBccEmails(d.bcc_emails); setShowBcc(true) } else { setBccEmails([]); setShowBcc(false) }
+                          setSubject(d.subject || '')
+                          setBody(d.body || ''); setEditorKey(k => k + 1)
+                          setShowDraftsPanel(false)
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white transition-colors ${isActive ? 'bg-white' : ''}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-slate-700 truncate">{d.subject || '(no subject)'}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {new Date(d.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        {isActive && <Check className="h-3 w-3 text-violet-500 shrink-0" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto">
 
               {/* ── Row 1: To ──────────────────────────────────────────────── */}
