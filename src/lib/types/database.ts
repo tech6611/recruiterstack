@@ -310,6 +310,8 @@ export interface OfferUpdate extends Partial<OfferInsert> {}
 // ── Candidate Tasks ───────────────────────────────────────────────────────────
 // Added in migration 019
 
+export type TaskStatus = 'to_do' | 'in_progress' | 'done' | 'blocked'
+
 export interface CandidateTask {
   id:             string
   org_id:         string
@@ -319,6 +321,7 @@ export interface CandidateTask {
   description:    string | null
   due_date:       string | null  // DATE stored as ISO string YYYY-MM-DD
   assignee_name:  string | null
+  status:         TaskStatus
   completed_at:   string | null
   created_by:     string
   created_at:     string

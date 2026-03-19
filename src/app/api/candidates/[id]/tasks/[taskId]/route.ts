@@ -22,14 +22,28 @@ export async function PATCH(
   const supabase = createAdminClient()
 
   const updates: Record<string, unknown> = {}
-  if (body.title        !== undefined) updates.title         = (body.title as string).trim()
-  if (body.description  !== undefined) updates.description   = body.description
-  if (body.due_date     !== undefined) updates.due_date      = body.due_date
+  if (body.title         !== undefined) updates.title         = (body.title as string).trim()
+  if (body.description   !== undefined) updates.description   = body.description
+  if (body.due_date      !== undefined) updates.due_date      = body.due_date
   if (body.assignee_name !== undefined) updates.assignee_name = body.assignee_name
 
-  // Toggle completion
-  if (body.completed === true)  updates.completed_at = new Date().toISOString()
-  if (body.completed === false) updates.completed_at = null
+  // Status change — also syncs completed_at unless completed is explicitly provided
+  if (body.status !== undefined) {
+    updates.status = body.status
+    if (body.completed === undefined) {
+      updates.completed_at = body.status === 'done' ? new Date().toISOString() : null
+    }
+  }
+
+  // Toggle completion — also syncs status unless status is explicitly provided
+  if (body.completed === true) {
+    updates.completed_at = new Date().toISOString()
+    if (body.status === undefined) updates.status = 'done'
+  }
+  if (body.completed === false) {
+    updates.completed_at = null
+    if (body.status === undefined) updates.status = 'to_do'
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })

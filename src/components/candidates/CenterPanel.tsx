@@ -5,14 +5,14 @@ import { Calendar, Wand2, Gift, ClipboardList } from 'lucide-react'
 import type { Candidate, CandidateTask, ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import ActivitiesTab from './center/ActivitiesTab'
 import SummaryTab from './center/SummaryTab'
-import FunnelTab from './center/FunnelTab'
+import HistoryTab from './center/HistoryTab'
 
 type ApplicationWithAttribution = Application & {
   pipeline_stages: { name: string; color: string } | null
   hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number'> | null
 }
 
-const CENTER_TABS = ['Activities', 'Funnel', 'Summary'] as const
+const CENTER_TABS = ['Summary', 'Activities', 'History'] as const
 type CenterTab = typeof CENTER_TABS[number]
 
 interface CenterPanelProps {
@@ -42,7 +42,7 @@ export default function CenterPanel({
   onCreateOffer,
   onAddScorecard,
 }: CenterPanelProps) {
-  const [activeTab, setActiveTab] = useState<CenterTab>('Activities')
+  const [activeTab, setActiveTab] = useState<CenterTab>('Summary')
 
   const activeApps = applications.filter(a => a.status === 'active')
   const hasActiveApps = activeApps.length > 0
@@ -117,8 +117,8 @@ export default function CenterPanel({
             onTaskDeleted={onTaskDeleted}
           />
         )}
-        {activeTab === 'Funnel' && (
-          <FunnelTab
+        {activeTab === 'History' && (
+          <HistoryTab
             events={events}
             applications={applications}
           />

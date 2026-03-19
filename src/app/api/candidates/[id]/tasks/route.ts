@@ -63,6 +63,7 @@ export async function POST(
       description:    (body.description   as string | undefined) ?? null,
       due_date:       (body.due_date       as string | undefined) ?? null,
       assignee_name:  (body.assignee_name  as string | undefined) ?? null,
+      status:         (body.status         as string | undefined) ?? 'to_do',
       created_by:     (body.created_by     as string | undefined) ?? 'Recruiter',
     } as never)
     .select()

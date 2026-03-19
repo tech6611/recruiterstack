@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Check, X } from 'lucide-react'
+import { Pencil, Check, X, ChevronRight } from 'lucide-react'
 import type { CandidateTask, ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import TaskScheduler from '../TaskScheduler'
 import InterviewProgressTable from '../InterviewProgressTable'
@@ -88,6 +88,110 @@ function AttributionCard({ app, onCreditedToChanged }: {
   )
 }
 
+// ── Pipeline flow section ─────────────────────────────────────────────────────
+
+interface StageStep {
+  stage: string
+  date: string
+}
+
+function buildPipelineFlow(events: ApplicationEvent[], appId: string): StageStep[] {
+  return events
+    .filter(e =>
+      e.application_id === appId &&
+      (e.event_type === 'applied' || e.event_type === 'stage_moved') &&
+      !!e.to_stage
+    )
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .map(e => ({ stage: e.to_stage as string, date: e.created_at }))
+}
+
+function fmtShort(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function PipelineFlowSection({ events, applications }: {
+  events: ApplicationEvent[]
+  applications: ApplicationWithAttribution[]
+}) {
+  const totalDays = (() => {
+    const sorted = [...events].sort((a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    )
+    if (!sorted[0]) return 0
+    return Math.floor((Date.now() - new Date(sorted[0].created_at).getTime()) / 86400000)
+  })()
+
+  const stagesMoved    = events.filter(e => (e.event_type as string) === 'stage_moved').length
+  const emailsSent     = events.filter(e => (e.event_type as string) === 'email_sent').length
+  const interviewsDone = events.filter(e => (e.event_type as string) === 'interview_completed').length
+
+  const flows = applications.map(app => ({
+    app,
+    steps: buildPipelineFlow(events, app.id),
+  })).filter(f => f.steps.length > 0)
+
+  if (events.length === 0) return null
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+      <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pipeline Activity</h4>
+
+      {/* Stats bar */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: 'Days in pipeline', value: totalDays },
+          { label: 'Stage moves',      value: stagesMoved },
+          { label: 'Emails sent',      value: emailsSent },
+          { label: 'Interviews done',  value: interviewsDone },
+        ].map(stat => (
+          <div key={stat.label} className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5 text-center">
+            <p className="text-xl font-bold text-slate-900">{stat.value}</p>
+            <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Stage progression blocks */}
+      {flows.map(({ app, steps }) => (
+        <div key={app.id}>
+          {app.hiring_requests && flows.length > 1 && (
+            <p className="text-[10px] font-semibold text-violet-500 uppercase tracking-wide mb-2">
+              {app.hiring_requests.position_title}
+            </p>
+          )}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            {steps.map((step, idx) => {
+              const isLast = idx === steps.length - 1
+              return (
+                <div key={`${step.stage}-${idx}`} className="flex items-center gap-1 shrink-0">
+                  <div className={`rounded-xl px-3 py-2 text-center min-w-[88px] border transition-colors ${
+                    isLast
+                      ? 'bg-violet-600 border-violet-600'
+                      : 'bg-white border-slate-200'
+                  }`}>
+                    <p className={`text-[11px] font-semibold leading-tight ${isLast ? 'text-white' : 'text-slate-800'}`}>
+                      {step.stage}
+                    </p>
+                    <p className={`text-[9px] mt-0.5 ${isLast ? 'text-violet-200' : 'text-slate-400'}`}>
+                      {fmtShort(step.date)}
+                    </p>
+                  </div>
+                  {!isLast && (
+                    <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function ActivitiesTab({
   candidateId,
   tasks,
@@ -122,6 +226,9 @@ export default function ActivitiesTab({
           onTaskDeleted={onTaskDeleted}
         />
       </div>
+
+      {/* Pipeline flow + stats */}
+      <PipelineFlowSection events={events} applications={appsWithLocalCredit} />
 
       {/* Interview Progress */}
       {events.length > 0 && (
