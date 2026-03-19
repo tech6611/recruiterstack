@@ -79,13 +79,23 @@ export default function CandidateProfilePage() {
   const [statusLoading, setStatusLoading] = useState(false)
   const statusRef = useRef<HTMLDivElement>(null)
 
+  // Guards one-time initialisation of selectedAppId (happens inside load())
+  const appIdInitialised = useRef(false)
+
   // ── Loaders ───────────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
     setLoading(true)
     const res = await fetch(`/api/candidates/${id}`)
     const json = await res.json()
-    setCandidate(json.data ?? null)
+    const data: CandidateWithPipeline | null = json.data ?? null
+    setCandidate(data)
+    // Initialise selectedAppId on first load (same React 18 batch → no null flash)
+    if (data && !appIdInitialised.current) {
+      appIdInitialised.current = true
+      const def = data.applications.find(a => a.status === 'active') ?? data.applications[0]
+      setSelectedAppId(def?.id ?? null)
+    }
     setLoading(false)
   }, [id])
 
@@ -135,16 +145,6 @@ export default function CandidateProfilePage() {
   useEffect(() => { loadTags() }, [loadTags])
   useEffect(() => { loadTasks() }, [loadTasks])
   useEffect(() => { loadReferrals() }, [loadReferrals])
-
-  // Initialise selectedAppId once candidate data arrives (prefer first active app)
-  const appIdInitialised = useRef(false)
-  useEffect(() => {
-    if (candidate && !appIdInitialised.current) {
-      appIdInitialised.current = true
-      const def = candidate.applications.find(a => a.status === 'active') ?? candidate.applications[0]
-      setSelectedAppId(def?.id ?? null)
-    }
-  }, [candidate])
 
   useEffect(() => {
     if (!candidate) return
@@ -363,6 +363,7 @@ export default function CandidateProfilePage() {
           tasks={tasks}
           events={candidate.events}
           applications={candidate.applications}
+          selectedAppId={selectedAppId}
           onTaskAdded={task => setTasks(prev => [...prev, task])}
           onTaskUpdated={task => setTasks(prev => prev.map(t => t.id === task.id ? task : t))}
           onTaskDeleted={taskId => setTasks(prev => prev.filter(t => t.id !== taskId))}

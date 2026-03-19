@@ -27,8 +27,10 @@ interface CenterPanelProps {
   onDraftEmail: () => void
   onCreateOffer: () => void
   onAddScorecard: () => void
+  /** Controlled: which application is currently active (drives both panels) */
+  selectedAppId: string | null
   /** Called whenever the user switches the active job context */
-  onAppSelected?: (appId: string) => void
+  onAppSelected: (appId: string) => void
 }
 
 // ── Status styles for job pills ───────────────────────────────────────────────
@@ -60,17 +62,13 @@ export default function CenterPanel({
   onDraftEmail,
   onCreateOffer,
   onAddScorecard,
+  selectedAppId,
   onAppSelected,
 }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState<CenterTab>('Summary')
 
-  // Default to first active application, fall back to first application overall
-  const defaultAppId = (applications.find(a => a.status === 'active') ?? applications[0])?.id ?? null
-  const [selectedAppId, setSelectedAppId] = useState<string | null>(defaultAppId)
-
   const handleAppSelect = (id: string) => {
-    setSelectedAppId(id)
-    onAppSelected?.(id)
+    onAppSelected(id)
   }
 
   // Derive filtered data for the selected application context
@@ -180,7 +178,7 @@ export default function CenterPanel({
             candidateId={candidate.id}
             tasks={tasks}
             events={filteredEvents}
-            applications={filteredActiveApps}
+            applications={filteredApps}
             onTaskAdded={onTaskAdded}
             onTaskUpdated={onTaskUpdated}
             onTaskDeleted={onTaskDeleted}
