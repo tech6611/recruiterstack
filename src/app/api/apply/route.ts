@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notifySlack } from '@/lib/notifications'
+import { runAutopilot } from '@/lib/ai/autopilot'
 
 // GET /api/apply?token=xxx — fetch job info for the public apply page
 export async function GET(request: NextRequest) {
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
   // ── Verify token & get job ────────────────────────────────────────────────
   const { data: job, error: jobErr } = await supabase
     .from('hiring_requests')
-    .select('id, org_id, position_title, status')
+    .select('id, org_id, position_title, status, auto_advance_score, auto_reject_score')
     .eq('apply_link_token', token)
     .single()
 
@@ -145,6 +146,17 @@ export async function POST(request: NextRequest) {
     job.org_id,
     `📥 New application: *${name}* applied for *${job.position_title}*`
   )
+
+  // ── Autopilot: fire-and-forget scoring if thresholds are configured ────────
+  const hasAutopilot =
+    (job as { auto_advance_score: number | null; auto_reject_score: number | null })
+      .auto_advance_score !== null ||
+    (job as { auto_advance_score: number | null; auto_reject_score: number | null })
+      .auto_reject_score  !== null
+
+  if (hasAutopilot) {
+    void runAutopilot(app!.id, job.org_id).catch(() => {})
+  }
 
   return NextResponse.json(
     {

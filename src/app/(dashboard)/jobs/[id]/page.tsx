@@ -2517,6 +2517,17 @@ function AutopilotDrawer({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
+          {/* Auto-runs banner */}
+          <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+            <span className="text-base leading-none mt-0.5">⚡</span>
+            <div>
+              <p className="text-xs font-semibold text-blue-800">Runs automatically on every new application</p>
+              <p className="text-xs text-blue-600 mt-0.5">
+                Sifter scores candidates the moment they apply — no manual trigger needed.
+              </p>
+            </div>
+          </div>
+
           {/* Auto-advance */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Auto-Advance</p>
@@ -2598,6 +2609,59 @@ function AutopilotDrawer({
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Live automation flow preview */}
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Automation Flow</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs space-y-1.5">
+
+              <div className="flex items-center gap-2">
+                <span className="text-base">📥</span>
+                <span className="text-slate-700 font-semibold">New application arrives</span>
+              </div>
+              <div className="ml-1 pl-4 border-l-2 border-slate-300 text-slate-400 text-[10px]">↓</div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-base">🧠</span>
+                <span className="text-slate-700 font-semibold">Sifter scores (0 – 100)</span>
+              </div>
+              <div className="ml-1 pl-4 border-l-2 border-slate-300 text-slate-400 text-[10px]">↓</div>
+
+              <div className="space-y-1.5">
+                <div className={`flex items-center gap-2 rounded-lg px-3 py-2 border ${
+                  advanceStageId
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : 'bg-slate-100 border-slate-200 opacity-50'
+                }`}>
+                  <span className="text-emerald-700 font-bold shrink-0">≥ {advanceScore}</span>
+                  <span className="text-slate-400 shrink-0">→</span>
+                  <span className="text-emerald-700 font-medium truncate">
+                    ✅ {advanceStageId
+                      ? (stages.find(s => s.id === advanceStageId)?.name ?? 'Next stage')
+                      : 'Set a stage above'}
+                  </span>
+                </div>
+
+                <div className={`flex items-center gap-2 rounded-lg px-3 py-2 border ${
+                  'bg-red-50 border-red-200'
+                }`}>
+                  <span className="text-red-700 font-bold shrink-0">≤ {rejectScore}</span>
+                  <span className="text-slate-400 shrink-0">→</span>
+                  <span className="text-red-700 font-medium">
+                    ❌ Rejected{autoEmail ? ' + rejection email sent' : ''}
+                  </span>
+                </div>
+
+                {advanceScore > rejectScore + 1 && (
+                  <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-amber-50 border border-amber-200">
+                    <span className="text-amber-700 font-bold shrink-0">{rejectScore + 1} – {advanceScore - 1}</span>
+                    <span className="text-slate-400 shrink-0">→</span>
+                    <span className="text-amber-700 font-medium">🕐 Stays in queue for review</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
