@@ -120,6 +120,7 @@ export async function PUT(
     .update(update)
     .eq('id', draftId)
     .eq('org_id', orgId)
+    .eq('application_id', params.id)   // security: scope to this application
     .select()
     .single()
 
