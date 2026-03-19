@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar, Wand2, Gift, ClipboardList } from 'lucide-react'
+import { Calendar, Wand2, Gift, ClipboardList, Briefcase } from 'lucide-react'
 import type { Candidate, CandidateTask, ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import ActivitiesTab from './center/ActivitiesTab'
 import SummaryTab from './center/SummaryTab'
@@ -29,6 +29,23 @@ interface CenterPanelProps {
   onAddScorecard: () => void
 }
 
+// ── Status styles for job pills ───────────────────────────────────────────────
+function statusDot(status: Application['status'], selected: boolean) {
+  if (selected) return 'bg-white/70'
+  return status === 'active'  ? 'bg-emerald-400'
+       : status === 'hired'   ? 'bg-emerald-600'
+       : status === 'rejected'? 'bg-red-400'
+       : 'bg-slate-400'
+}
+
+function statusLabel(status: Application['status']) {
+  return status === 'active'   ? 'Active'
+       : status === 'hired'    ? 'Hired'
+       : status === 'rejected' ? 'Rejected'
+       : status === 'withdrawn'? 'Withdrawn'
+       : status
+}
+
 export default function CenterPanel({
   candidate,
   tasks,
@@ -44,8 +61,17 @@ export default function CenterPanel({
 }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState<CenterTab>('Summary')
 
-  const activeApps = applications.filter(a => a.status === 'active')
-  const hasActiveApps = activeApps.length > 0
+  // Default to first active application, fall back to first application overall
+  const defaultAppId = (applications.find(a => a.status === 'active') ?? applications[0])?.id ?? null
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(defaultAppId)
+
+  // Derive filtered data for the selected application context
+  const selectedApp   = selectedAppId ? applications.find(a => a.id === selectedAppId) ?? null : null
+  const filteredApps  = selectedApp ? [selectedApp] : applications
+  const filteredEvents = selectedApp ? events.filter(e => e.application_id === selectedApp.id) : events
+  const filteredActiveApps = filteredApps.filter(a => a.status === 'active')
+  const hasActiveApps = filteredActiveApps.length > 0
+  const multiJob      = applications.length > 1
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-r border-slate-200 bg-slate-50">
@@ -85,6 +111,41 @@ export default function CenterPanel({
         </button>
       </div>
 
+      {/* ── Job / Application picker (only when candidate has multiple apps) ── */}
+      {multiJob && (
+        <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 flex items-center gap-2 overflow-x-auto">
+          <Briefcase className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          {applications.map(app => {
+            const isSel     = app.id === selectedAppId
+            const jobTitle  = app.hiring_requests?.position_title ?? 'Unknown Role'
+            return (
+              <button
+                key={app.id}
+                onClick={() => setSelectedAppId(app.id)}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium shrink-0 transition-colors border ${
+                  isSel
+                    ? 'bg-violet-600 border-violet-600 text-white'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${statusDot(app.status, isSel)}`} />
+                <span className="max-w-[140px] truncate">{jobTitle}</span>
+                {!isSel && (
+                  <span className={`text-[9px] font-normal ${
+                    app.status === 'active'   ? 'text-emerald-500' :
+                    app.status === 'rejected' ? 'text-red-400'     :
+                    app.status === 'hired'    ? 'text-emerald-600' :
+                    'text-slate-400'
+                  }`}>
+                    · {statusLabel(app.status)}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Tab switcher */}
       <div className="shrink-0 bg-white border-b border-slate-200 px-4">
         <div className="flex gap-0">
@@ -110,8 +171,8 @@ export default function CenterPanel({
           <ActivitiesTab
             candidateId={candidate.id}
             tasks={tasks}
-            events={events}
-            applications={activeApps}
+            events={filteredEvents}
+            applications={filteredActiveApps}
             onTaskAdded={onTaskAdded}
             onTaskUpdated={onTaskUpdated}
             onTaskDeleted={onTaskDeleted}
@@ -119,14 +180,14 @@ export default function CenterPanel({
         )}
         {activeTab === 'History' && (
           <HistoryTab
-            events={events}
-            applications={applications}
+            events={filteredEvents}
+            applications={filteredApps}
           />
         )}
         {activeTab === 'Summary' && (
           <SummaryTab
             candidate={candidate}
-            applications={applications}
+            applications={filteredApps}
           />
         )}
       </div>

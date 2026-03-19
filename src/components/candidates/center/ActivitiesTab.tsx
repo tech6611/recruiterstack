@@ -93,6 +93,7 @@ function AttributionCard({ app, onCreditedToChanged }: {
 interface StageStep {
   stage: string
   date: string
+  type: 'applied' | 'stage_moved'
 }
 
 function buildPipelineFlow(events: ApplicationEvent[], appId: string): StageStep[] {
@@ -103,7 +104,7 @@ function buildPipelineFlow(events: ApplicationEvent[], appId: string): StageStep
       !!e.to_stage
     )
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    .map(e => ({ stage: e.to_stage as string, date: e.created_at }))
+    .map(e => ({ stage: e.to_stage as string, date: e.created_at, type: e.event_type as 'applied' | 'stage_moved' }))
 }
 
 function fmtShort(d: string) {
@@ -163,17 +164,27 @@ function PipelineFlowSection({ events, applications }: {
           <div className="flex items-center gap-1 overflow-x-auto pb-1">
             {steps.map((step, idx) => {
               const isLast = idx === steps.length - 1
+              // Color scheme: Applied = indigo, current stage = violet, past stages = white/slate
+              const blockCls = step.type === 'applied'
+                ? isLast
+                  ? 'bg-indigo-600 border-indigo-600'           // Applied & current
+                  : 'bg-indigo-50 border-indigo-200'            // Applied (past)
+                : isLast
+                  ? 'bg-violet-600 border-violet-600'           // Stage move & current
+                  : 'bg-white border-slate-200'                 // Stage move (past)
+              const textCls = step.type === 'applied'
+                ? isLast ? 'text-white' : 'text-indigo-700'
+                : isLast ? 'text-white' : 'text-slate-800'
+              const dateCls = step.type === 'applied'
+                ? isLast ? 'text-indigo-200' : 'text-indigo-400'
+                : isLast ? 'text-violet-200' : 'text-slate-400'
               return (
                 <div key={`${step.stage}-${idx}`} className="flex items-center gap-1 shrink-0">
-                  <div className={`rounded-xl px-3 py-2 text-center min-w-[88px] border transition-colors ${
-                    isLast
-                      ? 'bg-violet-600 border-violet-600'
-                      : 'bg-white border-slate-200'
-                  }`}>
-                    <p className={`text-[11px] font-semibold leading-tight ${isLast ? 'text-white' : 'text-slate-800'}`}>
+                  <div className={`rounded-xl px-3 py-2 text-center min-w-[88px] border transition-colors ${blockCls}`}>
+                    <p className={`text-[11px] font-semibold leading-tight ${textCls}`}>
                       {step.stage}
                     </p>
-                    <p className={`text-[9px] mt-0.5 ${isLast ? 'text-violet-200' : 'text-slate-400'}`}>
+                    <p className={`text-[9px] mt-0.5 ${dateCls}`}>
                       {fmtShort(step.date)}
                     </p>
                   </div>
