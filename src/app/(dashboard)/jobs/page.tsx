@@ -634,6 +634,9 @@ export default function JobsPage() {
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  // ── Global search ─────────────────────────────────────────────────────────
+  const [jobSearch, setJobSearch] = useState('')
+
   // ── Time filter ───────────────────────────────────────────────────────────
   const [timeFilter, setTimeFilter]   = useState<TimeFilter>('all')
   const [customFrom,  setCustomFrom]  = useState('')
@@ -785,6 +788,18 @@ export default function JobsPage() {
   const filtered = useMemo(() => {
     let result = [...jobs]
 
+    // Global text search
+    if (jobSearch.trim()) {
+      const q = jobSearch.trim().toLowerCase()
+      result = result.filter(j =>
+        j.position_title.toLowerCase().includes(q) ||
+        (j.department ?? '').toLowerCase().includes(q) ||
+        (j.hiring_manager_name ?? '').toLowerCase().includes(q) ||
+        (j.ticket_number ?? '').toLowerCase().includes(q) ||
+        (j.location ?? '').toLowerCase().includes(q)
+      )
+    }
+
     if (timeFilter !== 'all') {
       if (timeFilter === 'custom') {
         if (customFrom) result = result.filter(j => new Date(j.created_at) >= new Date(customFrom))
@@ -812,9 +827,9 @@ export default function JobsPage() {
       return (sortDir === 'asc' ? 1 : -1) * vA.localeCompare(vB, undefined, { numeric: true })
     })
     return result
-  }, [jobs, timeFilter, customFrom, customTo, colFilters, sortKey, sortDir])
+  }, [jobs, jobSearch, timeFilter, customFrom, customTo, colFilters, sortKey, sortDir])
 
-  useEffect(() => { setManualOrder(null) }, [colFilters, timeFilter, customFrom, customTo, sortKey, sortDir])
+  useEffect(() => { setManualOrder(null) }, [colFilters, jobSearch, timeFilter, customFrom, customTo, sortKey, sortDir])
 
   const displayedJobs = useMemo(() => {
     if (!manualOrder) return filtered
@@ -824,7 +839,7 @@ export default function JobsPage() {
 
   // ── Derived filter state ───────────────────────────────────────────────────
   const hasColFilters = Object.values(colFilters).some(v => v.length > 0)
-  const hasAnyFilter  = hasColFilters || timeFilter !== 'all'
+  const hasAnyFilter  = hasColFilters || timeFilter !== 'all' || !!jobSearch.trim()
 
   const timeLabel = timeFilter === '7d' ? 'Last 7 days' : timeFilter === '30d' ? 'Last 30 days'
     : timeFilter === '3m' ? 'Last 3 months' : timeFilter === 'custom' ? 'Custom range' : 'All time'
@@ -989,6 +1004,30 @@ export default function JobsPage() {
           <p className="text-sm text-slate-500 mt-0.5">Manage open roles and candidate pipelines</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Global search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={jobSearch}
+              onChange={e => setJobSearch(e.target.value)}
+              placeholder="Search jobs…"
+              className={`h-9 w-52 rounded-xl border pl-8 pr-8 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                jobSearch
+                  ? 'border-blue-300 bg-blue-50 text-slate-800'
+                  : 'border-slate-200 bg-white text-slate-700 placeholder-slate-400'
+              }`}
+            />
+            {jobSearch && (
+              <button
+                onClick={() => setJobSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
           {/* Time filter icon + dropdown */}
           <div className="relative">
             <button

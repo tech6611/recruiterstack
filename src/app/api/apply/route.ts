@@ -38,13 +38,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { token, name, email, phone, linkedin_url, cover_letter } = body as {
+  const { token, name, email, phone, linkedin_url, cover_letter, cv_url } = body as {
     token: string
     name: string
     email: string
     phone?: string
     linkedin_url?: string
     cover_letter?: string
+    cv_url?: string
   }
 
   if (!token || !name || !email) {
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
         name,
         email: email.toLowerCase(),
         phone: phone ?? null,
+        resume_url: cv_url ?? null,
         skills: [],
         experience_years: 0,
         status: 'active',
@@ -130,6 +132,10 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Timeline event ────────────────────────────────────────────────────────
+  const noteParts: string[] = []
+  if (linkedin_url) noteParts.push(`LinkedIn: ${linkedin_url}`)
+  if (cv_url) noteParts.push(`CV: ${cv_url}`)
+
   await supabase
     .from('application_events')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,7 +143,7 @@ export async function POST(request: NextRequest) {
       application_id: app!.id,
       event_type: 'applied',
       to_stage: firstStage?.name ?? 'Applied',
-      note: linkedin_url ? `LinkedIn: ${linkedin_url}` : null,
+      note: noteParts.length ? noteParts.join(' | ') : null,
       created_by: name,
     } as any)
 

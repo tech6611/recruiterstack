@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import { Zap, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
+import {
+  Zap, CheckCircle, Loader2, AlertCircle,
+  Upload, Link2, FileText, X, CloudUpload,
+} from 'lucide-react'
 
 interface JobInfo {
   position_title: string
@@ -10,6 +13,15 @@ interface JobInfo {
   location: string | null
   generated_jd: string | null
 }
+
+type CvMode = 'upload' | 'drive'
+
+const ACCEPTED_TYPES = '.pdf,.doc,.docx'
+const ACCEPTED_MIME = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]
 
 export default function ApplyPage() {
   const { token } = useParams<{ token: string }>()
@@ -19,18 +31,25 @@ export default function ApplyPage() {
   const [notFound, setNotFound] = useState(false)
 
   // Form state
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [linkedin, setLinkedin] = useState('')
+  const [name, setName]               = useState('')
+  const [email, setEmail]             = useState('')
+  const [phone, setPhone]             = useState('')
+  const [linkedin, setLinkedin]       = useState('')
   const [coverLetter, setCoverLetter] = useState('')
 
+  // CV / resume state
+  const [cvMode, setCvMode]       = useState<CvMode>('upload')
+  const [cvFile, setCvFile]       = useState<File | null>(null)
+  const [cvDriveUrl, setCvDriveUrl] = useState('')
+  const [cvError, setCvError]     = useState('')
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [error, setError] = useState('')
+  const [submitted, setSubmitted]   = useState(false)
+  const [error, setError]           = useState('')
 
   useEffect(() => {
-    // Fetch job info via the apply token
     fetch(`/api/apply?token=${token}`)
       .then(r => {
         if (r.status === 404) { setNotFound(true); return null }
@@ -43,22 +62,70 @@ export default function ApplyPage() {
       .catch(() => { setNotFound(true); setLoadingJob(false) })
   }, [token])
 
+  // ── File helpers ──────────────────────────────────────────────────────────
+  const validateFile = (file: File): string => {
+    if (!ACCEPTED_MIME.includes(file.type)) return 'Only PDF and Word (.doc/.docx) files are accepted.'
+    if (file.size > 10 * 1024 * 1024) return 'File must be under 10 MB.'
+    return ''
+  }
+
+  const handleFileSelect = (file: File) => {
+    const err = validateFile(file)
+    if (err) { setCvError(err); setCvFile(null); return }
+    setCvError('')
+    setCvFile(file)
+  }
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleFileSelect(file)
+  }
+
+  // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || !email.trim()) return
     setSubmitting(true)
     setError('')
 
+    // 1. Upload file if provided
+    let finalCvUrl: string | undefined
+    if (cvMode === 'upload' && cvFile) {
+      const fd = new FormData()
+      fd.append('file', cvFile)
+      fd.append('token', token)
+      try {
+        const uploadRes = await fetch('/api/apply/upload', { method: 'POST', body: fd })
+        const uploadJson = await uploadRes.json()
+        if (!uploadRes.ok) {
+          setError(uploadJson.error ?? 'Failed to upload CV. Please try again.')
+          setSubmitting(false)
+          return
+        }
+        finalCvUrl = uploadJson.url
+      } catch {
+        setError('Failed to upload CV. Please check your connection and try again.')
+        setSubmitting(false)
+        return
+      }
+    } else if (cvMode === 'drive' && cvDriveUrl.trim()) {
+      finalCvUrl = cvDriveUrl.trim()
+    }
+
+    // 2. Submit application
     const res = await fetch('/api/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token,
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim() || undefined,
+        name:         name.trim(),
+        email:        email.trim(),
+        phone:        phone.trim() || undefined,
         linkedin_url: linkedin.trim() || undefined,
         cover_letter: coverLetter.trim() || undefined,
+        cv_url:       finalCvUrl,
       }),
     })
     const json = await res.json()
@@ -73,7 +140,7 @@ export default function ApplyPage() {
     setSubmitting(false)
   }
 
-  // ── Loading ──────────────────────────────────────────────────────────────
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loadingJob) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -82,7 +149,7 @@ export default function ApplyPage() {
     )
   }
 
-  // ── Not found ────────────────────────────────────────────────────────────
+  // ── Not found ─────────────────────────────────────────────────────────────
   if (notFound || !job) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-center px-4">
@@ -93,7 +160,7 @@ export default function ApplyPage() {
     )
   }
 
-  // ── Submitted ────────────────────────────────────────────────────────────
+  // ── Submitted ─────────────────────────────────────────────────────────────
   if (submitted) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-center px-4">
@@ -108,7 +175,7 @@ export default function ApplyPage() {
     )
   }
 
-  // ── Form ─────────────────────────────────────────────────────────────────
+  // ── Form ──────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -153,6 +220,7 @@ export default function ApplyPage() {
           <h2 className="text-lg font-bold text-slate-900 mb-6">Apply for this role</h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Name + Email */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
@@ -181,6 +249,7 @@ export default function ApplyPage() {
               </div>
             </div>
 
+            {/* Phone + LinkedIn */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Phone</label>
@@ -204,6 +273,122 @@ export default function ApplyPage() {
               </div>
             </div>
 
+            {/* ── Resume / CV ────────────────────────────────────────────── */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Resume / CV
+              </label>
+
+              {/* Mode toggle */}
+              <div className="flex rounded-xl border border-slate-200 overflow-hidden mb-3 w-fit">
+                <button
+                  type="button"
+                  onClick={() => { setCvMode('upload'); setCvError('') }}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition-colors ${
+                    cvMode === 'upload'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Upload file
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setCvMode('drive'); setCvError('') }}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition-colors border-l border-slate-200 ${
+                    cvMode === 'drive'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Google Drive link
+                </button>
+              </div>
+
+              {/* Upload from computer */}
+              {cvMode === 'upload' && (
+                cvFile ? (
+                  /* File selected — show name + remove */
+                  <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <FileText className="h-5 w-5 text-emerald-600 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{cvFile.name}</p>
+                      <p className="text-xs text-slate-500">{(cvFile.size / 1024).toFixed(0)} KB</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setCvFile(null); setCvError('') }}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  /* Drop zone */
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleFileDrop}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 cursor-pointer transition-colors ${
+                      isDragging
+                        ? 'border-blue-400 bg-blue-50'
+                        : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/40'
+                    }`}
+                  >
+                    <CloudUpload className={`h-8 w-8 ${isDragging ? 'text-blue-500' : 'text-slate-300'}`} />
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-slate-700">
+                        Drag & drop or{' '}
+                        <span className="text-blue-600 underline underline-offset-2">browse</span>
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">PDF, DOC, DOCX · max 10 MB</p>
+                    </div>
+                  </div>
+                )
+              )}
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_TYPES}
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (file) handleFileSelect(file)
+                  e.target.value = ''
+                }}
+              />
+
+              {/* Google Drive URL */}
+              {cvMode === 'drive' && (
+                <div>
+                  <input
+                    type="url"
+                    value={cvDriveUrl}
+                    onChange={e => setCvDriveUrl(e.target.value)}
+                    placeholder="https://drive.google.com/file/d/…"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-400 mt-1.5">
+                    Paste a shareable Google Drive link to your CV/resume.
+                  </p>
+                </div>
+              )}
+
+              {/* CV error */}
+              {cvError && (
+                <div className="flex items-center gap-2 mt-2 rounded-xl bg-red-50 border border-red-200 px-4 py-2.5">
+                  <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                  <p className="text-xs text-red-700">{cvError}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Cover Letter */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Cover Letter / Why are you a great fit?
@@ -212,11 +397,12 @@ export default function ApplyPage() {
                 value={coverLetter}
                 onChange={e => setCoverLetter(e.target.value)}
                 rows={5}
-                placeholder="Tell us a bit about yourself and why you&#39;re excited about this role…"
+                placeholder="Tell us a bit about yourself and why you're excited about this role…"
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               />
             </div>
 
+            {/* Submission error */}
             {error && (
               <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
                 <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
