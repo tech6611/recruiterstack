@@ -53,23 +53,36 @@ export async function POST(
 
   const supabase = createAdminClient()
 
+  const baseInsert = {
+    org_id:         orgId,
+    candidate_id:   params.id,
+    application_id: (body.application_id as string | undefined) ?? null,
+    title,
+    description:    (body.description   as string | undefined) ?? null,
+    due_date:       (body.due_date       as string | undefined) ?? null,
+    assignee_name:  (body.assignee_name  as string | undefined) ?? null,
+    created_by:     (body.created_by     as string | undefined) ?? 'Recruiter',
+  }
+
+  const statusValue = (body.status as string | undefined) ?? 'to_do'
+
   const { data, error } = await supabase
     .from('candidate_tasks')
-    .insert({
-      org_id:         orgId,
-      candidate_id:   params.id,
-      application_id: (body.application_id as string | undefined) ?? null,
-      title,
-      description:    (body.description   as string | undefined) ?? null,
-      due_date:       (body.due_date       as string | undefined) ?? null,
-      assignee_name:  (body.assignee_name  as string | undefined) ?? null,
-      status:         (body.status         as string | undefined) ?? 'to_do',
-      created_by:     (body.created_by     as string | undefined) ?? 'Recruiter',
-    } as never)
+    .insert({ ...baseInsert, status: statusValue } as never)
     .select()
     .single()
 
   if (error) {
+    // PGRST204/42703: status column hasn't been added via migration yet — retry without it
+    if (error.code === '42703' || error.message?.includes('status')) {
+      const { data: data2, error: error2 } = await supabase
+        .from('candidate_tasks')
+        .insert(baseInsert as never)
+        .select()
+        .single()
+      if (error2) return NextResponse.json({ error: error2.message }, { status: 500 })
+      return NextResponse.json({ data: { ...data2, status: statusValue } }, { status: 201 })
+    }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 

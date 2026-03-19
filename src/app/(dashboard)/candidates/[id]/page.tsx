@@ -70,6 +70,9 @@ export default function CandidateProfilePage() {
   const [showOfferDrawer, setShowOfferDrawer]   = useState(false)
   const [offerDefaultAppId, setOfferDefaultAppId] = useState('')
 
+  // Selected application context (drives both center + right panels)
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
+
   // Change Status dropdown
   const [statusOpen,    setStatusOpen]    = useState(false)
   const [stages,        setStages]        = useState<{ id: string; name: string; color: string }[]>([])
@@ -132,6 +135,16 @@ export default function CandidateProfilePage() {
   useEffect(() => { loadTags() }, [loadTags])
   useEffect(() => { loadTasks() }, [loadTasks])
   useEffect(() => { loadReferrals() }, [loadReferrals])
+
+  // Initialise selectedAppId once candidate data arrives (prefer first active app)
+  const appIdInitialised = useRef(false)
+  useEffect(() => {
+    if (candidate && !appIdInitialised.current) {
+      appIdInitialised.current = true
+      const def = candidate.applications.find(a => a.status === 'active') ?? candidate.applications[0]
+      setSelectedAppId(def?.id ?? null)
+    }
+  }, [candidate])
 
   useEffect(() => {
     if (!candidate) return
@@ -360,12 +373,22 @@ export default function CandidateProfilePage() {
             setShowOfferDrawer(true)
           }}
           onAddScorecard={() => openScorecardDrawer(activeApps[0]?.id ?? '')}
+          onAppSelected={setSelectedAppId}
         />
 
+        {/* RightPanel: scoped to the selected application for multi-job candidates */}
         <RightPanel
           candidateId={candidate.id}
-          applications={candidate.applications}
-          events={candidate.events}
+          applications={
+            selectedAppId
+              ? candidate.applications.filter(a => a.id === selectedAppId)
+              : candidate.applications
+          }
+          events={
+            selectedAppId
+              ? candidate.events.filter(e => e.application_id === selectedAppId)
+              : candidate.events
+          }
           scorecards={scorecards}
           scorecardsLoading={scorecardsLoading}
           referrals={referrals}

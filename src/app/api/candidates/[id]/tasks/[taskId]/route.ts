@@ -49,9 +49,15 @@ export async function PATCH(
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
   }
 
+  // Separate status/completed_at from other updates for graceful fallback
+  const statusUpdates: Record<string, unknown> = {}
+  if ('status'       in updates) { statusUpdates.status       = updates.status;       delete updates.status }
+  if ('completed_at' in updates) { statusUpdates.completed_at = updates.completed_at; delete updates.completed_at }
+  const mergedUpdates = { ...updates, ...statusUpdates }
+
   const { data, error } = await supabase
     .from('candidate_tasks')
-    .update(updates as never)
+    .update(mergedUpdates as never)
     .eq('id', params.taskId)
     .eq('candidate_id', params.id)
     .eq('org_id', orgId)
@@ -59,8 +65,25 @@ export async function PATCH(
     .single()
 
   if (error) {
-    const status = error.code === 'PGRST116' ? 404 : 500
-    return NextResponse.json({ error: error.message }, { status })
+    // 42703: status column hasn't been added via migration yet — retry without status fields
+    if (error.code === '42703' || error.message?.includes('status')) {
+      const safeUpdates = { ...updates }
+      const { data: data2, error: error2 } = await supabase
+        .from('candidate_tasks')
+        .update(safeUpdates as never)
+        .eq('id', params.taskId)
+        .eq('candidate_id', params.id)
+        .eq('org_id', orgId)
+        .select()
+        .single()
+      if (error2) {
+        const httpStatus = error2.code === 'PGRST116' ? 404 : 500
+        return NextResponse.json({ error: error2.message }, { status: httpStatus })
+      }
+      return NextResponse.json({ data: { ...data2, ...statusUpdates } })
+    }
+    const httpStatus = error.code === 'PGRST116' ? 404 : 500
+    return NextResponse.json({ error: error.message }, { status: httpStatus })
   }
 
   return NextResponse.json({ data })

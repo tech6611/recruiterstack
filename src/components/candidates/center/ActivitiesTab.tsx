@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Check, X, ChevronRight } from 'lucide-react'
+import { Pencil, Check, X, ArrowRight } from 'lucide-react'
 import type { CandidateTask, ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import TaskScheduler from '../TaskScheduler'
 import InterviewProgressTable from '../InterviewProgressTable'
@@ -161,18 +161,19 @@ function PipelineFlowSection({ events, applications }: {
               {app.hiring_requests.position_title}
             </p>
           )}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+          {/* Adaptive: flex-wrap when ≤ 4 stages, horizontal scroll when more */}
+          <div className={`flex items-center gap-1 pb-1 ${steps.length > 4 ? 'overflow-x-auto' : 'flex-wrap'}`}>
             {steps.map((step, idx) => {
               const isLast = idx === steps.length - 1
-              // Color scheme: Applied = indigo, current stage = violet, past stages = white/slate
+              // Color scheme: Applied = indigo, current/last stage = violet, past = white/slate
               const blockCls = step.type === 'applied'
                 ? isLast
-                  ? 'bg-indigo-600 border-indigo-600'           // Applied & current
-                  : 'bg-indigo-50 border-indigo-200'            // Applied (past)
+                  ? 'bg-indigo-600 border-indigo-600'
+                  : 'bg-indigo-50 border-indigo-200'
                 : isLast
-                  ? 'bg-violet-600 border-violet-600'           // Stage move & current
-                  : 'bg-white border-slate-200'                 // Stage move (past)
-              const textCls = step.type === 'applied'
+                  ? 'bg-violet-600 border-violet-600'
+                  : 'bg-white border-slate-200'
+              const labelCls = step.type === 'applied'
                 ? isLast ? 'text-white' : 'text-indigo-700'
                 : isLast ? 'text-white' : 'text-slate-800'
               const dateCls = step.type === 'applied'
@@ -180,16 +181,16 @@ function PipelineFlowSection({ events, applications }: {
                 : isLast ? 'text-violet-200' : 'text-slate-400'
               return (
                 <div key={`${step.stage}-${idx}`} className="flex items-center gap-1 shrink-0">
-                  <div className={`rounded-xl px-3 py-2 text-center min-w-[88px] border transition-colors ${blockCls}`}>
-                    <p className={`text-[11px] font-semibold leading-tight ${textCls}`}>
+                  <div className={`rounded-xl px-3 py-2.5 text-center min-w-[80px] border transition-colors ${blockCls}`}>
+                    <p className={`text-[11px] font-semibold leading-tight truncate max-w-[96px] ${labelCls}`}>
                       {step.stage}
                     </p>
-                    <p className={`text-[9px] mt-0.5 ${dateCls}`}>
+                    <p className={`text-[9px] font-medium mt-1 ${dateCls}`}>
                       {fmtShort(step.date)}
                     </p>
                   </div>
                   {!isLast && (
-                    <ChevronRight className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+                    <ArrowRight className="h-3 w-3 text-slate-300 shrink-0" />
                   )}
                 </div>
               )

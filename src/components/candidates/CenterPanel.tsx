@@ -27,6 +27,8 @@ interface CenterPanelProps {
   onDraftEmail: () => void
   onCreateOffer: () => void
   onAddScorecard: () => void
+  /** Called whenever the user switches the active job context */
+  onAppSelected?: (appId: string) => void
 }
 
 // ── Status styles for job pills ───────────────────────────────────────────────
@@ -58,12 +60,18 @@ export default function CenterPanel({
   onDraftEmail,
   onCreateOffer,
   onAddScorecard,
+  onAppSelected,
 }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState<CenterTab>('Summary')
 
   // Default to first active application, fall back to first application overall
   const defaultAppId = (applications.find(a => a.status === 'active') ?? applications[0])?.id ?? null
   const [selectedAppId, setSelectedAppId] = useState<string | null>(defaultAppId)
+
+  const handleAppSelect = (id: string) => {
+    setSelectedAppId(id)
+    onAppSelected?.(id)
+  }
 
   // Derive filtered data for the selected application context
   const selectedApp   = selectedAppId ? applications.find(a => a.id === selectedAppId) ?? null : null
@@ -121,7 +129,7 @@ export default function CenterPanel({
             return (
               <button
                 key={app.id}
-                onClick={() => setSelectedAppId(app.id)}
+                onClick={() => handleAppSelect(app.id)}
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium shrink-0 transition-colors border ${
                   isSel
                     ? 'bg-violet-600 border-violet-600 text-white'
