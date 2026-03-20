@@ -41,6 +41,16 @@ const nextConfig = {
             { source: '/api/applications/:id', destination: `${djangoUrl}/api/applications/:id` },
             // ── Batch 3: Matches ──────────────────────────────────────────
             { source: '/api/matches', destination: `${djangoUrl}/api/matches` },
+            // ── Batch 4: Hiring Requests ──────────────────────────────────
+            { source: '/api/hiring-requests', destination: `${djangoUrl}/api/hiring-requests` },
+            { source: '/api/hiring-requests/:id', destination: `${djangoUrl}/api/hiring-requests/:id` },
+            // ── Batch 4: Jobs ─────────────────────────────────────────────
+            { source: '/api/jobs', destination: `${djangoUrl}/api/jobs` },
+            { source: '/api/jobs/:id/stages', destination: `${djangoUrl}/api/jobs/:id/stages` },
+            { source: '/api/jobs/:id', destination: `${djangoUrl}/api/jobs/:id` },
+            // ── Batch 4: Application Email + Draft ────────────────────────
+            { source: '/api/applications/:id/send-email', destination: `${djangoUrl}/api/applications/:id/send-email` },
+            { source: '/api/applications/:id/draft', destination: `${djangoUrl}/api/applications/:id/draft` },
           ];
         },
       }
