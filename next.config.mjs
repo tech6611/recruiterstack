@@ -51,6 +51,20 @@ const nextConfig = {
             // ── Batch 4: Application Email + Draft ────────────────────────
             { source: '/api/applications/:id/send-email', destination: `${djangoUrl}/api/applications/:id/send-email` },
             { source: '/api/applications/:id/draft', destination: `${djangoUrl}/api/applications/:id/draft` },
+            // ── Batch 5: Google OAuth ─────────────────────────────────────
+            { source: '/api/google/connect',      destination: `${djangoUrl}/api/google/connect` },
+            { source: '/api/google/callback',     destination: `${djangoUrl}/api/google/callback` },
+            { source: '/api/google/disconnect',   destination: `${djangoUrl}/api/google/disconnect` },
+            { source: '/api/google/availability', destination: `${djangoUrl}/api/google/availability` },
+            // ── Batch 5: Slack OAuth ──────────────────────────────────────
+            { source: '/api/slack/install',    destination: `${djangoUrl}/api/slack/install` },
+            { source: '/api/slack/callback',   destination: `${djangoUrl}/api/slack/callback` },
+            { source: '/api/slack/disconnect', destination: `${djangoUrl}/api/slack/disconnect` },
+            // ── Batch 5: Interviews + Offers + Inbox ──────────────────────
+            { source: '/api/interviews',           destination: `${djangoUrl}/api/interviews` },
+            { source: '/api/interviews/:id',       destination: `${djangoUrl}/api/interviews/:id` },
+            { source: '/api/offers/:id',           destination: `${djangoUrl}/api/offers/:id` },
+            { source: '/api/inbox',                destination: `${djangoUrl}/api/inbox` },
           ];
         },
       }
