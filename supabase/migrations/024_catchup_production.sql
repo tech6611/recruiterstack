@@ -47,8 +47,17 @@ UPDATE hiring_requests
   SET ticket_number = generate_ticket_number()
   WHERE ticket_number IS NULL;
 
-ALTER TABLE hiring_requests
-  ADD CONSTRAINT IF NOT EXISTS hiring_requests_ticket_number_key UNIQUE (ticket_number);
+-- ADD CONSTRAINT IF NOT EXISTS is not valid syntax — use DO block
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'hiring_requests_ticket_number_key'
+  ) THEN
+    ALTER TABLE hiring_requests ADD CONSTRAINT hiring_requests_ticket_number_key UNIQUE (ticket_number);
+  END IF;
+END;
+$$;
 
 -- ── From 003: apply_link_token on hiring_requests ─────────────────────────────
 ALTER TABLE hiring_requests
