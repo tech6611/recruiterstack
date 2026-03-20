@@ -27,6 +27,20 @@ const nextConfig = {
             { source: '/api/resume/parse', destination: `${djangoUrl}/api/resume/parse` },
             { source: '/api/email/draft', destination: `${djangoUrl}/api/email/draft` },
             { source: '/api/email/send', destination: `${djangoUrl}/api/email/send` },
+            // ── Batch 3: Candidates ───────────────────────────────────────
+            { source: '/api/candidates', destination: `${djangoUrl}/api/candidates` },
+            { source: '/api/candidates/:id', destination: `${djangoUrl}/api/candidates/:id` },
+            { source: '/api/candidates/:id/tags', destination: `${djangoUrl}/api/candidates/:id/tags` },
+            { source: '/api/candidates/:id/tags/:tagId', destination: `${djangoUrl}/api/candidates/:id/tags/:tagId` },
+            { source: '/api/candidates/:id/tasks', destination: `${djangoUrl}/api/candidates/:id/tasks` },
+            { source: '/api/candidates/:id/tasks/:taskId', destination: `${djangoUrl}/api/candidates/:id/tasks/:taskId` },
+            { source: '/api/candidates/:id/referrals', destination: `${djangoUrl}/api/candidates/:id/referrals` },
+            { source: '/api/candidates/:id/ai-summary', destination: `${djangoUrl}/api/candidates/:id/ai-summary` },
+            // ── Batch 3: Applications ─────────────────────────────────────
+            { source: '/api/applications', destination: `${djangoUrl}/api/applications` },
+            { source: '/api/applications/:id', destination: `${djangoUrl}/api/applications/:id` },
+            // ── Batch 3: Matches ──────────────────────────────────────────
+            { source: '/api/matches', destination: `${djangoUrl}/api/matches` },
           ];
         },
       }
