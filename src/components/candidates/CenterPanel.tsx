@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar, Wand2, Gift, ClipboardList, Briefcase } from 'lucide-react'
+import { Calendar, Wand2, Gift, ClipboardList, Briefcase, PhoneCall } from 'lucide-react'
 import type { Candidate, CandidateTask, ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import ActivitiesTab from './center/ActivitiesTab'
 import SummaryTab from './center/SummaryTab'
@@ -27,6 +27,7 @@ interface CenterPanelProps {
   onDraftEmail: () => void
   onCreateOffer: () => void
   onAddScorecard: () => void
+  onPhoneScreen: () => void
   /** Controlled: which application is currently active (drives both panels) */
   selectedAppId: string | null
   /** Called whenever the user switches the active job context */
@@ -62,6 +63,7 @@ export default function CenterPanel({
   onDraftEmail,
   onCreateOffer,
   onAddScorecard,
+  onPhoneScreen,
   selectedAppId,
   onAppSelected,
 }: CenterPanelProps) {
@@ -90,6 +92,14 @@ export default function CenterPanel({
         >
           <Calendar className="h-3.5 w-3.5" />
           Schedule Interview
+        </button>
+        <button
+          onClick={onPhoneScreen}
+          disabled={!hasActiveApps}
+          className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <PhoneCall className="h-3.5 w-3.5" />
+          Phone Screen
         </button>
         <button
           onClick={onDraftEmail}

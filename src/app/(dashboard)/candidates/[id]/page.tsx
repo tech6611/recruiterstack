@@ -16,6 +16,7 @@ import EmailDraftDrawer from '@/components/candidates/EmailDraftDrawer'
 import ScorecardDrawer from '@/components/candidates/ScorecardDrawer'
 import ScheduleInterviewModal from '@/components/ScheduleInterviewModal'
 import CreateOfferDrawer from '@/components/candidates/CreateOfferDrawer'
+import VoiceCallModal from '@/components/candidates/VoiceCallModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,9 @@ export default function CandidateProfilePage() {
   // Offers
   const [showOfferDrawer, setShowOfferDrawer]   = useState(false)
   const [offerDefaultAppId, setOfferDefaultAppId] = useState('')
+
+  // Voice call
+  const [showVoiceCallModal, setShowVoiceCallModal] = useState(false)
 
   // Selected application context (drives both center + right panels)
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
@@ -374,6 +378,7 @@ export default function CandidateProfilePage() {
             setShowOfferDrawer(true)
           }}
           onAddScorecard={() => openScorecardDrawer(activeApps[0]?.id ?? '')}
+          onPhoneScreen={() => setShowVoiceCallModal(true)}
           onAppSelected={setSelectedAppId}
         />
 
@@ -449,6 +454,20 @@ export default function CandidateProfilePage() {
           candidateId={candidate.id}
           onClose={() => setShowOfferDrawer(false)}
           onSaved={load}
+        />
+      )}
+
+      {/* ── Voice Call Modal ─────────────────────────────────────────── */}
+      {showVoiceCallModal && activeApps.length > 0 && (
+        <VoiceCallModal
+          candidateId={candidate.id}
+          candidateName={candidate.name}
+          candidatePhone={candidate.phone}
+          applicationId={activeApps[0].id}
+          hiringRequestId={activeApps[0].hiring_request_id}
+          positionTitle={activeApps[0].hiring_requests?.position_title ?? 'Open Role'}
+          onClose={() => setShowVoiceCallModal(false)}
+          onCallInitiated={load}
         />
       )}
 
