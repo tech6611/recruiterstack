@@ -57,8 +57,15 @@ export default function VoiceCallModal({
         return
       }
 
+      // Check if the call was actually dispatched or failed immediately
+      const callData = json.data
+      if (callData?.status === 'failed') {
+        setResult('error')
+        setErrorMsg(callData.metadata?.error || 'Failed to dispatch call — check voice service configuration')
+        return
+      }
+
       setResult('success')
-      onCallInitiated()
     } catch {
       setResult('error')
       setErrorMsg('Network error — please try again')
