@@ -63,8 +63,14 @@ const nextConfig = {
             // ── Batch 5: Interviews + Offers + Inbox ──────────────────────
             { source: '/api/interviews',           destination: `${djangoUrl}/api/interviews` },
             { source: '/api/interviews/:id',       destination: `${djangoUrl}/api/interviews/:id` },
+            { source: '/api/offers',               destination: `${djangoUrl}/api/offers` },
             { source: '/api/offers/:id',           destination: `${djangoUrl}/api/offers/:id` },
             { source: '/api/inbox',                destination: `${djangoUrl}/api/inbox` },
+            // ── Batch 5: Application AI email-draft ───────────────────────
+            { source: '/api/applications/:id/email-draft', destination: `${djangoUrl}/api/applications/:id/email-draft` },
+            // ── Batch 6: Analytics + Dashboard ────────────────────────────
+            { source: '/api/analytics',            destination: `${djangoUrl}/api/analytics` },
+            { source: '/api/dashboard',            destination: `${djangoUrl}/api/dashboard` },
           ];
         },
       }
