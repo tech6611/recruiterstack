@@ -71,6 +71,19 @@ const nextConfig = {
             // ── Batch 6: Analytics + Dashboard ────────────────────────────
             { source: '/api/analytics',            destination: `${djangoUrl}/api/analytics` },
             { source: '/api/dashboard',            destination: `${djangoUrl}/api/dashboard` },
+            // ── Batch 7: Sourcing ─────────────────────────────────────────
+            { source: '/api/sourcing/confirm',         destination: `${djangoUrl}/api/sourcing/confirm` },
+            { source: '/api/sourcing/import',          destination: `${djangoUrl}/api/sourcing/import` },
+            { source: '/api/sourcing/parse-cv',        destination: `${djangoUrl}/api/sourcing/parse-cv` },
+            { source: '/api/sourcing/parse-drive-url', destination: `${djangoUrl}/api/sourcing/parse-drive-url` },
+            { source: '/api/sourcing/parse-profile',   destination: `${djangoUrl}/api/sourcing/parse-profile` },
+            // ── Batch 7: Agent ────────────────────────────────────────────
+            { source: '/api/agent/schedule-interview', destination: `${djangoUrl}/api/agent/schedule-interview` },
+            // ── Batch 7: Copilot + Debug ──────────────────────────────────
+            { source: '/api/copilot',      destination: `${djangoUrl}/api/copilot` },
+            { source: '/api/debug-scores', destination: `${djangoUrl}/api/debug-scores` },
+            // ── Voice AI ────────────────────────────────────────────────
+            { source: '/api/voice/:path*', destination: `${djangoUrl}/api/voice/:path*` },
           ];
         },
       }
