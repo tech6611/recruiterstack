@@ -11,7 +11,6 @@ interface VoiceCallModalProps {
   hiringRequestId: string
   positionTitle: string
   onClose: () => void
-  onCallInitiated: () => void
 }
 
 export default function VoiceCallModal({
@@ -22,7 +21,6 @@ export default function VoiceCallModal({
   hiringRequestId,
   positionTitle,
   onClose,
-  onCallInitiated,
 }: VoiceCallModalProps) {
   const [phone, setPhone] = useState(candidatePhone ?? '')
   const [calling, setCalling] = useState(false)

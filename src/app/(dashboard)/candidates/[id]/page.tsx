@@ -467,7 +467,6 @@ export default function CandidateProfilePage() {
           hiringRequestId={activeApps[0].hiring_request_id}
           positionTitle={activeApps[0].hiring_requests?.position_title ?? 'Open Role'}
           onClose={() => setShowVoiceCallModal(false)}
-          onCallInitiated={load}
         />
       )}
 
