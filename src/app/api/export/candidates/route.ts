@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireOrg } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { buildSearchFilter } from '@/lib/api/search'
-import { toCsvRow, toCsvResponse } from '@/lib/api/csv'
+import { toCsvResponse } from '@/lib/api/csv'
 
 const CSV_HEADERS = [
   'Name', 'Email', 'Phone', 'Status', 'Title', 'Location',

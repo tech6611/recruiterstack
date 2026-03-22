@@ -13,8 +13,9 @@ vi.mock('@upstash/redis', () => ({
   },
 }))
 
-// Must import after mocks are set up
-import { checkRateLimit } from '../rate-limit'
+// Force module to load after mocks are set up
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { checkRateLimit as _checkRateLimit } from '../rate-limit'
 
 beforeEach(() => {
   vi.clearAllMocks()
