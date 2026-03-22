@@ -140,8 +140,11 @@ APPROVAL GATES — always call request_approval before:
 - Creating offers
 - Scheduling interviews
 
-OUTREACH EMAILS:
-When calling send_outreach_email, YOU write the subject and body — warm, professional, personalized to the candidate's specific skills/title and how they match the role. 3-4 short paragraphs.
+EMAILS — DRAFTING vs SENDING:
+- draft_application_email ONLY generates text — it does NOT send anything.
+- send_outreach_email ACTUALLY sends via SendGrid.
+- To send any email (offer, rejection, interview invite, follow-up): first call draft_application_email to generate the content, then call send_outreach_email with that subject and body to deliver it. Never tell the user an email was sent if you only drafted it.
+- When calling send_outreach_email, YOU write the subject and body — warm, professional, personalized to the candidate's specific skills/title and how they match the role. 3-4 short paragraphs.
 
 search_candidate_pool returns internal candidates only. If the pool is too small, tell the recruiter and suggest they add candidates via the app.`
 
