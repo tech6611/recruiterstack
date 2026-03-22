@@ -107,12 +107,43 @@ CAPABILITIES (what you can do):
 - Draft: generate interview invite / rejection / offer / follow-up emails for any application
 - Orchestrate: create job + pipeline, source candidates, run full hiring workflows
 
-AUTONOMOUS AGENT RULES (for complex multi-step goals):
-- For high-level goals like "hire N engineers in [city]", plan briefly then execute tool-by-tool without waiting for confirmation between steps — EXCEPT before checkpoints.
-- ALWAYS call request_approval before: sending any emails, creating jobs, or taking bulk actions that affect 3+ candidates at once. The recruiter must approve before you proceed.
-- When calling send_outreach_email: YOU write the subject and body — warm, professional, personalized to the candidate's specific skills/title and how they match the role. 3-4 short paragraphs.
-- After completing a full workflow, give a 2-sentence summary: what was accomplished + recommended next action.
-- search_candidate_pool returns internal candidates only. If the pool is too small, tell the recruiter and suggest they add candidates via the app.`
+BEHAVIOR MODES:
+
+1. SIMPLE QUERIES (lookup, single action):
+   Execute immediately. No plan needed.
+   Examples: "Show me active jobs", "Move John to interview stage", "What's stale?"
+
+2. COMPLEX GOALS (multi-step workflows, hiring initiatives):
+   First, ask clarifying questions if critical info is missing (role level, location, hiring manager, tech stack, etc.) — never guess required fields.
+   Then generate a structured plan covering the ENTIRE workflow end-to-end. Embed it in your response exactly like this:
+
+   <!-- PLAN: {"summary":"...","steps":[{"number":1,"description":"...","tools":["tool_name"],"needs_approval":false,"status":"pending"},{"number":2,"description":"...","tools":["tool_name"],"needs_approval":true,"status":"pending"}]} -->
+
+   Then call request_approval so the recruiter can review, edit, and approve the plan before execution.
+
+   Plan rules:
+   - Cover the full funnel: job creation → sourcing → scoring → outreach → screens → interviews → offers
+   - Mark needs_approval: true for: sending emails, creating jobs, bulk actions (3+ candidates), rejections, offers, scheduling interviews
+   - Steps depending on async results (phone screens, interview feedback) use "status": "queued" with a "depends_on" field explaining the dependency
+   - Keep step descriptions concise but specific (include numbers, names, criteria)
+
+3. AFTER PLAN APPROVAL:
+   Execute each step sequentially, reporting progress. Pause at steps with needs_approval: true and call request_approval before proceeding.
+   If the user edited the plan, follow their edited version exactly.
+   After completing all executable steps, summarize what was accomplished and note any queued steps with their dependencies.
+
+APPROVAL GATES — always call request_approval before:
+- Sending any emails
+- Creating jobs
+- Bulk actions affecting 3+ candidates
+- Rejecting or withdrawing candidates
+- Creating offers
+- Scheduling interviews
+
+OUTREACH EMAILS:
+When calling send_outreach_email, YOU write the subject and body — warm, professional, personalized to the candidate's specific skills/title and how they match the role. 3-4 short paragraphs.
+
+search_candidate_pool returns internal candidates only. If the pool is too small, tell the recruiter and suggest they add candidates via the app.`
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -129,7 +160,7 @@ AUTONOMOUS AGENT RULES (for complex multi-step goals):
         }))
 
         // Agentic loop — max 6 iterations to prevent runaway
-        for (let iteration = 0; iteration < 6; iteration++) {
+        for (let iteration = 0; iteration < 15; iteration++) {
           const claudeStream = client.messages.stream({
             model:    'claude-opus-4-6',
             max_tokens: 4096,
@@ -142,6 +173,7 @@ AUTONOMOUS AGENT RULES (for complex multi-step goals):
           const toolCalls: { id: string; name: string; inputJson: string }[] = []
           let currentToolCall: { id: string; name: string; inputJson: string } | null = null
           let stopReason = ''
+          let textBuffer = ''
 
           for await (const event of claudeStream) {
             // ── Block starts ──────────────────────────────────────────────────
@@ -160,6 +192,7 @@ AUTONOMOUS AGENT RULES (for complex multi-step goals):
             if (event.type === 'content_block_delta') {
               if (event.delta.type === 'text_delta') {
                 send({ type: 'text', delta: event.delta.text })
+                textBuffer += event.delta.text
               }
               // thinking_delta is intentionally skipped — don't send to client
               if (event.delta.type === 'input_json_delta' && currentToolCall) {
@@ -182,6 +215,15 @@ AUTONOMOUS AGENT RULES (for complex multi-step goals):
           // Get the full message (includes thinking blocks for next iteration)
           const finalMsg = await claudeStream.finalMessage()
           conversationMessages.push({ role: 'assistant', content: finalMsg.content })
+
+          // ── Plan detection — look for <!-- PLAN: {...} --> in text output ──
+          const planMatch = textBuffer.match(/<!-- PLAN: ([\s\S]*?) -->/)
+          if (planMatch) {
+            try {
+              const planData = JSON.parse(planMatch[1])
+              send({ type: 'plan', summary: planData.summary ?? '', steps: planData.steps ?? [] })
+            } catch { /* ignore malformed plan JSON */ }
+          }
 
           // If Claude didn't request tools, we're done
           if (stopReason !== 'tool_use' || toolCalls.length === 0) break

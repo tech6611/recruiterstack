@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { Bot, X, Send, Trash2 } from 'lucide-react'
+import { Bot, X, Send, Trash2, Pencil, Plus, ShieldAlert, Play } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,12 +23,27 @@ type ToolEvent = {
   summary?: string
 }
 
+type PlanStep = {
+  number:         number
+  description:    string
+  tools:          string[]
+  needs_approval: boolean
+  status:         'pending' | 'queued'
+  depends_on?:    string
+}
+
+type PlanData = {
+  summary: string
+  steps:   PlanStep[]
+}
+
 type Message = {
   id:          string
   role:        'user' | 'assistant'
   content:     string
   toolEvents?: ToolEvent[]
   checkpoint?: { action_summary: string; details: string; impact: string }
+  plan?:       PlanData
 }
 
 type SSEEvent =
@@ -36,6 +51,7 @@ type SSEEvent =
   | { type: 'tool_start'; id: string; name: string; label: string }
   | { type: 'tool_done';  id: string; name: string; summary: string }
   | { type: 'checkpoint'; action_summary: string; details: string; impact: string }
+  | { type: 'plan';       summary: string; steps: PlanStep[] }
   | { type: 'done' }
   | { type: 'error';      message: string }
 
@@ -67,6 +83,11 @@ function MarkdownText({ text }: { text: string }) {
       ))}
     </>
   )
+}
+
+// ── Strip plan markers from displayed text ───────────────────────────────────
+function stripPlanMarker(text: string): string {
+  return text.replace(/<!-- PLAN: [\s\S]*? -->/g, '').trim()
 }
 
 // ── WorkflowStepList ──────────────────────────────────────────────────────────
@@ -177,6 +198,186 @@ function CheckpointCard({
           className="text-xs font-medium text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-lg px-3 py-2 transition-colors"
         >
           Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── PlanCard ─────────────────────────────────────────────────────────────────
+// Rendered when Claude generates a structured plan for a complex goal.
+
+function PlanCard({
+  plan,
+  onUpdatePlan,
+  onExecute,
+  onModifyViaChat,
+}: {
+  plan:            PlanData
+  onUpdatePlan:    (plan: PlanData) => void
+  onExecute:       (plan: PlanData) => void
+  onModifyViaChat: () => void
+}) {
+  const [editingStep, setEditingStep] = useState<number | null>(null)
+  const [editText, setEditText]       = useState('')
+  const [addingStep, setAddingStep]   = useState(false)
+  const [newStepText, setNewStepText] = useState('')
+
+  const startEdit = (step: PlanStep) => {
+    setEditingStep(step.number)
+    setEditText(step.description)
+  }
+
+  const saveEdit = () => {
+    if (editingStep === null || !editText.trim()) return
+    onUpdatePlan({
+      ...plan,
+      steps: plan.steps.map(s =>
+        s.number === editingStep ? { ...s, description: editText.trim() } : s
+      ),
+    })
+    setEditingStep(null)
+  }
+
+  const deleteStep = (stepNumber: number) => {
+    if (!confirm('Remove this step from the plan?')) return
+    const updated = plan.steps
+      .filter(s => s.number !== stepNumber)
+      .map((s, i) => ({ ...s, number: i + 1 }))
+    onUpdatePlan({ ...plan, steps: updated })
+  }
+
+  const addStep = () => {
+    if (!newStepText.trim()) return
+    const newStep: PlanStep = {
+      number:         plan.steps.length + 1,
+      description:    newStepText.trim(),
+      tools:          [],
+      needs_approval: false,
+      status:         'pending',
+    }
+    onUpdatePlan({ ...plan, steps: [...plan.steps, newStep] })
+    setNewStepText('')
+    setAddingStep(false)
+  }
+
+  return (
+    <div className="bg-violet-50 border border-violet-200 rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="px-3.5 py-2.5 border-b border-violet-100 bg-white">
+        <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest">Plan</p>
+        <p className="text-sm font-semibold text-slate-800 mt-0.5">{plan.summary}</p>
+      </div>
+
+      {/* Steps */}
+      <div className="divide-y divide-violet-100">
+        {plan.steps.map(step => {
+          const isQueued  = step.status === 'queued'
+          const isEditing = editingStep === step.number
+
+          return (
+            <div key={step.number} className={`flex items-start gap-2.5 px-3.5 py-2.5 group ${isQueued ? 'opacity-50' : ''}`}>
+              {/* Step number + approval indicator */}
+              <div className="flex-shrink-0 flex items-center gap-1 mt-0.5">
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  step.needs_approval
+                    ? 'bg-amber-100 text-amber-600'
+                    : 'bg-emerald-100 text-emerald-600'
+                }`}>
+                  {step.number}
+                </span>
+                {step.needs_approval && (
+                  <ShieldAlert className="w-3 h-3 text-amber-500" />
+                )}
+              </div>
+
+              {/* Description or edit input */}
+              <div className="min-w-0 flex-1">
+                {isEditing ? (
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={editText}
+                      onChange={e => setEditText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingStep(null) }}
+                      autoFocus
+                      className="flex-1 text-xs border border-violet-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-400"
+                    />
+                    <button onClick={saveEdit} className="text-xs text-violet-600 font-medium hover:text-violet-800">Save</button>
+                  </div>
+                ) : (
+                  <p className="text-xs leading-snug text-slate-700">
+                    {step.description}
+                    {isQueued && step.depends_on && (
+                      <span className="text-slate-400 italic ml-1">— waiting on: {step.depends_on}</span>
+                    )}
+                  </p>
+                )}
+              </div>
+
+              {/* Edit / Delete actions */}
+              {!isEditing && !isQueued && (
+                <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => startEdit(step)}
+                    className="p-1 text-slate-400 hover:text-violet-600 rounded"
+                    title="Edit step"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => deleteStep(step.number)}
+                    className="p-1 text-slate-400 hover:text-red-500 rounded"
+                    title="Remove step"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Add step */}
+      <div className="px-3.5 py-2 border-t border-violet-100">
+        {addingStep ? (
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              value={newStepText}
+              onChange={e => setNewStepText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addStep(); if (e.key === 'Escape') { setAddingStep(false); setNewStepText('') } }}
+              placeholder="Describe the new step…"
+              autoFocus
+              className="flex-1 text-xs border border-violet-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-400 placeholder:text-slate-400"
+            />
+            <button onClick={addStep} className="text-xs text-violet-600 font-medium hover:text-violet-800">Add</button>
+            <button onClick={() => { setAddingStep(false); setNewStepText('') }} className="text-xs text-slate-400 hover:text-slate-600">Cancel</button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setAddingStep(true)}
+            className="flex items-center gap-1 text-xs text-violet-500 hover:text-violet-700 font-medium"
+          >
+            <Plus className="w-3 h-3" /> Add Step
+          </button>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="px-3.5 py-2.5 border-t border-violet-100 bg-white flex items-center gap-2">
+        <button
+          onClick={() => onExecute(plan)}
+          className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 text-white rounded-lg px-3 py-2 transition-colors active:scale-95"
+        >
+          <Play className="w-3 h-3" /> Execute Plan
+        </button>
+        <button
+          onClick={onModifyViaChat}
+          className="text-xs text-violet-500 hover:text-violet-700 font-medium underline underline-offset-2"
+        >
+          Modify via Chat
         </button>
       </div>
     </div>
@@ -327,6 +528,14 @@ export function Copilot() {
                   : m
               ))
               setStreaming(false)
+              break
+
+            case 'plan':
+              setMessages(prev => prev.map((m, i) =>
+                i === prev.length - 1 && m.role === 'assistant'
+                  ? { ...m, plan: { summary: event.summary, steps: event.steps } }
+                  : m
+              ))
               break
 
             case 'error':
@@ -500,8 +709,30 @@ export function Copilot() {
                         </div>
                       )}
 
+                      {/* ── Plan card ─────────────────────────── */}
+                      {msg.plan && (
+                        <PlanCard
+                          plan={msg.plan}
+                          onUpdatePlan={(newPlan) => {
+                            setMessages(prev => prev.map(m =>
+                              m.id === msg.id ? { ...m, plan: newPlan } : m
+                            ))
+                          }}
+                          onExecute={(executedPlan) => {
+                            setMessages(prev => prev.map(m =>
+                              m.id === msg.id ? { ...m, plan: undefined, checkpoint: undefined } : m
+                            ))
+                            submit(`Approved. Execute this plan:\n${JSON.stringify(executedPlan.steps)}`)
+                          }}
+                          onModifyViaChat={() => {
+                            setInput('Modify the plan: ')
+                            setTimeout(() => inputRef.current?.focus(), 50)
+                          }}
+                        />
+                      )}
+
                       {/* ── Checkpoint approval card ─────────── */}
-                      {msg.checkpoint && (
+                      {msg.checkpoint && !msg.plan && (
                         <CheckpointCard
                           checkpoint={msg.checkpoint}
                           onProceed={() => submit('Approved, please proceed with the plan.')}
@@ -516,9 +747,9 @@ export function Copilot() {
                       )}
 
                       {/* ── Text content ─────────────────────── */}
-                      {msg.content ? (
+                      {stripPlanMarker(msg.content) ? (
                         <div className="bg-slate-50 border border-slate-100 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm text-slate-700 leading-relaxed">
-                          <MarkdownText text={msg.content} />
+                          <MarkdownText text={stripPlanMarker(msg.content)} />
                         </div>
                       ) : (
                         /* Loading dots — while streaming, all tools done, no checkpoint */
