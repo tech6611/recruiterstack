@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getOrgId } from '@/lib/auth'
+import { verifyOAuthState } from '@/lib/api/oauth-state'
+import { encrypt } from '@/lib/crypto'
+import { logger } from '@/lib/logger'
 
 // GET /api/slack/callback — Slack sends the user here after OAuth
 export async function GET(request: NextRequest) {
@@ -8,24 +10,32 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const error = searchParams.get('error')
+  const state = searchParams.get('state')
 
   if (error || !code) {
-    console.error('[slack-oauth] slack returned error or no code:', error)
+    logger.error('[slack-oauth] slack returned error or no code', undefined, { error })
     return NextResponse.redirect(`${appUrl}/settings?slack=error&reason=${error ?? 'no_code'}`)
   }
 
-  // Get the org for the currently logged-in user (Clerk session cookie persists)
-  const orgId = await getOrgId()
-  if (!orgId) {
-    console.error('[slack-oauth] getOrgId() returned null — Clerk session may not persist through OAuth redirect')
-    return NextResponse.redirect(`${appUrl}/settings?slack=error&reason=no_orgid`)
+  // Verify CSRF state
+  if (!state) {
+    logger.error('[slack-oauth] missing state parameter')
+    return NextResponse.redirect(`${appUrl}/settings?slack=error&reason=missing_state`)
   }
+
+  const verified = verifyOAuthState(state)
+  if (!verified) {
+    logger.error('[slack-oauth] invalid or expired state parameter')
+    return NextResponse.redirect(`${appUrl}/settings?slack=error&reason=invalid_state`)
+  }
+
+  const orgId = verified.orgId
 
   // Verify env vars are present
   const clientId = process.env.SLACK_CLIENT_ID
   const clientSecret = process.env.SLACK_CLIENT_SECRET
   if (!clientId || !clientSecret) {
-    console.error('[slack-oauth] SLACK_CLIENT_ID or SLACK_CLIENT_SECRET not set')
+    logger.error('[slack-oauth] SLACK_CLIENT_ID or SLACK_CLIENT_SECRET not set')
     return NextResponse.redirect(`${appUrl}/settings?slack=error&reason=missing_env`)
   }
 
@@ -47,13 +57,16 @@ export async function GET(request: NextRequest) {
   const tokenData = await tokenRes.json()
 
   if (!tokenData.ok) {
-    console.error('[slack-oauth] token exchange failed:', tokenData.error)
+    logger.error('[slack-oauth] token exchange failed', undefined, { error: tokenData.error })
     return NextResponse.redirect(`${appUrl}/settings?slack=error&reason=token_${tokenData.error ?? 'unknown'}`)
   }
 
   const botToken = tokenData.access_token as string
   const teamId = tokenData.team?.id as string
   const teamName = tokenData.team?.name as string
+
+  // Encrypt token before storing
+  const encryptedBotToken = process.env.TOKEN_ENCRYPTION_KEY ? encrypt(botToken) : botToken
 
   // Store in org_settings
   const supabase = createAdminClient()
@@ -62,7 +75,7 @@ export async function GET(request: NextRequest) {
     .upsert(
       {
         org_id: orgId,
-        slack_bot_token: botToken,
+        slack_bot_token: encryptedBotToken,
         slack_team_id: teamId,
         slack_team_name: teamName,
         updated_at: new Date().toISOString(),
@@ -71,7 +84,7 @@ export async function GET(request: NextRequest) {
     )
 
   if (upsertError) {
-    console.error('[slack-oauth] upsert failed:', upsertError)
+    logger.error('[slack-oauth] upsert failed', upsertError)
     return NextResponse.redirect(
       `${appUrl}/settings?slack=error&reason=db_${encodeURIComponent(upsertError.code ?? 'unknown')}`
     )

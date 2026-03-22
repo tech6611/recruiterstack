@@ -26,6 +26,8 @@ import { requireOrg } from '@/lib/auth'
 import { randomBytes } from 'crypto'
 import { getValidAccessToken, createMeetEvent, queryFreeBusy } from '@/lib/google/calendar'
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
+import { decryptSafe, encrypt } from '@/lib/crypto'
+import { logger } from '@/lib/logger'
 
 interface ScheduleInterviewBody {
   // Required
@@ -112,8 +114,9 @@ export async function POST(req: NextRequest) {
     .eq('org_id', orgId)
     .single()
 
-  const googleConnected =
-    !!(orgSettings?.google_oauth_access_token && orgSettings?.google_oauth_refresh_token)
+  const oauthAccess  = decryptSafe(orgSettings?.google_oauth_access_token)
+  const oauthRefresh = decryptSafe(orgSettings?.google_oauth_refresh_token)
+  const googleConnected  = !!(oauthAccess && oauthRefresh)
 
   // ── Availability check (optional) ────────────────────────────────────────
   const availabilityConflicts: { email: string; conflicts: { start: string; end: string }[] }[] = []
@@ -121,8 +124,8 @@ export async function POST(req: NextRequest) {
   if (check_availability && googleConnected && interviewer_email?.trim()) {
     try {
       const { access_token } = await getValidAccessToken({
-        access_token:  orgSettings!.google_oauth_access_token!,
-        refresh_token: orgSettings!.google_oauth_refresh_token!,
+        access_token:  oauthAccess as string,
+        refresh_token: oauthRefresh as string,
         token_expiry:  orgSettings!.google_oauth_token_expiry ?? null,
       })
 
@@ -144,7 +147,7 @@ export async function POST(req: NextRequest) {
         }
       }
     } catch (e) {
-      console.error('[agent-schedule] availability check failed (non-fatal):', e)
+      logger.error('[agent-schedule] availability check failed (non-fatal)', e)
     }
   }
 
@@ -160,16 +163,17 @@ export async function POST(req: NextRequest) {
   ) {
     try {
       const { access_token, tokens: freshTokens } = await getValidAccessToken({
-        access_token:  orgSettings!.google_oauth_access_token!,
-        refresh_token: orgSettings!.google_oauth_refresh_token!,
+        access_token:  oauthAccess as string,
+        refresh_token: oauthRefresh as string,
         token_expiry:  orgSettings!.google_oauth_token_expiry ?? null,
       })
 
-      if (freshTokens.access_token !== orgSettings!.google_oauth_access_token) {
+      // Persist refreshed tokens if changed (encrypt before saving)
+      if (freshTokens.access_token !== oauthAccess) {
         await supabase
           .from('org_settings')
           .update({
-            google_oauth_access_token: freshTokens.access_token,
+            google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
             google_oauth_token_expiry: freshTokens.token_expiry,
           })
           .eq('org_id', orgId)
@@ -196,7 +200,7 @@ export async function POST(req: NextRequest) {
       }
     } catch (e) {
       calendarError = e instanceof Error ? e.message : String(e)
-      console.error('[agent-schedule] Google Meet creation failed:', e)
+      logger.error('[agent-schedule] Google Meet creation failed', e)
     }
   }
 
@@ -273,7 +277,7 @@ export async function POST(req: NextRequest) {
         recruiterEmail:      process.env.SENDGRID_FROM_EMAIL ?? '',
       })
     } catch (e) {
-      console.error('[agent-schedule] notification dispatch failed:', e)
+      logger.error('[agent-schedule] notification dispatch failed', e)
     }
   })()
 

@@ -1,7 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { checkRateLimit } from '@/lib/api/rate-limit'
+import { logger } from '@/lib/logger'
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const rateLimited = await checkRateLimit(req)
+  if (rateLimited) return rateLimited
+
   try {
     const { email, source = 'homepage' } = await req.json()
 
@@ -25,13 +30,13 @@ export async function POST(req: Request) {
       if (error.code === '23505') {
         return NextResponse.json({ success: true })
       }
-      console.error('[leads] insert error:', error)
+      logger.error('[leads] insert error', error)
       return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('[leads] unexpected error:', err)
+    logger.error('[leads] unexpected error', err)
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
 }

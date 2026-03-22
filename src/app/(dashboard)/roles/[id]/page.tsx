@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Pencil, Trash2, Sparkles, MapPin, Briefcase, DollarSign, Loader2, Copy, Check, Send, TrendingUp, TrendingDown } from 'lucide-react'
@@ -58,15 +58,64 @@ export default function RoleDetailPage() {
 
   useEffect(() => { if (orgId) fetchData() }, [fetchData, orgId])
 
+  const mountedRef = useRef(true)
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
+
+  const pollForMatches = useCallback(async (prevCount: number) => {
+    const MAX_ATTEMPTS = 60
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      if (!mountedRef.current) return
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      if (!mountedRef.current) return
+
+      try {
+        const res = await fetch(`/api/matches?role_id=${id}`)
+        if (!res.ok) continue
+        const json = await res.json()
+        const newCount = (json.data ?? []).length
+
+        if (newCount > prevCount) {
+          // Matching produced results
+          if (mountedRef.current) {
+            setMatchMsg(`AI matching complete — ${newCount} candidate${newCount !== 1 ? 's' : ''} scored.`)
+            setMatchMsgType('success')
+            await fetchData()
+            setMatching(false)
+          }
+          return
+        }
+      } catch {
+        // Network error — continue polling
+      }
+    }
+    // Timed out
+    if (mountedRef.current) {
+      setMatchMsg('Matching is taking longer than expected. Results will appear shortly.')
+      setMatchMsgType('error')
+      setMatching(false)
+    }
+  }, [id, fetchData])
+
   const runMatching = async () => {
     setMatching(true)
     setMatchMsg(null)
+    const prevCount = matches.length
+
     const res = await fetch('/api/matches', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role_id: id }),
     })
     const json = await res.json()
+
+    if (res.status === 202) {
+      // Background processing — poll for results
+      setMatchMsg('AI matching in progress…')
+      setMatchMsgType('success')
+      pollForMatches(prevCount)
+      return
+    }
+
     if (res.ok) {
       const parts = [`Scored ${json.count} candidate${json.count !== 1 ? 's' : ''}`]
       if (json.failed > 0) parts.push(`${json.failed} failed`)

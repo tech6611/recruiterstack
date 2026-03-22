@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
+import { createNotification } from '@/lib/api/notify'
 import type { Candidate, HiringRequest } from '@/lib/types/database'
 
 export const maxDuration = 300 // 5 min — needed for large pipelines on Vercel
@@ -272,6 +273,16 @@ export async function POST(
         auto_advanced: autoAdvanced,
         auto_rejected: autoRejected,
         emails_sent:   emailsSent,
+      })
+
+      // In-app notification for scoring completion
+      await createNotification({
+        orgId,
+        type: 'score_complete',
+        title: `Scoring complete: ${job.position_title}`,
+        body: `${scored} candidate${scored !== 1 ? 's' : ''} scored${autoAdvanced ? `, ${autoAdvanced} advanced` : ''}${autoRejected ? `, ${autoRejected} rejected` : ''}`,
+        resourceType: 'job',
+        resourceId: jobId,
       })
 
       controller.close()

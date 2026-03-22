@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Briefcase, MapPin, DollarSign, ChevronRight } from 'lucide-react'
+import { Plus, Briefcase, MapPin, DollarSign, ChevronRight, Search, X } from 'lucide-react'
 import { SlideOver } from '@/components/ui/SlideOver'
 import { RoleForm } from '@/components/roles/RoleForm'
 import { StatusBadge } from '@/components/ui/Badge'
@@ -13,10 +13,21 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [slideOpen, setSlideOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
-  const fetchRoles = useCallback(async () => {
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const fetchRoles = useCallback(async (q?: string) => {
     setLoading(true)
-    const res = await fetch('/api/roles')
+    const params = new URLSearchParams()
+    if (q) params.set('search', q)
+    const qs = params.toString()
+    const res = await fetch(`/api/roles${qs ? `?${qs}` : ''}`)
     if (res.ok) {
       const json = await res.json()
       setRoles(json.data ?? [])
@@ -25,8 +36,8 @@ export default function RolesPage() {
   }, [])
 
   useEffect(() => {
-    fetchRoles()
-  }, [fetchRoles])
+    fetchRoles(debouncedSearch)
+  }, [fetchRoles, debouncedSearch])
 
   const formatSalary = (min: number | null, max: number | null) => {
     if (!min && !max) return null
@@ -52,6 +63,26 @@ export default function RolesPage() {
           <Plus className="h-4 w-4" />
           Add Role
         </button>
+      </div>
+
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search roles by title, department, or location…"
+          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -132,7 +163,7 @@ export default function RolesPage() {
         <RoleForm
           onSuccess={() => {
             setSlideOpen(false)
-            fetchRoles()
+            fetchRoles(debouncedSearch)
           }}
         />
       </SlideOver>

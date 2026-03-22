@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import {
-  Plus, Search, X, Users, Loader2,
+  Plus, Search, X, Users, Loader2, Download,
   UserCheck, UserMinus, MessageSquare, FileCheck, CheckCircle, XCircle,
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight,
   GripVertical, Pencil,
@@ -528,13 +528,28 @@ export default function CandidatesPage() {
           <h1 className="text-2xl font-bold text-slate-900">Candidates</h1>
           <p className="text-sm text-slate-500 mt-0.5">Your talent pool across all roles</p>
         </div>
-        <button
-          onClick={() => setShowDrawer(true)}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <Plus className="h-4 w-4" />
-          Add Candidate
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const params = new URLSearchParams()
+              if (filterStatus !== 'all') params.set('status', filterStatus)
+              if (search.trim()) params.set('search', search.trim())
+              const qs = params.toString()
+              window.location.href = `/api/export/candidates${qs ? `?${qs}` : ''}`
+            }}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
+          <button
+            onClick={() => setShowDrawer(true)}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            Add Candidate
+          </button>
+        </div>
       </div>
 
       {/* Stat cards */}

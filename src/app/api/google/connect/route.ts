@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { requireOrg } from '@/lib/auth'
+import { generateOAuthState } from '@/lib/api/oauth-state'
 
 // GET /api/google/connect — redirects to Google OAuth authorization page
 export async function GET() {
-  const { userId } = auth()
-  if (!userId) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/sign-in`)
-  }
+  const authResult = await requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
 
   const clientId = process.env.GOOGLE_CLIENT_ID
   if (!clientId) {
@@ -31,6 +31,8 @@ export async function GET() {
     ].join(' ')
   )
 
+  const state = encodeURIComponent(generateOAuthState(orgId))
+
   const url =
     `https://accounts.google.com/o/oauth2/v2/auth` +
     `?client_id=${clientId}` +
@@ -39,7 +41,8 @@ export async function GET() {
     `&scope=${scopes}` +
     `&access_type=offline` +   // request a refresh token
     `&prompt=consent` +        // always show consent screen to ensure refresh token
-    `&include_granted_scopes=true`
+    `&include_granted_scopes=true` +
+    `&state=${state}`
 
   return NextResponse.redirect(url)
 }

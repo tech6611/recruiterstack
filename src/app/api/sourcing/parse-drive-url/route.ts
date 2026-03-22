@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { requireOrg } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getValidAccessToken } from '@/lib/google/calendar'
+import { decryptSafe, encrypt } from '@/lib/crypto'
 
 export const maxDuration = 30
 
@@ -59,7 +60,10 @@ export async function POST(request: NextRequest) {
     .eq('org_id', orgId)
     .single()
 
-  if (!settings?.google_oauth_access_token || !settings?.google_oauth_refresh_token) {
+  const decryptedAccess  = decryptSafe(settings?.google_oauth_access_token)
+  const decryptedRefresh = decryptSafe(settings?.google_oauth_refresh_token)
+
+  if (!decryptedAccess || !decryptedRefresh) {
     return NextResponse.json(
       { error: 'Google Drive is not connected. Go to Settings → Integrations and connect Google.' },
       { status: 400 },
@@ -70,18 +74,18 @@ export async function POST(request: NextRequest) {
   let accessToken: string
   try {
     const result = await getValidAccessToken({
-      access_token:  settings.google_oauth_access_token,
-      refresh_token: settings.google_oauth_refresh_token,
-      token_expiry:  settings.google_oauth_token_expiry ?? null,
+      access_token:  decryptedAccess,
+      refresh_token: decryptedRefresh,
+      token_expiry:  settings!.google_oauth_token_expiry ?? null,
     })
     accessToken = result.access_token
 
-    // Persist refreshed tokens if they changed
-    if (result.tokens.access_token !== settings.google_oauth_access_token) {
+    // Persist refreshed tokens if they changed (encrypt before saving)
+    if (result.tokens.access_token !== decryptedAccess) {
       await supabase
         .from('org_settings')
         .update({
-          google_oauth_access_token: result.tokens.access_token,
+          google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(result.tokens.access_token) : result.tokens.access_token,
           google_oauth_token_expiry: result.tokens.token_expiry,
         })
         .eq('org_id', orgId)

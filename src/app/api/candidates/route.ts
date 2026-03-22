@@ -1,21 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
-import type { CandidateInsert, CandidateListItem, CandidateStatus } from '@/lib/types/database'
+import { NextResponse } from 'next/server'
+import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { buildSearchFilter } from '@/lib/api/search'
+import { candidateInsertSchema } from '@/lib/validations/candidates'
+import { candidateStatusEnum } from '@/lib/validations/common'
+import type { CandidateListItem } from '@/lib/types/database'
 
 // GET /api/candidates?status=active&limit=50&offset=0
-export async function GET(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+export const GET = withOrg(async (req, orgId, supabase) => {
+  const { searchParams } = new URL(req.url)
 
-  const supabase = createAdminClient()
-  const { searchParams } = new URL(request.url)
-
-  const status = searchParams.get('status') as CandidateStatus | null
+  const status = searchParams.get('status')
   const limit = Math.min(Number(searchParams.get('limit') ?? 50), 200)
   const offset = Number(searchParams.get('offset') ?? 0)
   const search = searchParams.get('search')
+
+  // Validate status if provided
+  if (status && !candidateStatusEnum.safeParse(status).success) {
+    return NextResponse.json({ error: 'Invalid status value' }, { status: 400 })
+  }
 
   let query = supabase
     .from('candidates')
@@ -26,9 +28,8 @@ export async function GET(request: NextRequest) {
 
   if (status) query = query.eq('status', status)
   if (search) {
-    query = query.or(
-      `name.ilike.%${search}%,email.ilike.%${search}%,current_title.ilike.%${search}%,phone.ilike.%${search}%,location.ilike.%${search}%`,
-    )
+    const filter = buildSearchFilter(search, ['name', 'email', 'current_title', 'phone', 'location'])
+    if (filter) query = query.or(filter)
   }
 
   // Run in parallel: paginated candidates + all active application candidate_ids
@@ -37,9 +38,7 @@ export async function GET(request: NextRequest) {
     supabase.from('applications').select('candidate_id').eq('status', 'active').eq('org_id', orgId),
   ])
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+  if (error) return handleSupabaseError(error)
 
   // Build count map: candidate_id → number of active applications
   const countMap = new Map<string, number>()
@@ -54,29 +53,12 @@ export async function GET(request: NextRequest) {
   }))
 
   return NextResponse.json({ data: enriched, count, limit, offset })
-}
+})
 
 // POST /api/candidates
-export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
-  let body: CandidateInsert
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
-
-  if (!body.name || !body.email) {
-    return NextResponse.json(
-      { error: 'name and email are required' },
-      { status: 400 },
-    )
-  }
+export const POST = withOrg(async (req, orgId, supabase) => {
+  const body = await parseBody(req, candidateInsertSchema)
+  if (body instanceof NextResponse) return body
 
   const { data, error } = await supabase
     .from('candidates')
@@ -85,10 +67,7 @@ export async function POST(request: NextRequest) {
     .select()
     .single()
 
-  if (error) {
-    const status = error.code === '23505' ? 409 : 500 // unique violation
-    return NextResponse.json({ error: error.message }, { status })
-  }
+  if (error) return handleSupabaseError(error)
 
   return NextResponse.json({ data }, { status: 201 })
-}
+})

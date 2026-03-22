@@ -1,83 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import sgMail from '@sendgrid/mail'
+import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { hiringRequestInsertSchema } from '@/lib/validations/hiring-requests'
+import { logger } from '@/lib/logger'
 
 // GET /api/hiring-requests
-export async function GET() {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withOrg(async (_req, orgId, supabase) => {
   const { data, error } = await supabase
     .from('hiring_requests')
     .select('*')
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return handleSupabaseError(error)
   return NextResponse.json({ data })
-}
+})
 
 // POST /api/hiring-requests
 // Mode A (send_to_hm):  { position_title, department?, hiring_manager_name, hiring_manager_email, hiring_manager_slack? }
 // Mode B (fill_myself): above + filled_by_recruiter:true + all intake fields + generated_jd
-export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+export const POST = withOrg(async (request, orgId, supabase) => {
+  const body = await parseBody(request, hiringRequestInsertSchema)
+  if (body instanceof NextResponse) return body
 
-  const supabase = createAdminClient()
-
-  let body: {
-    position_title: string
-    department?: string
-    hiring_manager_name: string
-    hiring_manager_email?: string
-    hiring_manager_slack?: string
-    filled_by_recruiter?: boolean
-    // Intake fields (Option B only)
-    team_context?: string
-    level?: string
-    headcount?: number
-    location?: string
-    remote_ok?: boolean
-    key_requirements?: string
-    nice_to_haves?: string
-    target_companies?: string
-    budget_min?: number
-    budget_max?: number
-    target_start_date?: string
-    additional_notes?: string
-    generated_jd?: string
-    // Custom pipeline stages (optional — overrides DB-trigger defaults)
-    pipeline_stages?: { name: string; color: string }[]
-    // Weighted scoring rubric (optional — from criteria builder)
-    scoring_criteria?: { id: string; name: string; weight: number; description: string | null }[]
-  }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
-
-  if (!body.position_title || !body.hiring_manager_name) {
-    return NextResponse.json(
-      { error: 'position_title and hiring_manager_name are required' },
-      { status: 400 },
-    )
-  }
-
-  // For Option A, email is required (we send a link to HM)
-  if (!body.filled_by_recruiter && !body.hiring_manager_email) {
-    return NextResponse.json(
-      { error: 'hiring_manager_email is required when sending to hiring manager' },
-      { status: 400 },
-    )
-  }
-
-  const isOptionB = Boolean(body.filled_by_recruiter)
+  const isOptionB = body.filled_by_recruiter
 
   const insertPayload: Record<string, unknown> = {
     position_title: body.position_title,
@@ -89,12 +35,10 @@ export async function POST(request: NextRequest) {
     status: isOptionB ? 'jd_approved' : 'intake_pending',
     intake_sent_at: isOptionB ? null : new Date().toISOString(),
     org_id: orgId,
-    // Weighted scoring rubric — always saved regardless of mode
     scoring_criteria: body.scoring_criteria ?? null,
   }
 
   if (isOptionB) {
-    // Save all intake details immediately
     Object.assign(insertPayload, {
       team_context: body.team_context || null,
       level: body.level || null,
@@ -113,21 +57,20 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: req, error: insertError } = await supabase
     .from('hiring_requests')
     .insert(insertPayload as any)
     .select()
     .single()
 
-  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+  if (insertError) return handleSupabaseError(insertError)
 
   // Replace DB-trigger-created default stages with user-configured pipeline stages
   if (body.pipeline_stages?.length) {
     const validStages = body.pipeline_stages.filter(s => s.name.trim())
     if (validStages.length > 0) {
-      // Delete auto-created defaults from the trigger
       await supabase.from('pipeline_stages').delete().eq('hiring_request_id', req.id)
-      // Insert the user's custom stages
       await supabase.from('pipeline_stages').insert(
         validStages.map((s, i) => ({
           hiring_request_id: req.id,
@@ -171,7 +114,7 @@ export async function POST(request: NextRequest) {
         `,
       })
     } catch (e) {
-      console.error('Intake email failed:', e)
+      logger.error('Intake email failed', e)
     }
   }
 
@@ -189,9 +132,9 @@ export async function POST(request: NextRequest) {
         }),
       })
     } catch (e) {
-      console.error('Slack intake notification failed:', e)
+      logger.error('Slack intake notification failed', e)
     }
   }
 
   return NextResponse.json({ data: req, intake_url: intakeUrl }, { status: 201 })
-}
+})

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@clerk/nextjs'
-import { RefreshCw, TrendingUp, Users, CheckCircle, XCircle, Briefcase, Clock } from 'lucide-react'
+import { RefreshCw, TrendingUp, Users, CheckCircle, XCircle, Briefcase, Clock, Download, ChevronDown } from 'lucide-react'
 import type { StageColor } from '@/lib/types/database'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -113,6 +113,20 @@ export default function AnalyticsPage() {
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState('')
   const [updatedAt, setUpdatedAt] = useState('')
+  const [exportOpen, setExportOpen] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!exportOpen) return
+    function handleClick(e: MouseEvent) {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [exportOpen])
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -173,6 +187,33 @@ export default function AnalyticsPage() {
           {updatedAt && (
             <span className="text-xs text-slate-400">Updated {timeAgo(updatedAt)}</span>
           )}
+          <div ref={exportRef} className="relative">
+            <button
+              onClick={() => setExportOpen(prev => !prev)}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+              <ChevronDown className={`h-3 w-3 transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-lg z-20">
+                {[
+                  { label: 'Candidates CSV',   path: '/api/export/candidates' },
+                  { label: 'Applications CSV',  path: '/api/export/applications' },
+                  { label: 'Pipeline CSV',      path: '/api/export/pipeline' },
+                ].map(item => (
+                  <button
+                    key={item.path}
+                    onClick={() => { window.location.href = item.path; setExportOpen(false) }}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             onClick={load}
             className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"

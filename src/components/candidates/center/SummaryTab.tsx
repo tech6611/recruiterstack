@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react'
 import type { Candidate, Application, AiRecommendation, HiringRequest } from '@/lib/types/database'
 
@@ -46,14 +46,88 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
   const [summary, setSummary] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState('')
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+
+  // Check for existing summary on mount
+  const checkExisting = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/candidates/${candidate.id}/ai-summary`)
+      if (res.ok) {
+        const json = await res.json()
+        if (json.data?.summary && mountedRef.current) {
+          setSummary(json.data.summary)
+        }
+      }
+    } catch {
+      // Silently ignore — non-critical
+    }
+  }, [candidate.id])
+
+  useEffect(() => { checkExisting() }, [checkExisting])
+
+  // Poll for summary result after triggering background generation
+  const pollForResult = useCallback(async () => {
+    const MAX_ATTEMPTS = 30
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      if (!mountedRef.current) return
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      if (!mountedRef.current) return
+
+      try {
+        const res = await fetch(`/api/candidates/${candidate.id}/ai-summary`)
+        if (!res.ok) continue
+        const json = await res.json()
+        if (json.data?.summary) {
+          if (mountedRef.current) {
+            setSummary(json.data.summary)
+            setGenerating(false)
+          }
+          return
+        }
+        // Still processing — continue polling
+      } catch {
+        // Network error — continue polling
+      }
+    }
+    // Timed out
+    if (mountedRef.current) {
+      setGenError('Taking longer than expected. Please try again later.')
+      setGenerating(false)
+    }
+  }, [candidate.id])
 
   const generate = async () => {
     setGenerating(true); setGenError('')
-    const res = await fetch(`/api/candidates/${candidate.id}/ai-summary`, { method: 'POST' })
-    const json = await res.json()
-    if (!res.ok) { setGenError(json.error ?? 'Generation failed'); setGenerating(false); return }
-    setSummary(json.data.summary)
-    setGenerating(false)
+    try {
+      const res = await fetch(`/api/candidates/${candidate.id}/ai-summary`, { method: 'POST' })
+      const json = await res.json()
+
+      if (res.status === 202) {
+        // Background processing started — poll for result
+        pollForResult()
+        return
+      }
+
+      if (!res.ok) {
+        setGenError(json.error ?? 'Generation failed')
+        setGenerating(false)
+        return
+      }
+
+      // Direct response (non-background mode)
+      if (json.data?.summary) {
+        setSummary(json.data.summary)
+      }
+      setGenerating(false)
+    } catch {
+      setGenError('Network error. Please try again.')
+      setGenerating(false)
+    }
   }
 
   // Find applications that have been AI-scored

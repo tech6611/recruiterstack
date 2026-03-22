@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getOrgId } from '@/lib/auth'
+import { cached, cacheKey } from '@/lib/api/cache'
 import type { CandidateStatus, StageColor } from '@/lib/types/database'
 
 const INTERVIEW_KEYWORDS = ['interview', 'screen', 'technical', 'phone', 'video', 'onsite', 'call']
@@ -28,6 +29,7 @@ export async function GET() {
     })
   }
 
+  const dashboardData = await cached(cacheKey(orgId, 'dashboard'), 60, async () => {
   const supabase = createAdminClient()
 
   const [jobsRes, stagesRes, appsRes, candidatesRes, eventsRes] = await Promise.all([
@@ -392,7 +394,7 @@ export async function GET() {
     count: statusCounts.get(status) ?? 0,
   }))
 
-  return NextResponse.json({
+  return {
     stats: {
       open_jobs, total_jobs, active_candidates, interviewing, hired_total,
       pending_offers, interviews_to_schedule, overdue_followups_count,
@@ -409,5 +411,8 @@ export async function GET() {
     offer_tracker,
     jobs_by_dept,
     stage_funnel,
-  })
+  }
+  }) // end cached()
+
+  return NextResponse.json(dashboardData)
 }

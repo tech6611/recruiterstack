@@ -4,6 +4,8 @@ import { requireOrg } from '@/lib/auth'
 import { randomBytes } from 'crypto'
 import { getValidAccessToken, createMeetEvent } from '@/lib/google/calendar'
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
+import { decryptSafe, encrypt } from '@/lib/crypto'
+import { logger } from '@/lib/logger'
 
 // Strip HTML tags → plain text (for Google Calendar event descriptions)
 function stripHtml(html: string): string {
@@ -83,22 +85,22 @@ export async function POST(req: NextRequest) {
         .eq('org_id', orgId)
         .single()
 
-      if (
-        orgSettings?.google_oauth_access_token &&
-        orgSettings?.google_oauth_refresh_token
-      ) {
+      const decryptedAccess  = decryptSafe(orgSettings?.google_oauth_access_token)
+      const decryptedRefresh = decryptSafe(orgSettings?.google_oauth_refresh_token)
+
+      if (decryptedAccess && decryptedRefresh) {
         const { access_token, tokens: freshTokens } = await getValidAccessToken({
-          access_token:  orgSettings.google_oauth_access_token,
-          refresh_token: orgSettings.google_oauth_refresh_token,
-          token_expiry:  orgSettings.google_oauth_token_expiry ?? null,
+          access_token:  decryptedAccess,
+          refresh_token: decryptedRefresh,
+          token_expiry:  orgSettings!.google_oauth_token_expiry ?? null,
         })
 
-        // Persist refreshed tokens if they changed
-        if (freshTokens.access_token !== orgSettings.google_oauth_access_token) {
+        // Persist refreshed tokens if they changed (encrypt before saving)
+        if (freshTokens.access_token !== decryptedAccess) {
           await supabase
             .from('org_settings')
             .update({
-              google_oauth_access_token:  freshTokens.access_token,
+              google_oauth_access_token:  process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
               google_oauth_token_expiry:  freshTokens.token_expiry,
             })
             .eq('org_id', orgId)
@@ -130,7 +132,7 @@ export async function POST(req: NextRequest) {
           description:      notes?.trim() ? stripHtml(notes) : undefined,
           start_at:         scheduled_at,
           duration_minutes: duration_minutes ?? 60,
-          organizer_email:  orgSettings.google_connected_email ?? '',
+          organizer_email:  orgSettings?.google_connected_email ?? '',
           attendees,
           timezone:         timezone ?? 'UTC',
         })
@@ -145,7 +147,7 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       // Non-fatal: log and continue without a Meet link
       const msg = e instanceof Error ? e.message : String(e)
-      console.error('[interviews] Google Meet creation failed:', msg)
+      logger.error('[interviews] Google Meet creation failed', undefined, { error: msg })
       googleMeetError = msg
     }
   }
@@ -214,7 +216,7 @@ export async function POST(req: NextRequest) {
         recruiterEmail:      process.env.SENDGRID_FROM_EMAIL ?? '',
       })
     } catch (e) {
-      console.error('[interviews] notification dispatch failed:', e)
+      logger.error('[interviews] notification dispatch failed', e)
     }
   })()
 

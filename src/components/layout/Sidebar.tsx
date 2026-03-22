@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { UserButton, useOrganization } from '@clerk/nextjs'
 import { useEffect, useState } from 'react'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
 
 const NAV_ITEMS = [
   { href: '/dashboard',   label: 'Dashboard',  icon: LayoutDashboard },
@@ -101,7 +102,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer — user + org */}
+      {/* Footer — user + org + notifications */}
       {!collapsed && (
         <div className="border-t border-slate-100 px-4 py-4">
           <div className="flex items-center gap-3">
@@ -112,12 +113,14 @@ export function Sidebar() {
               </p>
               <p className="text-xs text-slate-400">Coming Soon</p>
             </div>
+            <NotificationBell />
           </div>
         </div>
       )}
       {collapsed && (
-        <div className="flex justify-center border-t border-slate-100 py-4">
+        <div className="flex flex-col items-center gap-3 border-t border-slate-100 py-4">
           <UserButton afterSignOutUrl="/sign-in" />
+          <NotificationBell collapsed />
         </div>
       )}
 

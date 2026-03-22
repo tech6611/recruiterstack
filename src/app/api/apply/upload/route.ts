@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { checkRateLimit } from '@/lib/api/rate-limit'
 
 const BUCKET = 'resumes'
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
@@ -20,6 +21,9 @@ const ALLOWED_TYPES = [
  * returns the public URL.
  */
 export async function POST(request: NextRequest) {
+  const rateLimited = await checkRateLimit(request)
+  if (rateLimited) return rateLimited
+
   let fd: FormData
   try {
     fd = await request.formData()

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
+import { decryptSafe } from '@/lib/crypto'
 
 // POST /api/google/disconnect — revokes and clears the stored Google OAuth tokens
 export async function POST() {
@@ -17,8 +18,8 @@ export async function POST() {
     .eq('org_id', orgId)
     .single()
 
-  // Best-effort revoke with Google (ignore errors)
-  const tokenToRevoke = settings?.google_oauth_access_token ?? settings?.google_oauth_refresh_token
+  // Best-effort revoke with Google (ignore errors) — decrypt first
+  const tokenToRevoke = decryptSafe(settings?.google_oauth_access_token) ?? decryptSafe(settings?.google_oauth_refresh_token)
   if (tokenToRevoke) {
     fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(tokenToRevoke)}`, {
       method: 'POST',
