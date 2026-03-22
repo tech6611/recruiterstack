@@ -6,6 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
+import sgMail from '@sendgrid/mail'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 
@@ -1389,19 +1390,23 @@ async function sendOutreachEmail(
 
   if (!candidate?.email) return 'Candidate has no email address on file.'
 
-  // Build absolute URL for internal API call
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-    ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+  // Send via SendGrid directly (avoid unreliable self-referential fetch on Vercel)
+  const sendgridKey  = process.env.SENDGRID_API_KEY
+  const fromEmail    = process.env.SENDGRID_FROM_EMAIL
+  if (!sendgridKey || !fromEmail) return 'Email not configured: SENDGRID_API_KEY or SENDGRID_FROM_EMAIL is missing.'
 
-  const res = await fetch(`${appUrl}/api/email/send`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ to: candidate.email, subject, body, from_name: recruiter_name }),
-  })
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => res.status.toString())
-    return `Failed to send email to ${candidate.name}: ${errText}`
+  sgMail.setApiKey(sendgridKey)
+  try {
+    await sgMail.send({
+      to:      candidate.email,
+      from:    { email: fromEmail, name: recruiter_name },
+      subject,
+      text:    body,
+      html:    body.replace(/\n/g, '<br>'),
+    })
+  } catch (err: any) {
+    const errMsg = err?.response?.body?.errors?.[0]?.message ?? err?.message ?? 'Unknown SendGrid error'
+    return `Failed to send email to ${candidate.name}: ${errMsg}`
   }
 
   // Log the outreach event
