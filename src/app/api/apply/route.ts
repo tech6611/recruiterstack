@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { notifySlack } from '@/lib/notifications'
+import { notify } from '@/lib/notifications'
 import { runAutopilot } from '@/lib/ai/autopilot'
+import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { checkRateLimit } from '@/lib/api/rate-limit'
+import { publicApplySchema } from '@/lib/validations/applications'
+import { logger } from '@/lib/logger'
 
 // GET /api/apply?token=xxx — fetch job info for the public apply page
 export async function GET(request: NextRequest) {
@@ -27,30 +31,17 @@ export async function GET(request: NextRequest) {
 
 // POST /api/apply
 // Public application form submission (no auth required).
-// body: { token, name, email, phone?, linkedin_url?, cover_letter? }
 export async function POST(request: NextRequest) {
+  // Rate limit public endpoint
+  const rateLimited = await checkRateLimit(request)
+  if (rateLimited) return rateLimited
+
   const supabase = createAdminClient()
 
-  let body: Record<string, unknown>
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
+  const body = await parseBody(request, publicApplySchema)
+  if (body instanceof NextResponse) return body
 
-  const { token, name, email, phone, linkedin_url, cover_letter, cv_url } = body as {
-    token: string
-    name: string
-    email: string
-    phone?: string
-    linkedin_url?: string
-    cover_letter?: string
-    cv_url?: string
-  }
-
-  if (!token || !name || !email) {
-    return NextResponse.json({ error: 'token, name, and email are required' }, { status: 400 })
-  }
+  const { token, name, email, phone, linkedin_url, cover_letter, cv_url } = body
 
   // ── Verify token & get job ────────────────────────────────────────────────
   const { data: job, error: jobErr } = await supabase
@@ -67,7 +58,7 @@ export async function POST(request: NextRequest) {
   const { data: existingCandidate } = await supabase
     .from('candidates')
     .select('id')
-    .eq('email', email.toLowerCase())
+    .eq('email', email)
     .single()
 
   let candidateId: string
@@ -80,7 +71,7 @@ export async function POST(request: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .insert({
         name,
-        email: email.toLowerCase(),
+        email,
         phone: phone ?? null,
         resume_url: cv_url ?? null,
         skills: [],
@@ -90,9 +81,7 @@ export async function POST(request: NextRequest) {
       .select('id')
       .single()
 
-    if (createErr) {
-      return NextResponse.json({ error: createErr.message }, { status: 500 })
-    }
+    if (createErr) return handleSupabaseError(createErr)
     candidateId = newCandidate!.id
   }
 
@@ -121,14 +110,13 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (appErr) {
-    // Duplicate — already applied
     if (appErr.code === '23505') {
       return NextResponse.json(
         { error: 'You have already applied for this role.' },
         { status: 409 }
       )
     }
-    return NextResponse.json({ error: appErr.message }, { status: 500 })
+    return handleSupabaseError(appErr)
   }
 
   // ── Timeline event ────────────────────────────────────────────────────────
@@ -147,11 +135,16 @@ export async function POST(request: NextRequest) {
       created_by: name,
     } as any)
 
-  // ── Slack notification ────────────────────────────────────────────────────
-  await notifySlack(
-    job.org_id,
-    `📥 New application: *${name}* applied for *${job.position_title}*`
-  )
+  // ── Notification (in-app + Slack) ─────────────────────────────────────────
+  await notify({
+    orgId: job.org_id,
+    type: 'candidate_applied',
+    title: `New application: ${name}`,
+    body: `${name} applied for ${job.position_title}`,
+    slackText: `📥 New application: *${name}* applied for *${job.position_title}*`,
+    resourceType: 'application',
+    resourceId: app!.id,
+  })
 
   // ── Autopilot: fire-and-forget scoring if thresholds are configured ────────
   const hasAutopilot =
@@ -161,7 +154,9 @@ export async function POST(request: NextRequest) {
       .auto_reject_score  !== null
 
   if (hasAutopilot) {
-    void runAutopilot(app!.id, job.org_id).catch(() => {})
+    void runAutopilot(app!.id, job.org_id).catch((err) => {
+      logger.error('Autopilot failed', err, { applicationId: app!.id })
+    })
   }
 
   return NextResponse.json(

@@ -1,4 +1,35 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { decryptSafe } from '@/lib/crypto'
+import { logger } from '@/lib/logger'
+import { createNotification, type NotificationType } from '@/lib/api/notify'
+
+interface NotifyParams {
+  orgId: string
+  type: NotificationType
+  title: string
+  body?: string
+  slackText: string
+  resourceType?: string
+  resourceId?: string
+}
+
+/**
+ * Combined notification: creates an in-app notification AND sends a Slack message in parallel.
+ * Non-throwing — both channels are fire-and-forget.
+ */
+export async function notify(params: NotifyParams): Promise<void> {
+  await Promise.all([
+    createNotification({
+      orgId: params.orgId,
+      type: params.type,
+      title: params.title,
+      body: params.body,
+      resourceType: params.resourceType,
+      resourceId: params.resourceId,
+    }),
+    notifySlack(params.orgId, params.slackText),
+  ])
+}
 
 // ── Webhook: sends to a Slack channel via incoming webhook URL ────────────────
 export async function notifySlack(orgId: string, text: string): Promise<void> {
@@ -19,7 +50,7 @@ export async function notifySlack(orgId: string, text: string): Promise<void> {
       body: JSON.stringify({ text }),
     })
   } catch (e) {
-    console.error('[slack] notification failed:', e)
+    logger.error('[slack] notification failed', e)
   }
 }
 
@@ -38,7 +69,7 @@ export async function notifySlackDM(
     .eq('org_id', orgId)
     .single()
 
-  const token = data?.slack_bot_token
+  const token = decryptSafe(data?.slack_bot_token)
   if (!token) return
 
   try {
@@ -60,6 +91,6 @@ export async function notifySlackDM(
       body: JSON.stringify({ channel: userData.user.id, text }),
     })
   } catch (e) {
-    console.error('[slack-dm] failed:', e)
+    logger.error('[slack-dm] failed', e)
   }
 }

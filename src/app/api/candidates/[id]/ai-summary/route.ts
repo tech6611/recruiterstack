@@ -2,9 +2,40 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
+import { runInBackground } from '@/lib/api/background'
+import { logger } from '@/lib/logger'
+
+// GET /api/candidates/[id]/ai-summary — poll for generated summary
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  const authResult = await requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('candidates')
+    .select('ai_summary, ai_summary_generated_at')
+    .eq('id', params.id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (error || !data) {
+    return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
+  }
+
+  return NextResponse.json({
+    data: {
+      summary: data.ai_summary ?? null,
+      generated_at: data.ai_summary_generated_at ?? null,
+    },
+  })
+}
 
 // POST /api/candidates/[id]/ai-summary
-// Generates a comprehensive AI summary of a candidate based on all their context
+// Kicks off AI summary generation in the background and returns 202 immediately.
 export async function POST(
   _req: NextRequest,
   { params }: { params: { id: string } },
@@ -23,12 +54,40 @@ export async function POST(
 
   const supabase = createAdminClient()
 
+  // Quick check: candidate exists
+  const { data: candCheck, error: candErr } = await supabase
+    .from('candidates')
+    .select('id')
+    .eq('id', params.id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (candErr || !candCheck) {
+    return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
+  }
+
+  // Run AI generation in the background
+  const candidateId = params.id
+  runInBackground(async () => {
+    await generateAndStoreSummary(candidateId, orgId, apiKey)
+  })
+
+  return NextResponse.json(
+    { data: { status: 'processing', candidate_id: params.id } },
+    { status: 202 },
+  )
+}
+
+/** Generate AI summary and write it to the candidates table */
+async function generateAndStoreSummary(candidateId: string, orgId: string, apiKey: string) {
+  const supabase = createAdminClient()
+
   // ── Fetch candidate + all applications + events + scorecards ────────────────
   const [candRes, appsRes] = await Promise.all([
     supabase
       .from('candidates')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', candidateId)
       .eq('org_id', orgId)
       .single(),
     supabase
@@ -39,17 +98,18 @@ export async function POST(
         pipeline_stages(name),
         hiring_requests(position_title, department, level)
       `)
-      .eq('candidate_id', params.id)
+      .eq('candidate_id', candidateId)
       .eq('org_id', orgId)
       .order('applied_at', { ascending: false }),
   ])
 
   if (candRes.error || !candRes.data) {
-    return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
+    logger.error('AI summary: candidate not found', undefined, { candidateId })
+    return
   }
 
   const candidate = candRes.data
-  const apps      = appsRes.data ?? []
+  const apps = appsRes.data ?? []
 
   // Fetch events for all applications
   const appIds = apps.map((a: { id: string }) => a.id)
@@ -122,25 +182,27 @@ Be concise, direct, and useful for a recruiter who hasn't reviewed this profile 
 
   const client = new Anthropic({ apiKey })
 
-  try {
-    const message = await client.messages.create({
-      model:      'claude-haiku-4-5-20251001',
-      max_tokens: 800,
-      messages:   [{ role: 'user', content: prompt }],
-    })
+  const message = await client.messages.create({
+    model:      'claude-haiku-4-5-20251001',
+    max_tokens: 800,
+    messages:   [{ role: 'user', content: prompt }],
+  })
 
-    const summary = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+  const summary = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
 
-    return NextResponse.json({
-      data: {
-        summary,
-        generated_at: new Date().toISOString(),
-      },
-    })
-  } catch {
-    return NextResponse.json(
-      { error: 'AI summary generation failed — check your API key and try again.' },
-      { status: 500 },
-    )
+  // Store the summary on the candidate record
+  const { error: updateErr } = await supabase
+    .from('candidates')
+    .update({
+      ai_summary: summary,
+      ai_summary_generated_at: new Date().toISOString(),
+    } as never)
+    .eq('id', candidateId)
+    .eq('org_id', orgId)
+
+  if (updateErr) {
+    logger.error('AI summary: failed to save', updateErr, { candidateId })
+  } else {
+    logger.info('AI summary generated', { candidateId })
   }
 }

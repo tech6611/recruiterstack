@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { getValidAccessToken, queryFreeBusy, type GoogleTokens } from '@/lib/google/calendar'
+import { decryptSafe, encrypt } from '@/lib/crypto'
+import { logger } from '@/lib/logger'
 
 /**
  * GET /api/google/availability
@@ -37,7 +39,10 @@ export async function GET(req: NextRequest) {
     .eq('org_id', orgId)
     .single()
 
-  if (!settings?.google_oauth_access_token || !settings?.google_oauth_refresh_token) {
+  const decryptedAccess  = decryptSafe(settings?.google_oauth_access_token)
+  const decryptedRefresh = decryptSafe(settings?.google_oauth_refresh_token)
+
+  if (!decryptedAccess || !decryptedRefresh) {
     return NextResponse.json(
       { error: 'Google Calendar is not connected. Visit Settings → Integrations to connect.' },
       { status: 409 }
@@ -61,25 +66,25 @@ export async function GET(req: NextRequest) {
   let freshTokens: GoogleTokens
   try {
     const result = await getValidAccessToken({
-      access_token:  settings.google_oauth_access_token,
-      refresh_token: settings.google_oauth_refresh_token,
-      token_expiry:  settings.google_oauth_token_expiry ?? null,
+      access_token:  decryptedAccess,
+      refresh_token: decryptedRefresh,
+      token_expiry:  settings!.google_oauth_token_expiry ?? null,
     })
     accessToken  = result.access_token
     freshTokens  = result.tokens
 
-    // Persist refreshed tokens if changed
-    if (freshTokens.access_token !== settings.google_oauth_access_token) {
+    // Persist refreshed tokens if changed (encrypt before saving)
+    if (freshTokens.access_token !== decryptedAccess) {
       await supabase
         .from('org_settings')
         .update({
-          google_oauth_access_token: freshTokens.access_token,
+          google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
           google_oauth_token_expiry: freshTokens.token_expiry,
         })
         .eq('org_id', orgId)
     }
   } catch (e) {
-    console.error('[google-availability] token refresh failed:', e)
+    logger.error('[google-availability] token refresh failed', e)
     return NextResponse.json({ error: 'Google token refresh failed. Please reconnect.' }, { status: 401 })
   }
 
@@ -87,7 +92,7 @@ export async function GET(req: NextRequest) {
     // Only query the emails explicitly requested (the actual panel members).
     // The connected Google account is NOT auto-added — it should only contribute to
     // availability when it is explicitly part of the interview panel.
-    const connectedEmail = (settings.google_connected_email as string | null) ?? null
+    const connectedEmail = (settings?.google_connected_email as string | null) ?? null
 
     const busyMap = await queryFreeBusy(accessToken, emails, timeMin, timeMax, timezone)
     return NextResponse.json(
@@ -95,7 +100,7 @@ export async function GET(req: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } }   // never cache — GCal events change in real-time
     )
   } catch (e) {
-    console.error('[google-availability] free/busy query failed:', e)
+    logger.error('[google-availability] free/busy query failed', e)
     return NextResponse.json({ error: 'Failed to query availability' }, { status: 500 })
   }
 }

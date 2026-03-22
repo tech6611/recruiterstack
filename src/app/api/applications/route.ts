@@ -1,58 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
-import type { Candidate } from '@/lib/types/database'
+import { NextResponse } from 'next/server'
+import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { applicationInsertSchema } from '@/lib/validations/applications'
+import { createNotification } from '@/lib/api/notify'
 
 // POST /api/applications
 // Adds a candidate to a job pipeline.
-// body: {
-//   hiring_request_id: string
-//   stage_id?: string         (defaults to first stage)
-//   source?: string
-//   source_detail?: string
-//   candidate_id?: string     (existing candidate)
-//   candidate_data?: { name, email, phone?, current_title?, location? }  (new/upsert)
-// }
-export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+export const POST = withOrg(async (req, orgId, supabase) => {
+  const body = await parseBody(req, applicationInsertSchema)
+  if (body instanceof NextResponse) return body
 
-  const supabase = createAdminClient()
-
-  let body: Record<string, unknown>
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
-
-  const { hiring_request_id, stage_id, source = 'manual', source_detail, candidate_id, candidate_data } =
-    body as {
-      hiring_request_id: string
-      stage_id?: string
-      source?: string
-      source_detail?: string
-      candidate_id?: string
-      candidate_data?: Partial<Candidate> & { name: string; email: string }
-    }
-
-  if (!hiring_request_id) {
-    return NextResponse.json({ error: 'hiring_request_id required' }, { status: 400 })
-  }
+  const { hiring_request_id, stage_id, source, source_detail, candidate_id, candidate_data } = body
 
   let resolvedCandidateId = candidate_id
 
   // ── Upsert candidate if candidate_data provided ───────────────────────────
   if (!resolvedCandidateId && candidate_data) {
-    if (!candidate_data.name || !candidate_data.email) {
-      return NextResponse.json({ error: 'candidate_data.name and .email required' }, { status: 400 })
-    }
-
     const { data: existing } = await supabase
       .from('candidates')
       .select('id')
-      .eq('email', candidate_data.email.toLowerCase())
+      .eq('email', candidate_data.email)
       .eq('org_id', orgId)
       .single()
 
@@ -64,7 +30,7 @@ export async function POST(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .insert({
           name: candidate_data.name,
-          email: candidate_data.email.toLowerCase(),
+          email: candidate_data.email,
           phone: candidate_data.phone ?? null,
           current_title: candidate_data.current_title ?? null,
           location: candidate_data.location ?? null,
@@ -76,9 +42,7 @@ export async function POST(request: NextRequest) {
         .select('id')
         .single()
 
-      if (createErr) {
-        return NextResponse.json({ error: createErr.message }, { status: 500 })
-      }
+      if (createErr) return handleSupabaseError(createErr)
       resolvedCandidateId = created!.id
     }
   }
@@ -127,10 +91,7 @@ export async function POST(request: NextRequest) {
     .select('*, candidate:candidates(*)')
     .single()
 
-  if (appErr) {
-    const status = appErr.code === '23505' ? 409 : 500
-    return NextResponse.json({ error: appErr.message }, { status })
-  }
+  if (appErr) return handleSupabaseError(appErr)
 
   // ── Record timeline event ─────────────────────────────────────────────────
   await supabase
@@ -144,5 +105,16 @@ export async function POST(request: NextRequest) {
       org_id: orgId,
     } as any)
 
+  // ── In-app notification ─────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const candidateName = (app as any).candidate?.name ?? 'Candidate'
+  await createNotification({
+    orgId,
+    type: 'candidate_applied',
+    title: `Application created: ${candidateName}`,
+    resourceType: 'application',
+    resourceId: app.id,
+  })
+
   return NextResponse.json({ data: app }, { status: 201 })
-}
+})

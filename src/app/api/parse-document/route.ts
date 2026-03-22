@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { checkRateLimit } from '@/lib/api/rate-limit'
+import { logger } from '@/lib/logger'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
@@ -8,6 +10,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 // Supports: PDF (via Claude document API), TXT, MD
 // Returns: { text: string }
 export async function POST(request: NextRequest) {
+  const rateLimited = await checkRateLimit(request)
+  if (rateLimited) return rateLimited
   let formData: FormData
   try {
     formData = await request.formData()
@@ -72,7 +76,7 @@ export async function POST(request: NextRequest) {
       const text = response.content[0].type === 'text' ? response.content[0].text : ''
       return NextResponse.json({ text })
     } catch (e) {
-      console.error('Claude document extraction failed:', e)
+      logger.error('Claude document extraction failed', e)
       return NextResponse.json({ error: 'Failed to extract text from PDF.' }, { status: 500 })
     }
   }

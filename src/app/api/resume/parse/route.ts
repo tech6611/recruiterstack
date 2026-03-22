@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
+import { checkRateLimit } from '@/lib/api/rate-limit'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -8,6 +9,8 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 // Accepts multipart/form-data with a `file` field (PDF)
 // Returns parsed candidate fields + storage path
 export async function POST(request: NextRequest) {
+  const rateLimited = await checkRateLimit(request)
+  if (rateLimited) return rateLimited
   let formData: FormData
   try {
     formData = await request.formData()

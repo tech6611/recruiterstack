@@ -1,46 +1,71 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { uuidSchema } from '@/lib/validations/common'
 import { matchCandidateToRole } from '@/lib/ai/matcher'
+import { createAdminClient } from '@/lib/supabase/server'
+import { runInBackground } from '@/lib/api/background'
 import type { Candidate, Role } from '@/lib/types/database'
+import { logger } from '@/lib/logger'
+
+const matchBodySchema = z.object({
+  role_id: uuidSchema,
+})
 
 // POST /api/matches  { role_id }
-// Runs AI scoring for all candidates against a role, upserts results
-export async function POST(request: NextRequest) {
-  const supabase = createAdminClient()
+// Kicks off AI matching in the background and returns 202 immediately.
+// Poll GET /api/matches?role_id=xxx to see results as they arrive.
+export const POST = withOrg(async (_req, orgId, supabase) => {
+  const body = await parseBody(_req, matchBodySchema)
+  if (body instanceof NextResponse) return body
 
-  let body: { role_id: string }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
-
-  if (!body.role_id) {
-    return NextResponse.json({ error: 'role_id is required' }, { status: 400 })
-  }
-
+  // Verify role exists before starting background work
   const { data: role, error: roleError } = await supabase
     .from('roles')
-    .select('*')
+    .select('id')
     .eq('id', body.role_id)
+    .eq('org_id', orgId)
     .single()
 
   if (roleError || !role) {
     return NextResponse.json({ error: 'Role not found' }, { status: 404 })
   }
 
-  const { data: candidates, error: candError } = await supabase
-    .from('candidates')
-    .select('*')
+  const roleId = body.role_id
+  runInBackground(async () => {
+    await runMatchingJob(roleId, orgId)
+  })
 
-  if (candError) {
-    return NextResponse.json({ error: candError.message }, { status: 500 })
+  return NextResponse.json(
+    { data: { status: 'processing', role_id: roleId } },
+    { status: 202 },
+  )
+})
+
+/** Background: score all candidates against a role, upsert results, apply auto-decisions */
+async function runMatchingJob(roleId: string, orgId: string) {
+  const supabase = createAdminClient()
+
+  const [roleRes, candsRes] = await Promise.all([
+    supabase.from('roles').select('*').eq('id', roleId).eq('org_id', orgId).single(),
+    supabase.from('candidates').select('*').eq('org_id', orgId),
+  ])
+
+  if (roleRes.error || !roleRes.data) {
+    logger.error('Matching job: role not found', undefined, { roleId })
+    return
+  }
+  if (candsRes.error) {
+    logger.error('Matching job: candidates query failed', candsRes.error, { roleId })
+    return
   }
 
-  // Run all matches in parallel
+  const role = roleRes.data as Role
+  const candidates = (candsRes.data ?? []) as Candidate[]
+
   const results = await Promise.allSettled(
-    (candidates as Candidate[]).map(async (candidate) => {
-      const match = await matchCandidateToRole(candidate, role as Role)
+    candidates.map(async (candidate) => {
+      const match = await matchCandidateToRole(candidate, role)
 
       const { data, error } = await supabase
         .from('matches')
@@ -48,7 +73,7 @@ export async function POST(request: NextRequest) {
         .upsert(
           {
             candidate_id: candidate.id,
-            role_id: body.role_id,
+            role_id: roleId,
             score: match.score,
             strengths: match.strengths,
             gaps: match.gaps,
@@ -60,7 +85,7 @@ export async function POST(request: NextRequest) {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) throw new Error(error.message)
       return data
     }),
   )
@@ -73,42 +98,36 @@ export async function POST(request: NextRequest) {
   const failed = results.filter((r) => r.status === 'rejected').length
 
   // Apply auto-decision thresholds
-  const typedRole = role as Role
   const toAdvance: string[] = []
   const toReject: string[] = []
 
-  if (typedRole.auto_advance_threshold || typedRole.auto_reject_threshold) {
+  if (role.auto_advance_threshold || role.auto_reject_threshold) {
     for (const match of succeeded) {
-      if (typedRole.auto_advance_threshold && match.score >= typedRole.auto_advance_threshold) {
+      if (role.auto_advance_threshold && match.score >= role.auto_advance_threshold) {
         toAdvance.push(match.candidate_id)
-      } else if (typedRole.auto_reject_threshold && match.score <= typedRole.auto_reject_threshold) {
+      } else if (role.auto_reject_threshold && match.score <= role.auto_reject_threshold) {
         toReject.push(match.candidate_id)
       }
     }
 
     await Promise.all([
       ...toAdvance.map((id) =>
-        supabase.from('candidates').update({ status: 'interviewing' }).eq('id', id),
+        supabase.from('candidates').update({ status: 'interviewing' }).eq('id', id).eq('org_id', orgId),
       ),
       ...toReject.map((id) =>
-        supabase.from('candidates').update({ status: 'rejected' }).eq('id', id),
+        supabase.from('candidates').update({ status: 'rejected' }).eq('id', id).eq('org_id', orgId),
       ),
     ])
   }
 
-  return NextResponse.json({
-    data: succeeded,
-    count: succeeded.length,
-    failed,
-    advanced: toAdvance.length,
-    rejected: toReject.length,
+  logger.info('Matching job complete', {
+    roleId, matched: succeeded.length, failed, advanced: toAdvance.length, rejected: toReject.length,
   })
 }
 
 // GET /api/matches?role_id=xxx  OR  ?candidate_id=xxx
-export async function GET(request: NextRequest) {
-  const supabase = createAdminClient()
-  const { searchParams } = new URL(request.url)
+export const GET = withOrg(async (req, orgId, supabase) => {
+  const { searchParams } = new URL(req.url)
 
   const role_id = searchParams.get('role_id')
   const candidate_id = searchParams.get('candidate_id')
@@ -126,14 +145,16 @@ export async function GET(request: NextRequest) {
     .select('*, candidates(*), roles(*)')
     .order('score', { ascending: false })
 
+  // Scope to org via joined tables
   if (role_id) query = query.eq('role_id', role_id)
   if (candidate_id) query = query.eq('candidate_id', candidate_id)
 
+  // Filter to only matches where the role belongs to this org
+  query = query.eq('roles.org_id', orgId)
+
   const { data, error } = await query
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+  if (error) return handleSupabaseError(error)
 
   return NextResponse.json({ data })
-}
+})

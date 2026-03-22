@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import sgMail from '@sendgrid/mail'
+import { checkRateLimit } from '@/lib/api/rate-limit'
 
 // GET /api/intake/:token — validate token, return request info for the HM form
 export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
+  const rateLimited = await checkRateLimit(_req)
+  if (rateLimited) return rateLimited
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('hiring_requests')
@@ -19,6 +22,9 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
 
 // POST /api/intake/:token — HM submits requirements + final JD → status = jd_approved
 export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
+  const rateLimited = await checkRateLimit(request)
+  if (rateLimited) return rateLimited
+
   const supabase = createAdminClient()
 
   const { data: req, error: fetchError } = await supabase

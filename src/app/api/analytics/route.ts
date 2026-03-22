@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getOrgId } from '@/lib/auth'
+import { cached, cacheKey } from '@/lib/api/cache'
 
 // GET /api/analytics — pipeline funnel, source breakdown, time-in-stage
 export async function GET() {
@@ -11,6 +12,7 @@ export async function GET() {
     })
   }
 
+  const analyticsData = await cached(cacheKey(orgId, 'analytics'), 60, async () => {
   const supabase = createAdminClient()
 
   const [jobsRes, appsRes, stagesRes, candsRes] = await Promise.all([
@@ -121,7 +123,8 @@ export async function GET() {
     active_jobs:        activeJobs.length,
   }
 
-  return NextResponse.json({
-    data: { stats, jobs_funnel: jobsFunnel, source_breakdown: sourceBreakdown, avg_time_per_stage: avgTimePerStage },
-  })
+  return { stats, jobs_funnel: jobsFunnel, source_breakdown: sourceBreakdown, avg_time_per_stage: avgTimePerStage }
+  }) // end cached()
+
+  return NextResponse.json({ data: analyticsData })
 }
