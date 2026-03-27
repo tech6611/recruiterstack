@@ -107,6 +107,8 @@ export default function ScheduleInterviewModal({
   const [scheduledAt, setScheduledAt] = useState<string | null>(null)
   const [error,     setError]     = useState('')
   const [googleConnected, setGoogleConnected] = useState(false)
+  const [zoomConnected,   setZoomConnected]   = useState(false)
+  const [msConnected,     setMsConnected]     = useState(false)
   const [autoMeetLink,    setAutoMeetLink]    = useState<string | null>(null)
   const [googleMeetError, setGoogleMeetError] = useState<string | null>(null)
 
@@ -173,13 +175,18 @@ export default function ScheduleInterviewModal({
   useEffect(() => {
     fetch('/api/org-settings')
       .then(r => r.json())
-      .then(({ data }) => setGoogleConnected(!!data?.google_connected))
+      .then(({ data }) => {
+        setGoogleConnected(!!data?.google_connected)
+        setZoomConnected(!!data?.zoom_connected)
+        setMsConnected(!!data?.ms_connected)
+      })
       .catch(() => {})
   }, [])
 
   useEffect(() => {
     const emails = panel.map(m => m.email.trim().toLowerCase()).filter(Boolean)
-    if (!emails.length || !googleConnected) return
+    const anyCalendarConnected = googleConnected || zoomConnected || msConnected
+    if (!emails.length || !anyCalendarConnected) return
     let cancelled = false
     const timer = setTimeout(async () => {
       setAvailLoading(true)
@@ -190,7 +197,7 @@ export default function ScheduleInterviewModal({
         const maxDt = new Date(days[6]); maxDt.setHours(23, 59, 59, 999)
         const tz    = Intl.DateTimeFormat().resolvedOptions().timeZone
         const res   = await fetch(
-          `/api/google/availability?emails=${encodeURIComponent(emails.join(','))}&time_min=${minDt.toISOString()}&time_max=${maxDt.toISOString()}&timezone=${encodeURIComponent(tz)}`,
+          `/api/availability?emails=${encodeURIComponent(emails.join(','))}&time_min=${minDt.toISOString()}&time_max=${maxDt.toISOString()}&timezone=${encodeURIComponent(tz)}`,
           { cache: 'no-store' }
         )
         if (!res.ok) { if (!cancelled) { setBusyRangesByEmail({}); setAvailNoData(true) }; return }
@@ -203,7 +210,7 @@ export default function ScheduleInterviewModal({
       finally  { if (!cancelled) setAvailLoading(false) }
     }, 600)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [panel, date, availWeekOffset, googleConnected]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [panel, date, availWeekOffset, googleConnected, zoomConnected, msConnected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!gridExpanded) return
@@ -250,7 +257,10 @@ export default function ScheduleInterviewModal({
 
   const openIntegration = (platform: typeof MEETING_INTEGRATIONS[number]) => {
     setActivePlatform(platform.id)
+    // Don't open external tab if the platform is connected (auto-create will handle it)
     if (platform.id === 'gmeet' && googleConnected) return
+    if (platform.id === 'zoom'  && zoomConnected)   return
+    if (platform.id === 'teams' && msConnected)      return
     window.open(platform.url, '_blank', 'noopener')
   }
 
@@ -306,6 +316,10 @@ export default function ScheduleInterviewModal({
             location:          location.trim() || null,
             notes:             isHtmlEmpty(notes) ? null : notes,
             timezone:          Intl.DateTimeFormat().resolvedOptions().timeZone,
+            meeting_platform:  activePlatform === 'gmeet' && googleConnected ? 'google_meet'
+                             : activePlatform === 'zoom'  && zoomConnected   ? 'zoom'
+                             : activePlatform === 'teams' && msConnected     ? 'ms_teams'
+                             : null,
           }),
         }).then(r => r.json())
       ))
@@ -743,38 +757,43 @@ export default function ScheduleInterviewModal({
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">Meeting platform</label>
               <div className="grid grid-cols-3 gap-1.5 mb-2">
-                {MEETING_INTEGRATIONS.map(p => (
-                  <button key={p.id} onClick={() => openIntegration(p)}
-                    className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
-                      activePlatform === p.id ? 'border-blue-400 bg-blue-50 text-blue-700' : `border-slate-200 text-slate-600 ${p.color}`
-                    }`}>
-                    <span className="text-base">{p.id === 'gmeet' ? '🎥' : p.id === 'zoom' ? '💻' : '🟦'}</span>
-                    {p.label}
-                    {p.id !== 'gmeet' && <span className="text-[9px] font-normal text-slate-400 leading-none">Coming soon</span>}
-                  </button>
-                ))}
+                {MEETING_INTEGRATIONS.map(p => {
+                  const isConnected = (p.id === 'gmeet' && googleConnected) || (p.id === 'zoom' && zoomConnected) || (p.id === 'teams' && msConnected)
+                  return (
+                    <button key={p.id} onClick={() => openIntegration(p)}
+                      className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+                        activePlatform === p.id ? 'border-blue-400 bg-blue-50 text-blue-700' : `border-slate-200 text-slate-600 ${p.color}`
+                      }`}>
+                      <span className="text-base">{p.id === 'gmeet' ? '🎥' : p.id === 'zoom' ? '💻' : '🟦'}</span>
+                      {p.label}
+                      {isConnected && <span className="text-[9px] font-normal text-green-600 leading-none">Connected</span>}
+                    </button>
+                  )
+                })}
               </div>
-              {activePlatform === 'gmeet' && googleConnected ? (
+              {((activePlatform === 'gmeet' && googleConnected) ||
+                (activePlatform === 'zoom'  && zoomConnected) ||
+                (activePlatform === 'teams' && msConnected)) ? (
                 <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
                   <span className="text-green-500 text-base">✓</span>
                   <div>
-                    <p className="text-xs font-semibold text-green-700">Google Meet link will be auto-created</p>
+                    <p className="text-xs font-semibold text-green-700">
+                      {activePlatform === 'gmeet' ? 'Google Meet' : activePlatform === 'zoom' ? 'Zoom' : 'Teams'} link will be auto-created
+                    </p>
                     <p className="text-[11px] text-green-600">Calendar invites sent to candidate &amp; interviewer on schedule</p>
                   </div>
                 </div>
               ) : (
                 <>
-                  {activePlatform && activePlatform !== 'gmeet' && (
+                  {activePlatform && (
                     <p className="text-xs text-slate-400 mb-1.5">Copy the link from the new tab and paste it below</p>
                   )}
-                  {(!activePlatform || activePlatform !== 'gmeet') && (
-                    <input
-                      value={location}
-                      onChange={e => setLocation(e.target.value)}
-                      placeholder={activePlatform ? MEETING_INTEGRATIONS.find(p => p.id === activePlatform)?.placeholder ?? 'Paste meeting link...' : 'Paste meeting link (Zoom, Meet, Teams…)'}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                  )}
+                  <input
+                    value={location}
+                    onChange={e => setLocation(e.target.value)}
+                    placeholder={activePlatform ? MEETING_INTEGRATIONS.find(p => p.id === activePlatform)?.placeholder ?? 'Paste meeting link...' : 'Paste meeting link (Zoom, Meet, Teams…)'}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
                 </>
               )}
             </div>

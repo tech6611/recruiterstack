@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle, Check, Building2, User, Sparkles, Database, Bell, Plug, LayoutList, Calendar } from 'lucide-react'
+import { CheckCircle, Check, Building2, User, Sparkles, Database, Bell, Plug, LayoutList, Calendar, Video, Monitor } from 'lucide-react'
 import { useSettings, KANBAN_CARD_FIELD_OPTIONS } from '@/lib/hooks/useSettings'
 import type { AppSettings } from '@/lib/hooks/useSettings'
 
@@ -30,6 +30,20 @@ export default function SettingsPage() {
   const [googleErrorReason, setGoogleErrorReason] = useState<string | null>(null)
   const [googleDisconnecting, setGoogleDisconnecting] = useState(false)
 
+  // Zoom OAuth state
+  const [zoomConnected, setZoomConnected] = useState(false)
+  const [zoomEmail, setZoomEmail] = useState<string | null>(null)
+  const [zoomToast, setZoomToast] = useState<'connected' | 'error' | null>(null)
+  const [zoomErrorReason, setZoomErrorReason] = useState<string | null>(null)
+  const [zoomDisconnecting, setZoomDisconnecting] = useState(false)
+
+  // Microsoft OAuth state
+  const [msConnected, setMsConnected] = useState(false)
+  const [msEmail, setMsEmail] = useState<string | null>(null)
+  const [msToast, setMsToast] = useState<'connected' | 'error' | null>(null)
+  const [msErrorReason, setMsErrorReason] = useState<string | null>(null)
+  const [msDisconnecting, setMsDisconnecting] = useState(false)
+
   // Sync form once settings load from localStorage
   useEffect(() => {
     if (loaded) setForm(settings)
@@ -38,8 +52,10 @@ export default function SettingsPage() {
   // Load Slack + Google settings from server
   // Capture URL params at mount time so the closure doesn't go stale
   useEffect(() => {
-    const freshGoogleOAuth = searchParams.get('google') === 'connected'
-    const freshSlackOAuth  = searchParams.get('slack')  === 'connected'
+    const freshGoogleOAuth = searchParams.get('google')    === 'connected'
+    const freshSlackOAuth  = searchParams.get('slack')     === 'connected'
+    const freshZoomOAuth   = searchParams.get('zoom')      === 'connected'
+    const freshMsOAuth     = searchParams.get('microsoft') === 'connected'
     fetch('/api/org-settings')
       .then(r => r.json())
       .then(({ data }) => {
@@ -52,6 +68,10 @@ export default function SettingsPage() {
         if (!freshSlackOAuth)  setSlackConnected(!!data?.slack_connected)
         if (!freshGoogleOAuth) setGoogleConnected(!!data?.google_connected)
         if (!freshGoogleOAuth) setGoogleEmail(data?.google_connected_email ?? null)
+        if (!freshZoomOAuth)   setZoomConnected(!!data?.zoom_connected)
+        if (!freshZoomOAuth)   setZoomEmail(data?.zoom_connected_email ?? null)
+        if (!freshMsOAuth)     setMsConnected(!!data?.ms_connected)
+        if (!freshMsOAuth)     setMsEmail(data?.ms_connected_email ?? null)
       })
       .catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -91,6 +111,44 @@ export default function SettingsPage() {
       setGoogleErrorReason(reason)
       setGoogleToast('error')
       setTimeout(() => setGoogleToast(null), 8000)
+    }
+  }, [searchParams])
+
+  // Show toast if redirected back from Zoom OAuth
+  useEffect(() => {
+    const result = searchParams.get('zoom')
+    if (result === 'connected') {
+      setZoomToast('connected')
+      setZoomConnected(true)
+      setTimeout(() => setZoomToast(null), 4000)
+      fetch('/api/org-settings')
+        .then(r => r.json())
+        .then(({ data }) => setZoomEmail(data?.zoom_connected_email ?? null))
+        .catch(() => {})
+    } else if (result === 'error') {
+      const reason = searchParams.get('reason')
+      setZoomErrorReason(reason)
+      setZoomToast('error')
+      setTimeout(() => setZoomToast(null), 8000)
+    }
+  }, [searchParams])
+
+  // Show toast if redirected back from Microsoft OAuth
+  useEffect(() => {
+    const result = searchParams.get('microsoft')
+    if (result === 'connected') {
+      setMsToast('connected')
+      setMsConnected(true)
+      setTimeout(() => setMsToast(null), 4000)
+      fetch('/api/org-settings')
+        .then(r => r.json())
+        .then(({ data }) => setMsEmail(data?.ms_connected_email ?? null))
+        .catch(() => {})
+    } else if (result === 'error') {
+      const reason = searchParams.get('reason')
+      setMsErrorReason(reason)
+      setMsToast('error')
+      setTimeout(() => setMsToast(null), 8000)
     }
   }, [searchParams])
 
@@ -166,6 +224,32 @@ export default function SettingsPage() {
     }
   }
 
+  const disconnectZoom = async () => {
+    setZoomDisconnecting(true)
+    try {
+      await fetch('/api/zoom/disconnect', { method: 'POST' })
+      setZoomConnected(false)
+      setZoomEmail(null)
+    } catch {
+      // ignore
+    } finally {
+      setZoomDisconnecting(false)
+    }
+  }
+
+  const disconnectMicrosoft = async () => {
+    setMsDisconnecting(true)
+    try {
+      await fetch('/api/microsoft/disconnect', { method: 'POST' })
+      setMsConnected(false)
+      setMsEmail(null)
+    } catch {
+      // ignore
+    } finally {
+      setMsDisconnecting(false)
+    }
+  }
+
   const inputCls =
     'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition'
 
@@ -199,6 +283,32 @@ export default function SettingsPage() {
           {googleToast === 'connected'
             ? '✅ Google Calendar connected! Interviews will now auto-create Google Meet links.'
             : `❌ Google connection failed${googleErrorReason ? ` · reason: ${googleErrorReason}` : ''}. Please try again.`}
+        </div>
+      )}
+
+      {/* Zoom OAuth toast */}
+      {zoomToast && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-medium ${
+          zoomToast === 'connected'
+            ? 'bg-green-50 text-green-700 border border-green-200'
+            : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          {zoomToast === 'connected'
+            ? '✅ Zoom connected! Interviews will now auto-create Zoom meeting links.'
+            : `❌ Zoom connection failed${zoomErrorReason ? ` · reason: ${zoomErrorReason}` : ''}. Please try again.`}
+        </div>
+      )}
+
+      {/* Microsoft OAuth toast */}
+      {msToast && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-medium ${
+          msToast === 'connected'
+            ? 'bg-green-50 text-green-700 border border-green-200'
+            : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          {msToast === 'connected'
+            ? '✅ Microsoft Teams connected! Interviews will now auto-create Teams meeting links.'
+            : `❌ Microsoft connection failed${msErrorReason ? ` · reason: ${msErrorReason}` : ''}. Please try again.`}
         </div>
       )}
 
@@ -490,6 +600,94 @@ export default function SettingsPage() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
               Connect Google Calendar
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* Zoom */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
+        <div className="flex items-center gap-2.5 mb-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+            <Video className="h-4 w-4 text-blue-600" />
+          </div>
+          <h2 className="text-sm font-semibold text-slate-800">Zoom</h2>
+          <span className="text-xs text-slate-400">Auto-create Zoom meeting links on scheduling</span>
+        </div>
+
+        {zoomConnected ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
+              <p className="text-sm text-slate-700">
+                Connected as <span className="font-semibold">{zoomEmail ?? 'your Zoom account'}</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={disconnectZoom}
+              disabled={zoomDisconnecting}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-60"
+            >
+              {zoomDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Connect Zoom so RecruiterStack can auto-create Zoom meeting links
+              when you schedule video interviews.
+            </p>
+            <a
+              href="/api/zoom/connect"
+              className="inline-flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              <Video className="h-4 w-4 text-blue-600" />
+              Connect Zoom
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* Microsoft Teams */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
+        <div className="flex items-center gap-2.5 mb-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50">
+            <Monitor className="h-4 w-4 text-violet-600" />
+          </div>
+          <h2 className="text-sm font-semibold text-slate-800">Microsoft Teams</h2>
+          <span className="text-xs text-slate-400">Auto-create Teams links &amp; Outlook events</span>
+        </div>
+
+        {msConnected ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
+              <p className="text-sm text-slate-700">
+                Connected as <span className="font-semibold">{msEmail ?? 'your Microsoft account'}</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={disconnectMicrosoft}
+              disabled={msDisconnecting}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-60"
+            >
+              {msDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Connect Microsoft to auto-create Teams meeting links and Outlook calendar events
+              when scheduling interviews. Supports work, school, and personal accounts.
+            </p>
+            <a
+              href="/api/microsoft/connect"
+              className="inline-flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              <Monitor className="h-4 w-4 text-violet-600" />
+              Connect Microsoft
             </a>
           </div>
         )}

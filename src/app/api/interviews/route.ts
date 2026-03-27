@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { randomBytes } from 'crypto'
-import { getValidAccessToken, createMeetEvent } from '@/lib/google/calendar'
+import { getValidAccessToken as getGoogleToken, createMeetEvent } from '@/lib/google/calendar'
+import { getValidAccessToken as getZoomToken, createZoomMeeting } from '@/lib/zoom/meetings'
+import { getValidAccessToken as getMSToken, createTeamsMeeting } from '@/lib/microsoft/calendar'
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
   const {
     application_id, candidate_id, hiring_request_id, stage_id,
     interviewer_name, interviewer_email, interview_type, scheduled_at, duration_minutes,
-    location, notes, generate_self_schedule, timezone,
+    location, notes, generate_self_schedule, timezone, meeting_platform,
   } = body
 
   if (!application_id || !candidate_id || !hiring_request_id || !interviewer_name?.trim() || !scheduled_at) {
@@ -71,84 +73,141 @@ export async function POST(req: NextRequest) {
   expires.setDate(expires.getDate() + 7)
   const self_schedule_expires_at = generate_self_schedule ? expires.toISOString() : null
 
-  // ── Google Meet: create calendar event if org has Google connected ─────────
-  let resolvedLocation  = location?.trim() || null
-  let calendar_event_id: string | null = null
-  let meetLink:          string | null = null
-  let googleMeetError:   string | null = null
+  // ── Meeting creation: branch by selected platform ──────────────────────────
+  let resolvedLocation    = location?.trim() || null
+  let calendar_event_id:  string | null = null
+  let meetLink:           string | null = null
+  let googleMeetError:    string | null = null
+  let resolvedPlatform:   string | null = meeting_platform ?? null
 
   if (interview_type === 'video' || interview_type === 'panel' || interview_type === 'technical') {
-    try {
-      const { data: orgSettings } = await supabase
-        .from('org_settings')
-        .select('google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry, google_connected_email')
-        .eq('org_id', orgId)
-        .single()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: orgSettings } = await supabase
+      .from('org_settings')
+      .select(
+        'google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry, google_connected_email, ' +
+        'zoom_access_token, zoom_refresh_token, zoom_token_expiry, zoom_connected_email, ' +
+        'ms_access_token, ms_refresh_token, ms_token_expiry, ms_connected_email'
+      )
+      .eq('org_id', orgId)
+      .single() as { data: any; error: any }
 
-      const decryptedAccess  = decryptSafe(orgSettings?.google_oauth_access_token)
-      const decryptedRefresh = decryptSafe(orgSettings?.google_oauth_refresh_token)
+    // Fetch candidate + hiring request info (needed for event summary)
+    const [{ data: candidate }, { data: hiringReq }] = await Promise.all([
+      supabase.from('candidates').select('name, email').eq('id', candidate_id).single(),
+      supabase.from('hiring_requests').select('position_title').eq('id', hiring_request_id).single(),
+    ])
 
-      if (decryptedAccess && decryptedRefresh) {
-        const { access_token, tokens: freshTokens } = await getValidAccessToken({
-          access_token:  decryptedAccess,
-          refresh_token: decryptedRefresh,
-          token_expiry:  orgSettings!.google_oauth_token_expiry ?? null,
-        })
+    const attendeeEmails: string[] = []
+    if (candidate?.email)          attendeeEmails.push(candidate.email)
+    if (interviewer_email?.trim()) attendeeEmails.push(interviewer_email.trim())
 
-        // Persist refreshed tokens if they changed (encrypt before saving)
-        if (freshTokens.access_token !== decryptedAccess) {
-          await supabase
-            .from('org_settings')
-            .update({
-              google_oauth_access_token:  process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
-              google_oauth_token_expiry:  freshTokens.token_expiry,
-            })
-            .eq('org_id', orgId)
-        }
+    const eventSummary = `Interview: ${candidate?.name ?? 'Candidate'} — ${hiringReq?.position_title ?? 'Position'}`
+    const eventDesc    = notes?.trim() ? stripHtml(notes) : undefined
 
-        // Fetch candidate email for the attendees list
-        const { data: candidate } = await supabase
-          .from('candidates')
-          .select('name, email')
-          .eq('id', candidate_id)
-          .single()
-
-        const { data: hiringReq } = await supabase
-          .from('hiring_requests')
-          .select('position_title')
-          .eq('id', hiring_request_id)
-          .single()
-
-        // Both candidate and interviewer are attendees so both calendars are blocked.
-        // Google's invite emails are suppressed (sendUpdates=none) so neither person
-        // gets the GCal invite email with "(admin@…)" in the subject — our SendGrid
-        // emails serve as the clean confirmation instead.
-        const attendees: string[] = []
-        if (candidate?.email)          attendees.push(candidate.email)
-        if (interviewer_email?.trim()) attendees.push(interviewer_email.trim())
-
-        const created = await createMeetEvent(access_token, {
-          summary:          `Interview: ${candidate?.name ?? 'Candidate'} — ${hiringReq?.position_title ?? 'Position'}`,
-          description:      notes?.trim() ? stripHtml(notes) : undefined,
-          start_at:         scheduled_at,
-          duration_minutes: duration_minutes ?? 60,
-          organizer_email:  orgSettings?.google_connected_email ?? '',
-          attendees,
-          timezone:         timezone ?? 'UTC',
-        })
-
-        calendar_event_id = created.calendar_event_id
-        meetLink          = created.meet_link
-        // Use meet link as location if no manual location was set
-        if (!resolvedLocation && created.meet_link) {
-          resolvedLocation = created.meet_link
+    // ── Zoom ──────────────────────────────────────────────────────────────
+    if (resolvedPlatform === 'zoom') {
+      const zAccess  = decryptSafe(orgSettings?.zoom_access_token)
+      const zRefresh = decryptSafe(orgSettings?.zoom_refresh_token)
+      if (zAccess && zRefresh) {
+        try {
+          const { access_token, tokens: fresh } = await getZoomToken({
+            access_token: zAccess, refresh_token: zRefresh,
+            token_expiry: orgSettings!.zoom_token_expiry ?? null,
+          })
+          if (fresh.access_token !== zAccess) {
+            await supabase.from('org_settings').update({
+              zoom_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.access_token) : fresh.access_token,
+              zoom_refresh_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.refresh_token) : fresh.refresh_token,
+              zoom_token_expiry: fresh.token_expiry,
+            }).eq('org_id', orgId)
+          }
+          const created = await createZoomMeeting(access_token, {
+            topic:      eventSummary,
+            start_time: scheduled_at,
+            duration:   duration_minutes ?? 60,
+            timezone:   timezone ?? 'UTC',
+          })
+          calendar_event_id = created.meeting_id
+          meetLink          = created.join_url
+          if (!resolvedLocation) resolvedLocation = created.join_url
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          logger.error('[interviews] Zoom meeting creation failed', undefined, { error: msg })
+          googleMeetError = msg
         }
       }
-    } catch (e) {
-      // Non-fatal: log and continue without a Meet link
-      const msg = e instanceof Error ? e.message : String(e)
-      logger.error('[interviews] Google Meet creation failed', undefined, { error: msg })
-      googleMeetError = msg
+
+    // ── Microsoft Teams ───────────────────────────────────────────────────
+    } else if (resolvedPlatform === 'ms_teams') {
+      const mAccess  = decryptSafe(orgSettings?.ms_access_token)
+      const mRefresh = decryptSafe(orgSettings?.ms_refresh_token)
+      if (mAccess && mRefresh) {
+        try {
+          const { access_token, tokens: fresh } = await getMSToken({
+            access_token: mAccess, refresh_token: mRefresh,
+            token_expiry: orgSettings!.ms_token_expiry ?? null,
+          })
+          if (fresh.access_token !== mAccess) {
+            await supabase.from('org_settings').update({
+              ms_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.access_token) : fresh.access_token,
+              ms_token_expiry: fresh.token_expiry,
+            }).eq('org_id', orgId)
+          }
+          const created = await createTeamsMeeting(access_token, {
+            summary:          eventSummary,
+            description:      eventDesc,
+            start_at:         scheduled_at,
+            duration_minutes: duration_minutes ?? 60,
+            attendees:        attendeeEmails,
+            timezone:         timezone ?? 'UTC',
+          })
+          calendar_event_id = created.event_id
+          meetLink          = created.teams_link
+          if (!resolvedLocation) resolvedLocation = created.teams_link
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          logger.error('[interviews] Teams meeting creation failed', undefined, { error: msg })
+          googleMeetError = msg
+        }
+      }
+
+    // ── Google Meet (default) ─────────────────────────────────────────────
+    } else {
+      const gAccess  = decryptSafe(orgSettings?.google_oauth_access_token)
+      const gRefresh = decryptSafe(orgSettings?.google_oauth_refresh_token)
+      if (gAccess && gRefresh) {
+        resolvedPlatform = 'google_meet'
+        try {
+          const { access_token, tokens: freshTokens } = await getGoogleToken({
+            access_token:  gAccess,
+            refresh_token: gRefresh,
+            token_expiry:  orgSettings!.google_oauth_token_expiry ?? null,
+          })
+          if (freshTokens.access_token !== gAccess) {
+            await supabase.from('org_settings').update({
+              google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
+              google_oauth_token_expiry: freshTokens.token_expiry,
+            }).eq('org_id', orgId)
+          }
+          const created = await createMeetEvent(access_token, {
+            summary:          eventSummary,
+            description:      eventDesc,
+            start_at:         scheduled_at,
+            duration_minutes: duration_minutes ?? 60,
+            organizer_email:  orgSettings?.google_connected_email ?? '',
+            attendees:        attendeeEmails,
+            timezone:         timezone ?? 'UTC',
+          })
+          calendar_event_id = created.calendar_event_id
+          meetLink          = created.meet_link
+          if (!resolvedLocation && created.meet_link) resolvedLocation = created.meet_link
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          logger.error('[interviews] Google Meet creation failed', undefined, { error: msg })
+          googleMeetError = msg
+        }
+      }
     }
   }
 
@@ -172,6 +231,7 @@ export async function POST(req: NextRequest) {
       self_schedule_token,
       self_schedule_expires_at,
       calendar_event_id,
+      meeting_platform: resolvedPlatform,
     } as any)
     .select()
     .single()
@@ -220,5 +280,5 @@ export async function POST(req: NextRequest) {
     }
   })()
 
-  return NextResponse.json({ data: { ...data, meet_link: meetLink, google_meet_error: googleMeetError } }, { status: 201 })
+  return NextResponse.json({ data: { ...data, meet_link: meetLink, meeting_link: meetLink, meeting_platform: resolvedPlatform, google_meet_error: googleMeetError } }, { status: 201 })
 }

@@ -12,22 +12,27 @@ export async function GET() {
 
   const settingsData = await cached(cacheKey(orgId, 'org-settings'), 300, async () => {
     const supabase = createAdminClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase
       .from('org_settings')
-      .select('slack_webhook_url, slack_bot_token, slack_team_name, google_oauth_access_token, google_connected_email')
+      .select('slack_webhook_url, slack_bot_token, slack_team_name, google_oauth_access_token, google_connected_email, zoom_access_token, zoom_connected_email, ms_access_token, ms_connected_email')
       .eq('org_id', orgId)
-      .single()
+      .single() as { data: any; error: any }
 
     if (error && error.code !== 'PGRST116') {
       logger.error('[org-settings] GET query failed — missing DB column or schema mismatch', error)
     }
 
     return {
-      slack_webhook_url:    data?.slack_webhook_url    ?? null,
-      slack_connected:      !!data?.slack_bot_token,
-      slack_team_name:      data?.slack_team_name      ?? null,
-      google_connected:     !!data?.google_oauth_access_token,
+      slack_webhook_url:      data?.slack_webhook_url      ?? null,
+      slack_connected:        !!data?.slack_bot_token,
+      slack_team_name:        data?.slack_team_name        ?? null,
+      google_connected:       !!data?.google_oauth_access_token,
       google_connected_email: data?.google_connected_email ?? null,
+      zoom_connected:         !!data?.zoom_access_token,
+      zoom_connected_email:   data?.zoom_connected_email   ?? null,
+      ms_connected:           !!data?.ms_access_token,
+      ms_connected_email:     data?.ms_connected_email     ?? null,
     }
   })
 
