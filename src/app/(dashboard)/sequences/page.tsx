@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import {
-  Plus, Mail, Loader2, MoreHorizontal,
+  Plus, Mail, Loader2,
   Play, Pause, Archive, ChevronRight,
 } from 'lucide-react'
 import type { Sequence, SequenceStatus } from '@/lib/types/database'
