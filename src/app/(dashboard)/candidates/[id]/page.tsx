@@ -17,6 +17,7 @@ import ScorecardDrawer from '@/components/candidates/ScorecardDrawer'
 import ScheduleInterviewModal from '@/components/ScheduleInterviewModal'
 import CreateOfferDrawer from '@/components/candidates/CreateOfferDrawer'
 import VoiceCallModal from '@/components/candidates/VoiceCallModal'
+import EnrollCandidateDrawer from '@/components/sequences/EnrollCandidateDrawer'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,9 @@ export default function CandidateProfilePage() {
 
   // Voice call
   const [showVoiceCallModal, setShowVoiceCallModal] = useState(false)
+
+  // Sequence enrollment
+  const [showEnrollDrawer, setShowEnrollDrawer] = useState(false)
 
   // Selected application context (drives both center + right panels)
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
@@ -379,6 +383,7 @@ export default function CandidateProfilePage() {
           }}
           onAddScorecard={() => openScorecardDrawer(activeApps[0]?.id ?? '')}
           onPhoneScreen={() => setShowVoiceCallModal(true)}
+          onAddToSequence={() => setShowEnrollDrawer(true)}
           onAppSelected={setSelectedAppId}
         />
 
@@ -467,6 +472,17 @@ export default function CandidateProfilePage() {
           hiringRequestId={activeApps[0].hiring_request_id}
           positionTitle={activeApps[0].hiring_requests?.position_title ?? 'Open Role'}
           onClose={() => setShowVoiceCallModal(false)}
+        />
+      )}
+
+      {/* ── Enroll in Sequence Drawer ─────────────────────────────────── */}
+      {showEnrollDrawer && (
+        <EnrollCandidateDrawer
+          candidateIds={[candidate.id]}
+          candidateNames={[candidate.name]}
+          applicationId={activeApps[0]?.id}
+          onClose={() => setShowEnrollDrawer(false)}
+          onEnrolled={load}
         />
       )}
 

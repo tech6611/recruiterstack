@@ -11,6 +11,7 @@ import {
   BarChart2,
   Inbox,
   Search,
+  Mail,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { href: '/jobs',        label: 'Jobs',       icon: Briefcase },
   { href: '/candidates',  label: 'Candidates', icon: Users },
   { href: '/sourcing',    label: 'Sourcing',   icon: Search },
+  { href: '/sequences',   label: 'Sequences',  icon: Mail },
   { href: '/analytics',   label: 'Analytics',  icon: BarChart2 },
   { href: '/inbox',       label: 'Inbox',      icon: Inbox },
   { href: '/settings',    label: 'Settings',   icon: Settings },

@@ -397,3 +397,116 @@ export type Database = {
     CompositeTypes: Record<never, never>
   }
 }
+
+// ── Email Sequences ─────────────────────────────────────────────────────────
+
+export type SequenceStatus = 'draft' | 'active' | 'archived'
+
+export type EnrollmentStatus =
+  | 'active'
+  | 'completed'
+  | 'replied'
+  | 'bounced'
+  | 'paused'
+  | 'cancelled'
+
+export type SequenceEmailStatus =
+  | 'queued'
+  | 'sent'
+  | 'delivered'
+  | 'opened'
+  | 'clicked'
+  | 'replied'
+  | 'bounced'
+  | 'failed'
+
+export interface Sequence {
+  id: string
+  name: string
+  description: string | null
+  status: SequenceStatus
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  stages?: SequenceStage[]
+  stage_count?: number
+  enrollment_count?: number
+  reply_count?: number
+}
+
+export interface SequenceStage {
+  id: string
+  sequence_id: string
+  order_index: number
+  delay_days: number
+  subject: string
+  body: string
+  send_on_behalf_of: string | null
+  send_on_behalf_email: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SequenceEnrollment {
+  id: string
+  sequence_id: string
+  candidate_id: string
+  application_id: string | null
+  enrolled_by: string | null
+  status: EnrollmentStatus
+  current_stage_index: number
+  next_send_at: string | null
+  started_at: string
+  completed_at: string | null
+  created_at: string
+  candidate_name?: string
+  candidate_email?: string
+  sequence_name?: string
+}
+
+export interface SequenceEmail {
+  id: string
+  enrollment_id: string
+  stage_id: string
+  candidate_id: string
+  to_email: string
+  subject: string
+  body: string
+  sendgrid_message_id: string | null
+  status: SequenceEmailStatus
+  sent_at: string | null
+  opened_at: string | null
+  clicked_at: string | null
+  replied_at: string | null
+  bounced_at: string | null
+  open_count: number
+  click_count: number
+  created_at: string
+}
+
+export interface SequenceAnalytics {
+  sequence_id: string
+  sequence_name: string
+  total_enrollments: number
+  enrollment_statuses: Record<string, number>
+  overall: {
+    total_sent: number
+    total_opened: number
+    total_replied: number
+    total_bounced: number
+  }
+  stages: StageAnalytics[]
+}
+
+export interface StageAnalytics {
+  stage_id: string
+  order_index: number
+  subject: string
+  delay_days: number
+  sent: number
+  delivered: number
+  opened: number
+  clicked: number
+  replied: number
+  bounced: number
+}
