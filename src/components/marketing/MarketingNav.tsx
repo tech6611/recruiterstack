@@ -16,15 +16,15 @@ export function MarketingNav() {
   const [open, setOpen] = useState(false)
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-zinc-900 bg-zinc-950/90 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-600">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600">
             <Zap className="h-3.5 w-3.5 text-white" />
           </div>
-          <span className="text-sm font-semibold tracking-tight text-white">RecruiterStack</span>
+          <span className="text-sm font-semibold tracking-tight text-slate-900">RecruiterStack</span>
         </Link>
 
         {/* Desktop links */}
@@ -33,7 +33,7 @@ export function MarketingNav() {
             <Link
               key={l.href}
               href={l.href}
-              className="rounded-lg px-3.5 py-2 text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
+              className="rounded-lg px-3.5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
             >
               {l.label}
             </Link>
@@ -44,13 +44,13 @@ export function MarketingNav() {
         <div className="hidden md:flex items-center gap-3">
           <Link
             href="/sign-in"
-            className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
           >
             Sign in
           </Link>
           <Link
             href="/sign-up"
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
           >
             Get started
           </Link>
@@ -58,7 +58,7 @@ export function MarketingNav() {
 
         {/* Mobile hamburger */}
         <button
-          className="md:hidden p-2 text-zinc-400 hover:text-white transition-colors"
+          className="md:hidden p-2 text-slate-400 hover:text-slate-700 transition-colors"
           onClick={() => setOpen(prev => !prev)}
           aria-label="Toggle menu"
         >
@@ -68,31 +68,31 @@ export function MarketingNav() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden border-t border-zinc-900 bg-zinc-950 px-6 py-4 space-y-1">
+        <div className="md:hidden border-t border-slate-200 bg-white px-6 py-4 space-y-1">
           {NAV_LINKS.map(l => (
             <Link
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
-              className="block rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
+              className="block rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
             >
               {l.label}
             </Link>
           ))}
-          <div className="pt-3 border-t border-zinc-900 flex flex-col gap-2">
+          <div className="pt-3 border-t border-slate-200 flex flex-col gap-2">
             <Link
               href="/sign-in"
               onClick={() => setOpen(false)}
-              className="block rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+              className="block rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
               Sign in
             </Link>
             <Link
               href="/sign-up"
               onClick={() => setOpen(false)}
-              className="block rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white text-center hover:bg-violet-500 transition-colors"
+              className="block rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white text-center hover:bg-blue-700 transition-colors"
             >
-              Get started →
+              Get started
             </Link>
           </div>
         </div>

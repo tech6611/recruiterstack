@@ -52,7 +52,7 @@ export function EmailCapture({
 
   if (status === 'success') {
     return (
-      <div className={`flex items-center gap-2.5 text-emerald-400 ${className}`}>
+      <div className={`flex items-center gap-2.5 text-emerald-600 ${className}`}>
         <CheckCircle className="h-5 w-5 shrink-0" />
         <span className="text-sm font-medium">{message}</span>
       </div>
@@ -67,12 +67,12 @@ export function EmailCapture({
         onChange={e => setEmail(e.target.value)}
         placeholder={placeholder}
         required
-        className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-colors"
+        className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors"
       />
       <button
         type="submit"
         disabled={status === 'loading'}
-        className="flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-60 transition-colors whitespace-nowrap"
+        className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 transition-colors whitespace-nowrap"
       >
         {status === 'loading' ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -84,7 +84,7 @@ export function EmailCapture({
         )}
       </button>
       {status === 'error' && (
-        <p className="w-full text-xs text-red-400 sm:col-span-2">{message}</p>
+        <p className="w-full text-xs text-red-600 sm:col-span-2">{message}</p>
       )}
     </form>
   )
