@@ -1,8 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Loader2, User, Clock, MessageSquare, Globe } from 'lucide-react'
+import { useState, useRef } from 'react'
+import {
+  X, Loader2, User, Clock, MessageSquare, Globe,
+  Wand2, ChevronDown, Send, CheckCircle,
+} from 'lucide-react'
 import type { SequenceStage, SequenceChannel, StageCondition } from '@/lib/types/database'
+import { RichTextEditor } from '@/components/RichTextEditor'
+import { useSettings } from '@/lib/hooks/useSettings'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -25,10 +30,18 @@ const CHANNELS: { value: SequenceChannel; label: string; icon: string }[] = [
 ]
 
 const CONDITIONS: { value: StageCondition | ''; label: string; description: string }[] = [
-  { value: '',         label: 'Always send',              description: 'Send regardless of previous stage activity' },
-  { value: 'no_reply', label: 'If no reply',              description: 'Only send if candidate hasn\'t replied to previous stage' },
-  { value: 'no_open',  label: 'If no open',               description: 'Only send if candidate hasn\'t opened previous stage email' },
-  { value: 'no_click', label: 'If no click',              description: 'Only send if candidate hasn\'t clicked a link in previous stage' },
+  { value: '',         label: 'Always send',   description: 'Send regardless of previous stage activity' },
+  { value: 'no_reply', label: 'If no reply',   description: 'Only send if candidate hasn\'t replied to previous stage' },
+  { value: 'no_open',  label: 'If no open',    description: 'Only send if candidate hasn\'t opened previous stage email' },
+  { value: 'no_click', label: 'If no click',   description: 'Only send if candidate hasn\'t clicked a link in previous stage' },
+]
+
+const AI_TEMPLATES = [
+  { id: 'cold_outreach',     emoji: '👋', name: 'Cold Outreach' },
+  { id: 'follow_up',         emoji: '🔄', name: 'Follow-up' },
+  { id: 'interview_invite',  emoji: '📅', name: 'Interview Invite' },
+  { id: 'value_prop',        emoji: '💎', name: 'Value Proposition' },
+  { id: 'breakup',           emoji: '👋', name: 'Final Check-in' },
 ]
 
 const TIMEZONES = [
@@ -61,26 +74,156 @@ interface Props {
 
 export default function SequenceStageEditor({ sequenceId, stage, stageCount, isFirstStage = false, onClose, onSaved }: Props) {
   const isEdit = !!stage
+  const { settings } = useSettings()
 
   const [channel, setChannel]             = useState<SequenceChannel>(stage?.channel ?? 'email')
   const [subject, setSubject]             = useState(stage?.subject ?? '')
   const [body, setBody]                   = useState(stage?.body ?? '')
+  const [editorKey, setEditorKey]         = useState(0)
   const [delayDays, setDelayDays]         = useState(stage?.delay_days ?? 3)
   const [businessDays, setBusinessDays]   = useState(stage?.delay_business_days ?? false)
-  const [sendTime, setSendTime]           = useState(stage?.send_at_time?.slice(0, 5) ?? '')  // "HH:MM"
-  const [sendTz, setSendTz]               = useState(stage?.send_timezone ?? 'UTC')
+  const [sendTime, setSendTime]           = useState(stage?.send_at_time?.slice(0, 5) ?? '')
+  const [sendTz, setSendTz]              = useState(stage?.send_timezone ?? 'UTC')
   const [condition, setCondition]         = useState<StageCondition | ''>(stage?.condition ?? '')
   const [soboName, setSoboName]           = useState(stage?.send_on_behalf_of ?? '')
   const [soboEmail, setSoboEmail]         = useState(stage?.send_on_behalf_email ?? '')
   const [saving, setSaving]               = useState(false)
   const [error, setError]                 = useState('')
 
+  // AI generation
+  const [aiOpen, setAiOpen]               = useState(false)
+  const [generating, setGenerating]       = useState(false)
+  const aiRef                             = useRef<HTMLDivElement>(null)
+
+  // Preview
+  const [previewing, setPreviewing]       = useState(false)
+  const [previewSent, setPreviewSent]     = useState(false)
+
   const showCondition = !isFirstStage && (isEdit ? stage!.order_index > 1 : stageCount >= 1)
 
-  const insertToken = (token: string, target: 'subject' | 'body') => {
-    if (target === 'subject') setSubject(prev => prev + token)
-    else setBody(prev => prev + token)
+  // ── AI Draft Generation ─────────────────────────────────────────────────
+
+  const generateWithAI = async (templateId: string) => {
+    setGenerating(true)
+    setAiOpen(false)
+    setError('')
+
+    const templates: Record<string, { subject: string; body: string }> = {
+      cold_outreach: {
+        subject: 'Hi {{candidate_first_name}}, exciting opportunity at {{company_name}}',
+        body: `<p>Hi {{candidate_first_name}},</p>
+<p>I came across your profile and was impressed by your experience as {{candidate_title}} at {{candidate_company}}. I think you'd be a great fit for a role we're hiring for at {{company_name}}.</p>
+<p>Would you be open to a quick chat this week? I'd love to share more about what we're building and how your background aligns.</p>
+<p>Best,<br/>{{recruiter_name}}</p>`,
+      },
+      follow_up: {
+        subject: 'Re: Quick follow-up, {{candidate_first_name}}',
+        body: `<p>Hi {{candidate_first_name}},</p>
+<p>Just wanted to follow up on my previous message. I understand you're busy, but I genuinely think this could be a great fit for where you are in your career.</p>
+<p>Happy to work around your schedule — even a 15-minute call would be great.</p>
+<p>Best,<br/>{{recruiter_name}}</p>`,
+      },
+      interview_invite: {
+        subject: '{{company_name}} — Interview for {{job_title}}',
+        body: `<p>Hi {{candidate_first_name}},</p>
+<p>Great news! The team was really impressed with your background and we'd love to move forward with an interview for the {{job_title}} role.</p>
+<p>Would any of the following times work for you this week?</p>
+<ul><li>Option 1: [Date/Time]</li><li>Option 2: [Date/Time]</li><li>Option 3: [Date/Time]</li></ul>
+<p>Looking forward to it!</p>
+<p>Best,<br/>{{recruiter_name}}</p>`,
+      },
+      value_prop: {
+        subject: 'Why {{company_name}} might be your next move, {{candidate_first_name}}',
+        body: `<p>Hi {{candidate_first_name}},</p>
+<p>I wanted to share a few reasons why others with your background have loved joining {{company_name}}:</p>
+<ul><li><strong>Impact:</strong> You'll work on problems that matter at scale</li><li><strong>Growth:</strong> Clear career progression and learning budget</li><li><strong>Team:</strong> Collaborative, senior team with low bureaucracy</li></ul>
+<p>Would love to chat if any of this resonates. No pressure at all.</p>
+<p>Best,<br/>{{recruiter_name}}</p>`,
+      },
+      breakup: {
+        subject: 'Last note from me, {{candidate_first_name}}',
+        body: `<p>Hi {{candidate_first_name}},</p>
+<p>I've reached out a couple of times and I know timing isn't always right. I don't want to be a bother, so this will be my last message.</p>
+<p>If you're ever open to exploring new opportunities, my door is always open. Feel free to reach out anytime.</p>
+<p>Wishing you all the best!</p>
+<p>{{recruiter_name}}<br/>{{recruiter_title}}, {{company_name}}</p>`,
+      },
+    }
+
+    const tpl = templates[templateId]
+    if (tpl) {
+      setSubject(tpl.subject)
+      setBody(tpl.body)
+      setEditorKey(k => k + 1)
+    }
+
+    setGenerating(false)
   }
+
+  // ── Send Preview ────────────────────────────────────────────────────────
+
+  const sendPreview = async () => {
+    const previewEmail = settings.recruiter_email
+    if (!previewEmail) {
+      setError('Set your recruiter email in Settings first to receive previews.')
+      return
+    }
+    if (!subject.trim() || !body.trim()) {
+      setError('Subject and body are required to send a preview.')
+      return
+    }
+
+    setPreviewing(true)
+    setError('')
+    setPreviewSent(false)
+
+    // Replace tokens with sample data for preview
+    const sampleContext: Record<string, string> = {
+      candidate_first_name: 'Jane',
+      candidate_name: 'Jane Doe',
+      candidate_title: 'Senior Engineer',
+      candidate_company: 'Google',
+      candidate_location: 'San Francisco',
+      job_title: 'Staff Backend Engineer',
+      company_name: settings.company_name || 'Your Company',
+      recruiter_name: settings.recruiter_name || 'Recruiter',
+      recruiter_title: settings.recruiter_title || '',
+      department: 'Engineering',
+    }
+
+    const renderedSubject = subject.replace(/\{\{(\w+)\}\}/g, (_, key) => sampleContext[key] || `[${key}]`)
+    const renderedBody = body.replace(/\{\{(\w+)\}\}/g, (_, key) => sampleContext[key] || `[${key}]`)
+
+    const res = await fetch('/api/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: previewEmail,
+        subject: `[PREVIEW] ${renderedSubject}`,
+        body: renderedBody,
+        from_name: soboName || settings.recruiter_name || 'RecruiterStack',
+      }),
+    })
+
+    setPreviewing(false)
+
+    if (!res.ok) {
+      const json = await res.json()
+      setError(json.error ?? 'Failed to send preview')
+      return
+    }
+
+    setPreviewSent(true)
+    setTimeout(() => setPreviewSent(false), 4000)
+  }
+
+  // ── Insert token into subject ───────────────────────────────────────────
+
+  const insertTokenInSubject = (token: string) => {
+    setSubject(prev => prev + token)
+  }
+
+  // ── Save ────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
     if (!subject.trim()) { setError('Subject is required'); return }
@@ -127,7 +270,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
+      <div className="relative flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
           <h2 className="text-base font-bold text-slate-900">
@@ -177,7 +320,6 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
               <Clock className="h-3.5 w-3.5" /> Scheduling
             </label>
 
-            {/* Delay */}
             <div className="flex items-center gap-3">
               <div>
                 <p className="text-[11px] text-slate-400 mb-1">Delay after previous stage</p>
@@ -204,7 +346,6 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
               </label>
             </div>
 
-            {/* Send time */}
             <div className="flex items-end gap-3">
               <div>
                 <p className="text-[11px] text-slate-400 mb-1">Send at specific time (optional)</p>
@@ -228,19 +369,11 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 </select>
               </div>
               {sendTime && (
-                <button
-                  type="button"
-                  onClick={() => setSendTime('')}
-                  className="text-[11px] text-slate-400 hover:text-slate-600 mb-2"
-                >
+                <button type="button" onClick={() => setSendTime('')} className="text-[11px] text-slate-400 hover:text-slate-600 mb-2">
                   Clear
                 </button>
               )}
             </div>
-
-            {delayDays === 0 && !sendTime && (
-              <p className="text-[11px] text-slate-400">Sends immediately on enrollment (stage 1) or after previous stage completes</p>
-            )}
           </div>
 
           {/* ── 3. Conditional Logic (stage 2+) ──────────────────────────── */}
@@ -300,14 +433,49 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               />
             </div>
-            <p className="text-[11px] text-slate-400">
-              Email appears to come from this person. Replies go to their email. Increases response rates by 50%+.
-            </p>
           </div>
 
-          {/* ── Subject ──────────────────────────────────────────────────── */}
+          {/* ── Subject + AI Draft + Tokens ──────────────────────────────── */}
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Subject Line</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-slate-500">Subject Line</label>
+
+              {/* AI Draft dropdown */}
+              <div ref={aiRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAiOpen(o => !o)}
+                  disabled={generating}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium border transition-colors disabled:opacity-50 ${
+                    aiOpen
+                      ? 'border-violet-400 bg-violet-50 text-violet-700'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {generating
+                    ? <><Loader2 className="h-3 w-3 animate-spin" /> Generating...</>
+                    : <><Wand2 className="h-3 w-3 text-violet-500" /> AI Draft <ChevronDown className="h-3 w-3 opacity-60" /></>}
+                </button>
+
+                {aiOpen && (
+                  <div className="absolute top-full right-0 mt-1.5 z-30 w-52 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
+                    <p className="px-3.5 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Generate with AI</p>
+                    {AI_TEMPLATES.map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => generateWithAI(t.id)}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left hover:bg-violet-50 transition-colors"
+                      >
+                        <span className="text-sm shrink-0">{t.emoji}</span>
+                        <p className="text-xs font-medium text-slate-700">{t.name}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <input
               type="text"
               value={subject}
@@ -320,7 +488,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 <button
                   key={t.token}
                   type="button"
-                  onClick={() => insertToken(t.token, 'subject')}
+                  onClick={() => insertTokenInSubject(t.token)}
                   className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
                 >
                   + {t.label}
@@ -329,22 +497,22 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
             </div>
           </div>
 
-          {/* ── Body ─────────────────────────────────────────────────────── */}
+          {/* ── Body — Rich Text Editor ──────────────────────────────────── */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1.5">Message Body</label>
-            <textarea
+            <RichTextEditor
+              key={editorKey}
               value={body}
-              onChange={e => setBody(e.target.value)}
-              rows={10}
-              placeholder="Write your outreach message here. Use {{tokens}} for personalization."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 resize-none font-mono"
+              onChange={setBody}
+              placeholder="Write your outreach message here..."
+              minHeight={200}
             />
             <div className="flex flex-wrap gap-1 mt-2">
               {TOKENS.map(t => (
                 <button
                   key={t.token}
                   type="button"
-                  onClick={() => insertToken(t.token, 'body')}
+                  onClick={() => setBody(prev => prev + t.token)}
                   className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
                 >
                   + {t.label}
@@ -359,18 +527,38 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
         </div>
 
         {/* Footer */}
-        <div className="border-t border-slate-100 px-6 py-4 flex justify-end gap-3 shrink-0">
-          <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-            Cancel
-          </button>
+        <div className="border-t border-slate-100 px-6 py-4 flex items-center justify-between shrink-0">
+          {/* Left: Send Preview */}
           <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
+            type="button"
+            onClick={sendPreview}
+            disabled={previewing || !subject.trim() || !body.trim()}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
           >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isEdit ? 'Update Stage' : 'Add Stage'}
+            {previewing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : previewSent ? (
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
+            {previewSent ? 'Preview sent!' : `Send Preview${settings.recruiter_email ? ` to ${settings.recruiter_email}` : ''}`}
           </button>
+
+          {/* Right: Cancel + Save */}
+          <div className="flex gap-3">
+            <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isEdit ? 'Update Stage' : 'Add Stage'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
