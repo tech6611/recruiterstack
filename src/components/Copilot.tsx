@@ -11,7 +11,7 @@
  * Checkpoints                  → amber CheckpointCard with Proceed / Cancel
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Bot, X, Send, Trash2, Pencil, Plus, ShieldAlert, Play } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -388,6 +388,45 @@ function PlanCard({
 
 export function Copilot() {
   const [open,      setOpen]      = useState(false)
+
+  // ── Draggable FAB state ───────────────────────────────────────────────
+  const [fabPos, setFabPos] = useState<{ x: number; y: number }>(() => {
+    if (typeof window === 'undefined') return { x: 0, y: 0 }
+    return { x: window.innerWidth - 80, y: window.innerHeight - 80 }
+  })
+  const dragging   = useRef(false)
+  const dragOffset = useRef({ x: 0, y: 0 })
+  const hasMoved   = useRef(false)
+
+  // Initialise position after hydration
+  useEffect(() => {
+    setFabPos({ x: window.innerWidth - 80, y: window.innerHeight - 80 })
+  }, [])
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    dragging.current = true
+    hasMoved.current = false
+    dragOffset.current = { x: e.clientX - fabPos.x, y: e.clientY - fabPos.y }
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  }, [fabPos])
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current) return
+    hasMoved.current = true
+    const x = Math.max(0, Math.min(e.clientX - dragOffset.current.x, window.innerWidth - 56))
+    const y = Math.max(0, Math.min(e.clientY - dragOffset.current.y, window.innerHeight - 56))
+    setFabPos({ x, y })
+  }, [])
+
+  const onPointerUp = useCallback(() => {
+    dragging.current = false
+  }, [])
+
+  const handleFabClick = useCallback(() => {
+    // Only open if the user didn't drag
+    if (!hasMoved.current) setOpen(true)
+  }, [])
+
   const [messages,  setMessages]  = useState<Message[]>(() => {
     // Lazy init — restore conversation from localStorage (survives page navigations)
     if (typeof window === 'undefined') return []
@@ -577,14 +616,18 @@ export function Copilot() {
         />
       )}
 
-      {/* Floating action button */}
+      {/* Floating action button — draggable */}
       {!open && (
         <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-violet-600 text-white shadow-lg hover:bg-violet-700 active:scale-95 transition-all flex items-center justify-center"
-          title="Open AI Copilot"
+          onClick={handleFabClick}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          style={{ left: fabPos.x, top: fabPos.y }}
+          className="fixed z-50 w-14 h-14 rounded-full bg-violet-600 text-white shadow-lg hover:bg-violet-700 transition-colors flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
+          title="Open AI Copilot (drag to reposition)"
         >
-          <Bot className="w-6 h-6" />
+          <Bot className="w-6 h-6 pointer-events-none" />
           {streaming && (
             <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white animate-ping" />
           )}
