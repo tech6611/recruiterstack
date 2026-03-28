@@ -434,6 +434,9 @@ export interface Sequence {
   reply_count?: number
 }
 
+export type SequenceChannel = 'email' | 'whatsapp' | 'sms' | 'linkedin'
+export type StageCondition = 'no_reply' | 'no_open' | 'no_click'
+
 export interface SequenceStage {
   id: string
   sequence_id: string
@@ -443,6 +446,11 @@ export interface SequenceStage {
   body: string
   send_on_behalf_of: string | null
   send_on_behalf_email: string | null
+  channel: SequenceChannel
+  send_at_time: string | null        // "HH:MM:SS" or null
+  send_timezone: string              // e.g. "America/New_York"
+  delay_business_days: boolean
+  condition: StageCondition | null   // null = unconditional
   created_at: string
   updated_at: string
 }

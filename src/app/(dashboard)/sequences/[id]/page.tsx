@@ -230,13 +230,31 @@ export default function SequenceDetailPage() {
                         {stage.order_index}
                       </span>
                       <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                            stage.channel === 'email' ? 'bg-blue-100 text-blue-700' :
+                            stage.channel === 'whatsapp' ? 'bg-green-100 text-green-700' :
+                            stage.channel === 'sms' ? 'bg-violet-100 text-violet-700' :
+                            'bg-sky-100 text-sky-700'
+                          }`}>
+                            {stage.channel ?? 'email'}
+                          </span>
+                          {stage.condition && (
+                            <span className="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                              if {stage.condition.replace('_', ' ')}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm font-semibold text-slate-800 truncate">{stage.subject}</p>
                         <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {stage.delay_days === 0 ? 'Immediate' : `+${stage.delay_days} day${stage.delay_days > 1 ? 's' : ''}`}
+                            {stage.delay_days === 0 ? 'Immediate' : `+${stage.delay_days} ${stage.delay_business_days ? 'business ' : ''}day${stage.delay_days > 1 ? 's' : ''}`}
                             {cumulativeDays > 0 && ` (Day ${cumulativeDays})`}
                           </span>
+                          {stage.send_at_time && (
+                            <span>at {stage.send_at_time.slice(0, 5)} {stage.send_timezone ?? 'UTC'}</span>
+                          )}
                           {stage.send_on_behalf_of && (
                             <span className="flex items-center gap-1">
                               <User className="h-3 w-3" /> {stage.send_on_behalf_of}
@@ -356,6 +374,7 @@ export default function SequenceDetailPage() {
           sequenceId={id}
           stage={editingStage}
           stageCount={stages.length}
+          isFirstStage={editingStage ? editingStage.order_index === 1 : stages.length === 0}
           onClose={() => { setEditorOpen(false); setEditingStage(null) }}
           onSaved={loadSequence}
         />
