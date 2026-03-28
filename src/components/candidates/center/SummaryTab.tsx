@@ -1,7 +1,35 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react'
+import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, TrendingDown, Phone, ChevronRight } from 'lucide-react'
 import type { Candidate, Application, AiRecommendation, HiringRequest } from '@/lib/types/database'
+import VoiceCallDetailModal from '../VoiceCallDetailModal'
+
+interface VoiceCallSummary {
+  id: string
+  status: string
+  created_at: string
+  duration_seconds: number | null
+  ai_score: number | null
+  ai_recommendation: string | null
+  hiring_request_id: string | null
+  metadata: { position_title?: string; candidate_name?: string }
+}
+
+const CALL_STATUS: Record<string, { label: string; color: string }> = {
+  completed:   { label: 'Completed',   color: 'text-emerald-600' },
+  in_progress: { label: 'In Progress', color: 'text-blue-600'    },
+  ringing:     { label: 'Ringing',     color: 'text-amber-600'   },
+  no_answer:   { label: 'No Answer',   color: 'text-slate-500'   },
+  failed:      { label: 'Failed',      color: 'text-red-600'     },
+  cancelled:   { label: 'Cancelled',   color: 'text-slate-500'   },
+}
+
+const CALL_REC: Record<string, { label: string; color: string; bg: string }> = {
+  strong_yes: { label: 'Strong Yes', color: 'text-emerald-700', bg: 'bg-emerald-100' },
+  yes:        { label: 'Yes',        color: 'text-blue-700',    bg: 'bg-blue-100'    },
+  maybe:      { label: 'Maybe',      color: 'text-amber-700',   bg: 'bg-amber-100'   },
+  no:         { label: 'No',         color: 'text-red-700',     bg: 'bg-red-100'     },
+}
 
 interface SummaryTabProps {
   candidate: Candidate
@@ -48,6 +76,11 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
   const [genError, setGenError] = useState('')
   const mountedRef = useRef(true)
 
+  // Phone screen call history
+  const [calls, setCalls] = useState<VoiceCallSummary[]>([])
+  const [callsLoading, setCallsLoading] = useState(true)
+  const [selectedCallId, setSelectedCallId] = useState<string | null>(null)
+
   useEffect(() => {
     mountedRef.current = true
     return () => { mountedRef.current = false }
@@ -69,6 +102,22 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
   }, [candidate.id])
 
   useEffect(() => { checkExisting() }, [checkExisting])
+
+  // Load voice calls for this candidate
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/voice/calls?candidate_id=${candidate.id}&limit=10`)
+        if (res.ok) {
+          const json = await res.json()
+          if (mountedRef.current) setCalls(json.data ?? [])
+        }
+      } catch { /* non-critical */ } finally {
+        if (mountedRef.current) setCallsLoading(false)
+      }
+    }
+    load()
+  }, [candidate.id])
 
   // Poll for summary result after triggering background generation
   const pollForResult = useCallback(async () => {
@@ -134,6 +183,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
   const scoredApps = applications.filter(a => a.ai_score !== null && a.ai_scored_at)
 
   return (
+    <>
     <div className="p-5 space-y-5">
 
       {/* ── AI Scorecard (if any application has been scored) ─────────────── */}
@@ -247,6 +297,60 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
         </div>
       </div>
 
+      {/* ── Phone Screens ─────────────────────────────────────────────────── */}
+      {(callsLoading || calls.length > 0) && (
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
+            <Phone className="h-4 w-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-slate-800">Phone Screens</h3>
+            <span className="ml-auto text-xs text-slate-400">{calls.length} call{calls.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {callsLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+              </div>
+            ) : calls.map(call => {
+              const statusCfg = CALL_STATUS[call.status] ?? { label: call.status, color: 'text-slate-500' }
+              const recCfg    = call.ai_recommendation ? CALL_REC[call.ai_recommendation] : null
+              const dateStr   = new Date(call.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              const duration  = call.duration_seconds != null
+                ? `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s`
+                : null
+              return (
+                <button
+                  key={call.id}
+                  onClick={() => setSelectedCallId(call.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                >
+                  <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                    <Phone className="h-3.5 w-3.5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs font-semibold ${statusCfg.color}`}>{statusCfg.label}</span>
+                      {recCfg && (
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${recCfg.bg} ${recCfg.color}`}>
+                          {recCfg.label}
+                        </span>
+                      )}
+                      {call.ai_score != null && (
+                        <span className="text-[10px] text-slate-400">Score: {call.ai_score}/100</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {dateStr}{duration ? ` · ${duration}` : ''}
+                      {call.metadata?.position_title ? ` · ${call.metadata.position_title}` : ''}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-300 shrink-0" />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Resume / CV ───────────────────────────────────────────────────── */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
@@ -277,5 +381,13 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
         </div>
       </div>
     </div>
+
+    {selectedCallId && (
+      <VoiceCallDetailModal
+        callId={selectedCallId}
+        onClose={() => setSelectedCallId(null)}
+      />
+    )}
+    </>
   )
 }

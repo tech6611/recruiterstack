@@ -59,6 +59,7 @@ interface Props {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function SequenceStageEditor({ sequenceId, stage, stageCount, isFirstStage, onClose, onSaved }: Props) {
   const isEdit = !!stage
 
