@@ -298,19 +298,26 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
       </div>
 
       {/* ── Phone Screens ─────────────────────────────────────────────────── */}
-      {(callsLoading || calls.length > 0) && (
-        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
-            <Phone className="h-4 w-4 text-blue-500" />
-            <h3 className="text-sm font-semibold text-slate-800">Phone Screens</h3>
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
+          <Phone className="h-4 w-4 text-blue-500" />
+          <h3 className="text-sm font-semibold text-slate-800">Phone Screens</h3>
+          {!callsLoading && (
             <span className="ml-auto text-xs text-slate-400">{calls.length} call{calls.length !== 1 ? 's' : ''}</span>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {callsLoading ? (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-              </div>
-            ) : calls.map(call => {
+          )}
+        </div>
+        <div className="divide-y divide-slate-100">
+          {callsLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+            </div>
+          ) : calls.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-center px-4">
+              <Phone className="h-7 w-7 text-slate-200 mb-2" />
+              <p className="text-sm text-slate-400">No phone screens yet</p>
+              <p className="text-xs text-slate-300 mt-1">Use the &quot;Phone Screen&quot; button above to start one</p>
+            </div>
+          ) : calls.map(call => {
               const statusCfg = CALL_STATUS[call.status] ?? { label: call.status, color: 'text-slate-500' }
               const recCfg    = call.ai_recommendation ? CALL_REC[call.ai_recommendation] : null
               const dateStr   = new Date(call.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -349,7 +356,6 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
             })}
           </div>
         </div>
-      )}
 
       {/* ── Resume / CV ───────────────────────────────────────────────────── */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
