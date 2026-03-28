@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       code,
       redirect_uri:  redirectUri,
       grant_type:    'authorization_code',
-      scope:         'Calendars.ReadWrite OnlineMeetings.ReadWrite User.Read offline_access',
+      scope:         'Calendars.ReadWrite User.Read offline_access',
     }),
   })
 

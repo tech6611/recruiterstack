@@ -17,9 +17,10 @@ export async function GET() {
     `${process.env.NEXT_PUBLIC_APP_URL}/api/microsoft/callback`
   )
 
-  // Scopes for calendar + Teams meetings + user profile + offline refresh
+  // Scopes: Calendars.ReadWrite covers event creation with Teams links via isOnlineMeeting.
+  // OnlineMeetings.ReadWrite is excluded — it's enterprise-only and fails for personal accounts.
   const scopes = encodeURIComponent(
-    'Calendars.ReadWrite OnlineMeetings.ReadWrite User.Read offline_access'
+    'Calendars.ReadWrite User.Read offline_access'
   )
 
   const state = encodeURIComponent(generateOAuthState(orgId))

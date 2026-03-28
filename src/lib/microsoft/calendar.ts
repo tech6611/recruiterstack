@@ -24,7 +24,7 @@ export interface CreatedTeamsMeeting {
   web_link: string
 }
 
-const MS_SCOPES = 'Calendars.ReadWrite OnlineMeetings.ReadWrite User.Read offline_access'
+const MS_SCOPES = 'Calendars.ReadWrite User.Read offline_access'
 
 // ── Token Refresh ─────────────────────────────────────────────────────────────
 
