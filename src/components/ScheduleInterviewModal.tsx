@@ -109,6 +109,9 @@ export default function ScheduleInterviewModal({
   const [googleConnected, setGoogleConnected] = useState(false)
   const [zoomConnected,   setZoomConnected]   = useState(false)
   const [msConnected,     setMsConnected]     = useState(false)
+  const [googleEmail,     setGoogleEmail]     = useState<string | null>(null)
+  const [zoomEmail,       setZoomEmail]       = useState<string | null>(null)
+  const [msEmail,         setMsEmail]         = useState<string | null>(null)
   const [autoMeetLink,    setAutoMeetLink]    = useState<string | null>(null)
   const [googleMeetError, setGoogleMeetError] = useState<string | null>(null)
 
@@ -179,6 +182,9 @@ export default function ScheduleInterviewModal({
         setGoogleConnected(!!data?.google_connected)
         setZoomConnected(!!data?.zoom_connected)
         setMsConnected(!!data?.ms_connected)
+        setGoogleEmail(data?.google_connected_email ?? null)
+        setZoomEmail(data?.zoom_connected_email ?? null)
+        setMsEmail(data?.ms_connected_email ?? null)
       })
       .catch(() => {})
   }, [])
@@ -629,8 +635,32 @@ export default function ScheduleInterviewModal({
             </div>
           </div>
 
+          {/* External panelist warning */}
+          {(googleConnected || zoomConnected || msConnected) && (() => {
+            const connectedDomains = [googleEmail, zoomEmail, msEmail]
+              .filter(Boolean)
+              .map(e => e!.split('@')[1]?.toLowerCase())
+              .filter(Boolean)
+            const externalMembers = panel.filter(m => {
+              const d = m.email.trim().split('@')[1]?.toLowerCase()
+              return d && connectedDomains.length > 0 && !connectedDomains.includes(d)
+            })
+            if (!externalMembers.length) return null
+            return (
+              <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
+                <AlertCircle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-700">Availability unavailable for external panelists</p>
+                  <p className="text-[11px] text-amber-600 mt-0.5">
+                    {externalMembers.map(m => m.email).join(', ')} — {externalMembers.length === 1 ? 'their calendar is' : 'their calendars are'} outside your organisation and cannot be read. Their slots will appear blank (not busy).
+                  </p>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Availability grid */}
-          {googleConnected && panel.some(m => m.email.trim()) && (
+          {(googleConnected || zoomConnected || msConnected) && panel.some(m => m.email.trim()) && (
             <div className="rounded-xl border border-slate-200 overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
                 <div className="flex items-center gap-2 min-w-0">
@@ -667,7 +697,7 @@ export default function ScheduleInterviewModal({
                 </div>
               ) : availNoData ? (
                 <div className="px-3 py-4 text-center text-xs text-slate-400">
-                  No calendar data — {panel.filter(m => m.email.trim()).length > 1 ? 'panel members may be' : 'interviewer may be'} outside your Google Workspace domain
+                  No calendar data — {panel.filter(m => m.email.trim()).length > 1 ? 'panel members may be' : 'interviewer may be'} outside your organisation&apos;s domain
                 </div>
               ) : (
                 <div ref={inlineGridRef} className="overflow-x-auto overflow-y-auto max-h-[280px]">
@@ -893,7 +923,7 @@ export default function ScheduleInterviewModal({
               <div className="flex flex-col items-center justify-center h-48 gap-2 text-slate-400">
                 <span className="text-2xl">📅</span>
                 <span className="text-sm text-center px-8">
-                  No calendar data — {panel.filter(m => m.email.trim()).length > 1 ? 'panel members may be' : 'interviewer may be'} outside your Google Workspace domain
+                  No calendar data — {panel.filter(m => m.email.trim()).length > 1 ? 'panel members may be' : 'interviewer may be'} outside your organisation&apos;s domain
                 </span>
               </div>
             ) : (
