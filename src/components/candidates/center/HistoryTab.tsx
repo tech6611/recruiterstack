@@ -9,7 +9,7 @@
 import {
   Send, ChevronRight, FileText, Calendar,
   BadgeCheck, Ban, Gift, ClipboardList, Clock,
-  AlertCircle, Mail, Users, GitBranch,
+  AlertCircle, Mail, Users, GitBranch, Phone,
 } from 'lucide-react'
 import type { ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 
@@ -70,6 +70,8 @@ const EVENT_ICON: Record<string, { icon: React.ReactNode; bg: string; title: (e:
   rejected:             { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-500',     title: () => 'Application rejected' },
   scorecard_added:      { icon: <ClipboardList className="h-3.5 w-3.5" />,bg: 'bg-violet-500',  title: () => 'Scorecard submitted' },
   referral_added:       { icon: <Users className="h-3.5 w-3.5" />,        bg: 'bg-pink-500',    title: () => 'Referral added' },
+  phone_screen_started: { icon: <Phone className="h-3.5 w-3.5" />,        bg: 'bg-blue-500',    title: () => 'AI phone screen initiated' },
+  phone_screen:         { icon: <Phone className="h-3.5 w-3.5" />,        bg: 'bg-emerald-500', title: e => `AI phone screen completed${(e.metadata as { ai_score?: number })?.ai_score != null ? ` — Score: ${(e.metadata as { ai_score?: number }).ai_score}/100` : ''}` },
 }
 
 // Build a synthetic "added to pipeline" event per application
