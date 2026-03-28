@@ -63,16 +63,15 @@ export default function EnrollCandidateDrawer({
     onEnrolled()
   }
 
-  const handleCreateAndActivate = async () => {
+  const handleCreateSequence = async () => {
     setCreating(true)
     setError('')
 
-    // Create a new sequence with a default stage
     const res = await fetch('/api/sequences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: 'New Outreach Sequence',
+        name: 'Untitled Sequence',
         stages: [
           { order_index: 1, delay_days: 0, subject: 'Hi {{candidate_first_name}}', body: '<p>Write your first outreach email here.</p>' },
         ],
@@ -87,19 +86,11 @@ export default function EnrollCandidateDrawer({
     }
 
     const { data: newSeq } = await res.json()
-
-    // Activate it immediately
-    await fetch(`/api/sequences/${newSeq.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'active' }),
-    })
-
     setCreating(false)
 
-    // Reload sequences and auto-select the new one
-    setSelectedId(newSeq.id)
-    loadSequences()
+    // Navigate to the sequence builder so user can configure stages properly
+    onClose()
+    router.push(`/sequences/${newSeq.id}`)
   }
 
   const selectedSeq = sequences.find(s => s.id === selectedId)
@@ -150,12 +141,12 @@ export default function EnrollCandidateDrawer({
                 </p>
               </div>
               <button
-                onClick={handleCreateAndActivate}
+                onClick={handleCreateSequence}
                 disabled={creating}
                 className="flex items-center justify-center gap-2 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
               >
                 {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                {creating ? 'Creating...' : 'Create New Sequence'}
+                {creating ? 'Creating...' : 'Create & Configure Sequence'}
               </button>
               <button
                 onClick={() => { onClose(); router.push('/sequences') }}
@@ -169,7 +160,7 @@ export default function EnrollCandidateDrawer({
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-semibold text-slate-500">Select Sequence</label>
                 <button
-                  onClick={handleCreateAndActivate}
+                  onClick={handleCreateSequence}
                   disabled={creating}
                   className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition-colors"
                 >
