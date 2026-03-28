@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Loader2, UserPlus, AlertTriangle } from 'lucide-react'
+import { X, Loader2, UserPlus, AlertTriangle, Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import type { Sequence } from '@/lib/types/database'
 
 interface Props {
@@ -15,24 +16,29 @@ interface Props {
 export default function EnrollCandidateDrawer({
   candidateIds, candidateNames, applicationId, onClose, onEnrolled,
 }: Props) {
+  const router = useRouter()
   const [sequences, setSequences]     = useState<Sequence[]>([])
   const [selectedId, setSelectedId]   = useState('')
   const [loading, setLoading]         = useState(true)
   const [enrolling, setEnrolling]     = useState(false)
+  const [creating, setCreating]       = useState(false)
   const [error, setError]             = useState('')
   const [result, setResult]           = useState<{ enrolled_count: number; skipped_count: number } | null>(null)
 
-  useEffect(() => {
+  const loadSequences = () => {
+    setLoading(true)
     fetch('/api/sequences')
       .then(r => r.json())
       .then(json => {
         const active = (json.data ?? []).filter((s: Sequence) => s.status === 'active')
         setSequences(active)
-        if (active.length > 0) setSelectedId(active[0].id)
+        if (active.length > 0 && !selectedId) setSelectedId(active[0].id)
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { loadSequences() }, [])
 
   const handleEnroll = async () => {
     if (!selectedId) { setError('Select a sequence'); return }
@@ -55,6 +61,45 @@ export default function EnrollCandidateDrawer({
 
     setResult(json.data)
     onEnrolled()
+  }
+
+  const handleCreateAndActivate = async () => {
+    setCreating(true)
+    setError('')
+
+    // Create a new sequence with a default stage
+    const res = await fetch('/api/sequences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'New Outreach Sequence',
+        stages: [
+          { order_index: 1, delay_days: 0, subject: 'Hi {{candidate_first_name}}', body: '<p>Write your first outreach email here.</p>' },
+        ],
+      }),
+    })
+
+    if (!res.ok) {
+      const json = await res.json()
+      setError(json.error ?? 'Failed to create sequence')
+      setCreating(false)
+      return
+    }
+
+    const { data: newSeq } = await res.json()
+
+    // Activate it immediately
+    await fetch(`/api/sequences/${newSeq.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'active' }),
+    })
+
+    setCreating(false)
+
+    // Reload sequences and auto-select the new one
+    setSelectedId(newSeq.id)
+    loadSequences()
   }
 
   const selectedSeq = sequences.find(s => s.id === selectedId)
@@ -94,18 +139,44 @@ export default function EnrollCandidateDrawer({
               <Loader2 className="h-4 w-4 animate-spin" /> Loading sequences...
             </div>
           ) : sequences.length === 0 ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <div className="flex items-center gap-2 text-amber-700">
-                <AlertTriangle className="h-4 w-4" />
-                <p className="text-sm font-medium">No active sequences</p>
+            <div className="space-y-3">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex items-center gap-2 text-amber-700">
+                  <AlertTriangle className="h-4 w-4" />
+                  <p className="text-sm font-medium">No active sequences</p>
+                </div>
+                <p className="text-xs text-amber-600 mt-1">
+                  Create a new sequence to get started, or activate an existing one from the Sequences page.
+                </p>
               </div>
-              <p className="text-xs text-amber-600 mt-1">
-                Create and activate a sequence first before enrolling candidates.
-              </p>
+              <button
+                onClick={handleCreateAndActivate}
+                disabled={creating}
+                className="flex items-center justify-center gap-2 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
+              >
+                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {creating ? 'Creating...' : 'Create New Sequence'}
+              </button>
+              <button
+                onClick={() => { onClose(); router.push('/sequences') }}
+                className="flex items-center justify-center gap-2 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Go to Sequences Page
+              </button>
             </div>
           ) : (
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Select Sequence</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-500">Select Sequence</label>
+                <button
+                  onClick={handleCreateAndActivate}
+                  disabled={creating}
+                  className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  {creating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                  New
+                </button>
+              </div>
               <select
                 value={selectedId}
                 onChange={e => setSelectedId(e.target.value)}
@@ -163,10 +234,10 @@ export default function EnrollCandidateDrawer({
           <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             {result ? 'Close' : 'Cancel'}
           </button>
-          {!result && (
+          {!result && sequences.length > 0 && (
             <button
               onClick={handleEnroll}
-              disabled={enrolling || sequences.length === 0}
+              disabled={enrolling}
               className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
             >
               {enrolling && <Loader2 className="h-4 w-4 animate-spin" />}
