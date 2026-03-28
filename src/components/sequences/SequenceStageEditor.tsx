@@ -59,8 +59,7 @@ interface Props {
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function SequenceStageEditor({ sequenceId, stage, stageCount, isFirstStage, onClose, onSaved }: Props) {
+export default function SequenceStageEditor({ sequenceId, stage, stageCount, isFirstStage = false, onClose, onSaved }: Props) {
   const isEdit = !!stage
 
   const [channel, setChannel]             = useState<SequenceChannel>(stage?.channel ?? 'email')
@@ -76,7 +75,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [saving, setSaving]               = useState(false)
   const [error, setError]                 = useState('')
 
-  const showCondition = isEdit ? (stage!.order_index > 1) : (stageCount >= 1)
+  const showCondition = !isFirstStage && (isEdit ? stage!.order_index > 1 : stageCount >= 1)
 
   const insertToken = (token: string, target: 'subject' | 'body') => {
     if (target === 'subject') setSubject(prev => prev + token)
