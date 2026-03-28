@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import {
   X, Loader2, User, Clock, MessageSquare, Globe,
   Wand2, ChevronDown, Send, CheckCircle,
@@ -8,6 +8,7 @@ import {
 import type { SequenceStage, SequenceChannel, StageCondition } from '@/lib/types/database'
 import { RichTextEditor } from '@/components/RichTextEditor'
 import { useSettings } from '@/lib/hooks/useSettings'
+import type { Editor } from '@tiptap/react'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -89,6 +90,14 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [soboEmail, setSoboEmail]         = useState(stage?.send_on_behalf_email ?? '')
   const [saving, setSaving]               = useState(false)
   const [error, setError]                 = useState('')
+
+  // TipTap editor ref for cursor-position insertion
+  const editorRef                         = useRef<Editor | null>(null)
+  const subjectRef                        = useRef<HTMLInputElement>(null)
+
+  const onEditorReady = useCallback((editor: Editor | null) => {
+    editorRef.current = editor
+  }, [])
 
   // AI generation
   const [aiOpen, setAiOpen]               = useState(false)
@@ -217,10 +226,32 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
     setTimeout(() => setPreviewSent(false), 4000)
   }
 
-  // ── Insert token into subject ───────────────────────────────────────────
+  // ── Insert token at cursor position ─────────────────────────────────────
 
   const insertTokenInSubject = (token: string) => {
-    setSubject(prev => prev + token)
+    const input = subjectRef.current
+    if (input) {
+      const start = input.selectionStart ?? subject.length
+      const end = input.selectionEnd ?? subject.length
+      const newVal = subject.slice(0, start) + token + subject.slice(end)
+      setSubject(newVal)
+      // Restore cursor position after the inserted token
+      requestAnimationFrame(() => {
+        input.setSelectionRange(start + token.length, start + token.length)
+        input.focus()
+      })
+    } else {
+      setSubject(prev => prev + token)
+    }
+  }
+
+  const insertTokenInBody = (token: string) => {
+    const editor = editorRef.current
+    if (editor) {
+      editor.chain().focus().insertContent(token).run()
+    } else {
+      setBody(prev => prev + token)
+    }
   }
 
   // ── Save ────────────────────────────────────────────────────────────────
@@ -477,6 +508,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
             </div>
 
             <input
+              ref={subjectRef}
               type="text"
               value={subject}
               onChange={e => setSubject(e.target.value)}
@@ -506,13 +538,14 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
               onChange={setBody}
               placeholder="Write your outreach message here..."
               minHeight={200}
+              onEditorReady={onEditorReady}
             />
             <div className="flex flex-wrap gap-1 mt-2">
               {TOKENS.map(t => (
                 <button
                   key={t.token}
                   type="button"
-                  onClick={() => setBody(prev => prev + t.token)}
+                  onClick={() => insertTokenInBody(t.token)}
                   className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
                 >
                   + {t.label}

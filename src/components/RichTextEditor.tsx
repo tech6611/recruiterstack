@@ -8,6 +8,7 @@
  * before being embedded in emails / Google Calendar descriptions.
  */
 
+import { useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit   from '@tiptap/starter-kit'
 import Underline    from '@tiptap/extension-underline'
@@ -83,6 +84,8 @@ interface RichTextEditorProps {
   onChange:     (html: string) => void
   placeholder?: string
   minHeight?:   number
+  /** Callback that receives the Tiptap editor instance after init — use for inserting text at cursor */
+  onEditorReady?: (editor: ReturnType<typeof useEditor>) => void
 }
 
 export function RichTextEditor({
@@ -90,6 +93,7 @@ export function RichTextEditor({
   onChange,
   placeholder = 'Topics to cover, prep instructions…',
   minHeight   = 96,
+  onEditorReady,
 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -108,6 +112,11 @@ export function RichTextEditor({
       },
     },
   })
+
+  // Expose editor instance to parent
+  useEffect(() => {
+    if (editor && onEditorReady) onEditorReady(editor)
+  }, [editor, onEditorReady])
 
   if (!editor) return null
 
