@@ -54,5 +54,11 @@ export async function GET() {
       ms_email:             data?.ms_connected_email ?? null,
     },
     org_id: orgId,
+    redirect_uris: {
+      microsoft_callback: `${process.env.NEXT_PUBLIC_APP_URL}/api/microsoft/callback`,
+      zoom_callback:      `${process.env.NEXT_PUBLIC_APP_URL}/api/zoom/callback`,
+      google_callback:    `${process.env.NEXT_PUBLIC_APP_URL}/api/google/callback`,
+      app_url:            process.env.NEXT_PUBLIC_APP_URL ?? 'NOT SET',
+    },
   })
 }
