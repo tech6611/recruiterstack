@@ -112,8 +112,11 @@ export default function ScheduleInterviewModal({
   const [googleEmail,     setGoogleEmail]     = useState<string | null>(null)
   const [zoomEmail,       setZoomEmail]       = useState<string | null>(null)
   const [msEmail,         setMsEmail]         = useState<string | null>(null)
-  const [autoMeetLink,    setAutoMeetLink]    = useState<string | null>(null)
-  const [googleMeetError, setGoogleMeetError] = useState<string | null>(null)
+  const [autoMeetLink,      setAutoMeetLink]      = useState<string | null>(null)
+  const [googleMeetError,   setGoogleMeetError]   = useState<string | null>(null)
+  const [selfScheduleLink,  setSelfScheduleLink]  = useState<string | null>(null)
+  const [linkCopied,        setLinkCopied]        = useState(false)
+  const [sendingLink,       setSendingLink]       = useState(false)
 
   const [availWeekOffset,   setAvailWeekOffset]   = useState(0)
   const [busyRangesByEmail, setBusyRangesByEmail] = useState<Record<string, { start: string; end: string }[]>>({})
@@ -253,21 +256,69 @@ export default function ScheduleInterviewModal({
 
   // ── Meeting integrations ─────────────────────────────────────────────────────
 
-  const MEETING_INTEGRATIONS = [
-    { id: 'gmeet',  label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',     url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
-    { id: 'zoom',   label: 'Zoom',        color: 'hover:bg-blue-50 hover:border-blue-300',     url: 'https://zoom.us/start/videomeeting',        placeholder: 'https://zoom.us/j/...' },
-    { id: 'teams',  label: 'MS Teams',    color: 'hover:bg-violet-50 hover:border-violet-300', url: 'https://teams.microsoft.com/l/meeting/new', placeholder: 'https://teams.microsoft.com/l/...' },
+  const MEETING_PLATFORMS = [
+    { id: 'gmeet',  label: 'Google Meet', icon: '🎥', connected: googleConnected },
+    { id: 'zoom',   label: 'Zoom',        icon: '💻', connected: zoomConnected   },
+    { id: 'teams',  label: 'MS Teams',    icon: '🟦', connected: msConnected     },
   ] as const
+
+  const connectedPlatforms = MEETING_PLATFORMS.filter(p => p.connected)
 
   const [activePlatform, setActivePlatform] = useState<string | null>(null)
 
-  const openIntegration = (platform: typeof MEETING_INTEGRATIONS[number]) => {
-    setActivePlatform(platform.id)
-    // Don't open external tab if the platform is connected (auto-create will handle it)
-    if (platform.id === 'gmeet' && googleConnected) return
-    if (platform.id === 'zoom'  && zoomConnected)   return
-    if (platform.id === 'teams' && msConnected)      return
-    window.open(platform.url, '_blank', 'noopener')
+  // Auto-select platform when exactly one is connected
+  useEffect(() => {
+    if (connectedPlatforms.length === 1) {
+      setActivePlatform(connectedPlatforms[0].id)
+    }
+  }, [googleConnected, zoomConnected, msConnected]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Send scheduling link ──────────────────────────────────────────────────────
+
+  const handleSendLink = async () => {
+    if (!interviewer.trim()) {
+      setError('Set a primary interviewer before generating a scheduling link.')
+      return
+    }
+    setSendingLink(true)
+    setError('')
+    const placeholder = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const platform    = activePlatform === 'gmeet' && googleConnected ? 'google_meet'
+                      : activePlatform === 'zoom'  && zoomConnected   ? 'zoom'
+                      : activePlatform === 'teams' && msConnected     ? 'ms_teams'
+                      : connectedPlatforms[0]?.id === 'gmeet' ? 'google_meet'
+                      : connectedPlatforms[0]?.id === 'teams' ? 'ms_teams'
+                      : connectedPlatforms[0]?.id === 'zoom'  ? 'zoom'
+                      : null
+    try {
+      const res = await fetch('/api/interviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          application_id:    apps[0].id,
+          candidate_id:      apps[0].candidate_id,
+          hiring_request_id: apps[0].hiring_request_id,
+          stage_id:          apps[0].stage_id ?? null,
+          interviewer_name:  interviewer.trim(),
+          interviewer_email: interviewerEmail.trim() || null,
+          interview_type:    interviewType,
+          scheduled_at:      placeholder,
+          duration_minutes:  duration,
+          notes:             null,
+          generate_self_schedule: true,
+          meeting_platform:  platform,
+          panel:             panel.filter(m => m.email.trim()),
+          timezone:          Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      })
+      const json = await res.json()
+      if (json.error) { setError(json.error); return }
+      setSelfScheduleLink(json.data?.self_schedule_link ?? null)
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setSendingLink(false)
+    }
   }
 
   const buildGCalLink = () => {
@@ -325,7 +376,11 @@ export default function ScheduleInterviewModal({
             meeting_platform:  activePlatform === 'gmeet' && googleConnected ? 'google_meet'
                              : activePlatform === 'zoom'  && zoomConnected   ? 'zoom'
                              : activePlatform === 'teams' && msConnected     ? 'ms_teams'
+                             : connectedPlatforms[0]?.id === 'gmeet' ? 'google_meet'
+                             : connectedPlatforms[0]?.id === 'teams' ? 'ms_teams'
+                             : connectedPlatforms[0]?.id === 'zoom'  ? 'zoom'
                              : null,
+                            panel: panel.filter(m => m.email.trim()),
           }),
         }).then(r => r.json())
       ))
@@ -786,44 +841,50 @@ export default function ScheduleInterviewModal({
           {interviewType !== 'in_person' && interviewType !== 'phone' && (
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">Meeting platform</label>
-              <div className="grid grid-cols-3 gap-1.5 mb-2">
-                {MEETING_INTEGRATIONS.map(p => {
-                  const isConnected = (p.id === 'gmeet' && googleConnected) || (p.id === 'zoom' && zoomConnected) || (p.id === 'teams' && msConnected)
-                  return (
-                    <button key={p.id} onClick={() => openIntegration(p)}
-                      className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
-                        activePlatform === p.id ? 'border-blue-400 bg-blue-50 text-blue-700' : `border-slate-200 text-slate-600 ${p.color}`
-                      }`}>
-                      <span className="text-base">{p.id === 'gmeet' ? '🎥' : p.id === 'zoom' ? '💻' : '🟦'}</span>
-                      {p.label}
-                      {isConnected && <span className="text-[9px] font-normal text-green-600 leading-none">Connected</span>}
-                    </button>
-                  )
-                })}
-              </div>
-              {((activePlatform === 'gmeet' && googleConnected) ||
-                (activePlatform === 'zoom'  && zoomConnected) ||
-                (activePlatform === 'teams' && msConnected)) ? (
+
+              {connectedPlatforms.length === 0 ? (
+                /* No calendar connected — paste field only */
+                <input
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
+                  placeholder="Paste meeting link (Zoom, Meet, Teams…)"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              ) : connectedPlatforms.length === 1 ? (
+                /* Exactly one connected — auto-selected, no selector needed */
                 <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
                   <span className="text-green-500 text-base">✓</span>
                   <div>
                     <p className="text-xs font-semibold text-green-700">
-                      {activePlatform === 'gmeet' ? 'Google Meet' : activePlatform === 'zoom' ? 'Zoom' : 'Teams'} link will be auto-created
+                      {connectedPlatforms[0].icon} {connectedPlatforms[0].label} meeting will be auto-created
                     </p>
-                    <p className="text-[11px] text-green-600">Calendar invites sent to candidate &amp; interviewer on schedule</p>
+                    <p className="text-[11px] text-green-600">Calendar invites sent to candidate &amp; all panel members on schedule</p>
                   </div>
                 </div>
               ) : (
+                /* Multiple connected — simple toggle among connected platforms */
                 <>
+                  <div className="flex gap-1.5 mb-2">
+                    {connectedPlatforms.map(p => (
+                      <button key={p.id} onClick={() => setActivePlatform(p.id)}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-colors ${
+                          activePlatform === p.id
+                            ? 'border-blue-400 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 text-slate-600 hover:border-blue-200 hover:bg-blue-50'
+                        }`}>
+                        <span>{p.icon}</span> {p.label}
+                        <span className="text-[9px] text-green-600 font-normal">Connected</span>
+                      </button>
+                    ))}
+                  </div>
                   {activePlatform && (
-                    <p className="text-xs text-slate-400 mb-1.5">Copy the link from the new tab and paste it below</p>
+                    <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
+                      <span className="text-green-500">✓</span>
+                      <p className="text-xs font-semibold text-green-700">
+                        {connectedPlatforms.find(p => p.id === activePlatform)?.label} meeting will be auto-created
+                      </p>
+                    </div>
                   )}
-                  <input
-                    value={location}
-                    onChange={e => setLocation(e.target.value)}
-                    placeholder={activePlatform ? MEETING_INTEGRATIONS.find(p => p.id === activePlatform)?.placeholder ?? 'Paste meeting link...' : 'Paste meeting link (Zoom, Meet, Teams…)'}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
                 </>
               )}
             </div>
@@ -852,6 +913,27 @@ export default function ScheduleInterviewModal({
             <RichTextEditor value={notes} onChange={setNotes} placeholder="Topics to cover, prep instructions…" />
           </div>
 
+          {/* Self-schedule link result */}
+          {selfScheduleLink && (
+            <div className="rounded-xl bg-blue-50 border border-blue-200 px-3 py-3">
+              <p className="text-xs font-semibold text-blue-700 mb-1.5">📅 Scheduling link generated</p>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={selfScheduleLink}
+                  className="flex-1 min-w-0 rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none"
+                />
+                <button
+                  onClick={() => { navigator.clipboard.writeText(selfScheduleLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000) }}
+                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+                >
+                  {linkCopied ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+              <p className="text-[11px] text-blue-600 mt-1.5">Share this link with the candidate — they&apos;ll pick their own slot and get a calendar invite automatically.</p>
+            </div>
+          )}
+
           {error && (
             <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
               <AlertCircle className="h-4 w-4 shrink-0" />
@@ -866,7 +948,13 @@ export default function ScheduleInterviewModal({
             className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-white transition-colors">
             Cancel
           </button>
-          <button onClick={handleSubmit} disabled={saving}
+          {(googleConnected || msConnected || zoomConnected) && !selfScheduleLink && (
+            <button onClick={handleSendLink} disabled={sendingLink || saving}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2.5 text-xs font-semibold transition-colors disabled:opacity-60 whitespace-nowrap">
+              {sendingLink ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…</> : '🔗 Send scheduling link'}
+            </button>
+          )}
+          <button onClick={handleSubmit} disabled={saving || sendingLink}
             className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60">
             {saving ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</>

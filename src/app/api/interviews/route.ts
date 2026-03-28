@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   const {
     application_id, candidate_id, hiring_request_id, stage_id,
     interviewer_name, interviewer_email, interview_type, scheduled_at, duration_minutes,
-    location, notes, generate_self_schedule, timezone, meeting_platform,
+    location, notes, generate_self_schedule, timezone, meeting_platform, panel,
   } = body
 
   if (!application_id || !candidate_id || !hiring_request_id || !interviewer_name?.trim() || !scheduled_at) {
@@ -232,6 +232,7 @@ export async function POST(req: NextRequest) {
       self_schedule_expires_at,
       calendar_event_id,
       meeting_platform: resolvedPlatform,
+      panel:            panel ?? null,
     } as any)
     .select()
     .single()
@@ -280,5 +281,7 @@ export async function POST(req: NextRequest) {
     }
   })()
 
-  return NextResponse.json({ data: { ...data, meet_link: meetLink, meeting_link: meetLink, meeting_platform: resolvedPlatform, google_meet_error: googleMeetError } }, { status: 201 })
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const selfScheduleLink = self_schedule_token ? `${appUrl}/schedule/${self_schedule_token}` : null
+  return NextResponse.json({ data: { ...data, meet_link: meetLink, meeting_link: meetLink, meeting_platform: resolvedPlatform, google_meet_error: googleMeetError, self_schedule_link: selfScheduleLink } }, { status: 201 })
 }
