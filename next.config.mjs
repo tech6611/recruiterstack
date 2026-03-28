@@ -104,6 +104,7 @@ const nextConfig = {
             { source: '/api/sequences/:id/stages',          destination: `${djangoUrl}/api/sequences/:id/stages` },
             { source: '/api/sequences/:id/enroll',          destination: `${djangoUrl}/api/sequences/:id/enroll` },
             { source: '/api/sequences/:id/enrollments',     destination: `${djangoUrl}/api/sequences/:id/enrollments` },
+            { source: '/api/sequences/process',               destination: `${djangoUrl}/api/sequences/process` },
             { source: '/api/sequences/:id/analytics',       destination: `${djangoUrl}/api/sequences/:id/analytics` },
             { source: '/api/sequences/:id',                 destination: `${djangoUrl}/api/sequences/:id` },
             { source: '/api/sequences',                     destination: `${djangoUrl}/api/sequences` },
