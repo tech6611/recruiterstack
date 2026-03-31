@@ -18,7 +18,6 @@ import {
   ChevronDown,
   ChevronUp,
   Send,
-  MessageSquare,
   Zap,
   CheckCircle2,
   XCircle,
