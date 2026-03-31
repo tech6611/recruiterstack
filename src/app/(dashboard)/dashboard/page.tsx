@@ -39,6 +39,7 @@ import {
   Search,
 } from 'lucide-react'
 import type { StageColor } from '@/lib/types/database'
+import { CandidateDrawer } from '@/components/dashboard/CandidateDrawer'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -418,7 +419,7 @@ function WidgetHeader({
   )
 }
 
-function InterviewsWidget({ interviews }: { interviews: UpcomingInterview[] }) {
+function InterviewsWidget({ interviews, onCandidateClick }: { interviews: UpcomingInterview[]; onCandidateClick: (id: string) => void }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
   const filtered  = filterFn(interviews, iv => [iv.candidate_name, iv.job_title, iv.stage_name])
   const preview   = filtered.slice(0, PREVIEW_LIMIT)
@@ -440,10 +441,10 @@ function InterviewsWidget({ interviews }: { interviews: UpcomingInterview[] }) {
       ) : (
         <>
           {preview.map(iv => (
-            <Link
+            <button
               key={iv.id}
-              href={`/candidates/${iv.candidate_id}`}
-              className="grid grid-cols-[2fr_2fr_1.2fr_1fr] items-center gap-3 rounded-sm border-b border-slate-50 py-2 hover:bg-slate-50 transition-colors"
+              onClick={() => onCandidateClick(iv.candidate_id)}
+              className="grid w-full grid-cols-[2fr_2fr_1.2fr_1fr] items-center gap-3 rounded-sm border-b border-slate-50 py-2 hover:bg-slate-50 transition-colors text-left"
             >
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-slate-800">{iv.stage_name}</p>
@@ -463,7 +464,7 @@ function InterviewsWidget({ interviews }: { interviews: UpcomingInterview[] }) {
               <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
                 Interviewer
               </span>
-            </Link>
+            </button>
           ))}
           {remaining > 0 && (
             <Link href="/candidates" className="mt-2 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
@@ -478,7 +479,7 @@ function InterviewsWidget({ interviews }: { interviews: UpcomingInterview[] }) {
 
 type TaskTab = 'all' | 'approvals' | 'feedback' | 'followups' | 'mentions' | 'sequences'
 
-function TasksWidget({ tasks }: { tasks: DashboardData['tasks'] }) {
+function TasksWidget({ tasks, onCandidateClick }: { tasks: DashboardData['tasks']; onCandidateClick: (id: string) => void }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
   const [activeTab, setActiveTab] = useState<TaskTab>('all')
   const counts = {
@@ -489,24 +490,24 @@ function TasksWidget({ tasks }: { tasks: DashboardData['tasks'] }) {
   const totalAll = counts.approvals + counts.feedback + counts.followups
 
   // Flatten all items for the compact preview
-  const allItems: { type: 'approval' | 'feedback' | 'followup'; id: string; title: string; sub: string; href: string; time: string; color: string; icon: React.ReactNode }[] = [
+  const allItems: { type: 'approval' | 'feedback' | 'followup'; id: string; candidateId: string | null; title: string; sub: string; href: string; time: string; color: string; icon: React.ReactNode }[] = [
     ...tasks.pending_approvals.map(t => ({
       type: 'approval' as const,
-      id: t.id, title: t.title, href: `/jobs/${t.id}`,
+      id: t.id, candidateId: null, title: t.title, href: `/jobs/${t.id}`,
       sub: `${t.department ?? 'No dept'}${t.location ? ` · ${t.location}` : ''}`,
       time: timeAgo(t.created_at), color: 'bg-emerald-100 text-emerald-600',
       icon: <CheckSquare className="h-3 w-3" />,
     })),
     ...tasks.feedback_needed.map(t => ({
       type: 'feedback' as const,
-      id: t.id, title: t.candidate_name, href: `/candidates/${t.candidate_id}`,
+      id: t.id, candidateId: t.candidate_id, title: t.candidate_name, href: `/candidates/${t.candidate_id}`,
       sub: `Feedback · ${t.job_title}`,
       time: timeAgo(t.moved_at), color: 'bg-amber-100 text-amber-600',
       icon: <MessageSquare className="h-3 w-3" />,
     })),
     ...tasks.overdue_followups.map(t => ({
       type: 'followup' as const,
-      id: t.id, title: t.candidate_name, href: `/candidates/${t.candidate_id}`,
+      id: t.id, candidateId: t.candidate_id, title: t.candidate_name, href: `/candidates/${t.candidate_id}`,
       sub: `Follow-up · ${t.job_title}`,
       time: timeAgo(t.last_event_at), color: 'bg-red-100 text-red-500',
       icon: <Bell className="h-3 w-3" />,
@@ -563,20 +564,33 @@ function TasksWidget({ tasks }: { tasks: DashboardData['tasks'] }) {
         </p>
       ) : (
         <div className="space-y-0.5">
-          {preview.map(item => (
-            <Link key={`${item.type}-${item.id}`} href={item.href}
-              className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-slate-50 transition-colors"
-            >
-              <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${item.color}`}>
-                {item.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-slate-800 truncate">{item.title}</p>
-                <p className="text-[10px] text-slate-400 truncate">{item.sub}</p>
-              </div>
-              <span className="shrink-0 text-[10px] text-slate-400">{item.time}</span>
-            </Link>
-          ))}
+          {preview.map(item => {
+            const inner = (
+              <>
+                <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${item.color}`}>
+                  {item.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-800 truncate">{item.title}</p>
+                  <p className="text-[10px] text-slate-400 truncate">{item.sub}</p>
+                </div>
+                <span className="shrink-0 text-[10px] text-slate-400">{item.time}</span>
+              </>
+            )
+            return item.candidateId ? (
+              <button key={`${item.type}-${item.id}`} onClick={() => onCandidateClick(item.candidateId!)}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-slate-50 transition-colors text-left"
+              >
+                {inner}
+              </button>
+            ) : (
+              <Link key={`${item.type}-${item.id}`} href={item.href}
+                className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-slate-50 transition-colors"
+              >
+                {inner}
+              </Link>
+            )
+          })}
           {remaining > 0 && (
             <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
               +{remaining} more task{remaining !== 1 ? 's' : ''} →
@@ -807,7 +821,7 @@ function HmActionsWidget({ approvals }: { approvals: TaskApproval[] }) {
 
 // ── RecentApplicationsWidget ──────────────────────────────────────────────────
 
-function RecentApplicationsWidget({ applications }: { applications: RecentApplication[] }) {
+function RecentApplicationsWidget({ applications, onCandidateClick }: { applications: RecentApplication[]; onCandidateClick: (id: string) => void }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
   const filtered  = filterFn(applications, a => [a.candidate_name, a.job_title, a.stage_name ?? '', a.source])
   const preview   = filtered.slice(0, PREVIEW_LIMIT)
@@ -821,8 +835,8 @@ function RecentApplicationsWidget({ applications }: { applications: RecentApplic
       ) : (
         <div className="space-y-0">
           {preview.map(a => (
-            <Link key={a.id} href={`/candidates/${a.candidate_id}`}
-              className="flex items-center gap-3 rounded-lg border-b border-slate-50 px-1 py-2 hover:bg-slate-50 transition-colors"
+            <button key={a.id} onClick={() => onCandidateClick(a.candidate_id)}
+              className="flex w-full items-center gap-3 rounded-lg border-b border-slate-50 px-1 py-2 hover:bg-slate-50 transition-colors text-left"
             >
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">
                 {a.candidate_name.charAt(0).toUpperCase()}
@@ -844,7 +858,7 @@ function RecentApplicationsWidget({ applications }: { applications: RecentApplic
                   'bg-slate-100 text-slate-600'
                 }`}>{a.ai_score}</span>
               )}
-            </Link>
+            </button>
           ))}
           {remaining > 0 && (
             <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
@@ -859,7 +873,7 @@ function RecentApplicationsWidget({ applications }: { applications: RecentApplic
 
 // ── TopScoredWidget ───────────────────────────────────────────────────────────
 
-function TopScoredWidget({ candidates }: { candidates: TopScored[] }) {
+function TopScoredWidget({ candidates, onCandidateClick }: { candidates: TopScored[]; onCandidateClick: (id: string) => void }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
   const filtered  = filterFn(candidates, c => [c.candidate_name, c.job_title])
   const preview   = filtered.slice(0, PREVIEW_LIMIT)
@@ -875,8 +889,8 @@ function TopScoredWidget({ candidates }: { candidates: TopScored[] }) {
           {preview.map((c, idx) => {
             const reco = RECO_CONFIG[c.ai_recommendation ?? '']
             return (
-              <Link key={c.id} href={`/candidates/${c.candidate_id}`}
-                className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 hover:bg-slate-100 transition-colors"
+              <button key={c.id} onClick={() => onCandidateClick(c.candidate_id)}
+                className="flex w-full items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 hover:bg-slate-100 transition-colors text-left"
               >
                 <span className="w-4 shrink-0 text-center text-[10px] font-bold text-slate-400">#{idx + 1}</span>
                 <div className="flex-1 min-w-0">
@@ -895,7 +909,7 @@ function TopScoredWidget({ candidates }: { candidates: TopScored[] }) {
                 }`}>
                   {c.ai_score}
                 </div>
-              </Link>
+              </button>
             )
           })}
           {remaining > 0 && (
@@ -950,7 +964,7 @@ function CandidateSourcesWidget({ sources }: { sources: CandidateSource[] }) {
 
 // ── OfferTrackerWidget ────────────────────────────────────────────────────────
 
-function OfferTrackerWidget({ offers }: { offers: OfferTrackerItem[] }) {
+function OfferTrackerWidget({ offers, onCandidateClick }: { offers: OfferTrackerItem[]; onCandidateClick: (id: string) => void }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
   const filtered  = filterFn(offers, o => [o.candidate_name, o.job_title, o.current_title ?? ''])
   const preview   = filtered.slice(0, PREVIEW_LIMIT)
@@ -964,8 +978,8 @@ function OfferTrackerWidget({ offers }: { offers: OfferTrackerItem[] }) {
       ) : (
         <div className="space-y-1.5">
           {preview.map(o => (
-            <Link key={o.candidate_id} href={`/candidates/${o.candidate_id}`}
-              className="flex items-center gap-2.5 rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-2 hover:bg-violet-100 transition-colors"
+            <button key={o.candidate_id} onClick={() => onCandidateClick(o.candidate_id)}
+              className="flex w-full items-center gap-2.5 rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-2 hover:bg-violet-100 transition-colors text-left"
             >
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-200 text-[10px] font-bold text-violet-700">
                 {o.candidate_name.charAt(0).toUpperCase()}
@@ -977,7 +991,7 @@ function OfferTrackerWidget({ offers }: { offers: OfferTrackerItem[] }) {
               <span className="shrink-0 rounded-full border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
                 Offer Out
               </span>
-            </Link>
+            </button>
           ))}
           {remaining > 0 && (
             <Link href="/candidates" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
@@ -1275,6 +1289,7 @@ function ActivityPanel({
   rightWidgets, rightPanelMode, rightWidgetSnapshot,
   onOpenCustomizer, onCloseCustomizer, onDiscardCustomizer,
   onReorderWidgets, onRemoveWidget, onAddWidget,
+  onCandidateClick,
 }: {
   data: DashboardData
   rightWidgets:        WidgetId[]
@@ -1286,6 +1301,7 @@ function ActivityPanel({
   onReorderWidgets:    (widgets: WidgetId[]) => void
   onRemoveWidget:      (id: WidgetId) => void
   onAddWidget:         (id: WidgetId) => void
+  onCandidateClick:    (id: string) => void
 }) {
   return (
     <aside className="sticky top-0 h-screen w-72 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
@@ -1325,17 +1341,17 @@ function ActivityPanel({
           key={wId}
           className={`px-4 py-4 ${idx < rightWidgets.length - 1 ? 'border-b border-slate-100' : ''} ${rightPanelMode ? 'pointer-events-none opacity-40' : ''}`}
         >
-          {wId === 'interviews'          && <InterviewsWidget         interviews={data.upcoming_interviews} />}
-          {wId === 'tasks'               && <TasksWidget              tasks={data.tasks} />}
+          {wId === 'interviews'          && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={onCandidateClick} />}
+          {wId === 'tasks'               && <TasksWidget              tasks={data.tasks} onCandidateClick={onCandidateClick} />}
           {wId === 'overview_stats'      && <OverviewStatsWidget      stats={data.stats} />}
           {wId === 'pipeline'            && <PipelineWidget           breakdown={data.candidate_breakdown} />}
           {wId === 'jobs_mini'           && <JobsMiniWidget           jobs={data.top_jobs} />}
           {wId === 'jobs_by_dept'        && <JobsByDeptWidget         departments={data.jobs_by_dept} />}
           {wId === 'hm_actions'          && <HmActionsWidget          approvals={data.tasks.pending_approvals} />}
-          {wId === 'recent_applications' && <RecentApplicationsWidget applications={data.recent_applications} />}
-          {wId === 'top_scored'          && <TopScoredWidget          candidates={data.top_scored} />}
+          {wId === 'recent_applications' && <RecentApplicationsWidget applications={data.recent_applications} onCandidateClick={onCandidateClick} />}
+          {wId === 'top_scored'          && <TopScoredWidget          candidates={data.top_scored} onCandidateClick={onCandidateClick} />}
           {wId === 'candidate_sources'   && <CandidateSourcesWidget   sources={data.candidate_sources} />}
-          {wId === 'offer_tracker'       && <OfferTrackerWidget        offers={data.offer_tracker} />}
+          {wId === 'offer_tracker'       && <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={onCandidateClick} />}
           {wId === 'recent_activity'     && <RecentActivityWidget      activity={data.recent_activity} />}
           {wId === 'stage_funnel'        && <StageFunnelWidget         funnel={data.stage_funnel} />}
         </div>
@@ -1594,6 +1610,9 @@ export default function DashboardPage() {
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
+  // Quick-view drawer
+  const [drawerCandidateId, setDrawerCandidateId] = useState<string | null>(null)
+
   // Views
   const [views,          setViews]         = useState<DashView[]>(DEFAULT_VIEWS)
   const [activeViewId,   setActiveViewId]  = useState('home')
@@ -1829,17 +1848,17 @@ export default function DashboardPage() {
                     key={wId}
                     className={`rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 ${isWide ? 'lg:col-span-2' : ''} ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
                   >
-                    {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} />}
-                    {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} />}
+                    {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={setDrawerCandidateId} />}
+                    {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={setDrawerCandidateId} />}
                     {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
                     {wId === 'pipeline'           && <PipelineWidget           breakdown={data.candidate_breakdown} />}
                     {wId === 'jobs_mini'          && <JobsMiniWidget           jobs={data.top_jobs} />}
                     {wId === 'jobs_by_dept'       && <JobsByDeptWidget         departments={data.jobs_by_dept} />}
                     {wId === 'hm_actions'         && <HmActionsWidget          approvals={data.tasks.pending_approvals} />}
-                    {wId === 'recent_applications'&& <RecentApplicationsWidget applications={data.recent_applications} />}
-                    {wId === 'top_scored'         && <TopScoredWidget          candidates={data.top_scored} />}
+                    {wId === 'recent_applications'&& <RecentApplicationsWidget applications={data.recent_applications} onCandidateClick={setDrawerCandidateId} />}
+                    {wId === 'top_scored'         && <TopScoredWidget          candidates={data.top_scored} onCandidateClick={setDrawerCandidateId} />}
                     {wId === 'candidate_sources'  && <CandidateSourcesWidget   sources={data.candidate_sources} />}
-                    {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} />}
+                    {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={setDrawerCandidateId} />}
                     {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
                     {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
                   </div>
@@ -1868,6 +1887,13 @@ export default function DashboardPage() {
         onReorderWidgets={handleRightReorderWidgets}
         onRemoveWidget={handleRightRemoveWidget}
         onAddWidget={handleRightAddWidget}
+        onCandidateClick={setDrawerCandidateId}
+      />
+
+      {/* Candidate quick-view drawer */}
+      <CandidateDrawer
+        candidateId={drawerCandidateId}
+        onClose={() => setDrawerCandidateId(null)}
       />
     </div>
   )
