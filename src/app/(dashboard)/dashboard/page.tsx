@@ -117,7 +117,7 @@ type WidgetId =
   | 'interviews' | 'tasks' | 'overview_stats' | 'pipeline' | 'jobs_mini'
   | 'jobs_by_dept' | 'hm_actions'
   | 'recent_applications' | 'top_scored' | 'candidate_sources' | 'offer_tracker'
-  | 'recent_activity' | 'stage_funnel'
+  | 'recent_activity' | 'stage_funnel' | 'action_queue'
 
 type WidgetCategory = 'jobs' | 'candidates' | 'activity'
 
@@ -146,6 +146,7 @@ const ALL_WIDGET_DEFS: WidgetDef[] = [
   { id: 'tasks',               category: 'activity',   name: 'Tasks',               icon: CheckSquare, description: 'Approvals, feedback, and overdue follow-ups' },
   { id: 'recent_activity',     category: 'activity',   name: 'Recent Activity',     icon: Zap,         description: 'Latest events across candidates and jobs' },
   { id: 'stage_funnel',        category: 'activity',   name: 'Stage Funnel',        icon: TrendingUp,  description: 'Active candidates broken down by pipeline stage' },
+  { id: 'action_queue',        category: 'activity',   name: 'Action Queue',        icon: Zap,         description: 'Auto-populated daily action items with one-click resolution' },
 ]
 
 const CATEGORY_LABELS: Record<WidgetCategory, string> = {
@@ -479,7 +480,40 @@ function InterviewsWidget({ interviews, onCandidateClick }: { interviews: Upcomi
 
 type TaskTab = 'all' | 'approvals' | 'feedback' | 'followups' | 'mentions' | 'sequences'
 
-function TasksWidget({ tasks, onCandidateClick }: { tasks: DashboardData['tasks']; onCandidateClick: (id: string) => void }) {
+function TasksWidget({ tasks, onCandidateClick, onRefresh }: { tasks: DashboardData['tasks']; onCandidateClick: (id: string) => void; onRefresh?: () => void }) {
+  const [actioningId, setActioningId] = useState<string | null>(null)
+  const [actionResult, setActionResult] = useState<{ id: string; msg: string } | null>(null)
+
+  async function handleApprove(jobId: string) {
+    setActioningId(jobId)
+    try {
+      await fetch(`/api/hiring-requests/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'posted' }),
+      })
+      setActionResult({ id: jobId, msg: 'Approved & posted!' })
+      setTimeout(() => { setActionResult(null); onRefresh?.() }, 1500)
+    } finally {
+      setActioningId(null)
+    }
+  }
+
+  async function handleMarkFollowupDone(applicationId: string) {
+    setActioningId(applicationId)
+    try {
+      await fetch(`/api/applications/${applicationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: 'Follow-up completed', created_by: 'Recruiter' }),
+      })
+      setActionResult({ id: applicationId, msg: 'Marked done!' })
+      setTimeout(() => { setActionResult(null); onRefresh?.() }, 1500)
+    } finally {
+      setActioningId(null)
+    }
+  }
+
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
   const [activeTab, setActiveTab] = useState<TaskTab>('all')
   const counts = {
@@ -565,6 +599,34 @@ function TasksWidget({ tasks, onCandidateClick }: { tasks: DashboardData['tasks'
       ) : (
         <div className="space-y-0.5">
           {preview.map(item => {
+            const resultMsg = actionResult?.id === item.id ? actionResult.msg : null
+
+            if (resultMsg) {
+              return (
+                <div key={`${item.type}-${item.id}`} className="flex items-center gap-2.5 rounded-lg bg-emerald-50 px-2 py-2 text-xs text-emerald-700">
+                  <CheckSquare className="h-3.5 w-3.5" /> {resultMsg}
+                </div>
+              )
+            }
+
+            const actionBtn = item.type === 'approval' ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleApprove(item.id) }}
+                disabled={actioningId === item.id}
+                className="shrink-0 rounded bg-emerald-500 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+              >
+                {actioningId === item.id ? '...' : 'Approve'}
+              </button>
+            ) : item.type === 'followup' ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleMarkFollowupDone(item.id) }}
+                disabled={actioningId === item.id}
+                className="shrink-0 rounded bg-slate-500 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-slate-600 disabled:opacity-50 transition-colors"
+              >
+                {actioningId === item.id ? '...' : 'Done'}
+              </button>
+            ) : null
+
             const inner = (
               <>
                 <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${item.color}`}>
@@ -575,6 +637,7 @@ function TasksWidget({ tasks, onCandidateClick }: { tasks: DashboardData['tasks'
                   <p className="text-[10px] text-slate-400 truncate">{item.sub}</p>
                 </div>
                 <span className="shrink-0 text-[10px] text-slate-400">{item.time}</span>
+                {actionBtn}
               </>
             )
             return item.candidateId ? (
@@ -1066,6 +1129,161 @@ function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
   )
 }
 
+// ── ActionQueueWidget ─────────────────────────────────────────────────────────
+
+interface ActionItem {
+  id: string
+  type: 'approve' | 'score' | 'followup' | 'feedback'
+  title: string
+  sub: string
+  actionLabel: string
+  actionColor: string
+  iconColor: string
+  icon: React.ReactNode
+  /** For approve: hiring_request_id. For score: job_id. For followup/feedback: application_id */
+  targetId: string
+  candidateId?: string
+}
+
+function ActionQueueWidget({
+  data, onCandidateClick, onRefresh,
+}: {
+  data: DashboardData; onCandidateClick: (id: string) => void; onRefresh?: () => void
+}) {
+  const [actioningId, setActioningId] = useState<string | null>(null)
+  const [doneIds, setDoneIds]         = useState<Set<string>>(new Set())
+
+  // Build action items from dashboard data
+  const items: ActionItem[] = []
+
+  // 1. JDs awaiting approval
+  for (const t of data.tasks.pending_approvals) {
+    items.push({
+      id: `approve-${t.id}`, type: 'approve', targetId: t.id,
+      title: t.title,
+      sub: `${t.department ?? 'No dept'}${t.location ? ` · ${t.location}` : ''}`,
+      actionLabel: 'Approve & Post', actionColor: 'bg-emerald-500 hover:bg-emerald-600',
+      iconColor: 'bg-emerald-100 text-emerald-600',
+      icon: <CheckSquare className="h-3 w-3" />,
+    })
+  }
+
+  // 2. Applications needing scoring (from application_review — jobs with unreviewed first-stage candidates)
+  for (const r of data.application_review) {
+    items.push({
+      id: `score-${r.job_id}`, type: 'score', targetId: r.job_id,
+      title: `${r.count} candidate${r.count !== 1 ? 's' : ''} need scoring`,
+      sub: r.job_title,
+      actionLabel: 'Score Now', actionColor: 'bg-amber-500 hover:bg-amber-600',
+      iconColor: 'bg-amber-100 text-amber-600',
+      icon: <Star className="h-3 w-3" />,
+    })
+  }
+
+  // 3. Overdue follow-ups
+  for (const t of data.tasks.overdue_followups) {
+    items.push({
+      id: `followup-${t.id}`, type: 'followup', targetId: t.id,
+      title: t.candidate_name, sub: `Follow-up overdue · ${t.job_title}`,
+      candidateId: t.candidate_id,
+      actionLabel: 'Mark Done', actionColor: 'bg-slate-500 hover:bg-slate-600',
+      iconColor: 'bg-red-100 text-red-500',
+      icon: <Bell className="h-3 w-3" />,
+    })
+  }
+
+  // 4. Feedback needed
+  for (const t of data.tasks.feedback_needed) {
+    items.push({
+      id: `feedback-${t.id}`, type: 'feedback', targetId: t.id,
+      title: t.candidate_name, sub: `Feedback needed · ${t.job_title}`,
+      candidateId: t.candidate_id,
+      actionLabel: 'Review', actionColor: 'bg-blue-500 hover:bg-blue-600',
+      iconColor: 'bg-amber-100 text-amber-600',
+      icon: <MessageSquare className="h-3 w-3" />,
+    })
+  }
+
+  const visibleItems = items.filter(i => !doneIds.has(i.id))
+
+  async function handleAction(item: ActionItem) {
+    setActioningId(item.id)
+    try {
+      if (item.type === 'approve') {
+        await fetch(`/api/hiring-requests/${item.targetId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'posted' }),
+        })
+      } else if (item.type === 'score') {
+        await fetch(`/api/jobs/${item.targetId}/score`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        })
+      } else if (item.type === 'followup') {
+        await fetch(`/api/applications/${item.targetId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note: 'Follow-up completed', created_by: 'Recruiter' }),
+        })
+      } else if (item.type === 'feedback') {
+        // Open candidate drawer for feedback
+        if (item.candidateId) onCandidateClick(item.candidateId)
+        setActioningId(null)
+        return
+      }
+      setDoneIds(prev => new Set(prev).add(item.id))
+      setTimeout(() => onRefresh?.(), 1500)
+    } finally {
+      setActioningId(null)
+    }
+  }
+
+  return (
+    <div>
+      <WidgetHeader wId="action_queue" title="Action Queue" badge={visibleItems.length} />
+
+      {visibleItems.length === 0 ? (
+        <div className="py-8 text-center">
+          <CheckSquare className="mx-auto mb-2 h-6 w-6 text-emerald-300" />
+          <p className="text-xs font-medium text-slate-600">All caught up!</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">No pending actions right now</p>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {visibleItems.slice(0, 8).map(item => (
+            <div key={item.id}
+              className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-white px-3 py-2.5 hover:border-slate-200 transition-colors"
+            >
+              <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${item.iconColor}`}>
+                {item.icon}
+              </div>
+              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => item.candidateId && onCandidateClick(item.candidateId)}>
+                <p className="text-xs font-medium text-slate-800 truncate">{item.title}</p>
+                <p className="text-[10px] text-slate-400 truncate">{item.sub}</p>
+              </div>
+              {doneIds.has(item.id) ? (
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                  Done!
+                </span>
+              ) : (
+                <button
+                  onClick={() => handleAction(item)}
+                  disabled={actioningId === item.id}
+                  className={`shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-medium text-white transition-colors disabled:opacity-50 ${item.actionColor}`}
+                >
+                  {actioningId === item.id ? '...' : item.actionLabel}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── StageFunnelWidget ─────────────────────────────────────────────────────────
 
 function StageFunnelWidget({ funnel }: { funnel: StageFunnelItem[] }) {
@@ -1074,29 +1292,36 @@ function StageFunnelWidget({ funnel }: { funnel: StageFunnelItem[] }) {
   const preview   = filtered.slice(0, PREVIEW_LIMIT)
   const remaining = filtered.length - preview.length
   const max = Math.max(...funnel.map(s => s.count), 1)
+  const total = funnel.reduce((sum, s) => sum + s.count, 0)
   return (
     <div>
-      <WidgetHeader wId="stage_funnel" title="Stage Funnel" href="/candidates"
+      <WidgetHeader wId="stage_funnel" title="Stage Funnel" href="/pipeline"
         searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
       {funnel.length === 0 ? (
         <p className="text-xs text-slate-400">No active candidates in the pipeline.</p>
       ) : (
         <div className="space-y-2">
-          {preview.map(s => (
-            <div key={s.stage_id} className="flex items-center gap-2.5">
-              <div className={`h-2 w-2 shrink-0 rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'}`} />
-              <span className="w-24 shrink-0 truncate text-xs text-slate-600">{s.stage_name}</span>
-              <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className={`h-full rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'} transition-all`}
-                  style={{ width: `${(s.count / max) * 100}%` }}
-                />
-              </div>
-              <span className="w-5 shrink-0 text-right text-xs font-semibold text-slate-700">{s.count}</span>
-            </div>
-          ))}
+          {preview.map(s => {
+            const pct = total > 0 ? Math.round((s.count / total) * 100) : 0
+            return (
+              <Link key={s.stage_id} href={`/pipeline?stage=${s.stage_id}`}
+                className="flex items-center gap-2.5 rounded-lg px-1 py-0.5 hover:bg-slate-50 transition-colors group"
+              >
+                <div className={`h-2 w-2 shrink-0 rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'}`} />
+                <span className="w-24 shrink-0 truncate text-xs text-slate-600 group-hover:text-slate-900">{s.stage_name}</span>
+                <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full ${STAGE_COLORS[s.color] ?? 'bg-slate-400'} transition-all`}
+                    style={{ width: `${(s.count / max) * 100}%` }}
+                  />
+                </div>
+                <span className="w-5 shrink-0 text-right text-xs font-semibold text-slate-700">{s.count}</span>
+                <span className="w-8 shrink-0 text-right text-[10px] text-slate-400">{pct}%</span>
+              </Link>
+            )
+          })}
           {remaining > 0 && (
-            <Link href="/candidates" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/pipeline" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
               +{remaining} more stage{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -1290,6 +1515,7 @@ function ActivityPanel({
   onOpenCustomizer, onCloseCustomizer, onDiscardCustomizer,
   onReorderWidgets, onRemoveWidget, onAddWidget,
   onCandidateClick,
+  onRefresh,
 }: {
   data: DashboardData
   rightWidgets:        WidgetId[]
@@ -1302,6 +1528,7 @@ function ActivityPanel({
   onRemoveWidget:      (id: WidgetId) => void
   onAddWidget:         (id: WidgetId) => void
   onCandidateClick:    (id: string) => void
+  onRefresh?:          () => void
 }) {
   return (
     <aside className="sticky top-0 h-screen w-72 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
@@ -1342,7 +1569,7 @@ function ActivityPanel({
           className={`px-4 py-4 ${idx < rightWidgets.length - 1 ? 'border-b border-slate-100' : ''} ${rightPanelMode ? 'pointer-events-none opacity-40' : ''}`}
         >
           {wId === 'interviews'          && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={onCandidateClick} />}
-          {wId === 'tasks'               && <TasksWidget              tasks={data.tasks} onCandidateClick={onCandidateClick} />}
+          {wId === 'tasks'               && <TasksWidget              tasks={data.tasks} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
           {wId === 'overview_stats'      && <OverviewStatsWidget      stats={data.stats} />}
           {wId === 'pipeline'            && <PipelineWidget           breakdown={data.candidate_breakdown} />}
           {wId === 'jobs_mini'           && <JobsMiniWidget           jobs={data.top_jobs} />}
@@ -1354,6 +1581,7 @@ function ActivityPanel({
           {wId === 'offer_tracker'       && <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={onCandidateClick} />}
           {wId === 'recent_activity'     && <RecentActivityWidget      activity={data.recent_activity} />}
           {wId === 'stage_funnel'        && <StageFunnelWidget         funnel={data.stage_funnel} />}
+          {wId === 'action_queue'        && <ActionQueueWidget         data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
         </div>
       ))}
 
@@ -1842,14 +2070,14 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {(activeView?.widgets ?? []).map(wId => {
                 // Interviews and Tasks span the full width — they have tabs/tables that need space
-                const isWide = ['interviews', 'tasks', 'overview_stats'].includes(wId)
+                const isWide = ['interviews', 'tasks', 'overview_stats', 'action_queue'].includes(wId)
                 return (
                   <div
                     key={wId}
                     className={`rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 ${isWide ? 'lg:col-span-2' : ''} ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={setDrawerCandidateId} />}
-                    {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={setDrawerCandidateId} />}
+                    {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />}
                     {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
                     {wId === 'pipeline'           && <PipelineWidget           breakdown={data.candidate_breakdown} />}
                     {wId === 'jobs_mini'          && <JobsMiniWidget           jobs={data.top_jobs} />}
@@ -1861,6 +2089,7 @@ export default function DashboardPage() {
                     {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={setDrawerCandidateId} />}
                     {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
                     {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
+                    {wId === 'action_queue'      && <ActionQueueWidget         data={data} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />}
                   </div>
                 )
               })}
@@ -1888,12 +2117,14 @@ export default function DashboardPage() {
         onRemoveWidget={handleRightRemoveWidget}
         onAddWidget={handleRightAddWidget}
         onCandidateClick={setDrawerCandidateId}
+        onRefresh={() => fetchData(true)}
       />
 
       {/* Candidate quick-view drawer */}
       <CandidateDrawer
         candidateId={drawerCandidateId}
         onClose={() => setDrawerCandidateId(null)}
+        onActionComplete={() => fetchData(true)}
       />
     </div>
   )
