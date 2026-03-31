@@ -1,5 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 const isPublic = createRouteMatcher([
   '/',
@@ -25,11 +25,14 @@ const isPublic = createRouteMatcher([
   '/api/intake/(.*)',
   '/api/parse-document(.*)',
   '/api/resume/parse(.*)',
-  // Queue worker (protected by CRON_SECRET, not Clerk)
-  '/api/queue(.*)',
 ])
 
-export default clerkMiddleware((auth, req) => {
+// Routes that bypass Clerk entirely (auth handled by the route itself)
+function isClerkBypassed(req: NextRequest): boolean {
+  return req.nextUrl.pathname.startsWith('/api/queue')
+}
+
+const clerk = clerkMiddleware((auth, req) => {
   if (!isPublic(req)) {
     const { userId } = auth()
     if (!userId) {
@@ -39,6 +42,14 @@ export default clerkMiddleware((auth, req) => {
     }
   }
 })
+
+export default function middleware(req: NextRequest) {
+  // Let queue worker through without Clerk — it uses CRON_SECRET
+  if (isClerkBypassed(req)) {
+    return NextResponse.next()
+  }
+  return clerk(req, {} as never)
+}
 
 export const config = {
   matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)'],
