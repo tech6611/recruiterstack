@@ -25,6 +25,8 @@ const isPublic = createRouteMatcher([
   '/api/intake/(.*)',
   '/api/parse-document(.*)',
   '/api/resume/parse(.*)',
+  // Queue worker (protected by CRON_SECRET, not Clerk)
+  '/api/queue/(.*)',
 ])
 
 export default clerkMiddleware((auth, req) => {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { notify } from '@/lib/notifications'
 import { runAutopilot } from '@/lib/ai/autopilot'
+import { enqueue } from '@/lib/api/job-queue'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { checkRateLimit } from '@/lib/api/rate-limit'
 import { publicApplySchema } from '@/lib/validations/applications'
@@ -146,7 +147,7 @@ export async function POST(request: NextRequest) {
     resourceId: app!.id,
   })
 
-  // ── Autopilot: fire-and-forget scoring if thresholds are configured ────────
+  // ── Autopilot: enqueue scoring if thresholds are configured ────────────────
   const hasAutopilot =
     (job as { auto_advance_score: number | null; auto_reject_score: number | null })
       .auto_advance_score !== null ||
@@ -154,9 +155,19 @@ export async function POST(request: NextRequest) {
       .auto_reject_score  !== null
 
   if (hasAutopilot) {
-    void runAutopilot(app!.id, job.org_id).catch((err) => {
-      logger.error('Autopilot failed', err, { applicationId: app!.id })
-    })
+    try {
+      await enqueue({
+        orgId: job.org_id,
+        jobType: 'autopilot',
+        payload: { applicationId: app!.id },
+      })
+    } catch {
+      // Queue unavailable — fall back to original fire-and-forget
+      logger.warn('Queue unavailable, falling back to direct autopilot', { applicationId: app!.id })
+      void runAutopilot(app!.id, job.org_id).catch((err) => {
+        logger.error('Autopilot failed', err, { applicationId: app!.id })
+      })
+    }
   }
 
   return NextResponse.json(

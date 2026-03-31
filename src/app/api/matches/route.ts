@@ -5,6 +5,7 @@ import { uuidSchema } from '@/lib/validations/common'
 import { matchCandidateToRole } from '@/lib/ai/matcher'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runInBackground } from '@/lib/api/background'
+import { enqueue } from '@/lib/api/job-queue'
 import type { Candidate, Role } from '@/lib/types/database'
 import { logger } from '@/lib/logger'
 
@@ -32,9 +33,20 @@ export const POST = withOrg(async (_req, orgId, supabase) => {
   }
 
   const roleId = body.role_id
-  runInBackground(async () => {
-    await runMatchingJob(roleId, orgId)
-  })
+
+  // Prefer job queue (persistent, retryable); fall back to runInBackground
+  try {
+    await enqueue({
+      orgId,
+      jobType: 'matching',
+      payload: { roleId },
+    })
+  } catch {
+    logger.warn('Queue unavailable, falling back to runInBackground', { roleId })
+    runInBackground(async () => {
+      await runMatchingJob(roleId, orgId)
+    })
+  }
 
   return NextResponse.json(
     { data: { status: 'processing', role_id: roleId } },

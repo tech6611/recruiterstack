@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
+import { enqueue } from '@/lib/api/job-queue'
 import { runInBackground } from '@/lib/api/background'
 import { logger } from '@/lib/logger'
 
@@ -44,14 +45,6 @@ export async function POST(
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY is not configured.' },
-      { status: 503 },
-    )
-  }
-
   const supabase = createAdminClient()
 
   // Quick check: candidate exists
@@ -66,11 +59,28 @@ export async function POST(
     return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
   }
 
-  // Run AI generation in the background
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: 'ANTHROPIC_API_KEY is not configured.' },
+      { status: 503 },
+    )
+  }
+
+  // Prefer job queue (persistent, retryable); fall back to runInBackground
   const candidateId = params.id
-  runInBackground(async () => {
-    await generateAndStoreSummary(candidateId, orgId, apiKey)
-  })
+  try {
+    await enqueue({
+      orgId,
+      jobType: 'ai_summary',
+      payload: { candidateId },
+    })
+  } catch {
+    logger.warn('Queue unavailable, falling back to runInBackground', { candidateId })
+    runInBackground(async () => {
+      await generateAndStoreSummary(candidateId, orgId, apiKey)
+    })
+  }
 
   return NextResponse.json(
     { data: { status: 'processing', candidate_id: params.id } },
