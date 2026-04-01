@@ -354,8 +354,7 @@ function WidgetGrid({
   const { containerRef, width } = useContainerWidth()
 
   return (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <div ref={containerRef as any} className="flex-1 overflow-auto">
+    <div ref={containerRef as React.RefObject<HTMLDivElement>} className="flex-1 overflow-auto">
       {width > 0 && (
         <GridLayout
           className="layout"

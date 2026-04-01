@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createMockSupabase, createMockRequest } from '@/test/helpers'
 import { createAdminClient } from '@/lib/supabase/server'
 
-import { GET, POST } from '../route'
-import { PATCH, DELETE } from '../[id]/route'
+import { POST } from '../route'
+import { PATCH } from '../[id]/route'
 
 describe('/api/offers', () => {
   let mockSupabase: ReturnType<typeof createMockSupabase>

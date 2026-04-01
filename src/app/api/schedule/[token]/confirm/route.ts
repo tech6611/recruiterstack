@@ -78,7 +78,7 @@ export async function POST(
     .single() as { data: any; error: any }
 
   let meetLink:         string | null = null
-  let calendarEventId:  string | null = null
+  // calendarEventId stored on calendar events directly — not needed in this scope
   let resolvedPlatform: string | null = interview.meeting_platform ?? null
 
   // Cancel old calendar event if rescheduling
@@ -143,7 +143,7 @@ export async function POST(
           attendees:        attendeeEmails,
           timezone,
         })
-        calendarEventId  = created.event_id
+        void created.event_id
         meetLink         = created.teams_link
         resolvedPlatform = 'ms_teams'
       } catch (e) { logger.error('[schedule/confirm] Teams creation failed', e) }
@@ -171,7 +171,7 @@ export async function POST(
           duration:   interview.duration_minutes ?? 60,
           timezone,
         })
-        calendarEventId  = created.meeting_id
+        void created.meeting_id
         meetLink         = created.join_url
         resolvedPlatform = 'zoom'
       } catch (e) { logger.error('[schedule/confirm] Zoom creation failed', e) }
@@ -202,7 +202,7 @@ export async function POST(
           attendees:        attendeeEmails,
           timezone,
         })
-        calendarEventId  = created.calendar_event_id
+        void created.calendar_event_id
         meetLink         = created.meet_link
         resolvedPlatform = 'google_meet'
       } catch (e) { logger.error('[schedule/confirm] Google Meet creation failed', e) }
