@@ -359,8 +359,8 @@ function WidgetGrid({
             className={`relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
           >
             {/* Fixed header row: drag handle + widget content header share the same line */}
-            <div className="widget-drag-handle absolute top-0 left-0 z-10 flex items-center justify-center w-5 h-9 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
-              <GripVertical className="h-4 w-4" />
+            <div className="widget-drag-handle absolute top-4 left-0.5 z-10 flex items-center justify-center w-4 h-6 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
+              <GripVertical className="h-3.5 w-3.5" />
             </div>
             {/* Scrollable content area */}
             <div className="flex-1 overflow-auto p-4 pl-5">
