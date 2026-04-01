@@ -2,12 +2,18 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getOrgId } from '@/lib/auth'
 import { cached, cacheKey } from '@/lib/api/cache'
+import { checkAuthRateLimit } from '@/lib/api/rate-limit'
 import type { CandidateStatus, StageColor } from '@/lib/types/database'
 
 const INTERVIEW_KEYWORDS = ['interview', 'screen', 'technical', 'phone', 'video', 'onsite', 'call']
 
 export async function GET() {
   const orgId = await getOrgId()
+
+  if (orgId) {
+    const rateLimited = await checkAuthRateLimit(orgId)
+    if (rateLimited) return rateLimited
+  }
 
   const ALL_STATUSES: CandidateStatus[] = [
     'active', 'interviewing', 'offer_extended', 'hired', 'inactive', 'rejected',
@@ -351,8 +357,8 @@ export async function GET() {
   const top_jobs = jobs.slice(0, 6).map((job: any) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const jobStages  = stages.filter((s: any) => s.hiring_request_id === job.id)
-    const activeApps = apps.filter(a => a.hiring_request_id === job.id && a.status === 'active')
-    const total      = apps.filter(a => a.hiring_request_id === job.id).length
+    const activeApps = apps.filter((a: { hiring_request_id: string; status: string }) => a.hiring_request_id === job.id && a.status === 'active')
+    const total      = apps.filter((a: { hiring_request_id: string }) => a.hiring_request_id === job.id).length
     return {
       id:               job.id,
       position_title:   job.position_title,

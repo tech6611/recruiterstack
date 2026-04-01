@@ -80,7 +80,7 @@ export async function enqueue(options: EnqueueOptions): Promise<string> {
       payload,
       max_attempts: maxAttempts,
       scheduled_at: scheduledAt,
-    } as never)
+    })
     .select('id')
     .single()
 
@@ -133,7 +133,7 @@ export async function processJobs(batchSize = 5): Promise<number> {
         status: 'processing',
         started_at: new Date().toISOString(),
         attempts: job.attempts + 1,
-      } as never)
+      })
       .eq('id', job.id)
       .in('status', ['pending', 'failed']) // Guard: only claim if still claimable
 
@@ -157,7 +157,7 @@ export async function processJobs(batchSize = 5): Promise<number> {
           status: 'completed',
           completed_at: new Date().toISOString(),
           error: null,
-        } as never)
+        })
         .eq('id', job.id)
 
       processed++
@@ -185,7 +185,7 @@ export async function processJobs(batchSize = 5): Promise<number> {
             status: 'failed',
             error: errorMsg,
             scheduled_at: retryAt,
-          } as never)
+          })
           .eq('id', job.id)
 
         logger.warn('Job failed, will retry', {
@@ -214,6 +214,6 @@ async function markDead(
       status: 'dead',
       error,
       completed_at: new Date().toISOString(),
-    } as never)
+    })
     .eq('id', jobId)
 }

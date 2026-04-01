@@ -44,8 +44,7 @@ export async function POST(
 
     const { data, error } = await supabase
       .from('pipeline_stages')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .insert({ hiring_request_id: jobId, name, color, order_index: nextIndex, org_id: orgId } as any)
+      .insert({ hiring_request_id: jobId, name, color, order_index: nextIndex, org_id: orgId })
       .select()
       .single()
 
@@ -61,7 +60,7 @@ export async function POST(
     const updates = stages.map(s =>
       supabase
         .from('pipeline_stages')
-        .update({ order_index: s.order_index } as never)
+        .update({ order_index: s.order_index })
         .eq('id', s.id)
         .eq('hiring_request_id', jobId)
     )
@@ -74,13 +73,13 @@ export async function POST(
     const { id, name, color } = body as { id: string; name?: string; color?: string }
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
-    const patch: Record<string, unknown> = {}
+    const patch: import('@/lib/types/database').PipelineStageUpdate = {}
     if (name !== undefined) patch.name = name
-    if (color !== undefined) patch.color = color
+    if (color !== undefined) patch.color = color as import('@/lib/types/database').StageColor
 
     const { data, error } = await supabase
       .from('pipeline_stages')
-      .update(patch as never)
+      .update(patch)
       .eq('id', id)
       .eq('hiring_request_id', jobId)
       .select()
@@ -98,7 +97,7 @@ export async function POST(
     // Null out stage_id on any applications in this stage
     await supabase
       .from('applications')
-      .update({ stage_id: null } as never)
+      .update({ stage_id: null })
       .eq('stage_id', id)
 
     const { error } = await supabase

@@ -151,7 +151,7 @@ Be concise, direct, and useful for a recruiter who hasn't reviewed this profile 
     .update({
       ai_summary: summary,
       ai_summary_generated_at: new Date().toISOString(),
-    } as never)
+    })
     .eq('id', candidateId)
     .eq('org_id', job.org_id)
 
@@ -193,8 +193,7 @@ registerHandler('matching', async (job: QueuedJob) => {
             gaps: match.gaps,
             reasoning: match.reasoning,
             recommendation: match.recommendation,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any,
+          },
           { onConflict: 'candidate_id,role_id' },
         )
       if (error) throw new Error(error.message)
@@ -205,21 +204,17 @@ registerHandler('matching', async (job: QueuedJob) => {
   const succeeded = results.length - failed
 
   // Auto-decision thresholds
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const r = role as any
-  if (r.auto_advance_threshold || r.auto_reject_threshold) {
+  if (role.auto_advance_threshold || role.auto_reject_threshold) {
     const { data: matches } = await supabase
       .from('matches')
       .select('candidate_id, score')
       .eq('role_id', roleId)
 
     for (const m of matches ?? []) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const match = m as any
-      if (r.auto_advance_threshold && match.score >= r.auto_advance_threshold) {
-        await supabase.from('candidates').update({ status: 'interviewing' }).eq('id', match.candidate_id).eq('org_id', job.org_id)
-      } else if (r.auto_reject_threshold && match.score <= r.auto_reject_threshold) {
-        await supabase.from('candidates').update({ status: 'rejected' }).eq('id', match.candidate_id).eq('org_id', job.org_id)
+      if (role.auto_advance_threshold && m.score >= role.auto_advance_threshold) {
+        await supabase.from('candidates').update({ status: 'interviewing' }).eq('id', m.candidate_id).eq('org_id', job.org_id)
+      } else if (role.auto_reject_threshold && m.score <= role.auto_reject_threshold) {
+        await supabase.from('candidates').update({ status: 'rejected' }).eq('id', m.candidate_id).eq('org_id', job.org_id)
       }
     }
   }

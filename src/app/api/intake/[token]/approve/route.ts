@@ -7,7 +7,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
 
   const { data, error } = await supabase
     .from('hiring_requests')
-    .update({ status: 'jd_approved' } as any)
+    .update({ status: 'jd_approved' })
     .eq('intake_token', params.token)
     .in('status', ['jd_sent', 'jd_generated'])
     .select('position_title')

@@ -1,11 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-// Database generic intentionally omitted until supabase CLI types are generated
+import type { Database } from '@/lib/types/database'
 
 export function createClient() {
   const cookieStore = cookies()
 
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -29,7 +29,7 @@ export function createClient() {
 
 /** Use the service-role key for trusted server-side mutations */
 export function createAdminClient() {
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {

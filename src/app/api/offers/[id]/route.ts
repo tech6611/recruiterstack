@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
+import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { offerUpdateSchema } from '@/lib/validations/offers'
 
 export async function GET(
   _req: NextRequest,
@@ -30,27 +32,30 @@ export async function PATCH(
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 
-  const body = await req.json()
+  const parsed = await parseBody(req, offerUpdateSchema)
+  if (parsed instanceof NextResponse) return parsed
+
   const supabase = createAdminClient()
 
   // Augment timestamps based on status transitions
-  const updatePayload: Record<string, unknown> = { ...body, updated_at: new Date().toISOString() }
-  if (body.status === 'approved')  updatePayload.approved_at  = new Date().toISOString()
-  if (body.status === 'sent')      updatePayload.sent_at      = new Date().toISOString()
-  if (body.status === 'accepted' || body.status === 'declined')
-                                   updatePayload.responded_at = new Date().toISOString()
+  const now = new Date().toISOString()
+  const updatePayload: Record<string, unknown> = { ...parsed, updated_at: now }
+  if (parsed.status === 'approved')  updatePayload.approved_at  = now
+  if (parsed.status === 'sent')      updatePayload.sent_at      = now
+  if (parsed.status === 'accepted' || parsed.status === 'declined')
+                                     updatePayload.responded_at = now
 
   const { data, error } = await supabase
     .from('offers')
-    .update(updatePayload)
+    .update(updatePayload as import('@/lib/types/database').OfferUpdate)
     .eq('id', params.id)
     .eq('org_id', orgId)
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return handleSupabaseError(error)
 
-  const offer = data as any
+  const offer = data as { application_id: string; candidate_id: string }
   // Log application event for significant status transitions
   const eventMap: Record<string, string> = {
     approved: 'offer_approved',
@@ -58,19 +63,19 @@ export async function PATCH(
     accepted: 'offer_accepted',
     declined: 'offer_declined',
   }
-  const eventType = body.status ? eventMap[body.status] : null
+  const eventType = parsed.status ? eventMap[parsed.status] : null
   if (eventType) {
     await supabase.from('application_events').insert({
       application_id: offer.application_id,
       org_id:         orgId,
       event_type:     eventType,
-      note:           `Offer ${body.status}${body.approved_by ? ` by ${body.approved_by}` : ''}`,
+      note:           `Offer ${parsed.status}${parsed.approved_by ? ` by ${parsed.approved_by}` : ''}`,
       metadata:       { offer_id: params.id },
       created_by:     orgId,
-    } as any)
+    })
 
     // Sync candidate status when offer accepted
-    if (body.status === 'accepted') {
+    if (parsed.status === 'accepted') {
       await supabase
         .from('candidates')
         .update({ status: 'hired', updated_at: new Date().toISOString() })

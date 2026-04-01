@@ -36,7 +36,10 @@
       "Bash(curl -s \"https://lvzdttievphhvxhuglfg.supabase.co/rest/v1/hiring_requests?select=id,position_title,org_id&org_id=eq.org_3AezudTBXrGG7mwimkk7QQ0Eaz9\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2emR0dGlldnBoaHZ4aHVnbGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ1MDA3MSwiZXhwIjoyMDg4MDI2MDcxfQ.XMue8qdypfsOCNz8EQ1sFcKjwnggQq4rwWAColpsT5c\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2emR0dGlldnBoaHZ4aHVnbGZnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ1MDA3MSwiZXhwIjoyMDg4MDI2MDcxfQ.XMue8qdypfsOCNz8EQ1sFcKjwnggQq4rwWAColpsT5c\")",
       "Bash(grep -n \"useEffect\\\\|fetchJobs\\\\|fetchCandidates\\\\|loadData\\\\|fetchData\\\\|useAuth\\\\|useOrganization\\\\|import.*clerk\" /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/jobs/page.tsx /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/candidates/page.tsx /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/pipeline/page.tsx /Users/sagar.kumar/cowork/recruiterstack/.claude/worktrees/amazing-keller/src/app/\\\\\\(dashboard\\\\\\)/roles/[id]/page.tsx)",
       "Bash(curl -s -I \"https://www.recruiterstack.in/jobs\")",
-      "Bash(git add src/app/api/debug-auth/route.ts)"
+      "Bash(git add src/app/api/debug-auth/route.ts)",
+      "Bash(find /Users/sagar/recruiterstack/src -name *.ts -type f)",
+      "Bash(grep -h \"CREATE TABLE\" /Users/sagar/recruiterstack/supabase/migrations/*.sql)",
+      "Bash(npm run:*)"
     ]
   }
 }

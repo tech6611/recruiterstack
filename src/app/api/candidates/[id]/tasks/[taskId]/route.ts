@@ -57,7 +57,7 @@ export async function PATCH(
 
   const { data, error } = await supabase
     .from('candidate_tasks')
-    .update(mergedUpdates as never)
+    .update(mergedUpdates as import('@/lib/types/database').CandidateTaskUpdate)
     .eq('id', params.taskId)
     .eq('candidate_id', params.id)
     .eq('org_id', orgId)
@@ -70,7 +70,7 @@ export async function PATCH(
       const safeUpdates = { ...updates }
       const { data: data2, error: error2 } = await supabase
         .from('candidate_tasks')
-        .update(safeUpdates as never)
+        .update(safeUpdates as import('@/lib/types/database').CandidateTaskUpdate)
         .eq('id', params.taskId)
         .eq('candidate_id', params.id)
         .eq('org_id', orgId)

@@ -33,9 +33,9 @@ export async function GET() {
       .eq('org_id', orgId),
   ])
 
-  const jobs = jobsRes.data ?? []
-  const stages = stagesRes.data ?? []
-  const apps = appsRes.data ?? []
+  const jobs = (jobsRes.data ?? []) as { id: string; position_title: string; department: string | null }[]
+  const stages = (stagesRes.data ?? []) as { id: string; hiring_request_id: string; name: string; order_index: number }[]
+  const apps = (appsRes.data ?? []) as { hiring_request_id: string; stage_id: string | null; status: string }[]
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rows: unknown[][] = []

@@ -23,12 +23,11 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: settings } = await supabase
     .from('org_settings')
     .select('zoom_access_token, zoom_refresh_token, zoom_token_expiry, zoom_connected_email')
     .eq('org_id', orgId)
-    .single() as { data: any; error: any }
+    .single()
 
   const decryptedAccess  = decryptSafe(settings?.zoom_access_token)
   const decryptedRefresh = decryptSafe(settings?.zoom_refresh_token)

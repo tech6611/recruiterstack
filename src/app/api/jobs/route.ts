@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
-import type { StageColor } from '@/lib/types/database'
+import type { HiringRequest, StageColor } from '@/lib/types/database'
 
 // GET /api/jobs — list all hiring requests with candidate counts per stage
 export async function GET() {
@@ -31,10 +31,10 @@ export async function GET() {
     return NextResponse.json({ error: jobsRes.error.message }, { status: 500 })
   }
 
-  const stages = stagesRes.data ?? []
-  const apps = appsRes.data ?? []
+  const stages = (stagesRes.data ?? []) as { id: string; hiring_request_id: string; name: string; color: StageColor; order_index: number }[]
+  const apps = (appsRes.data ?? []) as { id: string; hiring_request_id: string; stage_id: string | null; status: string }[]
 
-  const data = (jobsRes.data ?? []).map(job => {
+  const data = ((jobsRes.data ?? []) as HiringRequest[]).map(job => {
     const jobStages = stages
       .filter(s => s.hiring_request_id === job.id)
       .sort((a, b) => a.order_index - b.order_index)

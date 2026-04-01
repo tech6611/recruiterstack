@@ -21,12 +21,11 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: settings } = await supabase
     .from('org_settings')
     .select('ms_access_token, ms_refresh_token, ms_token_expiry, ms_connected_email')
     .eq('org_id', orgId)
-    .single() as { data: any; error: any }
+    .single()
 
   const decryptedAccess  = decryptSafe(settings?.ms_access_token)
   const decryptedRefresh = decryptSafe(settings?.ms_refresh_token)

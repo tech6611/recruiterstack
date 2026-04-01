@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { applicationInsertSchema } from '@/lib/validations/applications'
 import { createNotification } from '@/lib/api/notify'
+import type { ApplicationInsert, ApplicationEventInsert } from '@/lib/types/database'
 
 // POST /api/applications
 // Adds a candidate to a job pipeline.
@@ -15,19 +16,19 @@ export const POST = withOrg(async (req, orgId, supabase) => {
 
   // ── Upsert candidate if candidate_data provided ───────────────────────────
   if (!resolvedCandidateId && candidate_data) {
-    const { data: existing } = await supabase
+    const { data: existingData } = await supabase
       .from('candidates')
       .select('id')
       .eq('email', candidate_data.email)
       .eq('org_id', orgId)
       .single()
+    const existing = existingData as { id: string } | null
 
     if (existing) {
       resolvedCandidateId = existing.id
     } else {
-      const { data: created, error: createErr } = await supabase
+      const { data: createdData, error: createErr } = await supabase
         .from('candidates')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .insert({
           name: candidate_data.name,
           email: candidate_data.email,
@@ -37,13 +38,13 @@ export const POST = withOrg(async (req, orgId, supabase) => {
           skills: [],
           experience_years: 0,
           status: 'active',
-          org_id: orgId,
-        } as any)
+        })
         .select('id')
         .single()
 
       if (createErr) return handleSupabaseError(createErr)
-      resolvedCandidateId = created!.id
+      const created = createdData as { id: string }
+      resolvedCandidateId = created.id
     }
   }
 
@@ -67,18 +68,18 @@ export const POST = withOrg(async (req, orgId, supabase) => {
   // ── Get stage name for timeline event ─────────────────────────────────────
   let stageName = 'Applied'
   if (resolvedStageId) {
-    const { data: stageRow } = await supabase
+    const { data: stageRowData } = await supabase
       .from('pipeline_stages')
       .select('name')
       .eq('id', resolvedStageId)
       .single()
+    const stageRow = stageRowData as { name: string } | null
     if (stageRow) stageName = stageRow.name
   }
 
   // ── Create application ────────────────────────────────────────────────────
-  const { data: app, error: appErr } = await supabase
+  const { data: appData, error: appErr } = await supabase
     .from('applications')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .insert({
       candidate_id: resolvedCandidateId,
       hiring_request_id,
@@ -86,28 +87,26 @@ export const POST = withOrg(async (req, orgId, supabase) => {
       status: 'active',
       source,
       source_detail: source_detail ?? null,
-      org_id: orgId,
-    } as any)
+    } as ApplicationInsert)
     .select('*, candidate:candidates(*)')
     .single()
 
   if (appErr) return handleSupabaseError(appErr)
+  const app = appData as Record<string, unknown> & { id: string; candidate?: { name: string } }
 
   // ── Record timeline event ─────────────────────────────────────────────────
   await supabase
     .from('application_events')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .insert({
       application_id: app.id,
       event_type: 'applied',
       to_stage: stageName,
       created_by: 'Recruiter',
       org_id: orgId,
-    } as any)
+    } as ApplicationEventInsert)
 
   // ── In-app notification ─────────────────────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const candidateName = (app as any).candidate?.name ?? 'Candidate'
+  const candidateName = app.candidate?.name ?? 'Candidate'
   await createNotification({
     orgId,
     type: 'candidate_applied',

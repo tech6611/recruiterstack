@@ -6,7 +6,7 @@ import { matchCandidateToRole } from '@/lib/ai/matcher'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runInBackground } from '@/lib/api/background'
 import { enqueue } from '@/lib/api/job-queue'
-import type { Candidate, Role } from '@/lib/types/database'
+import type { Candidate, Role, Match } from '@/lib/types/database'
 import { logger } from '@/lib/logger'
 
 const matchBodySchema = z.object({
@@ -91,7 +91,7 @@ async function runMatchingJob(roleId: string, orgId: string) {
             gaps: match.gaps,
             reasoning: match.reasoning,
             recommendation: match.recommendation,
-          } as any,
+          },
           { onConflict: 'candidate_id,role_id' },
         )
         .select()
@@ -105,7 +105,7 @@ async function runMatchingJob(roleId: string, orgId: string) {
   const succeeded = results
     .filter((r) => r.status === 'fulfilled')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((r) => (r as PromiseFulfilledResult<any>).value)
+    .map((r) => (r as PromiseFulfilledResult<Match>).value)
 
   const failed = results.filter((r) => r.status === 'rejected').length
 

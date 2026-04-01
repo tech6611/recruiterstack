@@ -19,6 +19,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { COPILOT_TOOLS, executeTool } from '@/lib/copilot-tools'
+import { checkAuthRateLimit } from '@/lib/api/rate-limit'
 
 export const maxDuration = 120
 
@@ -75,6 +76,9 @@ export async function POST(request: NextRequest) {
   const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
+
+  const rateLimited = await checkAuthRateLimit(orgId, { maxRequests: 20, window: '60 s' })
+  if (rateLimited) return rateLimited
 
   let messages: { role: 'user' | 'assistant'; content: string }[]
   try {

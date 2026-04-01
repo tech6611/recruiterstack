@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
+import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { emailTemplateUpdateSchema } from '@/lib/validations/email-templates'
 
 // PATCH /api/email-templates/[id] — rename / update a saved template
 export async function PATCH(
@@ -11,15 +13,14 @@ export async function PATCH(
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 
-  let body: { name?: string; subject?: string; body?: string }
-  try { body = await request.json() } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
+  const parsed = await parseBody(request, emailTemplateUpdateSchema)
+  if (parsed instanceof NextResponse) return parsed
 
-  const updates: Record<string, string> = {}
-  if (body.name?.trim())    updates.name    = body.name.trim()
-  if (body.subject?.trim()) updates.subject = body.subject.trim()
-  if (body.body?.trim())    updates.body    = body.body.trim()
+  // Build update payload from validated fields
+  const updates: import('@/lib/types/database').EmailTemplateUpdate = {}
+  if (parsed.name)    updates.name    = parsed.name.trim()
+  if (parsed.subject) updates.subject = parsed.subject.trim()
+  if (parsed.body)    updates.body    = parsed.body.trim()
 
   if (Object.keys(updates).length === 0)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
@@ -33,7 +34,7 @@ export async function PATCH(
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return handleSupabaseError(error)
   return NextResponse.json({ data })
 }
 

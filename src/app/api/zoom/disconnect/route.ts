@@ -12,12 +12,11 @@ export async function POST() {
   const supabase = createAdminClient()
 
   // Fetch token for revocation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: settings } = await supabase
     .from('org_settings')
     .select('zoom_access_token')
     .eq('org_id', orgId)
-    .single() as { data: any; error: any }
+    .single()
 
   // Best-effort revoke with Zoom
   const tokenToRevoke = decryptSafe(settings?.zoom_access_token)

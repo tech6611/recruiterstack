@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { notifySlack, notifySlackDM } from '@/lib/notifications'
+import { applicationStatusEnum } from '@/lib/validations/common'
+import type { ApplicationUpdate, ApplicationEventInsert } from '@/lib/types/database'
 
 // GET /api/applications/[id]
 export async function GET(
@@ -20,7 +22,7 @@ export async function GET(
       .select('*, candidate:candidates(*), pipeline_stages(name, color)')
       .eq('id', params.id)
       .eq('org_id', orgId)
-      .single(),
+      .single() as { data: Record<string, unknown> | null; error: unknown },
     supabase
       .from('application_events')
       .select('*')
@@ -59,15 +61,20 @@ export async function PATCH(
   }
 
   // ── Fetch current application ─────────────────────────────────────────────
-  const { data: current, error: fetchErr } = await supabase
+  const { data: currentData, error: fetchErr } = await supabase
     .from('applications')
     .select('*, pipeline_stages(name), candidate:candidates(name), hiring_request:hiring_requests(hiring_manager_email, position_title)')
     .eq('id', params.id)
     .eq('org_id', orgId)
     .single()
 
-  if (fetchErr || !current) {
+  if (fetchErr || !currentData) {
     return NextResponse.json({ error: 'Application not found' }, { status: 404 })
+  }
+  const current = currentData as Record<string, unknown> & {
+    pipeline_stages: { name: string } | null
+    candidate: { name: string } | null
+    hiring_request: { hiring_manager_email: string | null; position_title: string } | null
   }
 
   // ── Stage move ────────────────────────────────────────────────────────────
@@ -85,10 +92,9 @@ export async function PATCH(
       newStageName = newStage?.name ?? null
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase
       .from('applications')
-      .update({ stage_id } as never)
+      .update({ stage_id } as ApplicationUpdate)
       .eq('id', params.id)
       .select('*, candidate:candidates(*)')
       .single()
@@ -98,23 +104,18 @@ export async function PATCH(
     // Record event
     await supabase
       .from('application_events')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .insert({
         application_id: params.id,
         event_type: 'stage_moved',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        from_stage: (current.pipeline_stages as any)?.name ?? null,
+        from_stage: current.pipeline_stages?.name ?? null,
         to_stage: newStageName,
         created_by: 'Recruiter',
         org_id: orgId,
-      } as any)
+      } as ApplicationEventInsert)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const candidateName = (current.candidate as any)?.name ?? 'Candidate'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const hmEmail = (current.hiring_request as any)?.hiring_manager_email as string | null
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const jobTitle = (current.hiring_request as any)?.position_title as string | null
+    const candidateName = current.candidate?.name ?? 'Candidate'
+    const hmEmail = current.hiring_request?.hiring_manager_email ?? null
+    const jobTitle = current.hiring_request?.position_title ?? null
     const stageMsg = `➡️ *${candidateName}* moved to *${newStageName ?? 'a new stage'}*${jobTitle ? ` for *${jobTitle}*` : ''}`
 
     // Fire-and-forget — don't block the API response waiting for Slack
@@ -128,11 +129,18 @@ export async function PATCH(
 
   // ── Status change ─────────────────────────────────────────────────────────
   if ('status' in body) {
-    const { status } = body as { status: string }
+    const statusResult = applicationStatusEnum.safeParse(body.status)
+    if (!statusResult.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', issues: [{ path: 'status', message: `Must be one of: ${applicationStatusEnum.options.join(', ')}` }] },
+        { status: 400 },
+      )
+    }
+    const status = statusResult.data
 
     const { data, error } = await supabase
       .from('applications')
-      .update({ status } as never)
+      .update({ status } as ApplicationUpdate)
       .eq('id', params.id)
       .select('*, candidate:candidates(*)')
       .single()
@@ -141,19 +149,16 @@ export async function PATCH(
 
     await supabase
       .from('application_events')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .insert({
         application_id: params.id,
         event_type: 'status_changed',
         to_stage: status,
         created_by: 'Recruiter',
         org_id: orgId,
-      } as any)
+      } as ApplicationEventInsert)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const candidateName = (current.candidate as any)?.name ?? 'Candidate'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const hmEmailStatus = (current.hiring_request as any)?.hiring_manager_email as string | null
+    const candidateName = current.candidate?.name ?? 'Candidate'
+    const hmEmailStatus = current.hiring_request?.hiring_manager_email ?? null
     const label =
       status === 'hired'
         ? `🎉 *${candidateName}* was marked Hired`
@@ -180,14 +185,13 @@ export async function PATCH(
 
     const { data, error } = await supabase
       .from('application_events')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .insert({
         application_id: params.id,
         event_type: 'note_added',
         note,
         created_by,
         org_id: orgId,
-      } as any)
+      } as ApplicationEventInsert)
       .select()
       .single()
 

@@ -13,6 +13,7 @@ export type RoleStatus = 'draft' | 'active' | 'paused' | 'closed'
 
 export interface Candidate {
   id: string
+  org_id: string
   name: string
   email: string
   phone: string | null
@@ -23,15 +24,19 @@ export interface Candidate {
   location: string | null
   linkedin_url: string | null
   status: CandidateStatus
+  ai_summary: string | null
+  ai_summary_generated_at: string | null
   created_at: string
   updated_at: string
 }
 
 export interface CandidateInsert
-  extends Omit<Candidate, 'id' | 'created_at' | 'updated_at'> {
+  extends Omit<Candidate, 'id' | 'created_at' | 'updated_at' | 'ai_summary' | 'ai_summary_generated_at'> {
   id?: string
   created_at?: string
   updated_at?: string
+  ai_summary?: string | null
+  ai_summary_generated_at?: string | null
 }
 
 export interface CandidateUpdate extends Partial<CandidateInsert> {}
@@ -43,6 +48,7 @@ export interface CandidateListItem extends Candidate {
 
 export interface Role {
   id: string
+  org_id: string
   job_title: string
   required_skills: string[]
   min_experience: number
@@ -87,6 +93,7 @@ export type HiringRequestStatus =
 
 export interface HiringRequest {
   id: string
+  org_id: string
   ticket_number: string | null
   position_title: string
   department: string | null
@@ -132,6 +139,7 @@ export type StageColor = 'slate' | 'blue' | 'violet' | 'amber' | 'emerald' | 'gr
 
 export interface PipelineStage {
   id: string
+  org_id: string
   hiring_request_id: string
   name: string
   order_index: number
@@ -147,6 +155,7 @@ export type AiRecommendation = 'strong_yes' | 'yes' | 'maybe' | 'no'
 
 export interface Application {
   id: string
+  org_id: string
   candidate_id: string
   hiring_request_id: string
   stage_id: string | null
@@ -183,8 +192,9 @@ export type ApplicationEventType =
 
 export interface ApplicationEvent {
   id: string
+  org_id: string
   application_id: string
-  event_type: ApplicationEventType
+  event_type: string
   from_stage: string | null
   to_stage: string | null
   note: string | null
@@ -217,6 +227,7 @@ export interface ScorecardScore {
 
 export interface Scorecard {
   id:               string
+  org_id:           string
   application_id:   string
   interviewer_name: string
   stage_name:       string | null
@@ -371,7 +382,299 @@ export interface MatchWithRelations extends Match {
   roles: Role
 }
 
-// Supabase Database shape for typed client
+// ── Notifications ────────────────────────────────────────────────────────────
+
+export interface Notification {
+  id: string
+  org_id: string
+  user_id: string | null
+  type: string
+  title: string
+  body: string | null
+  resource_type: string | null
+  resource_id: string | null
+  read: boolean
+  created_at: string
+}
+
+export interface NotificationInsert extends Omit<Notification, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+export interface NotificationUpdate {
+  read?: boolean
+}
+
+// ── Org Settings ─────────────────────────────────────────────────────────────
+
+export interface OrgSettings {
+  org_id: string
+  slack_webhook_url: string | null
+  slack_bot_token: string | null
+  slack_team_id: string | null
+  slack_team_name: string | null
+  google_oauth_access_token: string | null
+  google_oauth_refresh_token: string | null
+  google_oauth_token_expiry: string | null
+  google_connected_email: string | null
+  zoom_account_id: string | null
+  zoom_access_token: string | null
+  zoom_refresh_token: string | null
+  zoom_token_expiry: string | null
+  zoom_connected_email: string | null
+  ms_tenant_id: string | null
+  ms_access_token: string | null
+  ms_refresh_token: string | null
+  ms_token_expiry: string | null
+  ms_connected_email: string | null
+  updated_at: string
+}
+
+export interface OrgSettingsInsert extends Partial<Omit<OrgSettings, 'org_id'>> {
+  org_id: string
+}
+
+export interface OrgSettingsUpdate extends Partial<Omit<OrgSettings, 'org_id'>> {}
+
+// ── Email Templates ──────────────────────────────────────────────────────────
+
+export interface EmailTemplate {
+  id: string
+  org_id: string
+  name: string
+  subject: string
+  body: string
+  created_by: string | null
+  created_at: string
+}
+
+export interface EmailTemplateInsert extends Omit<EmailTemplate, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+export interface EmailTemplateUpdate {
+  name?: string
+  subject?: string
+  body?: string
+}
+
+// ── Email Drafts ─────────────────────────────────────────────────────────────
+
+export interface EmailDraft {
+  id: string
+  org_id: string
+  application_id: string
+  name: string
+  to_emails: string[]
+  cc_emails: string[]
+  bcc_emails: string[]
+  subject: string
+  body: string
+  created_by: string | null
+  updated_at: string
+  created_at: string
+}
+
+export interface EmailDraftInsert extends Omit<EmailDraft, 'id' | 'updated_at' | 'created_at'> {
+  id?: string
+  updated_at?: string
+  created_at?: string
+}
+
+export interface EmailDraftUpdate extends Partial<Omit<EmailDraftInsert, 'org_id' | 'application_id'>> {}
+
+// ── Leads ────────────────────────────────────────────────────────────────────
+
+export interface Lead {
+  id: string
+  email: string
+  source: string
+  created_at: string
+}
+
+export interface LeadInsert extends Omit<Lead, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+// ── Job Queue ────────────────────────────────────────────────────────────────
+
+export type JobQueueStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'dead'
+
+export interface JobQueueItem {
+  id: string
+  org_id: string
+  job_type: string
+  payload: Record<string, unknown>
+  status: JobQueueStatus
+  attempts: number
+  max_attempts: number
+  error: string | null
+  scheduled_at: string
+  started_at: string | null
+  completed_at: string | null
+  created_at: string
+}
+
+export interface JobQueueInsert extends Omit<JobQueueItem, 'id' | 'created_at' | 'status' | 'attempts'> {
+  id?: string
+  created_at?: string
+  status?: JobQueueStatus
+  attempts?: number
+}
+
+export interface JobQueueUpdate {
+  status?: JobQueueStatus
+  attempts?: number
+  error?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+}
+
+// ── Voice Calls ──────────────────────────────────────────────────────────────
+
+export interface VoiceCall {
+  id: string
+  org_id: string
+  candidate_id: string | null
+  hiring_request_id: string | null
+  application_id: string | null
+  direction: string
+  phone_number: string | null
+  status: string
+  agent_type: string
+  duration_seconds: number | null
+  started_at: string | null
+  ended_at: string | null
+  transcript: Record<string, unknown>[] | null
+  summary: string | null
+  ai_score: number | null
+  ai_recommendation: string | null
+  recording_url: string | null
+  vobiz_call_id: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface VoiceCallInsert extends Omit<VoiceCall, 'id' | 'created_at' | 'updated_at'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface VoiceCallUpdate extends Partial<VoiceCallInsert> {}
+
+// ── Insert/Update variants for tables that were missing them ─────────────────
+
+export interface HiringRequestInsert extends Omit<HiringRequest, 'id' | 'created_at' | 'updated_at'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface HiringRequestUpdate extends Partial<HiringRequestInsert> {}
+
+export interface PipelineStageInsert extends Omit<PipelineStage, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+export interface PipelineStageUpdate extends Partial<PipelineStageInsert> {}
+
+// Application Row type (without optional joined relations)
+type ApplicationRow = Omit<Application, 'candidate' | 'stage' | 'hiring_request'>
+
+export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at'> {
+  id?: string
+  created_at?: string
+  applied_at?: string
+}
+
+export interface ApplicationUpdate extends Partial<ApplicationInsert> {}
+
+export interface ApplicationEventInsert extends Omit<ApplicationEvent, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+export interface ApplicationEventUpdate extends Partial<ApplicationEventInsert> {}
+
+// Interview Row type (without optional joined relations)
+type InterviewRow = Omit<Interview, 'candidate' | 'hiring_request'>
+
+export interface ScorecardInsert extends Omit<Scorecard, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+export interface ScorecardUpdate extends Partial<ScorecardInsert> {}
+
+// Offer Row type (without optional joined relations)
+type OfferRow = Omit<Offer, 'candidate' | 'hiring_request'>
+
+export interface CandidateTaskInsert extends Omit<CandidateTask, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+export interface CandidateTaskUpdate extends Partial<CandidateTaskInsert> {}
+
+export interface CandidateTagInsert extends Omit<CandidateTag, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+export interface CandidateReferralInsert extends Omit<CandidateReferral, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+export interface MatchInsert extends Omit<Match, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+// Sequence Row types (without optional computed/joined fields)
+type SequenceRow = Omit<Sequence, 'stages' | 'stage_count' | 'enrollment_count' | 'reply_count'>
+
+export interface SequenceInsert extends Omit<SequenceRow, 'id' | 'created_at' | 'updated_at'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface SequenceUpdate extends Partial<SequenceInsert> {}
+
+export interface SequenceStageInsert extends Omit<SequenceStage, 'id' | 'created_at' | 'updated_at'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface SequenceStageUpdate extends Partial<SequenceStageInsert> {}
+
+// SequenceEnrollment Row type (without optional computed fields)
+type SequenceEnrollmentRow = Omit<SequenceEnrollment, 'candidate_name' | 'candidate_email' | 'sequence_name'>
+
+export interface SequenceEnrollmentInsert extends Omit<SequenceEnrollmentRow, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+export interface SequenceEnrollmentUpdate extends Partial<SequenceEnrollmentInsert> {}
+
+export interface SequenceEmailInsert extends Omit<SequenceEmail, 'id' | 'created_at'> {
+  id?: string
+  created_at?: string
+}
+
+export interface SequenceEmailUpdate extends Partial<SequenceEmailInsert> {}
+
+// ── Supabase Database shape for typed client ─────────────────────────────────
+
 export type Database = {
   public: {
     Tables: {
@@ -387,12 +690,158 @@ export type Database = {
         Update: RoleUpdate
         Relationships: []
       }
+      hiring_requests: {
+        Row: HiringRequest
+        Insert: HiringRequestInsert
+        Update: HiringRequestUpdate
+        Relationships: []
+      }
+      pipeline_stages: {
+        Row: PipelineStage
+        Insert: PipelineStageInsert
+        Update: PipelineStageUpdate
+        Relationships: []
+      }
+      applications: {
+        Row: ApplicationRow
+        Insert: ApplicationInsert
+        Update: ApplicationUpdate
+        Relationships: []
+      }
+      application_events: {
+        Row: ApplicationEvent
+        Insert: ApplicationEventInsert
+        Update: ApplicationEventUpdate
+        Relationships: []
+      }
+      interviews: {
+        Row: InterviewRow
+        Insert: InterviewInsert
+        Update: InterviewUpdate
+        Relationships: []
+      }
+      offers: {
+        Row: OfferRow
+        Insert: OfferInsert
+        Update: OfferUpdate
+        Relationships: []
+      }
+      scorecards: {
+        Row: Scorecard
+        Insert: ScorecardInsert
+        Update: ScorecardUpdate
+        Relationships: []
+      }
+      candidate_tasks: {
+        Row: CandidateTask
+        Insert: CandidateTaskInsert
+        Update: CandidateTaskUpdate
+        Relationships: []
+      }
+      candidate_tags: {
+        Row: CandidateTag
+        Insert: CandidateTagInsert
+        Update: Partial<CandidateTagInsert>
+        Relationships: []
+      }
+      candidate_referrals: {
+        Row: CandidateReferral
+        Insert: CandidateReferralInsert
+        Update: Partial<CandidateReferralInsert>
+        Relationships: []
+      }
+      matches: {
+        Row: Match
+        Insert: MatchInsert
+        Update: Partial<MatchInsert>
+        Relationships: []
+      }
+      notifications: {
+        Row: Notification
+        Insert: NotificationInsert
+        Update: NotificationUpdate
+        Relationships: []
+      }
+      org_settings: {
+        Row: OrgSettings
+        Insert: OrgSettingsInsert
+        Update: OrgSettingsUpdate
+        Relationships: []
+      }
+      email_templates: {
+        Row: EmailTemplate
+        Insert: EmailTemplateInsert
+        Update: EmailTemplateUpdate
+        Relationships: []
+      }
+      email_drafts: {
+        Row: EmailDraft
+        Insert: EmailDraftInsert
+        Update: EmailDraftUpdate
+        Relationships: []
+      }
+      leads: {
+        Row: Lead
+        Insert: LeadInsert
+        Update: Partial<LeadInsert>
+        Relationships: []
+      }
+      job_queue: {
+        Row: JobQueueItem
+        Insert: JobQueueInsert
+        Update: JobQueueUpdate
+        Relationships: []
+      }
+      voice_calls: {
+        Row: VoiceCall
+        Insert: VoiceCallInsert
+        Update: VoiceCallUpdate
+        Relationships: []
+      }
+      sequences: {
+        Row: SequenceRow
+        Insert: SequenceInsert
+        Update: SequenceUpdate
+        Relationships: []
+      }
+      sequence_stages: {
+        Row: SequenceStage
+        Insert: SequenceStageInsert
+        Update: SequenceStageUpdate
+        Relationships: []
+      }
+      sequence_enrollments: {
+        Row: SequenceEnrollmentRow
+        Insert: SequenceEnrollmentInsert
+        Update: SequenceEnrollmentUpdate
+        Relationships: []
+      }
+      sequence_emails: {
+        Row: SequenceEmail
+        Insert: SequenceEmailInsert
+        Update: SequenceEmailUpdate
+        Relationships: []
+      }
     }
     Views: Record<never, never>
     Functions: Record<never, never>
     Enums: {
       candidate_status: CandidateStatus
       role_status: RoleStatus
+      hiring_request_status: HiringRequestStatus
+      application_status: ApplicationStatus
+      application_source: ApplicationSource
+      interview_type: InterviewType
+      interview_status: InterviewStatus
+      offer_status: OfferStatus
+      task_status: TaskStatus
+      stage_color: StageColor
+      scorecard_recommendation: ScorecardRecommendation
+      ai_recommendation: AiRecommendation
+      sequence_status: SequenceStatus
+      enrollment_status: EnrollmentStatus
+      sequence_email_status: SequenceEmailStatus
+      job_queue_status: JobQueueStatus
     }
     CompositeTypes: Record<never, never>
   }

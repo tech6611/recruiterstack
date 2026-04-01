@@ -35,7 +35,7 @@ export async function PATCH(
 
   const { data, error } = await supabase
     .from('interviews')
-    .update({ ...body, updated_at: new Date().toISOString() })
+    .update({ ...body, updated_at: new Date().toISOString() } as import('@/lib/types/database').InterviewUpdate)
     .eq('id', params.id)
     .eq('org_id', orgId)
     .select()
@@ -45,25 +45,23 @@ export async function PATCH(
 
   // Log status change events
   if (body.status === 'completed') {
-    const interview = data as any
     await supabase.from('application_events').insert({
-      application_id: interview.application_id,
+      application_id: data.application_id,
       org_id:         orgId,
       event_type:     'interview_completed',
-      note:           `Interview completed with ${interview.interviewer_name}`,
+      note:           `Interview completed with ${data.interviewer_name}`,
       metadata:       { interview_id: params.id },
       created_by:     orgId,
-    } as any)
+    })
   } else if (body.status === 'cancelled') {
-    const interview = data as any
     await supabase.from('application_events').insert({
-      application_id: interview.application_id,
+      application_id: data.application_id,
       org_id:         orgId,
       event_type:     'interview_cancelled',
       note:           `Interview cancelled`,
       metadata:       { interview_id: params.id },
       created_by:     orgId,
-    } as any)
+    })
   }
 
   return NextResponse.json({ data })

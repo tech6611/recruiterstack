@@ -180,7 +180,7 @@ export async function runAutopilot(
       ...(result.criterion_scores?.length
         ? { ai_criterion_scores: result.criterion_scores }
         : {}),
-    } as never)
+    })
     .eq('id', applicationId)
 
   const advanceStage = job.auto_advance_stage_id
@@ -210,7 +210,7 @@ export async function runAutopilot(
         to_stage:       advanceStage?.name ?? null,
         note:           `AI Autopilot: score ${result.score} ≥ threshold ${job.auto_advance_score}`,
         created_by:     'AI Autopilot',
-      } as never)
+      })
 
     return { scored: true, score: result.score, action: 'advanced', emailSent: false }
   }
@@ -235,7 +235,7 @@ export async function runAutopilot(
         to_stage:       'rejected',
         note:           `AI Autopilot: score ${result.score} ≤ threshold ${job.auto_reject_score}`,
         created_by:     'AI Autopilot',
-      } as never)
+      })
 
     // Auto-send rejection email
     let emailSent = false
@@ -272,7 +272,7 @@ export async function runAutopilot(
               event_type:     'email_sent',
               note:           `Rejection email sent automatically: "${draft.subject}"`,
               created_by:     'AI Autopilot',
-            } as never)
+            })
         }
       }
     }

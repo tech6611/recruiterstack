@@ -62,8 +62,7 @@ export const POST = withOrg(async (req, orgId, supabase) => {
 
   const { data, error } = await supabase
     .from('candidates')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .insert({ ...body, org_id: orgId } as any)
+    .insert({ ...body, org_id: orgId })
     .select()
     .single()
 

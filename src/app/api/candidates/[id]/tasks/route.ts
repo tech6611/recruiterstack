@@ -68,7 +68,7 @@ export async function POST(
 
   const { data, error } = await supabase
     .from('candidate_tasks')
-    .insert({ ...baseInsert, status: statusValue } as never)
+    .insert({ ...baseInsert, status: statusValue })
     .select()
     .single()
 
@@ -77,7 +77,7 @@ export async function POST(
     if (error.code === '42703' || error.message?.includes('status')) {
       const { data: data2, error: error2 } = await supabase
         .from('candidate_tasks')
-        .insert(baseInsert as never)
+        .insert(baseInsert)
         .select()
         .single()
       if (error2) return NextResponse.json({ error: error2.message }, { status: 500 })

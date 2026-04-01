@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import sgMail from '@sendgrid/mail'
 import { checkRateLimit } from '@/lib/api/rate-limit'
+import type { HiringRequest, HiringRequestUpdate } from '@/lib/types/database'
 
 // GET /api/intake/:token — validate token, return request info for the HM form
 export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
@@ -27,15 +28,16 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
   const supabase = createAdminClient()
 
-  const { data: req, error: fetchError } = await supabase
+  const { data: reqData, error: fetchError } = await supabase
     .from('hiring_requests')
     .select('*')
     .eq('intake_token', params.token)
     .single()
 
-  if (fetchError || !req) {
+  if (fetchError || !reqData) {
     return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 })
   }
+  const req = reqData as HiringRequest
   if (req.status !== 'intake_pending') {
     return NextResponse.json({ error: 'This intake form has already been submitted' }, { status: 409 })
   }
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     return NextResponse.json({ error: 'A Job Description is required before submitting.' }, { status: 400 })
   }
 
-  const { error: updateError } = await supabase.from('hiring_requests').update({
+  const updatePayload: HiringRequestUpdate = {
     position_title: body.position_title || req.position_title,
     team_context: body.team_context || null,
     level: body.level || null,
@@ -84,7 +86,8 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     status: 'jd_approved',
     intake_submitted_at: new Date().toISOString(),
     jd_sent_at: new Date().toISOString(),
-  } as any).eq('intake_token', params.token)
+  }
+  const { error: updateError } = await supabase.from('hiring_requests').update(updatePayload).eq('intake_token', params.token)
 
   if (updateError) {
     return NextResponse.json({ error: 'Failed to save. Please try again.' }, { status: 500 })

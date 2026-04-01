@@ -206,7 +206,7 @@ Be concise, direct, and useful for a recruiter who hasn't reviewed this profile 
     .update({
       ai_summary: summary,
       ai_summary_generated_at: new Date().toISOString(),
-    } as never)
+    })
     .eq('id', candidateId)
     .eq('org_id', orgId)
 

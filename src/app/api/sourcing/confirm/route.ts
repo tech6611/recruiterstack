@@ -79,16 +79,14 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('candidates')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .insert(chunk as any)
+      .insert(chunk)
       .select('id')
 
     if (error) {
       if (error.code === '23505') {
         // Batch had a duplicate — fall back to one-by-one for this chunk
         for (const row of chunk) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error: e } = await supabase.from('candidates').insert(row as any).select('id').single()
+          const { error: e } = await supabase.from('candidates').insert(row).select('id').single()
           if (!e) created++
           // duplicates already counted above; other errors tracked
           else if (e.code !== '23505') errors.push(`${row.name}: ${e.message}`)

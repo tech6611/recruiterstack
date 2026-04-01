@@ -7,6 +7,7 @@ import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { checkRateLimit } from '@/lib/api/rate-limit'
 import { publicApplySchema } from '@/lib/validations/applications'
 import { logger } from '@/lib/logger'
+import type { CandidateInsert, ApplicationInsert, ApplicationEventInsert } from '@/lib/types/database'
 
 // GET /api/apply?token=xxx — fetch job info for the public apply page
 export async function GET(request: NextRequest) {
@@ -45,15 +46,17 @@ export async function POST(request: NextRequest) {
   const { token, name, email, phone, linkedin_url, cover_letter, cv_url } = body
 
   // ── Verify token & get job ────────────────────────────────────────────────
-  const { data: job, error: jobErr } = await supabase
+  const { data: jobRaw, error: jobErr } = await supabase
     .from('hiring_requests')
     .select('id, org_id, position_title, status, auto_advance_score, auto_reject_score')
     .eq('apply_link_token', token)
     .single()
 
-  if (jobErr || !job) {
+  if (jobErr || !jobRaw) {
     return NextResponse.json({ error: 'Invalid or expired apply link' }, { status: 404 })
   }
+
+  const job = jobRaw as { id: string; org_id: string; position_title: string; status: string; auto_advance_score: number | null; auto_reject_score: number | null }
 
   // ── Upsert candidate ──────────────────────────────────────────────────────
   const { data: existingCandidate } = await supabase
@@ -65,11 +68,10 @@ export async function POST(request: NextRequest) {
   let candidateId: string
 
   if (existingCandidate) {
-    candidateId = existingCandidate.id
+    candidateId = (existingCandidate as { id: string }).id
   } else {
     const { data: newCandidate, error: createErr } = await supabase
       .from('candidates')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .insert({
         name,
         email,
@@ -78,35 +80,47 @@ export async function POST(request: NextRequest) {
         skills: [],
         experience_years: 0,
         status: 'active',
-      } as any)
+        current_title: null,
+        location: null,
+        linkedin_url: null,
+      } as unknown as CandidateInsert)
       .select('id')
       .single()
 
     if (createErr) return handleSupabaseError(createErr)
-    candidateId = newCandidate!.id
+    candidateId = (newCandidate as { id: string }).id
   }
 
   // ── Get first pipeline stage ──────────────────────────────────────────────
-  const { data: firstStage } = await supabase
+  const { data: firstStageRaw } = await supabase
     .from('pipeline_stages')
     .select('id, name')
     .eq('hiring_request_id', job.id)
     .order('order_index')
     .limit(1)
     .single()
+  const firstStage = firstStageRaw as { id: string; name: string } | null
 
   // ── Create application ────────────────────────────────────────────────────
   const { data: app, error: appErr } = await supabase
     .from('applications')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .insert({
       candidate_id: candidateId,
       hiring_request_id: job.id,
       stage_id: firstStage?.id ?? null,
       status: 'active',
       source: 'applied',
+      source_detail: null,
+      resume_url: null,
       cover_letter: cover_letter ?? null,
-    } as any)
+      ai_score: null,
+      ai_recommendation: null,
+      ai_strengths: [],
+      ai_gaps: [],
+      ai_scored_at: null,
+      ai_criterion_scores: null,
+      credited_to: null,
+    } as unknown as ApplicationInsert)
     .select('id')
     .single()
 
@@ -120,6 +134,8 @@ export async function POST(request: NextRequest) {
     return handleSupabaseError(appErr)
   }
 
+  const appId = (app as { id: string }).id
+
   // ── Timeline event ────────────────────────────────────────────────────────
   const noteParts: string[] = []
   if (linkedin_url) noteParts.push(`LinkedIn: ${linkedin_url}`)
@@ -127,14 +143,15 @@ export async function POST(request: NextRequest) {
 
   await supabase
     .from('application_events')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .insert({
-      application_id: app!.id,
+      application_id: appId,
       event_type: 'applied',
+      from_stage: null,
       to_stage: firstStage?.name ?? 'Applied',
       note: noteParts.length ? noteParts.join(' | ') : null,
+      metadata: {},
       created_by: name,
-    } as any)
+    } as unknown as ApplicationEventInsert)
 
   // ── Notification (in-app + Slack) ─────────────────────────────────────────
   await notify({
@@ -144,28 +161,26 @@ export async function POST(request: NextRequest) {
     body: `${name} applied for ${job.position_title}`,
     slackText: `📥 New application: *${name}* applied for *${job.position_title}*`,
     resourceType: 'application',
-    resourceId: app!.id,
+    resourceId: appId,
   })
 
   // ── Autopilot: enqueue scoring if thresholds are configured ────────────────
   const hasAutopilot =
-    (job as { auto_advance_score: number | null; auto_reject_score: number | null })
-      .auto_advance_score !== null ||
-    (job as { auto_advance_score: number | null; auto_reject_score: number | null })
-      .auto_reject_score  !== null
+    job.auto_advance_score !== null ||
+    job.auto_reject_score  !== null
 
   if (hasAutopilot) {
     try {
       await enqueue({
         orgId: job.org_id,
         jobType: 'autopilot',
-        payload: { applicationId: app!.id },
+        payload: { applicationId: appId },
       })
     } catch {
       // Queue unavailable — fall back to original fire-and-forget
-      logger.warn('Queue unavailable, falling back to direct autopilot', { applicationId: app!.id })
-      void runAutopilot(app!.id, job.org_id).catch((err) => {
-        logger.error('Autopilot failed', err, { applicationId: app!.id })
+      logger.warn('Queue unavailable, falling back to direct autopilot', { applicationId: appId })
+      void runAutopilot(appId, job.org_id).catch((err) => {
+        logger.error('Autopilot failed', err, { applicationId: appId })
       })
     }
   }
@@ -173,7 +188,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(
     {
       data: {
-        application_id: app!.id,
+        application_id: appId,
         job_title: job.position_title,
         message: 'Application submitted successfully.',
       },

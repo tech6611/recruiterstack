@@ -3,6 +3,7 @@ import sgMail from '@sendgrid/mail'
 import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { hiringRequestInsertSchema } from '@/lib/validations/hiring-requests'
 import { logger } from '@/lib/logger'
+import type { HiringRequest, HiringRequestInsert } from '@/lib/types/database'
 
 // GET /api/hiring-requests
 export const GET = withOrg(async (_req, orgId, supabase) => {
@@ -57,14 +58,14 @@ export const POST = withOrg(async (request, orgId, supabase) => {
     })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: req, error: insertError } = await supabase
+  const { data: reqData, error: insertError } = await supabase
     .from('hiring_requests')
-    .insert(insertPayload as any)
+    .insert(insertPayload as HiringRequestInsert)
     .select()
     .single()
 
   if (insertError) return handleSupabaseError(insertError)
+  const req = reqData as HiringRequest
 
   // Replace DB-trigger-created default stages with user-configured pipeline stages
   if (body.pipeline_stages?.length) {

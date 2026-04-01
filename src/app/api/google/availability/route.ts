@@ -4,6 +4,7 @@ import { requireOrg } from '@/lib/auth'
 import { getValidAccessToken, queryFreeBusy, type GoogleTokens } from '@/lib/google/calendar'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
+import type { OrgSettingsUpdate } from '@/lib/types/database'
 
 /**
  * GET /api/google/availability
@@ -33,11 +34,12 @@ export async function GET(req: NextRequest) {
   const supabase = createAdminClient()
 
   // Load stored Google tokens + connected account email (set at OAuth callback time)
-  const { data: settings } = await supabase
+  const { data: settingsData } = await supabase
     .from('org_settings')
     .select('google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry, google_connected_email')
     .eq('org_id', orgId)
     .single()
+  const settings = settingsData as { google_oauth_access_token: string | null; google_oauth_refresh_token: string | null; google_oauth_token_expiry: string | null; google_connected_email: string | null } | null
 
   const decryptedAccess  = decryptSafe(settings?.google_oauth_access_token)
   const decryptedRefresh = decryptSafe(settings?.google_oauth_refresh_token)
@@ -80,7 +82,7 @@ export async function GET(req: NextRequest) {
         .update({
           google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
           google_oauth_token_expiry: freshTokens.token_expiry,
-        })
+        } as OrgSettingsUpdate)
         .eq('org_id', orgId)
     }
   } catch (e) {
@@ -92,7 +94,7 @@ export async function GET(req: NextRequest) {
     // Only query the emails explicitly requested (the actual panel members).
     // The connected Google account is NOT auto-added — it should only contribute to
     // availability when it is explicitly part of the interview panel.
-    const connectedEmail = (settings?.google_connected_email as string | null) ?? null
+    const connectedEmail = settings?.google_connected_email ?? null
 
     const busyMap = await queryFreeBusy(accessToken, emails, timeMin, timeMax, timezone)
     return NextResponse.json(

@@ -58,8 +58,7 @@ export async function POST(
     return NextResponse.json({ error: 'Application not found' }, { status: 404 })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const candidate = app.candidate as any as { name: string; email: string } | null
+  const candidate = app.candidate as unknown as { name: string; email: string } | null
 
   // Resolve recipient list: use explicit list if provided, else fall back to candidate email
   const toEmails: string[] = body.to_emails && body.to_emails.length > 0

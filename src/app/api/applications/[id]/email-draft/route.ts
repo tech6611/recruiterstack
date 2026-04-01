@@ -61,12 +61,9 @@ export async function POST(
     return NextResponse.json({ error: 'Application not found' }, { status: 404 })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const candidate   = app.candidate as any as { name: string; email: string } | null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const job         = app.job       as any as { position_title: string; department: string | null } | null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stage       = app.stage     as any as { name: string } | null
+  const candidate   = app.candidate as unknown as { name: string; email: string } | null
+  const job         = app.job       as unknown as { position_title: string; department: string | null } | null
+  const stage       = app.stage     as unknown as { name: string } | null
 
   const firstName   = candidate?.name?.split(' ')[0] ?? 'there'
   const jobTitle    = job?.position_title ?? 'the position'

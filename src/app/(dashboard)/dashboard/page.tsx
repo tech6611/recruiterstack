@@ -40,6 +40,9 @@ import {
 } from 'lucide-react'
 import type { StageColor } from '@/lib/types/database'
 import { CandidateDrawer } from '@/components/dashboard/CandidateDrawer'
+import { GridLayout, useContainerWidth, verticalCompactor, type LayoutItem, type Layout } from 'react-grid-layout'
+import 'react-grid-layout/css/styles.css'
+import 'react-resizable/css/styles.css'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -168,11 +171,9 @@ function widgetAccent(wId: WidgetId) {
 
 // ── View type & defaults ──────────────────────────────────────────────────────
 
-interface WidgetDimensions { w: number; h: number }
-
 interface DashView {
   id: string; name: string; icon: string; widgets: WidgetId[]
-  widgetDims?: Partial<Record<WidgetId, WidgetDimensions>>
+  gridLayouts?: LayoutItem[]
 }
 
 const DEFAULT_VIEWS: DashView[] = [
@@ -338,123 +339,75 @@ function ViewsSidebar({
 /** Max items shown per widget — content scrolls within the widget's viewport-constrained container */
 const PREVIEW_LIMIT = 50
 
-/** Drag-resize handle for bottom-right corner of widgets */
-function ResizeHandle({ onResizeStart, onResize }: { onResizeStart?: () => void; onResize: (deltaW: number, deltaH: number) => void }) {
-  function handleMouseDown(e: React.MouseEvent) {
-    e.preventDefault()
-    onResizeStart?.()
-    const startX = e.clientX
-    const startY = e.clientY
-
-    function onMouseMove(ev: MouseEvent) {
-      onResize(ev.clientX - startX, ev.clientY - startY)
-    }
-    function onMouseUp() {
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-    }
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
-  }
+/** Widget grid wrapper — uses useContainerWidth for react-grid-layout v2 */
+function WidgetGrid({
+  widgets, layout, onLayoutChange, disabled, data, onCandidateClick, onRefresh,
+}: {
+  widgets: WidgetId[]
+  layout: LayoutItem[]
+  onLayoutChange: (layout: Layout) => void
+  disabled: boolean
+  data: DashboardData
+  onCandidateClick: (id: string) => void
+  onRefresh: () => void
+}) {
+  const { containerRef, width } = useContainerWidth()
 
   return (
-    <div
-      onMouseDown={handleMouseDown}
-      className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity z-10"
-      title="Drag to resize"
-    >
-      <svg viewBox="0 0 16 16" className="h-5 w-5 text-slate-300 hover:text-slate-500">
-        <path d="M14 14L6 14L14 6Z" fill="currentColor" />
-        <path d="M14 14L10 14L14 10Z" fill="currentColor" opacity="0.5" />
-      </svg>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    <div ref={containerRef as any} className="flex-1 overflow-auto">
+      {width > 0 && (
+        <GridLayout
+          className="layout"
+          layout={layout}
+          width={width}
+          gridConfig={{ cols: 2, rowHeight: 80, margin: [12, 12] as const }}
+          dragConfig={{ enabled: !disabled, handle: '.widget-drag-handle' }}
+          resizeConfig={{ enabled: !disabled }}
+          compactor={verticalCompactor}
+          onLayoutChange={onLayoutChange}
+        >
+          {widgets.map(wId => (
+            <div
+              key={wId}
+              className={`rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+            >
+              <div className="widget-drag-handle absolute top-2 left-2 z-10 cursor-grab text-slate-300 hover:text-slate-500">
+                <GripVertical className="h-4 w-4" />
+              </div>
+              {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={onCandidateClick} />}
+              {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
+              {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
+              {wId === 'pipeline'           && <PipelineWidget           breakdown={data.candidate_breakdown} />}
+              {wId === 'jobs_mini'          && <JobsMiniWidget           jobs={data.top_jobs} />}
+              {wId === 'jobs_by_dept'       && <JobsByDeptWidget         departments={data.jobs_by_dept} />}
+              {wId === 'hm_actions'         && <HmActionsWidget          approvals={data.tasks.pending_approvals} />}
+              {wId === 'recent_applications'&& <RecentApplicationsWidget applications={data.recent_applications} onCandidateClick={onCandidateClick} />}
+              {wId === 'top_scored'         && <TopScoredWidget          candidates={data.top_scored} onCandidateClick={onCandidateClick} />}
+              {wId === 'candidate_sources'  && <CandidateSourcesWidget   sources={data.candidate_sources} />}
+              {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={onCandidateClick} />}
+              {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
+              {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
+              {wId === 'action_queue'      && <ActionQueueWidget         data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
+            </div>
+          ))}
+        </GridLayout>
+      )}
     </div>
   )
 }
 
-/**
- * Resizable widget wrapper.
- * Dims are stored as percentages of the grid container (w: % of width, h: % of height).
- * Without custom dims, widgets auto-fill using CSS grid fr units.
- */
-function ResizableWidget({
-  wId, dims, onResize, disabled, children,
-  isDragging, isDragOver,
-  onDragStart, onDragOver, onDrop, onDragEnd,
-}: {
-  wId: WidgetId
-  dims: WidgetDimensions | null
-  onResize: (dims: WidgetDimensions) => void
-  disabled: boolean
-  children: React.ReactNode
-  isDragging?: boolean
-  isDragOver?: boolean
-  onDragStart?: () => void
-  onDragOver?: (e: React.DragEvent) => void
-  onDrop?: () => void
-  onDragEnd?: () => void
-}) {
-  const ref = useRef<HTMLDivElement>(null)
-  const startDims = useRef<{ w: number; h: number }>({ w: 0, h: 0 })
-
-  function handleResizeStart() {
-    const el = ref.current
-    if (!el) return
-    const parent = el.parentElement
-    if (!parent) return
-    const parentRect = parent.getBoundingClientRect()
-    const rect = el.getBoundingClientRect()
-    // Store starting size as percentage of parent
-    startDims.current = {
-      w: dims?.w ?? (rect.width / parentRect.width) * 100,
-      h: dims?.h ?? (rect.height / parentRect.height) * 100,
-    }
-  }
-
-  const style: React.CSSProperties = {}
-  if (dims) {
-    style.width = `${dims.w}%`
-    style.height = `${dims.h}%`
-  }
-
-  return (
-    <div
-      ref={ref}
-      style={style}
-      draggable={!disabled}
-      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart?.() }}
-      onDragOver={(e) => { e.preventDefault(); onDragOver?.(e) }}
-      onDrop={() => onDrop?.()}
-      onDragEnd={() => onDragEnd?.()}
-      className={`group relative rounded-xl border-2 ${
-        isDragOver ? 'border-blue-400 bg-blue-50/50' : 'border-slate-200'
-      } border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto transition-colors ${
-        isDragging ? 'opacity-40' : ''
-      } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-    >
-      {/* Drag handle indicator — top-left, visible on hover */}
-      {!disabled && (
-        <div className="absolute top-2 left-2 z-10 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-slate-500">
-          <GripVertical className="h-4 w-4" />
-        </div>
-      )}
-      {!disabled && (
-        <ResizeHandle onResizeStart={handleResizeStart} onResize={(dw, dh) => {
-          const el = ref.current
-          const parent = el?.parentElement
-          if (!parent) return
-          const parentRect = parent.getBoundingClientRect()
-          // Convert pixel delta to percentage of parent
-          const dwPct = (dw / parentRect.width) * 100
-          const dhPct = (dh / parentRect.height) * 100
-          onResize({
-            w: Math.max(20, Math.min(100, startDims.current.w + dwPct)),
-            h: Math.max(15, Math.min(100, startDims.current.h + dhPct)),
-          })
-        }} />
-      )}
-      {children}
-    </div>
-  )
+/** Generate default grid layout for a set of widgets — 2 columns, auto-packed */
+function defaultGridLayout(widgets: WidgetId[]): LayoutItem[] {
+  return widgets.map((wId, idx) => ({
+    i: wId,
+    x: idx % 2,
+    y: Math.floor(idx / 2) * 4,
+    w: 1,
+    h: 4,
+    minW: 1,
+    minH: 2,
+  }))
 }
 
 /** Per-widget search state + filter helper */
@@ -2070,27 +2023,6 @@ export default function DashboardPage() {
   // Quick-view drawer
   const [drawerCandidateId, setDrawerCandidateId] = useState<string | null>(null)
 
-  // Widget drag-to-reposition
-  const [dragWidgetId, setDragWidgetId]   = useState<WidgetId | null>(null)
-  const [dragOverWidgetId, setDragOverWidgetId] = useState<WidgetId | null>(null)
-
-  function handleWidgetDrop(targetId: WidgetId) {
-    if (!dragWidgetId || dragWidgetId === targetId) {
-      setDragWidgetId(null)
-      setDragOverWidgetId(null)
-      return
-    }
-    const widgets = activeView?.widgets ?? []
-    const fromIdx = widgets.indexOf(dragWidgetId)
-    const toIdx   = widgets.indexOf(targetId)
-    if (fromIdx === -1 || toIdx === -1) return
-    const next = [...widgets]
-    next.splice(fromIdx, 1)
-    next.splice(toIdx, 0, dragWidgetId)
-    updateWidgets(next)
-    setDragWidgetId(null)
-    setDragOverWidgetId(null)
-  }
 
   // Views
   const [views,          setViews]         = useState<DashView[]>(DEFAULT_VIEWS)
@@ -2234,15 +2166,30 @@ export default function DashboardPage() {
   function handleRightReorderWidgets(widgets: WidgetId[]) { setRightWidgets(widgets) }
   function handleRightRemoveWidget(id: WidgetId)         { setRightWidgets(prev => prev.filter(w => w !== id)) }
 
-  // Widget dimension helpers
-  function getWidgetDims(wId: WidgetId): WidgetDimensions | null {
+  // Grid layout helpers
+  function getGridLayout(): LayoutItem[] {
     const view = views.find(v => v.id === activeViewId)
-    return view?.widgetDims?.[wId] ?? null
+    const widgets = view?.widgets ?? []
+    if (view?.gridLayouts && view.gridLayouts.length > 0) {
+      // Ensure layout has entries for all current widgets
+      const existing = new Set(view.gridLayouts.map(l => l.i))
+      const missing = widgets.filter(w => !existing.has(w))
+      if (missing.length === 0) return view.gridLayouts
+      // Add default positions for newly added widgets
+      const maxY = Math.max(0, ...view.gridLayouts.map(l => l.y + l.h))
+      return [
+        ...view.gridLayouts,
+        ...missing.map((wId, idx) => ({
+          i: wId, x: idx % 2, y: maxY, w: 1, h: 4, minW: 1, minH: 2,
+        })),
+      ]
+    }
+    return defaultGridLayout(widgets)
   }
-  function setWidgetDims(wId: WidgetId, dims: WidgetDimensions) {
+  function handleLayoutChange(newLayout: Layout) {
     setViews(prev => prev.map(v => {
       if (v.id !== activeViewId) return v
-      return { ...v, widgetDims: { ...(v.widgetDims ?? {}), [wId]: dims } }
+      return { ...v, gridLayouts: [...newLayout] }
     }))
   }
   function handleRightAddWidget(id: WidgetId)            { setRightWidgets(prev => [...prev, id]) }
@@ -2328,47 +2275,17 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Render widgets — auto-sized to fill viewport */}
+          {/* Render widgets — drag-to-position and resize via react-grid-layout */}
           {(activeView?.widgets ?? []).length > 0 ? (
-            <div className="flex-1 flex flex-wrap gap-3 content-start overflow-hidden"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${Math.min((activeView?.widgets ?? []).length, 2)}, 1fr)`,
-                gridTemplateRows: `repeat(${Math.ceil((activeView?.widgets ?? []).length / 2)}, 1fr)`,
-                gap: '0.75rem',
-              }}
-            >
-              {(activeView?.widgets ?? []).map(wId => (
-                  <ResizableWidget
-                    key={wId}
-                    wId={wId}
-                    dims={getWidgetDims(wId)}
-                    onResize={(dims) => setWidgetDims(wId, dims)}
-                    disabled={widgetMode}
-                    isDragging={dragWidgetId === wId}
-                    isDragOver={dragOverWidgetId === wId}
-                    onDragStart={() => setDragWidgetId(wId)}
-                    onDragOver={() => setDragOverWidgetId(wId)}
-                    onDrop={() => handleWidgetDrop(wId)}
-                    onDragEnd={() => { setDragWidgetId(null); setDragOverWidgetId(null) }}
-                  >
-                    {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={setDrawerCandidateId} />}
-                    {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />}
-                    {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
-                    {wId === 'pipeline'           && <PipelineWidget           breakdown={data.candidate_breakdown} />}
-                    {wId === 'jobs_mini'          && <JobsMiniWidget           jobs={data.top_jobs} />}
-                    {wId === 'jobs_by_dept'       && <JobsByDeptWidget         departments={data.jobs_by_dept} />}
-                    {wId === 'hm_actions'         && <HmActionsWidget          approvals={data.tasks.pending_approvals} />}
-                    {wId === 'recent_applications'&& <RecentApplicationsWidget applications={data.recent_applications} onCandidateClick={setDrawerCandidateId} />}
-                    {wId === 'top_scored'         && <TopScoredWidget          candidates={data.top_scored} onCandidateClick={setDrawerCandidateId} />}
-                    {wId === 'candidate_sources'  && <CandidateSourcesWidget   sources={data.candidate_sources} />}
-                    {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={setDrawerCandidateId} />}
-                    {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
-                    {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
-                    {wId === 'action_queue'      && <ActionQueueWidget         data={data} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />}
-                  </ResizableWidget>
-              ))}
-            </div>
+            <WidgetGrid
+              widgets={activeView?.widgets ?? []}
+              layout={getGridLayout()}
+              onLayoutChange={handleLayoutChange}
+              disabled={widgetMode}
+              data={data}
+              onCandidateClick={setDrawerCandidateId}
+              onRefresh={() => fetchData(true)}
+            />
           ) : !widgetMode ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Settings2 className="mb-3 h-8 w-8 text-slate-300" />

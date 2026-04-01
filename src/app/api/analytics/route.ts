@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getOrgId } from '@/lib/auth'
 import { cached, cacheKey } from '@/lib/api/cache'
+import type { HiringRequest, PipelineStage, Candidate } from '@/lib/types/database'
 
 // GET /api/analytics — pipeline funnel, source breakdown, time-in-stage
 export async function GET() {
@@ -36,10 +37,10 @@ export async function GET() {
       .eq('org_id', orgId),
   ])
 
-  const jobs   = jobsRes.data   ?? []
-  const apps   = appsRes.data   ?? []
-  const stages = stagesRes.data ?? []
-  const cands  = candsRes.data  ?? []
+  const jobs   = (jobsRes.data   ?? []) as Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'status'>[]
+  const apps   = (appsRes.data   ?? []) as { id: string; status: string; source: string; stage_id: string | null; applied_at: string; hiring_request_id: string; candidate_id: string }[]
+  const stages = (stagesRes.data ?? []) as Pick<PipelineStage, 'id' | 'name' | 'color' | 'order_index' | 'hiring_request_id'>[]
+  const cands  = (candsRes.data  ?? []) as Pick<Candidate, 'id' | 'status'>[]
 
   // ── 1. Jobs funnel ────────────────────────────────────────────────────────
   const ACTIVE_JOB_STATUSES = ['active', 'jd_approved', 'jd_sent', 'jd_generated', 'posted']

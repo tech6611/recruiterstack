@@ -117,7 +117,7 @@ export async function PUT(
 
   const { data, error } = await supabase
     .from('email_drafts')
-    .update(update)
+    .update(update as import('@/lib/types/database').EmailDraftUpdate)
     .eq('id', draftId)
     .eq('org_id', orgId)
     .eq('application_id', params.id)   // security: scope to this application

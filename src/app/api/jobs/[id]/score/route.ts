@@ -15,7 +15,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import { createNotification } from '@/lib/api/notify'
-import type { Candidate, HiringRequest } from '@/lib/types/database'
+import type { Candidate, HiringRequest, PipelineStage, Application, ApplicationUpdate, ApplicationEventInsert } from '@/lib/types/database'
 
 export const maxDuration = 300 // 5 min — needed for large pipelines on Vercel
 
@@ -58,13 +58,13 @@ export async function POST(
       .eq('status', 'active'),
   ])
 
-  if (jobRes.error || !jobRes.data) {
+  if (jobRes.error || !(jobRes as { data: unknown }).data) {
     return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   }
 
-  const job    = jobRes.data as HiringRequest
-  const stages = stagesRes.data ?? []
-  const allApps = appsRes.data ?? []
+  const job    = (jobRes as { data: unknown }).data as HiringRequest
+  const stages = (stagesRes.data ?? []) as PipelineStage[]
+  const allApps = (appsRes.data ?? []) as (Application & { candidate: Candidate })[]
 
   // Filter by application_id or stage_id if requested
   let apps = allApps
@@ -100,7 +100,7 @@ export async function POST(
 
       // ── 3. Score each application (sequentially for meaningful progress) ────
       for (const app of apps) {
-        const candidate = (app as unknown as { candidate: Candidate }).candidate
+        const candidate = app.candidate
         if (!candidate) continue
 
         try {
@@ -120,7 +120,7 @@ export async function POST(
               ai_strengths:      result.strengths,
               ai_gaps:           result.gaps,
               ai_scored_at:      new Date().toISOString(),
-            } as never)
+            } as unknown as ApplicationUpdate)
             .eq('id', app.id)
 
           if (updateErr) throw new Error(`DB write failed: ${updateErr.message}`)
@@ -129,7 +129,7 @@ export async function POST(
           if (result.criterion_scores && result.criterion_scores.length > 0) {
             await supabase
               .from('applications')
-              .update({ ai_criterion_scores: result.criterion_scores } as never)
+              .update({ ai_criterion_scores: result.criterion_scores } as unknown as ApplicationUpdate)
               .eq('id', app.id)
             // ignore error: column may not exist yet (migration 018 pending)
           }
@@ -149,7 +149,7 @@ export async function POST(
           if (shouldAdvance) {
             await supabase
               .from('applications')
-              .update({ stage_id: job.auto_advance_stage_id } as never)
+              .update({ stage_id: job.auto_advance_stage_id } as unknown as ApplicationUpdate)
               .eq('id', app.id)
 
             await supabase.from('application_events').insert({
@@ -158,8 +158,9 @@ export async function POST(
               from_stage:     stages.find(s => s.id === app.stage_id)?.name ?? null,
               to_stage:       advanceStage?.name ?? null,
               note:           `AI Autopilot: score ${result.score} ≥ threshold ${job.auto_advance_score}`,
+              metadata:       {},
               created_by:     'AI Autopilot',
-            } as never)
+            } as unknown as ApplicationEventInsert)
 
             autoAdvanced++
             action = 'advanced'
@@ -175,16 +176,18 @@ export async function POST(
           if (shouldReject) {
             await supabase
               .from('applications')
-              .update({ status: 'rejected' } as never)
+              .update({ status: 'rejected' } as unknown as ApplicationUpdate)
               .eq('id', app.id)
 
             await supabase.from('application_events').insert({
               application_id: app.id,
               event_type:     'status_changed',
+              from_stage:     null,
               to_stage:       'rejected',
               note:           `AI Autopilot: score ${result.score} ≤ threshold ${job.auto_reject_score}`,
+              metadata:       {},
               created_by:     'AI Autopilot',
-            } as never)
+            } as unknown as ApplicationEventInsert)
 
             autoRejected++
             action = 'rejected'
@@ -225,9 +228,12 @@ export async function POST(
                       await supabase.from('application_events').insert({
                         application_id: app.id,
                         event_type:     'email_sent',
+                        from_stage:     null,
+                        to_stage:       null,
                         note:           `Rejection email sent automatically: "${draft.subject}"`,
+                        metadata:       {},
                         created_by:     'AI Autopilot',
-                      } as never)
+                      } as unknown as ApplicationEventInsert)
                     }
                   }
                 }

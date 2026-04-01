@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
 }`,
           },
         ],
-      }] as any,
+      }] as Anthropic.MessageParam[],
     })
 
     const content = message.content[0]

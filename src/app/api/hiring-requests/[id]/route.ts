@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
+import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { hiringRequestUpdateSchema } from '@/lib/validations/hiring-requests'
 
 // GET /api/hiring-requests/:id
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -26,23 +28,19 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (authResult instanceof NextResponse) return authResult
   const { orgId } = authResult
 
-  const supabase = createAdminClient()
+  const parsed = await parseBody(request, hiringRequestUpdateSchema)
+  if (parsed instanceof NextResponse) return parsed
 
-  let body: Record<string, unknown>
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
+  const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('hiring_requests')
-    .update({ ...body, updated_at: new Date().toISOString() } as any)
+    .update({ ...parsed, updated_at: new Date().toISOString() } as import('@/lib/types/database').HiringRequestUpdate)
     .eq('id', params.id)
     .eq('org_id', orgId)
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return handleSupabaseError(error)
   return NextResponse.json({ data })
 }

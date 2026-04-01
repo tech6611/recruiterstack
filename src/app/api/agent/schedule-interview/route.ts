@@ -28,6 +28,7 @@ import { getValidAccessToken, createMeetEvent, queryFreeBusy } from '@/lib/googl
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
+import type { InterviewInsert, ApplicationEventInsert, OrgSettingsUpdate } from '@/lib/types/database'
 
 interface ScheduleInterviewBody {
   // Required
@@ -104,15 +105,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Hiring request not found' }, { status: 404 })
   }
 
-  const candidate  = candidateRes.data
-  const hiringReq  = hiringReqRes.data
+  const candidate  = candidateRes.data as { name: string; email: string; current_title: string | null; location: string | null }
+  const hiringReq  = hiringReqRes.data as { position_title: string; ticket_number: string | null }
 
   // ── Fetch org settings (Google tokens, Slack config) ─────────────────────
-  const { data: orgSettings } = await supabase
+  const { data: orgSettingsData } = await supabase
     .from('org_settings')
     .select('google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry, google_connected_email')
     .eq('org_id', orgId)
     .single()
+  const orgSettings = orgSettingsData as { google_oauth_access_token: string | null; google_oauth_refresh_token: string | null; google_oauth_token_expiry: string | null; google_connected_email: string | null } | null
 
   const oauthAccess  = decryptSafe(orgSettings?.google_oauth_access_token)
   const oauthRefresh = decryptSafe(orgSettings?.google_oauth_refresh_token)
@@ -175,7 +177,7 @@ export async function POST(req: NextRequest) {
           .update({
             google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
             google_oauth_token_expiry: freshTokens.token_expiry,
-          })
+          } as OrgSettingsUpdate)
           .eq('org_id', orgId)
       }
 
@@ -220,7 +222,6 @@ export async function POST(req: NextRequest) {
       hiring_request_id,
       stage_id:                stage_id ?? null,
       interviewer_name:        interviewer_name.trim(),
-      interviewer_email:       interviewer_email?.trim() || null,
       interview_type,
       scheduled_at,
       duration_minutes,
@@ -229,8 +230,7 @@ export async function POST(req: NextRequest) {
       status:                  'scheduled',
       self_schedule_token,
       self_schedule_expires_at,
-      calendar_event_id,
-    } as any)
+    } as InterviewInsert)
     .select()
     .single()
 
@@ -239,13 +239,14 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Application event log ─────────────────────────────────────────────────
+  const interviewRow = interview as { id: string } | null
   await supabase.from('application_events').insert({
     application_id,
     org_id:       orgId,
     event_type:   'interview_scheduled',
     note:         `[Agent] Interview scheduled with ${interviewer_name.trim()} — ${new Date(scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
     metadata:     {
-      interview_id:     (interview as any).id,
+      interview_id:     interviewRow?.id ?? null,
       interview_type,
       duration_minutes,
       calendar_event_id,
@@ -253,7 +254,7 @@ export async function POST(req: NextRequest) {
       agent_scheduled:  true,
     },
     created_by:   orgId,
-  } as any)
+  } as ApplicationEventInsert)
 
   // ── Notifications (non-blocking) ─────────────────────────────────────────
   ;(async () => {
@@ -286,7 +287,7 @@ export async function POST(req: NextRequest) {
     {
       success: true,
       interview: {
-        id:                interview ? (interview as any).id : null,
+        id:                interviewRow?.id ?? null,
         scheduled_at,
         duration_minutes,
         interview_type,

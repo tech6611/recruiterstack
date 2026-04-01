@@ -5,6 +5,7 @@ import { getValidAccessToken as getMSToken, createTeamsMeeting } from '@/lib/mic
 import { getValidAccessToken as getZoomToken, createZoomMeeting } from '@/lib/zoom/meetings'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
+import type { OrgSettingsUpdate, InterviewUpdate, ApplicationEventInsert } from '@/lib/types/database'
 
 // POST /api/schedule/[token]/confirm — public, no auth
 // Body: { scheduled_at: ISO string, timezone: string, reschedule?: boolean }
@@ -132,7 +133,7 @@ export async function POST(
           await supabase.from('org_settings').update({
             ms_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.access_token) : fresh.access_token,
             ms_token_expiry: fresh.token_expiry,
-          }).eq('org_id', orgId)
+          } as OrgSettingsUpdate).eq('org_id', orgId)
         }
         const created = await createTeamsMeeting(access_token, {
           summary:          eventSummary,
@@ -162,7 +163,7 @@ export async function POST(
             zoom_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.access_token) : fresh.access_token,
             zoom_refresh_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.refresh_token) : fresh.refresh_token,
             zoom_token_expiry: fresh.token_expiry,
-          }).eq('org_id', orgId)
+          } as OrgSettingsUpdate).eq('org_id', orgId)
         }
         const created = await createZoomMeeting(access_token, {
           topic:      eventSummary,
@@ -190,7 +191,7 @@ export async function POST(
           await supabase.from('org_settings').update({
             google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.access_token) : fresh.access_token,
             google_oauth_token_expiry: fresh.token_expiry,
-          }).eq('org_id', orgId)
+          } as OrgSettingsUpdate).eq('org_id', orgId)
         }
         const created = await createMeetEvent(access_token, {
           summary:          eventSummary,
@@ -215,10 +216,8 @@ export async function POST(
       scheduled_at,
       status:           'scheduled',
       location:         meetLink ?? interview.location,
-      calendar_event_id: calendarEventId ?? interview.calendar_event_id,
-      meeting_platform: resolvedPlatform ?? interview.meeting_platform,
       updated_at:       new Date().toISOString(),
-    } as any)
+    } as InterviewUpdate)
     .eq('self_schedule_token', token)
 
   if (updateError) {
@@ -236,7 +235,7 @@ export async function POST(
       : `Candidate self-scheduled interview for ${new Date(scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
     metadata:       { interview_id: interview.id, self_scheduled: true, reschedule },
     created_by:     orgId,
-  } as any)
+  } as ApplicationEventInsert)
 
   return NextResponse.json({
     success:          true,

@@ -41,7 +41,6 @@ export async function GET(req: NextRequest) {
   }
 
   // Load all provider tokens in one query
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: settings } = await supabase
     .from('org_settings')
     .select(
@@ -50,7 +49,7 @@ export async function GET(req: NextRequest) {
       'ms_access_token, ms_refresh_token, ms_token_expiry, ms_connected_email'
     )
     .eq('org_id', orgId)
-    .single() as { data: any; error: any }
+    .single()
 
   const providers = { google: false, zoom: false, microsoft: false }
   const allBusy: Record<string, FreeBusySlot[]> = {}

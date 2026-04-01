@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
-import type { CandidateUpdate } from '@/lib/types/database'
+import { parseBody } from '@/lib/api/helpers'
+import { candidateUpdateSchema } from '@/lib/validations/candidates'
 
 // GET /api/candidates/:id — candidate + all applications (with job + stage) + all events + tags + tasks + referrals
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -80,17 +81,12 @@ export async function PATCH(
 
   const supabase = createAdminClient()
 
-  let body: CandidateUpdate
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
+  const parsed = await parseBody(request, candidateUpdateSchema)
+  if (parsed instanceof NextResponse) return parsed
 
   const { data, error } = await supabase
     .from('candidates')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .update(body as any)
+    .update(parsed as import('@/lib/types/database').CandidateUpdate)
     .eq('id', params.id)
     .eq('org_id', orgId)
     .select()

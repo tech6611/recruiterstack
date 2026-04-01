@@ -6,6 +6,7 @@ import { getValidAccessToken as getMSToken, queryMSFreeBusy, type MSTokens } fro
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 import type { FreeBusySlot } from '@/lib/google/calendar'
+import type { OrgSettingsUpdate } from '@/lib/types/database'
 
 // GET /api/schedule/[token] — public, no auth
 // Returns interview metadata + panel busy slots for the candidate to see available times
@@ -92,7 +93,7 @@ export async function GET(
           await supabase.from('org_settings').update({
             google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(tokens.access_token) : tokens.access_token,
             google_oauth_token_expiry: tokens.token_expiry,
-          }).eq('org_id', interview.org_id)
+          } as OrgSettingsUpdate).eq('org_id', interview.org_id)
         }
         const busyMap = await queryGoogleBusy(access_token, emails, timeMin, timeMax, timezone)
         for (const [email, slots] of Object.entries(busyMap)) mergeBusy(email, slots)
@@ -114,7 +115,7 @@ export async function GET(
           await supabase.from('org_settings').update({
             ms_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(tokens.access_token) : tokens.access_token,
             ms_token_expiry: tokens.token_expiry,
-          }).eq('org_id', interview.org_id)
+          } as OrgSettingsUpdate).eq('org_id', interview.org_id)
         }
         const busyMap = await queryMSFreeBusy(access_token, emails, timeMin, timeMax, timezone)
         for (const [email, slots] of Object.entries(busyMap)) mergeBusy(email, slots)
@@ -137,7 +138,7 @@ export async function GET(
             zoom_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(tokens.access_token) : tokens.access_token,
             zoom_refresh_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(tokens.refresh_token) : tokens.refresh_token,
             zoom_token_expiry: tokens.token_expiry,
-          }).eq('org_id', interview.org_id)
+          } as OrgSettingsUpdate).eq('org_id', interview.org_id)
         }
         const zoomEmail = (settings?.zoom_connected_email as string | null)?.toLowerCase()
         if (zoomEmail && emails.includes(zoomEmail)) {

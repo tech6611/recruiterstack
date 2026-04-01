@@ -8,6 +8,7 @@ import { getValidAccessToken as getMSToken, createTeamsMeeting } from '@/lib/mic
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
+import type { InterviewInsert, ApplicationEventInsert, OrgSettingsUpdate } from '@/lib/types/database'
 
 // Strip HTML tags → plain text (for Google Calendar event descriptions)
 function stripHtml(html: string): string {
@@ -81,8 +82,7 @@ export async function POST(req: NextRequest) {
   let resolvedPlatform:   string | null = meeting_platform ?? null
 
   if (interview_type === 'video' || interview_type === 'panel' || interview_type === 'technical') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: orgSettings } = await supabase
+    const { data: orgSettingsRaw } = await supabase
       .from('org_settings')
       .select(
         'google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry, google_connected_email, ' +
@@ -90,13 +90,24 @@ export async function POST(req: NextRequest) {
         'ms_access_token, ms_refresh_token, ms_token_expiry, ms_connected_email'
       )
       .eq('org_id', orgId)
-      .single() as { data: any; error: any }
+      .single()
+
+    const orgSettings = orgSettingsRaw as {
+      google_oauth_access_token: string | null; google_oauth_refresh_token: string | null;
+      google_oauth_token_expiry: string | null; google_connected_email: string | null;
+      zoom_access_token: string | null; zoom_refresh_token: string | null;
+      zoom_token_expiry: string | null; zoom_connected_email: string | null;
+      ms_access_token: string | null; ms_refresh_token: string | null;
+      ms_token_expiry: string | null; ms_connected_email: string | null;
+    } | null
 
     // Fetch candidate + hiring request info (needed for event summary)
-    const [{ data: candidate }, { data: hiringReq }] = await Promise.all([
+    const [{ data: candidateRaw }, { data: hiringReqRaw }] = await Promise.all([
       supabase.from('candidates').select('name, email').eq('id', candidate_id).single(),
       supabase.from('hiring_requests').select('position_title').eq('id', hiring_request_id).single(),
     ])
+    const candidate = candidateRaw as { name: string; email: string } | null
+    const hiringReq = hiringReqRaw as { position_title: string } | null
 
     const attendeeEmails: string[] = []
     if (candidate?.email)          attendeeEmails.push(candidate.email)
@@ -107,8 +118,8 @@ export async function POST(req: NextRequest) {
 
     // ── Zoom ──────────────────────────────────────────────────────────────
     if (resolvedPlatform === 'zoom') {
-      const zAccess  = decryptSafe(orgSettings?.zoom_access_token)
-      const zRefresh = decryptSafe(orgSettings?.zoom_refresh_token)
+      const zAccess  = decryptSafe(orgSettings?.zoom_access_token ?? null)
+      const zRefresh = decryptSafe(orgSettings?.zoom_refresh_token ?? null)
       if (zAccess && zRefresh) {
         try {
           const { access_token, tokens: fresh } = await getZoomToken({
@@ -120,7 +131,7 @@ export async function POST(req: NextRequest) {
               zoom_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.access_token) : fresh.access_token,
               zoom_refresh_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.refresh_token) : fresh.refresh_token,
               zoom_token_expiry: fresh.token_expiry,
-            }).eq('org_id', orgId)
+            } as unknown as OrgSettingsUpdate).eq('org_id', orgId)
           }
           const created = await createZoomMeeting(access_token, {
             topic:      eventSummary,
@@ -140,8 +151,8 @@ export async function POST(req: NextRequest) {
 
     // ── Microsoft Teams ───────────────────────────────────────────────────
     } else if (resolvedPlatform === 'ms_teams') {
-      const mAccess  = decryptSafe(orgSettings?.ms_access_token)
-      const mRefresh = decryptSafe(orgSettings?.ms_refresh_token)
+      const mAccess  = decryptSafe(orgSettings?.ms_access_token ?? null)
+      const mRefresh = decryptSafe(orgSettings?.ms_refresh_token ?? null)
       if (mAccess && mRefresh) {
         try {
           const { access_token, tokens: fresh } = await getMSToken({
@@ -152,7 +163,7 @@ export async function POST(req: NextRequest) {
             await supabase.from('org_settings').update({
               ms_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.access_token) : fresh.access_token,
               ms_token_expiry: fresh.token_expiry,
-            }).eq('org_id', orgId)
+            } as unknown as OrgSettingsUpdate).eq('org_id', orgId)
           }
           const created = await createTeamsMeeting(access_token, {
             summary:          eventSummary,
@@ -174,8 +185,8 @@ export async function POST(req: NextRequest) {
 
     // ── Google Meet (default) ─────────────────────────────────────────────
     } else {
-      const gAccess  = decryptSafe(orgSettings?.google_oauth_access_token)
-      const gRefresh = decryptSafe(orgSettings?.google_oauth_refresh_token)
+      const gAccess  = decryptSafe(orgSettings?.google_oauth_access_token ?? null)
+      const gRefresh = decryptSafe(orgSettings?.google_oauth_refresh_token ?? null)
       if (gAccess && gRefresh) {
         resolvedPlatform = 'google_meet'
         try {
@@ -188,7 +199,7 @@ export async function POST(req: NextRequest) {
             await supabase.from('org_settings').update({
               google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
               google_oauth_token_expiry: freshTokens.token_expiry,
-            }).eq('org_id', orgId)
+            } as unknown as OrgSettingsUpdate).eq('org_id', orgId)
           }
           const created = await createMeetEvent(access_token, {
             summary:          eventSummary,
@@ -233,38 +244,43 @@ export async function POST(req: NextRequest) {
       calendar_event_id,
       meeting_platform: resolvedPlatform,
       panel:            panel ?? null,
-    } as any)
+    } as unknown as InterviewInsert)
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  const interviewData = data as Record<string, unknown>
+
   // ── Log application event ────────────────────────────────────────────────
   await supabase.from('application_events').insert({
     application_id,
-    org_id:       orgId,
     event_type:   'interview_scheduled',
+    from_stage:   null,
+    to_stage:     null,
     note:         `Interview scheduled with ${interviewer_name.trim()} — ${new Date(scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
-    metadata:     { interview_id: (data as any).id, interview_type: interview_type ?? 'video', duration_minutes: duration_minutes ?? 60 },
+    metadata:     { interview_id: interviewData.id, interview_type: interview_type ?? 'video', duration_minutes: duration_minutes ?? 60 },
     created_by:   orgId,
-  } as any)
+  } as unknown as ApplicationEventInsert)
 
   // ── Fire notifications (non-blocking) ────────────────────────────────────
   // Fetch recruiter + candidate info for notification copy
   ;(async () => {
     try {
-      const [candidateRes, hiringReqRes] = await Promise.all([
+      const [candidateRes2, hiringReqRes2] = await Promise.all([
         supabase.from('candidates').select('name, email').eq('id', candidate_id).single(),
         supabase.from('hiring_requests').select('position_title').eq('id', hiring_request_id).single(),
       ])
+      const candData = candidateRes2.data as { name: string; email: string } | null
+      const hrData = hiringReqRes2.data as { position_title: string } | null
 
       await notifyInterviewScheduled({
         orgId,
-        candidateName:    candidateRes.data?.name ?? 'Candidate',
-        candidateEmail:   candidateRes.data?.email ?? '',
+        candidateName:    candData?.name ?? 'Candidate',
+        candidateEmail:   candData?.email ?? '',
         interviewerName:  interviewer_name.trim(),
         interviewerEmail: interviewer_email?.trim() || null,
-        positionTitle:    hiringReqRes.data?.position_title ?? 'Position',
+        positionTitle:    hrData?.position_title ?? 'Position',
         scheduledAt:         scheduled_at,
         durationMinutes:     duration_minutes ?? 60,
         timezone:            timezone ?? null,
@@ -283,5 +299,5 @@ export async function POST(req: NextRequest) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
   const selfScheduleLink = self_schedule_token ? `${appUrl}/schedule/${self_schedule_token}` : null
-  return NextResponse.json({ data: { ...data, meet_link: meetLink, meeting_link: meetLink, meeting_platform: resolvedPlatform, google_meet_error: googleMeetError, self_schedule_link: selfScheduleLink } }, { status: 201 })
+  return NextResponse.json({ data: { ...interviewData, meet_link: meetLink, meeting_link: meetLink, meeting_platform: resolvedPlatform, google_meet_error: googleMeetError, self_schedule_link: selfScheduleLink } }, { status: 201 })
 }
