@@ -168,11 +168,11 @@ function widgetAccent(wId: WidgetId) {
 
 // ── View type & defaults ──────────────────────────────────────────────────────
 
-type WidgetSize = 'small' | 'wide' | 'tall' | 'large'
+interface WidgetDimensions { w: number; h: number }
 
 interface DashView {
   id: string; name: string; icon: string; widgets: WidgetId[]
-  widgetSizes?: Partial<Record<WidgetId, WidgetSize>>
+  widgetDims?: Partial<Record<WidgetId, WidgetDimensions>>
 }
 
 const DEFAULT_VIEWS: DashView[] = [
@@ -335,7 +335,82 @@ function ViewsSidebar({
 
 // ── Individual widget components ──────────────────────────────────────────────
 
-const PREVIEW_LIMIT = 4
+/** Widgets show all items by default — container overflow handles scroll */
+const PREVIEW_LIMIT = Infinity
+
+/** Drag-resize handle for bottom-right corner of widgets */
+function ResizeHandle({ onResizeStart, onResize }: { onResizeStart?: () => void; onResize: (deltaW: number, deltaH: number) => void }) {
+  function handleMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
+    onResizeStart?.()
+    const startX = e.clientX
+    const startY = e.clientY
+
+    function onMouseMove(ev: MouseEvent) {
+      onResize(ev.clientX - startX, ev.clientY - startY)
+    }
+    function onMouseUp() {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }
+
+  return (
+    <div
+      onMouseDown={handleMouseDown}
+      className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity z-10"
+      title="Drag to resize"
+    >
+      <svg viewBox="0 0 16 16" className="h-5 w-5 text-slate-300 hover:text-slate-500">
+        <path d="M14 14L6 14L14 6Z" fill="currentColor" />
+        <path d="M14 14L10 14L14 10Z" fill="currentColor" opacity="0.5" />
+      </svg>
+    </div>
+  )
+}
+
+/** Resizable widget wrapper — tracks its own ref for drag calculations */
+function ResizableWidget({
+  wId, dims, onResize, disabled, children,
+}: {
+  wId: WidgetId
+  dims: WidgetDimensions | null
+  onResize: (dims: WidgetDimensions) => void
+  disabled: boolean
+  children: React.ReactNode
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const startDims = useRef<{ w: number; h: number }>({ w: 0, h: 0 })
+
+  function handleResizeStart() {
+    const el = ref.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    startDims.current = { w: dims?.w ?? rect.width, h: dims?.h ?? rect.height }
+  }
+
+  return (
+    <div
+      ref={ref}
+      style={dims ? { width: dims.w, height: dims.h, minWidth: 280, minHeight: 160 } : { minWidth: 280, minHeight: 160 }}
+      className={`group relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto ${
+        dims ? '' : 'flex-1 basis-[calc(50%-0.5rem)]'
+      } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+    >
+      {!disabled && (
+        <ResizeHandle onResizeStart={handleResizeStart} onResize={(dw, dh) => {
+          onResize({
+            w: Math.max(280, startDims.current.w + dw),
+            h: Math.max(160, startDims.current.h + dh),
+          })
+        }} />
+      )}
+      {children}
+    </div>
+  )
+}
 
 /** Per-widget search state + filter helper */
 function useWidgetSearch() {
@@ -1260,7 +1335,7 @@ function ActionQueueWidget({
         </div>
       ) : (
         <div className="space-y-1.5">
-          {visibleItems.slice(0, 8).map(item => (
+          {visibleItems.map(item => (
             <div key={item.id}
               className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-white px-3 py-2.5 hover:border-slate-200 transition-colors"
             >
@@ -1996,17 +2071,15 @@ export default function DashboardPage() {
   function handleRightReorderWidgets(widgets: WidgetId[]) { setRightWidgets(widgets) }
   function handleRightRemoveWidget(id: WidgetId)         { setRightWidgets(prev => prev.filter(w => w !== id)) }
 
-  // Widget size helpers
-  function getWidgetSize(wId: WidgetId): WidgetSize {
+  // Widget dimension helpers
+  function getWidgetDims(wId: WidgetId): WidgetDimensions | null {
     const view = views.find(v => v.id === activeViewId)
-    return view?.widgetSizes?.[wId] ?? 'small'
+    return view?.widgetDims?.[wId] ?? null
   }
-  function cycleWidgetSize(wId: WidgetId) {
-    const current = getWidgetSize(wId)
-    const next: WidgetSize = current === 'small' ? 'wide' : current === 'wide' ? 'tall' : current === 'tall' ? 'large' : 'small'
+  function setWidgetDims(wId: WidgetId, dims: WidgetDimensions) {
     setViews(prev => prev.map(v => {
       if (v.id !== activeViewId) return v
-      return { ...v, widgetSizes: { ...(v.widgetSizes ?? {}), [wId]: next } }
+      return { ...v, widgetDims: { ...(v.widgetDims ?? {}), [wId]: dims } }
     }))
   }
   function handleRightAddWidget(id: WidgetId)            { setRightWidgets(prev => [...prev, id]) }
@@ -2094,29 +2167,15 @@ export default function DashboardPage() {
 
           {/* Render widgets in 2-col grid */}
           {(activeView?.widgets ?? []).length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {(activeView?.widgets ?? []).map(wId => {
-                const size = getWidgetSize(wId)
-                const sizeClass =
-                  size === 'wide'  ? 'lg:col-span-2' :
-                  size === 'tall'  ? 'lg:row-span-2' :
-                  size === 'large' ? 'lg:col-span-2 lg:row-span-2' : ''
-                const SIZE_LABELS: Record<WidgetSize, string> = { small: '1×1', wide: '2×1', tall: '1×2', large: '2×2' }
-                return (
-                  <div
+            <div className="flex flex-wrap gap-4">
+              {(activeView?.widgets ?? []).map(wId => (
+                  <ResizableWidget
                     key={wId}
-                    className={`group relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 ${sizeClass} ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
+                    wId={wId}
+                    dims={getWidgetDims(wId)}
+                    onResize={(dims) => setWidgetDims(wId, dims)}
+                    disabled={widgetMode}
                   >
-                    {/* Resize toggle — visible on hover */}
-                    {!widgetMode && (
-                      <button
-                        onClick={() => cycleWidgetSize(wId)}
-                        title={`Size: ${SIZE_LABELS[size]} — click to cycle`}
-                        className="absolute top-2 right-2 z-10 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-medium text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-slate-50 hover:text-slate-600 transition-all"
-                      >
-                        {SIZE_LABELS[size]}
-                      </button>
-                    )}
                     {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={setDrawerCandidateId} />}
                     {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />}
                     {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
@@ -2131,9 +2190,8 @@ export default function DashboardPage() {
                     {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
                     {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
                     {wId === 'action_queue'      && <ActionQueueWidget         data={data} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />}
-                  </div>
-                )
-              })}
+                  </ResizableWidget>
+              ))}
             </div>
           ) : !widgetMode ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
