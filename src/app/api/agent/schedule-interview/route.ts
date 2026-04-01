@@ -28,7 +28,6 @@ import { getValidAccessToken, createMeetEvent, queryFreeBusy } from '@/lib/googl
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
-import type { InterviewInsert, ApplicationEventInsert, OrgSettingsUpdate } from '@/lib/types/database'
 
 interface ScheduleInterviewBody {
   // Required
@@ -171,12 +170,12 @@ export async function POST(req: NextRequest) {
 
       // Persist refreshed tokens if changed (encrypt before saving)
       if (freshTokens.access_token !== oauthAccess) {
-        await supabase
-          .from('org_settings')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.from('org_settings') as any)
           .update({
             google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
             google_oauth_token_expiry: freshTokens.token_expiry,
-          } as OrgSettingsUpdate)
+          })
           .eq('org_id', orgId)
       }
 
@@ -212,8 +211,8 @@ export async function POST(req: NextRequest) {
   const self_schedule_expires_at = generate_self_schedule ? expires.toISOString() : null
 
   // ── Insert interview ──────────────────────────────────────────────────────
-  const { data: interview, error: insertError } = await supabase
-    .from('interviews')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: interview, error: insertError } = await (supabase.from('interviews') as any)
     .insert({
       org_id:                  orgId,
       application_id,
@@ -229,7 +228,7 @@ export async function POST(req: NextRequest) {
       status:                  'scheduled',
       self_schedule_token,
       self_schedule_expires_at,
-    } as InterviewInsert)
+    })
     .select()
     .single()
 
@@ -239,7 +238,8 @@ export async function POST(req: NextRequest) {
 
   // ── Application event log ─────────────────────────────────────────────────
   const interviewRow = interview as { id: string } | null
-  await supabase.from('application_events').insert({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('application_events') as any).insert({
     application_id,
     org_id:       orgId,
     event_type:   'interview_scheduled',
@@ -253,7 +253,7 @@ export async function POST(req: NextRequest) {
       agent_scheduled:  true,
     },
     created_by:   orgId,
-  } as ApplicationEventInsert)
+  })
 
   // ── Notifications (non-blocking) ─────────────────────────────────────────
   ;(async () => {
