@@ -342,8 +342,8 @@ function WidgetGrid({
       <GridLayout
         className="layout"
         layout={layout}
-        cols={2}
-        rowHeight={80}
+        cols={12}
+        rowHeight={20}
         isDraggable={!disabled}
         isResizable={!disabled}
         draggableHandle=".widget-drag-handle"
@@ -385,12 +385,12 @@ function WidgetGrid({
 function defaultGridLayout(widgets: WidgetId[]): LayoutItem[] {
   return widgets.map((wId, idx) => ({
     i: wId,
-    x: idx % 2,
-    y: Math.floor(idx / 2) * 4,
-    w: 1,
-    h: 4,
-    minW: 1,
-    minH: 2,
+    x: (idx % 2) * 6,
+    y: Math.floor(idx / 2) * 16,
+    w: 6,
+    h: 16,
+    minW: 2,
+    minH: 4,
   }))
 }
 
@@ -2164,7 +2164,7 @@ export default function DashboardPage() {
       return [
         ...view.gridLayouts,
         ...missing.map((wId, idx) => ({
-          i: wId, x: idx % 2, y: maxY, w: 1, h: 4, minW: 1, minH: 2,
+          i: wId, x: (idx % 2) * 6, y: maxY, w: 6, h: 16, minW: 2, minH: 4,
         })),
       ]
     }
