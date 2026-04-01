@@ -337,6 +337,9 @@ function WidgetGrid({
   onCandidateClick: (id: string) => void
   onRefresh: () => void
 }) {
+  // Only save layout on user interaction (drag/resize), not on mount/reflow
+  const userInteracted = useRef(false)
+
   return (
     <div className="flex-1 overflow-auto">
       <GridLayout
@@ -349,14 +352,21 @@ function WidgetGrid({
         draggableHandle=".widget-drag-handle"
         compactType="vertical"
         margin={[12, 12]}
-        onLayoutChange={onLayoutChange}
+        onDragStart={() => { userInteracted.current = true }}
+        onResizeStart={() => { userInteracted.current = true }}
+        onLayoutChange={(newLayout: LayoutItem[]) => {
+          if (userInteracted.current) {
+            onLayoutChange(newLayout)
+            userInteracted.current = false
+          }
+        }}
       >
         {widgets.map(wId => (
           <div
             key={wId}
-            className={`rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+            className={`relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
           >
-            <div className="widget-drag-handle absolute top-2 left-2 z-10 cursor-grab text-slate-300 hover:text-slate-500">
+            <div className="widget-drag-handle absolute top-2 left-2 z-10 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
               <GripVertical className="h-4 w-4" />
             </div>
             {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={onCandidateClick} />}
