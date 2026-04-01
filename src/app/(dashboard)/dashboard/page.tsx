@@ -358,7 +358,7 @@ function WidgetGrid({
             key={wId}
             className={`relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
           >
-            <div className="widget-drag-handle absolute top-2 left-2 z-10 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
+            <div className="widget-drag-handle absolute top-2 -left-0.5 z-10 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
               <GripVertical className="h-4 w-4" />
             </div>
             {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={onCandidateClick} />}
