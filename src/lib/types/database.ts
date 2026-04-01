@@ -870,6 +870,12 @@ export type Database = {
         Update: Indexify<SequenceEmailUpdate>
         Relationships: []
       }
+      user_preferences: {
+        Row: { id: string; user_id: string; org_id: string; key: string; value: unknown; updated_at: string; created_at: string }
+        Insert: { user_id: string; org_id: string; key: string; value: unknown; updated_at?: string }
+        Update: { value?: unknown; updated_at?: string }
+        Relationships: []
+      }
     }
     Views: Record<never, never>
     Functions: Record<never, never>

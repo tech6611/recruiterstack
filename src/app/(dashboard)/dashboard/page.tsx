@@ -2027,66 +2027,114 @@ export default function DashboardPage() {
   const [rightWidgetSnapshot, setRightWidgetSnapshot] = useState<WidgetId[]>([])
 
 
-  // Hydrate localStorage — migrate old data that lacks `widgets`
-  useEffect(() => {
-    try {
-      const version = localStorage.getItem(LS_VERSION)
-
-      if (version !== CURRENT_VERSION) {
-        // First load after upgrade — clear stale data, start fresh with defaults
-        localStorage.removeItem(LS_VIEWS)
-        localStorage.removeItem(LS_ACTIVE)
-        localStorage.setItem(LS_VERSION, CURRENT_VERSION)
-      } else {
-        const v = localStorage.getItem(LS_VIEWS)
-        if (v) {
-          const parsed = JSON.parse(v) as DashView[]
-          // Migrate any view missing the widgets array
-          const migrated = parsed.map(view => {
-            if (!Array.isArray(view.widgets)) {
-              const def = DEFAULT_VIEWS.find(d => d.id === view.id)
-              return { ...view, widgets: def?.widgets ?? (['interviews', 'tasks'] as WidgetId[]) }
-            }
-            return view
-          })
-          setViews(migrated)
-        }
-        const a = localStorage.getItem(LS_ACTIVE)
-        if (a) setActiveViewId(a)
-      }
-    } catch {
-      // Corrupted storage — reset silently
-      localStorage.removeItem(LS_VIEWS)
-      localStorage.removeItem(LS_ACTIVE)
-    }
-    // Hydrate right panel widgets — filter out stale IDs from old schema
-    try {
-      const rw = localStorage.getItem(LS_RIGHT_WIDGETS)
-      if (rw) {
-        const parsed = JSON.parse(rw) as string[]
-        const validIds = new Set(ALL_WIDGET_DEFS.map(w => w.id))
-        const valid = parsed.filter(id => validIds.has(id as WidgetId)) as WidgetId[]
-        if (valid.length > 0) setRightWidgets(valid)
-        // If all IDs were stale (old schema), keep DEFAULT_RIGHT_WIDGETS
-      }
-    } catch {}
-    setHydrated(true)
+  // ── Save preference to DB (debounced) ─────────────────────────────────────
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const savePref = useCallback((key: string, value: unknown) => {
+    // Immediate localStorage write (fast cache)
+    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    // Debounced DB write (persistent)
+    if (saveTimers.current[key]) clearTimeout(saveTimers.current[key])
+    saveTimers.current[key] = setTimeout(() => {
+      fetch('/api/user-preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value }),
+      }).catch(() => {}) // silent fail — localStorage is the fallback
+    }, 1000)
   }, [])
 
+  // ── Hydrate: DB first → localStorage fallback → defaults ─────────────────
+  useEffect(() => {
+    async function loadPreferences() {
+      try {
+        // Try loading from DB
+        const [viewsRes, activeRes, rightRes] = await Promise.all([
+          fetch('/api/user-preferences?key=dashboard_views'),
+          fetch('/api/user-preferences?key=dashboard_active_view'),
+          fetch('/api/user-preferences?key=right_panel_widgets'),
+        ])
+        const viewsJson = viewsRes.ok ? await viewsRes.json() : null
+        const activeJson = activeRes.ok ? await activeRes.json() : null
+        const rightJson = rightRes.ok ? await rightRes.json() : null
+
+        let loaded = false
+
+        if (viewsJson?.data) {
+          setViews(viewsJson.data as DashView[])
+          loaded = true
+        }
+        if (activeJson?.data) {
+          setActiveViewId(activeJson.data as string)
+          loaded = true
+        }
+        if (rightJson?.data) {
+          setRightWidgets(rightJson.data as WidgetId[])
+          loaded = true
+        }
+
+        // If DB had nothing, try localStorage
+        if (!loaded) {
+          try {
+            const version = localStorage.getItem(LS_VERSION)
+            if (version === CURRENT_VERSION) {
+              const v = localStorage.getItem(LS_VIEWS)
+              if (v) {
+                const parsed = JSON.parse(v) as DashView[]
+                const migrated = parsed.map(view => {
+                  if (!Array.isArray(view.widgets)) {
+                    const def = DEFAULT_VIEWS.find(d => d.id === view.id)
+                    return { ...view, widgets: def?.widgets ?? (['interviews', 'tasks'] as WidgetId[]) }
+                  }
+                  return view
+                })
+                setViews(migrated)
+              }
+              const a = localStorage.getItem(LS_ACTIVE)
+              if (a) setActiveViewId(a)
+              const rw = localStorage.getItem(LS_RIGHT_WIDGETS)
+              if (rw) {
+                const parsed = JSON.parse(rw) as string[]
+                const validIds = new Set(ALL_WIDGET_DEFS.map(w => w.id))
+                const valid = parsed.filter(id => validIds.has(id as WidgetId)) as WidgetId[]
+                if (valid.length > 0) setRightWidgets(valid)
+              }
+            } else {
+              // Stale version — clear
+              localStorage.removeItem(LS_VIEWS)
+              localStorage.removeItem(LS_ACTIVE)
+              localStorage.setItem(LS_VERSION, CURRENT_VERSION)
+            }
+          } catch {
+            localStorage.removeItem(LS_VIEWS)
+            localStorage.removeItem(LS_ACTIVE)
+          }
+        }
+      } catch {
+        // API not available — fall back to localStorage silently
+      }
+      setHydrated(true)
+    }
+    loadPreferences()
+  }, [])
+
+  // ── Persist changes to both localStorage and DB ──────────────────────────
   useEffect(() => {
     if (!hydrated) return
-    try { localStorage.setItem(LS_VIEWS, JSON.stringify(views)) } catch {}
-  }, [views, hydrated])
+    savePref(LS_VIEWS, views)
+    savePref('dashboard_views', views)
+  }, [views, hydrated, savePref])
 
   useEffect(() => {
     if (!hydrated) return
-    try { localStorage.setItem(LS_ACTIVE, activeViewId) } catch {}
-  }, [activeViewId, hydrated])
+    savePref(LS_ACTIVE, activeViewId)
+    savePref('dashboard_active_view', activeViewId)
+  }, [activeViewId, hydrated, savePref])
 
   useEffect(() => {
     if (!hydrated) return
-    try { localStorage.setItem(LS_RIGHT_WIDGETS, JSON.stringify(rightWidgets)) } catch {}
-  }, [rightWidgets, hydrated])
+    savePref(LS_RIGHT_WIDGETS, rightWidgets)
+    savePref('right_panel_widgets', rightWidgets)
+  }, [rightWidgets, hydrated, savePref])
 
   // Fetch
   const fetchData = useCallback(async (isRefresh = false) => {
