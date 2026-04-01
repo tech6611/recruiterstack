@@ -335,8 +335,8 @@ function ViewsSidebar({
 
 // ── Individual widget components ──────────────────────────────────────────────
 
-/** Widgets show all items by default — container overflow handles scroll */
-const PREVIEW_LIMIT = Infinity
+/** Max items shown per widget — content scrolls within the widget's viewport-constrained container */
+const PREVIEW_LIMIT = 50
 
 /** Drag-resize handle for bottom-right corner of widgets */
 function ResizeHandle({ onResizeStart, onResize }: { onResizeStart?: () => void; onResize: (deltaW: number, deltaH: number) => void }) {
@@ -371,7 +371,11 @@ function ResizeHandle({ onResizeStart, onResize }: { onResizeStart?: () => void;
   )
 }
 
-/** Resizable widget wrapper — tracks its own ref for drag calculations */
+/**
+ * Resizable widget wrapper.
+ * Dims are stored as percentages of the grid container (w: % of width, h: % of height).
+ * Without custom dims, widgets auto-fill using CSS grid fr units.
+ */
 function ResizableWidget({
   wId, dims, onResize, disabled, children,
 }: {
@@ -387,23 +391,43 @@ function ResizableWidget({
   function handleResizeStart() {
     const el = ref.current
     if (!el) return
+    const parent = el.parentElement
+    if (!parent) return
+    const parentRect = parent.getBoundingClientRect()
     const rect = el.getBoundingClientRect()
-    startDims.current = { w: dims?.w ?? rect.width, h: dims?.h ?? rect.height }
+    // Store starting size as percentage of parent
+    startDims.current = {
+      w: dims?.w ?? (rect.width / parentRect.width) * 100,
+      h: dims?.h ?? (rect.height / parentRect.height) * 100,
+    }
+  }
+
+  const style: React.CSSProperties = {}
+  if (dims) {
+    style.width = `${dims.w}%`
+    style.height = `${dims.h}%`
   }
 
   return (
     <div
       ref={ref}
-      style={dims ? { width: dims.w, height: dims.h, minWidth: 280, minHeight: 160 } : { minWidth: 280, minHeight: 160 }}
+      style={style}
       className={`group relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto ${
-        dims ? '' : 'flex-1 basis-[calc(50%-0.5rem)]'
+        dims ? '' : ''
       } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
     >
       {!disabled && (
         <ResizeHandle onResizeStart={handleResizeStart} onResize={(dw, dh) => {
+          const el = ref.current
+          const parent = el?.parentElement
+          if (!parent) return
+          const parentRect = parent.getBoundingClientRect()
+          // Convert pixel delta to percentage of parent
+          const dwPct = (dw / parentRect.width) * 100
+          const dhPct = (dh / parentRect.height) * 100
           onResize({
-            w: Math.max(280, startDims.current.w + dw),
-            h: Math.max(160, startDims.current.h + dh),
+            w: Math.max(20, Math.min(100, startDims.current.w + dwPct)),
+            h: Math.max(15, Math.min(100, startDims.current.h + dhPct)),
           })
         }} />
       )}
@@ -2099,7 +2123,7 @@ export default function DashboardPage() {
   const ActiveIcon = VIEW_ICONS[activeView?.icon ?? 'home'] ?? Home
 
   return (
-    <div className="flex bg-slate-50">
+    <div className="flex h-screen overflow-hidden bg-slate-50">
 
       {/* Views sidebar */}
       <ViewsSidebar
@@ -2114,7 +2138,7 @@ export default function DashboardPage() {
       />
 
       {/* Center main */}
-      <div className="flex-1 min-w-0 divide-y divide-slate-100">
+      <div className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
 
         {/* View header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200">
@@ -2148,11 +2172,11 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Widget area */}
-        <div className="p-4">
+        {/* Widget area — fills remaining viewport height */}
+        <div className="flex-1 overflow-hidden p-4 flex flex-col">
           {/* Customize panel */}
           {widgetMode && (
-            <div className="mb-4">
+            <div className="mb-4 shrink-0">
               <WidgetCustomizer
                 activeWidgets={activeView?.widgets ?? []}
                 snapshotWidgets={widgetSnapshot}
@@ -2165,9 +2189,16 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Render widgets in 2-col grid */}
+          {/* Render widgets — auto-sized to fill viewport */}
           {(activeView?.widgets ?? []).length > 0 ? (
-            <div className="flex flex-wrap gap-4">
+            <div className="flex-1 flex flex-wrap gap-3 content-start overflow-hidden"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${Math.min((activeView?.widgets ?? []).length, 2)}, 1fr)`,
+                gridTemplateRows: `repeat(${Math.ceil((activeView?.widgets ?? []).length / 2)}, 1fr)`,
+                gap: '0.75rem',
+              }}
+            >
               {(activeView?.widgets ?? []).map(wId => (
                   <ResizableWidget
                     key={wId}
