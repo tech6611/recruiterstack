@@ -168,8 +168,11 @@ function widgetAccent(wId: WidgetId) {
 
 // ── View type & defaults ──────────────────────────────────────────────────────
 
+type WidgetSize = 'small' | 'wide' | 'tall' | 'large'
+
 interface DashView {
   id: string; name: string; icon: string; widgets: WidgetId[]
+  widgetSizes?: Partial<Record<WidgetId, WidgetSize>>
 }
 
 const DEFAULT_VIEWS: DashView[] = [
@@ -1136,6 +1139,7 @@ interface ActionItem {
   type: 'approve' | 'score' | 'followup' | 'feedback'
   title: string
   sub: string
+  openSince: string | null
   actionLabel: string
   actionColor: string
   iconColor: string
@@ -1162,6 +1166,7 @@ function ActionQueueWidget({
       id: `approve-${t.id}`, type: 'approve', targetId: t.id,
       title: t.title,
       sub: `${t.department ?? 'No dept'}${t.location ? ` · ${t.location}` : ''}`,
+      openSince: t.created_at,
       actionLabel: 'Approve & Post', actionColor: 'bg-emerald-500 hover:bg-emerald-600',
       iconColor: 'bg-emerald-100 text-emerald-600',
       icon: <CheckSquare className="h-3 w-3" />,
@@ -1174,6 +1179,7 @@ function ActionQueueWidget({
       id: `score-${r.job_id}`, type: 'score', targetId: r.job_id,
       title: `${r.count} candidate${r.count !== 1 ? 's' : ''} need scoring`,
       sub: r.job_title,
+      openSince: null,
       actionLabel: 'Score Now', actionColor: 'bg-amber-500 hover:bg-amber-600',
       iconColor: 'bg-amber-100 text-amber-600',
       icon: <Star className="h-3 w-3" />,
@@ -1185,6 +1191,7 @@ function ActionQueueWidget({
     items.push({
       id: `followup-${t.id}`, type: 'followup', targetId: t.id,
       title: t.candidate_name, sub: `Follow-up overdue · ${t.job_title}`,
+      openSince: t.last_event_at,
       candidateId: t.candidate_id,
       actionLabel: 'Mark Done', actionColor: 'bg-slate-500 hover:bg-slate-600',
       iconColor: 'bg-red-100 text-red-500',
@@ -1197,6 +1204,7 @@ function ActionQueueWidget({
     items.push({
       id: `feedback-${t.id}`, type: 'feedback', targetId: t.id,
       title: t.candidate_name, sub: `Feedback needed · ${t.job_title}`,
+      openSince: t.moved_at,
       candidateId: t.candidate_id,
       actionLabel: 'Review', actionColor: 'bg-blue-500 hover:bg-blue-600',
       iconColor: 'bg-amber-100 text-amber-600',
@@ -1263,6 +1271,11 @@ function ActionQueueWidget({
                 <p className="text-xs font-medium text-slate-800 truncate">{item.title}</p>
                 <p className="text-[10px] text-slate-400 truncate">{item.sub}</p>
               </div>
+              {item.openSince && (
+                <span className="shrink-0 text-[10px] text-slate-400" title={new Date(item.openSince).toLocaleString()}>
+                  {timeAgo(item.openSince)}
+                </span>
+              )}
               {doneIds.has(item.id) ? (
                 <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
                   Done!
@@ -1982,6 +1995,20 @@ export default function DashboardPage() {
   function handleRightDiscardCustomizer() { setRightWidgets(rightWidgetSnapshot); setRightPanelMode(false) }
   function handleRightReorderWidgets(widgets: WidgetId[]) { setRightWidgets(widgets) }
   function handleRightRemoveWidget(id: WidgetId)         { setRightWidgets(prev => prev.filter(w => w !== id)) }
+
+  // Widget size helpers
+  function getWidgetSize(wId: WidgetId): WidgetSize {
+    const view = views.find(v => v.id === activeViewId)
+    return view?.widgetSizes?.[wId] ?? 'small'
+  }
+  function cycleWidgetSize(wId: WidgetId) {
+    const current = getWidgetSize(wId)
+    const next: WidgetSize = current === 'small' ? 'wide' : current === 'wide' ? 'tall' : current === 'tall' ? 'large' : 'small'
+    setViews(prev => prev.map(v => {
+      if (v.id !== activeViewId) return v
+      return { ...v, widgetSizes: { ...(v.widgetSizes ?? {}), [wId]: next } }
+    }))
+  }
   function handleRightAddWidget(id: WidgetId)            { setRightWidgets(prev => [...prev, id]) }
 
   if (loading || !hydrated) return <DashboardSkeleton />
@@ -2069,13 +2096,27 @@ export default function DashboardPage() {
           {(activeView?.widgets ?? []).length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {(activeView?.widgets ?? []).map(wId => {
-                // Interviews and Tasks span the full width — they have tabs/tables that need space
-                const isWide = ['interviews', 'tasks', 'overview_stats', 'action_queue'].includes(wId)
+                const size = getWidgetSize(wId)
+                const sizeClass =
+                  size === 'wide'  ? 'lg:col-span-2' :
+                  size === 'tall'  ? 'lg:row-span-2' :
+                  size === 'large' ? 'lg:col-span-2 lg:row-span-2' : ''
+                const SIZE_LABELS: Record<WidgetSize, string> = { small: '1×1', wide: '2×1', tall: '1×2', large: '2×2' }
                 return (
                   <div
                     key={wId}
-                    className={`rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 ${isWide ? 'lg:col-span-2' : ''} ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
+                    className={`group relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 ${sizeClass} ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
                   >
+                    {/* Resize toggle — visible on hover */}
+                    {!widgetMode && (
+                      <button
+                        onClick={() => cycleWidgetSize(wId)}
+                        title={`Size: ${SIZE_LABELS[size]} — click to cycle`}
+                        className="absolute top-2 right-2 z-10 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-medium text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-slate-50 hover:text-slate-600 transition-all"
+                      >
+                        {SIZE_LABELS[size]}
+                      </button>
+                    )}
                     {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={setDrawerCandidateId} />}
                     {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />}
                     {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
