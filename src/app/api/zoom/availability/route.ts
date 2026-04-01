@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
     .eq('org_id', orgId)
     .single()
 
-  const decryptedAccess  = decryptSafe(settings?.zoom_access_token)
-  const decryptedRefresh = decryptSafe(settings?.zoom_refresh_token)
+  const decryptedAccess  = decryptSafe(settings?.zoom_access_token ?? null)
+  const decryptedRefresh = decryptSafe(settings?.zoom_refresh_token ?? null)
 
   if (!decryptedAccess || !decryptedRefresh) {
     return NextResponse.json(

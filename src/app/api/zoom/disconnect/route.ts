@@ -19,7 +19,7 @@ export async function POST() {
     .single()
 
   // Best-effort revoke with Zoom
-  const tokenToRevoke = decryptSafe(settings?.zoom_access_token)
+  const tokenToRevoke = decryptSafe(settings?.zoom_access_token ?? null)
   if (tokenToRevoke) {
     const clientId     = process.env.ZOOM_CLIENT_ID!
     const clientSecret = process.env.ZOOM_CLIENT_SECRET!

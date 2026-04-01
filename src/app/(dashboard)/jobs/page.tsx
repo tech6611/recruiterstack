@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
 import EditHMModal from '@/components/EditHMModal'
+import { inputCls, labelCls } from '@/lib/ui/styles'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -54,8 +55,6 @@ const CITIES = [
 
 type NewJobMode = 'send_to_hm' | 'fill_myself' | null
 
-const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition'
-const labelCls = 'block text-xs font-semibold text-slate-500 mb-1.5'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared sub-components (form helpers)

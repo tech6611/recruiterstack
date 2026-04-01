@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { X, Phone, Clock, Calendar, Loader2, MessageSquare, Sparkles, Mic } from 'lucide-react'
+import { fmtDateTime } from '@/lib/ui/date-utils'
+import { ScoreRing } from '@/components/ui/ScoreRing'
 
 interface TranscriptTurn {
   role: 'assistant' | 'user' | string
@@ -40,41 +42,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   cancelled:   { label: 'Cancelled',   color: 'text-slate-600',   bg: 'bg-slate-100'   },
 }
 
-function ScoreRing({ score }: { score: number }) {
-  const radius = 28
-  const circ   = 2 * Math.PI * radius
-  const offset = circ - (score / 100) * circ
-  const color  = score >= 70 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444'
-  return (
-    <svg width="72" height="72" className="shrink-0">
-      <circle cx="36" cy="36" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="6" />
-      <circle
-        cx="36" cy="36" r={radius} fill="none"
-        stroke={color} strokeWidth="6"
-        strokeDasharray={circ} strokeDashoffset={offset}
-        strokeLinecap="round"
-        transform="rotate(-90 36 36)"
-        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-      />
-      <text x="36" y="36" textAnchor="middle" dominantBaseline="central"
-        fill={color} fontSize="14" fontWeight="700">
-        {score}
-      </text>
-    </svg>
-  )
-}
 
 function formatDuration(seconds: number) {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return m > 0 ? `${m}m ${s}s` : `${s}s`
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
 }
 
 interface Props {
@@ -156,7 +128,7 @@ export default function VoiceCallDetailModal({ callId, onClose }: Props) {
                 {call.created_at && (
                   <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
                     <Calendar className="h-3.5 w-3.5" />
-                    {formatDate(call.created_at)}
+                    {fmtDateTime(call.created_at)}
                   </span>
                 )}
                 {call.duration_seconds != null && (

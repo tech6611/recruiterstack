@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import type { Candidate, CandidateStatus } from '@/lib/types/database'
+import { inputCls } from '@/lib/ui/styles'
 
 interface CandidateFormProps {
   candidate?: Candidate
@@ -127,9 +128,6 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
     router.refresh()
     onSuccess()
   }
-
-  const inputCls =
-    'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition'
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">

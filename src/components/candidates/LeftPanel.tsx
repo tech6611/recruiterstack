@@ -7,23 +7,9 @@ import {
 } from 'lucide-react'
 import type { Candidate, CandidateTag, Application, HiringRequest } from '@/lib/types/database'
 import TagInput from './TagInput'
+import { avatarColor, initials } from '@/lib/ui/avatar'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700', 'bg-violet-100 text-violet-700',
-  'bg-amber-100 text-amber-700', 'bg-emerald-100 text-emerald-700',
-  'bg-pink-100 text-pink-700', 'bg-indigo-100 text-indigo-700',
-]
-
-function avatarColor(name: string) {
-  const h = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]
-}
-
-function initials(name: string) {
-  return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-}
 
 const STAGE_COLOR_MAP: Record<string, string> = {
   slate:   'bg-slate-100 text-slate-700',

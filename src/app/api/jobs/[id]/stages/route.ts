@@ -44,7 +44,7 @@ export async function POST(
 
     const { data, error } = await supabase
       .from('pipeline_stages')
-      .insert({ hiring_request_id: jobId, name, color, order_index: nextIndex, org_id: orgId })
+      .insert({ hiring_request_id: jobId, name, color: color as import('@/lib/types/database').StageColor, order_index: nextIndex, org_id: orgId })
       .select()
       .single()
 

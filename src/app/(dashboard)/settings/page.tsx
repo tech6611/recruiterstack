@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Check, Building2, User, Sparkles, Database, Bell, Plug, LayoutList, Calendar, Video, Monitor } from 'lucide-react'
 import { useSettings, KANBAN_CARD_FIELD_OPTIONS } from '@/lib/hooks/useSettings'
+import { inputCls } from '@/lib/ui/styles'
 import type { AppSettings } from '@/lib/hooks/useSettings'
 
 export default function SettingsPage() {
@@ -249,9 +250,6 @@ export default function SettingsPage() {
       setMsDisconnecting(false)
     }
   }
-
-  const inputCls =
-    'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition'
 
   return (
     <div className="p-8 max-w-2xl space-y-8">

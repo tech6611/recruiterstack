@@ -43,11 +43,7 @@ export async function GET(req: NextRequest) {
   // Load all provider tokens in one query
   const { data: settings } = await supabase
     .from('org_settings')
-    .select(
-      'google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry, google_connected_email, ' +
-      'zoom_access_token, zoom_refresh_token, zoom_token_expiry, zoom_connected_email, ' +
-      'ms_access_token, ms_refresh_token, ms_token_expiry, ms_connected_email'
-    )
+    .select('*')
     .eq('org_id', orgId)
     .single()
 
@@ -64,8 +60,8 @@ export async function GET(req: NextRequest) {
   const queries: Promise<void>[] = []
 
   // Google
-  const gAccess  = decryptSafe(settings?.google_oauth_access_token)
-  const gRefresh = decryptSafe(settings?.google_oauth_refresh_token)
+  const gAccess  = decryptSafe(settings?.google_oauth_access_token ?? null)
+  const gRefresh = decryptSafe(settings?.google_oauth_refresh_token ?? null)
   if (gAccess && gRefresh) {
     providers.google = true
     queries.push(
@@ -89,8 +85,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Zoom (only the connected user's meetings)
-  const zAccess  = decryptSafe(settings?.zoom_access_token)
-  const zRefresh = decryptSafe(settings?.zoom_refresh_token)
+  const zAccess  = decryptSafe(settings?.zoom_access_token ?? null)
+  const zRefresh = decryptSafe(settings?.zoom_refresh_token ?? null)
   if (zAccess && zRefresh) {
     providers.zoom = true
     queries.push(
@@ -118,8 +114,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Microsoft
-  const mAccess  = decryptSafe(settings?.ms_access_token)
-  const mRefresh = decryptSafe(settings?.ms_refresh_token)
+  const mAccess  = decryptSafe(settings?.ms_access_token ?? null)
+  const mRefresh = decryptSafe(settings?.ms_refresh_token ?? null)
   if (mAccess && mRefresh) {
     providers.microsoft = true
     queries.push(

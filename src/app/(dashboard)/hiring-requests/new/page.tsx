@@ -8,6 +8,7 @@ import {
   Wand2, RefreshCw, Loader2, Sparkles, Paperclip, X, Plus, GripVertical,
 } from 'lucide-react'
 import type { StageColor, ScoringCriterion } from '@/lib/types/database'
+import { inputCls, labelCls } from '@/lib/ui/styles'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -84,9 +85,6 @@ const PIPELINE_DOT: Record<StageColor, string> = {
 
 type Mode = 'send_to_hm' | 'fill_myself' | null
 
-// ─── Shared input styles ─────────────────────────────────────────────────────
-const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition'
-const labelCls = 'block text-xs font-semibold text-slate-500 mb-1.5'
 
 // ─── Autocomplete input ───────────────────────────────────────────────────────
 function AutocompleteInput({

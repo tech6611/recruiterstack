@@ -64,7 +64,7 @@ export async function POST(
     created_by:     (body.created_by     as string | undefined) ?? 'Recruiter',
   }
 
-  const statusValue = (body.status as string | undefined) ?? 'to_do'
+  const statusValue = ((body.status as string | undefined) ?? 'to_do') as import('@/lib/types/database').TaskStatus
 
   const { data, error } = await supabase
     .from('candidate_tasks')

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   // Build normalized rows
   const rows = candidates.map(c => ({
     name:             (c.name ?? c.email ?? 'Unknown').trim(),
-    email:            c.email?.toLowerCase().trim() ?? null,
+    email:            c.email?.toLowerCase().trim() ?? '',
     phone:            c.phone?.trim()                ?? null,
     current_title:    c.current_title?.trim()        ?? null,
     location:         c.location?.trim()             ?? null,

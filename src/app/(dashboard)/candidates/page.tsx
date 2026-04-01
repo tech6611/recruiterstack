@@ -10,6 +10,7 @@ import {
   GripVertical, Pencil,
 } from 'lucide-react'
 import type { CandidateStatus, CandidateListItem } from '@/lib/types/database'
+import { inputCls, labelCls } from '@/lib/ui/styles'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -357,8 +358,6 @@ type SortKey = 'name' | 'current_title' | 'status' | 'created_at'
 
 const PAGE_SIZE = 30
 
-const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition'
-const labelCls = 'block text-xs font-semibold text-slate-500 mb-1.5'
 
 const BLANK_FORM = {
   name: '', email: '', phone: '',

@@ -17,7 +17,10 @@ import type {
 } from '@/lib/types/database'
 import type { CriterionScore } from '@/lib/ai/job-scorer'
 import { useSettings } from '@/lib/hooks/useSettings'
+import { fmtRelative } from '@/lib/ui/date-utils'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
+import { avatarColor, initials } from '@/lib/ui/avatar'
+import { RECOMMENDATION_CONFIG, RATING_CONFIG } from '@/lib/ui/scorecard-config'
 
 // ── Scorecard config (shared) ─────────────────────────────────────────────────
 
@@ -30,20 +33,6 @@ const DEFAULT_SCORING_CRITERIA_OBJ: ScoringCriterion[] = [
   { id: 'culture',       name: 'Culture Fit',       weight: 20, description: 'Alignment with team values and ways of working' },
 ]
 
-const RECOMMENDATION_CONFIG: Record<ScorecardRecommendation, { label: string; badge: string; active: string; btn: string }> = {
-  strong_yes: { label: 'Strong Yes', badge: 'bg-emerald-100 text-emerald-700', active: 'bg-emerald-600 text-white border-emerald-600', btn: 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
-  yes:        { label: 'Yes',        badge: 'bg-blue-100 text-blue-700',       active: 'bg-blue-600 text-white border-blue-600',       btn: 'border border-blue-200 text-blue-700 hover:bg-blue-50'       },
-  maybe:      { label: 'Maybe',      badge: 'bg-amber-100 text-amber-700',     active: 'bg-amber-500 text-white border-amber-500',     btn: 'border border-amber-200 text-amber-700 hover:bg-amber-50'   },
-  no:         { label: 'No',         badge: 'bg-red-100 text-red-700',         active: 'bg-red-600 text-white border-red-600',         btn: 'border border-red-200 text-red-700 hover:bg-red-50'         },
-}
-
-const RATING_CONFIG = [
-  { value: 1 as const, label: 'Poor',      dot: 'bg-red-400',     active: 'bg-red-500 text-white border-red-500',         btn: 'border border-red-200 text-red-600 hover:bg-red-50'         },
-  { value: 2 as const, label: 'Fair',      dot: 'bg-amber-400',   active: 'bg-amber-500 text-white border-amber-500',     btn: 'border border-amber-200 text-amber-600 hover:bg-amber-50'   },
-  { value: 3 as const, label: 'Good',      dot: 'bg-blue-400',    active: 'bg-blue-500 text-white border-blue-500',       btn: 'border border-blue-200 text-blue-600 hover:bg-blue-50'       },
-  { value: 4 as const, label: 'Excellent', dot: 'bg-emerald-400', active: 'bg-emerald-500 text-white border-emerald-500', btn: 'border border-emerald-200 text-emerald-600 hover:bg-emerald-50' },
-]
-
 function RatingDots({ rating }: { rating: number }) {
   const cfg = RATING_CONFIG[rating - 1]
   return (
@@ -53,15 +42,6 @@ function RatingDots({ rating }: { rating: number }) {
       ))}
     </div>
   )
-}
-
-function fmtRelative(d: string) {
-  const diff = Date.now() - new Date(d).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
 }
 
 // ── Stage colours ─────────────────────────────────────────────────────────────
@@ -102,21 +82,6 @@ const SOURCE_COLORS: Record<string, string> = {
 }
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
-
-const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700', 'bg-violet-100 text-violet-700',
-  'bg-amber-100 text-amber-700', 'bg-emerald-100 text-emerald-700',
-  'bg-pink-100 text-pink-700', 'bg-indigo-100 text-indigo-700',
-]
-
-function avatarColor(name: string) {
-  const h = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]
-}
-
-function initials(name: string) {
-  return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-}
 
 function daysSince(dateStr: string) {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)

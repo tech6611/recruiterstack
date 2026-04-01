@@ -69,7 +69,7 @@ export async function notifySlackDM(
     .eq('org_id', orgId)
     .single()
 
-  const token = decryptSafe(data?.slack_bot_token)
+  const token = decryptSafe(data?.slack_bot_token ?? null)
   if (!token) return
 
   try {

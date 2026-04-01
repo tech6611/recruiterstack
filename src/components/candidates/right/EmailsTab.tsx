@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Wand2, Mail, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
+import { fmtDateTime } from '@/lib/ui/date-utils'
 
 type ApplicationWithHiringRequest = Application & {
   hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number'> | null
@@ -12,13 +13,6 @@ interface EmailsTabProps {
   applications: ApplicationWithHiringRequest[]
   emailEvents: ApplicationEvent[]
   onDraftEmail: (appId: string) => void
-}
-
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
 }
 
 interface EmailMeta {
@@ -73,7 +67,7 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
                 )}
               </p>
               <div className="flex items-center gap-1 shrink-0">
-                <span className="text-[10px] text-slate-400 whitespace-nowrap">{fmtDate(event.created_at)}</span>
+                <span className="text-[10px] text-slate-400 whitespace-nowrap">{fmtDateTime(event.created_at)}</span>
                 {hasBody && (
                   expanded
                     ? <ChevronUp className="h-3 w-3 text-slate-400" />

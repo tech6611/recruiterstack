@@ -64,7 +64,7 @@ export async function POST(
 
   const job    = (jobRes as { data: unknown }).data as HiringRequest
   const stages = (stagesRes.data ?? []) as PipelineStage[]
-  const allApps = (appsRes.data ?? []) as (Application & { candidate: Candidate })[]
+  const allApps = (appsRes.data ?? []) as unknown as (Application & { candidate: Candidate })[]
 
   // Filter by application_id or stage_id if requested
   let apps = allApps

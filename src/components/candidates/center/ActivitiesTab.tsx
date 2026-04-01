@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Pencil, Check, X, ArrowRight } from 'lucide-react'
 import type { CandidateTask, ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
+import { fmtShort } from '@/lib/ui/date-utils'
 import TaskScheduler from '../TaskScheduler'
 import InterviewProgressTable from '../InterviewProgressTable'
 
@@ -105,10 +106,6 @@ function buildPipelineFlow(events: ApplicationEvent[], appId: string): StageStep
     )
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     .map(e => ({ stage: e.to_stage as string, date: e.created_at, type: e.event_type as 'applied' | 'stage_moved' }))
-}
-
-function fmtShort(d: string) {
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function PipelineFlowSection({ events, applications }: {

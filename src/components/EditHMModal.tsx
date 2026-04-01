@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { X, Loader2, Pencil } from 'lucide-react'
+import { inputCls } from '@/lib/ui/styles'
 
 interface EditHMModalProps {
   requestId: string
@@ -16,9 +17,6 @@ export default function EditHMModal({ requestId, initial, onClose, onSaved }: Ed
   const [slack, setSlack] = useState(initial.slack ?? '')
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
-
-  const inputCls =
-    'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition'
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Name is required.'); return }

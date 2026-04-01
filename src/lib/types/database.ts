@@ -31,12 +31,17 @@ export interface Candidate {
 }
 
 export interface CandidateInsert
-  extends Omit<Candidate, 'id' | 'created_at' | 'updated_at' | 'ai_summary' | 'ai_summary_generated_at'> {
+  extends Omit<Candidate, 'id' | 'created_at' | 'updated_at' | 'ai_summary' | 'ai_summary_generated_at' | 'phone' | 'resume_url' | 'current_title' | 'location' | 'linkedin_url'> {
   id?: string
   created_at?: string
   updated_at?: string
   ai_summary?: string | null
   ai_summary_generated_at?: string | null
+  phone?: string | null
+  resume_url?: string | null
+  current_title?: string | null
+  location?: string | null
+  linkedin_url?: string | null
 }
 
 export interface CandidateUpdate extends Partial<CandidateInsert> {}
@@ -310,10 +315,22 @@ export interface Offer {
   hiring_request?:   Pick<HiringRequest, 'position_title' | 'ticket_number'>
 }
 
-export interface OfferInsert extends Omit<Offer, 'id' | 'created_at' | 'updated_at' | 'candidate' | 'hiring_request'> {
+export interface OfferInsert extends Omit<Offer, 'id' | 'created_at' | 'updated_at' | 'candidate' | 'hiring_request' | 'approved_by' | 'approved_at' | 'sent_at' | 'responded_at' | 'created_by' | 'notes' | 'offer_letter_text' | 'base_salary' | 'bonus' | 'equity' | 'start_date' | 'expiry_date'> {
   id?: string
   created_at?: string
   updated_at?: string
+  approved_by?: string | null
+  approved_at?: string | null
+  sent_at?: string | null
+  responded_at?: string | null
+  created_by?: string | null
+  notes?: string | null
+  offer_letter_text?: string | null
+  base_salary?: number | null
+  bonus?: number | null
+  equity?: string | null
+  start_date?: string | null
+  expiry_date?: string | null
 }
 
 export interface OfferUpdate extends Partial<OfferInsert> {}
@@ -518,11 +535,14 @@ export interface JobQueueItem {
   created_at: string
 }
 
-export interface JobQueueInsert extends Omit<JobQueueItem, 'id' | 'created_at' | 'status' | 'attempts'> {
+export interface JobQueueInsert extends Omit<JobQueueItem, 'id' | 'created_at' | 'status' | 'attempts' | 'error' | 'started_at' | 'completed_at'> {
   id?: string
   created_at?: string
   status?: JobQueueStatus
   attempts?: number
+  error?: string | null
+  started_at?: string | null
+  completed_at?: string | null
 }
 
 export interface JobQueueUpdate {
@@ -587,17 +607,32 @@ export interface PipelineStageUpdate extends Partial<PipelineStageInsert> {}
 // Application Row type (without optional joined relations)
 type ApplicationRow = Omit<Application, 'candidate' | 'stage' | 'hiring_request'>
 
-export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at'> {
+export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at' | 'resume_url' | 'cover_letter' | 'ai_score' | 'ai_recommendation' | 'ai_strengths' | 'ai_gaps' | 'ai_scored_at' | 'ai_criterion_scores' | 'source_detail' | 'credited_to' | 'stage_id'> {
   id?: string
   created_at?: string
   applied_at?: string
+  resume_url?: string | null
+  cover_letter?: string | null
+  ai_score?: number | null
+  ai_recommendation?: AiRecommendation | null
+  ai_strengths?: string[]
+  ai_gaps?: string[]
+  ai_scored_at?: string | null
+  ai_criterion_scores?: { name: string; rating: number; weight: number }[] | null
+  source_detail?: string | null
+  credited_to?: string | null
+  stage_id?: string | null
 }
 
 export interface ApplicationUpdate extends Partial<ApplicationInsert> {}
 
-export interface ApplicationEventInsert extends Omit<ApplicationEvent, 'id' | 'created_at'> {
+export interface ApplicationEventInsert extends Omit<ApplicationEvent, 'id' | 'created_at' | 'metadata' | 'from_stage' | 'to_stage' | 'note'> {
   id?: string
   created_at?: string
+  metadata?: Record<string, unknown>
+  from_stage?: string | null
+  to_stage?: string | null
+  note?: string | null
 }
 
 export interface ApplicationEventUpdate extends Partial<ApplicationEventInsert> {}
@@ -615,9 +650,15 @@ export interface ScorecardUpdate extends Partial<ScorecardInsert> {}
 // Offer Row type (without optional joined relations)
 type OfferRow = Omit<Offer, 'candidate' | 'hiring_request'>
 
-export interface CandidateTaskInsert extends Omit<CandidateTask, 'id' | 'created_at'> {
+export interface CandidateTaskInsert extends Omit<CandidateTask, 'id' | 'created_at' | 'status' | 'completed_at' | 'description' | 'due_date' | 'assignee_name' | 'application_id'> {
   id?: string
   created_at?: string
+  status?: TaskStatus
+  completed_at?: string | null
+  description?: string | null
+  due_date?: string | null
+  assignee_name?: string | null
+  application_id?: string | null
 }
 
 export interface CandidateTaskUpdate extends Partial<CandidateTaskInsert> {}
@@ -675,151 +716,158 @@ export interface SequenceEmailUpdate extends Partial<SequenceEmailInsert> {}
 
 // ── Supabase Database shape for typed client ─────────────────────────────────
 
+// Utility: converts an interface into a type with an implicit index signature.
+// TypeScript interfaces don't have index signatures, which prevents them from
+// satisfying Record<string, unknown>.  Supabase's GenericTable requires
+// Row / Insert / Update to extend Record<string, unknown>, so we map each
+// interface through this helper to add the implicit index signature.
+type Indexify<T> = { [K in keyof T]: T[K] }
+
 export type Database = {
   public: {
     Tables: {
       candidates: {
-        Row: Candidate
-        Insert: CandidateInsert
-        Update: CandidateUpdate
+        Row: Indexify<Candidate>
+        Insert: Indexify<CandidateInsert>
+        Update: Indexify<CandidateUpdate>
         Relationships: []
       }
       roles: {
-        Row: Role
-        Insert: RoleInsert
-        Update: RoleUpdate
+        Row: Indexify<Role>
+        Insert: Indexify<RoleInsert>
+        Update: Indexify<RoleUpdate>
         Relationships: []
       }
       hiring_requests: {
-        Row: HiringRequest
-        Insert: HiringRequestInsert
-        Update: HiringRequestUpdate
+        Row: Indexify<HiringRequest>
+        Insert: Indexify<HiringRequestInsert>
+        Update: Indexify<HiringRequestUpdate>
         Relationships: []
       }
       pipeline_stages: {
-        Row: PipelineStage
-        Insert: PipelineStageInsert
-        Update: PipelineStageUpdate
+        Row: Indexify<PipelineStage>
+        Insert: Indexify<PipelineStageInsert>
+        Update: Indexify<PipelineStageUpdate>
         Relationships: []
       }
       applications: {
-        Row: ApplicationRow
-        Insert: ApplicationInsert
-        Update: ApplicationUpdate
+        Row: Indexify<ApplicationRow>
+        Insert: Indexify<ApplicationInsert>
+        Update: Indexify<ApplicationUpdate>
         Relationships: []
       }
       application_events: {
-        Row: ApplicationEvent
-        Insert: ApplicationEventInsert
-        Update: ApplicationEventUpdate
+        Row: Indexify<ApplicationEvent>
+        Insert: Indexify<ApplicationEventInsert>
+        Update: Indexify<ApplicationEventUpdate>
         Relationships: []
       }
       interviews: {
-        Row: InterviewRow
-        Insert: InterviewInsert
-        Update: InterviewUpdate
+        Row: Indexify<InterviewRow>
+        Insert: Indexify<InterviewInsert>
+        Update: Indexify<InterviewUpdate>
         Relationships: []
       }
       offers: {
-        Row: OfferRow
-        Insert: OfferInsert
-        Update: OfferUpdate
+        Row: Indexify<OfferRow>
+        Insert: Indexify<OfferInsert>
+        Update: Indexify<OfferUpdate>
         Relationships: []
       }
       scorecards: {
-        Row: Scorecard
-        Insert: ScorecardInsert
-        Update: ScorecardUpdate
+        Row: Indexify<Scorecard>
+        Insert: Indexify<ScorecardInsert>
+        Update: Indexify<ScorecardUpdate>
         Relationships: []
       }
       candidate_tasks: {
-        Row: CandidateTask
-        Insert: CandidateTaskInsert
-        Update: CandidateTaskUpdate
+        Row: Indexify<CandidateTask>
+        Insert: Indexify<CandidateTaskInsert>
+        Update: Indexify<CandidateTaskUpdate>
         Relationships: []
       }
       candidate_tags: {
-        Row: CandidateTag
-        Insert: CandidateTagInsert
-        Update: Partial<CandidateTagInsert>
+        Row: Indexify<CandidateTag>
+        Insert: Indexify<CandidateTagInsert>
+        Update: Indexify<Partial<CandidateTagInsert>>
         Relationships: []
       }
       candidate_referrals: {
-        Row: CandidateReferral
-        Insert: CandidateReferralInsert
-        Update: Partial<CandidateReferralInsert>
+        Row: Indexify<CandidateReferral>
+        Insert: Indexify<CandidateReferralInsert>
+        Update: Indexify<Partial<CandidateReferralInsert>>
         Relationships: []
       }
       matches: {
-        Row: Match
-        Insert: MatchInsert
-        Update: Partial<MatchInsert>
+        Row: Indexify<Match>
+        Insert: Indexify<MatchInsert>
+        Update: Indexify<Partial<MatchInsert>>
         Relationships: []
       }
       notifications: {
-        Row: Notification
-        Insert: NotificationInsert
-        Update: NotificationUpdate
+        Row: Indexify<Notification>
+        Insert: Indexify<NotificationInsert>
+        Update: Indexify<NotificationUpdate>
         Relationships: []
       }
       org_settings: {
-        Row: OrgSettings
-        Insert: OrgSettingsInsert
-        Update: OrgSettingsUpdate
+        Row: Indexify<OrgSettings>
+        Insert: Indexify<OrgSettingsInsert>
+        Update: Indexify<OrgSettingsUpdate>
         Relationships: []
       }
       email_templates: {
-        Row: EmailTemplate
-        Insert: EmailTemplateInsert
-        Update: EmailTemplateUpdate
+        Row: Indexify<EmailTemplate>
+        Insert: Indexify<EmailTemplateInsert>
+        Update: Indexify<EmailTemplateUpdate>
         Relationships: []
       }
       email_drafts: {
-        Row: EmailDraft
-        Insert: EmailDraftInsert
-        Update: EmailDraftUpdate
+        Row: Indexify<EmailDraft>
+        Insert: Indexify<EmailDraftInsert>
+        Update: Indexify<EmailDraftUpdate>
         Relationships: []
       }
       leads: {
-        Row: Lead
-        Insert: LeadInsert
-        Update: Partial<LeadInsert>
+        Row: Indexify<Lead>
+        Insert: Indexify<LeadInsert>
+        Update: Indexify<Partial<LeadInsert>>
         Relationships: []
       }
       job_queue: {
-        Row: JobQueueItem
-        Insert: JobQueueInsert
-        Update: JobQueueUpdate
+        Row: Indexify<JobQueueItem>
+        Insert: Indexify<JobQueueInsert>
+        Update: Indexify<JobQueueUpdate>
         Relationships: []
       }
       voice_calls: {
-        Row: VoiceCall
-        Insert: VoiceCallInsert
-        Update: VoiceCallUpdate
+        Row: Indexify<VoiceCall>
+        Insert: Indexify<VoiceCallInsert>
+        Update: Indexify<VoiceCallUpdate>
         Relationships: []
       }
       sequences: {
-        Row: SequenceRow
-        Insert: SequenceInsert
-        Update: SequenceUpdate
+        Row: Indexify<SequenceRow>
+        Insert: Indexify<SequenceInsert>
+        Update: Indexify<SequenceUpdate>
         Relationships: []
       }
       sequence_stages: {
-        Row: SequenceStage
-        Insert: SequenceStageInsert
-        Update: SequenceStageUpdate
+        Row: Indexify<SequenceStage>
+        Insert: Indexify<SequenceStageInsert>
+        Update: Indexify<SequenceStageUpdate>
         Relationships: []
       }
       sequence_enrollments: {
-        Row: SequenceEnrollmentRow
-        Insert: SequenceEnrollmentInsert
-        Update: SequenceEnrollmentUpdate
+        Row: Indexify<SequenceEnrollmentRow>
+        Insert: Indexify<SequenceEnrollmentInsert>
+        Update: Indexify<SequenceEnrollmentUpdate>
         Relationships: []
       }
       sequence_emails: {
-        Row: SequenceEmail
-        Insert: SequenceEmailInsert
-        Update: SequenceEmailUpdate
+        Row: Indexify<SequenceEmail>
+        Insert: Indexify<SequenceEmailInsert>
+        Update: Indexify<SequenceEmailUpdate>
         Relationships: []
       }
     }

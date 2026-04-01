@@ -19,7 +19,7 @@ export async function POST() {
     .single()
 
   // Best-effort revoke with Google (ignore errors) — decrypt first
-  const tokenToRevoke = decryptSafe(settings?.google_oauth_access_token) ?? decryptSafe(settings?.google_oauth_refresh_token)
+  const tokenToRevoke = decryptSafe(settings?.google_oauth_access_token ?? null) ?? decryptSafe(settings?.google_oauth_refresh_token ?? null)
   if (tokenToRevoke) {
     fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(tokenToRevoke)}`, {
       method: 'POST',

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, TrendingDown, Phone, ChevronRight } from 'lucide-react'
 import type { Candidate, Application, AiRecommendation, HiringRequest } from '@/lib/types/database'
 import VoiceCallDetailModal from '../VoiceCallDetailModal'
+import { ScoreRing } from '@/components/ui/ScoreRing'
 
 interface VoiceCallSummary {
   id: string
@@ -46,29 +47,6 @@ const REC_CONFIG: Record<AiRecommendation, { label: string; color: string; bg: s
   no:         { label: 'No',          color: 'text-red-700',     bg: 'bg-red-100'     },
 }
 
-function ScoreRing({ score }: { score: number }) {
-  const radius = 28
-  const circ   = 2 * Math.PI * radius
-  const offset = circ - (score / 100) * circ
-  const color  = score >= 70 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444'
-  return (
-    <svg width="72" height="72" className="shrink-0">
-      <circle cx="36" cy="36" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="6" />
-      <circle
-        cx="36" cy="36" r={radius} fill="none"
-        stroke={color} strokeWidth="6"
-        strokeDasharray={circ} strokeDashoffset={offset}
-        strokeLinecap="round"
-        transform="rotate(-90 36 36)"
-        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-      />
-      <text x="36" y="36" textAnchor="middle" dominantBaseline="central"
-        fill={color} fontSize="14" fontWeight="700">
-        {score}
-      </text>
-    </svg>
-  )
-}
 
 export default function SummaryTab({ candidate, applications }: SummaryTabProps) {
   const [summary, setSummary] = useState<string | null>(null)

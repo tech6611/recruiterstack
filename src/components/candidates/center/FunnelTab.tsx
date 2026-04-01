@@ -12,6 +12,7 @@ import {
   AlertCircle, Mail, Users, GitBranch,
 } from 'lucide-react'
 import type { ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
+import { fmtRelative, fmtDateTime } from '@/lib/ui/date-utils'
 
 type ApplicationWithJob = Application & {
   pipeline_stages: { name: string; color: string } | null
@@ -32,24 +33,6 @@ interface TimelineEvent {
   subtitle?: string
   note?: string
   jobTitle?: string
-}
-
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
-
-function fmtRelative(d: string) {
-  const diff = Date.now() - new Date(d).getTime()
-  const days = Math.floor(diff / 86400000)
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7)  return `${days}d ago`
-  if (days < 30) return `${Math.floor(days / 7)}w ago`
-  if (days < 365) return `${Math.floor(days / 30)}mo ago`
-  return `${Math.floor(days / 365)}y ago`
 }
 
 const EVENT_ICON: Record<string, { icon: React.ReactNode; bg: string; title: (e: ApplicationEvent) => string }> = {
@@ -193,7 +176,7 @@ export default function FunnelTab({ events, applications }: FunnelTabProps) {
                           </div>
                           <div className="shrink-0 text-right">
                             <p className="text-[10px] text-slate-400 whitespace-nowrap">{fmtRelative(item.date)}</p>
-                            <p className="text-[9px] text-slate-300 mt-0.5 whitespace-nowrap">{fmtDate(item.date)}</p>
+                            <p className="text-[9px] text-slate-300 mt-0.5 whitespace-nowrap">{fmtDateTime(item.date)}</p>
                           </div>
                         </div>
                       </div>

@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react'
+import { timeAgo } from '@/lib/ui/date-utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,19 +74,6 @@ interface CandidateDrawerProps {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1)  return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24)  return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days < 7)  return `${days}d ago`
-  const wks = Math.floor(days / 7)
-  return wks < 52 ? `${wks}w ago` : `${Math.floor(wks / 52)}y ago`
-}
 
 const STATUS_STYLES: Record<string, string> = {
   active:       'bg-emerald-100 text-emerald-700',

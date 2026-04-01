@@ -5,6 +5,7 @@ import {
   BadgeCheck, Ban, Gift, ClipboardList, Clock,
 } from 'lucide-react'
 import type { ApplicationEvent } from '@/lib/types/database'
+import { fmtRelative, fmtDate } from '@/lib/ui/date-utils'
 
 const EVENT_CONFIG: Record<string, { label: (e: ApplicationEvent) => string; icon: React.ReactNode; color: string }> = {
   applied: {
@@ -82,19 +83,6 @@ const EVENT_CONFIG: Record<string, { label: (e: ApplicationEvent) => string; ico
     icon: <Ban className="h-3.5 w-3.5" />,
     color: 'bg-red-50 text-red-600',
   },
-}
-
-function fmtRelative(d: string) {
-  const diff = Date.now() - new Date(d).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
-}
-
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 interface FeedTabProps {

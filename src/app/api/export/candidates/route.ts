@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     .eq('org_id', orgId)
     .order('created_at', { ascending: false })
 
-  if (status) query = query.eq('status', status)
+  if (status) query = query.eq('status', status as import('@/lib/types/database').CandidateStatus)
   if (search) {
     const filter = buildSearchFilter(search, ['name', 'email', 'current_title', 'location'])
     if (filter) query = query.or(filter)

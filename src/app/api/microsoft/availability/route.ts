@@ -27,8 +27,8 @@ export async function GET(req: NextRequest) {
     .eq('org_id', orgId)
     .single()
 
-  const decryptedAccess  = decryptSafe(settings?.ms_access_token)
-  const decryptedRefresh = decryptSafe(settings?.ms_refresh_token)
+  const decryptedAccess  = decryptSafe(settings?.ms_access_token ?? null)
+  const decryptedRefresh = decryptSafe(settings?.ms_refresh_token ?? null)
 
   if (!decryptedAccess || !decryptedRefresh) {
     return NextResponse.json(

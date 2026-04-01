@@ -26,7 +26,7 @@ export const GET = withOrg(async (req, orgId, supabase) => {
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
-  if (status) query = query.eq('status', status)
+  if (status) query = query.eq('status', status as import('@/lib/types/database').CandidateStatus)
   if (search) {
     const filter = buildSearchFilter(search, ['name', 'email', 'current_title', 'phone', 'location'])
     if (filter) query = query.or(filter)

@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
     .eq('org_id', orgId)
     .single()
 
-  const decryptedAccess  = decryptSafe(settings?.google_oauth_access_token)
-  const decryptedRefresh = decryptSafe(settings?.google_oauth_refresh_token)
+  const decryptedAccess  = decryptSafe(settings?.google_oauth_access_token ?? null)
+  const decryptedRefresh = decryptSafe(settings?.google_oauth_refresh_token ?? null)
 
   if (!decryptedAccess || !decryptedRefresh) {
     return NextResponse.json(

@@ -60,7 +60,7 @@ export const POST = withOrg(async (request, orgId, supabase) => {
 
   const { data: reqData, error: insertError } = await supabase
     .from('hiring_requests')
-    .insert(insertPayload as HiringRequestInsert)
+    .insert(insertPayload as unknown as HiringRequestInsert)
     .select()
     .single()
 

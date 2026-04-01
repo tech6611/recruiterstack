@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Plus, Loader2, AlertCircle, Check, ExternalLink } from 'lucide-react'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
+import { avatarColor, initials } from '@/lib/ui/avatar'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -22,21 +23,6 @@ const DURATION_OPTIONS = [
   { value: 90,  label: '1.5 hr' },
   { value: 120, label: '2 hr'   },
 ] as const
-
-const AVATAR_COLORS = [
-  'bg-blue-100 text-blue-700', 'bg-violet-100 text-violet-700',
-  'bg-amber-100 text-amber-700', 'bg-emerald-100 text-emerald-700',
-  'bg-pink-100 text-pink-700', 'bg-indigo-100 text-indigo-700',
-]
-
-function avatarColor(name: string) {
-  const h = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]
-}
-
-function initials(name: string) {
-  return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-}
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 

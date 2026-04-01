@@ -6,6 +6,7 @@ import {
   Loader2, CheckCircle, AlertCircle, Sparkles, Wand2, PenLine,
   RefreshCw, Pencil, Paperclip, X,
 } from 'lucide-react'
+import { inputClsWhite } from '@/lib/ui/styles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ interface RequestInfo {
 }
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
-const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition'
+const inputCls = inputClsWhite
 const labelCls = 'block text-sm font-semibold text-slate-700 mb-1.5'
 
 // ─── Location autocomplete ────────────────────────────────────────────────────

@@ -33,14 +33,14 @@ export async function POST(request: NextRequest) {
 
   // Fetch candidate, role, and match in parallel
   const [candRes, roleRes, matchRes] = await Promise.all([
-    supabase.from('candidates').select('*').eq('id', body.candidate_id).single() as Promise<{ data: Candidate | null; error: unknown }>,
-    supabase.from('roles').select('*').eq('id', body.role_id).single() as Promise<{ data: Role | null; error: unknown }>,
+    supabase.from('candidates').select('*').eq('id', body.candidate_id).single() as unknown as Promise<{ data: Candidate | null; error: unknown }>,
+    supabase.from('roles').select('*').eq('id', body.role_id).single() as unknown as Promise<{ data: Role | null; error: unknown }>,
     supabase
       .from('matches')
       .select('score, strengths, reasoning')
       .eq('candidate_id', body.candidate_id)
       .eq('role_id', body.role_id)
-      .single() as Promise<{ data: { score: number; strengths: string[]; reasoning: string } | null; error: unknown }>,
+      .single() as unknown as Promise<{ data: { score: number; strengths: string[]; reasoning: string } | null; error: unknown }>,
   ])
 
   if (candRes.error || !candRes.data) {

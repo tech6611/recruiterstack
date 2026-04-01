@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     .order('applied_at', { ascending: false })
 
   if (jobId) query = query.eq('hiring_request_id', jobId)
-  if (status) query = query.eq('status', status)
+  if (status) query = query.eq('status', status as import('@/lib/types/database').ApplicationStatus)
 
   const { data, error } = await query
 
