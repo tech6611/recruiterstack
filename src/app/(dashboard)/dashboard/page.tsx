@@ -356,11 +356,14 @@ function WidgetGrid({
         {widgets.map(wId => (
           <div
             key={wId}
-            className={`relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+            className={`relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
           >
-            <div className="widget-drag-handle absolute top-2 -left-0.5 z-10 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
+            {/* Fixed header row: drag handle + widget content header share the same line */}
+            <div className="widget-drag-handle absolute top-0 left-0 z-10 flex items-center justify-center w-5 h-9 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
               <GripVertical className="h-4 w-4" />
             </div>
+            {/* Scrollable content area */}
+            <div className="flex-1 overflow-auto p-4 pl-5">
             {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={onCandidateClick} />}
             {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
             {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
@@ -375,6 +378,7 @@ function WidgetGrid({
             {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
             {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
             {wId === 'action_queue'      && <ActionQueueWidget         data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
+            </div>
           </div>
         ))}
       </GridLayout>
