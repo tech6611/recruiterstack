@@ -94,8 +94,8 @@ export async function POST(req: NextRequest) {
 
   // ── Fetch candidate + hiring request context ─────────────────────────────
   const [candidateRes, hiringReqRes] = await Promise.all([
-    supabase.from('candidates').select('name, email, current_title, location').eq('id', candidate_id).single(),
-    supabase.from('hiring_requests').select('position_title, ticket_number').eq('id', hiring_request_id).single(),
+    supabase.from('candidates').select('name, email, current_title, location').eq('id', candidate_id).single() as unknown as Promise<{ data: { name: string; email: string; current_title: string | null; location: string | null } | null; error: unknown }>,
+    supabase.from('hiring_requests').select('position_title, ticket_number').eq('id', hiring_request_id).single() as unknown as Promise<{ data: { position_title: string; ticket_number: string | null } | null; error: unknown }>,
   ])
 
   if (!candidateRes.data) {
@@ -105,19 +105,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Hiring request not found' }, { status: 404 })
   }
 
-  const candidate  = candidateRes.data as { name: string; email: string; current_title: string | null; location: string | null }
-  const hiringReq  = hiringReqRes.data as { position_title: string; ticket_number: string | null }
+  const candidate  = candidateRes.data
+  const hiringReq  = hiringReqRes.data
 
   // ── Fetch org settings (Google tokens, Slack config) ─────────────────────
-  const { data: orgSettingsData } = await supabase
+  const { data: orgSettings } = await (supabase
     .from('org_settings')
     .select('google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry, google_connected_email')
     .eq('org_id', orgId)
-    .single()
-  const orgSettings = orgSettingsData as { google_oauth_access_token: string | null; google_oauth_refresh_token: string | null; google_oauth_token_expiry: string | null; google_connected_email: string | null } | null
+    .single() as unknown as Promise<{ data: { google_oauth_access_token: string | null; google_oauth_refresh_token: string | null; google_oauth_token_expiry: string | null; google_connected_email: string | null } | null; error: unknown }>)
 
-  const oauthAccess  = decryptSafe(orgSettings?.google_oauth_access_token)
-  const oauthRefresh = decryptSafe(orgSettings?.google_oauth_refresh_token)
+  const oauthAccess  = decryptSafe(orgSettings?.google_oauth_access_token ?? null)
+  const oauthRefresh = decryptSafe(orgSettings?.google_oauth_refresh_token ?? null)
   const googleConnected  = !!(oauthAccess && oauthRefresh)
 
   // ── Availability check (optional) ────────────────────────────────────────
