@@ -199,7 +199,7 @@ const LS_VIEWS         = 'rs_dashboard_views'
 const LS_ACTIVE        = 'rs_dashboard_active_view'
 const LS_VERSION       = 'rs_dashboard_version'
 const LS_RIGHT_WIDGETS = 'rs_right_panel_widgets'
-const CURRENT_VERSION  = 'v4' // bump when DashView shape changes
+const CURRENT_VERSION  = 'v5' // bumped: 12-col grid + gridLayouts shape change
 
 // ── Right Panel Widget defaults ─────────────────────────────────────────────────
 // The right panel uses the same WidgetId type and ALL_WIDGET_DEFS as the main area.
@@ -346,6 +346,7 @@ function WidgetGrid({
         rowHeight={20}
         isDraggable={!disabled}
         isResizable={!disabled}
+        resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 'n', 's']}
         draggableHandle=".widget-drag-handle"
         compactType={null}
         margin={[12, 12]}
