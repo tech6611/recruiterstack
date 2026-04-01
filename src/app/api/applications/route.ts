@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { applicationInsertSchema } from '@/lib/validations/applications'
 import { createNotification } from '@/lib/api/notify'
-import type { ApplicationInsert, ApplicationEventInsert } from '@/lib/types/database'
 
 // POST /api/applications
 // Adds a candidate to a job pipeline.
@@ -30,6 +29,7 @@ export const POST = withOrg(async (req, orgId, supabase) => {
       const { data: createdData, error: createErr } = await supabase
         .from('candidates')
         .insert({
+          org_id: orgId,
           name: candidate_data.name,
           email: candidate_data.email,
           phone: candidate_data.phone ?? null,
@@ -62,7 +62,7 @@ export const POST = withOrg(async (req, orgId, supabase) => {
       .order('order_index')
       .limit(1)
       .single()
-    resolvedStageId = firstStage?.id ?? null
+    resolvedStageId = firstStage?.id ?? undefined
   }
 
   // ── Get stage name for timeline event ─────────────────────────────────────
@@ -81,14 +81,15 @@ export const POST = withOrg(async (req, orgId, supabase) => {
   const { data: appData, error: appErr } = await supabase
     .from('applications')
     .insert({
+      org_id: orgId,
       candidate_id: resolvedCandidateId,
       hiring_request_id,
       stage_id: resolvedStageId ?? null,
       status: 'active',
       source,
       source_detail: source_detail ?? null,
-    } as ApplicationInsert)
-    .select('*, candidate:candidates(*)')
+    })
+    .select('*')
     .single()
 
   if (appErr) return handleSupabaseError(appErr)
@@ -103,7 +104,7 @@ export const POST = withOrg(async (req, orgId, supabase) => {
       to_stage: stageName,
       created_by: 'Recruiter',
       org_id: orgId,
-    } as ApplicationEventInsert)
+    })
 
   // ── In-app notification ─────────────────────────────────────────────────
   const candidateName = app.candidate?.name ?? 'Candidate'

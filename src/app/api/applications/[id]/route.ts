@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { notifySlack, notifySlackDM } from '@/lib/notifications'
 import { applicationStatusEnum } from '@/lib/validations/common'
-import type { ApplicationUpdate, ApplicationEventInsert } from '@/lib/types/database'
+import type { ApplicationUpdate } from '@/lib/types/database'
 
 // GET /api/applications/[id]
 export async function GET(
@@ -22,7 +22,7 @@ export async function GET(
       .select('*, candidate:candidates(*), pipeline_stages(name, color)')
       .eq('id', params.id)
       .eq('org_id', orgId)
-      .single() as { data: Record<string, unknown> | null; error: unknown },
+      .single() as unknown as { data: Record<string, unknown> | null; error: unknown },
     supabase
       .from('application_events')
       .select('*')
@@ -71,7 +71,7 @@ export async function PATCH(
   if (fetchErr || !currentData) {
     return NextResponse.json({ error: 'Application not found' }, { status: 404 })
   }
-  const current = currentData as Record<string, unknown> & {
+  const current = currentData as unknown as Record<string, unknown> & {
     pipeline_stages: { name: string } | null
     candidate: { name: string } | null
     hiring_request: { hiring_manager_email: string | null; position_title: string } | null
@@ -96,7 +96,7 @@ export async function PATCH(
       .from('applications')
       .update({ stage_id } as ApplicationUpdate)
       .eq('id', params.id)
-      .select('*, candidate:candidates(*)')
+      .select('*')
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -111,7 +111,7 @@ export async function PATCH(
         to_stage: newStageName,
         created_by: 'Recruiter',
         org_id: orgId,
-      } as ApplicationEventInsert)
+      })
 
     const candidateName = current.candidate?.name ?? 'Candidate'
     const hmEmail = current.hiring_request?.hiring_manager_email ?? null
@@ -142,7 +142,7 @@ export async function PATCH(
       .from('applications')
       .update({ status } as ApplicationUpdate)
       .eq('id', params.id)
-      .select('*, candidate:candidates(*)')
+      .select('*')
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -155,7 +155,7 @@ export async function PATCH(
         to_stage: status,
         created_by: 'Recruiter',
         org_id: orgId,
-      } as ApplicationEventInsert)
+      })
 
     const candidateName = current.candidate?.name ?? 'Candidate'
     const hmEmailStatus = current.hiring_request?.hiring_manager_email ?? null
@@ -191,7 +191,7 @@ export async function PATCH(
         note,
         created_by,
         org_id: orgId,
-      } as ApplicationEventInsert)
+      })
       .select()
       .single()
 
