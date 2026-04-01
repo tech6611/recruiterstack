@@ -378,12 +378,20 @@ function ResizeHandle({ onResizeStart, onResize }: { onResizeStart?: () => void;
  */
 function ResizableWidget({
   wId, dims, onResize, disabled, children,
+  isDragging, isDragOver,
+  onDragStart, onDragOver, onDrop, onDragEnd,
 }: {
   wId: WidgetId
   dims: WidgetDimensions | null
   onResize: (dims: WidgetDimensions) => void
   disabled: boolean
   children: React.ReactNode
+  isDragging?: boolean
+  isDragOver?: boolean
+  onDragStart?: () => void
+  onDragOver?: (e: React.DragEvent) => void
+  onDrop?: () => void
+  onDragEnd?: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const startDims = useRef<{ w: number; h: number }>({ w: 0, h: 0 })
@@ -412,10 +420,23 @@ function ResizableWidget({
     <div
       ref={ref}
       style={style}
-      className={`group relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto ${
-        dims ? '' : ''
+      draggable={!disabled}
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart?.() }}
+      onDragOver={(e) => { e.preventDefault(); onDragOver?.(e) }}
+      onDrop={() => onDrop?.()}
+      onDragEnd={() => onDragEnd?.()}
+      className={`group relative rounded-xl border-2 ${
+        isDragOver ? 'border-blue-400 bg-blue-50/50' : 'border-slate-200'
+      } border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto transition-colors ${
+        isDragging ? 'opacity-40' : ''
       } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
     >
+      {/* Drag handle indicator — top-left, visible on hover */}
+      {!disabled && (
+        <div className="absolute top-2 left-2 z-10 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-slate-500">
+          <GripVertical className="h-4 w-4" />
+        </div>
+      )}
       {!disabled && (
         <ResizeHandle onResizeStart={handleResizeStart} onResize={(dw, dh) => {
           const el = ref.current
@@ -447,6 +468,33 @@ function useWidgetSearch() {
     return items.filter(item => getFields(item).some(f => f.toLowerCase().includes(q)))
   }
   return { showSearch, query, setQuery, toggle, filterFn }
+}
+
+/** Reusable filter pills — renders horizontally, highlights active filter */
+function FilterPills({
+  options, active, onSelect,
+}: {
+  options: { value: string; label: string }[]
+  active: string
+  onSelect: (value: string) => void
+}) {
+  return (
+    <div className="flex gap-1 flex-wrap mb-2">
+      {options.map(o => (
+        <button
+          key={o.value}
+          onClick={() => onSelect(active === o.value ? '' : o.value)}
+          className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+            active === o.value
+              ? 'bg-blue-100 text-blue-700'
+              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 /** Shared coloured header row for every widget */
@@ -524,13 +572,24 @@ function WidgetHeader({
 
 function InterviewsWidget({ interviews, onCandidateClick }: { interviews: UpcomingInterview[]; onCandidateClick: (id: string) => void }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
-  const filtered  = filterFn(interviews, iv => [iv.candidate_name, iv.job_title, iv.stage_name])
+  const [filterStage, setFilterStage] = useState('')
+  const stages = Array.from(new Set(interviews.map(iv => iv.stage_name))).filter(Boolean)
+  const afterFilter = filterStage ? interviews.filter(iv => iv.stage_name === filterStage) : interviews
+  const filtered  = filterFn(afterFilter, iv => [iv.candidate_name, iv.job_title, iv.stage_name])
   const preview   = filtered.slice(0, PREVIEW_LIMIT)
   const remaining = filtered.length - preview.length
   return (
     <div>
       <WidgetHeader wId="interviews" title="Interviews" badge={interviews.length} href="/candidates"
         searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
+
+      {stages.length > 1 && (
+        <FilterPills
+          options={stages.map(s => ({ value: s, label: s }))}
+          active={filterStage}
+          onSelect={setFilterStage}
+        />
+      )}
 
       <div className="grid grid-cols-[2fr_2fr_1.2fr_1fr] gap-3 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
         <span>Stage</span><span>Candidate</span><span>Date</span><span>Role</span>
@@ -835,13 +894,23 @@ function PipelineWidget({ breakdown }: { breakdown: StatusBreakdown[] }) {
 
 function JobsMiniWidget({ jobs }: { jobs: TopJob[] }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
-  const filtered  = filterFn(jobs, j => [j.position_title, j.department ?? '', j.location ?? ''])
+  const [filterDept, setFilterDept] = useState('')
+  const depts = Array.from(new Set(jobs.map(j => j.department).filter(Boolean))) as string[]
+  const afterFilter = filterDept ? jobs.filter(j => j.department === filterDept) : jobs
+  const filtered  = filterFn(afterFilter, j => [j.position_title, j.department ?? '', j.location ?? ''])
   const preview   = filtered.slice(0, PREVIEW_LIMIT)
   const remaining = filtered.length - preview.length
   return (
     <div>
       <WidgetHeader wId="jobs_mini" title="Active Jobs" badge={jobs.length} href="/jobs"
         searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
+      {depts.length > 1 && (
+        <FilterPills
+          options={depts.map(d => ({ value: d, label: d }))}
+          active={filterDept}
+          onSelect={setFilterDept}
+        />
+      )}
       {jobs.length === 0 ? (
         <p className="text-xs text-slate-400">No open jobs. <Link href="/jobs" className="text-blue-500 hover:underline">Create one</Link></p>
       ) : (
@@ -988,13 +1057,23 @@ function HmActionsWidget({ approvals }: { approvals: TaskApproval[] }) {
 
 function RecentApplicationsWidget({ applications, onCandidateClick }: { applications: RecentApplication[]; onCandidateClick: (id: string) => void }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
-  const filtered  = filterFn(applications, a => [a.candidate_name, a.job_title, a.stage_name ?? '', a.source])
+  const [filterSource, setFilterSource] = useState('')
+  const sources = Array.from(new Set(applications.map(a => a.source))).filter(Boolean)
+  const afterFilter = filterSource ? applications.filter(a => a.source === filterSource) : applications
+  const filtered  = filterFn(afterFilter, a => [a.candidate_name, a.job_title, a.stage_name ?? '', a.source])
   const preview   = filtered.slice(0, PREVIEW_LIMIT)
   const remaining = filtered.length - preview.length
   return (
     <div>
       <WidgetHeader wId="recent_applications" title="Recent Applications" badge={applications.length} href="/candidates"
         searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
+      {sources.length > 1 && (
+        <FilterPills
+          options={sources.map(s => ({ value: s, label: SOURCE_LABELS[s] ?? s }))}
+          active={filterSource}
+          onSelect={setFilterSource}
+        />
+      )}
       {applications.length === 0 ? (
         <p className="text-xs text-slate-400">No applications yet.</p>
       ) : (
@@ -1040,13 +1119,25 @@ function RecentApplicationsWidget({ applications, onCandidateClick }: { applicat
 
 function TopScoredWidget({ candidates, onCandidateClick }: { candidates: TopScored[]; onCandidateClick: (id: string) => void }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
-  const filtered  = filterFn(candidates, c => [c.candidate_name, c.job_title])
+  const [filterReco, setFilterReco] = useState('')
+  const afterFilter = filterReco ? candidates.filter(c => c.ai_recommendation === filterReco) : candidates
+  const filtered  = filterFn(afterFilter, c => [c.candidate_name, c.job_title])
   const preview   = filtered.slice(0, PREVIEW_LIMIT)
   const remaining = filtered.length - preview.length
   return (
     <div>
       <WidgetHeader wId="top_scored" title="Top AI-Scored" href="/candidates"
         searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
+      <FilterPills
+        options={[
+          { value: 'strong_yes', label: 'Strong Yes' },
+          { value: 'yes', label: 'Yes' },
+          { value: 'maybe', label: 'Maybe' },
+          { value: 'no', label: 'No' },
+        ]}
+        active={filterReco}
+        onSelect={setFilterReco}
+      />
       {candidates.length === 0 ? (
         <p className="text-xs text-slate-400">No AI scores yet — candidates are scored automatically when added.</p>
       ) : (
@@ -1186,13 +1277,27 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
 
 function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
-  const filtered  = filterFn(activity, e => [e.candidate_name, e.job_title, e.to_stage ?? '', e.event_type])
+  const [filterEvent, setFilterEvent] = useState('')
+  const eventTypes = Array.from(new Set(activity.map(e => e.event_type))).filter(Boolean)
+  const EVENT_LABELS: Record<string, string> = {
+    applied: 'Applied', stage_moved: 'Stage Moved', note_added: 'Notes',
+    status_changed: 'Status Changed', email_sent: 'Emails',
+  }
+  const afterFilter = filterEvent ? activity.filter(e => e.event_type === filterEvent) : activity
+  const filtered  = filterFn(afterFilter, e => [e.candidate_name, e.job_title, e.to_stage ?? '', e.event_type])
   const preview   = filtered.slice(0, PREVIEW_LIMIT)
   const remaining = filtered.length - preview.length
   return (
     <div>
       <WidgetHeader wId="recent_activity" title="Recent Activity" href="/candidates"
         searchable showSearch={showSearch} onToggleSearch={toggle} query={query} onQueryChange={setQuery} />
+      {eventTypes.length > 1 && (
+        <FilterPills
+          options={eventTypes.map(t => ({ value: t, label: EVENT_LABELS[t] ?? t }))}
+          active={filterEvent}
+          onSelect={setFilterEvent}
+        />
+      )}
       {activity.length === 0 ? (
         <p className="text-xs text-slate-400">No recent activity.</p>
       ) : (
@@ -1255,6 +1360,7 @@ function ActionQueueWidget({
 }) {
   const [actioningId, setActioningId] = useState<string | null>(null)
   const [doneIds, setDoneIds]         = useState<Set<string>>(new Set())
+  const [filterType, setFilterType]   = useState('')
 
   // Build action items from dashboard data
   const items: ActionItem[] = []
@@ -1311,7 +1417,7 @@ function ActionQueueWidget({
     })
   }
 
-  const visibleItems = items.filter(i => !doneIds.has(i.id))
+  const visibleItems = items.filter(i => !doneIds.has(i.id) && (!filterType || i.type === filterType))
 
   async function handleAction(item: ActionItem) {
     setActioningId(item.id)
@@ -1350,6 +1456,17 @@ function ActionQueueWidget({
   return (
     <div>
       <WidgetHeader wId="action_queue" title="Action Queue" badge={visibleItems.length} />
+
+      <FilterPills
+        options={[
+          { value: 'approve', label: 'Approvals' },
+          { value: 'score', label: 'Scoring' },
+          { value: 'followup', label: 'Follow-ups' },
+          { value: 'feedback', label: 'Feedback' },
+        ]}
+        active={filterType}
+        onSelect={setFilterType}
+      />
 
       {visibleItems.length === 0 ? (
         <div className="py-8 text-center">
@@ -1953,6 +2070,28 @@ export default function DashboardPage() {
   // Quick-view drawer
   const [drawerCandidateId, setDrawerCandidateId] = useState<string | null>(null)
 
+  // Widget drag-to-reposition
+  const [dragWidgetId, setDragWidgetId]   = useState<WidgetId | null>(null)
+  const [dragOverWidgetId, setDragOverWidgetId] = useState<WidgetId | null>(null)
+
+  function handleWidgetDrop(targetId: WidgetId) {
+    if (!dragWidgetId || dragWidgetId === targetId) {
+      setDragWidgetId(null)
+      setDragOverWidgetId(null)
+      return
+    }
+    const widgets = activeView?.widgets ?? []
+    const fromIdx = widgets.indexOf(dragWidgetId)
+    const toIdx   = widgets.indexOf(targetId)
+    if (fromIdx === -1 || toIdx === -1) return
+    const next = [...widgets]
+    next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, dragWidgetId)
+    updateWidgets(next)
+    setDragWidgetId(null)
+    setDragOverWidgetId(null)
+  }
+
   // Views
   const [views,          setViews]         = useState<DashView[]>(DEFAULT_VIEWS)
   const [activeViewId,   setActiveViewId]  = useState('home')
@@ -2206,6 +2345,12 @@ export default function DashboardPage() {
                     dims={getWidgetDims(wId)}
                     onResize={(dims) => setWidgetDims(wId, dims)}
                     disabled={widgetMode}
+                    isDragging={dragWidgetId === wId}
+                    isDragOver={dragOverWidgetId === wId}
+                    onDragStart={() => setDragWidgetId(wId)}
+                    onDragOver={() => setDragOverWidgetId(wId)}
+                    onDrop={() => handleWidgetDrop(wId)}
+                    onDragEnd={() => { setDragWidgetId(null); setDragOverWidgetId(null) }}
                   >
                     {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={setDrawerCandidateId} />}
                     {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />}
