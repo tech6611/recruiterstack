@@ -39,10 +39,15 @@ import {
   Search,
 } from 'lucide-react'
 import type { StageColor } from '@/lib/types/database'
+import { timeAgo, fmtDate } from '@/lib/ui/date-utils'
 import { CandidateDrawer } from '@/components/dashboard/CandidateDrawer'
-import { GridLayout, useContainerWidth, verticalCompactor, type LayoutItem, type Layout } from 'react-grid-layout'
+import RGLBase, { WidthProvider } from 'react-grid-layout/legacy'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
+
+const GridLayout = WidthProvider(RGLBase)
+
+type LayoutItem = RGLBase.Layout
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -202,25 +207,6 @@ const DEFAULT_RIGHT_WIDGETS: WidgetId[] = ['tasks', 'recent_applications', 'jobs
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1)  return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24)  return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days < 7)  return `${days}d ago`
-  const wks = Math.floor(days / 7)
-  return wks < 52 ? `${wks}w ago` : `${Math.floor(wks / 52)}y ago`
-}
-
-function fmtDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
-  })
-}
-
 const STAGE_COLORS: Record<StageColor, string> = {
   slate: 'bg-slate-400', blue: 'bg-blue-500', violet: 'bg-violet-500',
   amber: 'bg-amber-400', emerald: 'bg-emerald-500', green: 'bg-green-500',
@@ -339,59 +325,57 @@ function ViewsSidebar({
 /** Max items shown per widget — content scrolls within the widget's viewport-constrained container */
 const PREVIEW_LIMIT = 50
 
-/** Widget grid wrapper — uses useContainerWidth for react-grid-layout v2 */
+/** Widget grid wrapper — uses WidthProvider (legacy v1 API) for reliable drag/drop */
 function WidgetGrid({
   widgets, layout, onLayoutChange, disabled, data, onCandidateClick, onRefresh,
 }: {
   widgets: WidgetId[]
   layout: LayoutItem[]
-  onLayoutChange: (layout: Layout) => void
+  onLayoutChange: (layout: LayoutItem[]) => void
   disabled: boolean
   data: DashboardData
   onCandidateClick: (id: string) => void
   onRefresh: () => void
 }) {
-  const { containerRef, width } = useContainerWidth()
-
   return (
-    <div ref={containerRef as React.RefObject<HTMLDivElement>} className="flex-1 overflow-auto">
-      {width > 0 && (
-        <GridLayout
-          className="layout"
-          layout={layout}
-          width={width}
-          gridConfig={{ cols: 2, rowHeight: 80, margin: [12, 12] as const }}
-          dragConfig={{ enabled: !disabled, handle: '.widget-drag-handle' }}
-          resizeConfig={{ enabled: !disabled }}
-          compactor={verticalCompactor}
-          onLayoutChange={onLayoutChange}
-        >
-          {widgets.map(wId => (
-            <div
-              key={wId}
-              className={`rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-            >
-              <div className="widget-drag-handle absolute top-2 left-2 z-10 cursor-grab text-slate-300 hover:text-slate-500">
-                <GripVertical className="h-4 w-4" />
-              </div>
-              {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={onCandidateClick} />}
-              {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
-              {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
-              {wId === 'pipeline'           && <PipelineWidget           breakdown={data.candidate_breakdown} />}
-              {wId === 'jobs_mini'          && <JobsMiniWidget           jobs={data.top_jobs} />}
-              {wId === 'jobs_by_dept'       && <JobsByDeptWidget         departments={data.jobs_by_dept} />}
-              {wId === 'hm_actions'         && <HmActionsWidget          approvals={data.tasks.pending_approvals} />}
-              {wId === 'recent_applications'&& <RecentApplicationsWidget applications={data.recent_applications} onCandidateClick={onCandidateClick} />}
-              {wId === 'top_scored'         && <TopScoredWidget          candidates={data.top_scored} onCandidateClick={onCandidateClick} />}
-              {wId === 'candidate_sources'  && <CandidateSourcesWidget   sources={data.candidate_sources} />}
-              {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={onCandidateClick} />}
-              {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
-              {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
-              {wId === 'action_queue'      && <ActionQueueWidget         data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
+    <div className="flex-1 overflow-auto">
+      <GridLayout
+        className="layout"
+        layout={layout}
+        cols={2}
+        rowHeight={80}
+        isDraggable={!disabled}
+        isResizable={!disabled}
+        draggableHandle=".widget-drag-handle"
+        compactType="vertical"
+        margin={[12, 12]}
+        onLayoutChange={onLayoutChange}
+      >
+        {widgets.map(wId => (
+          <div
+            key={wId}
+            className={`rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white p-4 overflow-auto ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            <div className="widget-drag-handle absolute top-2 left-2 z-10 cursor-grab text-slate-300 hover:text-slate-500">
+              <GripVertical className="h-4 w-4" />
             </div>
-          ))}
-        </GridLayout>
-      )}
+            {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={onCandidateClick} />}
+            {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
+            {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
+            {wId === 'pipeline'           && <PipelineWidget           breakdown={data.candidate_breakdown} />}
+            {wId === 'jobs_mini'          && <JobsMiniWidget           jobs={data.top_jobs} />}
+            {wId === 'jobs_by_dept'       && <JobsByDeptWidget         departments={data.jobs_by_dept} />}
+            {wId === 'hm_actions'         && <HmActionsWidget          approvals={data.tasks.pending_approvals} />}
+            {wId === 'recent_applications'&& <RecentApplicationsWidget applications={data.recent_applications} onCandidateClick={onCandidateClick} />}
+            {wId === 'top_scored'         && <TopScoredWidget          candidates={data.top_scored} onCandidateClick={onCandidateClick} />}
+            {wId === 'candidate_sources'  && <CandidateSourcesWidget   sources={data.candidate_sources} />}
+            {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={onCandidateClick} />}
+            {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
+            {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
+            {wId === 'action_queue'      && <ActionQueueWidget         data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
+          </div>
+        ))}
+      </GridLayout>
     </div>
   )
 }
@@ -2185,10 +2169,10 @@ export default function DashboardPage() {
     }
     return defaultGridLayout(widgets)
   }
-  function handleLayoutChange(newLayout: Layout) {
+  function handleLayoutChange(newLayout: LayoutItem[]) {
     setViews(prev => prev.map(v => {
       if (v.id !== activeViewId) return v
-      return { ...v, gridLayouts: [...newLayout] }
+      return { ...v, gridLayouts: newLayout }
     }))
   }
   function handleRightAddWidget(id: WidgetId)            { setRightWidgets(prev => [...prev, id]) }
