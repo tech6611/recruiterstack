@@ -337,9 +337,6 @@ function WidgetGrid({
   onCandidateClick: (id: string) => void
   onRefresh: () => void
 }) {
-  // Only save layout on user interaction (drag/resize), not on mount/reflow
-  const userInteracted = useRef(false)
-
   return (
     <div className="flex-1 overflow-auto">
       <GridLayout
@@ -350,16 +347,10 @@ function WidgetGrid({
         isDraggable={!disabled}
         isResizable={!disabled}
         draggableHandle=".widget-drag-handle"
-        compactType="vertical"
+        compactType={null}
         margin={[12, 12]}
-        onDragStart={() => { userInteracted.current = true }}
-        onResizeStart={() => { userInteracted.current = true }}
-        onLayoutChange={(newLayout: LayoutItem[]) => {
-          if (userInteracted.current) {
-            onLayoutChange(newLayout)
-            userInteracted.current = false
-          }
-        }}
+        onDragStop={(_layout: LayoutItem[]) => { onLayoutChange(_layout) }}
+        onResizeStop={(_layout: LayoutItem[]) => { onLayoutChange(_layout) }}
       >
         {widgets.map(wId => (
           <div
