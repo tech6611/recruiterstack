@@ -369,7 +369,7 @@ function WidgetGrid({ widgets, widgetMode, data, onCandidateClick, onRefresh, on
           onDrop={(e) => handleDrop(e, idx)}
           className={`rounded-xl border-2 ${
             dragOverIdx === idx ? 'border-blue-400 bg-blue-50/30' : 'border-slate-200'
-          } border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col min-h-0 transition-colors ${
+          } border-t-2 ${widgetAccent(wId).border} bg-white relative flex flex-col min-h-0 transition-colors ${
             widgetMode ? 'opacity-50 pointer-events-none' : ''
           }`}
         >
