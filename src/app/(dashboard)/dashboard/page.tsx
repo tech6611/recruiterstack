@@ -2146,23 +2146,6 @@ export default function DashboardPage() {
   function handleRightReorderWidgets(widgets: WidgetId[]) { setRightWidgets(widgets) }
   function handleRightRemoveWidget(id: WidgetId)         { setRightWidgets(prev => prev.filter(w => w !== id)) }
 
-  // Drag-to-reorder state
-  const [dragId, setDragId]       = useState<WidgetId | null>(null)
-  const [dragOverId, setDragOverId] = useState<WidgetId | null>(null)
-
-  function handleDrop(targetId: WidgetId) {
-    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return }
-    const widgets = activeView?.widgets ?? []
-    const from = widgets.indexOf(dragId)
-    const to   = widgets.indexOf(targetId)
-    if (from === -1 || to === -1) return
-    const next = [...widgets]
-    next.splice(from, 1)
-    next.splice(to, 0, dragId)
-    updateWidgets(next)
-    setDragId(null)
-    setDragOverId(null)
-  }
   function handleRightAddWidget(id: WidgetId)            { setRightWidgets(prev => [...prev, id]) }
 
   if (loading || !hydrated) return <DashboardSkeleton />
@@ -2246,41 +2229,21 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Render widgets — viewport-filling CSS Grid */}
+          {/* Render widgets — viewport-filling CSS Grid, no page scroll */}
           {(activeView?.widgets ?? []).length > 0 ? (
             <div
-              className="flex-1 overflow-hidden"
+              className="flex-1 min-h-0 grid gap-3"
               style={{
-                display: 'grid',
                 gridTemplateColumns: `repeat(${Math.min((activeView?.widgets ?? []).length, 2)}, 1fr)`,
                 gridTemplateRows: `repeat(${Math.ceil((activeView?.widgets ?? []).length / 2)}, 1fr)`,
-                gap: '0.75rem',
-                height: '100%',
               }}
             >
               {(activeView?.widgets ?? []).map(wId => (
                 <div
                   key={wId}
-                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverId(wId) }}
-                  onDrop={(e) => { e.preventDefault(); handleDrop(wId) }}
-                  className={`relative rounded-xl border-2 ${
-                    dragOverId === wId && dragId !== wId ? 'border-blue-400 bg-blue-50/30' : 'border-slate-200'
-                  } border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col transition-colors ${
-                    dragId === wId ? 'opacity-40' : ''
-                  } ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
-                  style={{ overflow: 'hidden', resize: widgetMode ? 'none' : 'both' }}
+                  className={`rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col min-h-0 ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
                 >
-                  {/* Drag handle — only this element is draggable */}
-                  <div
-                    draggable={!widgetMode}
-                    onDragStart={(e) => { e.stopPropagation(); setDragId(wId) }}
-                    onDragEnd={() => { setDragId(null); setDragOverId(null) }}
-                    className="absolute top-4 left-0.5 z-10 flex items-center justify-center w-4 h-6 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500"
-                  >
-                    <GripVertical className="h-3.5 w-3.5" />
-                  </div>
-                  {/* Scrollable widget content */}
-                  <div className="flex-1 overflow-auto p-4 pl-5">
+                  <div className="flex-1 min-h-0 overflow-auto p-4">
                     <WidgetContent wId={wId} data={data} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />
                   </div>
                 </div>
