@@ -319,6 +319,79 @@ function ViewsSidebar({
 const PREVIEW_LIMIT = 50
 
 /** Widget grid wrapper — uses WidthProvider (legacy v1 API) for reliable drag/drop */
+/** Viewport-filling widget grid with drag-to-reorder */
+function WidgetGrid({ widgets, widgetMode, data, onCandidateClick, onRefresh, onReorder }: {
+  widgets: WidgetId[]
+  widgetMode: boolean
+  data: DashboardData
+  onCandidateClick: (id: string) => void
+  onRefresh: () => void
+  onReorder: (widgets: WidgetId[]) => void
+}) {
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+
+  function handleDragStart(e: React.DragEvent, wId: WidgetId) {
+    e.dataTransfer.setData('text/plain', wId)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverIdx(idx)
+  }
+
+  function handleDrop(e: React.DragEvent, targetIdx: number) {
+    e.preventDefault()
+    const sourceId = e.dataTransfer.getData('text/plain') as WidgetId
+    const sourceIdx = widgets.indexOf(sourceId)
+    if (sourceIdx === -1 || sourceIdx === targetIdx) { setDragOverIdx(null); return }
+    const next = [...widgets]
+    next.splice(sourceIdx, 1)
+    next.splice(targetIdx, 0, sourceId)
+    onReorder(next)
+    setDragOverIdx(null)
+  }
+
+  return (
+    <div
+      className="flex-1 min-h-0 grid gap-3"
+      style={{
+        gridTemplateColumns: `repeat(${Math.min(widgets.length, 2)}, 1fr)`,
+        gridTemplateRows: `repeat(${Math.ceil(widgets.length / 2)}, 1fr)`,
+      }}
+    >
+      {widgets.map((wId, idx) => (
+        <div
+          key={wId}
+          onDragOver={(e) => handleDragOver(e, idx)}
+          onDragLeave={() => setDragOverIdx(null)}
+          onDrop={(e) => handleDrop(e, idx)}
+          className={`rounded-xl border-2 ${
+            dragOverIdx === idx ? 'border-blue-400 bg-blue-50/30' : 'border-slate-200'
+          } border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col min-h-0 transition-colors ${
+            widgetMode ? 'opacity-50 pointer-events-none' : ''
+          }`}
+        >
+          {/* Drag handle — only this initiates drag */}
+          {!widgetMode && (
+            <div
+              draggable
+              onDragStart={(e) => handleDragStart(e, wId)}
+              className="absolute top-4 left-0.5 z-10 flex items-center justify-center w-4 h-6 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500"
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </div>
+          )}
+          <div className="flex-1 min-h-0 overflow-auto p-4 pl-5">
+            <WidgetContent wId={wId} data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** Renders a widget by ID */
 function WidgetContent({ wId, data, onCandidateClick, onRefresh }: {
   wId: WidgetId; data: DashboardData; onCandidateClick: (id: string) => void; onRefresh: () => void
@@ -2231,24 +2304,15 @@ export default function DashboardPage() {
 
           {/* Render widgets — viewport-filling CSS Grid, no page scroll */}
           {(activeView?.widgets ?? []).length > 0 ? (
-            <div
-              className="flex-1 min-h-0 grid gap-3"
-              style={{
-                gridTemplateColumns: `repeat(${Math.min((activeView?.widgets ?? []).length, 2)}, 1fr)`,
-                gridTemplateRows: `repeat(${Math.ceil((activeView?.widgets ?? []).length / 2)}, 1fr)`,
-              }}
-            >
-              {(activeView?.widgets ?? []).map(wId => (
-                <div
-                  key={wId}
-                  className={`rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col min-h-0 ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
-                >
-                  <div className="flex-1 min-h-0 overflow-auto p-4">
-                    <WidgetContent wId={wId} data={data} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <WidgetGrid
+              widgets={activeView?.widgets ?? []}
+              widgetMode={widgetMode}
+              data={data}
+              onCandidateClick={setDrawerCandidateId}
+              onRefresh={() => fetchData(true)}
+              onReorder={updateWidgets}
+            />
+
           ) : !widgetMode ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Settings2 className="mb-3 h-8 w-8 text-slate-300" />
