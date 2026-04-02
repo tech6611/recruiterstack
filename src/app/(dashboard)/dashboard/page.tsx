@@ -373,18 +373,21 @@ function WidgetGrid({ widgets, widgetMode, data, onCandidateClick, onRefresh, on
             widgetMode ? 'opacity-50 pointer-events-none' : ''
           }`}
         >
-          {/* Drag handle — only this initiates drag */}
-          {!widgetMode && (
-            <div
-              draggable
-              onDragStart={(e) => handleDragStart(e, wId)}
-              className="absolute top-4 left-0.5 z-10 flex items-center justify-center w-4 h-6 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500"
-            >
-              <GripVertical className="h-3.5 w-3.5" />
+          <div className="flex min-h-0 flex-1">
+            {/* Drag handle — left strip, always visible, only this initiates drag */}
+            {!widgetMode && (
+              <div
+                draggable
+                onDragStart={(e) => handleDragStart(e, wId)}
+                className="shrink-0 w-6 flex items-start justify-center pt-4 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 hover:bg-slate-50 transition-colors rounded-l-xl"
+              >
+                <GripVertical className="h-4 w-4" />
+              </div>
+            )}
+            {/* Scrollable widget content */}
+            <div className="flex-1 min-h-0 min-w-0 overflow-auto p-4">
+              <WidgetContent wId={wId} data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />
             </div>
-          )}
-          <div className="flex-1 min-h-0 overflow-auto p-4 pl-5">
-            <WidgetContent wId={wId} data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />
           </div>
         </div>
       ))}
