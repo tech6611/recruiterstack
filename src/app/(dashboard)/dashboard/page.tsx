@@ -41,13 +41,6 @@ import {
 import type { StageColor } from '@/lib/types/database'
 import { timeAgo, fmtDate } from '@/lib/ui/date-utils'
 import { CandidateDrawer } from '@/components/dashboard/CandidateDrawer'
-import RGLBase, { WidthProvider } from 'react-grid-layout/legacy'
-import 'react-grid-layout/css/styles.css'
-import 'react-resizable/css/styles.css'
-
-const GridLayout = WidthProvider(RGLBase)
-
-type LayoutItem = RGLBase.Layout
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -178,7 +171,6 @@ function widgetAccent(wId: WidgetId) {
 
 interface DashView {
   id: string; name: string; icon: string; widgets: WidgetId[]
-  gridLayouts?: LayoutItem[]
 }
 
 const DEFAULT_VIEWS: DashView[] = [
@@ -199,7 +191,7 @@ const LS_VIEWS         = 'rs_dashboard_views'
 const LS_ACTIVE        = 'rs_dashboard_active_view'
 const LS_VERSION       = 'rs_dashboard_version'
 const LS_RIGHT_WIDGETS = 'rs_right_panel_widgets'
-const CURRENT_VERSION  = 'v5' // bumped: 12-col grid + gridLayouts shape change
+const CURRENT_VERSION  = 'v6' // bumped: removed RGL, viewport-filling CSS Grid
 
 // ── Right Panel Widget defaults ─────────────────────────────────────────────────
 // The right panel uses the same WidgetId type and ALL_WIDGET_DEFS as the main area.
@@ -327,77 +319,27 @@ function ViewsSidebar({
 const PREVIEW_LIMIT = 50
 
 /** Widget grid wrapper — uses WidthProvider (legacy v1 API) for reliable drag/drop */
-function WidgetGrid({
-  widgets, layout, onLayoutChange, disabled, data, onCandidateClick, onRefresh,
-}: {
-  widgets: WidgetId[]
-  layout: LayoutItem[]
-  onLayoutChange: (layout: LayoutItem[]) => void
-  disabled: boolean
-  data: DashboardData
-  onCandidateClick: (id: string) => void
-  onRefresh: () => void
+/** Renders a widget by ID */
+function WidgetContent({ wId, data, onCandidateClick, onRefresh }: {
+  wId: WidgetId; data: DashboardData; onCandidateClick: (id: string) => void; onRefresh: () => void
 }) {
-  return (
-    <div className="flex-1 overflow-auto">
-      <GridLayout
-        className="layout"
-        layout={layout}
-        cols={12}
-        rowHeight={20}
-        isDraggable={!disabled}
-        isResizable={!disabled}
-        resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 'n', 's']}
-        draggableHandle=".widget-drag-handle"
-        compactType={null}
-        margin={[12, 12]}
-        onDragStop={(_layout: LayoutItem[]) => { onLayoutChange(_layout) }}
-        onResizeStop={(_layout: LayoutItem[]) => { onLayoutChange(_layout) }}
-      >
-        {widgets.map(wId => (
-          <div
-            key={wId}
-            className={`relative rounded-xl border border-slate-200 border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-          >
-            {/* Fixed header row: drag handle + widget content header share the same line */}
-            <div className="widget-drag-handle absolute top-4 left-0.5 z-10 flex items-center justify-center w-4 h-6 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
-              <GripVertical className="h-3.5 w-3.5" />
-            </div>
-            {/* Scrollable content area */}
-            <div className="flex-1 overflow-auto p-4 pl-5">
-            {wId === 'interviews'         && <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={onCandidateClick} />}
-            {wId === 'tasks'              && <TasksWidget              tasks={data.tasks} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
-            {wId === 'overview_stats'     && <OverviewStatsWidget      stats={data.stats} />}
-            {wId === 'pipeline'           && <PipelineWidget           breakdown={data.candidate_breakdown} />}
-            {wId === 'jobs_mini'          && <JobsMiniWidget           jobs={data.top_jobs} />}
-            {wId === 'jobs_by_dept'       && <JobsByDeptWidget         departments={data.jobs_by_dept} />}
-            {wId === 'hm_actions'         && <HmActionsWidget          approvals={data.tasks.pending_approvals} />}
-            {wId === 'recent_applications'&& <RecentApplicationsWidget applications={data.recent_applications} onCandidateClick={onCandidateClick} />}
-            {wId === 'top_scored'         && <TopScoredWidget          candidates={data.top_scored} onCandidateClick={onCandidateClick} />}
-            {wId === 'candidate_sources'  && <CandidateSourcesWidget   sources={data.candidate_sources} />}
-            {wId === 'offer_tracker'      && <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={onCandidateClick} />}
-            {wId === 'recent_activity'    && <RecentActivityWidget      activity={data.recent_activity} />}
-            {wId === 'stage_funnel'       && <StageFunnelWidget         funnel={data.stage_funnel} />}
-            {wId === 'action_queue'      && <ActionQueueWidget         data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
-            </div>
-          </div>
-        ))}
-      </GridLayout>
-    </div>
-  )
-}
-
-/** Generate default grid layout for a set of widgets — 2 columns, auto-packed */
-function defaultGridLayout(widgets: WidgetId[]): LayoutItem[] {
-  return widgets.map((wId, idx) => ({
-    i: wId,
-    x: (idx % 2) * 6,
-    y: Math.floor(idx / 2) * 16,
-    w: 6,
-    h: 16,
-    minW: 2,
-    minH: 4,
-  }))
+  switch (wId) {
+    case 'interviews':          return <InterviewsWidget         interviews={data.upcoming_interviews} onCandidateClick={onCandidateClick} />
+    case 'tasks':               return <TasksWidget              tasks={data.tasks} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />
+    case 'overview_stats':      return <OverviewStatsWidget      stats={data.stats} />
+    case 'pipeline':            return <PipelineWidget           breakdown={data.candidate_breakdown} />
+    case 'jobs_mini':           return <JobsMiniWidget           jobs={data.top_jobs} />
+    case 'jobs_by_dept':        return <JobsByDeptWidget         departments={data.jobs_by_dept} />
+    case 'hm_actions':          return <HmActionsWidget          approvals={data.tasks.pending_approvals} />
+    case 'recent_applications': return <RecentApplicationsWidget applications={data.recent_applications} onCandidateClick={onCandidateClick} />
+    case 'top_scored':          return <TopScoredWidget          candidates={data.top_scored} onCandidateClick={onCandidateClick} />
+    case 'candidate_sources':   return <CandidateSourcesWidget   sources={data.candidate_sources} />
+    case 'offer_tracker':       return <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={onCandidateClick} />
+    case 'recent_activity':     return <RecentActivityWidget      activity={data.recent_activity} />
+    case 'stage_funnel':        return <StageFunnelWidget         funnel={data.stage_funnel} />
+    case 'action_queue':        return <ActionQueueWidget         data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />
+    default:                    return null
+  }
 }
 
 /** Per-widget search state + filter helper */
@@ -2204,31 +2146,22 @@ export default function DashboardPage() {
   function handleRightReorderWidgets(widgets: WidgetId[]) { setRightWidgets(widgets) }
   function handleRightRemoveWidget(id: WidgetId)         { setRightWidgets(prev => prev.filter(w => w !== id)) }
 
-  // Grid layout helpers
-  function getGridLayout(): LayoutItem[] {
-    const view = views.find(v => v.id === activeViewId)
-    const widgets = view?.widgets ?? []
-    if (view?.gridLayouts && view.gridLayouts.length > 0) {
-      // Ensure layout has entries for all current widgets
-      const existing = new Set(view.gridLayouts.map(l => l.i))
-      const missing = widgets.filter(w => !existing.has(w))
-      if (missing.length === 0) return view.gridLayouts
-      // Add default positions for newly added widgets
-      const maxY = Math.max(0, ...view.gridLayouts.map(l => l.y + l.h))
-      return [
-        ...view.gridLayouts,
-        ...missing.map((wId, idx) => ({
-          i: wId, x: (idx % 2) * 6, y: maxY, w: 6, h: 16, minW: 2, minH: 4,
-        })),
-      ]
-    }
-    return defaultGridLayout(widgets)
-  }
-  function handleLayoutChange(newLayout: LayoutItem[]) {
-    setViews(prev => prev.map(v => {
-      if (v.id !== activeViewId) return v
-      return { ...v, gridLayouts: newLayout }
-    }))
+  // Drag-to-reorder state
+  const [dragId, setDragId]       = useState<WidgetId | null>(null)
+  const [dragOverId, setDragOverId] = useState<WidgetId | null>(null)
+
+  function handleDrop(targetId: WidgetId) {
+    if (!dragId || dragId === targetId) { setDragId(null); setDragOverId(null); return }
+    const widgets = activeView?.widgets ?? []
+    const from = widgets.indexOf(dragId)
+    const to   = widgets.indexOf(targetId)
+    if (from === -1 || to === -1) return
+    const next = [...widgets]
+    next.splice(from, 1)
+    next.splice(to, 0, dragId)
+    updateWidgets(next)
+    setDragId(null)
+    setDragOverId(null)
   }
   function handleRightAddWidget(id: WidgetId)            { setRightWidgets(prev => [...prev, id]) }
 
@@ -2313,17 +2246,43 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Render widgets — drag-to-position and resize via react-grid-layout */}
+          {/* Render widgets — viewport-filling CSS Grid */}
           {(activeView?.widgets ?? []).length > 0 ? (
-            <WidgetGrid
-              widgets={activeView?.widgets ?? []}
-              layout={getGridLayout()}
-              onLayoutChange={handleLayoutChange}
-              disabled={widgetMode}
-              data={data}
-              onCandidateClick={setDrawerCandidateId}
-              onRefresh={() => fetchData(true)}
-            />
+            <div
+              className="flex-1 overflow-hidden"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${Math.min((activeView?.widgets ?? []).length, 2)}, 1fr)`,
+                gridTemplateRows: `repeat(${Math.ceil((activeView?.widgets ?? []).length / 2)}, 1fr)`,
+                gap: '0.75rem',
+                height: '100%',
+              }}
+            >
+              {(activeView?.widgets ?? []).map(wId => (
+                <div
+                  key={wId}
+                  draggable={!widgetMode}
+                  onDragStart={() => setDragId(wId)}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverId(wId) }}
+                  onDrop={() => handleDrop(wId)}
+                  onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+                  className={`relative rounded-xl border-2 ${
+                    dragOverId === wId && dragId !== wId ? 'border-blue-400 bg-blue-50/30' : 'border-slate-200'
+                  } border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col overflow-hidden transition-colors ${
+                    dragId === wId ? 'opacity-40' : ''
+                  } ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
+                >
+                  {/* Drag handle */}
+                  <div className="absolute top-4 left-0.5 z-10 flex items-center justify-center w-4 h-6 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
+                    <GripVertical className="h-3.5 w-3.5" />
+                  </div>
+                  {/* Scrollable widget content */}
+                  <div className="flex-1 overflow-auto p-4 pl-5">
+                    <WidgetContent wId={wId} data={data} onCandidateClick={setDrawerCandidateId} onRefresh={() => fetchData(true)} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : !widgetMode ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Settings2 className="mb-3 h-8 w-8 text-slate-300" />
