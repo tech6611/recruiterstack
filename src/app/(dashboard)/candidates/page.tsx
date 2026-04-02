@@ -4,13 +4,14 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import {
-  Plus, Search, X, Users, Loader2, Download,
+  Plus, Search, X, Users, Loader2, Download, Clock,
   UserCheck, UserMinus, MessageSquare, FileCheck, CheckCircle, XCircle,
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight,
   GripVertical, Pencil,
 } from 'lucide-react'
 import type { CandidateStatus, CandidateListItem } from '@/lib/types/database'
 import { inputCls, labelCls } from '@/lib/ui/styles'
+import { trackEvent } from '@/lib/analytics'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -18,6 +19,7 @@ import { inputCls, labelCls } from '@/lib/ui/styles'
 
 const STATUS_CONFIG: Record<CandidateStatus, { label: string; color: string; icon: React.ReactNode }> = {
   active:         { label: 'Active',         color: 'bg-blue-50 text-blue-700 border-blue-200',          icon: <UserCheck className="h-3 w-3" /> },
+  on_hold:        { label: 'On Hold',        color: 'bg-orange-50 text-orange-700 border-orange-200',    icon: <Clock className="h-3 w-3" /> },
   inactive:       { label: 'Inactive',       color: 'bg-slate-100 text-slate-600 border-slate-200',      icon: <UserMinus className="h-3 w-3" /> },
   interviewing:   { label: 'Interviewing',   color: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <MessageSquare className="h-3 w-3" /> },
   offer_extended: { label: 'Offer Extended', color: 'bg-violet-50 text-violet-700 border-violet-200',    icon: <FileCheck className="h-3 w-3" /> },
@@ -592,7 +594,10 @@ export default function CandidatesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <input
             value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            onChange={e => {
+              setSearch(e.target.value); setPage(1)
+              if (e.target.value.length > 2) trackEvent('candidates_searched', { query_length: e.target.value.length })
+            }}
             placeholder="Search name, email, title…"
             className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
           />
@@ -604,7 +609,11 @@ export default function CandidatesPage() {
         </div>
         <select
           value={filterStatus}
-          onChange={e => { setFilterStatus(e.target.value as CandidateStatus | 'all'); setPage(1) }}
+          onChange={e => {
+            const val = e.target.value as CandidateStatus | 'all'
+            setFilterStatus(val); setPage(1)
+            if (val !== 'all') trackEvent('candidates_filtered', { filter_type: val })
+          }}
           className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
         >
           <option value="all">All statuses</option>

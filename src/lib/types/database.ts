@@ -3,6 +3,7 @@
 
 export type CandidateStatus =
   | 'active'
+  | 'on_hold'
   | 'inactive'
   | 'interviewing'
   | 'offer_extended'
@@ -94,6 +95,7 @@ export type HiringRequestStatus =
   | 'jd_sent'
   | 'jd_approved'
   | 'posted'
+  | 'active'
   | 'closed'
 
 export interface HiringRequest {
@@ -154,7 +156,9 @@ export interface PipelineStage {
 
 // ── Applications ──────────────────────────────────────────────────────────
 
-export type ApplicationStatus = 'active' | 'rejected' | 'withdrawn' | 'hired'
+export type ApplicationStatus = 'active' | 'on_hold' | 'rejected' | 'withdrawn' | 'hired'
+
+export type ApplicationReviewStatus = 'unreviewed' | 'reviewed' | 'yes' | 'no' | 'maybe'
 export type ApplicationSource = 'manual' | 'applied' | 'imported' | 'sourced' | 'referral'
 export type AiRecommendation = 'strong_yes' | 'yes' | 'maybe' | 'no'
 
@@ -165,6 +169,7 @@ export interface Application {
   hiring_request_id: string
   stage_id: string | null
   status: ApplicationStatus
+  review_status: ApplicationReviewStatus
   source: ApplicationSource
   source_detail: string | null
   resume_url: string | null

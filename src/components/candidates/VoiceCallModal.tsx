@@ -129,10 +129,11 @@ export default function VoiceCallModal({
 
               {/* Phone number input */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                <label htmlFor="phone-number" className="block text-xs font-semibold text-slate-600 mb-1.5">
                   Phone Number
                 </label>
                 <input
+                  id="phone-number"
                   type="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}

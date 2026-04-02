@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import type { ApplicationEvent, Scorecard, CandidateReferral, Application, HiringRequest } from '@/lib/types/database'
+import { useCandidateProfile } from './CandidateProfileContext'
 import FeedTab from './right/FeedTab'
 import NotesTab from './right/NotesTab'
 import FeedbackTab from './right/FeedbackTab'
@@ -24,26 +25,23 @@ interface RightPanelProps {
   scorecards: Map<string, Scorecard[]>
   scorecardsLoading: boolean
   referrals: CandidateReferral[]
-  onAddScorecard: (appId: string) => void
-  onScorecardDeleted: (id: string, appId: string) => void
-  onDraftEmail: (appId: string) => void
-  onNoteAdded: () => void
-  onReferralAdded: (ref: CandidateReferral) => void
 }
 
-export default function RightPanel({
+export default React.memo(function RightPanel({
   candidateId,
   applications,
   events,
   scorecards,
   scorecardsLoading,
   referrals,
-  onAddScorecard,
-  onScorecardDeleted,
-  onDraftEmail,
-  onNoteAdded,
-  onReferralAdded,
 }: RightPanelProps) {
+  const {
+    openScorecardDrawer: onAddScorecard,
+    handleScorecardDeleted: onScorecardDeleted,
+    openEmailDraft: onDraftEmail,
+    reload: onNoteAdded,
+    addReferral: onReferralAdded,
+  } = useCandidateProfile()
   const [activeTab, setActiveTab] = useState<RightTab>('Feed')
 
   const activeApps = applications.filter(a => a.status === 'active')
@@ -112,4 +110,4 @@ export default function RightPanel({
       </div>
     </div>
   )
-}
+})

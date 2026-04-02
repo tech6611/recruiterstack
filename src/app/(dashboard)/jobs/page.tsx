@@ -12,6 +12,7 @@ import {
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
 import EditHMModal from '@/components/EditHMModal'
 import { inputCls, labelCls } from '@/lib/ui/styles'
+import { trackEvent } from '@/lib/analytics'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -181,6 +182,7 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
       setJdGenError('Please fill in Team Context and Key Requirements before generating.')
       return
     }
+    trackEvent('jd_generation_started', { source: 'dashboard' })
     setJdMode('ai'); setGeneratingJD(true); setJdGenError(null)
     const res = await fetch('/api/intake/preview-jd', {
       method: 'POST',
@@ -198,7 +200,10 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
     const data = await res.json()
     setGeneratingJD(false)
     if (!res.ok) setJdGenError(data.error ?? 'Failed to generate JD.')
-    else setJd(data.jd)
+    else {
+      setJd(data.jd)
+      trackEvent('jd_generated', { source: 'dashboard', word_count: data.jd.trim().split(/\s+/).length })
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -239,6 +244,7 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
     setLoading(false)
     if (!res.ok) { setError(json.error ?? 'Something went wrong'); return }
     setSuccess({ ticketNumber: json.data?.ticket_number ?? '', intakeUrl: json.intake_url, positionTitle })
+    trackEvent('job_created', { mode: mode ?? 'unknown', position_title: positionTitle })
     onCreated()
   }
 
@@ -690,6 +696,7 @@ export default function JobsPage() {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     })
+    trackEvent(newStatus === 'posted' ? 'job_published' : 'job_unpublished', { job_id: jobId })
     fetchJobs()
   }, [fetchJobs])
 

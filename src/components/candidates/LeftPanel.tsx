@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import {
   Mail, Phone, MapPin, Briefcase, ExternalLink, FileText,
   Linkedin, Pencil, Check, X,
@@ -8,6 +8,7 @@ import {
 import type { Candidate, CandidateTag, Application, HiringRequest } from '@/lib/types/database'
 import TagInput from './TagInput'
 import { avatarColor, initials } from '@/lib/ui/avatar'
+import { useCandidateProfile } from './CandidateProfileContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -31,23 +32,17 @@ interface LeftPanelProps {
   candidate: Candidate
   tags: CandidateTag[]
   applications: ApplicationWithJobInfo[]
-  onTagAdded: (tag: CandidateTag) => void
-  onTagRemoved: (tagId: string) => void
-  onLinkedinSaved: (url: string | null) => void
-  onSkillsUpdated: (skills: string[]) => void
-  onDraftEmail: () => void
 }
 
-export default function LeftPanel({
+export default React.memo(function LeftPanel({
   candidate,
   tags,
   applications,
-  onTagAdded,
-  onTagRemoved,
-  onLinkedinSaved,
-  onSkillsUpdated,
-  onDraftEmail,
 }: LeftPanelProps) {
+  const { addTag: onTagAdded, removeTag: onTagRemoved, setCandidate, openEmailDraft, activeApps: ctxActiveApps } = useCandidateProfile()
+  const onLinkedinSaved = (url: string | null) => setCandidate(prev => prev ? { ...prev, linkedin_url: url } : prev)
+  const onSkillsUpdated = (skills: string[]) => setCandidate(prev => prev ? { ...prev, skills } : prev)
+  const onDraftEmail = () => openEmailDraft(ctxActiveApps[0]?.id ?? null)
   const [editLinkedin, setEditLinkedin] = useState(false)
   const [linkedinInput, setLinkedinInput] = useState('')
   const [editSkills, setEditSkills] = useState(false)
@@ -178,10 +173,10 @@ export default function LeftPanel({
                   placeholder="linkedin.com/in/…"
                   className="flex-1 min-w-0 rounded-lg border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs focus:outline-none focus:border-blue-400"
                 />
-                <button onClick={saveLinkedin} className="text-blue-600 hover:text-blue-800 shrink-0">
+                <button onClick={saveLinkedin} aria-label="Save" className="text-blue-600 hover:text-blue-800 shrink-0">
                   <Check className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => setEditLinkedin(false)} className="text-slate-400 hover:text-slate-600 shrink-0">
+                <button onClick={() => setEditLinkedin(false)} aria-label="Cancel" className="text-slate-400 hover:text-slate-600 shrink-0">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -197,6 +192,7 @@ export default function LeftPanel({
                 </a>
                 <button
                   onClick={() => { setLinkedinInput(candidate.linkedin_url ?? ''); setEditLinkedin(true) }}
+                  aria-label="Edit LinkedIn URL"
                   className="p-0.5 text-slate-300 hover:text-slate-600 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
                 >
                   <Pencil className="h-3 w-3" />
@@ -219,6 +215,7 @@ export default function LeftPanel({
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Skills</p>
             <button
               onClick={() => setEditSkills(e => !e)}
+              aria-label={editSkills ? "Save skills" : "Edit skills"}
               className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
             >
               {editSkills ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
@@ -234,6 +231,7 @@ export default function LeftPanel({
                 {editSkills && (
                   <button
                     onClick={() => removeSkill(skill)}
+                    aria-label={`Remove ${skill}`}
                     className="text-slate-400 hover:text-red-500 transition-colors"
                   >
                     <X className="h-3 w-3" />
@@ -299,4 +297,4 @@ export default function LeftPanel({
       </div>
     </div>
   )
-}
+})

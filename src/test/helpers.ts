@@ -132,6 +132,47 @@ export function buildApplication(overrides: Record<string, unknown> = {}) {
   }
 }
 
+export function buildInterview(overrides: Record<string, unknown> = {}) {
+  return {
+    id: nextId(),
+    org_id: 'org_test123',
+    application_id: nextId(),
+    candidate_id: nextId(),
+    hiring_request_id: nextId(),
+    stage_id: null,
+    interviewer_name: 'Test Interviewer',
+    interviewer_email: 'interviewer@example.com',
+    interview_type: 'video',
+    scheduled_at: new Date(Date.now() + 86400000).toISOString(),
+    duration_minutes: 45,
+    location: null,
+    notes: null,
+    status: 'scheduled',
+    self_schedule_token: null,
+    self_schedule_expires_at: null,
+    calendar_event_id: null,
+    meeting_platform: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  }
+}
+
+export function buildScorecard(overrides: Record<string, unknown> = {}) {
+  return {
+    id: nextId(),
+    application_id: nextId(),
+    interviewer_name: 'Test Interviewer',
+    stage_name: 'Technical',
+    recommendation: 'yes',
+    scores: [{ criterion: 'Technical Skills', rating: 3, notes: 'Good' }],
+    overall_notes: 'Solid candidate',
+    org_id: 'org_test123',
+    created_at: new Date().toISOString(),
+    ...overrides,
+  }
+}
+
 export function buildHiringRequest(overrides: Record<string, unknown> = {}) {
   return {
     id: nextId(),

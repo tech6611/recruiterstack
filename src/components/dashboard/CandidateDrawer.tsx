@@ -23,6 +23,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { timeAgo } from '@/lib/ui/date-utils'
+import { trackEvent } from '@/lib/analytics'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ interface PipelineStage {
 interface ApplicationBrief {
   id: string
   status: string
+  review_status: string
   stage_id: string | null
   stage_name: string | null
   hiring_request_id: string | null
@@ -77,6 +79,7 @@ interface CandidateDrawerProps {
 
 const STATUS_STYLES: Record<string, string> = {
   active:       'bg-emerald-100 text-emerald-700',
+  on_hold:      'bg-orange-100 text-orange-700',
   hired:        'bg-green-100 text-green-700',
   rejected:     'bg-red-100 text-red-700',
   withdrawn:    'bg-slate-100 text-slate-600',
@@ -316,6 +319,74 @@ function RejectAction({ applicationId, onDone }: { applicationId: string; onDone
 
 // ── Application Card with Actions ─────────────────────────────────────────────
 
+function ReviewTriageButtons({ applicationId, current, onDone }: { applicationId: string; current: string; onDone: () => void }) {
+  const [saving, setSaving] = useState(false)
+  const options = [
+    { value: 'yes',   label: 'Yes',   cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+    { value: 'maybe', label: 'Maybe', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+    { value: 'no',    label: 'No',    cls: 'bg-red-100 text-red-700 border-red-200' },
+  ]
+
+  async function setReview(value: string) {
+    setSaving(true)
+    try {
+      await fetch(`/api/applications/${applicationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ review_status: value === current ? 'unreviewed' : value }),
+      })
+      onDone()
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {options.map(o => (
+        <button
+          key={o.value}
+          onClick={() => setReview(o.value)}
+          disabled={saving}
+          className={`rounded-full px-2 py-0.5 text-[10px] font-medium border transition-colors disabled:opacity-50 ${
+            current === o.value ? o.cls : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function OnHoldToggle({ applicationId, isOnHold, onDone }: { applicationId: string; isOnHold: boolean; onDone: () => void }) {
+  const [saving, setSaving] = useState(false)
+
+  async function toggle() {
+    setSaving(true)
+    try {
+      await fetch(`/api/applications/${applicationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: isOnHold ? 'active' : 'on_hold' }),
+      })
+      onDone()
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={saving}
+      className={`rounded-full px-2 py-0.5 text-[10px] font-medium border transition-colors disabled:opacity-50 ${
+        isOnHold
+          ? 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200'
+          : 'bg-white text-slate-500 border-slate-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200'
+      }`}
+    >
+      {saving ? '...' : isOnHold ? 'Resume' : 'Hold'}
+    </button>
+  )
+}
+
 function ApplicationCard({
   app, stages, candidateEmail, candidateName, onRefresh,
 }: {
@@ -326,7 +397,7 @@ function ApplicationCard({
   onRefresh: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const isActive = app.status === 'active'
+  const isActive = app.status === 'active' || app.status === 'on_hold'
 
   return (
     <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
@@ -379,6 +450,14 @@ function ApplicationCard({
               {RECO_STYLES[app.ai_recommendation].label}
             </span>
           )}
+        </div>
+      )}
+
+      {/* Review triage + On Hold */}
+      {isActive && (
+        <div className="mt-2 flex items-center justify-between">
+          <ReviewTriageButtons applicationId={app.id} current={app.review_status} onDone={onRefresh} />
+          <OnHoldToggle applicationId={app.id} isOnHold={app.status === 'on_hold'} onDone={onRefresh} />
         </div>
       )}
 
@@ -447,6 +526,7 @@ export function CandidateDrawer({ candidateId, onClose, onActionComplete }: Cand
       const apps: ApplicationBrief[] = (appsJson.data ?? []).map((a: any) => ({
         id: a.id,
         status: a.status,
+        review_status: a.review_status ?? 'unreviewed',
         stage_id: a.stage_id ?? null,
         stage_name: a.pipeline_stages?.name ?? a.stage_name ?? null,
         hiring_request_id: a.hiring_request_id ?? null,
@@ -510,6 +590,7 @@ export function CandidateDrawer({ candidateId, onClose, onActionComplete }: Cand
   async function handleScoreApplication(appId: string, jobId: string) {
     setScoringAppId(appId)
     setScoreStatus('scoring')
+    trackEvent('ai_score_triggered', { job_id: jobId })
     try {
       await fetch(`/api/jobs/${jobId}/score`, {
         method: 'POST',
@@ -529,10 +610,10 @@ export function CandidateDrawer({ candidateId, onClose, onActionComplete }: Cand
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity" onClick={onClose} />
-      <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+      <div role="dialog" aria-modal="true" aria-labelledby="candidate-drawer-title" className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200">
-          <h2 className="text-sm font-semibold text-slate-900">Quick View</h2>
+          <h2 id="candidate-drawer-title" className="text-sm font-semibold text-slate-900">Quick View</h2>
           <button onClick={onClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
             <X className="h-4 w-4" />

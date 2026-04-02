@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import type { Candidate, CandidateStatus } from '@/lib/types/database'
+import { trackEvent } from '@/lib/analytics'
 
 // ─── Column config ───────────────────────────────────────────────────────────
 
@@ -144,13 +145,20 @@ export default function PipelinePage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { if (orgId) fetchCandidates() }, [fetchCandidates, orgId])
+  useEffect(() => {
+    if (orgId) {
+      fetchCandidates()
+      trackEvent('pipeline_viewed', {})
+    }
+  }, [fetchCandidates, orgId])
 
   const handleDrop = async (newStatus: CandidateStatus) => {
     const id = dragId.current
     if (!id) return
     const candidate = candidates.find(c => c.id === id)
     if (!candidate || candidate.status === newStatus) return
+
+    trackEvent('candidate_stage_changed', { from_status: candidate.status, to_status: newStatus })
 
     // Optimistic update
     setCandidates(prev =>

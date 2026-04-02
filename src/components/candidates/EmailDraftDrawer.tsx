@@ -157,6 +157,7 @@ function EmailTagsInput({
           <button
             type="button"
             onClick={e => { e.stopPropagation(); onChange(emails.filter(m => m !== email)) }}
+            aria-label="Remove email"
             className="text-slate-400 hover:text-red-500 transition-colors"
           >
             <X className="h-2.5 w-2.5" />
@@ -526,7 +527,7 @@ export default function EmailDraftDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex h-full flex-col bg-white shadow-2xl" style={{ width: drawerWidth }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="email-draft-title" className="relative flex h-full flex-col bg-white shadow-2xl" style={{ width: drawerWidth }}>
           {/* Drag handle — grab left edge to resize */}
           <div
             onMouseDown={onDragHandleMouseDown}
@@ -538,7 +539,7 @@ export default function EmailDraftDrawer({
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 shrink-0">
           <div className="flex items-center gap-2">
             <Wand2 className="h-4 w-4 text-violet-500" />
-            <h2 className="text-sm font-bold text-slate-900">
+            <h2 id="email-draft-title" className="text-sm font-bold text-slate-900">
               {step === 'sent' ? 'Email Sent' : 'Draft Email'}
             </h2>
             {draftStatus === 'saving' && <span className="text-[10px] text-slate-400">Saving draft…</span>}
@@ -558,7 +559,7 @@ export default function EmailDraftDrawer({
                 <ChevronDown className={`h-2.5 w-2.5 transition-transform ${showDraftsPanel ? 'rotate-180' : ''}`} />
               </button>
             )}
-            <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+            <button onClick={onClose} aria-label="Close email drawer" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -713,6 +714,7 @@ export default function EmailDraftDrawer({
                             <button
                               onClick={addTemplate}
                               disabled={tplSaving || !newTplName.trim()}
+                              aria-label="Save template"
                               className="flex items-center justify-center w-8 shrink-0 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors"
                             >
                               {tplSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
@@ -752,6 +754,7 @@ export default function EmailDraftDrawer({
                                   />
                                   <button
                                     onClick={() => setRenamingId(null)}
+                                    aria-label="Cancel rename"
                                     className="p-1 text-slate-400 hover:text-slate-600 transition-colors shrink-0"
                                   >
                                     <X className="h-3 w-3" />
@@ -775,6 +778,7 @@ export default function EmailDraftDrawer({
                                       onClick={e => { e.stopPropagation(); setRenamingId(t.id); setRenamingName(t.name) }}
                                       className="p-1 rounded text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
                                       title="Rename"
+                                      aria-label="Rename template"
                                     >
                                       <Pencil className="h-3 w-3" />
                                     </button>
@@ -782,6 +786,7 @@ export default function EmailDraftDrawer({
                                       onClick={e => { e.stopPropagation(); deleteTemplate(t.id) }}
                                       className="p-1 rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors"
                                       title="Delete"
+                                      aria-label="Delete template"
                                     >
                                       <Trash2 className="h-3 w-3" />
                                     </button>
@@ -839,7 +844,7 @@ export default function EmailDraftDrawer({
                   <div className="flex-1 min-w-0">
                     <EmailTagsInput emails={ccEmails} onChange={setCcEmails} placeholder="Add CC…" />
                   </div>
-                  <button onClick={() => { setShowCc(false); setCcEmails([]) }} className="shrink-0 pt-1.5 text-slate-300 hover:text-red-400 transition-colors">
+                  <button onClick={() => { setShowCc(false); setCcEmails([]) }} aria-label="Remove CC field" className="shrink-0 pt-1.5 text-slate-300 hover:text-red-400 transition-colors">
                     <X className="h-3 w-3" />
                   </button>
                 </div>
@@ -852,7 +857,7 @@ export default function EmailDraftDrawer({
                   <div className="flex-1 min-w-0">
                     <EmailTagsInput emails={bccEmails} onChange={setBccEmails} placeholder="Add BCC…" />
                   </div>
-                  <button onClick={() => { setShowBcc(false); setBccEmails([]) }} className="shrink-0 pt-1.5 text-slate-300 hover:text-red-400 transition-colors">
+                  <button onClick={() => { setShowBcc(false); setBccEmails([]) }} aria-label="Remove BCC field" className="shrink-0 pt-1.5 text-slate-300 hover:text-red-400 transition-colors">
                     <X className="h-3 w-3" />
                   </button>
                 </div>

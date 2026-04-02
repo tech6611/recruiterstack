@@ -79,21 +79,22 @@ export default function CreateOfferDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="create-offer-title" className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
           <div className="flex items-center gap-2">
             <Gift className="h-5 w-5 text-emerald-500" />
-            <h2 className="text-base font-bold text-slate-900">Create Offer</h2>
+            <h2 id="create-offer-title" className="text-base font-bold text-slate-900">Create Offer</h2>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} aria-label="Close offer drawer" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {/* Job selector */}
           {activeApps.length > 1 && (
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">For Job</label>
+              <label htmlFor="offer-job" className="block text-xs font-semibold text-slate-500 mb-1.5">For Job</label>
               <select
+                id="offer-job"
                 value={appId}
                 onChange={e => setAppId(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
@@ -113,10 +114,11 @@ export default function CreateOfferDrawer({
           {/* Salary row */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Base Salary (USD)</label>
+              <label htmlFor="base-salary" className="block text-xs font-semibold text-slate-500 mb-1.5">Base Salary (USD)</label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <input
+                  id="base-salary"
                   type="number"
                   value={baseSalary}
                   onChange={e => setBaseSalary(e.target.value)}
@@ -126,10 +128,11 @@ export default function CreateOfferDrawer({
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Bonus (USD)</label>
+              <label htmlFor="offer-bonus" className="block text-xs font-semibold text-slate-500 mb-1.5">Bonus (USD)</label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <input
+                  id="offer-bonus"
                   type="number"
                   value={bonus}
                   onChange={e => setBonus(e.target.value)}
@@ -142,8 +145,9 @@ export default function CreateOfferDrawer({
 
           {/* Equity */}
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Equity</label>
+            <label htmlFor="offer-equity" className="block text-xs font-semibold text-slate-500 mb-1.5">Equity</label>
             <input
+              id="offer-equity"
               value={equity}
               onChange={e => setEquity(e.target.value)}
               placeholder="e.g. 0.05% vested over 4 years"
@@ -154,8 +158,9 @@ export default function CreateOfferDrawer({
           {/* Start/Expiry dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Start Date</label>
+              <label htmlFor="offer-start-date" className="block text-xs font-semibold text-slate-500 mb-1.5">Start Date</label>
               <input
+                id="offer-start-date"
                 type="date"
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
@@ -163,8 +168,9 @@ export default function CreateOfferDrawer({
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">Offer Expiry</label>
+              <label htmlFor="offer-expiry" className="block text-xs font-semibold text-slate-500 mb-1.5">Offer Expiry</label>
               <input
+                id="offer-expiry"
                 type="date"
                 value={expiryDate}
                 onChange={e => setExpiryDate(e.target.value)}
@@ -175,8 +181,9 @@ export default function CreateOfferDrawer({
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Notes</label>
+            <label htmlFor="offer-notes" className="block text-xs font-semibold text-slate-500 mb-1.5">Notes</label>
             <textarea
+              id="offer-notes"
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={2}
@@ -187,8 +194,9 @@ export default function CreateOfferDrawer({
 
           {/* Offer letter */}
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Offer Letter (optional)</label>
+            <label htmlFor="offer-letter" className="block text-xs font-semibold text-slate-500 mb-1.5">Offer Letter (optional)</label>
             <textarea
+              id="offer-letter"
               value={offerLetter}
               onChange={e => setOfferLetter(e.target.value)}
               rows={5}

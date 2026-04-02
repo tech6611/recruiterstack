@@ -13,6 +13,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Bot, X, Send, Trash2, Pencil, Plus, ShieldAlert, Play } from 'lucide-react'
+import { trackEvent } from '@/lib/analytics'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -490,6 +491,8 @@ export function Copilot() {
     if (inputRef.current) {
       inputRef.current.style.height = 'auto'
     }
+
+    trackEvent('copilot_message_sent', {})
 
     try {
       const res = await fetch('/api/copilot', {

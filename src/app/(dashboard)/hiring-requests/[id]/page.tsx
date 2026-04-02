@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { HiringRequest } from '@/lib/types/database'
 import EditHMModal from '@/components/EditHMModal'
+import { trackEvent } from '@/lib/analytics'
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   intake_pending:   { label: 'Awaiting HM',      color: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -16,7 +17,9 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   jd_generated:    { label: 'JD Generated',      color: 'bg-violet-50 text-violet-700 border-violet-200' },
   jd_sent:         { label: 'JD Sent',           color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   jd_approved:     { label: 'JD Ready — Review', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  posted:          { label: 'Posted',            color: 'bg-slate-100 text-slate-600 border-slate-200' },
+  posted:          { label: 'Posted',            color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  active:          { label: 'Active',            color: 'bg-green-50 text-green-700 border-green-200' },
+  closed:          { label: 'Closed',            color: 'bg-slate-100 text-slate-500 border-slate-200' },
 }
 
 const JOB_BOARDS = [
@@ -46,7 +49,10 @@ export default function HiringRequestDetailPage() {
       .then(r => r.json())
       .then(d => {
         if (d.error) setError(d.error)
-        else setRequest(d.data)
+        else {
+          setRequest(d.data)
+          trackEvent('hiring_request_viewed', { request_id: id })
+        }
         setLoading(false)
       })
       .catch(() => { setError('Failed to load.'); setLoading(false) })

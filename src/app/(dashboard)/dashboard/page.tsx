@@ -215,6 +215,7 @@ const STAGE_COLORS: Record<StageColor, string> = {
 
 const STATUS_COLORS: Record<string, { bg: string; label: string }> = {
   active:         { bg: 'bg-blue-500',    label: 'Active' },
+  on_hold:        { bg: 'bg-orange-400',  label: 'On Hold' },
   interviewing:   { bg: 'bg-amber-400',   label: 'Interviewing' },
   offer_extended: { bg: 'bg-violet-500',  label: 'Offer Extended' },
   hired:          { bg: 'bg-emerald-500', label: 'Hired' },

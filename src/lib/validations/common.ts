@@ -10,16 +10,18 @@ export const paginationSchema = z.object({
 // ── Shared Enums ───────────────────────────────────────────────────────────────
 
 export const candidateStatusEnum = z.enum([
-  'active', 'inactive', 'interviewing', 'offer_extended', 'hired', 'rejected',
+  'active', 'on_hold', 'inactive', 'interviewing', 'offer_extended', 'hired', 'rejected',
 ])
 
 export const roleStatusEnum = z.enum(['draft', 'active', 'paused', 'closed'])
 
 export const hiringRequestStatusEnum = z.enum([
-  'intake_pending', 'intake_submitted', 'jd_generated', 'jd_sent', 'jd_approved', 'posted', 'closed',
+  'intake_pending', 'intake_submitted', 'jd_generated', 'jd_sent', 'jd_approved', 'posted', 'active', 'closed',
 ])
 
-export const applicationStatusEnum = z.enum(['active', 'rejected', 'withdrawn', 'hired'])
+export const applicationStatusEnum = z.enum(['active', 'on_hold', 'rejected', 'withdrawn', 'hired'])
+
+export const applicationReviewStatusEnum = z.enum(['unreviewed', 'reviewed', 'yes', 'no', 'maybe'])
 
 export const applicationSourceEnum = z.enum(['manual', 'applied', 'imported', 'sourced', 'referral'])
 

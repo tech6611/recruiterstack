@@ -20,6 +20,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { COPILOT_TOOLS, executeTool } from '@/lib/copilot-tools'
 import { checkAuthRateLimit } from '@/lib/api/rate-limit'
+import { trackUsage } from '@/lib/ai/track-usage'
 
 export const maxDuration = 120
 
@@ -221,6 +222,7 @@ search_candidate_pool returns internal candidates only. If the pool is too small
 
           // Get the full message (includes thinking blocks for next iteration)
           const finalMsg = await claudeStream.finalMessage()
+          trackUsage('copilot', 'claude-opus-4-6', finalMsg.usage)
           conversationMessages.push({ role: 'assistant', content: finalMsg.content })
 
           // ── Plan detection — look for <!-- PLAN: {...} --> in text output ──

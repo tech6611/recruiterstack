@@ -7,7 +7,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 
 const inter = Inter({ subsets: ['latin'] })
 
-const GA_ID = 'G-G9SVM2QKL5'
+const GA_ID = 'G-DLRVVH1FBQ'
 
 export const metadata: Metadata = {
   title: 'RecruiterStack',

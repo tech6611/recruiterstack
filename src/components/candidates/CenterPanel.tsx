@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Calendar, Wand2, Gift, ClipboardList, Briefcase, PhoneCall, Mail } from 'lucide-react'
 import type { Candidate, CandidateTask, ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
+import { useCandidateProfile } from './CandidateProfileContext'
 import ActivitiesTab from './center/ActivitiesTab'
 import SummaryTab from './center/SummaryTab'
 import HistoryTab from './center/HistoryTab'
@@ -20,19 +21,7 @@ interface CenterPanelProps {
   tasks: CandidateTask[]
   events: ApplicationEvent[]
   applications: ApplicationWithAttribution[]
-  onTaskAdded: (task: CandidateTask) => void
-  onTaskUpdated: (task: CandidateTask) => void
-  onTaskDeleted: (taskId: string) => void
-  onScheduleInterview: () => void
-  onDraftEmail: () => void
-  onCreateOffer: () => void
-  onAddScorecard: () => void
-  onPhoneScreen: () => void
-  onAddToSequence: () => void
-  /** Controlled: which application is currently active (drives both panels) */
   selectedAppId: string | null
-  /** Called whenever the user switches the active job context */
-  onAppSelected: (appId: string) => void
 }
 
 // ── Status styles for job pills ───────────────────────────────────────────────
@@ -52,23 +41,31 @@ function statusLabel(status: Application['status']) {
        : status
 }
 
-export default function CenterPanel({
+export default React.memo(function CenterPanel({
   candidate,
   tasks,
   events,
   applications,
-  onTaskAdded,
-  onTaskUpdated,
-  onTaskDeleted,
-  onScheduleInterview,
-  onDraftEmail,
-  onCreateOffer,
-  onAddScorecard,
-  onPhoneScreen,
-  onAddToSequence,
   selectedAppId,
-  onAppSelected,
 }: CenterPanelProps) {
+  const {
+    addTask: onTaskAdded,
+    updateTask: onTaskUpdated,
+    deleteTask: onTaskDeleted,
+    openScheduleDrawer: onScheduleInterview,
+    openEmailDraft,
+    openOfferDrawer,
+    openScorecardDrawer,
+    openVoiceCallModal: onPhoneScreen,
+    openEnrollDrawer: onAddToSequence,
+    setSelectedAppId: onAppSelected,
+    activeApps,
+  } = useCandidateProfile()
+
+  const onDraftEmail = () => openEmailDraft(activeApps[0]?.id ?? null)
+  const onCreateOffer = () => openOfferDrawer(activeApps[0]?.id ?? '')
+  const onAddScorecard = () => openScorecardDrawer(activeApps[0]?.id ?? '')
+
   const [activeTab, setActiveTab] = useState<CenterTab>('Summary')
 
   const handleAppSelect = (id: string) => {
@@ -218,4 +215,4 @@ export default function CenterPanel({
       </div>
     </div>
   )
-}
+})

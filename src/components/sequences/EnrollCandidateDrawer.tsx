@@ -99,12 +99,12 @@ export default function EnrollCandidateDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="enroll-candidate-title" className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
           <div className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-blue-500" />
-            <h2 className="text-base font-bold text-slate-900">Enroll in Sequence</h2>
+            <h2 id="enroll-candidate-title" className="text-base font-bold text-slate-900">Enroll in Sequence</h2>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
             <X className="h-4 w-4" />

@@ -7,6 +7,7 @@ import {
   RefreshCw, Pencil, Paperclip, X,
 } from 'lucide-react'
 import { inputClsWhite } from '@/lib/ui/styles'
+import { trackEvent } from '@/lib/analytics'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -149,7 +150,10 @@ export default function IntakePage() {
       .then(r => r.json())
       .then(d => {
         if (d.error) setLoadError(d.error)
-        else { setRequestInfo(d.data); setPositionTitle(d.data.position_title) }
+        else {
+          setRequestInfo(d.data); setPositionTitle(d.data.position_title)
+          trackEvent('intake_page_viewed', { position_title: d.data.position_title })
+        }
         setLoading(false)
       })
       .catch(() => { setLoadError('Failed to load form.'); setLoading(false) })
@@ -206,6 +210,7 @@ export default function IntakePage() {
       setJdGenError('Please fill in Team Context and Key Requirements above before generating.')
       return
     }
+    trackEvent('jd_generation_started', { source: 'intake' })
     setJdMode('ai'); setGeneratingJD(true); setJdGenError(null)
     const res = await fetch(`/api/intake/${token}/generate-jd`, {
       method: 'POST',
@@ -221,7 +226,10 @@ export default function IntakePage() {
     const data = await res.json()
     setGeneratingJD(false)
     if (!res.ok) setJdGenError(data.error ?? 'Failed to generate JD.')
-    else setJd(data.jd)
+    else {
+      setJd(data.jd)
+      trackEvent('jd_generated', { source: 'intake', word_count: data.jd.trim().split(/\s+/).length })
+    }
   }
 
   // ── Submit ──
@@ -256,6 +264,7 @@ export default function IntakePage() {
     if (!res.ok) { setSubmitError(json.error ?? 'Something went wrong. Please try again.'); return }
     setStatusUrl(json.status_url ?? null)
     setSubmitted(true)
+    trackEvent('intake_submitted', { position_title: positionTitle, has_jd: !!jd.trim() })
   }
 
   const wordCount = jd.trim() ? jd.trim().split(/\s+/).length : 0

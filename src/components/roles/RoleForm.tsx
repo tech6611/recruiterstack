@@ -90,10 +90,11 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2">
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+          <label htmlFor="role-job-title" className="block text-xs font-semibold text-slate-500 mb-1.5">
             Job Title <span className="text-red-500">*</span>
           </label>
           <input
+            id="role-job-title"
             required
             value={form.job_title}
             onChange={(e) => set('job_title', e.target.value)}
@@ -103,8 +104,9 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">Location</label>
+          <label htmlFor="role-location" className="block text-xs font-semibold text-slate-500 mb-1.5">Location</label>
           <input
+            id="role-location"
             value={form.location}
             onChange={(e) => set('location', e.target.value)}
             placeholder="Remote, New York, etc."
@@ -113,10 +115,11 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+          <label htmlFor="role-min-experience" className="block text-xs font-semibold text-slate-500 mb-1.5">
             Min Experience (yrs)
           </label>
           <input
+            id="role-min-experience"
             type="number"
             min={0}
             value={form.min_experience}
@@ -126,8 +129,9 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">Status</label>
+          <label htmlFor="role-status" className="block text-xs font-semibold text-slate-500 mb-1.5">Status</label>
           <select
+            id="role-status"
             value={form.status}
             onChange={(e) => set('status', e.target.value)}
             className={inputCls}
@@ -141,10 +145,11 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+          <label htmlFor="role-salary-min" className="block text-xs font-semibold text-slate-500 mb-1.5">
             Salary Min ($)
           </label>
           <input
+            id="role-salary-min"
             type="number"
             min={0}
             value={form.salary_min}
@@ -155,10 +160,11 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+          <label htmlFor="role-salary-max" className="block text-xs font-semibold text-slate-500 mb-1.5">
             Salary Max ($)
           </label>
           <input
+            id="role-salary-max"
             type="number"
             min={0}
             value={form.salary_max}
@@ -169,11 +175,12 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+          <label htmlFor="role-required-skills" className="block text-xs font-semibold text-slate-500 mb-1.5">
             Required Skills{' '}
             <span className="text-slate-400 font-normal">(comma-separated)</span>
           </label>
           <input
+            id="role-required-skills"
             value={form.required_skills}
             onChange={(e) => set('required_skills', e.target.value)}
             placeholder="TypeScript, React, Node.js, PostgreSQL"
@@ -190,10 +197,11 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-emerald-600 mb-1.5">
+            <label htmlFor="role-auto-advance" className="block text-xs font-semibold text-emerald-600 mb-1.5">
               Auto-Advance if score ≥
             </label>
             <input
+              id="role-auto-advance"
               type="number"
               min={1}
               max={100}
@@ -205,10 +213,11 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
             <p className="text-xs text-slate-400 mt-1">→ Moves to Interviewing</p>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-red-500 mb-1.5">
+            <label htmlFor="role-auto-reject" className="block text-xs font-semibold text-red-500 mb-1.5">
               Auto-Reject if score ≤
             </label>
             <input
+              id="role-auto-reject"
               type="number"
               min={1}
               max={100}

@@ -67,8 +67,9 @@ export default function EditHMModal({ requestId, initial, onClose, onSaved }: Ed
         {/* Fields */}
         <div className="px-5 py-4 space-y-3.5">
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Name <span className="text-red-400">*</span></label>
+            <label htmlFor="hm-name" className="block text-xs font-semibold text-slate-500 mb-1.5">Name <span className="text-red-400">*</span></label>
             <input
+              id="hm-name"
               autoFocus
               value={name}
               onChange={e => setName(e.target.value)}
@@ -78,8 +79,9 @@ export default function EditHMModal({ requestId, initial, onClose, onSaved }: Ed
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Email</label>
+            <label htmlFor="hm-email" className="block text-xs font-semibold text-slate-500 mb-1.5">Email</label>
             <input
+              id="hm-email"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -89,10 +91,11 @@ export default function EditHMModal({ requestId, initial, onClose, onSaved }: Ed
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Slack handle <span className="text-slate-400 font-normal">(for DM notifications)</span></label>
+            <label htmlFor="hm-slack" className="block text-xs font-semibold text-slate-500 mb-1.5">Slack handle <span className="text-slate-400 font-normal">(for DM notifications)</span></label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">@</span>
               <input
+                id="hm-slack"
                 value={slack.replace(/^@/, '')}
                 onChange={e => setSlack(e.target.value.replace(/^@/, ''))}
                 placeholder="priya.sharma"

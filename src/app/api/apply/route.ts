@@ -58,6 +58,19 @@ export async function POST(request: NextRequest) {
 
   const job = jobRaw as { id: string; org_id: string; position_title: string; status: string; auto_advance_score: number | null; auto_reject_score: number | null }
 
+  // Only accept applications for posted or active jobs
+  if (job.status !== 'posted' && job.status !== 'active') {
+    return NextResponse.json({ error: 'This position is no longer accepting applications.' }, { status: 400 })
+  }
+
+  // Auto-transition posted → active on first application
+  if (job.status === 'posted') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('hiring_requests') as any)
+      .update({ status: 'active' })
+      .eq('id', job.id)
+  }
+
   // ── Upsert candidate ──────────────────────────────────────────────────────
   const { data: existingCandidate } = await supabase
     .from('candidates')

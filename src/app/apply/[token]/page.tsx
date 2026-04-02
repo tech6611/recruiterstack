@@ -6,6 +6,7 @@ import {
   Zap, CheckCircle, Loader2, AlertCircle,
   Upload, Link2, FileText, X, CloudUpload,
 } from 'lucide-react'
+import { trackEvent } from '@/lib/analytics'
 
 interface JobInfo {
   position_title: string
@@ -56,7 +57,10 @@ export default function ApplyPage() {
         return r.json()
       })
       .then(j => {
-        if (j) setJob(j.data)
+        if (j) {
+          setJob(j.data)
+          trackEvent('apply_page_viewed', { job_title: j.data.position_title })
+        }
         setLoadingJob(false)
       })
       .catch(() => { setNotFound(true); setLoadingJob(false) })
@@ -74,6 +78,7 @@ export default function ApplyPage() {
     if (err) { setCvError(err); setCvFile(null); return }
     setCvError('')
     setCvFile(file)
+    trackEvent('cv_uploaded', { file_size_kb: Math.round(file.size / 1024) })
   }
 
   const handleFileDrop = (e: React.DragEvent) => {
@@ -138,6 +143,11 @@ export default function ApplyPage() {
 
     setSubmitted(true)
     setSubmitting(false)
+    trackEvent('application_submitted', {
+      job_title: job!.position_title,
+      has_cv: !!finalCvUrl,
+      has_cover_letter: !!coverLetter.trim(),
+    })
   }
 
   // ── Loading ───────────────────────────────────────────────────────────────

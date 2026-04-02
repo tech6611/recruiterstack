@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   FileText,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
 import { MarketingFooter } from '@/components/marketing/MarketingFooter'
+import { trackEvent } from '@/lib/analytics'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -184,6 +185,8 @@ export default function PricingPage() {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly')
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
+  useEffect(() => { trackEvent('pricing_page_viewed', { billing_period: 'monthly' }) }, [])
+
   function toggleFaq(idx: number) {
     if (openFaq === idx) {
       setOpenFaq(null)
@@ -339,6 +342,7 @@ export default function PricingPage() {
               </ul>
               <Link
                 href="/sign-up"
+                onClick={() => trackEvent('pricing_cta_clicked', { plan: 'pro', billing_period: billingPeriod })}
                 className="mt-auto block rounded-xl bg-violet-600 px-6 py-3 text-center text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
               >
                 Get started with Pro
@@ -363,6 +367,7 @@ export default function PricingPage() {
               </ul>
               <a
                 href="mailto:enterprise@recruiterstack.com"
+                onClick={() => trackEvent('pricing_cta_clicked', { plan: 'enterprise', billing_period: billingPeriod })}
                 className="mt-auto block rounded-xl border border-zinc-700 px-6 py-3 text-center text-sm font-semibold text-white hover:border-zinc-600 hover:bg-zinc-800 transition-colors"
               >
                 Contact sales

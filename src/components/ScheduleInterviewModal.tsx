@@ -474,11 +474,11 @@ export default function ScheduleInterviewModal({
 
   return (<>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden">
+      <div role="dialog" aria-modal="true" aria-labelledby="schedule-interview-title" className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Schedule Interview</h2>
+            <h2 id="schedule-interview-title" className="text-base font-bold text-slate-900">Schedule Interview</h2>
             <p className="text-xs text-slate-400 mt-0.5">
               {uniqueCandidates.length === 1
                 ? uniqueCandidates[0]?.name

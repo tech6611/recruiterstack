@@ -139,7 +139,7 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
 
       {/* Resume upload */}
       <div>
-        <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+        <label htmlFor="candidate-resume" className="block text-xs font-semibold text-slate-500 mb-1.5">
           Resume <span className="text-slate-400 font-normal">(PDF — auto-fills fields below)</span>
         </label>
 
@@ -187,6 +187,7 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         )}
 
         <input
+          id="candidate-resume"
           ref={fileInputRef}
           type="file"
           accept="application/pdf"
@@ -201,10 +202,11 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2">
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+          <label htmlFor="candidate-name" className="block text-xs font-semibold text-slate-500 mb-1.5">
             Full Name <span className="text-red-500">*</span>
           </label>
           <input
+            id="candidate-name"
             required
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
@@ -214,10 +216,11 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+          <label htmlFor="candidate-email" className="block text-xs font-semibold text-slate-500 mb-1.5">
             Email <span className="text-red-500">*</span>
           </label>
           <input
+            id="candidate-email"
             required
             type="email"
             value={form.email}
@@ -228,8 +231,9 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">Phone</label>
+          <label htmlFor="candidate-phone" className="block text-xs font-semibold text-slate-500 mb-1.5">Phone</label>
           <input
+            id="candidate-phone"
             value={form.phone}
             onChange={(e) => set('phone', e.target.value)}
             placeholder="+1-555-0101"
@@ -238,10 +242,11 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+          <label htmlFor="candidate-experience" className="block text-xs font-semibold text-slate-500 mb-1.5">
             Experience (years)
           </label>
           <input
+            id="candidate-experience"
             type="number"
             min={0}
             value={form.experience_years}
@@ -251,10 +256,11 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+          <label htmlFor="candidate-title" className="block text-xs font-semibold text-slate-500 mb-1.5">
             Current Title
           </label>
           <input
+            id="candidate-title"
             value={form.current_title}
             onChange={(e) => set('current_title', e.target.value)}
             placeholder="Senior Software Engineer"
@@ -263,8 +269,9 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">Location</label>
+          <label htmlFor="candidate-location" className="block text-xs font-semibold text-slate-500 mb-1.5">Location</label>
           <input
+            id="candidate-location"
             value={form.location}
             onChange={(e) => set('location', e.target.value)}
             placeholder="Remote, New York, etc."
@@ -273,11 +280,12 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+          <label htmlFor="candidate-skills" className="block text-xs font-semibold text-slate-500 mb-1.5">
             Skills{' '}
             <span className="text-slate-400 font-normal">(comma-separated)</span>
           </label>
           <input
+            id="candidate-skills"
             value={form.skills}
             onChange={(e) => set('skills', e.target.value)}
             placeholder="TypeScript, React, Node.js, AWS"
@@ -286,8 +294,9 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">Status</label>
+          <label htmlFor="candidate-status" className="block text-xs font-semibold text-slate-500 mb-1.5">Status</label>
           <select
+            id="candidate-status"
             value={form.status}
             onChange={(e) => set('status', e.target.value)}
             className={inputCls}

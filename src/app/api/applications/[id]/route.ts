@@ -199,5 +199,25 @@ export async function PATCH(
     return NextResponse.json({ data }, { status: 201 })
   }
 
+  // ── Review triage ─────────────────────────────────────────────────────────
+  if ('review_status' in body) {
+    const { review_status } = body as { review_status: string }
+    const valid = ['unreviewed', 'reviewed', 'yes', 'no', 'maybe']
+    if (!valid.includes(review_status)) {
+      return NextResponse.json({ error: `review_status must be one of: ${valid.join(', ')}` }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from('applications')
+      .update({ review_status } as ApplicationUpdate)
+      .eq('id', params.id)
+      .eq('org_id', orgId)
+      .select()
+      .single()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ data })
+  }
+
   return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 }

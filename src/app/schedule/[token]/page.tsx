@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Loader2, Check, AlertCircle, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { trackEvent } from '@/lib/analytics'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,7 @@ export default function SchedulePage() {
   const [confirming,  setConfirming]  = useState(false)
   const [confirmed,   setConfirmed]   = useState<ConfirmResult | null>(null)
   const [copied,      setCopied]      = useState(false)
+  const tracked = useRef(false)
 
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -117,6 +119,10 @@ export default function SchedulePage() {
       const json = await res.json()
       if (!res.ok) { setError(json.error ?? 'Failed to load schedule'); return }
       setPayload(json)
+      if (!tracked.current) {
+        tracked.current = true
+        trackEvent('schedule_page_viewed', { is_reschedule: isReschedule })
+      }
     } catch {
       setError('Network error. Please refresh and try again.')
     } finally {
@@ -204,6 +210,10 @@ export default function SchedulePage() {
       const json = await res.json()
       if (!res.ok) { alert(json.error ?? 'Failed to confirm. Please try again.'); return }
       setConfirmed(json)
+      trackEvent('interview_scheduled', {
+        duration_minutes: payload.interview.duration_minutes,
+        is_reschedule: isReschedule,
+      })
     } catch {
       alert('Network error. Please try again.')
     } finally {
@@ -414,7 +424,14 @@ export default function SchedulePage() {
                             <td key={key} className={`px-0.5 py-0 ${isWeekend ? 'bg-slate-50/60' : ''}`}>
                               <button
                                 disabled={!clickable}
-                                onClick={() => setSelectedKey(clickable ? key : null)}
+                                onClick={() => {
+                                  if (clickable) {
+                                    setSelectedKey(key)
+                                    trackEvent('slot_selected', { day_of_week: day.toLocaleDateString('en-US', { weekday: 'long' }) })
+                                  } else {
+                                    setSelectedKey(null)
+                                  }
+                                }}
                                 style={{ height: 16 }}
                                 className={`w-full rounded transition-colors ${
                                   past   ? 'bg-slate-100/50 cursor-not-allowed'

@@ -15,7 +15,8 @@ const STATUS_CONFIG: Record<HiringRequestStatus, { label: string; color: string;
   jd_generated:    { label: 'JD Generated',          color: 'bg-violet-50 text-violet-700 border-violet-200',    icon: <FileText className="h-3 w-3" /> },
   jd_sent:         { label: 'JD Sent',               color: 'bg-indigo-50 text-indigo-700 border-indigo-200',    icon: <Mail className="h-3 w-3" /> },
   jd_approved:     { label: 'To be Published',       color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
-  posted:          { label: 'Active',                color: 'bg-green-50 text-green-700 border-green-200',       icon: <Send className="h-3 w-3" /> },
+  posted:          { label: 'Posted',                 color: 'bg-cyan-50 text-cyan-700 border-cyan-200',          icon: <Send className="h-3 w-3" /> },
+  active:          { label: 'Active',                color: 'bg-green-50 text-green-700 border-green-200',       icon: <CheckCircle className="h-3 w-3" /> },
   closed:          { label: 'Closed',                color: 'bg-slate-100 text-slate-500 border-slate-200',      icon: <Archive className="h-3 w-3" /> },
 }
 

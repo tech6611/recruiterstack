@@ -66,10 +66,10 @@ function AttributionCard({ app, onCreditedToChanged }: {
               placeholder="Recruiter name…"
               className="flex-1 min-w-0 rounded border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs focus:outline-none focus:border-blue-400"
             />
-            <button onClick={save} disabled={saving} className="text-blue-600 hover:text-blue-800 shrink-0">
+            <button onClick={save} disabled={saving} aria-label="Save" className="text-blue-600 hover:text-blue-800 shrink-0">
               <Check className="h-3 w-3" />
             </button>
-            <button onClick={() => { setEditing(false); setInput(app.credited_to ?? '') }} className="text-slate-400 hover:text-slate-600 shrink-0">
+            <button onClick={() => { setEditing(false); setInput(app.credited_to ?? '') }} aria-label="Cancel" className="text-slate-400 hover:text-slate-600 shrink-0">
               <X className="h-3 w-3" />
             </button>
           </div>

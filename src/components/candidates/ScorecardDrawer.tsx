@@ -68,7 +68,7 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="w-full max-w-xl bg-white shadow-2xl flex flex-col overflow-hidden">
+      <div role="dialog" aria-modal="true" aria-labelledby="scorecard-drawer-title" className="w-full max-w-xl bg-white shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-3">
@@ -76,11 +76,11 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
               <ClipboardList className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Add Scorecard</h2>
+              <h2 id="scorecard-drawer-title" className="text-base font-bold text-slate-900">Add Scorecard</h2>
               <p className="text-xs text-slate-400">Structured interview feedback</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+          <button onClick={onClose} aria-label="Close scorecard drawer" className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -90,8 +90,9 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
           {/* Application selector (if multiple) */}
           {activeApps.length > 1 && (
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Application</label>
+              <label htmlFor="scorecard-application" className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Application</label>
               <select
+                id="scorecard-application"
                 value={appId}
                 onChange={e => setAppId(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
@@ -108,10 +109,11 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
           {/* Interviewer + Round */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+              <label htmlFor="interviewer-name" className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                 Interviewer Name *
               </label>
               <input
+                id="interviewer-name"
                 value={interviewer}
                 onChange={e => setInterviewer(e.target.value)}
                 placeholder="Jane Smith"
@@ -119,10 +121,11 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+              <label htmlFor="interview-round" className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
                 Interview Round
               </label>
               <input
+                id="interview-round"
                 value={round}
                 onChange={e => setRound(e.target.value)}
                 placeholder="e.g. Phone Screen, Onsite"
@@ -183,10 +186,11 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+            <label htmlFor="scorecard-notes" className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
               Notes
             </label>
             <textarea
+              id="scorecard-notes"
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={3}
