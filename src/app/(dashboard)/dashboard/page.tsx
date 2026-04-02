@@ -2239,7 +2239,7 @@ export default function DashboardPage() {
   const ActiveIcon = VIEW_ICONS[activeView?.icon ?? 'home'] ?? Home
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-screen overflow-hidden bg-slate-50">
 
       {/* Views sidebar */}
       <ViewsSidebar
@@ -2254,7 +2254,7 @@ export default function DashboardPage() {
       />
 
       {/* Center main */}
-      <div className="flex-1 min-w-0 flex flex-col h-screen">
+      <div className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
 
         {/* View header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200">
@@ -2289,7 +2289,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Widget area — fills remaining viewport height */}
-        <div className="flex-1 min-h-0 p-4 flex flex-col">
+        <div className="flex-1 overflow-hidden p-4 flex flex-col">
           {/* Customize panel */}
           {widgetMode && (
             <div className="mb-4 shrink-0">
