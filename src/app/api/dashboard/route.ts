@@ -383,6 +383,7 @@ export async function GET() {
   const recent_activity = events.slice(0, 10).map((e: any) => ({
     id:             e.id,
     event_type:     e.event_type,
+    candidate_id:   e.applications?.candidate_id                    ?? null,
     candidate_name: e.applications?.candidates?.name                ?? 'Unknown',
     job_title:      e.applications?.hiring_requests?.position_title ?? 'Unknown',
     to_stage:       e.to_stage,

@@ -88,7 +88,7 @@ interface OfferTrackerItem {
 interface JobByDept { department: string; job_count: number; candidate_count: number }
 interface StageFunnelItem { stage_id: string; stage_name: string; color: StageColor; count: number }
 interface RecentEvent {
-  id: string; event_type: string; candidate_name: string
+  id: string; event_type: string; candidate_id: string | null; candidate_name: string
   job_title: string; to_stage: string | null; note: string | null; created_at: string
 }
 
@@ -411,7 +411,7 @@ function WidgetContent({ wId, data, onCandidateClick, onRefresh }: {
     case 'top_scored':          return <TopScoredWidget          candidates={data.top_scored} onCandidateClick={onCandidateClick} />
     case 'candidate_sources':   return <CandidateSourcesWidget   sources={data.candidate_sources} />
     case 'offer_tracker':       return <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={onCandidateClick} />
-    case 'recent_activity':     return <RecentActivityWidget      activity={data.recent_activity} />
+    case 'recent_activity':     return <RecentActivityWidget      activity={data.recent_activity} onCandidateClick={onCandidateClick} />
     case 'stage_funnel':        return <StageFunnelWidget         funnel={data.stage_funnel} />
     case 'action_queue':        return <ActionQueueWidget         data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />
     default:                    return null
@@ -1236,7 +1236,7 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   email_sent: 'bg-violet-100 text-violet-600',
 }
 
-function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
+function RecentActivityWidget({ activity, onCandidateClick }: { activity: RecentEvent[]; onCandidateClick?: (id: string) => void }) {
   const { showSearch, query, setQuery, toggle, filterFn } = useWidgetSearch()
   const [filterEvent, setFilterEvent] = useState('')
   const eventTypes = Array.from(new Set(activity.map(e => e.event_type))).filter(Boolean)
@@ -1264,7 +1264,11 @@ function RecentActivityWidget({ activity }: { activity: RecentEvent[] }) {
       ) : (
         <div>
           {preview.map((e, idx) => (
-            <div key={e.id} className="flex gap-2.5 py-2 border-b border-slate-50">
+            <div
+              key={e.id}
+              className={`flex gap-2.5 py-2 border-b border-slate-50 ${e.candidate_id && onCandidateClick ? 'cursor-pointer hover:bg-slate-50 rounded-lg transition-colors' : ''}`}
+              onClick={() => e.candidate_id && onCandidateClick?.(e.candidate_id)}
+            >
               <div className="flex flex-col items-center">
                 <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${EVENT_TYPE_COLORS[e.event_type] ?? 'bg-slate-100 text-slate-500'}`}>
                   {EVENT_TYPE_ICONS[e.event_type] ?? '·'}
@@ -1769,7 +1773,7 @@ function ActivityPanel({
           {wId === 'top_scored'          && <TopScoredWidget          candidates={data.top_scored} onCandidateClick={onCandidateClick} />}
           {wId === 'candidate_sources'   && <CandidateSourcesWidget   sources={data.candidate_sources} />}
           {wId === 'offer_tracker'       && <OfferTrackerWidget        offers={data.offer_tracker} onCandidateClick={onCandidateClick} />}
-          {wId === 'recent_activity'     && <RecentActivityWidget      activity={data.recent_activity} />}
+          {wId === 'recent_activity'     && <RecentActivityWidget      activity={data.recent_activity} onCandidateClick={onCandidateClick} />}
           {wId === 'stage_funnel'        && <StageFunnelWidget         funnel={data.stage_funnel} />}
           {wId === 'action_queue'        && <ActionQueueWidget         data={data} onCandidateClick={onCandidateClick} onRefresh={onRefresh} />}
         </div>
