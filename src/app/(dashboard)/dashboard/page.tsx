@@ -2261,19 +2261,22 @@ export default function DashboardPage() {
               {(activeView?.widgets ?? []).map(wId => (
                 <div
                   key={wId}
-                  draggable={!widgetMode}
-                  onDragStart={() => setDragId(wId)}
-                  onDragOver={(e) => { e.preventDefault(); setDragOverId(wId) }}
-                  onDrop={() => handleDrop(wId)}
-                  onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverId(wId) }}
+                  onDrop={(e) => { e.preventDefault(); handleDrop(wId) }}
                   className={`relative rounded-xl border-2 ${
                     dragOverId === wId && dragId !== wId ? 'border-blue-400 bg-blue-50/30' : 'border-slate-200'
-                  } border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col overflow-hidden transition-colors ${
+                  } border-t-2 ${widgetAccent(wId).border} bg-white flex flex-col transition-colors ${
                     dragId === wId ? 'opacity-40' : ''
                   } ${widgetMode ? 'opacity-50 pointer-events-none' : ''}`}
+                  style={{ overflow: 'hidden', resize: widgetMode ? 'none' : 'both' }}
                 >
-                  {/* Drag handle */}
-                  <div className="absolute top-4 left-0.5 z-10 flex items-center justify-center w-4 h-6 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
+                  {/* Drag handle — only this element is draggable */}
+                  <div
+                    draggable={!widgetMode}
+                    onDragStart={(e) => { e.stopPropagation(); setDragId(wId) }}
+                    onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+                    className="absolute top-4 left-0.5 z-10 flex items-center justify-center w-4 h-6 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500"
+                  >
                     <GripVertical className="h-3.5 w-3.5" />
                   </div>
                   {/* Scrollable widget content */}
