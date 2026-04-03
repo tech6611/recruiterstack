@@ -322,7 +322,8 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     return
   }
 
-  const sgMail = (await import('@sendgrid/mail')).default
+  const sgModule = await import('@sendgrid/mail')
+  const sgMail = sgModule.default ?? sgModule
   sgMail.setApiKey(apiKey)
 
   const fromName = stage.send_on_behalf_of ?? 'RecruiterStack'
@@ -331,7 +332,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
   try {
     const [response] = await sgMail.send({
       to: candidate.email,
-      from: { email: stage.send_on_behalf_email ?? fromEmail, name: fromName },
+      from: { email: stage.send_on_behalf_email || fromEmail, name: fromName },
       subject,
       html: body,
     })
