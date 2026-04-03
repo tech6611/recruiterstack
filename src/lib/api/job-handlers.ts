@@ -253,11 +253,12 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
 
   const supabase = createAdminClient()
 
-  // Fetch enrollment
+  // Fetch enrollment — scoped to org
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: enrollment } = await (supabase.from('sequence_enrollments') as any)
     .select('*, candidates(name, email, current_title, location)')
     .eq('id', enrollmentId)
+    .eq('org_id', job.org_id)
     .single()
 
   if (!enrollment) throw new Error('Enrollment not found')
@@ -336,7 +337,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     })
     sendgridMessageId = response?.headers?.['x-message-id'] ?? null
   } catch (err) {
-    // Record failed email
+    // Record failed email and mark enrollment as bounced — don't retry
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('sequence_emails') as any)
       .insert({
@@ -347,8 +348,14 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
         subject,
         body,
         status: 'failed',
+        org_id: job.org_id,
       })
-    throw err
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('sequence_enrollments') as any)
+      .update({ status: 'bounced', completed_at: new Date().toISOString() })
+      .eq('id', enrollmentId)
+    logger.error('Sequence email send failed, enrollment marked bounced', err, { enrollmentId })
+    return // Don't throw — prevents infinite retry
   }
 
   // Record sent email
@@ -364,6 +371,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
       sendgrid_message_id: sendgridMessageId,
       status: 'sent',
       sent_at: new Date().toISOString(),
+      org_id: job.org_id,
     })
 
   // Calculate next_send_at for the next stage

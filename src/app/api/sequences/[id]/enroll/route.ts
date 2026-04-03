@@ -57,13 +57,14 @@ export async function POST(
   // Create enrollments
   const now = new Date().toISOString()
   const enrollments = toEnroll.map(candidateId => ({
+    org_id: orgId,
     sequence_id: params.id,
     candidate_id: candidateId,
     application_id: body.application_id ?? null,
     enrolled_by: userId ?? null,
     status: 'active',
     current_stage_index: 0,
-    next_send_at: now, // First email sends immediately
+    next_send_at: now,
     started_at: now,
   }))
 

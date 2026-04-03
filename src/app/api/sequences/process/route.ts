@@ -20,10 +20,10 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // Find active enrollments ready to send
+  // Find active enrollments ready to send — org_id is directly on the table
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: ready, error } = await (supabase.from('sequence_enrollments') as any)
-    .select('id, sequence_id, candidates(org_id)')
+    .select('id, org_id, sequence_id')
     .eq('status', 'active')
     .lte('next_send_at', new Date().toISOString())
     .limit(20)
@@ -35,8 +35,7 @@ export async function POST(req: NextRequest) {
 
   let enqueued = 0
   for (const enrollment of ready ?? []) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const orgId = (enrollment as any).candidates?.org_id
+    const orgId = enrollment.org_id as string
     if (!orgId) continue
 
     try {
