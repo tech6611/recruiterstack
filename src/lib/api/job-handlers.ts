@@ -248,7 +248,9 @@ registerHandler('slack_notify', async (job: QueuedJob) => {
 // ── Sequence Email ────────────────────────────────────────────────────────────
 
 registerHandler('sequence_email', async (job: QueuedJob) => {
-  const { enrollmentId, sequenceId } = job.payload as { enrollmentId: string; sequenceId: string }
+  const { enrollmentId, sequenceId, stageId, stageIndex } = job.payload as {
+    enrollmentId: string; sequenceId: string; stageId?: string; stageIndex?: number
+  }
   if (!enrollmentId || !sequenceId) throw new Error('Missing enrollmentId or sequenceId')
 
   const supabase = createAdminClient()
@@ -267,31 +269,30 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     return
   }
 
-  // Fetch sequence stages
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: stages } = await (supabase.from('sequence_stages') as any)
-    .select('*')
-    .eq('sequence_id', sequenceId)
-    .order('order_index', { ascending: true })
-
-  if (!stages || stages.length === 0) throw new Error('No stages in sequence')
-
-  const stageIdx = enrollment.current_stage_index ?? 0
-  if (stageIdx >= stages.length) {
-    // All stages completed
+  // Fetch the specific stage (or fall back to current_stage_index for legacy jobs)
+  let stage
+  if (stageId) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from('sequence_enrollments') as any)
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', enrollmentId)
-    logger.info('Sequence completed', { enrollmentId })
+    const { data } = await (supabase.from('sequence_stages') as any)
+      .select('*').eq('id', stageId).single()
+    stage = data
+  } else {
+    // Legacy: fetch by order_index
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: stages } = await (supabase.from('sequence_stages') as any)
+      .select('*').eq('sequence_id', sequenceId).order('order_index', { ascending: true })
+    const idx = stageIndex ?? enrollment.current_stage_index ?? 0
+    stage = stages?.[idx]
+  }
+
+  if (!stage) {
+    logger.warn('Stage not found, skipping', { enrollmentId, stageId, stageIndex })
     return
   }
 
-  const stage = stages[stageIdx]
   const candidate = enrollment.candidates
-
   if (!candidate?.email) {
-    logger.error('Candidate has no email', undefined, { enrollmentId, candidateId: enrollment.candidate_id })
+    logger.error('Candidate has no email', undefined, { enrollmentId })
     return
   }
 
@@ -302,7 +303,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     '{{candidate_name}}': candidate.name ?? '',
     '{{candidate_title}}': candidate.current_title ?? '',
     '{{candidate_location}}': candidate.location ?? '',
-    '{{job_title}}': '', // Would need application context
+    '{{job_title}}': '',
     '{{company_name}}': '',
     '{{recruiter_name}}': '',
   }
@@ -318,7 +319,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
   const apiKey = process.env.SENDGRID_API_KEY
   const fromEmail = process.env.SENDGRID_FROM_EMAIL
   if (!apiKey || !fromEmail) {
-    logger.warn('SendGrid not configured, skipping sequence email', { enrollmentId })
+    logger.warn('SendGrid not configured, skipping', { enrollmentId })
     return
   }
 
@@ -326,90 +327,60 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
   const sgMail = sgModule.default ?? sgModule
   sgMail.setApiKey(apiKey)
 
-  const fromName = stage.send_on_behalf_of ?? 'RecruiterStack'
-
   let sendgridMessageId: string | null = null
   try {
     const [response] = await sgMail.send({
       to: candidate.email,
-      from: { email: stage.send_on_behalf_email || fromEmail, name: fromName },
+      from: { email: stage.send_on_behalf_email || fromEmail, name: stage.send_on_behalf_of || 'RecruiterStack' },
       subject,
       html: body,
     })
     sendgridMessageId = response?.headers?.['x-message-id'] ?? null
   } catch (err) {
-    // Record failed email and mark enrollment as bounced — don't retry
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('sequence_emails') as any)
       .insert({
-        enrollment_id: enrollmentId,
-        stage_id: stage.id,
-        candidate_id: enrollment.candidate_id,
-        to_email: candidate.email,
-        subject,
-        body,
-        status: 'failed',
-        org_id: job.org_id,
+        enrollment_id: enrollmentId, stage_id: stage.id, candidate_id: enrollment.candidate_id,
+        to_email: candidate.email, subject, body, status: 'failed', org_id: job.org_id,
       })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('sequence_enrollments') as any)
       .update({ status: 'bounced', completed_at: new Date().toISOString() })
       .eq('id', enrollmentId)
-    logger.error('Sequence email send failed, enrollment marked bounced', err, { enrollmentId })
-    return // Don't throw — prevents infinite retry
+    logger.error('Sequence email failed, enrollment bounced', err, { enrollmentId })
+    return
   }
 
   // Record sent email
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase.from('sequence_emails') as any)
     .insert({
-      enrollment_id: enrollmentId,
-      stage_id: stage.id,
-      candidate_id: enrollment.candidate_id,
-      to_email: candidate.email,
-      subject,
-      body,
-      sendgrid_message_id: sendgridMessageId,
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      org_id: job.org_id,
+      enrollment_id: enrollmentId, stage_id: stage.id, candidate_id: enrollment.candidate_id,
+      to_email: candidate.email, subject, body, sendgrid_message_id: sendgridMessageId,
+      status: 'sent', sent_at: new Date().toISOString(), org_id: job.org_id,
     })
 
-  // Calculate next_send_at for the next stage
-  const nextStageIdx = stageIdx + 1
-  if (nextStageIdx < stages.length) {
-    const nextStage = stages[nextStageIdx]
-    let delayMs = (nextStage.delay_days ?? 1) * 24 * 60 * 60 * 1000
+  // Update enrollment progress
+  const currentIdx = stageIndex ?? enrollment.current_stage_index ?? 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('sequence_enrollments') as any)
+    .update({ current_stage_index: currentIdx + 1 })
+    .eq('id', enrollmentId)
 
-    // Business days: rough approximation (add 2 days per 5 for weekends)
-    if (nextStage.delay_business_days) {
-      const weekends = Math.floor((nextStage.delay_days ?? 1) / 5) * 2
-      delayMs += weekends * 24 * 60 * 60 * 1000
-    }
+  // Check if this was the last stage — fetch total stage count
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count } = await (supabase.from('sequence_stages') as any)
+    .select('id', { count: 'exact', head: true })
+    .eq('sequence_id', sequenceId)
 
-    const nextSendAt = new Date(Date.now() + delayMs).toISOString()
-
+  if (currentIdx + 1 >= (count ?? 0)) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('sequence_enrollments') as any)
-      .update({ current_stage_index: nextStageIdx, next_send_at: nextSendAt })
-      .eq('id', enrollmentId)
-
-    // Enqueue the next email send
-    await enqueue({
-      orgId: job.org_id,
-      jobType: 'sequence_email',
-      payload: { enrollmentId, sequenceId },
-      delaySeconds: Math.round(delayMs / 1000),
-    })
-  } else {
-    // Last stage — mark completed
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from('sequence_enrollments') as any)
-      .update({ status: 'completed', completed_at: new Date().toISOString(), current_stage_index: nextStageIdx })
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', enrollmentId)
   }
 
   logger.info('Sequence email sent', {
-    jobId: job.id, enrollmentId, stageIdx, candidateEmail: candidate.email,
+    jobId: job.id, enrollmentId, stageId: stage.id, candidateEmail: candidate.email,
   })
 })

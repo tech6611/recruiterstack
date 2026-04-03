@@ -75,16 +75,43 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Enqueue email sending for each enrollment
+  // Fetch all stages to calculate delays upfront
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: stages } = await (supabase.from('sequence_stages') as any)
+    .select('id, order_index, delay_days, delay_business_days')
+    .eq('sequence_id', params.id)
+    .order('order_index', { ascending: true })
+
+  // Enqueue ALL stage emails upfront for each enrollment
   for (const enrollment of created ?? []) {
-    try {
-      await enqueue({
-        orgId,
-        jobType: 'sequence_email',
-        payload: { enrollmentId: enrollment.id, sequenceId: params.id },
-      })
-    } catch (err) {
-      logger.error('Failed to enqueue sequence email', err, { enrollmentId: enrollment.id })
+    let cumulativeDelaySeconds = 0
+
+    for (const stage of stages ?? []) {
+      // Accumulate delay from each stage
+      let stageDelayMs = (stage.delay_days ?? 0) * 24 * 60 * 60 * 1000
+      if (stage.delay_business_days) {
+        const weekends = Math.floor((stage.delay_days ?? 0) / 5) * 2
+        stageDelayMs += weekends * 24 * 60 * 60 * 1000
+      }
+      cumulativeDelaySeconds += Math.round(stageDelayMs / 1000)
+
+      try {
+        await enqueue({
+          orgId,
+          jobType: 'sequence_email',
+          payload: {
+            enrollmentId: enrollment.id,
+            sequenceId: params.id,
+            stageId: stage.id,
+            stageIndex: stage.order_index,
+          },
+          delaySeconds: cumulativeDelaySeconds,
+        })
+      } catch (err) {
+        logger.error('Failed to enqueue sequence email', err, {
+          enrollmentId: enrollment.id, stageId: stage.id,
+        })
+      }
     }
   }
 
