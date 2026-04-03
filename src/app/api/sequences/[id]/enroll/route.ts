@@ -77,10 +77,14 @@ export async function POST(
 
   // Fetch all stages to calculate delays upfront
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: stages } = await (supabase.from('sequence_stages') as any)
-    .select('id, order_index, delay_days, delay_minutes, delay_business_days, send_at')
+  const { data: stages, error: stagesErr } = await (supabase.from('sequence_stages') as any)
+    .select('*')
     .eq('sequence_id', params.id)
     .order('order_index', { ascending: true })
+
+  if (stagesErr) {
+    logger.error('Failed to fetch stages for enrollment', stagesErr, { sequenceId: params.id })
+  }
 
   // Enqueue ALL stage emails upfront for each enrollment
   const nowMs = Date.now()
