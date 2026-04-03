@@ -29,7 +29,7 @@ const isPublic = createRouteMatcher([
 
 // Routes that bypass Clerk entirely (auth handled by the route itself)
 function isClerkBypassed(req: NextRequest): boolean {
-  return req.nextUrl.pathname.startsWith('/api/queue') || req.nextUrl.pathname.startsWith('/drag-test')
+  return req.nextUrl.pathname.startsWith('/api/queue') || req.nextUrl.pathname.startsWith('/api/sequences/process')
 }
 
 const clerk = clerkMiddleware((auth, req) => {

@@ -244,3 +244,164 @@ registerHandler('slack_notify', async (job: QueuedJob) => {
 
   logger.info('Slack notification sent via queue', { jobId: job.id })
 })
+
+// ── Sequence Email ────────────────────────────────────────────────────────────
+
+registerHandler('sequence_email', async (job: QueuedJob) => {
+  const { enrollmentId, sequenceId } = job.payload as { enrollmentId: string; sequenceId: string }
+  if (!enrollmentId || !sequenceId) throw new Error('Missing enrollmentId or sequenceId')
+
+  const supabase = createAdminClient()
+
+  // Fetch enrollment
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: enrollment } = await (supabase.from('sequence_enrollments') as any)
+    .select('*, candidates(name, email, current_title, location)')
+    .eq('id', enrollmentId)
+    .single()
+
+  if (!enrollment) throw new Error('Enrollment not found')
+  if (enrollment.status !== 'active') {
+    logger.info('Enrollment not active, skipping', { enrollmentId, status: enrollment.status })
+    return
+  }
+
+  // Fetch sequence stages
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: stages } = await (supabase.from('sequence_stages') as any)
+    .select('*')
+    .eq('sequence_id', sequenceId)
+    .order('order_index', { ascending: true })
+
+  if (!stages || stages.length === 0) throw new Error('No stages in sequence')
+
+  const stageIdx = enrollment.current_stage_index ?? 0
+  if (stageIdx >= stages.length) {
+    // All stages completed
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('sequence_enrollments') as any)
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', enrollmentId)
+    logger.info('Sequence completed', { enrollmentId })
+    return
+  }
+
+  const stage = stages[stageIdx]
+  const candidate = enrollment.candidates
+
+  if (!candidate?.email) {
+    logger.error('Candidate has no email', undefined, { enrollmentId, candidateId: enrollment.candidate_id })
+    return
+  }
+
+  // Token replacement
+  const firstName = candidate.name?.split(' ')[0] ?? ''
+  const tokens: Record<string, string> = {
+    '{{candidate_first_name}}': firstName,
+    '{{candidate_name}}': candidate.name ?? '',
+    '{{candidate_title}}': candidate.current_title ?? '',
+    '{{candidate_location}}': candidate.location ?? '',
+    '{{job_title}}': '', // Would need application context
+    '{{company_name}}': '',
+    '{{recruiter_name}}': '',
+  }
+
+  let subject = stage.subject ?? ''
+  let body = stage.body ?? ''
+  for (const [token, value] of Object.entries(tokens)) {
+    subject = subject.replaceAll(token, value)
+    body = body.replaceAll(token, value)
+  }
+
+  // Send via SendGrid
+  const apiKey = process.env.SENDGRID_API_KEY
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL
+  if (!apiKey || !fromEmail) {
+    logger.warn('SendGrid not configured, skipping sequence email', { enrollmentId })
+    return
+  }
+
+  const sgMail = (await import('@sendgrid/mail')).default
+  sgMail.setApiKey(apiKey)
+
+  const fromName = stage.send_on_behalf_of ?? 'RecruiterStack'
+
+  let sendgridMessageId: string | null = null
+  try {
+    const [response] = await sgMail.send({
+      to: candidate.email,
+      from: { email: stage.send_on_behalf_email ?? fromEmail, name: fromName },
+      subject,
+      html: body,
+    })
+    sendgridMessageId = response?.headers?.['x-message-id'] ?? null
+  } catch (err) {
+    // Record failed email
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('sequence_emails') as any)
+      .insert({
+        enrollment_id: enrollmentId,
+        stage_id: stage.id,
+        candidate_id: enrollment.candidate_id,
+        to_email: candidate.email,
+        subject,
+        body,
+        status: 'failed',
+      })
+    throw err
+  }
+
+  // Record sent email
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('sequence_emails') as any)
+    .insert({
+      enrollment_id: enrollmentId,
+      stage_id: stage.id,
+      candidate_id: enrollment.candidate_id,
+      to_email: candidate.email,
+      subject,
+      body,
+      sendgrid_message_id: sendgridMessageId,
+      status: 'sent',
+      sent_at: new Date().toISOString(),
+    })
+
+  // Calculate next_send_at for the next stage
+  const nextStageIdx = stageIdx + 1
+  if (nextStageIdx < stages.length) {
+    const nextStage = stages[nextStageIdx]
+    let delayMs = (nextStage.delay_days ?? 1) * 24 * 60 * 60 * 1000
+
+    // Business days: rough approximation (add 2 days per 5 for weekends)
+    if (nextStage.delay_business_days) {
+      const weekends = Math.floor((nextStage.delay_days ?? 1) / 5) * 2
+      delayMs += weekends * 24 * 60 * 60 * 1000
+    }
+
+    const nextSendAt = new Date(Date.now() + delayMs).toISOString()
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('sequence_enrollments') as any)
+      .update({ current_stage_index: nextStageIdx, next_send_at: nextSendAt })
+      .eq('id', enrollmentId)
+
+    // Enqueue the next email send
+    const { enqueue: enqueueJob } = await import('./job-queue')
+    await enqueueJob({
+      orgId: job.org_id,
+      jobType: 'sequence_email',
+      payload: { enrollmentId, sequenceId },
+      delaySeconds: Math.round(delayMs / 1000),
+    })
+  } else {
+    // Last stage — mark completed
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('sequence_enrollments') as any)
+      .update({ status: 'completed', completed_at: new Date().toISOString(), current_stage_index: nextStageIdx })
+      .eq('id', enrollmentId)
+  }
+
+  logger.info('Sequence email sent', {
+    jobId: job.id, enrollmentId, stageIdx, candidateEmail: candidate.email,
+  })
+})

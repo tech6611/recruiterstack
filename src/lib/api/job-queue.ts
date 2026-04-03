@@ -19,6 +19,7 @@ export type JobType =
   | 'ai_summary'
   | 'matching'
   | 'slack_notify'
+  | 'sequence_email'
 
 export interface EnqueueOptions {
   orgId: string
