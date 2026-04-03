@@ -112,7 +112,7 @@ export async function processJobs(batchSize = 5): Promise<number> {
     .select('*')
     .in('status', ['pending', 'failed'])
     .lte('scheduled_at', new Date().toISOString())
-    .order('created_at', { ascending: true })
+    .order('scheduled_at', { ascending: true })
     .limit(batchSize)
 
   if (error) {
