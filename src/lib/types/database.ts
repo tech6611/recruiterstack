@@ -950,12 +950,14 @@ export interface SequenceStage {
   sequence_id: string
   order_index: number
   delay_days: number
+  delay_minutes: number              // fine-grained delay (added to delay_days)
   subject: string
   body: string
   send_on_behalf_of: string | null
   send_on_behalf_email: string | null
   channel: SequenceChannel
-  send_at_time: string | null        // "HH:MM:SS" or null
+  send_at: string | null             // exact datetime to send (overrides delay if set)
+  send_at_time: string | null        // "HH:MM:SS" or null (legacy)
   send_timezone: string              // e.g. "America/New_York"
   delay_business_days: boolean
   condition: StageCondition | null   // null = unconditional

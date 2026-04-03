@@ -18,8 +18,8 @@ export async function PATCH(
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
   const allowed = [
-    'order_index', 'delay_days', 'subject', 'body', 'send_on_behalf_of', 'send_on_behalf_email',
-    'channel', 'send_at_time', 'send_timezone', 'delay_business_days', 'condition',
+    'order_index', 'delay_days', 'delay_minutes', 'subject', 'body', 'send_on_behalf_of', 'send_on_behalf_email',
+    'channel', 'send_at', 'send_at_time', 'send_timezone', 'delay_business_days', 'condition',
   ]
   const update: Record<string, unknown> = {}
   for (const key of allowed) {

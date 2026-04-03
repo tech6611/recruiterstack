@@ -78,22 +78,32 @@ export async function POST(
   // Fetch all stages to calculate delays upfront
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: stages } = await (supabase.from('sequence_stages') as any)
-    .select('id, order_index, delay_days, delay_business_days')
+    .select('id, order_index, delay_days, delay_minutes, delay_business_days, send_at')
     .eq('sequence_id', params.id)
     .order('order_index', { ascending: true })
 
   // Enqueue ALL stage emails upfront for each enrollment
+  const nowMs = Date.now()
+
   for (const enrollment of created ?? []) {
     let cumulativeDelaySeconds = 0
 
     for (const stage of stages ?? []) {
-      // Accumulate delay from each stage
-      let stageDelayMs = (stage.delay_days ?? 0) * 24 * 60 * 60 * 1000
-      if (stage.delay_business_days) {
-        const weekends = Math.floor((stage.delay_days ?? 0) / 5) * 2
-        stageDelayMs += weekends * 24 * 60 * 60 * 1000
+      if (stage.send_at) {
+        // Exact datetime: calculate seconds from now to that time
+        const sendAtMs = new Date(stage.send_at).getTime()
+        const delayFromNow = Math.max(0, Math.round((sendAtMs - nowMs) / 1000))
+        cumulativeDelaySeconds = delayFromNow // absolute, not cumulative
+      } else {
+        // Relative delay: accumulate days + minutes
+        let stageDelayMs = (stage.delay_days ?? 0) * 24 * 60 * 60 * 1000
+        stageDelayMs += (stage.delay_minutes ?? 0) * 60 * 1000
+        if (stage.delay_business_days) {
+          const weekends = Math.floor((stage.delay_days ?? 0) / 5) * 2
+          stageDelayMs += weekends * 24 * 60 * 60 * 1000
+        }
+        cumulativeDelaySeconds += Math.round(stageDelayMs / 1000)
       }
-      cumulativeDelaySeconds += Math.round(stageDelayMs / 1000)
 
       try {
         await enqueue({

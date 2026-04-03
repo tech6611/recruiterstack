@@ -81,8 +81,11 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [subject, setSubject]             = useState(stage?.subject ?? '')
   const [body, setBody]                   = useState(stage?.body ?? '')
   const [editorKey, setEditorKey]         = useState(0)
-  const [delayDays, setDelayDays]         = useState(stage?.delay_days ?? 3)
+  const [delayDays, setDelayDays]         = useState(stage?.delay_days ?? 0)
+  const [delayMinutes, setDelayMinutes]   = useState(stage?.delay_minutes ?? 0)
   const [businessDays, setBusinessDays]   = useState(stage?.delay_business_days ?? false)
+  const [sendAt, setSendAt]               = useState(stage?.send_at ? stage.send_at.slice(0, 16) : '') // datetime-local format
+  const [scheduleMode, setScheduleMode]   = useState<'delay' | 'exact'>(stage?.send_at ? 'exact' : 'delay')
   const [sendTime, setSendTime]           = useState(stage?.send_at_time?.slice(0, 5) ?? '')
   const [sendTz, setSendTz]              = useState(stage?.send_timezone ?? 'UTC')
   const [condition, setCondition]         = useState<StageCondition | ''>(stage?.condition ?? '')
@@ -264,15 +267,17 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
     setError('')
 
     const payload: Record<string, unknown> = {
-      delay_days: delayDays,
+      delay_days: scheduleMode === 'delay' ? delayDays : 0,
+      delay_minutes: scheduleMode === 'delay' ? delayMinutes : 0,
       subject,
       body,
       send_on_behalf_of: soboName,
       send_on_behalf_email: soboEmail,
       channel,
-      send_at_time: sendTime || null,
+      send_at: scheduleMode === 'exact' && sendAt ? new Date(sendAt).toISOString() : null,
+      send_at_time: scheduleMode === 'delay' && sendTime ? sendTime : null,
       send_timezone: sendTz,
-      delay_business_days: businessDays,
+      delay_business_days: scheduleMode === 'delay' ? businessDays : false,
       condition: condition || null,
     }
 
@@ -351,52 +356,84 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
               <Clock className="h-3.5 w-3.5" /> Scheduling
             </label>
 
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-[11px] text-slate-400 mb-1">Delay after previous stage</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    max={90}
-                    value={delayDays}
-                    onChange={e => setDelayDays(Number(e.target.value))}
-                    className="w-20 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                  />
-                  <span className="text-xs text-slate-500">days</span>
-                </div>
-              </div>
-              <label className="flex items-center gap-2 mt-4 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={businessDays}
-                  onChange={e => setBusinessDays(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-xs text-slate-600">Business days only</span>
-              </label>
+            {/* Schedule mode toggle */}
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setScheduleMode('delay')}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  scheduleMode === 'delay' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                Relative delay
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduleMode('exact')}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  scheduleMode === 'exact' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                Exact date & time
+              </button>
             </div>
 
-            <div className="flex items-end gap-3">
-              <div>
-                <p className="text-[11px] text-slate-400 mb-1">Send at specific time (optional)</p>
-                <input
-                  type="time"
-                  value={sendTime}
-                  onChange={e => setSendTime(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-              <div>
-                <p className="text-[11px] text-slate-400 mb-1">Timezone</p>
-                <select
-                  value={sendTz}
-                  onChange={e => setSendTz(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                >
-                  {TIMEZONES.map(tz => (
-                    <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
-                  ))}
+            {scheduleMode === 'delay' ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <p className="text-[11px] text-slate-400 mb-1">Days</p>
+                    <input
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={delayDays}
+                      onChange={e => setDelayDays(Number(e.target.value))}
+                      className="w-20 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-400 mb-1">Minutes</p>
+                    <input
+                      type="number"
+                      min={0}
+                      max={1440}
+                      value={delayMinutes}
+                      onChange={e => setDelayMinutes(Number(e.target.value))}
+                      className="w-20 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 mt-4 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={businessDays}
+                      onChange={e => setBusinessDays(e.target.checked)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-xs text-slate-600">Business days only</span>
+                  </label>
+                </div>
+
+                <div className="flex items-end gap-3">
+                  <div>
+                    <p className="text-[11px] text-slate-400 mb-1">Send at specific time (optional)</p>
+                    <input
+                      type="time"
+                      value={sendTime}
+                      onChange={e => setSendTime(e.target.value)}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-400 mb-1">Timezone</p>
+                    <select
+                      value={sendTz}
+                      onChange={e => setSendTz(e.target.value)}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    >
+                      {TIMEZONES.map(tz => (
+                        <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                      ))}
                 </select>
               </div>
               {sendTime && (
@@ -404,7 +441,25 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                   Clear
                 </button>
               )}
-            </div>
+                </div>
+              </>
+            ) : (
+              /* Exact datetime picker */
+              <div>
+                <p className="text-[11px] text-slate-400 mb-1">Send at exact date & time</p>
+                <input
+                  type="datetime-local"
+                  value={sendAt}
+                  onChange={e => setSendAt(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+                {sendAt && (
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Email will be sent at {new Date(sendAt).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ── 3. Conditional Logic (stage 2+) ──────────────────────────── */}
