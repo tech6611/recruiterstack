@@ -4,7 +4,7 @@
  * Import this file once (in the queue worker endpoint) to register all handlers.
  */
 
-import { registerHandler, type QueuedJob } from './job-queue'
+import { registerHandler, enqueue, type QueuedJob } from './job-queue'
 import { runAutopilot } from '@/lib/ai/autopilot'
 import { matchCandidateToRole } from '@/lib/ai/matcher'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -395,8 +395,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
       .eq('id', enrollmentId)
 
     // Enqueue the next email send
-    const { enqueue: enqueueJob } = await import('./job-queue')
-    await enqueueJob({
+    await enqueue({
       orgId: job.org_id,
       jobType: 'sequence_email',
       payload: { enrollmentId, sequenceId },
