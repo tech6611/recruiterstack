@@ -68,12 +68,21 @@ export async function POST(
     started_at: now,
   }))
 
+  // Insert enrollments — don't use .select() as PostgREST cache may not know new columns
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: created, error } = await (supabase.from('sequence_enrollments') as any)
+  const { error } = await (supabase.from('sequence_enrollments') as any)
     .insert(enrollments)
-    .select()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Fetch the just-created enrollments by candidate IDs
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: created } = await (supabase.from('sequence_enrollments') as any)
+    .select('id')
+    .eq('sequence_id', params.id)
+    .eq('org_id', orgId)
+    .in('candidate_id', toEnroll)
+    .in('status', ['active'])
 
   // Fetch all stages to calculate delays upfront
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
