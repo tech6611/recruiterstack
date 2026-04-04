@@ -143,14 +143,15 @@ export async function POST(
     }
   }
 
-  logger.info('Enrollment complete', {
-    sequenceId: params.id, enrolled: toEnroll.length, jobsEnqueued: totalJobsEnqueued,
-  })
-
   return NextResponse.json({
     data: {
       enrolled_count: toEnroll.length,
       skipped_count: body.candidate_ids.length - toEnroll.length,
+      _debug: {
+        stagesFound: stages?.length ?? 0,
+        stagesError: stagesErr?.message ?? null,
+        jobsEnqueued: totalJobsEnqueued,
+      },
     },
   }, { status: 201 })
 }
