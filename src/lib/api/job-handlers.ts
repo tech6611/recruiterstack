@@ -336,11 +336,14 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     })
     sendgridMessageId = response?.headers?.['x-message-id'] ?? null
   } catch (err) {
+    const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    // Store the error in the body field so we can read it via SQL
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('sequence_emails') as any)
       .insert({
         enrollment_id: enrollmentId, stage_id: stage.id, candidate_id: enrollment.candidate_id,
-        to_email: candidate.email, subject, body, status: 'failed', org_id: job.org_id,
+        to_email: candidate.email, subject, body: `ERROR: ${errMsg}\n\n---ORIGINAL BODY---\n${body}`,
+        status: 'failed', org_id: job.org_id,
       })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('sequence_enrollments') as any)
