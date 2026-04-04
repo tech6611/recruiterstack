@@ -10,6 +10,7 @@ import { matchCandidateToRole } from '@/lib/ai/matcher'
 import { createAdminClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import Anthropic from '@anthropic-ai/sdk'
+import sgMail from '@sendgrid/mail'
 import type { Candidate, Role } from '@/lib/types/database'
 
 // ── Autopilot ─────────────────────────────────────────────────────────────────
@@ -323,8 +324,6 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     return
   }
 
-  const sgModule = await import('@sendgrid/mail')
-  const sgMail = sgModule.default ?? sgModule
   sgMail.setApiKey(apiKey)
 
   let sendgridMessageId: string | null = null
