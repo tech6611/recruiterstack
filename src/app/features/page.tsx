@@ -41,11 +41,11 @@ const AGENTS: Agent[] = [
     icon:      FileText,
     description:
       'Drafter handles everything that happens before the first CV arrives. It uses your intake form answers to generate a complete, tailored job description in seconds, then tracks every requisition through approval, posting, and close — giving your team a single source of truth for every open role.',
-    color:     'text-violet-400',
-    border:    'border-violet-500/30',
-    bg:        'bg-violet-500/10',
-    badge:     'bg-violet-500/20 text-violet-300',
-    iconColor: 'text-violet-400',
+    color:     'text-blue-400',
+    border:    'border-blue-500/20',
+    bg:        'bg-blue-500/10',
+    badge:     'bg-blue-500/20 text-blue-300',
+    iconColor: 'text-blue-400',
     features: [
       { title: 'AI-drafted job descriptions',       description: 'Generate a full JD from a short intake form in under 10 seconds.' },
       { title: 'Structured intake forms',           description: 'Collect hiring-manager requirements through a guided, shareable form.' },
@@ -155,19 +155,19 @@ const AGENTS: Agent[] = [
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-[#061D46]">
       <MarketingNav />
 
       {/* Hero */}
-      <section className="border-b border-zinc-900 py-24 text-center">
+      <section className="border-b border-white/10 py-24 text-center">
         <div className="mx-auto max-w-6xl px-6">
-          <span className="mb-4 inline-block rounded-full border border-violet-500/30 bg-violet-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-violet-400">
+          <span className="mb-4 inline-block rounded-full border border-blue-500/20 bg-blue-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-blue-400">
             Features
           </span>
           <h1 className="mt-4 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
             Everything your recruiting<br className="hidden sm:block" /> team needs
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-zinc-400">
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-blue-100/60">
             One capability per agent. All working together.
           </p>
         </div>
@@ -176,11 +176,11 @@ export default function FeaturesPage() {
       {/* Agent sections */}
       {AGENTS.map((agent, idx) => {
         const Icon = agent.icon
-        const sectionBg = idx % 2 === 0 ? 'bg-zinc-950' : 'bg-zinc-900/20'
+        const sectionBg = idx % 2 === 0 ? 'bg-[#061D46]' : 'bg-white/5'
         return (
           <section
             key={agent.name}
-            className={`${sectionBg} border-b border-zinc-900 py-20`}
+            className={`${sectionBg} border-b border-white/10 py-20`}
           >
             <div className="mx-auto max-w-6xl px-6">
               {/* Agent header */}
@@ -198,7 +198,7 @@ export default function FeaturesPage() {
                   <p className={`text-sm font-semibold uppercase tracking-widest ${agent.color}`}>
                     {agent.role}
                   </p>
-                  <p className="mt-3 max-w-2xl text-base text-zinc-400 leading-relaxed">
+                  <p className="mt-3 max-w-2xl text-base text-blue-100/60 leading-relaxed">
                     {agent.description}
                   </p>
                 </div>
@@ -209,13 +209,13 @@ export default function FeaturesPage() {
                 {agent.features.map((feat) => (
                   <div
                     key={feat.title}
-                    className={`rounded-xl border ${agent.border} bg-zinc-900/50 p-5`}
+                    className={`rounded-xl border ${agent.border} bg-white/5 p-5`}
                   >
                     <div className="mb-2 flex items-start gap-2.5">
                       <Check className={`mt-0.5 h-4 w-4 shrink-0 ${agent.iconColor}`} />
                       <p className="text-sm font-semibold text-white leading-snug">{feat.title}</p>
                     </div>
-                    <p className="pl-6 text-xs text-zinc-500 leading-relaxed">{feat.description}</p>
+                    <p className="pl-6 text-xs text-blue-200/40 leading-relaxed">{feat.description}</p>
                   </div>
                 ))}
               </div>
@@ -224,7 +224,7 @@ export default function FeaturesPage() {
               <div className="mt-10">
                 <Link
                   href="/sign-up"
-                  className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-400 transition-colors"
                 >
                   Add {agent.name} to your stack
                   <span aria-hidden>→</span>

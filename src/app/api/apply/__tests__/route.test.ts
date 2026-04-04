@@ -36,7 +36,7 @@ describe('/api/apply', () => {
         department: 'Engineering',
         location: 'Remote',
         generated_jd: 'Some JD',
-        status: 'open',
+        status: 'posted',
       }
       mockSupabase.results.set('hiring_requests', { data: job, error: null })
 
@@ -108,7 +108,7 @@ describe('/api/apply', () => {
 
     it('returns 409 for duplicate application', async () => {
       mockSupabase.results.set('hiring_requests', {
-        data: { id: 'job-1', org_id: 'org-1', position_title: 'Engineer', status: 'open', auto_advance_score: null, auto_reject_score: null },
+        data: { id: 'job-1', org_id: 'org-1', position_title: 'Engineer', status: 'posted', auto_advance_score: null, auto_reject_score: null },
         error: null,
       })
       mockSupabase.results.set('candidates', { data: { id: 'cand-1' }, error: null })
@@ -129,7 +129,7 @@ describe('/api/apply', () => {
 
     it('creates application successfully with valid input', async () => {
       mockSupabase.results.set('hiring_requests', {
-        data: { id: 'job-1', org_id: 'org-1', position_title: 'Engineer', status: 'open', auto_advance_score: null, auto_reject_score: null },
+        data: { id: 'job-1', org_id: 'org-1', position_title: 'Engineer', status: 'posted', auto_advance_score: null, auto_reject_score: null },
         error: null,
       })
       mockSupabase.results.set('candidates', { data: { id: 'cand-1' }, error: null })

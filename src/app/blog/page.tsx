@@ -9,8 +9,8 @@ const PLACEHOLDER_POSTS = [
     title:    'Introducing RecruiterStack Agents: AI for every stage of your hiring funnel',
     excerpt:  'We built 5 AI agents that plug into your existing recruiting stack. Here\'s why we designed them this way.',
     date:     'Coming soon',
-    color:    'text-violet-400',
-    badge:    'bg-violet-500/20 text-violet-300',
+    color:    'text-blue-400',
+    badge:    'bg-blue-500/20 text-blue-300',
   },
   {
     category: 'Guide',
@@ -32,17 +32,17 @@ const PLACEHOLDER_POSTS = [
 
 export default function BlogPage() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-[#061D46] text-white">
       <MarketingNav />
 
       {/* Hero */}
-      <section className="border-b border-zinc-900 py-20">
+      <section className="border-b border-white/10 py-20">
         <div className="mx-auto max-w-4xl px-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-violet-500 mb-3">Blog</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-3">Blog</p>
           <h1 className="text-4xl font-black text-white sm:text-5xl">
             Recruiting, reimagined
           </h1>
-          <p className="mt-4 text-zinc-400 text-lg">
+          <p className="mt-4 text-blue-100/60 text-lg">
             Guides, product updates, and insights on AI-powered hiring.
           </p>
         </div>
@@ -52,8 +52,8 @@ export default function BlogPage() {
       <section className="py-20">
         <div className="mx-auto max-w-5xl px-6">
           <div className="flex items-center gap-2 mb-8">
-            <Rss className="h-4 w-4 text-violet-500" />
-            <span className="text-sm font-semibold text-zinc-400">Latest posts</span>
+            <Rss className="h-4 w-4 text-blue-400" />
+            <span className="text-sm font-semibold text-blue-100/60">Latest posts</span>
             <span className="text-xs text-zinc-700 ml-2">— Content coming soon</span>
           </div>
 
@@ -61,13 +61,13 @@ export default function BlogPage() {
             {PLACEHOLDER_POSTS.map(({ category, title, excerpt, date, color, badge }) => (
               <div
                 key={title}
-                className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 flex flex-col"
+                className="rounded-2xl border border-white/10 bg-white/5 p-6 flex flex-col"
               >
                 <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full self-start ${badge} mb-4`}>
                   {category}
                 </span>
                 <h3 className="text-sm font-bold text-white leading-snug flex-1">{title}</h3>
-                <p className="mt-3 text-xs text-zinc-500 leading-relaxed">{excerpt}</p>
+                <p className="mt-3 text-xs text-blue-200/40 leading-relaxed">{excerpt}</p>
                 <div className="mt-5 flex items-center justify-between">
                   <span className="text-xs text-zinc-700">{date}</span>
                   <span className={`flex items-center gap-1 text-xs font-semibold ${color} opacity-50`}>
@@ -81,10 +81,10 @@ export default function BlogPage() {
       </section>
 
       {/* Subscribe */}
-      <section className="border-t border-zinc-900 py-20">
+      <section className="border-t border-white/10 py-20">
         <div className="mx-auto max-w-xl px-6 text-center">
           <h2 className="text-2xl font-bold text-white mb-2">Stay in the loop</h2>
-          <p className="text-zinc-500 mb-8">
+          <p className="text-blue-200/40 mb-8">
             Get notified when we publish new articles, product updates, and recruiting guides.
           </p>
           <EmailCapture

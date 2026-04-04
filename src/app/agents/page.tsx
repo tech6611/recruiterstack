@@ -34,32 +34,32 @@ interface Agent {
 // ── Preview mockups (CSS-only, no images) ─────────────────────────────────────
 
 const DrafterPreview = (
-  <div className="rounded-xl border border-violet-500/20 bg-zinc-950 p-5 font-mono text-xs leading-relaxed">
+  <div className="rounded-xl border border-blue-500/20 bg-[#061D46] p-5 font-mono text-xs leading-relaxed">
     <div className="mb-3 flex items-center gap-2">
-      <span className="h-2 w-2 rounded-full bg-violet-500" />
-      <span className="text-violet-400 font-semibold">Drafter — JD generated</span>
+      <span className="h-2 w-2 rounded-full bg-blue-500" />
+      <span className="text-blue-400 font-semibold">Drafter — JD generated</span>
     </div>
-    <p className="text-zinc-500 uppercase tracking-widest text-[10px] mb-1">Senior Product Designer</p>
-    <div className="space-y-1.5 text-zinc-400">
-      <p className="text-zinc-300 font-semibold">About the role</p>
+    <p className="text-blue-200/40 uppercase tracking-widest text-[10px] mb-1">Senior Product Designer</p>
+    <div className="space-y-1.5 text-blue-100/60">
+      <p className="text-blue-100 font-semibold">About the role</p>
       <p>We are looking for a Senior Product Designer to shape the end-to-end experience of our B2B SaaS platform...</p>
-      <p className="text-zinc-300 font-semibold mt-2">What you will do</p>
+      <p className="text-blue-100 font-semibold mt-2">What you will do</p>
       <p>· Lead design for 0→1 features across web and mobile</p>
       <p>· Partner with product and engineering from discovery to ship</p>
       <p>· Define and maintain our design system</p>
-      <p className="text-zinc-300 font-semibold mt-2">You bring</p>
+      <p className="text-blue-100 font-semibold mt-2">You bring</p>
       <p>· 5+ years of product design experience</p>
       <p>· Fluency in Figma and design systems</p>
     </div>
     <div className="mt-3 flex gap-2">
-      <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] text-violet-300">Draft</span>
-      <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-400">Awaiting approval</span>
+      <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] text-blue-300">Draft</span>
+      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-blue-100/60">Awaiting approval</span>
     </div>
   </div>
 )
 
 const ScoutPreview = (
-  <div className="rounded-xl border border-blue-500/20 bg-zinc-950 p-5 text-xs">
+  <div className="rounded-xl border border-blue-500/20 bg-[#061D46] p-5 text-xs">
     <div className="mb-3 flex items-center justify-between">
       <span className="text-blue-400 font-semibold">Scout — 247 imported</span>
       <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] text-blue-300">CSV</span>
@@ -72,12 +72,12 @@ const ScoutPreview = (
         { name: 'Tom Brecker',    src: 'CSV upload', score: 79 },
         { name: 'Ana Sousa',      src: 'LinkedIn',  score: 72 },
       ].map((c) => (
-        <div key={c.name} className="flex items-center justify-between rounded-lg bg-zinc-900 px-3 py-2">
+        <div key={c.name} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
           <div>
             <p className="text-zinc-200 font-medium">{c.name}</p>
             <p className="text-zinc-600 text-[10px]">{c.src}</p>
           </div>
-          <span className={`text-[11px] font-bold ${c.score >= 85 ? 'text-blue-400' : 'text-zinc-500'}`}>
+          <span className={`text-[11px] font-bold ${c.score >= 85 ? 'text-blue-400' : 'text-blue-200/40'}`}>
             {c.score}
           </span>
         </div>
@@ -88,12 +88,12 @@ const ScoutPreview = (
 )
 
 const SifterPreview = (
-  <div className="rounded-xl border border-fuchsia-500/20 bg-zinc-950 p-5 text-xs">
+  <div className="rounded-xl border border-fuchsia-500/20 bg-[#061D46] p-5 text-xs">
     <div className="mb-3 flex items-center gap-2">
       <span className="h-2 w-2 rounded-full bg-fuchsia-500" />
       <span className="text-fuchsia-400 font-semibold">Sifter — Score breakdown</span>
     </div>
-    <p className="mb-3 text-zinc-300 font-semibold">Priya Sharma · 91/100</p>
+    <p className="mb-3 text-blue-100 font-semibold">Priya Sharma · 91/100</p>
     {[
       { label: 'Skills match',      score: 95 },
       { label: 'Experience level',  score: 88 },
@@ -102,11 +102,11 @@ const SifterPreview = (
       { label: 'Education',         score: 80 },
     ].map((row) => (
       <div key={row.label} className="mb-2">
-        <div className="mb-0.5 flex justify-between text-[10px] text-zinc-500">
+        <div className="mb-0.5 flex justify-between text-[10px] text-blue-200/40">
           <span>{row.label}</span>
           <span className="text-fuchsia-400">{row.score}</span>
         </div>
-        <div className="h-1.5 rounded-full bg-zinc-800">
+        <div className="h-1.5 rounded-full bg-white/10">
           <div
             className="h-1.5 rounded-full bg-fuchsia-500"
             style={{ width: `${row.score}%` }}
@@ -116,13 +116,13 @@ const SifterPreview = (
     ))}
     <div className="mt-3 rounded-lg bg-fuchsia-500/10 px-3 py-2">
       <p className="text-[10px] text-fuchsia-300 font-semibold">Strengths</p>
-      <p className="text-[10px] text-zinc-400 mt-0.5">Strong Figma background, shipped 3 B2B products</p>
+      <p className="text-[10px] text-blue-100/60 mt-0.5">Strong Figma background, shipped 3 B2B products</p>
     </div>
   </div>
 )
 
 const SchedulerPreview = (
-  <div className="rounded-xl border border-emerald-500/20 bg-zinc-950 p-5 text-xs">
+  <div className="rounded-xl border border-emerald-500/20 bg-[#061D46] p-5 text-xs">
     <div className="mb-3 flex items-center gap-2">
       <span className="h-2 w-2 rounded-full bg-emerald-500" />
       <span className="text-emerald-400 font-semibold">Scheduler — Interview queue</span>
@@ -133,7 +133,7 @@ const SchedulerPreview = (
         { name: 'James Okafor',  time: 'Mon 14 Mar · 2:00 PM',  round: 'Technical round', status: 'Pending' },
         { name: 'Leila Nazari',  time: 'Tue 15 Mar · 11:00 AM', round: 'Final panel',     status: 'Confirmed' },
       ].map((slot) => (
-        <div key={slot.name} className="rounded-lg bg-zinc-900 px-3 py-2.5">
+        <div key={slot.name} className="rounded-lg bg-white/5 px-3 py-2.5">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-zinc-200 font-medium">{slot.name}</p>
@@ -143,7 +143,7 @@ const SchedulerPreview = (
             <span className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-medium ${
               slot.status === 'Confirmed'
                 ? 'bg-emerald-500/20 text-emerald-400'
-                : 'bg-zinc-800 text-zinc-500'
+                : 'bg-white/10 text-blue-200/40'
             }`}>
               {slot.status}
             </span>
@@ -156,21 +156,21 @@ const SchedulerPreview = (
 )
 
 const CloserPreview = (
-  <div className="rounded-xl border border-amber-500/20 bg-zinc-950 p-5 font-mono text-xs leading-relaxed">
+  <div className="rounded-xl border border-amber-500/20 bg-[#061D46] p-5 font-mono text-xs leading-relaxed">
     <div className="mb-3 flex items-center gap-2">
       <span className="h-2 w-2 rounded-full bg-amber-500" />
       <span className="text-amber-400 font-semibold">Closer — Offer letter draft</span>
     </div>
-    <div className="rounded-lg bg-zinc-900 p-3 text-zinc-300 text-[11px] leading-loose">
-      <p className="text-zinc-500 text-[10px] uppercase tracking-widest mb-2">Offer of Employment</p>
+    <div className="rounded-lg bg-white/5 p-3 text-blue-100 text-[11px] leading-loose">
+      <p className="text-blue-200/40 text-[10px] uppercase tracking-widest mb-2">Offer of Employment</p>
       <p>Dear <span className="text-amber-300">Priya</span>,</p>
       <p className="mt-1">We are delighted to offer you the position of <span className="text-amber-300">Senior Product Designer</span> at RecruiterStack, commencing <span className="text-amber-300">1 April 2026</span>.</p>
       <p className="mt-1">Compensation: <span className="text-amber-300">$130,000 / yr</span> + equity</p>
-      <p className="mt-2 text-zinc-500">— Awaiting finance approval —</p>
+      <p className="mt-2 text-blue-200/40">— Awaiting finance approval —</p>
     </div>
     <div className="mt-3 flex gap-2">
       <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-300">Draft</span>
-      <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">Not sent</span>
+      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-blue-200/40">Not sent</span>
     </div>
   </div>
 )
@@ -196,11 +196,11 @@ const AGENTS: Agent[] = [
     ],
     connects: 'Drafter hands newly approved roles directly to Scout, which begins sourcing candidates the moment a JD is finalised.',
     pricing:  'From $19/mo as a standalone agent.',
-    color:     'text-violet-400',
-    border:    'border-violet-500/30',
-    bg:        'bg-violet-500/10',
-    badge:     'bg-violet-500/20 text-violet-300',
-    iconColor: 'text-violet-400',
+    color:     'text-blue-400',
+    border:    'border-blue-500/20',
+    bg:        'bg-blue-500/10',
+    badge:     'bg-blue-500/20 text-blue-300',
+    iconColor: 'text-blue-400',
     preview:   DrafterPreview,
   },
   {
@@ -309,19 +309,19 @@ const AGENTS: Agent[] = [
 
 export default function AgentsPage() {
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-[#061D46]">
       <MarketingNav />
 
       {/* Hero */}
-      <section className="border-b border-zinc-900 py-24 text-center">
+      <section className="border-b border-white/10 py-24 text-center">
         <div className="mx-auto max-w-6xl px-6">
-          <span className="mb-4 inline-block rounded-full border border-violet-500/30 bg-violet-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-violet-400">
+          <span className="mb-4 inline-block rounded-full border border-blue-500/20 bg-blue-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-blue-400">
             The Agents
           </span>
           <h1 className="mt-4 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
             Your AI recruiting team
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-zinc-400">
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-blue-100/60">
             5 specialised agents. One for each stage of the hiring funnel.
             Deploy individually or together.
           </p>
@@ -335,7 +335,7 @@ export default function AgentsPage() {
         return (
           <section
             key={agent.name}
-            className={`border-b border-zinc-900 py-20 ${isEven ? 'bg-zinc-950' : 'bg-zinc-900/20'}`}
+            className={`border-b border-white/10 py-20 ${isEven ? 'bg-[#061D46]' : 'bg-white/5'}`}
           >
             <div className="mx-auto max-w-6xl px-6">
               <div className={`flex flex-col gap-12 lg:flex-row lg:items-start ${isEven ? '' : 'lg:flex-row-reverse'}`}>
@@ -355,7 +355,7 @@ export default function AgentsPage() {
                   <p className={`text-sm font-semibold uppercase tracking-widest ${agent.color} mb-3`}>
                     {agent.role}
                   </p>
-                  <p className="text-base text-zinc-400 leading-relaxed mb-7 max-w-lg">
+                  <p className="text-base text-blue-100/60 leading-relaxed mb-7 max-w-lg">
                     {agent.description}
                   </p>
 
@@ -364,7 +364,7 @@ export default function AgentsPage() {
                     {agent.bullets.map((b) => (
                       <li key={b} className="flex items-start gap-2.5">
                         <Check className={`mt-0.5 h-4 w-4 shrink-0 ${agent.iconColor}`} />
-                        <span className="text-sm text-zinc-300">{b}</span>
+                        <span className="text-sm text-blue-100">{b}</span>
                       </li>
                     ))}
                   </ul>
@@ -374,16 +374,16 @@ export default function AgentsPage() {
                     <p className={`text-xs font-semibold uppercase tracking-widest ${agent.color} mb-1`}>
                       How it connects
                     </p>
-                    <p className="text-xs text-zinc-400">{agent.connects}</p>
+                    <p className="text-xs text-blue-100/60">{agent.connects}</p>
                   </div>
 
                   {/* Pricing note */}
-                  <p className="mb-5 text-xs text-zinc-600">{agent.pricing}</p>
+                  <p className="mb-5 text-xs text-blue-200/40">{agent.pricing}</p>
 
                   {/* CTA */}
                   <Link
                     href="/sign-up"
-                    className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+                    className="inline-flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-400 transition-colors"
                   >
                     Try {agent.name} free
                     <ChevronRight className="h-4 w-4" />
@@ -406,7 +406,7 @@ export default function AgentsPage() {
           <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
             Start with one. Scale to all five.
           </h2>
-          <p className="mt-4 text-zinc-400">
+          <p className="mt-4 text-blue-100/60">
             All 5 agents. One platform. Zero manual handoffs between stages.
           </p>
           <div className="mt-8">
@@ -416,7 +416,7 @@ export default function AgentsPage() {
               buttonLabel="Get early access"
             />
           </div>
-          <p className="mt-4 text-xs text-zinc-600">
+          <p className="mt-4 text-xs text-blue-200/40">
             Free to start · No credit card required · Cancel any time
           </p>
         </div>

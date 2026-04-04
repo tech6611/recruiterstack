@@ -10,7 +10,7 @@ import { EmailCapture } from '@/components/EmailCapture'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
 import { MarketingFooter } from '@/components/marketing/MarketingFooter'
 
-// ── Agent definitions ──────────────────────────────────────────────────────────
+// ── Agent definitions (GEM-inspired palette — each agent gets its own accent) ─
 
 const AGENTS = [
   {
@@ -18,11 +18,11 @@ const AGENTS = [
     name:     'Drafter',
     role:     'Job Creation & Tracking',
     icon:     FileText,
-    color:    'text-blue-600',
-    border:   'border-blue-200',
-    bg:       'bg-blue-50',
-    badge:    'bg-blue-100 text-blue-700',
-    dot:      'bg-blue-500',
+    color:    'text-violet-600',
+    border:   'border-violet-200',
+    bg:       'bg-violet-50',
+    badge:    'bg-violet-100 text-violet-700',
+    dot:      'bg-violet-500',
     features: [
       'AI-drafted job descriptions in seconds',
       'Requisition tracking & approval workflows',
@@ -52,11 +52,11 @@ const AGENTS = [
     name:     'Sifter',
     role:     'Screening & Scoring',
     icon:     Brain,
-    color:    'text-blue-600',
-    border:   'border-blue-200',
-    bg:       'bg-blue-50',
-    badge:    'bg-blue-100 text-blue-700',
-    dot:      'bg-blue-500',
+    color:    'text-amber-600',
+    border:   'border-amber-200',
+    bg:       'bg-amber-50',
+    badge:    'bg-amber-100 text-amber-700',
+    dot:      'bg-amber-500',
     features: [
       'AI score vs. JD the moment a CV lands',
       'Strengths & gaps analysis per candidate',
@@ -69,11 +69,11 @@ const AGENTS = [
     name:     'Scheduler',
     role:     'Interview Coordination',
     icon:     CalendarCheck,
-    color:    'text-blue-600',
-    border:   'border-blue-200',
-    bg:       'bg-blue-50',
-    badge:    'bg-blue-100 text-blue-700',
-    dot:      'bg-blue-500',
+    color:    'text-teal-600',
+    border:   'border-teal-200',
+    bg:       'bg-teal-50',
+    badge:    'bg-teal-100 text-teal-700',
+    dot:      'bg-teal-500',
     features: [
       'Automated interview invites & reminders',
       'Calendar availability sync (coming soon)',
@@ -86,11 +86,11 @@ const AGENTS = [
     name:     'Closer',
     role:     'Offer Management',
     icon:     BadgeCheck,
-    color:    'text-blue-600',
-    border:   'border-blue-200',
-    bg:       'bg-blue-50',
-    badge:    'bg-blue-100 text-blue-700',
-    dot:      'bg-blue-500',
+    color:    'text-emerald-600',
+    border:   'border-emerald-200',
+    bg:       'bg-emerald-50',
+    badge:    'bg-emerald-100 text-emerald-700',
+    dot:      'bg-emerald-500',
     features: [
       'AI-drafted offer letters',
       'Approval workflow routing',
@@ -119,36 +119,38 @@ export default function HomePage() {
   if (userId) redirect('/dashboard')
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-white text-slate-900">
       <MarketingNav />
 
-      {/* ══ HERO ══════════════════════════════════════════════════════════════ */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 flex items-start justify-center">
-          <div className="mt-0 h-[500px] w-[1000px] rounded-full bg-blue-100/60 blur-[140px]" />
+      {/* ══ HERO (dark navy, GEM-inspired) ═══════════════════════════════════ */}
+      <section className="relative overflow-hidden bg-[#061D46]">
+        {/* Decorative gradient orbs */}
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-40 left-1/4 h-[600px] w-[600px] rounded-full bg-blue-500/10 blur-[120px]" />
+          <div className="absolute -bottom-20 right-1/4 h-[400px] w-[400px] rounded-full bg-violet-500/10 blur-[100px]" />
         </div>
 
-        <div className="relative mx-auto max-w-5xl px-6 pb-20 pt-24 text-center">
+        <div className="relative mx-auto max-w-5xl px-6 pb-24 pt-28 text-center">
           {/* Eyebrow */}
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-500 shadow-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-blue-200 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
             Plug-and-play AI recruitment agents
           </div>
 
           {/* Headline */}
-          <h1 className="mx-auto max-w-4xl text-5xl font-black tracking-tight text-slate-900 sm:text-6xl lg:text-7xl leading-[1.05]">
+          <h1 className="mx-auto max-w-4xl text-5xl font-black tracking-tight text-white sm:text-6xl lg:text-7xl leading-[1.05]">
             Hire smarter.{' '}
-            <span className="text-blue-600">
+            <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-amber-400 bg-clip-text text-transparent">
               Ship faster.
             </span>
             <br />
-            <span className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-500">
+            <span className="text-4xl sm:text-5xl lg:text-6xl font-bold text-blue-200/70">
               With AI agents for every stage.
             </span>
           </h1>
 
           {/* Sub */}
-          <p className="mx-auto mt-7 max-w-2xl text-lg text-slate-500 leading-relaxed">
+          <p className="mx-auto mt-7 max-w-2xl text-lg text-blue-100/70 leading-relaxed">
             5 specialised AI agents that slot into your existing HR stack —
             no rip-and-replace, no 6-month implementation.
             Just deploy the agents you need and close roles faster.
@@ -158,19 +160,19 @@ export default function HomePage() {
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
               href="#agents"
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 rounded-xl bg-blue-500 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-400 transition-colors"
             >
               Meet the agents
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/sign-up"
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-3.5 text-sm font-medium text-white backdrop-blur-sm hover:bg-white/10 transition-colors"
             >
               Start free — no card needed
             </Link>
           </div>
-          <p className="mt-4 text-xs text-slate-400">Free to start · Deploy in minutes · No lock-in</p>
+          <p className="mt-4 text-xs text-blue-200/40">Free to start · Deploy in minutes · No lock-in</p>
 
           {/* Agent funnel visual */}
           <div className="mt-16 flex items-center justify-center gap-0 overflow-x-auto pb-2">
@@ -178,18 +180,18 @@ export default function HomePage() {
               const Icon = agent.icon
               return (
                 <div key={agent.name} className="flex items-center">
-                  <div className={`flex flex-col items-center gap-2 rounded-2xl border ${agent.border} ${agent.bg} px-4 py-4 min-w-[100px] sm:min-w-[110px]`}>
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl bg-white border ${agent.border} shadow-sm`}>
-                      <Icon className={`h-4 w-4 ${agent.color}`} />
+                  <div className={`flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm px-4 py-4 min-w-[100px] sm:min-w-[110px]`}>
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 border border-white/10`}>
+                      <Icon className={`h-4 w-4 text-white`} />
                     </div>
-                    <span className={`text-xs font-bold ${agent.color}`}>{agent.name}</span>
-                    <span className="text-[10px] text-slate-500 text-center leading-tight">{agent.role}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${agent.badge}`}>{agent.n}</span>
+                    <span className={`text-xs font-bold text-white`}>{agent.name}</span>
+                    <span className="text-[10px] text-blue-200/60 text-center leading-tight">{agent.role}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-blue-200`}>{agent.n}</span>
                   </div>
                   {i < AGENTS.length - 1 && (
                     <div className="flex items-center px-1">
-                      <div className="h-px w-6 bg-slate-200" />
-                      <ChevronRight className="h-3 w-3 text-slate-300 -mx-1" />
+                      <div className="h-px w-6 bg-white/20" />
+                      <ChevronRight className="h-3 w-3 text-white/30 -mx-1" />
                     </div>
                   )}
                 </div>
@@ -200,7 +202,7 @@ export default function HomePage() {
       </section>
 
       {/* ══ INTEGRATION BAR ═══════════════════════════════════════════════════ */}
-      <section className="border-y border-slate-200 bg-white py-8">
+      <section className="border-y border-slate-200 bg-[#F9F8F4] py-8">
         <div className="mx-auto max-w-5xl px-6 text-center">
           <p className="mb-5 text-xs font-semibold uppercase tracking-widest text-slate-400">
             Works with your existing stack — no lock-in
@@ -209,7 +211,7 @@ export default function HomePage() {
             {INTEGRATIONS.map(name => (
               <span
                 key={name}
-                className="rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-medium text-slate-500"
+                className="rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-500"
               >
                 {name}
               </span>
@@ -223,11 +225,14 @@ export default function HomePage() {
       </section>
 
       {/* ══ AGENTS SECTION ════════════════════════════════════════════════════ */}
-      <section id="agents" className="border-t border-slate-200 py-24">
+      <section id="agents" className="py-24 bg-white">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">The agents</p>
-            <h2 className="mt-3 text-3xl font-bold text-slate-900">Meet your AI recruiting team</h2>
+            <h2 className="mt-3 text-3xl font-bold text-slate-900">
+              Meet your{' '}
+              <span className="bg-gradient-to-r from-violet-600 to-blue-600 bg-clip-text text-transparent">AI recruiting team</span>
+            </h2>
             <p className="mt-3 text-slate-500 max-w-xl mx-auto">
               Deploy one. Deploy all five. Each agent handles a specific stage of your funnel
               and plugs into your existing tools.
@@ -253,13 +258,13 @@ export default function HomePage() {
               return (
                 <div
                   key={agent.name}
-                  className="group relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col"
+                  className="group relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col"
                 >
                   {/* Header */}
                   <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl ${agent.bg} border ${agent.border}`}>
                     <Icon className={`h-5 w-5 ${agent.color}`} />
                   </div>
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-blue-600">
+                  <div className={`mb-1 text-[10px] font-bold uppercase tracking-widest ${agent.color}`}>
                     Agent {agent.n}
                   </div>
                   <h3 className="text-base font-bold text-slate-900">{agent.name}</h3>
@@ -278,7 +283,7 @@ export default function HomePage() {
                   {/* CTA */}
                   <Link
                     href={`/agents`}
-                    className="mt-5 flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                    className={`mt-5 flex items-center gap-1 text-xs font-semibold ${agent.color} hover:opacity-80 transition-opacity`}
                   >
                     Learn more <ChevronRight className="h-3 w-3" />
                   </Link>
@@ -299,7 +304,7 @@ export default function HomePage() {
       </section>
 
       {/* ══ PLUG & PLAY ═══════════════════════════════════════════════════════ */}
-      <section className="border-t border-slate-200 py-24 bg-white">
+      <section className="py-24 bg-[#EFEFFF]">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid gap-12 lg:grid-cols-2 items-center">
 
@@ -338,12 +343,12 @@ export default function HomePage() {
             </div>
 
             {/* Architecture diagram */}
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 font-mono text-xs shadow-sm">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 font-mono text-xs shadow-sm">
               <p className="text-slate-400 mb-4">{'// Your existing infrastructure'}</p>
 
               <div className="space-y-2 mb-6">
                 {['Workday / SAP', 'Greenhouse / Lever', 'LinkedIn / Naukri', 'Google Calendar / Slack'].map(tool => (
-                  <div key={tool} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <div key={tool} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                     <span className="h-2 w-2 rounded-full bg-slate-300" />
                     <span className="text-slate-600">{tool}</span>
                   </div>
@@ -374,7 +379,7 @@ export default function HomePage() {
       </section>
 
       {/* ══ AUDIENCE ══════════════════════════════════════════════════════════ */}
-      <section className="border-t border-slate-200 py-24">
+      <section className="py-24 bg-white">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-14 text-center">
             <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">Built for</p>
@@ -387,28 +392,34 @@ export default function HomePage() {
                 title:   'Recruiting Agencies',
                 sub:     'Run multiple client mandates from one workspace.',
                 agents:  ['Scout', 'Sifter'],
+                tint:    'bg-[#FFF9F8]',
                 bullets: ['Multi-client workspace isolation', 'AI screening saves 10+ hrs/week', 'Automated candidate shortlists'],
               },
               {
                 title:   'Enterprise TA Teams',
                 sub:     'Process hundreds of applications across dozens of reqs.',
                 agents:  ['Drafter', 'Scout', 'Sifter', 'Scheduler', 'Closer'],
+                tint:    'bg-[#EFEFFF]',
                 bullets: ['Full-funnel automation', 'Cross-team pipeline visibility', 'Analytics & velocity reporting'],
               },
               {
                 title:   'Startups & Small Teams',
                 sub:     'No dedicated recruiter? AI fills the gap.',
                 agents:  ['Sifter', 'Scheduler'],
+                tint:    'bg-[#EAFDF5]',
                 bullets: ['Zero setup — live in minutes', 'AI handles top-of-funnel entirely', 'Pay only for what you use'],
               },
-            ].map(({ title, sub, agents, bullets }) => (
-              <div key={title} className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm hover:shadow-md transition-shadow">
+            ].map(({ title, sub, agents, tint, bullets }) => (
+              <div key={title} className={`rounded-2xl border border-slate-200 ${tint} p-7 shadow-sm hover:shadow-md transition-shadow`}>
                 <h3 className="text-lg font-bold text-slate-900">{title}</h3>
                 <p className="mt-2 text-sm text-slate-500">{sub}</p>
                 <div className="mt-4 flex flex-wrap gap-1.5">
-                  {agents.map(a => (
-                    <span key={a} className="text-xs px-2.5 py-1 rounded-full border border-blue-200 text-blue-600 bg-blue-50">{a}</span>
-                  ))}
+                  {agents.map(a => {
+                    const agentDef = AGENTS.find(ag => ag.name === a)
+                    return (
+                      <span key={a} className={`text-xs px-2.5 py-1 rounded-full border ${agentDef?.border ?? 'border-blue-200'} ${agentDef?.color ?? 'text-blue-600'} ${agentDef?.bg ?? 'bg-blue-50'}`}>{a}</span>
+                    )
+                  })}
                 </div>
                 <ul className="mt-5 space-y-2">
                   {bullets.map(b => (
@@ -425,7 +436,7 @@ export default function HomePage() {
       </section>
 
       {/* ══ PRICING TEASER ════════════════════════════════════════════════════ */}
-      <section className="border-t border-slate-200 py-24 bg-white">
+      <section className="py-24 bg-[#F9F8F4]">
         <div className="mx-auto max-w-5xl px-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">Pricing</p>
           <h2 className="text-3xl font-bold text-slate-900">Pay only for what you deploy</h2>
@@ -465,12 +476,12 @@ export default function HomePage() {
                 key={label}
                 className={`rounded-2xl p-6 text-left ${
                   highlight
-                    ? 'border-2 border-blue-500 bg-blue-50/50 shadow-md'
-                    : 'border border-slate-200 bg-slate-50 shadow-sm'
+                    ? 'border-2 border-blue-500 bg-white shadow-lg shadow-blue-500/10'
+                    : 'border border-slate-200 bg-white shadow-sm'
                 }`}
               >
                 {highlight && (
-                  <span className="mb-3 inline-block rounded-full bg-blue-600 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">
+                  <span className="mb-3 inline-block rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">
                     Most popular
                   </span>
                 )}
@@ -485,7 +496,7 @@ export default function HomePage() {
                   className={`mt-5 block rounded-xl py-2.5 text-sm font-semibold text-center transition-colors ${
                     highlight
                       ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-white'
+                      : 'border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
                   {cta}
@@ -501,7 +512,7 @@ export default function HomePage() {
       </section>
 
       {/* ══ HOW IT WORKS ══════════════════════════════════════════════════════ */}
-      <section className="border-t border-slate-200 py-24">
+      <section className="py-24 bg-white">
         <div className="mx-auto max-w-4xl px-6">
           <div className="mb-14 text-center">
             <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">How it works</p>
@@ -513,7 +524,7 @@ export default function HomePage() {
                 key={n}
                 className="flex items-start gap-6 rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm hover:shadow-md transition-shadow"
               >
-                <span className="shrink-0 font-black text-3xl text-slate-200 leading-none tabular-nums">{n}</span>
+                <span className="shrink-0 font-black text-3xl bg-gradient-to-br from-blue-500 to-violet-500 bg-clip-text text-transparent leading-none tabular-nums">{n}</span>
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
                   <p className="mt-1 text-sm text-slate-500">{desc}</p>
@@ -525,17 +536,17 @@ export default function HomePage() {
       </section>
 
       {/* ══ LEAD CAPTURE ══════════════════════════════════════════════════════ */}
-      <section className="border-t border-slate-200 py-24">
+      <section className="py-24 bg-[#061D46]">
         <div className="mx-auto max-w-2xl px-6 text-center">
-          <div className="rounded-3xl border border-slate-200 bg-white px-8 py-14 shadow-sm">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm px-8 py-14">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-blue-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Now in early access
             </div>
-            <h2 className="mt-5 text-3xl font-bold text-slate-900">
+            <h2 className="mt-5 text-3xl font-bold text-white">
               Ready to deploy your AI recruiting team?
             </h2>
-            <p className="mt-3 text-slate-500">
+            <p className="mt-3 text-blue-100/60">
               Join teams already running AI agents across their hiring funnel.
               Drop your email and we&apos;ll walk you through the right agents for your workflow.
             </p>
@@ -546,9 +557,9 @@ export default function HomePage() {
                 source="homepage-cta"
               />
             </div>
-            <p className="mt-5 text-xs text-slate-400">
+            <p className="mt-5 text-xs text-blue-200/40">
               Or{' '}
-              <Link href="/sign-up" className="text-blue-600 hover:text-blue-700 transition-colors">
+              <Link href="/sign-up" className="text-blue-300 hover:text-blue-200 transition-colors">
                 create a free account
               </Link>{' '}
               — no credit card required.

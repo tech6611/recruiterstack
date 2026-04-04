@@ -39,12 +39,12 @@ const SECTIONS = [
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-[#061D46] text-white">
       <MarketingNav />
 
-      <section className="py-20 border-b border-zinc-900">
+      <section className="py-20 border-b border-white/10">
         <div className="mx-auto max-w-3xl px-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-violet-500 mb-3">Legal</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-3">Legal</p>
           <h1 className="text-4xl font-black text-white mb-2">Privacy Policy</h1>
           <p className="text-sm text-zinc-600">
             Last updated: March 2026 · <span className="text-amber-600 font-medium">Placeholder — seek legal review before publishing</span>
@@ -57,13 +57,13 @@ export default function PrivacyPage() {
           {SECTIONS.map(({ title, body }) => (
             <div key={title}>
               <h2 className="text-base font-bold text-white mb-2">{title}</h2>
-              <p className="text-sm text-zinc-500 leading-relaxed">{body}</p>
+              <p className="text-sm text-blue-200/40 leading-relaxed">{body}</p>
             </div>
           ))}
-          <div className="pt-4 border-t border-zinc-900">
+          <div className="pt-4 border-t border-white/10">
             <p className="text-xs text-zinc-700">
               Questions?{' '}
-              <Link href="/contact" className="text-violet-400 hover:text-violet-300 transition-colors">
+              <Link href="/contact" className="text-blue-400 hover:text-blue-300 transition-colors">
                 Contact us
               </Link>
             </p>

@@ -45,12 +45,12 @@ const AGENT_CARDS: AgentCard[] = [
     name:         'Drafter',
     role:         'Job Creation & Tracking',
     icon:         FileText,
-    color:        'text-violet-400',
-    border:       'border-violet-500/30',
-    bg:           'bg-violet-500/10',
-    badge:        'bg-violet-500/20 text-violet-300',
-    iconColor:    'text-violet-400',
-    btnBg:        'bg-violet-600 hover:bg-violet-500',
+    color:        'text-blue-400',
+    border:       'border-blue-500/20',
+    bg:           'bg-blue-500/10',
+    badge:        'bg-blue-500/20 text-blue-300',
+    iconColor:    'text-blue-400',
+    btnBg:        'bg-blue-600 hover:bg-blue-500',
     monthlyPrice: 19,
     features: [
       'AI-drafted job descriptions',
@@ -205,30 +205,30 @@ export default function PricingPage() {
   const proMonthly = billingPeriod === 'annual' ? 119 : 149
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-[#061D46]">
       <MarketingNav />
 
       {/* Hero */}
-      <section className="border-b border-zinc-900 py-24 text-center">
+      <section className="border-b border-white/10 py-24 text-center">
         <div className="mx-auto max-w-6xl px-6">
-          <span className="mb-4 inline-block rounded-full border border-violet-500/30 bg-violet-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-violet-400">
+          <span className="mb-4 inline-block rounded-full border border-blue-500/20 bg-blue-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-blue-400">
             Pricing
           </span>
           <h1 className="mt-4 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
             Pay only for what<br className="hidden sm:block" /> you deploy
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-lg text-zinc-400">
+          <p className="mx-auto mt-5 max-w-xl text-lg text-blue-100/60">
             Individual agents or the full suite — no hidden fees.
           </p>
 
           {/* Billing toggle */}
-          <div className="mt-10 inline-flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 p-1">
+          <div className="mt-10 inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
             <button
               onClick={() => setBillingPeriod('monthly')}
               className={`rounded-lg px-5 py-2 text-sm font-semibold transition-colors ${
                 billingPeriod === 'monthly'
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-white/10 text-white'
+                  : 'text-blue-200/40 hover:text-blue-100'
               }`}
             >
               Monthly
@@ -237,8 +237,8 @@ export default function PricingPage() {
               onClick={() => setBillingPeriod('annual')}
               className={`flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition-colors ${
                 billingPeriod === 'annual'
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-white/10 text-white'
+                  : 'text-blue-200/40 hover:text-blue-100'
               }`}
             >
               Annual
@@ -251,11 +251,11 @@ export default function PricingPage() {
       </section>
 
       {/* Build your own stack */}
-      <section className="border-b border-zinc-900 py-20">
+      <section className="border-b border-white/10 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-10 text-center">
             <h2 className="text-2xl font-bold text-white sm:text-3xl">Meet the agents</h2>
-            <p className="mt-2 text-zinc-400">All five are included in Pro. Buy individually coming soon.</p>
+            <p className="mt-2 text-blue-100/60">All five are included in Pro. Buy individually coming soon.</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -265,7 +265,7 @@ export default function PricingPage() {
               return (
                 <div
                   key={agent.name}
-                  className={`flex flex-col rounded-2xl border ${agent.border} bg-zinc-900/50 p-6`}
+                  className={`flex flex-col rounded-2xl border ${agent.border} bg-white/5 p-6`}
                 >
                   <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl ${agent.bg}`}>
                     <Icon className={`h-5 w-5 ${agent.iconColor}`} />
@@ -277,10 +277,10 @@ export default function PricingPage() {
 
                   <div className="mt-4 flex items-end gap-1">
                     <span className="text-3xl font-bold text-white">${price}</span>
-                    <span className="mb-1 text-sm text-zinc-500">/mo</span>
+                    <span className="mb-1 text-sm text-blue-200/40">/mo</span>
                   </div>
                   {billingPeriod === 'annual' && (
-                    <p className="mt-0.5 text-xs text-zinc-600 line-through">
+                    <p className="mt-0.5 text-xs text-blue-200/40 line-through">
                       ${agent.monthlyPrice}/mo
                     </p>
                   )}
@@ -289,14 +289,14 @@ export default function PricingPage() {
                     {agent.features.map((feat) => (
                       <li key={feat} className="flex items-start gap-2">
                         <Check className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${agent.iconColor}`} />
-                        <span className="text-xs text-zinc-400">{feat}</span>
+                        <span className="text-xs text-blue-100/60">{feat}</span>
                       </li>
                     ))}
                   </ul>
 
                   <a
                     href="#full-suite"
-                    className="mt-auto block rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-center text-sm font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white transition-colors"
+                    className="mt-auto block rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-center text-sm font-semibold text-blue-100 hover:border-white/20 hover:text-white transition-colors"
                   >
                     Included in Pro ↓
                   </a>
@@ -308,67 +308,67 @@ export default function PricingPage() {
       </section>
 
       {/* Full suite */}
-      <section id="full-suite" className="border-b border-zinc-900 py-20">
+      <section id="full-suite" className="border-b border-white/10 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-10 text-center">
             <h2 className="text-2xl font-bold text-white sm:text-3xl">Full suite</h2>
-            <p className="mt-2 text-zinc-400">All 5 agents. One flat price. Zero per-agent billing.</p>
+            <p className="mt-2 text-blue-100/60">All 5 agents. One flat price. Zero per-agent billing.</p>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Pro */}
-            <div className="relative flex flex-col rounded-2xl border border-violet-500/40 bg-violet-500/5 p-8">
+            <div className="relative flex flex-col rounded-2xl border border-blue-500/30 bg-blue-500/5 p-8">
               <div className="absolute -top-3 left-6">
-                <span className="rounded-full bg-violet-600 px-3 py-1 text-xs font-bold text-white">
+                <span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-bold text-white">
                   Most popular
                 </span>
               </div>
               <h3 className="text-xl font-bold text-white">Pro</h3>
-              <p className="mt-1 text-sm text-zinc-400">For growing teams ready to automate the full funnel.</p>
+              <p className="mt-1 text-sm text-blue-100/60">For growing teams ready to automate the full funnel.</p>
               <div className="mt-6 flex items-end gap-2">
                 <span className="text-5xl font-bold text-white">${proMonthly}</span>
-                <span className="mb-2 text-sm text-zinc-500">/mo</span>
+                <span className="mb-2 text-sm text-blue-200/40">/mo</span>
               </div>
               {billingPeriod === 'annual' && (
-                <p className="mt-0.5 text-xs text-zinc-600 line-through">$149/mo</p>
+                <p className="mt-0.5 text-xs text-blue-200/40 line-through">$149/mo</p>
               )}
               <ul className="my-8 space-y-3">
                 {PRO_FEATURES.map((feat) => (
                   <li key={feat} className="flex items-start gap-3">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet-400" />
-                    <span className="text-sm text-zinc-300">{feat}</span>
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+                    <span className="text-sm text-blue-100">{feat}</span>
                   </li>
                 ))}
               </ul>
               <Link
                 href="/sign-up"
                 onClick={() => trackEvent('pricing_cta_clicked', { plan: 'pro', billing_period: billingPeriod })}
-                className="mt-auto block rounded-xl bg-violet-600 px-6 py-3 text-center text-sm font-semibold text-white hover:bg-violet-500 transition-colors"
+                className="mt-auto block rounded-xl bg-blue-500 px-6 py-3 text-center text-sm font-semibold text-white hover:bg-blue-400 transition-colors"
               >
                 Get started with Pro
               </Link>
             </div>
 
             {/* Enterprise */}
-            <div className="flex flex-col rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8">
+            <div className="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-8">
               <h3 className="text-xl font-bold text-white">Enterprise</h3>
-              <p className="mt-1 text-sm text-zinc-400">For large teams with complex workflows and compliance needs.</p>
+              <p className="mt-1 text-sm text-blue-100/60">For large teams with complex workflows and compliance needs.</p>
               <div className="mt-6 flex items-end gap-2">
                 <span className="text-5xl font-bold text-white">Custom</span>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">Pricing based on seats and usage</p>
+              <p className="mt-1 text-xs text-blue-200/40">Pricing based on seats and usage</p>
               <ul className="my-8 space-y-3">
                 {ENTERPRISE_FEATURES.map((feat) => (
                   <li key={feat} className="flex items-start gap-3">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-                    <span className="text-sm text-zinc-300">{feat}</span>
+                    <span className="text-sm text-blue-100">{feat}</span>
                   </li>
                 ))}
               </ul>
               <a
                 href="mailto:enterprise@recruiterstack.com"
                 onClick={() => trackEvent('pricing_cta_clicked', { plan: 'enterprise', billing_period: billingPeriod })}
-                className="mt-auto block rounded-xl border border-zinc-700 px-6 py-3 text-center text-sm font-semibold text-white hover:border-zinc-600 hover:bg-zinc-800 transition-colors"
+                className="mt-auto block rounded-xl border border-white/15 px-6 py-3 text-center text-sm font-semibold text-white hover:border-white/20 hover:bg-white/10 transition-colors"
               >
                 Contact sales
               </a>
@@ -378,20 +378,20 @@ export default function PricingPage() {
       </section>
 
       {/* Comparison row: free vs pro vs enterprise */}
-      <section className="border-b border-zinc-900 py-14">
+      <section className="border-b border-white/10 py-14">
         <div className="mx-auto max-w-4xl px-6">
           <h2 className="mb-8 text-center text-xl font-bold text-white">Plan comparison</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-800">
-                  <th className="pb-4 text-left font-medium text-zinc-500">Feature</th>
-                  <th className="pb-4 text-center font-medium text-zinc-500">Free</th>
-                  <th className="pb-4 text-center font-semibold text-violet-400">Pro</th>
+                <tr className="border-b border-white/10">
+                  <th className="pb-4 text-left font-medium text-blue-200/40">Feature</th>
+                  <th className="pb-4 text-center font-medium text-blue-200/40">Free</th>
+                  <th className="pb-4 text-center font-semibold text-blue-400">Pro</th>
                   <th className="pb-4 text-center font-medium text-amber-400">Enterprise</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-900">
+              <tbody className="divide-y divide-white/10">
                 {[
                   { label: 'Active jobs',       free: '1',          pro: 'Unlimited',    ent: 'Unlimited' },
                   { label: 'Candidates',        free: '50',         pro: 'Unlimited',    ent: 'Unlimited' },
@@ -402,19 +402,19 @@ export default function PricingPage() {
                   { label: 'Dedicated CSM',     free: false,        pro: false,          ent: true },
                   { label: 'SLA',               free: false,        pro: false,          ent: true },
                 ].map((row) => (
-                  <tr key={row.label} className="hover:bg-zinc-900/30 transition-colors">
-                    <td className="py-3.5 text-zinc-300">{row.label}</td>
-                    <td className="py-3.5 text-center text-zinc-500">
+                  <tr key={row.label} className="hover:bg-white/5 transition-colors">
+                    <td className="py-3.5 text-blue-100">{row.label}</td>
+                    <td className="py-3.5 text-center text-blue-200/40">
                       {typeof row.free === 'boolean' ? (
                         row.free ? <Check className="mx-auto h-4 w-4 text-emerald-400" /> : <X className="mx-auto h-4 w-4 text-zinc-700" />
                       ) : row.free}
                     </td>
-                    <td className="py-3.5 text-center text-zinc-300">
+                    <td className="py-3.5 text-center text-blue-100">
                       {typeof row.pro === 'boolean' ? (
                         row.pro ? <Check className="mx-auto h-4 w-4 text-emerald-400" /> : <X className="mx-auto h-4 w-4 text-zinc-700" />
                       ) : row.pro}
                     </td>
-                    <td className="py-3.5 text-center text-zinc-300">
+                    <td className="py-3.5 text-center text-blue-100">
                       {typeof row.ent === 'boolean' ? (
                         row.ent ? <Check className="mx-auto h-4 w-4 text-emerald-400" /> : <X className="mx-auto h-4 w-4 text-zinc-700" />
                       ) : row.ent}
@@ -437,7 +437,7 @@ export default function PricingPage() {
             {FAQ_ITEMS.map((item, idx) => (
               <div
                 key={item.q}
-                className="rounded-xl border border-zinc-800 bg-zinc-900/50 overflow-hidden"
+                className="rounded-xl border border-white/10 bg-white/5 overflow-hidden"
               >
                 <button
                   onClick={() => toggleFaq(idx)}
@@ -446,14 +446,14 @@ export default function PricingPage() {
                 >
                   <span className="text-sm font-semibold text-white">{item.q}</span>
                   {openFaq === idx ? (
-                    <Minus className="h-4 w-4 shrink-0 text-zinc-500" />
+                    <Minus className="h-4 w-4 shrink-0 text-blue-200/40" />
                   ) : (
-                    <Plus className="h-4 w-4 shrink-0 text-zinc-500" />
+                    <Plus className="h-4 w-4 shrink-0 text-blue-200/40" />
                   )}
                 </button>
                 {openFaq === idx && (
-                  <div className="border-t border-zinc-800 px-6 py-4">
-                    <p className="text-sm text-zinc-400 leading-relaxed">{item.a}</p>
+                  <div className="border-t border-white/10 px-6 py-4">
+                    <p className="text-sm text-blue-100/60 leading-relaxed">{item.a}</p>
                   </div>
                 )}
               </div>

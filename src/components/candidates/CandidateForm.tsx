@@ -12,11 +12,12 @@ interface CandidateFormProps {
 }
 
 const STATUS_OPTIONS: CandidateStatus[] = [
-  'active', 'inactive', 'interviewing', 'offer_extended', 'hired', 'rejected',
+  'active', 'on_hold', 'inactive', 'interviewing', 'offer_extended', 'hired', 'rejected',
 ]
 
 const STATUS_LABELS: Record<CandidateStatus, string> = {
   active: 'Active',
+  on_hold: 'On Hold',
   inactive: 'Inactive',
   interviewing: 'Interviewing',
   offer_extended: 'Offer Extended',

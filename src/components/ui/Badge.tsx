@@ -4,6 +4,7 @@ type Status = CandidateStatus | RoleStatus
 
 const CANDIDATE_STYLES: Record<CandidateStatus, string> = {
   active:         'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200',
+  on_hold:        'bg-amber-100  text-amber-800  ring-1 ring-amber-200',
   inactive:       'bg-slate-100  text-slate-600  ring-1 ring-slate-200',
   interviewing:   'bg-blue-100   text-blue-800   ring-1 ring-blue-200',
   offer_extended: 'bg-violet-100 text-violet-800 ring-1 ring-violet-200',
@@ -20,6 +21,7 @@ const ROLE_STYLES: Record<RoleStatus, string> = {
 
 const LABEL: Record<Status, string> = {
   active:         'Active',
+  on_hold:        'On Hold',
   inactive:       'Inactive',
   interviewing:   'Interviewing',
   offer_extended: 'Offer Extended',
