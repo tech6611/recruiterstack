@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { auth } from '@clerk/nextjs/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
@@ -54,9 +55,17 @@ export async function POST(
     })
   }
 
-  // Create enrollments
+  // Fetch stages upfront
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: stages } = await (supabase.from('sequence_stages') as any)
+    .select('*')
+    .eq('sequence_id', params.id)
+    .order('order_index', { ascending: true })
+
+  // Create enrollments with client-generated UUIDs
   const now = new Date().toISOString()
-  const enrollments = toEnroll.map(candidateId => ({
+  const enrollmentRecords = toEnroll.map(candidateId => ({
+    id: randomUUID(),
     org_id: orgId,
     sequence_id: params.id,
     candidate_id: candidateId,
@@ -68,54 +77,31 @@ export async function POST(
     started_at: now,
   }))
 
-  // Insert enrollments — don't use .select() as PostgREST cache may not know new columns
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('sequence_enrollments') as any)
-    .insert(enrollments)
+    .insert(enrollmentRecords)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Fetch the just-created enrollments by candidate IDs
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: created } = await (supabase.from('sequence_enrollments') as any)
-    .select('id')
-    .eq('sequence_id', params.id)
-    .eq('org_id', orgId)
-    .in('candidate_id', toEnroll)
-    .in('status', ['active'])
-
-  // Fetch all stages to calculate delays upfront
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: stages, error: stagesErr } = await (supabase.from('sequence_stages') as any)
-    .select('*')
-    .eq('sequence_id', params.id)
-    .order('order_index', { ascending: true })
-
-  if (stagesErr) {
-    logger.error('Failed to fetch stages for enrollment', stagesErr, { sequenceId: params.id })
+  if (error) {
+    logger.error('Failed to insert enrollments', error, { sequenceId: params.id })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Enqueue ALL stage emails upfront for each enrollment
+  // Enqueue jobs for each enrollment × each stage
   const nowMs = Date.now()
+  let totalJobsEnqueued = 0
 
-  for (const enrollment of created ?? []) {
+  for (const enrollment of enrollmentRecords) {
     let cumulativeDelaySeconds = 0
 
     for (const stage of stages ?? []) {
+      // Calculate delay
       if (stage.send_at) {
-        // Exact datetime: calculate seconds from now to that time
         const sendAtMs = new Date(stage.send_at).getTime()
-        const delayFromNow = Math.max(0, Math.round((sendAtMs - nowMs) / 1000))
-        cumulativeDelaySeconds = delayFromNow // absolute, not cumulative
+        cumulativeDelaySeconds = Math.max(0, Math.round((sendAtMs - nowMs) / 1000))
       } else {
-        // Relative delay: accumulate days + minutes
-        let stageDelayMs = (stage.delay_days ?? 0) * 24 * 60 * 60 * 1000
-        stageDelayMs += (stage.delay_minutes ?? 0) * 60 * 1000
-        if (stage.delay_business_days) {
-          const weekends = Math.floor((stage.delay_days ?? 0) / 5) * 2
-          stageDelayMs += weekends * 24 * 60 * 60 * 1000
-        }
-        cumulativeDelaySeconds += Math.round(stageDelayMs / 1000)
+        const dayMs = (stage.delay_days ?? 0) * 24 * 60 * 60 * 1000
+        const minMs = (stage.delay_minutes ?? 0) * 60 * 1000
+        cumulativeDelaySeconds += Math.round((dayMs + minMs) / 1000)
       }
 
       try {
@@ -130,13 +116,31 @@ export async function POST(
           },
           delaySeconds: cumulativeDelaySeconds,
         })
+        totalJobsEnqueued++
       } catch (err) {
         logger.error('Failed to enqueue sequence email', err, {
           enrollmentId: enrollment.id, stageId: stage.id,
         })
       }
     }
+
+    // Fallback: if no stages found or all enqueues failed, create a single legacy job
+    if (totalJobsEnqueued === 0) {
+      try {
+        await enqueue({
+          orgId,
+          jobType: 'sequence_email',
+          payload: { enrollmentId: enrollment.id, sequenceId: params.id },
+        })
+      } catch (err) {
+        logger.error('Failed to enqueue fallback sequence email', err, { enrollmentId: enrollment.id })
+      }
+    }
   }
+
+  logger.info('Enrollment complete', {
+    sequenceId: params.id, enrolled: toEnroll.length, jobsEnqueued: totalJobsEnqueued,
+  })
 
   return NextResponse.json({
     data: {
