@@ -56,10 +56,10 @@ export async function POST(
   }
 
   // Fetch stages upfront
-  // Select only pre-031 columns to avoid PostgREST cache issues with new columns
+  // Select only original migration 025 columns — PostgREST cache doesn't know later columns
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: stages, error: stagesErr } = await (supabase.from('sequence_stages') as any)
-    .select('id, sequence_id, order_index, delay_days, subject, body, send_on_behalf_of, send_on_behalf_email, channel, send_at_time, send_timezone, delay_business_days, condition, created_at, updated_at')
+    .select('id, order_index, delay_days, subject, body, send_on_behalf_of, send_on_behalf_email, created_at, updated_at')
     .eq('sequence_id', params.id)
     .order('order_index', { ascending: true })
 
