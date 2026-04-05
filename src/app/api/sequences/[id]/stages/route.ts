@@ -44,13 +44,23 @@ export async function POST(
     condition: body.condition ?? null,
   }
 
+  // Insert without .select() to avoid PostgREST schema cache issues with newer columns
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from('sequence_stages') as any)
+  const { error } = await (supabase.from('sequence_stages') as any)
     .insert(stage)
-    .select()
-    .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Fetch the created stage using known columns
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase.from('sequence_stages') as any)
+    .select('id, org_id, sequence_id, order_index, delay_days, subject, body, send_on_behalf_of, send_on_behalf_email, created_at, updated_at')
+    .eq('sequence_id', params.id)
+    .eq('org_id', orgId)
+    .eq('order_index', stage.order_index)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
 
   return NextResponse.json({ data }, { status: 201 })
 }
