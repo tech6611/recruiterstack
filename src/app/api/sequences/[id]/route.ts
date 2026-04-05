@@ -30,6 +30,23 @@ export async function GET(
     data.stages = []
   }
 
+  // Add enrollment_count and reply_count (Django included these via _full_sequence)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count: enrollmentCount } = await (supabase.from('sequence_enrollments') as any)
+    .select('id', { count: 'exact', head: true })
+    .eq('sequence_id', params.id)
+    .eq('org_id', orgId)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count: replyCount } = await (supabase.from('sequence_enrollments') as any)
+    .select('id', { count: 'exact', head: true })
+    .eq('sequence_id', params.id)
+    .eq('org_id', orgId)
+    .eq('status', 'replied')
+
+  data.enrollment_count = enrollmentCount ?? 0
+  data.reply_count = replyCount ?? 0
+
   return NextResponse.json({ data })
 }
 
