@@ -122,7 +122,7 @@ export async function POST(
             enrollmentId: enrollment.id,
             sequenceId: params.id,
             stageId: stage.id,
-            stageIndex: stage.order_index,
+            stageIndex: i,  // 0-based — handler uses this for progress tracking
           },
           delaySeconds: cumulativeDelaySeconds,
         })
