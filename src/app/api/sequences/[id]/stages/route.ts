@@ -27,6 +27,7 @@ export async function POST(
   if (!seq) return NextResponse.json({ error: 'Sequence not found' }, { status: 404 })
 
   const stage = {
+    org_id: orgId,
     sequence_id: params.id,
     order_index: body.order_index ?? 0,
     delay_days: body.delay_days ?? 0,

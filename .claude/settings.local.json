@@ -39,7 +39,9 @@
       "Bash(git add src/app/api/debug-auth/route.ts)",
       "Bash(find /Users/sagar/recruiterstack/src -name *.ts -type f)",
       "Bash(grep -h \"CREATE TABLE\" /Users/sagar/recruiterstack/supabase/migrations/*.sql)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "WebFetch(domain:www.gem.com)",
+      "Bash(npx vitest:*)"
     ]
   }
 }
