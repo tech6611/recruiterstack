@@ -22,9 +22,12 @@ export async function GET(
 
   if (error || !data) return NextResponse.json({ error: 'Sequence not found' }, { status: 404 })
 
-  // Sort stages by order_index
+  // Rename sequence_stages → stages to match frontend expectations (Django used "stages")
   if (data.sequence_stages) {
-    data.sequence_stages.sort((a: { order_index: number }, b: { order_index: number }) => a.order_index - b.order_index)
+    data.stages = data.sequence_stages.sort((a: { order_index: number }, b: { order_index: number }) => a.order_index - b.order_index)
+    delete data.sequence_stages
+  } else {
+    data.stages = []
   }
 
   return NextResponse.json({ data })
