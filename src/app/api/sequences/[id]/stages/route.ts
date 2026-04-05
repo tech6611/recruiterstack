@@ -26,18 +26,18 @@ export async function POST(
 
   if (!seq) return NextResponse.json({ error: 'Sequence not found' }, { status: 404 })
 
-  const stage = {
+  // Only include columns PostgREST knows about (migrations 025 + 027)
+  // Migration 031 columns (delay_minutes, send_at) are excluded to avoid schema cache errors
+  const stage: Record<string, unknown> = {
     org_id: orgId,
     sequence_id: params.id,
-    order_index: body.order_index ?? 0,
+    order_index: body.order_index ?? 1,
     delay_days: body.delay_days ?? 0,
-    delay_minutes: body.delay_minutes ?? 0,
     subject: body.subject ?? '',
     body: body.body ?? '',
-    send_on_behalf_of: body.send_on_behalf_of ?? null,
-    send_on_behalf_email: body.send_on_behalf_email ?? null,
+    send_on_behalf_of: body.send_on_behalf_of ?? '',
+    send_on_behalf_email: body.send_on_behalf_email ?? '',
     channel: body.channel ?? 'email',
-    send_at: body.send_at ?? null,
     send_at_time: body.send_at_time ?? null,
     send_timezone: body.send_timezone ?? 'UTC',
     delay_business_days: body.delay_business_days ?? false,
