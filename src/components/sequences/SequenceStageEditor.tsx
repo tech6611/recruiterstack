@@ -87,7 +87,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [sendAt, setSendAt]               = useState(stage?.send_at ? stage.send_at.slice(0, 16) : '') // datetime-local format
   const [scheduleMode, setScheduleMode]   = useState<'delay' | 'exact'>(stage?.send_at ? 'exact' : 'delay')
   const [sendTime, setSendTime]           = useState(stage?.send_at_time?.slice(0, 5) ?? '')
-  const [sendTz, setSendTz]              = useState(stage?.send_timezone ?? 'UTC')
+  const [sendTz, setSendTz]              = useState(stage?.send_timezone ?? 'Asia/Kolkata')
   const [condition, setCondition]         = useState<StageCondition | ''>(stage?.condition ?? '')
   const [soboName, setSoboName]           = useState(stage?.send_on_behalf_of ?? '')
   const [soboEmail, setSoboEmail]         = useState(stage?.send_on_behalf_email ?? '')

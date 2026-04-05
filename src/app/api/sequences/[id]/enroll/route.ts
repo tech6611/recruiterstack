@@ -55,11 +55,10 @@ export async function POST(
     })
   }
 
-  // Fetch stages upfront
-  // Select only original migration 025 columns — PostgREST cache doesn't know later columns
+  // Fetch stages upfront — include all columns needed for scheduling
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: stages, error: stagesErr } = await (supabase.from('sequence_stages') as any)
-    .select('id, order_index, delay_days, subject, body, send_on_behalf_of, send_on_behalf_email, created_at, updated_at')
+    .select('*')
     .eq('sequence_id', params.id)
     .order('order_index', { ascending: true })
 
@@ -92,26 +91,62 @@ export async function POST(
   }
 
   // Enqueue jobs for each enrollment × each stage
-  const nowMs = Date.now()
+  const nowDate = new Date()
+  const nowMs = nowDate.getTime()
   let totalJobsEnqueued = 0
 
   for (const enrollment of enrollmentRecords) {
-    let cumulativeDelaySeconds = 0
-
     for (let i = 0; i < (stages ?? []).length; i++) {
       const stage = stages[i]
 
-      // Calculate delay: stage 1 sends immediately, subsequent stages get at least 60s gap
+      // Calculate when this stage should fire
+      let delaySeconds: number
+
       if (stage.send_at) {
+        // Exact datetime override — send at this specific moment
         const sendAtMs = new Date(stage.send_at).getTime()
-        cumulativeDelaySeconds = Math.max(0, Math.round((sendAtMs - nowMs) / 1000))
-      } else if (i === 0) {
-        // First stage: send immediately (no delay)
-        cumulativeDelaySeconds = 0
+        delaySeconds = Math.max(0, Math.round((sendAtMs - nowMs) / 1000))
+
+      } else if (stage.send_at_time) {
+        // Time-of-day scheduling: "send at HH:MM in timezone"
+        const tz = stage.send_timezone || 'Asia/Kolkata'
+        const [targetH, targetM] = stage.send_at_time.split(':').map(Number)
+
+        // Get current date parts in the target timezone using Intl (works regardless of system tz)
+        const fmt = new Intl.DateTimeFormat('en-US', {
+          timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+        })
+        const parts = fmt.formatToParts(nowDate)
+        const get = (t: string) => parseInt(parts.find(p => p.type === t)!.value)
+        const tzYear = get('year'), tzMonth = get('month') - 1, tzDay = get('day')
+        const tzHour = get('hour'), tzMinute = get('minute')
+
+        // Calculate tz offset: realUTC = fakeUTC + offset
+        const nowFakeUtc = Date.UTC(tzYear, tzMonth, tzDay, tzHour, tzMinute, 0)
+        const tzOffsetMs = nowMs - nowFakeUtc
+
+        // Build target time in the timezone (as fake UTC)
+        const extraDays = stage.delay_days ?? 0
+        let targetFakeUtc = Date.UTC(tzYear, tzMonth, tzDay + extraDays, targetH, targetM, 0)
+
+        // If target time already passed today and no delay_days, push to tomorrow
+        const targetRealUtc = targetFakeUtc + tzOffsetMs
+        if (targetRealUtc <= nowMs && extraDays === 0) {
+          targetFakeUtc += 86_400_000 // +1 day
+        }
+
+        delaySeconds = Math.max(0, Math.round((targetFakeUtc + tzOffsetMs - nowMs) / 1000))
+
       } else {
-        const daySeconds = (stage.delay_days ?? 0) * 86400
-        const minSeconds = (stage.delay_minutes ?? 0) * 60
-        cumulativeDelaySeconds += Math.max(daySeconds + minSeconds, 60) // minimum 60s gap
+        // Relative delay from enrollment time
+        if (i === 0 && (stage.delay_days ?? 0) === 0 && (stage.delay_minutes ?? 0) === 0) {
+          delaySeconds = 0 // First stage with no delay: send immediately
+        } else {
+          const daySeconds = (stage.delay_days ?? 0) * 86400
+          const minSeconds = (stage.delay_minutes ?? 0) * 60
+          delaySeconds = Math.max(daySeconds + minSeconds, i > 0 ? 60 : 0) // min 60s gap for stages 2+
+        }
       }
 
       try {
@@ -124,7 +159,7 @@ export async function POST(
             stageId: stage.id,
             stageIndex: i,  // 0-based — handler uses this for progress tracking
           },
-          delaySeconds: cumulativeDelaySeconds,
+          delaySeconds,
         })
         totalJobsEnqueued++
       } catch (err) {

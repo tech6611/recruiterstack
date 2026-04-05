@@ -39,7 +39,7 @@ export async function POST(
     channel: body.channel ?? 'email',
     send_at: body.send_at ?? null,
     send_at_time: body.send_at_time ?? null,
-    send_timezone: body.send_timezone ?? 'UTC',
+    send_timezone: body.send_timezone ?? 'Asia/Kolkata',
     delay_business_days: body.delay_business_days ?? false,
     condition: body.condition ?? null,
   }
