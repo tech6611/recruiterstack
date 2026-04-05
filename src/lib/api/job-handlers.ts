@@ -278,16 +278,29 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
       .select('*').eq('id', stageId).single()
     stage = data
   } else {
-    // Legacy: fetch by order_index
+    // Legacy: fetch by order_index — handles both 0-based (new) and 1-based (Django) indexing
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: stages } = await (supabase.from('sequence_stages') as any)
       .select('*').eq('sequence_id', sequenceId).order('order_index', { ascending: true })
     const idx = stageIndex ?? enrollment.current_stage_index ?? 0
-    stage = stages?.[idx]
+    // Try matching by order_index first (handles 1-based), fall back to array index (0-based)
+    stage = stages?.find((s: { order_index: number }) => s.order_index === idx) ?? stages?.[idx]
   }
 
   if (!stage) {
     logger.warn('Stage not found, skipping', { enrollmentId, stageId, stageIndex })
+    return
+  }
+
+  // Idempotency: skip if a 'sent' email already exists for this enrollment + stage
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count: alreadySent } = await (supabase.from('sequence_emails') as any)
+    .select('id', { count: 'exact', head: true })
+    .eq('enrollment_id', enrollmentId)
+    .eq('stage_id', stage.id)
+    .eq('status', 'sent')
+  if (alreadySent && alreadySent > 0) {
+    logger.info('Email already sent for this stage, skipping', { enrollmentId, stageId: stage.id })
     return
   }
 
@@ -297,6 +310,27 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     return
   }
 
+  // Fetch hiring request data for token population
+  let jobTitle = ''
+  let companyName = ''
+  let recruiterName = ''
+  if (enrollment.application_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: app } = await (supabase.from('applications') as any)
+      .select('hiring_request_id').eq('id', enrollment.application_id).single()
+    if (app?.hiring_request_id) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: hr } = await (supabase.from('hiring_requests') as any)
+        .select('position_title, autopilot_company_name, autopilot_recruiter_name')
+        .eq('id', app.hiring_request_id).single()
+      if (hr) {
+        jobTitle = hr.position_title ?? ''
+        companyName = hr.autopilot_company_name ?? ''
+        recruiterName = hr.autopilot_recruiter_name ?? ''
+      }
+    }
+  }
+
   // Token replacement
   const firstName = candidate.name?.split(' ')[0] ?? ''
   const tokens: Record<string, string> = {
@@ -304,9 +338,9 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     '{{candidate_name}}': candidate.name ?? '',
     '{{candidate_title}}': candidate.current_title ?? '',
     '{{candidate_location}}': candidate.location ?? '',
-    '{{job_title}}': '',
-    '{{company_name}}': '',
-    '{{recruiter_name}}': '',
+    '{{job_title}}': jobTitle,
+    '{{company_name}}': companyName,
+    '{{recruiter_name}}': recruiterName,
   }
 
   let subject = stage.subject ?? ''
@@ -336,21 +370,12 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     })
     sendgridMessageId = response?.headers?.['x-message-id'] ?? null
   } catch (err) {
-    const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
-    // Store the error in the body field so we can read it via SQL
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from('sequence_emails') as any)
-      .insert({
-        enrollment_id: enrollmentId, stage_id: stage.id, candidate_id: enrollment.candidate_id,
-        to_email: candidate.email, subject, body: `ERROR: ${errMsg}\n\n---ORIGINAL BODY---\n${body}`,
-        status: 'failed', org_id: job.org_id,
-      })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from('sequence_enrollments') as any)
-      .update({ status: 'bounced', completed_at: new Date().toISOString() })
-      .eq('id', enrollmentId)
-    logger.error('Sequence email failed, enrollment bounced', err, { enrollmentId })
-    return
+    // Log the failure — do NOT mark enrollment as bounced so the job queue can retry
+    logger.error('Sequence email send failed (will retry via job queue)', err, {
+      enrollmentId, stageId: stage.id,
+    })
+    // Re-throw so processJobs() marks the job as failed and retries with exponential backoff
+    throw err
   }
 
   // Record sent email

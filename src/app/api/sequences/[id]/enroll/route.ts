@@ -98,15 +98,20 @@ export async function POST(
   for (const enrollment of enrollmentRecords) {
     let cumulativeDelaySeconds = 0
 
-    for (const stage of stages ?? []) {
-      // Calculate delay
+    for (let i = 0; i < (stages ?? []).length; i++) {
+      const stage = stages[i]
+
+      // Calculate delay: stage 1 sends immediately, subsequent stages get at least 60s gap
       if (stage.send_at) {
         const sendAtMs = new Date(stage.send_at).getTime()
         cumulativeDelaySeconds = Math.max(0, Math.round((sendAtMs - nowMs) / 1000))
+      } else if (i === 0) {
+        // First stage: send immediately (no delay)
+        cumulativeDelaySeconds = 0
       } else {
-        const dayMs = (stage.delay_days ?? 0) * 24 * 60 * 60 * 1000
-        const minMs = (stage.delay_minutes ?? 0) * 60 * 1000
-        cumulativeDelaySeconds += Math.round((dayMs + minMs) / 1000)
+        const daySeconds = (stage.delay_days ?? 0) * 86400
+        const minSeconds = (stage.delay_minutes ?? 0) * 60
+        cumulativeDelaySeconds += Math.max(daySeconds + minSeconds, 60) // minimum 60s gap
       }
 
       try {
@@ -127,6 +132,14 @@ export async function POST(
           enrollmentId: enrollment.id, stageId: stage.id,
         })
       }
+    }
+
+    // If per-stage jobs were created, clear next_send_at so the cron doesn't create duplicate legacy jobs
+    if (totalJobsEnqueued > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from('sequence_enrollments') as any)
+        .update({ next_send_at: null })
+        .eq('id', enrollment.id)
     }
 
     // Fallback: if no stages found or all enqueues failed, create a single legacy job
