@@ -86,7 +86,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [businessDays, setBusinessDays]   = useState(stage?.delay_business_days ?? false)
   const [sendAt, setSendAt]               = useState(stage?.send_at ? stage.send_at.slice(0, 16) : '') // datetime-local format
   const [sendTime, setSendTime]           = useState(stage?.send_at_time?.slice(0, 5) ?? '')
-  const [sendTz, setSendTz]              = useState(stage?.send_timezone ?? 'Asia/Kolkata')
+  const [sendTz, setSendTz]              = useState(stage?.send_timezone && stage.send_timezone !== 'UTC' ? stage.send_timezone : 'Asia/Kolkata')
   const [condition, setCondition]         = useState<StageCondition | ''>(stage?.condition ?? '')
   const [soboName, setSoboName]           = useState(stage?.send_on_behalf_of ?? '')
   const [soboEmail, setSoboEmail]         = useState(stage?.send_on_behalf_email ?? '')
@@ -390,51 +390,53 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
               </label>
             </div>
 
-            {/* Time of day + Timezone */}
-            <div className="flex items-end gap-3">
-              <div>
-                <p className="text-[11px] text-slate-400 mb-1">Send at specific time (optional)</p>
+            {/* Time + Date + Timezone — single compact row */}
+            <div className="flex items-end gap-2">
+              <div className="shrink-0">
+                <p className="text-[11px] text-slate-400 mb-1">Time</p>
                 <input
                   type="time"
                   value={sendTime}
                   onChange={e => setSendTime(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
-              <div>
+              <div className="shrink-0">
+                <p className="text-[11px] text-slate-400 mb-1">Date <span className="text-slate-300">(optional)</span></p>
+                <input
+                  type="datetime-local"
+                  value={sendAt}
+                  onChange={e => setSendAt(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 w-[170px]"
+                />
+              </div>
+              <div className="min-w-0">
                 <p className="text-[11px] text-slate-400 mb-1">Timezone</p>
                 <select
                   value={sendTz}
                   onChange={e => setSendTz(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 w-full"
                 >
                   {TIMEZONES.map(tz => (
                     <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
                   ))}
                 </select>
               </div>
-              {sendTime && (
-                <button type="button" onClick={() => setSendTime('')} className="text-[11px] text-slate-400 hover:text-slate-600 mb-2">
+              {(sendTime || sendAt) && (
+                <button
+                  type="button"
+                  onClick={() => { setSendTime(''); setSendAt('') }}
+                  className="text-[11px] text-slate-400 hover:text-slate-600 mb-2 shrink-0"
+                >
                   Clear
                 </button>
               )}
             </div>
-
-            {/* Optional: specific date */}
-            <div>
-              <p className="text-[11px] text-slate-400 mb-1">Or send on a specific date & time (optional)</p>
-              <input
-                type="datetime-local"
-                value={sendAt}
-                onChange={e => setSendAt(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              />
-              {sendAt && (
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Overrides delay settings — email will be sent at {new Date(sendAt).toLocaleString()}
-                </p>
-              )}
-            </div>
+            {sendAt && (
+              <p className="text-[10px] text-amber-600">
+                Exact date overrides delay settings
+              </p>
+            )}
           </div>
 
           {/* ── 3. Conditional Logic (stage 2+) ──────────────────────────── */}
