@@ -86,13 +86,6 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [businessDays, setBusinessDays]   = useState(stage?.delay_business_days ?? false)
   const [sendTime, setSendTime]           = useState(stage?.send_at_time?.slice(0, 5) ?? '')
   const [sendTz, setSendTz]              = useState(stage?.send_timezone && stage.send_timezone !== 'UTC' ? stage.send_timezone : 'Asia/Kolkata')
-  // Convert UTC send_at to the stage's timezone for the datetime-local input
-  const [sendAt, setSendAt]               = useState(() => {
-    if (!stage?.send_at) return ''
-    const tz = stage.send_timezone && stage.send_timezone !== 'UTC' ? stage.send_timezone : 'Asia/Kolkata'
-    const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
-    return fmt.format(new Date(stage.send_at)).replace(' ', 'T') // "2026-04-06T07:40" format
-  })
   const [condition, setCondition]         = useState<StageCondition | ''>(stage?.condition ?? '')
   const [soboName, setSoboName]           = useState(stage?.send_on_behalf_of ?? '')
   const [soboEmail, setSoboEmail]         = useState(stage?.send_on_behalf_email ?? '')
@@ -279,22 +272,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
       send_on_behalf_of: soboName,
       send_on_behalf_email: soboEmail,
       channel,
-      send_at: sendAt ? (() => {
-        // Convert datetime-local (in sendTz) to UTC
-        // Parse the local datetime parts
-        const [datePart, timePart] = sendAt.split('T')
-        const [y, mo, d] = datePart.split('-').map(Number)
-        const [h, mi] = timePart.split(':').map(Number)
-        // Get tz offset using Intl
-        const fakeUtc = Date.UTC(y, mo - 1, d, h, mi, 0)
-        const probe = new Date(fakeUtc)
-        const fmt = new Intl.DateTimeFormat('en-US', { timeZone: sendTz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
-        const parts = fmt.formatToParts(probe)
-        const get = (t: string) => parseInt(parts.find(p => p.type === t)!.value)
-        const probeLocal = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), 0)
-        const offsetMs = probe.getTime() - probeLocal
-        return new Date(fakeUtc + offsetMs).toISOString()
-      })() : null,
+      send_at: null,
       send_at_time: sendTime || null,
       send_timezone: sendTz,
       delay_business_days: businessDays,
@@ -370,94 +348,72 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
             )}
           </div>
 
-          {/* ── 2. Scheduling ────────────────────────────────────────────── */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+          {/* ── 2. Scheduling — GEM-style inline row ────────────────────── */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2.5">
             <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
               <Clock className="h-3.5 w-3.5" /> Scheduling
             </label>
 
-            {/* Delay: Days + Minutes */}
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-[11px] text-slate-400 mb-1">Days</p>
-                <input
-                  type="number"
-                  min={0}
-                  max={90}
-                  value={delayDays}
-                  onChange={e => setDelayDays(Number(e.target.value))}
-                  className="w-20 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-              <div>
-                <p className="text-[11px] text-slate-400 mb-1">Minutes</p>
-                <input
-                  type="number"
-                  min={0}
-                  max={1440}
-                  value={delayMinutes}
-                  onChange={e => setDelayMinutes(Number(e.target.value))}
-                  className="w-20 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-              <label className="flex items-center gap-2 mt-4 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={businessDays}
-                  onChange={e => setBusinessDays(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-xs text-slate-600">Business days only</span>
-              </label>
-            </div>
+            {/* Single inline row: [days] [type ▼] (date preview) at [time] [tz ▼] */}
+            <div className="flex flex-wrap items-center gap-1.5 text-sm text-slate-700">
+              <input
+                type="number"
+                min={0}
+                max={90}
+                value={delayDays}
+                onChange={e => setDelayDays(Number(e.target.value))}
+                className="w-14 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-center text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+              <select
+                value={businessDays ? 'business' : 'calendar'}
+                onChange={e => setBusinessDays(e.target.value === 'business')}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="calendar">{delayDays === 1 ? 'day' : 'days'}</option>
+                <option value="business">business {delayDays === 1 ? 'day' : 'days'}</option>
+              </select>
 
-            {/* Time + Date + Timezone — single compact row */}
-            <div className="flex items-end gap-2">
-              <div className="shrink-0">
-                <p className="text-[11px] text-slate-400 mb-1">Time</p>
-                <input
-                  type="time"
-                  value={sendTime}
-                  onChange={e => setSendTime(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-              <div className="shrink-0">
-                <p className="text-[11px] text-slate-400 mb-1">Date <span className="text-slate-300">(optional)</span></p>
-                <input
-                  type="datetime-local"
-                  value={sendAt}
-                  onChange={e => setSendAt(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 w-[170px]"
-                />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] text-slate-400 mb-1">Timezone</p>
-                <select
-                  value={sendTz}
-                  onChange={e => setSendTz(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 w-full"
-                >
-                  {TIMEZONES.map(tz => (
-                    <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
-                  ))}
-                </select>
-              </div>
-              {(sendTime || sendAt) && (
-                <button
-                  type="button"
-                  onClick={() => { setSendTime(''); setSendAt('') }}
-                  className="text-[11px] text-slate-400 hover:text-slate-600 mb-2 shrink-0"
-                >
-                  Clear
-                </button>
+              {/* Date preview — shows computed target date */}
+              {delayDays > 0 && (
+                <span className="text-xs text-slate-400">
+                  ({(() => {
+                    const target = new Date()
+                    let added = 0
+                    while (added < delayDays) {
+                      target.setDate(target.getDate() + 1)
+                      if (!businessDays || target.getDay() !== 0 && target.getDay() !== 6) added++
+                    }
+                    return target.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                  })()})
+                </span>
               )}
+
+              <span className="text-slate-400">at</span>
+
+              <input
+                type="time"
+                value={sendTime}
+                onChange={e => setSendTime(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+
+              <select
+                value={sendTz}
+                onChange={e => setSendTz(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              >
+                {TIMEZONES.map(tz => {
+                  // Short labels for common timezones
+                  const labels: Record<string, string> = {
+                    'Asia/Kolkata': 'IST', 'America/New_York': 'EST', 'America/Chicago': 'CST',
+                    'America/Denver': 'MST', 'America/Los_Angeles': 'PST', 'Europe/London': 'GMT',
+                    'Europe/Berlin': 'CET', 'Europe/Paris': 'CET', 'Asia/Singapore': 'SGT',
+                    'Asia/Tokyo': 'JST', 'Australia/Sydney': 'AEDT', 'UTC': 'UTC',
+                  }
+                  return <option key={tz} value={tz}>{labels[tz] ?? tz.replace(/_/g, ' ')}</option>
+                })}
+              </select>
             </div>
-            {sendAt && (
-              <p className="text-[10px] text-amber-600">
-                Exact date overrides delay settings
-              </p>
-            )}
           </div>
 
           {/* ── 3. Conditional Logic (stage 2+) ──────────────────────────── */}
