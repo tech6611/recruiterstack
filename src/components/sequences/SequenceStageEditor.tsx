@@ -84,9 +84,15 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [delayDays, setDelayDays]         = useState(stage?.delay_days ?? 0)
   const [delayMinutes, setDelayMinutes]   = useState(stage?.delay_minutes ?? 0)
   const [businessDays, setBusinessDays]   = useState(stage?.delay_business_days ?? false)
-  const [sendAt, setSendAt]               = useState(stage?.send_at ? stage.send_at.slice(0, 16) : '') // datetime-local format
   const [sendTime, setSendTime]           = useState(stage?.send_at_time?.slice(0, 5) ?? '')
   const [sendTz, setSendTz]              = useState(stage?.send_timezone && stage.send_timezone !== 'UTC' ? stage.send_timezone : 'Asia/Kolkata')
+  // Convert UTC send_at to the stage's timezone for the datetime-local input
+  const [sendAt, setSendAt]               = useState(() => {
+    if (!stage?.send_at) return ''
+    const tz = stage.send_timezone && stage.send_timezone !== 'UTC' ? stage.send_timezone : 'Asia/Kolkata'
+    const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+    return fmt.format(new Date(stage.send_at)).replace(' ', 'T') // "2026-04-06T07:40" format
+  })
   const [condition, setCondition]         = useState<StageCondition | ''>(stage?.condition ?? '')
   const [soboName, setSoboName]           = useState(stage?.send_on_behalf_of ?? '')
   const [soboEmail, setSoboEmail]         = useState(stage?.send_on_behalf_email ?? '')
@@ -273,7 +279,22 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
       send_on_behalf_of: soboName,
       send_on_behalf_email: soboEmail,
       channel,
-      send_at: sendAt ? new Date(sendAt).toISOString() : null,
+      send_at: sendAt ? (() => {
+        // Convert datetime-local (in sendTz) to UTC
+        // Parse the local datetime parts
+        const [datePart, timePart] = sendAt.split('T')
+        const [y, mo, d] = datePart.split('-').map(Number)
+        const [h, mi] = timePart.split(':').map(Number)
+        // Get tz offset using Intl
+        const fakeUtc = Date.UTC(y, mo - 1, d, h, mi, 0)
+        const probe = new Date(fakeUtc)
+        const fmt = new Intl.DateTimeFormat('en-US', { timeZone: sendTz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+        const parts = fmt.formatToParts(probe)
+        const get = (t: string) => parseInt(parts.find(p => p.type === t)!.value)
+        const probeLocal = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), 0)
+        const offsetMs = probe.getTime() - probeLocal
+        return new Date(fakeUtc + offsetMs).toISOString()
+      })() : null,
       send_at_time: sendTime || null,
       send_timezone: sendTz,
       delay_business_days: businessDays,
