@@ -9,34 +9,34 @@ const PLACEHOLDER_POSTS = [
     title:    'Introducing RecruiterStack Agents: AI for every stage of your hiring funnel',
     excerpt:  'We built 5 AI agents that plug into your existing recruiting stack. Here\'s why we designed them this way.',
     date:     'Coming soon',
-    color:    'text-blue-400',
-    badge:    'bg-blue-500/20 text-blue-300',
+    color:    'text-blue-600',
+    badge:    'bg-blue-100 text-blue-700',
   },
   {
     category: 'Guide',
     title:    'How to cut time-to-hire by 60% without changing your ATS',
     excerpt:  'A step-by-step guide to deploying AI agents on top of Greenhouse, Lever, or Workday without any migration.',
     date:     'Coming soon',
-    color:    'text-blue-400',
-    badge:    'bg-blue-500/20 text-blue-300',
+    color:    'text-blue-600',
+    badge:    'bg-blue-100 text-blue-700',
   },
   {
     category: 'Insights',
     title:    'The real cost of manual CV screening (it\'s not just time)',
     excerpt:  'Data from 50+ recruiting teams on what happens when screening is done entirely by hand — and what AI changes.',
     date:     'Coming soon',
-    color:    'text-fuchsia-400',
-    badge:    'bg-fuchsia-500/20 text-fuchsia-300',
+    color:    'text-fuchsia-600',
+    badge:    'bg-fuchsia-100 text-fuchsia-700',
   },
 ]
 
 export default function BlogPage() {
   return (
-    <div className="min-h-screen bg-[#061D46] text-white">
+    <div className="min-h-screen bg-white text-slate-900">
       <MarketingNav />
 
       {/* Hero */}
-      <section className="border-b border-white/10 py-20">
+      <section className="bg-[#061D46] py-20">
         <div className="mx-auto max-w-4xl px-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-3">Blog</p>
           <h1 className="text-4xl font-black text-white sm:text-5xl">
@@ -52,24 +52,24 @@ export default function BlogPage() {
       <section className="py-20">
         <div className="mx-auto max-w-5xl px-6">
           <div className="flex items-center gap-2 mb-8">
-            <Rss className="h-4 w-4 text-blue-400" />
-            <span className="text-sm font-semibold text-blue-100/60">Latest posts</span>
-            <span className="text-xs text-zinc-700 ml-2">— Content coming soon</span>
+            <Rss className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-semibold text-slate-500">Latest posts</span>
+            <span className="text-xs text-slate-400 ml-2">— Content coming soon</span>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-3">
             {PLACEHOLDER_POSTS.map(({ category, title, excerpt, date, color, badge }) => (
               <div
                 key={title}
-                className="rounded-2xl border border-white/10 bg-white/5 p-6 flex flex-col"
+                className="rounded-2xl border border-slate-200 bg-white p-6 flex flex-col shadow-sm"
               >
                 <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full self-start ${badge} mb-4`}>
                   {category}
                 </span>
-                <h3 className="text-sm font-bold text-white leading-snug flex-1">{title}</h3>
-                <p className="mt-3 text-xs text-blue-200/40 leading-relaxed">{excerpt}</p>
+                <h3 className="text-sm font-bold text-slate-900 leading-snug flex-1">{title}</h3>
+                <p className="mt-3 text-xs text-slate-400 leading-relaxed">{excerpt}</p>
                 <div className="mt-5 flex items-center justify-between">
-                  <span className="text-xs text-zinc-700">{date}</span>
+                  <span className="text-xs text-slate-400">{date}</span>
                   <span className={`flex items-center gap-1 text-xs font-semibold ${color} opacity-50`}>
                     Read <ArrowRight className="h-3 w-3" />
                   </span>
@@ -81,7 +81,7 @@ export default function BlogPage() {
       </section>
 
       {/* Subscribe */}
-      <section className="border-t border-white/10 py-20">
+      <section className="bg-[#061D46] py-20">
         <div className="mx-auto max-w-xl px-6 text-center">
           <h2 className="text-2xl font-bold text-white mb-2">Stay in the loop</h2>
           <p className="text-blue-200/40 mb-8">

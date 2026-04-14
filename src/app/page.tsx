@@ -202,7 +202,7 @@ export default function HomePage() {
       </section>
 
       {/* ══ INTEGRATION BAR ═══════════════════════════════════════════════════ */}
-      <section className="border-y border-slate-200 bg-[#F9F8F4] py-8">
+      <section className="border-y border-slate-200 bg-slate-50 py-8">
         <div className="mx-auto max-w-5xl px-6 text-center">
           <p className="mb-5 text-xs font-semibold uppercase tracking-widest text-slate-400">
             Works with your existing stack — no lock-in
@@ -304,7 +304,7 @@ export default function HomePage() {
       </section>
 
       {/* ══ PLUG & PLAY ═══════════════════════════════════════════════════════ */}
-      <section className="py-24 bg-[#EFEFFF]">
+      <section className="py-24 bg-slate-50">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid gap-12 lg:grid-cols-2 items-center">
 
@@ -392,21 +392,21 @@ export default function HomePage() {
                 title:   'Recruiting Agencies',
                 sub:     'Run multiple client mandates from one workspace.',
                 agents:  ['Scout', 'Sifter'],
-                tint:    'bg-[#FFF9F8]',
+                tint:    'bg-white',
                 bullets: ['Multi-client workspace isolation', 'AI screening saves 10+ hrs/week', 'Automated candidate shortlists'],
               },
               {
                 title:   'Enterprise TA Teams',
                 sub:     'Process hundreds of applications across dozens of reqs.',
                 agents:  ['Drafter', 'Scout', 'Sifter', 'Scheduler', 'Closer'],
-                tint:    'bg-[#EFEFFF]',
+                tint:    'bg-white',
                 bullets: ['Full-funnel automation', 'Cross-team pipeline visibility', 'Analytics & velocity reporting'],
               },
               {
                 title:   'Startups & Small Teams',
                 sub:     'No dedicated recruiter? AI fills the gap.',
                 agents:  ['Sifter', 'Scheduler'],
-                tint:    'bg-[#EAFDF5]',
+                tint:    'bg-white',
                 bullets: ['Zero setup — live in minutes', 'AI handles top-of-funnel entirely', 'Pay only for what you use'],
               },
             ].map(({ title, sub, agents, tint, bullets }) => (
@@ -436,7 +436,7 @@ export default function HomePage() {
       </section>
 
       {/* ══ PRICING TEASER ════════════════════════════════════════════════════ */}
-      <section className="py-24 bg-[#F9F8F4]">
+      <section className="py-24 bg-slate-50">
         <div className="mx-auto max-w-5xl px-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">Pricing</p>
           <h2 className="text-3xl font-bold text-slate-900">Pay only for what you deploy</h2>

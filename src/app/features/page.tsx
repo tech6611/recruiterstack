@@ -41,11 +41,11 @@ const AGENTS: Agent[] = [
     icon:      FileText,
     description:
       'Drafter handles everything that happens before the first CV arrives. It uses your intake form answers to generate a complete, tailored job description in seconds, then tracks every requisition through approval, posting, and close — giving your team a single source of truth for every open role.',
-    color:     'text-blue-400',
-    border:    'border-blue-500/20',
-    bg:        'bg-blue-500/10',
-    badge:     'bg-blue-500/20 text-blue-300',
-    iconColor: 'text-blue-400',
+    color:     'text-blue-600',
+    border:    'border-blue-200',
+    bg:        'bg-blue-50',
+    badge:     'bg-blue-100 text-blue-700',
+    iconColor: 'text-blue-600',
     features: [
       { title: 'AI-drafted job descriptions',       description: 'Generate a full JD from a short intake form in under 10 seconds.' },
       { title: 'Structured intake forms',           description: 'Collect hiring-manager requirements through a guided, shareable form.' },
@@ -64,11 +64,11 @@ const AGENTS: Agent[] = [
     icon:      Search,
     description:
       'Scout brings candidates in from wherever they live. Upload a CSV from any job board, paste a LinkedIn export, or drop raw CVs — Scout parses, deduplicates, and creates structured candidate profiles automatically. Your pipeline fills without manual data entry.',
-    color:     'text-blue-400',
-    border:    'border-blue-500/30',
-    bg:        'bg-blue-500/10',
-    badge:     'bg-blue-500/20 text-blue-300',
-    iconColor: 'text-blue-400',
+    color:     'text-blue-600',
+    border:    'border-blue-200',
+    bg:        'bg-blue-50',
+    badge:     'bg-blue-100 text-blue-700',
+    iconColor: 'text-blue-600',
     features: [
       { title: 'Bulk CSV import',                   description: 'Import hundreds of candidates at once from any job board export.' },
       { title: 'PDF CV parsing',                    description: 'Upload raw CVs and let AI extract name, contact, skills, and experience.' },
@@ -87,11 +87,11 @@ const AGENTS: Agent[] = [
     icon:      Brain,
     description:
       'Sifter reads every CV against your job description the moment it lands and produces a structured fit score, a strengths summary, and a gaps analysis. Recruiters stop reading CVs they would reject anyway and focus on the top of the pile from day one.',
-    color:     'text-fuchsia-400',
-    border:    'border-fuchsia-500/30',
-    bg:        'bg-fuchsia-500/10',
-    badge:     'bg-fuchsia-500/20 text-fuchsia-300',
-    iconColor: 'text-fuchsia-400',
+    color:     'text-fuchsia-600',
+    border:    'border-fuchsia-200',
+    bg:        'bg-fuchsia-50',
+    badge:     'bg-fuchsia-100 text-fuchsia-700',
+    iconColor: 'text-fuchsia-600',
     features: [
       { title: 'JD-vs-CV fit scoring',              description: 'Every candidate receives a 0–100 relevance score against the role.' },
       { title: 'Strengths & gaps analysis',         description: 'Sifter surfaces exactly what matches and what is missing for each hire.' },
@@ -110,11 +110,11 @@ const AGENTS: Agent[] = [
     icon:      CalendarCheck,
     description:
       'Scheduler eliminates the back-and-forth of interview booking. It sends personalised invitations, attaches prep materials, and fires reminders to both sides automatically. Your team shows up prepared and candidates arrive informed.',
-    color:     'text-emerald-400',
-    border:    'border-emerald-500/30',
-    bg:        'bg-emerald-500/10',
-    badge:     'bg-emerald-500/20 text-emerald-300',
-    iconColor: 'text-emerald-400',
+    color:     'text-emerald-600',
+    border:    'border-emerald-200',
+    bg:        'bg-emerald-50',
+    badge:     'bg-emerald-100 text-emerald-700',
+    iconColor: 'text-emerald-600',
     features: [
       { title: 'Automated interview invites',       description: 'Send personalised interview invitations directly from the platform.' },
       { title: 'Candidate prep packs',              description: 'Attach role context, company info, and prep tips to every invite.' },
@@ -133,11 +133,11 @@ const AGENTS: Agent[] = [
     icon:      BadgeCheck,
     description:
       'Closer takes over once you have decided on a hire. It drafts an offer letter from a template in seconds, tracks the approval chain, sends it to the candidate, and monitors acceptance — all without chasing anyone over email.',
-    color:     'text-amber-400',
-    border:    'border-amber-500/30',
-    bg:        'bg-amber-500/10',
-    badge:     'bg-amber-500/20 text-amber-300',
-    iconColor: 'text-amber-400',
+    color:     'text-amber-600',
+    border:    'border-amber-200',
+    bg:        'bg-amber-50',
+    badge:     'bg-amber-100 text-amber-700',
+    iconColor: 'text-amber-600',
     features: [
       { title: 'AI-drafted offer letters',          description: 'Generate a compliant, personalised offer from a template in seconds.' },
       { title: 'Offer approval workflows',          description: 'Route draft offers through finance and legal before sending.' },
@@ -155,11 +155,11 @@ const AGENTS: Agent[] = [
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-[#061D46]">
+    <div className="min-h-screen bg-white">
       <MarketingNav />
 
       {/* Hero */}
-      <section className="border-b border-white/10 py-24 text-center">
+      <section className="bg-[#061D46] py-24 text-center">
         <div className="mx-auto max-w-6xl px-6">
           <span className="mb-4 inline-block rounded-full border border-blue-500/20 bg-blue-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-blue-400">
             Features
@@ -176,11 +176,11 @@ export default function FeaturesPage() {
       {/* Agent sections */}
       {AGENTS.map((agent, idx) => {
         const Icon = agent.icon
-        const sectionBg = idx % 2 === 0 ? 'bg-[#061D46]' : 'bg-white/5'
+        const sectionBg = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
         return (
           <section
             key={agent.name}
-            className={`${sectionBg} border-b border-white/10 py-20`}
+            className={`${sectionBg} border-b border-slate-200 py-20`}
           >
             <div className="mx-auto max-w-6xl px-6">
               {/* Agent header */}
@@ -193,12 +193,12 @@ export default function FeaturesPage() {
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold tracking-widest ${agent.badge}`}>
                       {agent.n}
                     </span>
-                    <h2 className="text-2xl font-bold text-white">{agent.name}</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">{agent.name}</h2>
                   </div>
                   <p className={`text-sm font-semibold uppercase tracking-widest ${agent.color}`}>
                     {agent.role}
                   </p>
-                  <p className="mt-3 max-w-2xl text-base text-blue-100/60 leading-relaxed">
+                  <p className="mt-3 max-w-2xl text-base text-slate-500 leading-relaxed">
                     {agent.description}
                   </p>
                 </div>
@@ -209,13 +209,13 @@ export default function FeaturesPage() {
                 {agent.features.map((feat) => (
                   <div
                     key={feat.title}
-                    className={`rounded-xl border ${agent.border} bg-white/5 p-5`}
+                    className={`rounded-xl border ${agent.border} bg-white p-5 shadow-sm`}
                   >
                     <div className="mb-2 flex items-start gap-2.5">
                       <Check className={`mt-0.5 h-4 w-4 shrink-0 ${agent.iconColor}`} />
-                      <p className="text-sm font-semibold text-white leading-snug">{feat.title}</p>
+                      <p className="text-sm font-semibold text-slate-900 leading-snug">{feat.title}</p>
                     </div>
-                    <p className="pl-6 text-xs text-blue-200/40 leading-relaxed">{feat.description}</p>
+                    <p className="pl-6 text-xs text-slate-400 leading-relaxed">{feat.description}</p>
                   </div>
                 ))}
               </div>

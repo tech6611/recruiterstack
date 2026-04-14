@@ -43,15 +43,15 @@ const SECTIONS = [
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-[#061D46] text-white">
+    <div className="min-h-screen bg-white text-slate-900">
       <MarketingNav />
 
-      <section className="py-20 border-b border-white/10">
+      <section className="bg-[#061D46] py-20">
         <div className="mx-auto max-w-3xl px-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-3">Legal</p>
           <h1 className="text-4xl font-black text-white mb-2">Terms of Service</h1>
-          <p className="text-sm text-zinc-600">
-            Last updated: March 2026 · <span className="text-amber-600 font-medium">Placeholder — seek legal review before publishing</span>
+          <p className="text-sm text-blue-200/40">
+            Last updated: March 2026 · <span className="text-amber-400 font-medium">Placeholder — seek legal review before publishing</span>
           </p>
         </div>
       </section>
@@ -60,14 +60,14 @@ export default function TermsPage() {
         <div className="mx-auto max-w-3xl px-6 space-y-10">
           {SECTIONS.map(({ title, body }) => (
             <div key={title}>
-              <h2 className="text-base font-bold text-white mb-2">{title}</h2>
-              <p className="text-sm text-blue-200/40 leading-relaxed">{body}</p>
+              <h2 className="text-base font-bold text-slate-900 mb-2">{title}</h2>
+              <p className="text-sm text-slate-500 leading-relaxed">{body}</p>
             </div>
           ))}
-          <div className="pt-4 border-t border-white/10">
-            <p className="text-xs text-zinc-700">
+          <div className="pt-4 border-t border-slate-200">
+            <p className="text-xs text-slate-400">
               Questions?{' '}
-              <Link href="/contact" className="text-blue-400 hover:text-blue-300 transition-colors">
+              <Link href="/contact" className="text-blue-600 hover:text-blue-500 transition-colors">
                 Contact us
               </Link>
             </p>

@@ -45,11 +45,11 @@ const AGENT_CARDS: AgentCard[] = [
     name:         'Drafter',
     role:         'Job Creation & Tracking',
     icon:         FileText,
-    color:        'text-blue-400',
-    border:       'border-blue-500/20',
-    bg:           'bg-blue-500/10',
-    badge:        'bg-blue-500/20 text-blue-300',
-    iconColor:    'text-blue-400',
+    color:        'text-blue-600',
+    border:       'border-blue-200',
+    bg:           'bg-blue-50',
+    badge:        'bg-blue-100 text-blue-700',
+    iconColor:    'text-blue-600',
     btnBg:        'bg-blue-600 hover:bg-blue-500',
     monthlyPrice: 19,
     features: [
@@ -64,11 +64,11 @@ const AGENT_CARDS: AgentCard[] = [
     name:         'Scout',
     role:         'Sourcing',
     icon:         Search,
-    color:        'text-blue-400',
-    border:       'border-blue-500/30',
-    bg:           'bg-blue-500/10',
-    badge:        'bg-blue-500/20 text-blue-300',
-    iconColor:    'text-blue-400',
+    color:        'text-blue-600',
+    border:       'border-blue-200',
+    bg:           'bg-blue-50',
+    badge:        'bg-blue-100 text-blue-700',
+    iconColor:    'text-blue-600',
     btnBg:        'bg-blue-600 hover:bg-blue-500',
     monthlyPrice: 29,
     features: [
@@ -83,11 +83,11 @@ const AGENT_CARDS: AgentCard[] = [
     name:         'Sifter',
     role:         'Screening & Scoring',
     icon:         Brain,
-    color:        'text-fuchsia-400',
-    border:       'border-fuchsia-500/30',
-    bg:           'bg-fuchsia-500/10',
-    badge:        'bg-fuchsia-500/20 text-fuchsia-300',
-    iconColor:    'text-fuchsia-400',
+    color:        'text-fuchsia-600',
+    border:       'border-fuchsia-200',
+    bg:           'bg-fuchsia-50',
+    badge:        'bg-fuchsia-100 text-fuchsia-700',
+    iconColor:    'text-fuchsia-600',
     btnBg:        'bg-fuchsia-600 hover:bg-fuchsia-500',
     monthlyPrice: 29,
     features: [
@@ -102,11 +102,11 @@ const AGENT_CARDS: AgentCard[] = [
     name:         'Scheduler',
     role:         'Interview Coordination',
     icon:         CalendarCheck,
-    color:        'text-emerald-400',
-    border:       'border-emerald-500/30',
-    bg:           'bg-emerald-500/10',
-    badge:        'bg-emerald-500/20 text-emerald-300',
-    iconColor:    'text-emerald-400',
+    color:        'text-emerald-600',
+    border:       'border-emerald-200',
+    bg:           'bg-emerald-50',
+    badge:        'bg-emerald-100 text-emerald-700',
+    iconColor:    'text-emerald-600',
     btnBg:        'bg-emerald-600 hover:bg-emerald-500',
     monthlyPrice: 19,
     features: [
@@ -121,11 +121,11 @@ const AGENT_CARDS: AgentCard[] = [
     name:         'Closer',
     role:         'Offer Management',
     icon:         BadgeCheck,
-    color:        'text-amber-400',
-    border:       'border-amber-500/30',
-    bg:           'bg-amber-500/10',
-    badge:        'bg-amber-500/20 text-amber-300',
-    iconColor:    'text-amber-400',
+    color:        'text-amber-600',
+    border:       'border-amber-200',
+    bg:           'bg-amber-50',
+    badge:        'bg-amber-100 text-amber-700',
+    iconColor:    'text-amber-600',
     btnBg:        'bg-amber-600 hover:bg-amber-500',
     monthlyPrice: 19,
     features: [
@@ -205,11 +205,11 @@ export default function PricingPage() {
   const proMonthly = billingPeriod === 'annual' ? 119 : 149
 
   return (
-    <div className="min-h-screen bg-[#061D46]">
+    <div className="min-h-screen bg-white">
       <MarketingNav />
 
       {/* Hero */}
-      <section className="border-b border-white/10 py-24 text-center">
+      <section className="bg-[#061D46] py-24 text-center">
         <div className="mx-auto max-w-6xl px-6">
           <span className="mb-4 inline-block rounded-full border border-blue-500/20 bg-blue-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-blue-400">
             Pricing
@@ -251,11 +251,11 @@ export default function PricingPage() {
       </section>
 
       {/* Build your own stack */}
-      <section className="border-b border-white/10 py-20">
+      <section className="border-b border-slate-200 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-10 text-center">
-            <h2 className="text-2xl font-bold text-white sm:text-3xl">Meet the agents</h2>
-            <p className="mt-2 text-blue-100/60">All five are included in Pro. Buy individually coming soon.</p>
+            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Meet the agents</h2>
+            <p className="mt-2 text-slate-500">All five are included in Pro. Buy individually coming soon.</p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -265,7 +265,7 @@ export default function PricingPage() {
               return (
                 <div
                   key={agent.name}
-                  className={`flex flex-col rounded-2xl border ${agent.border} bg-white/5 p-6`}
+                  className={`flex flex-col rounded-2xl border ${agent.border} bg-white p-6 shadow-sm`}
                 >
                   <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl ${agent.bg}`}>
                     <Icon className={`h-5 w-5 ${agent.iconColor}`} />
@@ -276,11 +276,11 @@ export default function PricingPage() {
                   <p className={`mt-0.5 text-xs font-medium ${agent.color}`}>{agent.role}</p>
 
                   <div className="mt-4 flex items-end gap-1">
-                    <span className="text-3xl font-bold text-white">${price}</span>
-                    <span className="mb-1 text-sm text-blue-200/40">/mo</span>
+                    <span className="text-3xl font-bold text-slate-900">${price}</span>
+                    <span className="mb-1 text-sm text-slate-400">/mo</span>
                   </div>
                   {billingPeriod === 'annual' && (
-                    <p className="mt-0.5 text-xs text-blue-200/40 line-through">
+                    <p className="mt-0.5 text-xs text-slate-400 line-through">
                       ${agent.monthlyPrice}/mo
                     </p>
                   )}
@@ -289,14 +289,14 @@ export default function PricingPage() {
                     {agent.features.map((feat) => (
                       <li key={feat} className="flex items-start gap-2">
                         <Check className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${agent.iconColor}`} />
-                        <span className="text-xs text-blue-100/60">{feat}</span>
+                        <span className="text-xs text-slate-500">{feat}</span>
                       </li>
                     ))}
                   </ul>
 
                   <a
                     href="#full-suite"
-                    className="mt-auto block rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-center text-sm font-semibold text-blue-100 hover:border-white/20 hover:text-white transition-colors"
+                    className="mt-auto block rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-center text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-100 transition-colors"
                   >
                     Included in Pro ↓
                   </a>
@@ -308,35 +308,35 @@ export default function PricingPage() {
       </section>
 
       {/* Full suite */}
-      <section id="full-suite" className="border-b border-white/10 py-20">
+      <section id="full-suite" className="border-b border-slate-200 bg-slate-50 py-20">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-10 text-center">
-            <h2 className="text-2xl font-bold text-white sm:text-3xl">Full suite</h2>
-            <p className="mt-2 text-blue-100/60">All 5 agents. One flat price. Zero per-agent billing.</p>
+            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Full suite</h2>
+            <p className="mt-2 text-slate-500">All 5 agents. One flat price. Zero per-agent billing.</p>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Pro */}
-            <div className="relative flex flex-col rounded-2xl border border-blue-500/30 bg-blue-500/5 p-8">
+            <div className="relative flex flex-col rounded-2xl border-2 border-blue-500 bg-white p-8 shadow-lg shadow-blue-500/10">
               <div className="absolute -top-3 left-6">
                 <span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-bold text-white">
                   Most popular
                 </span>
               </div>
-              <h3 className="text-xl font-bold text-white">Pro</h3>
-              <p className="mt-1 text-sm text-blue-100/60">For growing teams ready to automate the full funnel.</p>
+              <h3 className="text-xl font-bold text-slate-900">Pro</h3>
+              <p className="mt-1 text-sm text-slate-500">For growing teams ready to automate the full funnel.</p>
               <div className="mt-6 flex items-end gap-2">
-                <span className="text-5xl font-bold text-white">${proMonthly}</span>
-                <span className="mb-2 text-sm text-blue-200/40">/mo</span>
+                <span className="text-5xl font-bold text-slate-900">${proMonthly}</span>
+                <span className="mb-2 text-sm text-slate-400">/mo</span>
               </div>
               {billingPeriod === 'annual' && (
-                <p className="mt-0.5 text-xs text-blue-200/40 line-through">$149/mo</p>
+                <p className="mt-0.5 text-xs text-slate-400 line-through">$149/mo</p>
               )}
               <ul className="my-8 space-y-3">
                 {PRO_FEATURES.map((feat) => (
                   <li key={feat} className="flex items-start gap-3">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
-                    <span className="text-sm text-blue-100">{feat}</span>
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                    <span className="text-sm text-slate-700">{feat}</span>
                   </li>
                 ))}
               </ul>
@@ -350,25 +350,25 @@ export default function PricingPage() {
             </div>
 
             {/* Enterprise */}
-            <div className="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-8">
-              <h3 className="text-xl font-bold text-white">Enterprise</h3>
-              <p className="mt-1 text-sm text-blue-100/60">For large teams with complex workflows and compliance needs.</p>
+            <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+              <h3 className="text-xl font-bold text-slate-900">Enterprise</h3>
+              <p className="mt-1 text-sm text-slate-500">For large teams with complex workflows and compliance needs.</p>
               <div className="mt-6 flex items-end gap-2">
-                <span className="text-5xl font-bold text-white">Custom</span>
+                <span className="text-5xl font-bold text-slate-900">Custom</span>
               </div>
-              <p className="mt-1 text-xs text-blue-200/40">Pricing based on seats and usage</p>
+              <p className="mt-1 text-xs text-slate-400">Pricing based on seats and usage</p>
               <ul className="my-8 space-y-3">
                 {ENTERPRISE_FEATURES.map((feat) => (
                   <li key={feat} className="flex items-start gap-3">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-                    <span className="text-sm text-blue-100">{feat}</span>
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <span className="text-sm text-slate-700">{feat}</span>
                   </li>
                 ))}
               </ul>
               <a
                 href="mailto:enterprise@recruiterstack.com"
                 onClick={() => trackEvent('pricing_cta_clicked', { plan: 'enterprise', billing_period: billingPeriod })}
-                className="mt-auto block rounded-xl border border-white/15 px-6 py-3 text-center text-sm font-semibold text-white hover:border-white/20 hover:bg-white/10 transition-colors"
+                className="mt-auto block rounded-xl border border-slate-200 px-6 py-3 text-center text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-colors"
               >
                 Contact sales
               </a>
@@ -378,20 +378,20 @@ export default function PricingPage() {
       </section>
 
       {/* Comparison row: free vs pro vs enterprise */}
-      <section className="border-b border-white/10 py-14">
+      <section className="border-b border-slate-200 py-14">
         <div className="mx-auto max-w-4xl px-6">
-          <h2 className="mb-8 text-center text-xl font-bold text-white">Plan comparison</h2>
+          <h2 className="mb-8 text-center text-xl font-bold text-slate-900">Plan comparison</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="pb-4 text-left font-medium text-blue-200/40">Feature</th>
-                  <th className="pb-4 text-center font-medium text-blue-200/40">Free</th>
-                  <th className="pb-4 text-center font-semibold text-blue-400">Pro</th>
-                  <th className="pb-4 text-center font-medium text-amber-400">Enterprise</th>
+                <tr className="border-b border-slate-200">
+                  <th className="pb-4 text-left font-medium text-slate-400">Feature</th>
+                  <th className="pb-4 text-center font-medium text-slate-400">Free</th>
+                  <th className="pb-4 text-center font-semibold text-blue-600">Pro</th>
+                  <th className="pb-4 text-center font-medium text-amber-600">Enterprise</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/10">
+              <tbody className="divide-y divide-slate-200">
                 {[
                   { label: 'Active jobs',       free: '1',          pro: 'Unlimited',    ent: 'Unlimited' },
                   { label: 'Candidates',        free: '50',         pro: 'Unlimited',    ent: 'Unlimited' },
@@ -402,21 +402,21 @@ export default function PricingPage() {
                   { label: 'Dedicated CSM',     free: false,        pro: false,          ent: true },
                   { label: 'SLA',               free: false,        pro: false,          ent: true },
                 ].map((row) => (
-                  <tr key={row.label} className="hover:bg-white/5 transition-colors">
-                    <td className="py-3.5 text-blue-100">{row.label}</td>
-                    <td className="py-3.5 text-center text-blue-200/40">
+                  <tr key={row.label} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3.5 text-slate-700">{row.label}</td>
+                    <td className="py-3.5 text-center text-slate-400">
                       {typeof row.free === 'boolean' ? (
-                        row.free ? <Check className="mx-auto h-4 w-4 text-emerald-400" /> : <X className="mx-auto h-4 w-4 text-zinc-700" />
+                        row.free ? <Check className="mx-auto h-4 w-4 text-emerald-500" /> : <X className="mx-auto h-4 w-4 text-slate-300" />
                       ) : row.free}
                     </td>
-                    <td className="py-3.5 text-center text-blue-100">
+                    <td className="py-3.5 text-center text-slate-700">
                       {typeof row.pro === 'boolean' ? (
-                        row.pro ? <Check className="mx-auto h-4 w-4 text-emerald-400" /> : <X className="mx-auto h-4 w-4 text-zinc-700" />
+                        row.pro ? <Check className="mx-auto h-4 w-4 text-emerald-500" /> : <X className="mx-auto h-4 w-4 text-slate-300" />
                       ) : row.pro}
                     </td>
-                    <td className="py-3.5 text-center text-blue-100">
+                    <td className="py-3.5 text-center text-slate-700">
                       {typeof row.ent === 'boolean' ? (
-                        row.ent ? <Check className="mx-auto h-4 w-4 text-emerald-400" /> : <X className="mx-auto h-4 w-4 text-zinc-700" />
+                        row.ent ? <Check className="mx-auto h-4 w-4 text-emerald-500" /> : <X className="mx-auto h-4 w-4 text-slate-300" />
                       ) : row.ent}
                     </td>
                   </tr>
@@ -428,32 +428,32 @@ export default function PricingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="py-20">
+      <section className="bg-slate-50 py-20">
         <div className="mx-auto max-w-3xl px-6">
-          <h2 className="mb-10 text-center text-2xl font-bold text-white sm:text-3xl">
+          <h2 className="mb-10 text-center text-2xl font-bold text-slate-900 sm:text-3xl">
             Frequently asked questions
           </h2>
           <div className="space-y-3">
             {FAQ_ITEMS.map((item, idx) => (
               <div
                 key={item.q}
-                className="rounded-xl border border-white/10 bg-white/5 overflow-hidden"
+                className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm"
               >
                 <button
                   onClick={() => toggleFaq(idx)}
                   className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left"
                   aria-expanded={openFaq === idx}
                 >
-                  <span className="text-sm font-semibold text-white">{item.q}</span>
+                  <span className="text-sm font-semibold text-slate-900">{item.q}</span>
                   {openFaq === idx ? (
-                    <Minus className="h-4 w-4 shrink-0 text-blue-200/40" />
+                    <Minus className="h-4 w-4 shrink-0 text-slate-400" />
                   ) : (
-                    <Plus className="h-4 w-4 shrink-0 text-blue-200/40" />
+                    <Plus className="h-4 w-4 shrink-0 text-slate-400" />
                   )}
                 </button>
                 {openFaq === idx && (
-                  <div className="border-t border-white/10 px-6 py-4">
-                    <p className="text-sm text-blue-100/60 leading-relaxed">{item.a}</p>
+                  <div className="border-t border-slate-200 px-6 py-4">
+                    <p className="text-sm text-slate-500 leading-relaxed">{item.a}</p>
                   </div>
                 )}
               </div>

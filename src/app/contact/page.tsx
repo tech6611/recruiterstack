@@ -34,11 +34,11 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#061D46] text-white">
+    <div className="min-h-screen bg-white text-slate-900">
       <MarketingNav />
 
       {/* Hero */}
-      <section className="border-b border-white/10 py-20">
+      <section className="bg-[#061D46] py-20">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-3">Contact</p>
           <h1 className="text-4xl font-black text-white sm:text-5xl">Get in touch</h1>
@@ -55,26 +55,26 @@ export default function ContactPage() {
           {/* Info */}
           <div className="space-y-8">
             <div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 border border-blue-500/20 mb-3">
-                <Mail className="h-5 w-5 text-blue-400" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 mb-3">
+                <Mail className="h-5 w-5 text-blue-600" />
               </div>
-              <h3 className="text-sm font-semibold text-white mb-1">Email us</h3>
-              <a href="mailto:hello@recruiterstack.in" className="text-sm text-blue-400 hover:text-blue-300 transition-colors">
+              <h3 className="text-sm font-semibold text-slate-900 mb-1">Email us</h3>
+              <a href="mailto:hello@recruiterstack.in" className="text-sm text-blue-600 hover:text-blue-500 transition-colors">
                 hello@recruiterstack.in
               </a>
             </div>
             <div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/10 border border-blue-600/20 mb-3">
-                <MessageSquare className="h-5 w-5 text-blue-400" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 mb-3">
+                <MessageSquare className="h-5 w-5 text-blue-600" />
               </div>
-              <h3 className="text-sm font-semibold text-white mb-1">Book a demo</h3>
-              <p className="text-sm text-blue-200/40">
+              <h3 className="text-sm font-semibold text-slate-900 mb-1">Book a demo</h3>
+              <p className="text-sm text-slate-400">
                 Want a live walkthrough? Drop your email and we&apos;ll reach out to schedule.
               </p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs font-semibold text-blue-100/60 mb-1">Response time</p>
-              <p className="text-xs text-blue-200/40">We typically respond within 24 hours on business days.</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-semibold text-slate-500 mb-1">Response time</p>
+              <p className="text-xs text-slate-400">We typically respond within 24 hours on business days.</p>
             </div>
           </div>
 
@@ -83,49 +83,49 @@ export default function ContactPage() {
             {status === 'success' ? (
               <div className="flex flex-col items-center justify-center h-full py-16 text-center">
                 <CheckCircle className="h-12 w-12 text-emerald-500 mb-4" />
-                <h2 className="text-xl font-bold text-white">Message sent!</h2>
-                <p className="mt-2 text-blue-200/40">Thanks for reaching out. We&apos;ll be in touch shortly.</p>
+                <h2 className="text-xl font-bold text-slate-900">Message sent!</h2>
+                <p className="mt-2 text-slate-400">Thanks for reaching out. We&apos;ll be in touch shortly.</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-medium text-blue-100/60 mb-1.5">Name</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Name</label>
                     <input
                       type="text"
                       required
                       value={form.name}
                       onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Your name"
-                      className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-blue-100/60 mb-1.5">Work email</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Work email</label>
                     <input
                       type="email"
                       required
                       value={form.email}
                       onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
                       placeholder="you@company.com"
-                      className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-blue-100/60 mb-1.5">Message</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Message</label>
                   <textarea
                     required
                     rows={6}
                     value={form.message}
                     onChange={e => setForm(prev => ({ ...prev, message: e.target.value }))}
                     placeholder="Tell us about your team size, current ATS, and what you're trying to improve..."
-                    className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors resize-none"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors resize-none"
                   />
                 </div>
 
                 {errMsg && (
-                  <p className="text-xs text-red-400">{errMsg}</p>
+                  <p className="text-xs text-red-500">{errMsg}</p>
                 )}
 
                 <button

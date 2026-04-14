@@ -196,11 +196,11 @@ const AGENTS: Agent[] = [
     ],
     connects: 'Drafter hands newly approved roles directly to Scout, which begins sourcing candidates the moment a JD is finalised.',
     pricing:  'From $19/mo as a standalone agent.',
-    color:     'text-blue-400',
-    border:    'border-blue-500/20',
-    bg:        'bg-blue-500/10',
-    badge:     'bg-blue-500/20 text-blue-300',
-    iconColor: 'text-blue-400',
+    color:     'text-blue-600',
+    border:    'border-blue-200',
+    bg:        'bg-blue-50',
+    badge:     'bg-blue-100 text-blue-700',
+    iconColor: 'text-blue-600',
     preview:   DrafterPreview,
   },
   {
@@ -221,11 +221,11 @@ const AGENTS: Agent[] = [
     ],
     connects: 'Every candidate Scout imports is immediately queued for Sifter to score against the relevant job description.',
     pricing:  'From $29/mo as a standalone agent.',
-    color:     'text-blue-400',
-    border:    'border-blue-500/30',
-    bg:        'bg-blue-500/10',
-    badge:     'bg-blue-500/20 text-blue-300',
-    iconColor: 'text-blue-400',
+    color:     'text-blue-600',
+    border:    'border-blue-200',
+    bg:        'bg-blue-50',
+    badge:     'bg-blue-100 text-blue-700',
+    iconColor: 'text-blue-600',
     preview:   ScoutPreview,
   },
   {
@@ -246,11 +246,11 @@ const AGENTS: Agent[] = [
     ],
     connects: 'Shortlisted candidates from Sifter are passed to Scheduler, which sends interview invitations automatically.',
     pricing:  'From $29/mo as a standalone agent.',
-    color:     'text-fuchsia-400',
-    border:    'border-fuchsia-500/30',
-    bg:        'bg-fuchsia-500/10',
-    badge:     'bg-fuchsia-500/20 text-fuchsia-300',
-    iconColor: 'text-fuchsia-400',
+    color:     'text-fuchsia-600',
+    border:    'border-fuchsia-200',
+    bg:        'bg-fuchsia-50',
+    badge:     'bg-fuchsia-100 text-fuchsia-700',
+    iconColor: 'text-fuchsia-600',
     preview:   SifterPreview,
   },
   {
@@ -271,11 +271,11 @@ const AGENTS: Agent[] = [
     ],
     connects: 'After all feedback is collected, Scheduler surfaces the decision-ready candidate to Closer for offer drafting.',
     pricing:  'From $19/mo as a standalone agent.',
-    color:     'text-emerald-400',
-    border:    'border-emerald-500/30',
-    bg:        'bg-emerald-500/10',
-    badge:     'bg-emerald-500/20 text-emerald-300',
-    iconColor: 'text-emerald-400',
+    color:     'text-emerald-600',
+    border:    'border-emerald-200',
+    bg:        'bg-emerald-50',
+    badge:     'bg-emerald-100 text-emerald-700',
+    iconColor: 'text-emerald-600',
     preview:   SchedulerPreview,
   },
   {
@@ -296,11 +296,11 @@ const AGENTS: Agent[] = [
     ],
     connects: 'On acceptance, Closer triggers your onboarding checklist and marks the requisition closed in Drafter.',
     pricing:  'From $19/mo as a standalone agent.',
-    color:     'text-amber-400',
-    border:    'border-amber-500/30',
-    bg:        'bg-amber-500/10',
-    badge:     'bg-amber-500/20 text-amber-300',
-    iconColor: 'text-amber-400',
+    color:     'text-amber-600',
+    border:    'border-amber-200',
+    bg:        'bg-amber-50',
+    badge:     'bg-amber-100 text-amber-700',
+    iconColor: 'text-amber-600',
     preview:   CloserPreview,
   },
 ]
@@ -309,11 +309,11 @@ const AGENTS: Agent[] = [
 
 export default function AgentsPage() {
   return (
-    <div className="min-h-screen bg-[#061D46]">
+    <div className="min-h-screen bg-white">
       <MarketingNav />
 
       {/* Hero */}
-      <section className="border-b border-white/10 py-24 text-center">
+      <section className="bg-[#061D46] py-24 text-center">
         <div className="mx-auto max-w-6xl px-6">
           <span className="mb-4 inline-block rounded-full border border-blue-500/20 bg-blue-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-blue-400">
             The Agents
@@ -335,7 +335,7 @@ export default function AgentsPage() {
         return (
           <section
             key={agent.name}
-            className={`border-b border-white/10 py-20 ${isEven ? 'bg-[#061D46]' : 'bg-white/5'}`}
+            className={`border-b border-slate-200 py-20 ${isEven ? 'bg-white' : 'bg-slate-50'}`}
           >
             <div className="mx-auto max-w-6xl px-6">
               <div className={`flex flex-col gap-12 lg:flex-row lg:items-start ${isEven ? '' : 'lg:flex-row-reverse'}`}>
@@ -350,12 +350,12 @@ export default function AgentsPage() {
                     <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${agent.border} ${agent.bg}`}>
                       <Icon className={`h-4.5 w-4.5 ${agent.iconColor}`} />
                     </div>
-                    <h2 className="text-2xl font-bold text-white">{agent.name}</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">{agent.name}</h2>
                   </div>
                   <p className={`text-sm font-semibold uppercase tracking-widest ${agent.color} mb-3`}>
                     {agent.role}
                   </p>
-                  <p className="text-base text-blue-100/60 leading-relaxed mb-7 max-w-lg">
+                  <p className="text-base text-slate-500 leading-relaxed mb-7 max-w-lg">
                     {agent.description}
                   </p>
 
@@ -364,7 +364,7 @@ export default function AgentsPage() {
                     {agent.bullets.map((b) => (
                       <li key={b} className="flex items-start gap-2.5">
                         <Check className={`mt-0.5 h-4 w-4 shrink-0 ${agent.iconColor}`} />
-                        <span className="text-sm text-blue-100">{b}</span>
+                        <span className="text-sm text-slate-700">{b}</span>
                       </li>
                     ))}
                   </ul>
@@ -374,11 +374,11 @@ export default function AgentsPage() {
                     <p className={`text-xs font-semibold uppercase tracking-widest ${agent.color} mb-1`}>
                       How it connects
                     </p>
-                    <p className="text-xs text-blue-100/60">{agent.connects}</p>
+                    <p className="text-xs text-slate-500">{agent.connects}</p>
                   </div>
 
                   {/* Pricing note */}
-                  <p className="mb-5 text-xs text-blue-200/40">{agent.pricing}</p>
+                  <p className="mb-5 text-xs text-slate-400">{agent.pricing}</p>
 
                   {/* CTA */}
                   <Link
@@ -401,7 +401,7 @@ export default function AgentsPage() {
       })}
 
       {/* Bottom CTA */}
-      <section className="py-24 text-center">
+      <section className="bg-[#061D46] py-24 text-center">
         <div className="mx-auto max-w-2xl px-6">
           <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
             Start with one. Scale to all five.
