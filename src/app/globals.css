@@ -3,11 +3,30 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: #f8fafc;
+    --foreground: #020617;
+  }
+  
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply bg-[var(--background)] text-[var(--foreground)];
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.04) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(225, 151, 23, 0.04) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-glass transition-all duration-300;
+  }
+  .glass-panel:hover {
+    @apply shadow-glass-hover bg-white/80 border-white/60;
   }
 }

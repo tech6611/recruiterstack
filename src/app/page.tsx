@@ -10,7 +10,7 @@ import { EmailCapture } from '@/components/EmailCapture'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
 import { MarketingFooter } from '@/components/marketing/MarketingFooter'
 
-// ── Agent definitions (GEM-inspired palette — each agent gets its own accent) ─
+// ── Agent definitions (Premium Glass & Emerald Palette) ───────────────
 
 const AGENTS = [
   {
@@ -18,11 +18,11 @@ const AGENTS = [
     name:     'Drafter',
     role:     'Job Creation & Tracking',
     icon:     FileText,
-    color:    'text-violet-600',
-    border:   'border-violet-200',
-    bg:       'bg-violet-50',
-    badge:    'bg-violet-100 text-violet-700',
-    dot:      'bg-violet-500',
+    color:    'text-emerald-700',
+    border:   'border-emerald-200',
+    bg:       'bg-emerald-50/50',
+    badge:    'bg-emerald-100 text-emerald-800',
+    dot:      'bg-emerald-500',
     features: [
       'AI-drafted job descriptions in seconds',
       'Requisition tracking & approval workflows',
@@ -35,11 +35,11 @@ const AGENTS = [
     name:     'Scout',
     role:     'Sourcing',
     icon:     Search,
-    color:    'text-blue-600',
-    border:   'border-blue-200',
-    bg:       'bg-blue-50',
-    badge:    'bg-blue-100 text-blue-700',
-    dot:      'bg-blue-500',
+    color:    'text-emerald-600',
+    border:   'border-emerald-200/60',
+    bg:       'bg-emerald-50/50',
+    badge:    'bg-emerald-100 text-emerald-700',
+    dot:      'bg-emerald-400',
     features: [
       'Bulk CSV import from any job board',
       'PDF CV parsing via AI',
@@ -52,11 +52,11 @@ const AGENTS = [
     name:     'Sifter',
     role:     'Screening & Scoring',
     icon:     Brain,
-    color:    'text-amber-600',
-    border:   'border-amber-200',
-    bg:       'bg-amber-50',
-    badge:    'bg-amber-100 text-amber-700',
-    dot:      'bg-amber-500',
+    color:    'text-gold-700',
+    border:   'border-gold-200',
+    bg:       'bg-gold-50/50',
+    badge:    'bg-gold-200 text-gold-800',
+    dot:      'bg-gold-500',
     features: [
       'AI score vs. JD the moment a CV lands',
       'Strengths & gaps analysis per candidate',
@@ -69,11 +69,11 @@ const AGENTS = [
     name:     'Scheduler',
     role:     'Interview Coordination',
     icon:     CalendarCheck,
-    color:    'text-teal-600',
-    border:   'border-teal-200',
-    bg:       'bg-teal-50',
-    badge:    'bg-teal-100 text-teal-700',
-    dot:      'bg-teal-500',
+    color:    'text-emerald-800',
+    border:   'border-emerald-300',
+    bg:       'bg-emerald-100/30',
+    badge:    'bg-emerald-200 text-emerald-900',
+    dot:      'bg-emerald-600',
     features: [
       'Automated interview invites & reminders',
       'Calendar availability sync (coming soon)',
@@ -86,11 +86,11 @@ const AGENTS = [
     name:     'Closer',
     role:     'Offer Management',
     icon:     BadgeCheck,
-    color:    'text-emerald-600',
-    border:   'border-emerald-200',
-    bg:       'bg-emerald-50',
-    badge:    'bg-emerald-100 text-emerald-700',
-    dot:      'bg-emerald-500',
+    color:    'text-gold-600',
+    border:   'border-gold-200/50',
+    bg:       'bg-gold-50/30',
+    badge:    'bg-gold-100 text-gold-700',
+    dot:      'bg-gold-400',
     features: [
       'AI-drafted offer letters',
       'Approval workflow routing',
@@ -122,35 +122,35 @@ export default function HomePage() {
     <div className="min-h-screen bg-white text-slate-900">
       <MarketingNav />
 
-      {/* ══ HERO (dark navy, GEM-inspired) ═══════════════════════════════════ */}
-      <section className="relative overflow-hidden bg-[#061D46]">
+      {/* ══ HERO (Glass & Emerald) ═══════════════════════════════════ */}
+      <section className="relative overflow-hidden bg-transparent">
         {/* Decorative gradient orbs */}
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-40 left-1/4 h-[600px] w-[600px] rounded-full bg-blue-500/10 blur-[120px]" />
-          <div className="absolute -bottom-20 right-1/4 h-[400px] w-[400px] rounded-full bg-violet-500/10 blur-[100px]" />
+        <div className="pointer-events-none absolute inset-0 text-emerald-900 overflow-hidden">
+          <div className="absolute -top-40 left-1/4 h-[600px] w-[600px] rounded-full bg-emerald-300/20 blur-[120px]" />
+          <div className="absolute -bottom-20 right-1/4 h-[400px] w-[400px] rounded-full bg-gold-300/20 blur-[100px]" />
         </div>
 
         <div className="relative mx-auto max-w-5xl px-6 pb-24 pt-28 text-center">
           {/* Eyebrow */}
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-blue-200 backdrop-blur-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-            Plug-and-play AI recruitment agents
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-200/50 bg-white/50 px-4 py-1.5 text-xs font-medium text-emerald-800 backdrop-blur-md shadow-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Introducing the fastest AI hiring platform
           </div>
 
           {/* Headline */}
-          <h1 className="mx-auto max-w-4xl text-5xl font-black tracking-tight text-white sm:text-6xl lg:text-7xl leading-[1.05]">
+          <h1 className="mx-auto max-w-4xl text-5xl font-black tracking-tight text-slate-800 sm:text-6xl lg:text-7xl leading-[1.05]">
             Hire smarter.{' '}
-            <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-amber-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-gold-500 bg-clip-text text-transparent">
               Ship faster.
             </span>
             <br />
-            <span className="text-4xl sm:text-5xl lg:text-6xl font-bold text-blue-200/70">
+            <span className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-500">
               With AI agents for every stage.
             </span>
           </h1>
 
           {/* Sub */}
-          <p className="mx-auto mt-7 max-w-2xl text-lg text-blue-100/70 leading-relaxed">
+          <p className="mx-auto mt-7 max-w-2xl text-lg text-slate-600 leading-relaxed">
             5 specialised AI agents that slot into your existing HR stack —
             no rip-and-replace, no 6-month implementation.
             Just deploy the agents you need and close roles faster.
@@ -160,19 +160,19 @@ export default function HomePage() {
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
               href="#agents"
-              className="flex items-center gap-2 rounded-xl bg-blue-500 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-400 transition-colors"
+              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-500 transition-colors"
             >
               Meet the agents
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/sign-up"
-              className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-3.5 text-sm font-medium text-white backdrop-blur-sm hover:bg-white/10 transition-colors"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-6 py-3.5 text-sm font-medium text-slate-700 backdrop-blur-md hover:bg-white/90 hover:border-slate-300 transition-colors shadow-sm"
             >
               Start free — no card needed
             </Link>
           </div>
-          <p className="mt-4 text-xs text-blue-200/40">Free to start · Deploy in minutes · No lock-in</p>
+          <p className="mt-4 text-xs text-slate-400">Free to start · Deploy in minutes · No lock-in</p>
 
           {/* Agent funnel visual */}
           <div className="mt-16 flex items-center justify-center gap-0 overflow-x-auto pb-2">
@@ -180,18 +180,18 @@ export default function HomePage() {
               const Icon = agent.icon
               return (
                 <div key={agent.name} className="flex items-center">
-                  <div className={`flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm px-4 py-4 min-w-[100px] sm:min-w-[110px]`}>
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 border border-white/10`}>
-                      <Icon className={`h-4 w-4 text-white`} />
+                  <div className={`flex flex-col items-center gap-2 rounded-2xl glass-panel px-4 py-4 min-w-[100px] sm:min-w-[110px]`}>
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 shadow-sm`}>
+                      <Icon className={`h-4 w-4 ${agent.color}`} />
                     </div>
-                    <span className={`text-xs font-bold text-white`}>{agent.name}</span>
-                    <span className="text-[10px] text-blue-200/60 text-center leading-tight">{agent.role}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-blue-200`}>{agent.n}</span>
+                    <span className={`text-xs font-bold text-slate-800`}>{agent.name}</span>
+                    <span className="text-[10px] text-slate-500 text-center leading-tight">{agent.role}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${agent.badge} border border-white/50 backdrop-blur-md`}>{agent.n}</span>
                   </div>
                   {i < AGENTS.length - 1 && (
                     <div className="flex items-center px-1">
-                      <div className="h-px w-6 bg-white/20" />
-                      <ChevronRight className="h-3 w-3 text-white/30 -mx-1" />
+                      <div className="h-px w-6 bg-slate-200" />
+                      <ChevronRight className="h-3 w-3 text-slate-300 -mx-1" />
                     </div>
                   )}
                 </div>
