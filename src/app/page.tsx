@@ -119,16 +119,11 @@ export default function HomePage() {
   if (userId) redirect('/dashboard')
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-transparent text-slate-900">
       <MarketingNav />
 
       {/* ══ HERO (Glass & Emerald) ═══════════════════════════════════ */}
       <section className="relative overflow-hidden bg-transparent">
-        {/* Decorative gradient orbs */}
-        <div className="pointer-events-none absolute inset-0 text-emerald-900 overflow-hidden">
-          <div className="absolute -top-40 left-1/4 h-[600px] w-[600px] rounded-full bg-emerald-300/20 blur-[120px]" />
-          <div className="absolute -bottom-20 right-1/4 h-[400px] w-[400px] rounded-full bg-gold-300/20 blur-[100px]" />
-        </div>
 
         <div className="relative mx-auto max-w-5xl px-6 pb-24 pt-28 text-center">
           {/* Eyebrow */}

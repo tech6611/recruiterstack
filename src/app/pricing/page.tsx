@@ -205,7 +205,7 @@ export default function PricingPage() {
   const proMonthly = billingPeriod === 'annual' ? 119 : 149
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-transparent">
       <MarketingNav />
 
       {/* Hero */}

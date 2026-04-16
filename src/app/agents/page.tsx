@@ -309,7 +309,7 @@ const AGENTS: Agent[] = [
 
 export default function AgentsPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-transparent">
       <MarketingNav />
 
       {/* Hero */}

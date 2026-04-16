@@ -34,7 +34,7 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-transparent text-slate-900">
       <MarketingNav />
 
       {/* Hero */}

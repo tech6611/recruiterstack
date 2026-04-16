@@ -32,7 +32,7 @@ const PLACEHOLDER_POSTS = [
 
 export default function BlogPage() {
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-transparent text-slate-900">
       <MarketingNav />
 
       {/* Hero */}

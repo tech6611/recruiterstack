@@ -155,7 +155,7 @@ const AGENTS: Agent[] = [
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-transparent">
       <MarketingNav />
 
       {/* Hero */}
