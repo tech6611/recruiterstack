@@ -45,7 +45,7 @@ export default function PrivacyPage() {
       <section className="bg-transparent py-20">
         <div className="mx-auto max-w-3xl px-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">Legal</p>
-          <h1 className="text-4xl font-black text-slate-900 mb-2">Privacy Policy</h1>
+          <h1 className="text-4xl font-black text-slate-900 mb-2">Privacy <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-gold-500 bg-clip-text text-transparent">Policy</span></h1>
           <p className="text-sm text-slate-500">
             Last updated: March 2026 · <span className="text-amber-400 font-medium">Placeholder — seek legal review before publishing</span>
           </p>

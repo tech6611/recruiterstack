@@ -40,7 +40,7 @@ export default function BlogPage() {
         <div className="mx-auto max-w-4xl px-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">Blog</p>
           <h1 className="text-4xl font-black text-slate-900 sm:text-5xl">
-            Recruiting, reimagined
+            Recruiting, <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-gold-500 bg-clip-text text-transparent">reimagined</span>
           </h1>
           <p className="mt-4 text-slate-600 text-lg">
             Guides, product updates, and insights on AI-powered hiring.

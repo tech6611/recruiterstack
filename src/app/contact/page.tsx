@@ -41,7 +41,7 @@ export default function ContactPage() {
       <section className="bg-transparent py-20">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">Contact</p>
-          <h1 className="text-4xl font-black text-slate-900 sm:text-5xl">Get in touch</h1>
+          <h1 className="text-4xl font-black text-slate-900 sm:text-5xl">Get <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-gold-500 bg-clip-text text-transparent">in touch</span></h1>
           <p className="mt-4 text-slate-600 text-lg">
             Questions, demos, partnerships, or just curious — we&apos;re here.
           </p>

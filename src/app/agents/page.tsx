@@ -319,7 +319,7 @@ export default function AgentsPage() {
             The Agents
           </span>
           <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-            Your AI recruiting team
+            Your AI <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-gold-500 bg-clip-text text-transparent">recruiting team</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-600">
             5 specialised agents. One for each stage of the hiring funnel.
