@@ -16,7 +16,7 @@ export default function AboutPage() {
         <div className="relative mx-auto max-w-3xl px-6 py-24 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">About</p>
           <h1 className="text-4xl font-black text-slate-900 sm:text-5xl">
-            Built for the next era of recruiting
+            Built for the next era of <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-gold-500 bg-clip-text text-transparent">recruiting</span>
           </h1>
           <p className="mt-5 text-lg text-slate-600 leading-relaxed">
             RecruiterStack was born from a simple frustration: too much time spent on tasks

@@ -165,7 +165,7 @@ export default function FeaturesPage() {
             Features
           </span>
           <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-            Everything your recruiting<br className="hidden sm:block" /> team needs
+            Everything your recruiting<br className="hidden sm:block" /> <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-gold-500 bg-clip-text text-transparent">team needs</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-600">
             One capability per agent. All working together.
