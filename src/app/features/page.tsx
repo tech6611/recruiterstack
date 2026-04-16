@@ -41,11 +41,11 @@ const AGENTS: Agent[] = [
     icon:      FileText,
     description:
       'Drafter handles everything that happens before the first CV arrives. It uses your intake form answers to generate a complete, tailored job description in seconds, then tracks every requisition through approval, posting, and close — giving your team a single source of truth for every open role.',
-    color:     'text-blue-600',
-    border:    'border-blue-200',
-    bg:        'bg-blue-50',
-    badge:     'bg-blue-100 text-blue-700',
-    iconColor: 'text-blue-600',
+    color:     'text-emerald-600',
+    border:    'border-emerald-200',
+    bg:        'bg-emerald-50',
+    badge:     'bg-emerald-100 text-emerald-700',
+    iconColor: 'text-emerald-600',
     features: [
       { title: 'AI-drafted job descriptions',       description: 'Generate a full JD from a short intake form in under 10 seconds.' },
       { title: 'Structured intake forms',           description: 'Collect hiring-manager requirements through a guided, shareable form.' },
@@ -64,11 +64,11 @@ const AGENTS: Agent[] = [
     icon:      Search,
     description:
       'Scout brings candidates in from wherever they live. Upload a CSV from any job board, paste a LinkedIn export, or drop raw CVs — Scout parses, deduplicates, and creates structured candidate profiles automatically. Your pipeline fills without manual data entry.',
-    color:     'text-blue-600',
-    border:    'border-blue-200',
-    bg:        'bg-blue-50',
-    badge:     'bg-blue-100 text-blue-700',
-    iconColor: 'text-blue-600',
+    color:     'text-emerald-600',
+    border:    'border-emerald-200',
+    bg:        'bg-emerald-50',
+    badge:     'bg-emerald-100 text-emerald-700',
+    iconColor: 'text-emerald-600',
     features: [
       { title: 'Bulk CSV import',                   description: 'Import hundreds of candidates at once from any job board export.' },
       { title: 'PDF CV parsing',                    description: 'Upload raw CVs and let AI extract name, contact, skills, and experience.' },
@@ -159,15 +159,15 @@ export default function FeaturesPage() {
       <MarketingNav />
 
       {/* Hero */}
-      <section className="bg-[#061D46] py-24 text-center">
+      <section className="bg-transparent py-24 text-center">
         <div className="mx-auto max-w-6xl px-6">
-          <span className="mb-4 inline-block rounded-full border border-blue-500/20 bg-blue-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-blue-400">
+          <span className="mb-4 inline-block rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-emerald-400">
             Features
           </span>
-          <h1 className="mt-4 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
+          <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
             Everything your recruiting<br className="hidden sm:block" /> team needs
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-blue-100/60">
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-600">
             One capability per agent. All working together.
           </p>
         </div>
@@ -224,7 +224,7 @@ export default function FeaturesPage() {
               <div className="mt-10">
                 <Link
                   href="/sign-up"
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-400 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-400 transition-colors"
                 >
                   Add {agent.name} to your stack
                   <span aria-hidden>→</span>

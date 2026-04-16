@@ -42,11 +42,11 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-white text-slate-900">
       <MarketingNav />
 
-      <section className="bg-[#061D46] py-20">
+      <section className="bg-transparent py-20">
         <div className="mx-auto max-w-3xl px-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-3">Legal</p>
-          <h1 className="text-4xl font-black text-white mb-2">Privacy Policy</h1>
-          <p className="text-sm text-blue-200/40">
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">Legal</p>
+          <h1 className="text-4xl font-black text-slate-900 mb-2">Privacy Policy</h1>
+          <p className="text-sm text-slate-500">
             Last updated: March 2026 · <span className="text-amber-400 font-medium">Placeholder — seek legal review before publishing</span>
           </p>
         </div>
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
           <div className="pt-4 border-t border-slate-200">
             <p className="text-xs text-slate-400">
               Questions?{' '}
-              <Link href="/contact" className="text-blue-600 hover:text-blue-500 transition-colors">
+              <Link href="/contact" className="text-emerald-600 hover:text-emerald-500 transition-colors">
                 Contact us
               </Link>
             </p>

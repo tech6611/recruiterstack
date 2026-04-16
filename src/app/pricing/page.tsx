@@ -45,12 +45,12 @@ const AGENT_CARDS: AgentCard[] = [
     name:         'Drafter',
     role:         'Job Creation & Tracking',
     icon:         FileText,
-    color:        'text-blue-600',
-    border:       'border-blue-200',
-    bg:           'bg-blue-50',
-    badge:        'bg-blue-100 text-blue-700',
-    iconColor:    'text-blue-600',
-    btnBg:        'bg-blue-600 hover:bg-blue-500',
+    color:        'text-emerald-600',
+    border:       'border-emerald-200',
+    bg:           'bg-emerald-50',
+    badge:        'bg-emerald-100 text-emerald-700',
+    iconColor:    'text-emerald-600',
+    btnBg:        'bg-emerald-600 hover:bg-emerald-500',
     monthlyPrice: 19,
     features: [
       'AI-drafted job descriptions',
@@ -64,12 +64,12 @@ const AGENT_CARDS: AgentCard[] = [
     name:         'Scout',
     role:         'Sourcing',
     icon:         Search,
-    color:        'text-blue-600',
-    border:       'border-blue-200',
-    bg:           'bg-blue-50',
-    badge:        'bg-blue-100 text-blue-700',
-    iconColor:    'text-blue-600',
-    btnBg:        'bg-blue-600 hover:bg-blue-500',
+    color:        'text-emerald-600',
+    border:       'border-emerald-200',
+    bg:           'bg-emerald-50',
+    badge:        'bg-emerald-100 text-emerald-700',
+    iconColor:    'text-emerald-600',
+    btnBg:        'bg-emerald-600 hover:bg-emerald-500',
     monthlyPrice: 29,
     features: [
       'Bulk CSV import',
@@ -209,15 +209,15 @@ export default function PricingPage() {
       <MarketingNav />
 
       {/* Hero */}
-      <section className="bg-[#061D46] py-24 text-center">
+      <section className="bg-transparent py-24 text-center">
         <div className="mx-auto max-w-6xl px-6">
-          <span className="mb-4 inline-block rounded-full border border-blue-500/20 bg-blue-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-blue-400">
+          <span className="mb-4 inline-block rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-widest text-emerald-400">
             Pricing
           </span>
-          <h1 className="mt-4 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
+          <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
             Pay only for what<br className="hidden sm:block" /> you deploy
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-lg text-blue-100/60">
+          <p className="mx-auto mt-5 max-w-xl text-lg text-slate-600">
             Individual agents or the full suite — no hidden fees.
           </p>
 
@@ -228,7 +228,7 @@ export default function PricingPage() {
               className={`rounded-lg px-5 py-2 text-sm font-semibold transition-colors ${
                 billingPeriod === 'monthly'
                   ? 'bg-white/10 text-white'
-                  : 'text-blue-200/40 hover:text-blue-100'
+                  : 'text-slate-500 hover:text-emerald-100'
               }`}
             >
               Monthly
@@ -238,7 +238,7 @@ export default function PricingPage() {
               className={`flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition-colors ${
                 billingPeriod === 'annual'
                   ? 'bg-white/10 text-white'
-                  : 'text-blue-200/40 hover:text-blue-100'
+                  : 'text-slate-500 hover:text-emerald-100'
               }`}
             >
               Annual
@@ -317,9 +317,9 @@ export default function PricingPage() {
 
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Pro */}
-            <div className="relative flex flex-col rounded-2xl border-2 border-blue-500 bg-white p-8 shadow-lg shadow-blue-500/10">
+            <div className="relative flex flex-col rounded-2xl border-2 border-emerald-500 bg-white p-8 shadow-lg shadow-emerald-500/10">
               <div className="absolute -top-3 left-6">
-                <span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-bold text-white">
+                <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-white">
                   Most popular
                 </span>
               </div>
@@ -335,7 +335,7 @@ export default function PricingPage() {
               <ul className="my-8 space-y-3">
                 {PRO_FEATURES.map((feat) => (
                   <li key={feat} className="flex items-start gap-3">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                     <span className="text-sm text-slate-700">{feat}</span>
                   </li>
                 ))}
@@ -343,7 +343,7 @@ export default function PricingPage() {
               <Link
                 href="/sign-up"
                 onClick={() => trackEvent('pricing_cta_clicked', { plan: 'pro', billing_period: billingPeriod })}
-                className="mt-auto block rounded-xl bg-blue-500 px-6 py-3 text-center text-sm font-semibold text-white hover:bg-blue-400 transition-colors"
+                className="mt-auto block rounded-xl bg-emerald-500 px-6 py-3 text-center text-sm font-semibold text-white hover:bg-emerald-400 transition-colors"
               >
                 Get started with Pro
               </Link>
@@ -387,7 +387,7 @@ export default function PricingPage() {
                 <tr className="border-b border-slate-200">
                   <th className="pb-4 text-left font-medium text-slate-400">Feature</th>
                   <th className="pb-4 text-center font-medium text-slate-400">Free</th>
-                  <th className="pb-4 text-center font-semibold text-blue-600">Pro</th>
+                  <th className="pb-4 text-center font-semibold text-emerald-600">Pro</th>
                   <th className="pb-4 text-center font-medium text-amber-600">Enterprise</th>
                 </tr>
               </thead>

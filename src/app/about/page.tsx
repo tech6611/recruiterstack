@@ -9,16 +9,16 @@ export default function AboutPage() {
       <MarketingNav />
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-[#061D46]">
+      <section className="relative overflow-hidden bg-transparent">
         <div className="pointer-events-none absolute inset-0 flex items-start justify-center">
-          <div className="mt-0 h-[300px] w-[700px] rounded-full bg-blue-500/10 blur-[120px]" />
+          <div className="mt-0 h-[300px] w-[700px] rounded-full bg-emerald-500/10 blur-[120px]" />
         </div>
         <div className="relative mx-auto max-w-3xl px-6 py-24 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-3">About</p>
-          <h1 className="text-4xl font-black text-white sm:text-5xl">
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">About</p>
+          <h1 className="text-4xl font-black text-slate-900 sm:text-5xl">
             Built for the next era of recruiting
           </h1>
-          <p className="mt-5 text-lg text-blue-100/60 leading-relaxed">
+          <p className="mt-5 text-lg text-slate-600 leading-relaxed">
             RecruiterStack was born from a simple frustration: too much time spent on tasks
             that don&apos;t require human judgment, and not enough time on the ones that do.
           </p>
@@ -28,7 +28,7 @@ export default function AboutPage() {
       {/* Mission */}
       <section className="py-20 border-b border-slate-200">
         <div className="mx-auto max-w-3xl px-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-4">Our mission</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 mb-4">Our mission</p>
           <h2 className="text-2xl font-bold text-slate-900 mb-5">
             Make great hiring accessible to every team, not just those with big recruiting budgets.
           </h2>
@@ -49,7 +49,7 @@ export default function AboutPage() {
       {/* Team placeholder */}
       <section className="py-20 border-b border-slate-200 bg-slate-50">
         <div className="mx-auto max-w-5xl px-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-4 text-center">Team</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 mb-4 text-center">Team</p>
           <h2 className="text-2xl font-bold text-slate-900 text-center mb-3">Our story is still being written</h2>
           <p className="text-slate-400 text-center mb-12 max-w-xl mx-auto">
             We&apos;re a small team of engineers, recruiters, and product people who&apos;ve seen firsthand
@@ -78,7 +78,7 @@ export default function AboutPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a
               href="mailto:hello@recruiterstack.in"
-              className="flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-400 transition-colors"
+              className="flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-400 transition-colors"
             >
               <Mail className="h-4 w-4" />
               hello@recruiterstack.in

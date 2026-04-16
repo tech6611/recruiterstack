@@ -38,11 +38,11 @@ export default function ContactPage() {
       <MarketingNav />
 
       {/* Hero */}
-      <section className="bg-[#061D46] py-20">
+      <section className="bg-transparent py-20">
         <div className="mx-auto max-w-3xl px-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-3">Contact</p>
-          <h1 className="text-4xl font-black text-white sm:text-5xl">Get in touch</h1>
-          <p className="mt-4 text-blue-100/60 text-lg">
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">Contact</p>
+          <h1 className="text-4xl font-black text-slate-900 sm:text-5xl">Get in touch</h1>
+          <p className="mt-4 text-slate-600 text-lg">
             Questions, demos, partnerships, or just curious — we&apos;re here.
           </p>
         </div>
@@ -55,17 +55,17 @@ export default function ContactPage() {
           {/* Info */}
           <div className="space-y-8">
             <div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 mb-3">
-                <Mail className="h-5 w-5 text-blue-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 border border-emerald-200 mb-3">
+                <Mail className="h-5 w-5 text-emerald-600" />
               </div>
               <h3 className="text-sm font-semibold text-slate-900 mb-1">Email us</h3>
-              <a href="mailto:hello@recruiterstack.in" className="text-sm text-blue-600 hover:text-blue-500 transition-colors">
+              <a href="mailto:hello@recruiterstack.in" className="text-sm text-emerald-600 hover:text-emerald-500 transition-colors">
                 hello@recruiterstack.in
               </a>
             </div>
             <div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 mb-3">
-                <MessageSquare className="h-5 w-5 text-blue-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 border border-emerald-200 mb-3">
+                <MessageSquare className="h-5 w-5 text-emerald-600" />
               </div>
               <h3 className="text-sm font-semibold text-slate-900 mb-1">Book a demo</h3>
               <p className="text-sm text-slate-400">
@@ -97,7 +97,7 @@ export default function ContactPage() {
                       value={form.name}
                       onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Your name"
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
                     />
                   </div>
                   <div>
@@ -108,7 +108,7 @@ export default function ContactPage() {
                       value={form.email}
                       onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
                       placeholder="you@company.com"
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
                     />
                   </div>
                 </div>
@@ -120,7 +120,7 @@ export default function ContactPage() {
                     value={form.message}
                     onChange={e => setForm(prev => ({ ...prev, message: e.target.value }))}
                     placeholder="Tell us about your team size, current ATS, and what you're trying to improve..."
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors resize-none"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors resize-none"
                   />
                 </div>
 
@@ -131,7 +131,7 @@ export default function ContactPage() {
                 <button
                   type="submit"
                   disabled={status === 'loading'}
-                  className="flex items-center gap-2 rounded-xl bg-blue-500 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-400 disabled:opacity-60 transition-colors"
+                  className="flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-400 disabled:opacity-60 transition-colors"
                 >
                   {status === 'loading'
                     ? <Loader2 className="h-4 w-4 animate-spin" />

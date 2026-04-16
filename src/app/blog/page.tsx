@@ -9,16 +9,16 @@ const PLACEHOLDER_POSTS = [
     title:    'Introducing RecruiterStack Agents: AI for every stage of your hiring funnel',
     excerpt:  'We built 5 AI agents that plug into your existing recruiting stack. Here\'s why we designed them this way.',
     date:     'Coming soon',
-    color:    'text-blue-600',
-    badge:    'bg-blue-100 text-blue-700',
+    color:    'text-emerald-600',
+    badge:    'bg-emerald-100 text-emerald-700',
   },
   {
     category: 'Guide',
     title:    'How to cut time-to-hire by 60% without changing your ATS',
     excerpt:  'A step-by-step guide to deploying AI agents on top of Greenhouse, Lever, or Workday without any migration.',
     date:     'Coming soon',
-    color:    'text-blue-600',
-    badge:    'bg-blue-100 text-blue-700',
+    color:    'text-emerald-600',
+    badge:    'bg-emerald-100 text-emerald-700',
   },
   {
     category: 'Insights',
@@ -36,13 +36,13 @@ export default function BlogPage() {
       <MarketingNav />
 
       {/* Hero */}
-      <section className="bg-[#061D46] py-20">
+      <section className="bg-transparent py-20">
         <div className="mx-auto max-w-4xl px-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-400 mb-3">Blog</p>
-          <h1 className="text-4xl font-black text-white sm:text-5xl">
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">Blog</p>
+          <h1 className="text-4xl font-black text-slate-900 sm:text-5xl">
             Recruiting, reimagined
           </h1>
-          <p className="mt-4 text-blue-100/60 text-lg">
+          <p className="mt-4 text-slate-600 text-lg">
             Guides, product updates, and insights on AI-powered hiring.
           </p>
         </div>
@@ -52,7 +52,7 @@ export default function BlogPage() {
       <section className="py-20">
         <div className="mx-auto max-w-5xl px-6">
           <div className="flex items-center gap-2 mb-8">
-            <Rss className="h-4 w-4 text-blue-600" />
+            <Rss className="h-4 w-4 text-emerald-600" />
             <span className="text-sm font-semibold text-slate-500">Latest posts</span>
             <span className="text-xs text-slate-400 ml-2">— Content coming soon</span>
           </div>
@@ -81,10 +81,10 @@ export default function BlogPage() {
       </section>
 
       {/* Subscribe */}
-      <section className="bg-[#061D46] py-20">
+      <section className="bg-transparent py-20">
         <div className="mx-auto max-w-xl px-6 text-center">
-          <h2 className="text-2xl font-bold text-white mb-2">Stay in the loop</h2>
-          <p className="text-blue-200/40 mb-8">
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Stay in the loop</h2>
+          <p className="text-slate-500 mb-8">
             Get notified when we publish new articles, product updates, and recruiting guides.
           </p>
           <EmailCapture
