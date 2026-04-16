@@ -14,8 +14,7 @@ export default function AboutPage() {
           <div className="mt-0 h-[300px] w-[700px] rounded-full bg-emerald-500/10 blur-[120px]" />
         </div>
         <div className="relative mx-auto max-w-3xl px-6 py-24 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">About</p>
-          <h1 className="text-4xl font-black text-slate-900 sm:text-5xl">
+          <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
             Built for the next era of <span className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-gold-500 bg-clip-text text-transparent">recruiting</span>
           </h1>
           <p className="mt-5 text-lg text-slate-600 leading-relaxed">
