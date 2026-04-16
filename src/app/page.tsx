@@ -202,7 +202,7 @@ export default function HomePage() {
       </section>
 
       {/* ══ INTEGRATION BAR ═══════════════════════════════════════════════════ */}
-      <section className="border-y border-slate-200 bg-slate-50 py-8">
+      <section className="border-y border-emerald-100 bg-white/50 backdrop-blur-sm py-8">
         <div className="mx-auto max-w-5xl px-6 text-center">
           <p className="mb-5 text-xs font-semibold uppercase tracking-widest text-slate-400">
             Works with your existing stack — no lock-in
@@ -211,12 +211,12 @@ export default function HomePage() {
             {INTEGRATIONS.map(name => (
               <span
                 key={name}
-                className="rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-500"
+                className="rounded-full border border-emerald-100/60 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm"
               >
                 {name}
               </span>
             ))}
-            <span className="rounded-full border border-dashed border-slate-300 px-3.5 py-1.5 text-xs font-medium text-slate-400">
+            <span className="rounded-full border border-dashed border-emerald-200 px-3.5 py-1.5 text-xs font-medium text-slate-400">
               + more
             </span>
           </div>
@@ -225,13 +225,13 @@ export default function HomePage() {
       </section>
 
       {/* ══ AGENTS SECTION ════════════════════════════════════════════════════ */}
-      <section id="agents" className="py-24 bg-white">
+      <section id="agents" className="py-24 bg-transparent">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-4 text-center">
-            <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">The agents</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">The agents</p>
             <h2 className="mt-3 text-3xl font-bold text-slate-900">
               Meet your{' '}
-              <span className="bg-gradient-to-r from-violet-600 to-blue-600 bg-clip-text text-transparent">AI recruiting team</span>
+              <span className="bg-gradient-to-r from-emerald-600 to-gold-500 bg-clip-text text-transparent">AI recruiting team</span>
             </h2>
             <p className="mt-3 text-slate-500 max-w-xl mx-auto">
               Deploy one. Deploy all five. Each agent handles a specific stage of your funnel
@@ -258,10 +258,10 @@ export default function HomePage() {
               return (
                 <div
                   key={agent.name}
-                  className="group relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex flex-col"
+                  className="group relative rounded-2xl glass-panel p-5 transition-all flex flex-col"
                 >
                   {/* Header */}
-                  <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl ${agent.bg} border ${agent.border}`}>
+                  <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-emerald-100 shadow-sm`}>
                     <Icon className={`h-5 w-5 ${agent.color}`} />
                   </div>
                   <div className={`mb-1 text-[10px] font-bold uppercase tracking-widest ${agent.color}`}>
@@ -295,7 +295,7 @@ export default function HomePage() {
           <div className="mt-10 text-center">
             <Link
               href="/agents"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-200/60 bg-white/70 px-5 py-2.5 text-sm font-medium text-emerald-800 shadow-sm hover:border-emerald-300 hover:bg-white transition-colors"
             >
               Deep-dive into every agent <ArrowRight className="h-4 w-4" />
             </Link>
@@ -304,13 +304,13 @@ export default function HomePage() {
       </section>
 
       {/* ══ PLUG & PLAY ═══════════════════════════════════════════════════════ */}
-      <section className="py-24 bg-slate-50">
+      <section className="py-24 bg-emerald-50/30">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid gap-12 lg:grid-cols-2 items-center">
 
             {/* Copy */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">
+              <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 mb-3">
                 Plug &amp; Play
               </p>
               <h2 className="text-3xl font-bold text-slate-900 leading-tight">
@@ -329,14 +329,14 @@ export default function HomePage() {
                   { icon: Shield,   text: 'Row-level data isolation — your data never touches another org' },
                 ].map(({ icon: Icon, text }) => (
                   <li key={text} className="flex items-start gap-3 text-sm text-slate-500">
-                    <Icon className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                    <Icon className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
                     {text}
                   </li>
                 ))}
               </ul>
               <Link
                 href="/sign-up"
-                className="mt-8 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
+                className="mt-8 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors"
               >
                 Connect your stack <ArrowRight className="h-4 w-4" />
               </Link>
@@ -356,9 +356,9 @@ export default function HomePage() {
               </div>
 
               <div className="flex items-center gap-2 mb-4 text-slate-400">
-                <div className="h-px flex-1 border-t border-dashed border-slate-300" />
-                <span className="text-blue-600 font-bold text-[11px]">RecruiterStack layer</span>
-                <div className="h-px flex-1 border-t border-dashed border-slate-300" />
+                <div className="h-px flex-1 border-t border-dashed border-emerald-200" />
+                <span className="text-emerald-600 font-bold text-[11px]">RecruiterStack layer</span>
+                <div className="h-px flex-1 border-t border-dashed border-emerald-200" />
               </div>
 
               <div className="grid grid-cols-5 gap-1">
@@ -379,10 +379,10 @@ export default function HomePage() {
       </section>
 
       {/* ══ AUDIENCE ══════════════════════════════════════════════════════════ */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-transparent">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-14 text-center">
-            <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">Built for</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">Built for</p>
             <h2 className="mt-3 text-3xl font-bold text-slate-900">Every recruiting team</h2>
           </div>
 
@@ -392,32 +392,29 @@ export default function HomePage() {
                 title:   'Recruiting Agencies',
                 sub:     'Run multiple client mandates from one workspace.',
                 agents:  ['Scout', 'Sifter'],
-                tint:    'bg-white',
                 bullets: ['Multi-client workspace isolation', 'AI screening saves 10+ hrs/week', 'Automated candidate shortlists'],
               },
               {
                 title:   'Enterprise TA Teams',
                 sub:     'Process hundreds of applications across dozens of reqs.',
                 agents:  ['Drafter', 'Scout', 'Sifter', 'Scheduler', 'Closer'],
-                tint:    'bg-white',
                 bullets: ['Full-funnel automation', 'Cross-team pipeline visibility', 'Analytics & velocity reporting'],
               },
               {
                 title:   'Startups & Small Teams',
                 sub:     'No dedicated recruiter? AI fills the gap.',
                 agents:  ['Sifter', 'Scheduler'],
-                tint:    'bg-white',
                 bullets: ['Zero setup — live in minutes', 'AI handles top-of-funnel entirely', 'Pay only for what you use'],
               },
-            ].map(({ title, sub, agents, tint, bullets }) => (
-              <div key={title} className={`rounded-2xl border border-slate-200 ${tint} p-7 shadow-sm hover:shadow-md transition-shadow`}>
+            ].map(({ title, sub, agents, bullets }) => (
+              <div key={title} className={`rounded-2xl glass-panel p-7 transition-shadow`}>
                 <h3 className="text-lg font-bold text-slate-900">{title}</h3>
                 <p className="mt-2 text-sm text-slate-500">{sub}</p>
                 <div className="mt-4 flex flex-wrap gap-1.5">
                   {agents.map(a => {
                     const agentDef = AGENTS.find(ag => ag.name === a)
                     return (
-                      <span key={a} className={`text-xs px-2.5 py-1 rounded-full border ${agentDef?.border ?? 'border-blue-200'} ${agentDef?.color ?? 'text-blue-600'} ${agentDef?.bg ?? 'bg-blue-50'}`}>{a}</span>
+                      <span key={a} className={`text-xs px-2.5 py-1 rounded-full border ${agentDef?.border ?? 'border-emerald-200'} ${agentDef?.color ?? 'text-emerald-700'} ${agentDef?.bg ?? 'bg-emerald-50'}`}>{a}</span>
                     )
                   })}
                 </div>
@@ -436,9 +433,9 @@ export default function HomePage() {
       </section>
 
       {/* ══ PRICING TEASER ════════════════════════════════════════════════════ */}
-      <section className="py-24 bg-slate-50">
+      <section className="py-24 bg-gold-50/30">
         <div className="mx-auto max-w-5xl px-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 mb-3">Pricing</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 mb-3">Pricing</p>
           <h2 className="text-3xl font-bold text-slate-900">Pay only for what you deploy</h2>
           <p className="mt-3 text-slate-500">Individual agents or the full suite — your call.</p>
 
@@ -474,14 +471,14 @@ export default function HomePage() {
             ].map(({ label, price, period, desc, cta, href, highlight }) => (
               <div
                 key={label}
-                className={`rounded-2xl p-6 text-left ${
+                className={`rounded-2xl p-6 text-left transition-all ${
                   highlight
-                    ? 'border-2 border-blue-500 bg-white shadow-lg shadow-blue-500/10'
-                    : 'border border-slate-200 bg-white shadow-sm'
+                    ? 'border-2 border-emerald-500 bg-white shadow-lg shadow-emerald-500/10 scale-105 relative z-10'
+                    : 'glass-panel shadow-sm'
                 }`}
               >
                 {highlight && (
-                  <span className="mb-3 inline-block rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">
+                  <span className="mb-3 inline-block rounded-full bg-gradient-to-r from-emerald-500 to-gold-500 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wide">
                     Most popular
                   </span>
                 )}
@@ -495,8 +492,8 @@ export default function HomePage() {
                   href={href}
                   className={`mt-5 block rounded-xl py-2.5 text-sm font-semibold text-center transition-colors ${
                     highlight
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm'
+                      : 'border border-emerald-200/50 text-emerald-800 hover:border-emerald-300 hover:bg-white'
                   }`}
                 >
                   {cta}
@@ -512,19 +509,19 @@ export default function HomePage() {
       </section>
 
       {/* ══ HOW IT WORKS ══════════════════════════════════════════════════════ */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-transparent">
         <div className="mx-auto max-w-4xl px-6">
           <div className="mb-14 text-center">
-            <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">How it works</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">How it works</p>
             <h2 className="mt-3 text-3xl font-bold text-slate-900">Live in minutes, not months</h2>
           </div>
           <div className="space-y-3">
             {HOW_IT_WORKS.map(({ n, title, desc }) => (
               <div
                 key={n}
-                className="flex items-start gap-6 rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm hover:shadow-md transition-shadow"
+                className="flex items-start gap-6 rounded-2xl glass-panel px-6 py-5 transition-shadow"
               >
-                <span className="shrink-0 font-black text-3xl bg-gradient-to-br from-blue-500 to-violet-500 bg-clip-text text-transparent leading-none tabular-nums">{n}</span>
+                <span className="shrink-0 font-black text-3xl bg-gradient-to-br from-emerald-500 to-gold-500 bg-clip-text text-transparent leading-none tabular-nums">{n}</span>
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
                   <p className="mt-1 text-sm text-slate-500">{desc}</p>
@@ -536,17 +533,17 @@ export default function HomePage() {
       </section>
 
       {/* ══ LEAD CAPTURE ══════════════════════════════════════════════════════ */}
-      <section className="py-24 bg-[#061D46]">
+      <section className="py-24 bg-transparent">
         <div className="mx-auto max-w-2xl px-6 text-center">
-          <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm px-8 py-14">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-blue-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="rounded-3xl glass-panel px-8 py-14 shadow-lg shadow-emerald-500/5">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-200/50 bg-emerald-50/80 px-3 py-1 text-xs font-medium text-emerald-800">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Now in early access
             </div>
-            <h2 className="mt-5 text-3xl font-bold text-white">
+            <h2 className="mt-5 text-3xl font-bold text-slate-900">
               Ready to deploy your AI recruiting team?
             </h2>
-            <p className="mt-3 text-blue-100/60">
+            <p className="mt-3 text-slate-600">
               Join teams already running AI agents across their hiring funnel.
               Drop your email and we&apos;ll walk you through the right agents for your workflow.
             </p>
@@ -557,9 +554,9 @@ export default function HomePage() {
                 source="homepage-cta"
               />
             </div>
-            <p className="mt-5 text-xs text-blue-200/40">
+            <p className="mt-5 text-xs text-slate-400">
               Or{' '}
-              <Link href="/sign-up" className="text-blue-300 hover:text-blue-200 transition-colors">
+              <Link href="/sign-up" className="text-emerald-600 hover:text-emerald-700 font-medium transition-colors">
                 create a free account
               </Link>{' '}
               — no credit card required.
