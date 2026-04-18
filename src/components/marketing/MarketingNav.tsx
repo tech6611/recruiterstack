@@ -33,7 +33,7 @@ export function MarketingNav() {
             <Link
               key={l.href}
               href={l.href}
-              className="rounded-lg px-3.5 py-2 text-sm font-medium text-emerald-100/80 hover:text-white hover:bg-emerald-800 transition-colors"
+              className="rounded-lg px-3.5 py-2 text-sm font-bold text-emerald-50 hover:text-white hover:bg-emerald-800 transition-colors"
             >
               {l.label}
             </Link>
@@ -74,7 +74,7 @@ export function MarketingNav() {
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
-              className="block rounded-lg px-3 py-2.5 text-sm font-medium text-emerald-100 hover:text-white hover:bg-emerald-800 transition-colors"
+              className="block rounded-lg px-3 py-2.5 text-sm font-bold text-emerald-50 hover:text-white hover:bg-emerald-800 transition-colors"
             >
               {l.label}
             </Link>
