@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg, requireOrgAndUser } from '@/lib/auth'
+import { requireOrgAndUser } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { cached, cacheKey, invalidate } from '@/lib/api/cache'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
@@ -61,34 +61,62 @@ export async function GET() {
   return NextResponse.json({ data: settingsData })
 }
 
-// PATCH /api/org-settings — upsert { slack_webhook_url }
+// PATCH /api/org-settings — partial update of any org-wide setting.
+// Any admin-only field (company_name, company_size, industry, website,
+// enabled_agents) requires the current user to be an admin.
 export async function PATCH(request: NextRequest) {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
 
   const parsed = await parseBody(request, orgSettingsUpdateSchema)
   if (parsed instanceof NextResponse) return parsed
 
   const supabase = createAdminClient()
+
+  const adminFieldPresent =
+    parsed.company_name !== undefined ||
+    parsed.company_size !== undefined ||
+    parsed.industry     !== undefined ||
+    parsed.website      !== undefined ||
+    parsed.enabled_agents !== undefined
+
+  if (adminFieldPresent) {
+    const { data: me } = await supabase
+      .from('org_members')
+      .select('role')
+      .eq('org_id', orgId)
+      .eq('user_id', userId)
+      .maybeSingle()
+    if ((me as { role: string } | null)?.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Only admins can change company info or enabled agents.' },
+        { status: 403 },
+      )
+    }
+  }
+
+  const patch: Record<string, unknown> = {
+    org_id:     orgId,
+    updated_at: new Date().toISOString(),
+  }
+  if (parsed.slack_webhook_url !== undefined) patch.slack_webhook_url = parsed.slack_webhook_url ?? null
+  if (parsed.company_name      !== undefined) patch.company_name      = parsed.company_name
+  if (parsed.company_size      !== undefined) patch.company_size      = parsed.company_size
+  if (parsed.industry          !== undefined) patch.industry          = parsed.industry ?? null
+  if (parsed.website           !== undefined) patch.website           = parsed.website ?? null
+  if (parsed.enabled_agents    !== undefined) patch.enabled_agents    = parsed.enabled_agents
+
   const { data, error } = await supabase
     .from('org_settings')
-    .upsert(
-      { org_id: orgId, slack_webhook_url: parsed.slack_webhook_url ?? null, updated_at: new Date().toISOString() },
-      { onConflict: 'org_id' }
-    )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .upsert(patch as any, { onConflict: 'org_id' })
     .select()
     .single()
 
   if (error) return handleSupabaseError(error)
 
-  // Slack changes are org-wide — the cache key embeds userId, so we'd have to
-  // scan N keys. Keep this simple: only invalidate the current user's entry;
-  // other users' cached copies expire naturally at 5 min.
-  const authForInvalidate = await requireOrgAndUser()
-  if (!(authForInvalidate instanceof NextResponse)) {
-    await invalidate(cacheKey(orgId, `org-settings:${authForInvalidate.userId}`))
-  }
+  await invalidate(cacheKey(orgId, `org-settings:${userId}`))
 
   return NextResponse.json({ data })
 }

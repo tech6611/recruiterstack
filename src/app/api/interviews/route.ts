@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   const {
     application_id, candidate_id, hiring_request_id, stage_id,
     interviewer_name, interviewer_email, interview_type, scheduled_at, duration_minutes,
-    location, notes, generate_self_schedule, timezone, meeting_platform, panel,
+    location, notes, generate_self_schedule, timezone, meeting_platform, panel, host_email,
   } = body
 
   if (!application_id || !candidate_id || !hiring_request_id || !interviewer_name?.trim() || !scheduled_at) {
@@ -101,10 +101,20 @@ export async function POST(req: NextRequest) {
 
     // Panel emails drive the host-fallback chain (first panelist with a working
     // token hosts the event). Fall back to org-level tokens if no panelist has
-    // connected this provider per-user yet.
-    const panelEmails: string[] = Array.isArray(panel)
+    // connected this provider per-user yet. If the caller specified a preferred
+    // host_email, pull it to the front of the chain.
+    const rawPanelEmails: string[] = Array.isArray(panel)
       ? (panel as PanelMember[]).map(m => m.email).filter(Boolean)
       : interviewer_email?.trim() ? [interviewer_email.trim()] : []
+
+    const normalize = (s: string) => s.trim().toLowerCase()
+    const preferred = typeof host_email === 'string' ? normalize(host_email) : null
+    const panelEmails: string[] = preferred
+      ? [
+          ...rawPanelEmails.filter(e => normalize(e) === preferred),
+          ...rawPanelEmails.filter(e => normalize(e) !== preferred),
+        ]
+      : rawPanelEmails
 
     const provider: ResolvableProvider =
       resolvedPlatform === 'zoom'     ? 'zoom' :

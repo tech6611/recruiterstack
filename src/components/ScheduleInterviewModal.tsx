@@ -86,6 +86,9 @@ export default function ScheduleInterviewModal({
 
   const [interviewer,      setInterviewer]      = useState(hmName)
   const [interviewerEmail, setInterviewerEmail] = useState(hmEmail)
+  // Preferred host calendar — first panelist with an email by default.
+  // Empty string means "let the backend pick the first working panelist".
+  const [hostEmail,        setHostEmail]        = useState<string>(hmEmail ?? '')
   const [location,  setLocation]  = useState('')
   const [notes,     setNotes]     = useState('')
   const [saving,    setSaving]    = useState(false)
@@ -294,6 +297,7 @@ export default function ScheduleInterviewModal({
           generate_self_schedule: true,
           meeting_platform:  platform,
           panel:             panel.filter(m => m.email.trim()),
+          host_email:        hostEmail || null,
           timezone:          Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       })
@@ -366,7 +370,8 @@ export default function ScheduleInterviewModal({
                              : connectedPlatforms[0]?.id === 'teams' ? 'ms_teams'
                              : connectedPlatforms[0]?.id === 'zoom'  ? 'zoom'
                              : null,
-                            panel: panel.filter(m => m.email.trim()),
+                            panel:      panel.filter(m => m.email.trim()),
+                            host_email: hostEmail || null,
           }),
         }).then(r => r.json())
       ))
@@ -611,6 +616,28 @@ export default function ScheduleInterviewModal({
               </div>
             )}
           </div>
+
+          {/* Host calendar — only show when 2+ panelists have email */}
+          {panel.filter(m => m.email.trim()).length >= 2 && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Host calendar</label>
+              <select
+                value={hostEmail}
+                onChange={e => setHostEmail(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none"
+              >
+                <option value="">Auto (first connected panelist)</option>
+                {panel.filter(m => m.email.trim()).map((m, i) => (
+                  <option key={i} value={m.email}>
+                    {m.name || m.email} · {m.email}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-slate-400">
+                This panelist&rsquo;s calendar owns the event. If their connection fails, we fall back to other panelists.
+              </p>
+            </div>
+          )}
 
           {/* Interview type */}
           <div>

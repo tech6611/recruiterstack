@@ -6,6 +6,9 @@ import { CheckCircle, Check, Building2, User, Sparkles, Database, Bell, Plug, La
 import { useSettings, KANBAN_CARD_FIELD_OPTIONS } from '@/lib/hooks/useSettings'
 import { inputCls } from '@/lib/ui/styles'
 import type { AppSettings } from '@/lib/hooks/useSettings'
+import { CompanyInfoCard } from '@/components/settings/CompanyInfoCard'
+import { AgentsCard } from '@/components/settings/AgentsCard'
+import { TeamCard } from '@/components/settings/TeamCard'
 
 export default function SettingsPage() {
   const { settings, save, loaded } = useSettings()
@@ -45,10 +48,20 @@ export default function SettingsPage() {
   const [msErrorReason, setMsErrorReason] = useState<string | null>(null)
   const [msDisconnecting, setMsDisconnecting] = useState(false)
 
+  // Current user's role — gates admin-only sections (Slack, company info, team, agents)
+  const [isAdmin, setIsAdmin] = useState(false)
+
   // Sync form once settings load from localStorage
   useEffect(() => {
     if (loaded) setForm(settings)
   }, [loaded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    fetch('/api/me')
+      .then(r => r.json())
+      .then(({ data }) => setIsAdmin(!!data?.is_admin))
+      .catch(() => {})
+  }, [])
 
   // Load Slack + Google settings from server
   // Capture URL params at mount time so the closure doesn't go stale
@@ -456,7 +469,18 @@ export default function SettingsPage() {
         </button>
       </form>
 
-      {/* Slack Notifications — channel webhook */}
+      {/* Slack Notifications — channel webhook (admin-only) */}
+      {!isAdmin ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
+              <Bell className="h-4 w-4 text-slate-400" />
+            </div>
+            <h2 className="text-sm font-semibold text-slate-500">Slack Channel Alerts</h2>
+          </div>
+          <p className="text-xs text-slate-500 ml-11">Only admins can change the Slack webhook URL.</p>
+        </div>
+      ) : (
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
         <div className="flex items-center gap-2.5 mb-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50">
@@ -506,8 +530,24 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+      )}
 
-      {/* Slack App — OAuth DMs */}
+      {/* Slack App — OAuth DMs (admin-only install/disconnect) */}
+      {!isAdmin ? (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
+              <Plug className="h-4 w-4 text-slate-400" />
+            </div>
+            <h2 className="text-sm font-semibold text-slate-500">Slack App</h2>
+          </div>
+          <p className="text-xs text-slate-500 ml-11">
+            {slackConnected
+              ? `Connected to ${slackTeamName ?? 'your workspace'} by your admin.`
+              : 'Your admin hasn’t installed the Slack app yet.'}
+          </p>
+        </div>
+      ) : (
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
         <div className="flex items-center gap-2.5 mb-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50">
@@ -552,6 +592,7 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Google Calendar / Meet */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
@@ -690,6 +731,15 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Admin-only workspace config */}
+      {isAdmin && (
+        <div className="space-y-4">
+          <CompanyInfoCard />
+          <AgentsCard />
+          <TeamCard />
+        </div>
+      )}
 
       {/* Info cards */}
       <div className="grid grid-cols-2 gap-4">
