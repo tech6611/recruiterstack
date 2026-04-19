@@ -495,6 +495,9 @@ export interface NotificationUpdate {
 
 // ── Org Settings ─────────────────────────────────────────────────────────────
 
+export type CompanySize = '1-10' | '11-50' | '51-200' | '201-1000' | '1000+'
+export type AgentKey = 'drafter' | 'scout' | 'sifter' | 'scheduler' | 'closer'
+
 export interface OrgSettings {
   org_id: string
   slack_webhook_url: string | null
@@ -515,6 +518,12 @@ export interface OrgSettings {
   ms_refresh_token: string | null
   ms_token_expiry: string | null
   ms_connected_email: string | null
+  // Onboarding-captured (migration 041)
+  company_name: string | null
+  company_size: CompanySize | null
+  industry: string | null
+  website: string | null
+  enabled_agents: AgentKey[]
   updated_at: string
 }
 

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { verifyOAuthState } from '@/lib/api/oauth-state'
 import { encrypt } from '@/lib/crypto'
+import { resolveUserIdFromClerk } from '@/lib/auth'
+import { postOAuthRedirectBase } from '@/lib/onboarding/redirect-target'
 import { logger } from '@/lib/logger'
 
 // GET /api/slack/callback — Slack sends the user here after OAuth
@@ -90,5 +93,10 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  return NextResponse.redirect(`${appUrl}/settings?slack=connected`)
+  // Slack state only carries orgId; look up the current Clerk user to
+  // decide whether to land on settings or resume onboarding.
+  const { userId: clerkUserId } = auth()
+  const userId = clerkUserId ? await resolveUserIdFromClerk(clerkUserId).catch(() => null) : null
+  const base = await postOAuthRedirectBase(orgId, userId)
+  return NextResponse.redirect(`${appUrl}${base}?slack=connected`)
 }

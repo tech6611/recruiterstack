@@ -39,13 +39,15 @@ export interface OrgMember {
   user_id: string
   role: OrgRole
   is_active: boolean
+  onboarded_at: string | null
   created_at: string
   updated_at: string
 }
 
-export interface OrgMemberInsert extends Omit<OrgMember, 'id' | 'created_at' | 'updated_at' | 'is_active'> {
+export interface OrgMemberInsert extends Omit<OrgMember, 'id' | 'created_at' | 'updated_at' | 'is_active' | 'onboarded_at'> {
   id?: string
   is_active?: boolean
+  onboarded_at?: string | null
   created_at?: string
   updated_at?: string
 }

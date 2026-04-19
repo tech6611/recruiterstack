@@ -4,6 +4,7 @@ import Script from 'next/script'
 import './globals.css'
 import { Analytics } from '@vercel/analytics/next'
 import { ClerkProvider } from '@clerk/nextjs'
+import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
         
         {children}
+        <Toaster position="top-right" richColors closeButton />
         <Analytics />
 
         {/* Google Analytics */}

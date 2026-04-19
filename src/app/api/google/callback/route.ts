@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOAuthState } from '@/lib/api/oauth-state'
 import { saveTokens } from '@/lib/integrations/store'
+import { postOAuthRedirectBase } from '@/lib/onboarding/redirect-target'
 import { logger } from '@/lib/logger'
 
 // GET /api/google/callback — Google sends user here after OAuth consent.
@@ -93,5 +94,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${appUrl}/settings?google=error&reason=db_save`)
   }
 
-  return NextResponse.redirect(`${appUrl}/settings?google=connected`)
+  const base = await postOAuthRedirectBase(orgId, userId)
+  return NextResponse.redirect(`${appUrl}${base}?google=connected`)
 }

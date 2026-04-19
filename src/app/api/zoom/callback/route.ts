@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOAuthState } from '@/lib/api/oauth-state'
 import { saveTokens } from '@/lib/integrations/store'
+import { postOAuthRedirectBase } from '@/lib/onboarding/redirect-target'
 import { logger } from '@/lib/logger'
 
 // GET /api/zoom/callback — per-user integration. Writes tokens to user_integrations.
@@ -94,5 +95,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${appUrl}/settings?zoom=error&reason=db_save`)
   }
 
-  return NextResponse.redirect(`${appUrl}/settings?zoom=connected`)
+  const base = await postOAuthRedirectBase(orgId, userId)
+  return NextResponse.redirect(`${appUrl}${base}?zoom=connected`)
 }
