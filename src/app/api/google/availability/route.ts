@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
-import { getValidAccessToken, queryFreeBusy, type GoogleTokens } from '@/lib/google/calendar'
-import { decryptSafe, encrypt } from '@/lib/crypto'
+import { requireOrgAndUser } from '@/lib/auth'
+import {
+  ensureValidGoogleTokensForUser,
+  queryFreeBusy,
+  GoogleNotConnectedError,
+} from '@/lib/google/calendar'
 import { logger } from '@/lib/logger'
-import type { OrgSettingsUpdate } from '@/lib/types/database'
 
 /**
  * GET /api/google/availability
  *
- * Query free/busy slots for one or more email addresses.
+ * Query free/busy slots for one or more email addresses, using the CURRENT
+ * USER's Google Calendar connection (per-user integration model).
  *
  * Query params:
  *   emails   — comma-separated list of email addresses
@@ -19,39 +21,14 @@ import type { OrgSettingsUpdate } from '@/lib/types/database'
  *
  * Response: { data: { [email]: [{ start, end }] }, connected_email: string | null }
  *
- * The connected_email is the Google account that owns the OAuth token (stored in
- * org_settings.google_connected_email at connection time).
- * It is automatically added to the freebusy query so the connected account's
- * calendar always shows regardless of what panel emails are provided.
- *
- * Returns 409 if Google is not connected for this org.
+ * Returns 409 if the current user has not connected Google.
+ * Returns 401 if the refresh token was revoked / refresh failed.
  */
 export async function GET(req: NextRequest) {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { userId } = authResult
 
-  const supabase = createAdminClient()
-
-  // Load stored Google tokens + connected account email (set at OAuth callback time)
-  const { data: settingsData } = await supabase
-    .from('org_settings')
-    .select('google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry, google_connected_email')
-    .eq('org_id', orgId)
-    .single()
-  const settings = settingsData as { google_oauth_access_token: string | null; google_oauth_refresh_token: string | null; google_oauth_token_expiry: string | null; google_connected_email: string | null } | null
-
-  const decryptedAccess  = decryptSafe(settings?.google_oauth_access_token ?? null)
-  const decryptedRefresh = decryptSafe(settings?.google_oauth_refresh_token ?? null)
-
-  if (!decryptedAccess || !decryptedRefresh) {
-    return NextResponse.json(
-      { error: 'Google Calendar is not connected. Visit Settings → Integrations to connect.' },
-      { status: 409 }
-    )
-  }
-
-  // Parse query params
   const { searchParams } = req.nextUrl
   const emailsParam = searchParams.get('emails') ?? ''
   const emails      = emailsParam.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
@@ -63,43 +40,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'emails param is required' }, { status: 400 })
   }
 
-  // Ensure token is valid (refresh if needed)
-  let accessToken: string
-  let freshTokens: GoogleTokens
+  let access_token: string
+  let connected_email: string | null
   try {
-    const result = await getValidAccessToken({
-      access_token:  decryptedAccess,
-      refresh_token: decryptedRefresh,
-      token_expiry:  settings!.google_oauth_token_expiry ?? null,
-    })
-    accessToken  = result.access_token
-    freshTokens  = result.tokens
-
-    // Persist refreshed tokens if changed (encrypt before saving)
-    if (freshTokens.access_token !== decryptedAccess) {
-      await supabase
-        .from('org_settings')
-        .update({
-          google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
-          google_oauth_token_expiry: freshTokens.token_expiry,
-        } as OrgSettingsUpdate)
-        .eq('org_id', orgId)
-    }
+    const ctx = await ensureValidGoogleTokensForUser(userId)
+    access_token    = ctx.access_token
+    connected_email = ctx.connected_email
   } catch (e) {
+    if (e instanceof GoogleNotConnectedError) {
+      return NextResponse.json(
+        { error: 'Google Calendar is not connected for your account. Visit Settings → Integrations to connect.' },
+        { status: 409 },
+      )
+    }
     logger.error('[google-availability] token refresh failed', e)
     return NextResponse.json({ error: 'Google token refresh failed. Please reconnect.' }, { status: 401 })
   }
 
   try {
-    // Only query the emails explicitly requested (the actual panel members).
-    // The connected Google account is NOT auto-added — it should only contribute to
-    // availability when it is explicitly part of the interview panel.
-    const connectedEmail = settings?.google_connected_email ?? null
-
-    const busyMap = await queryFreeBusy(accessToken, emails, timeMin, timeMax, timezone)
+    const busyMap = await queryFreeBusy(access_token, emails, timeMin, timeMax, timezone)
     return NextResponse.json(
-      { data: busyMap, connected_email: connectedEmail },
-      { headers: { 'Cache-Control': 'no-store' } }   // never cache — GCal events change in real-time
+      { data: busyMap, connected_email },
+      { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (e) {
     logger.error('[google-availability] free/busy query failed', e)

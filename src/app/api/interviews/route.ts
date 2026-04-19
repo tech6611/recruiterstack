@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { randomBytes } from 'crypto'
-import { getValidAccessToken as getGoogleToken, createMeetEvent } from '@/lib/google/calendar'
-import { getValidAccessToken as getZoomToken, createZoomMeeting } from '@/lib/zoom/meetings'
-import { getValidAccessToken as getMSToken, createTeamsMeeting } from '@/lib/microsoft/calendar'
+import { createMeetEvent } from '@/lib/google/calendar'
+import { createZoomMeeting } from '@/lib/zoom/meetings'
+import { createTeamsMeeting } from '@/lib/microsoft/calendar'
+import { resolveHost, HostTokenUnavailableError, type ResolvableProvider } from '@/lib/integrations/host-resolver'
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
-import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
-import type { InterviewInsert, ApplicationEventInsert, OrgSettingsUpdate } from '@/lib/types/database'
+import type { InterviewInsert, ApplicationEventInsert } from '@/lib/types/database'
+
+interface PanelMember { name?: string; email: string }
 
 // Strip HTML tags → plain text (for Google Calendar event descriptions)
 function stripHtml(html: string): string {
@@ -82,25 +84,6 @@ export async function POST(req: NextRequest) {
   let resolvedPlatform:   string | null = meeting_platform ?? null
 
   if (interview_type === 'video' || interview_type === 'panel' || interview_type === 'technical') {
-    const { data: orgSettingsRaw } = await supabase
-      .from('org_settings')
-      .select(
-        'google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry, google_connected_email, ' +
-        'zoom_access_token, zoom_refresh_token, zoom_token_expiry, zoom_connected_email, ' +
-        'ms_access_token, ms_refresh_token, ms_token_expiry, ms_connected_email'
-      )
-      .eq('org_id', orgId)
-      .single()
-
-    const orgSettings = orgSettingsRaw as {
-      google_oauth_access_token: string | null; google_oauth_refresh_token: string | null;
-      google_oauth_token_expiry: string | null; google_connected_email: string | null;
-      zoom_access_token: string | null; zoom_refresh_token: string | null;
-      zoom_token_expiry: string | null; zoom_connected_email: string | null;
-      ms_access_token: string | null; ms_refresh_token: string | null;
-      ms_token_expiry: string | null; ms_connected_email: string | null;
-    } | null
-
     // Fetch candidate + hiring request info (needed for event summary)
     const [{ data: candidateRaw }, { data: hiringReqRaw }] = await Promise.all([
       supabase.from('candidates').select('name, email').eq('id', candidate_id).single(),
@@ -116,109 +99,75 @@ export async function POST(req: NextRequest) {
     const eventSummary = `Interview: ${candidate?.name ?? 'Candidate'} — ${hiringReq?.position_title ?? 'Position'}`
     const eventDesc    = notes?.trim() ? stripHtml(notes) : undefined
 
-    // ── Zoom ──────────────────────────────────────────────────────────────
-    if (resolvedPlatform === 'zoom') {
-      const zAccess  = decryptSafe(orgSettings?.zoom_access_token ?? null)
-      const zRefresh = decryptSafe(orgSettings?.zoom_refresh_token ?? null)
-      if (zAccess && zRefresh) {
-        try {
-          const { access_token, tokens: fresh } = await getZoomToken({
-            access_token: zAccess, refresh_token: zRefresh,
-            token_expiry: orgSettings!.zoom_token_expiry ?? null,
-          })
-          if (fresh.access_token !== zAccess) {
-            await supabase.from('org_settings').update({
-              zoom_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.access_token) : fresh.access_token,
-              zoom_refresh_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.refresh_token) : fresh.refresh_token,
-              zoom_token_expiry: fresh.token_expiry,
-            } as unknown as OrgSettingsUpdate).eq('org_id', orgId)
-          }
-          const created = await createZoomMeeting(access_token, {
-            topic:      eventSummary,
-            start_time: scheduled_at,
-            duration:   duration_minutes ?? 60,
-            timezone:   timezone ?? 'UTC',
-          })
-          calendar_event_id = created.meeting_id
-          meetLink          = created.join_url
-          if (!resolvedLocation) resolvedLocation = created.join_url
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e)
-          logger.error('[interviews] Zoom meeting creation failed', undefined, { error: msg })
-          googleMeetError = msg
-        }
+    // Panel emails drive the host-fallback chain (first panelist with a working
+    // token hosts the event). Fall back to org-level tokens if no panelist has
+    // connected this provider per-user yet.
+    const panelEmails: string[] = Array.isArray(panel)
+      ? (panel as PanelMember[]).map(m => m.email).filter(Boolean)
+      : interviewer_email?.trim() ? [interviewer_email.trim()] : []
+
+    const provider: ResolvableProvider =
+      resolvedPlatform === 'zoom'     ? 'zoom' :
+      resolvedPlatform === 'ms_teams' ? 'microsoft' :
+      'google'
+    // Normalize platform name for DB (google → google_meet)
+    if (provider === 'google') resolvedPlatform = 'google_meet'
+
+    try {
+      const host = await resolveHost(provider, panelEmails, orgId)
+
+      if (provider === 'zoom') {
+        const created = await createZoomMeeting(host.access_token, {
+          topic:      eventSummary,
+          start_time: scheduled_at,
+          duration:   duration_minutes ?? 60,
+          timezone:   timezone ?? 'UTC',
+        })
+        calendar_event_id = created.meeting_id
+        meetLink          = created.join_url
+        if (!resolvedLocation) resolvedLocation = created.join_url
+      } else if (provider === 'microsoft') {
+        const created = await createTeamsMeeting(host.access_token, {
+          summary:          eventSummary,
+          description:      eventDesc,
+          start_at:         scheduled_at,
+          duration_minutes: duration_minutes ?? 60,
+          attendees:        attendeeEmails,
+          timezone:         timezone ?? 'UTC',
+        })
+        calendar_event_id = created.event_id
+        meetLink          = created.teams_link
+        if (!resolvedLocation) resolvedLocation = created.teams_link
+      } else {
+        const created = await createMeetEvent(host.access_token, {
+          summary:          eventSummary,
+          description:      eventDesc,
+          start_at:         scheduled_at,
+          duration_minutes: duration_minutes ?? 60,
+          organizer_email:  host.connected_email ?? '',
+          attendees:        attendeeEmails,
+          timezone:         timezone ?? 'UTC',
+        })
+        calendar_event_id = created.calendar_event_id
+        meetLink          = created.meet_link
+        if (!resolvedLocation && created.meet_link) resolvedLocation = created.meet_link
       }
 
-    // ── Microsoft Teams ───────────────────────────────────────────────────
-    } else if (resolvedPlatform === 'ms_teams') {
-      const mAccess  = decryptSafe(orgSettings?.ms_access_token ?? null)
-      const mRefresh = decryptSafe(orgSettings?.ms_refresh_token ?? null)
-      if (mAccess && mRefresh) {
-        try {
-          const { access_token, tokens: fresh } = await getMSToken({
-            access_token: mAccess, refresh_token: mRefresh,
-            token_expiry: orgSettings!.ms_token_expiry ?? null,
-          })
-          if (fresh.access_token !== mAccess) {
-            await supabase.from('org_settings').update({
-              ms_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(fresh.access_token) : fresh.access_token,
-              ms_token_expiry: fresh.token_expiry,
-            } as unknown as OrgSettingsUpdate).eq('org_id', orgId)
-          }
-          const created = await createTeamsMeeting(access_token, {
-            summary:          eventSummary,
-            description:      eventDesc,
-            start_at:         scheduled_at,
-            duration_minutes: duration_minutes ?? 60,
-            attendees:        attendeeEmails,
-            timezone:         timezone ?? 'UTC',
-          })
-          calendar_event_id = created.event_id
-          meetLink          = created.teams_link
-          if (!resolvedLocation) resolvedLocation = created.teams_link
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e)
-          logger.error('[interviews] Teams meeting creation failed', undefined, { error: msg })
-          googleMeetError = msg
-        }
+      if (host.via === 'user_integrations') {
+        logger.info('[interviews] meeting hosted on user calendar', {
+          provider, host_user_id: host.host_user_id,
+        })
       }
-
-    // ── Google Meet (default) ─────────────────────────────────────────────
-    } else {
-      const gAccess  = decryptSafe(orgSettings?.google_oauth_access_token ?? null)
-      const gRefresh = decryptSafe(orgSettings?.google_oauth_refresh_token ?? null)
-      if (gAccess && gRefresh) {
-        resolvedPlatform = 'google_meet'
-        try {
-          const { access_token, tokens: freshTokens } = await getGoogleToken({
-            access_token:  gAccess,
-            refresh_token: gRefresh,
-            token_expiry:  orgSettings!.google_oauth_token_expiry ?? null,
-          })
-          if (freshTokens.access_token !== gAccess) {
-            await supabase.from('org_settings').update({
-              google_oauth_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
-              google_oauth_token_expiry: freshTokens.token_expiry,
-            } as unknown as OrgSettingsUpdate).eq('org_id', orgId)
-          }
-          const created = await createMeetEvent(access_token, {
-            summary:          eventSummary,
-            description:      eventDesc,
-            start_at:         scheduled_at,
-            duration_minutes: duration_minutes ?? 60,
-            organizer_email:  orgSettings?.google_connected_email ?? '',
-            attendees:        attendeeEmails,
-            timezone:         timezone ?? 'UTC',
-          })
-          calendar_event_id = created.calendar_event_id
-          meetLink          = created.meet_link
-          if (!resolvedLocation && created.meet_link) resolvedLocation = created.meet_link
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e)
-          logger.error('[interviews] Google Meet creation failed', undefined, { error: msg })
-          googleMeetError = msg
-        }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (e instanceof HostTokenUnavailableError) {
+        logger.warn('[interviews] no host token available; proceeding without calendar event', {
+          provider, orgId,
+        })
+      } else {
+        logger.error(`[interviews] ${provider} meeting creation failed`, undefined, { error: msg })
       }
+      googleMeetError = msg
     }
   }
 

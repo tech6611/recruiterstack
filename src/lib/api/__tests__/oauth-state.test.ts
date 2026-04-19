@@ -12,7 +12,7 @@ describe('OAuth CSRF State', () => {
   })
 
   it('generates a state token with payload and signature', () => {
-    const state = generateOAuthState('org_123')
+    const state = generateOAuthState({ orgId: 'org_123' })
     expect(state).toContain('.')
     const [encoded, signature] = state.split('.')
     expect(encoded).toBeTruthy()
@@ -21,20 +21,32 @@ describe('OAuth CSRF State', () => {
 
   it('round-trips: generate → verify returns orgId', () => {
     const orgId = 'org_abc123'
-    const state = generateOAuthState(orgId)
+    const state = generateOAuthState({ orgId })
     const result = verifyOAuthState(state)
-    expect(result).toEqual({ orgId })
+    expect(result).toMatchObject({ orgId })
+  })
+
+  it('round-trips userId when supplied (per-user integrations)', () => {
+    const state = generateOAuthState({ orgId: 'org_x', userId: 'usr_123' })
+    expect(verifyOAuthState(state)).toMatchObject({ orgId: 'org_x', userId: 'usr_123' })
+  })
+
+  it('omits userId when not supplied (Slack org-level flow)', () => {
+    const state = generateOAuthState({ orgId: 'org_x' })
+    const result = verifyOAuthState(state)
+    expect(result?.orgId).toBe('org_x')
+    expect(result?.userId).toBeUndefined()
   })
 
   it('rejects a tampered signature', () => {
-    const state = generateOAuthState('org_123')
+    const state = generateOAuthState({ orgId: 'org_123' })
     const [encoded] = state.split('.')
     const tampered = `${encoded}.tampered-signature`
     expect(verifyOAuthState(tampered)).toBeNull()
   })
 
   it('rejects a tampered payload', () => {
-    const state = generateOAuthState('org_123')
+    const state = generateOAuthState({ orgId: 'org_123' })
     const [, signature] = state.split('.')
     const fakePayload = Buffer.from(JSON.stringify({
       orgId: 'org_evil',
@@ -46,7 +58,7 @@ describe('OAuth CSRF State', () => {
 
   it('rejects an expired token', () => {
     // Generate a token, then mock Date.now to simulate time passing
-    const state = generateOAuthState('org_123')
+    const state = generateOAuthState({ orgId: 'org_123' })
 
     // Fast-forward 11 minutes
     const originalDateNow = Date.now
@@ -64,8 +76,8 @@ describe('OAuth CSRF State', () => {
   })
 
   it('generates unique nonces for the same orgId', () => {
-    const state1 = generateOAuthState('org_123')
-    const state2 = generateOAuthState('org_123')
+    const state1 = generateOAuthState({ orgId: 'org_123' })
+    const state2 = generateOAuthState({ orgId: 'org_123' })
     expect(state1).not.toBe(state2)
   })
 })

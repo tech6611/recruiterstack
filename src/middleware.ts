@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 const isPublic = createRouteMatcher([
   '/',
   // Marketing pages — publicly accessible
+  '/craigslist',
   '/features',
   '/agents',
   '/pricing',
@@ -29,7 +30,11 @@ const isPublic = createRouteMatcher([
 
 // Routes that bypass Clerk entirely (auth handled by the route itself)
 function isClerkBypassed(req: NextRequest): boolean {
-  return req.nextUrl.pathname.startsWith('/api/queue') || req.nextUrl.pathname.startsWith('/api/sequences/process')
+  return (
+    req.nextUrl.pathname.startsWith('/api/queue') ||
+    req.nextUrl.pathname.startsWith('/api/sequences/process') ||
+    req.nextUrl.pathname.startsWith('/api/webhooks/clerk')
+  )
 }
 
 const clerk = clerkMiddleware((auth, req) => {

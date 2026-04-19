@@ -10,6 +10,7 @@
  */
 
 import type { FreeBusySlot } from '@/lib/google/calendar'
+import { getTokens, updateAfterRefresh, markRefreshFailure } from '@/lib/integrations/store'
 
 export interface ZoomTokens {
   access_token: string
@@ -77,6 +78,49 @@ export async function getValidAccessToken(
   }
 
   return { access_token: tokens.access_token, tokens }
+}
+
+// ── User-aware helper (preferred going forward) ────────────────────────────
+
+export interface ValidZoomContext {
+  access_token: string
+  connected_email: string | null
+}
+
+export class ZoomNotConnectedError extends Error {
+  constructor(public userId: string) {
+    super(`Zoom is not connected for user ${userId}`)
+    this.name = 'ZoomNotConnectedError'
+  }
+}
+
+export async function ensureValidZoomTokensForUser(userId: string): Promise<ValidZoomContext> {
+  const stored = await getTokens(userId, 'zoom')
+  if (!stored || !stored.refresh_token) {
+    throw new ZoomNotConnectedError(userId)
+  }
+
+  try {
+    const { access_token, tokens } = await getValidAccessToken({
+      access_token:  stored.access_token,
+      refresh_token: stored.refresh_token,
+      token_expiry:  stored.token_expiry,
+    })
+
+    if (tokens.access_token !== stored.access_token) {
+      // Zoom rotates the refresh token on each refresh — persist it too.
+      await updateAfterRefresh(userId, 'zoom', {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        token_expiry: tokens.token_expiry,
+      })
+    }
+
+    return { access_token, connected_email: stored.connected_email }
+  } catch (err) {
+    await markRefreshFailure(userId, 'zoom', err instanceof Error ? err.message : String(err))
+    throw err
+  }
 }
 
 // ── Create Zoom Meeting ──────────────────────────────────────────────────────

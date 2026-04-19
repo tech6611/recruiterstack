@@ -1,45 +1,29 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
-import { decryptSafe } from '@/lib/crypto'
+import { requireOrgAndUser } from '@/lib/auth'
+import { getTokens, clearTokens } from '@/lib/integrations/store'
 
-// POST /api/google/disconnect — revokes and clears the stored Google OAuth tokens
+// POST /api/google/disconnect — best-effort revokes then clears this user's Google tokens.
 export async function POST() {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { userId } = authResult
 
-  const supabase = createAdminClient()
-
-  // Fetch the access token so we can revoke it with Google
-  const { data: settings } = await supabase
-    .from('org_settings')
-    .select('google_oauth_access_token, google_oauth_refresh_token')
-    .eq('org_id', orgId)
-    .single()
-
-  // Best-effort revoke with Google (ignore errors) — decrypt first
-  const tokenToRevoke = decryptSafe(settings?.google_oauth_access_token ?? null) ?? decryptSafe(settings?.google_oauth_refresh_token ?? null)
+  // Best-effort revoke (Google accepts either access or refresh token).
+  const stored = await getTokens(userId, 'google')
+  const tokenToRevoke = stored?.refresh_token ?? stored?.access_token
   if (tokenToRevoke) {
     fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(tokenToRevoke)}`, {
       method: 'POST',
     }).catch(() => {})
   }
 
-  // Clear columns in DB
-  const { error } = await supabase
-    .from('org_settings')
-    .update({
-      google_oauth_access_token:  null,
-      google_oauth_refresh_token: null,
-      google_oauth_token_expiry:  null,
-      google_connected_email:     null,
-      updated_at:                 new Date().toISOString(),
-    })
-    .eq('org_id', orgId)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    await clearTokens(userId, 'google')
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to disconnect' },
+      { status: 500 },
+    )
   }
 
   return NextResponse.json({ success: true })

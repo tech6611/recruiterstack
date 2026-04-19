@@ -1,6 +1,71 @@
 // Auto-generated shape matching the Supabase schema.
 // Re-run `supabase gen types typescript` after schema changes.
 
+// Requisition module tables (migrations 032–039) live in dedicated files.
+import type {
+  User              as ReqUser,
+  UserInsert        as ReqUserInsert,
+  UserUpdate        as ReqUserUpdate,
+  OrgMember,
+  OrgMemberInsert,
+  OrgMemberUpdate,
+  Department,
+  DepartmentInsert,
+  DepartmentUpdate,
+  Location          as ReqLocation,
+  LocationInsert,
+  LocationUpdate,
+  CompensationBand,
+  CompensationBandInsert,
+  CompensationBandUpdate,
+  Opening,
+  OpeningInsert,
+  OpeningUpdate,
+  Job               as ReqJob,
+  JobInsert,
+  JobUpdate,
+  JobOpening,
+  JobPosting,
+  JobPostingInsert,
+  JobPostingUpdate,
+  HiringTeam,
+  HiringTeamInsert,
+  HiringTeamUpdate,
+  HiringTeamMember,
+  HiringTeamMemberInsert,
+  CustomFieldDefinition,
+  CustomFieldDefinitionInsert,
+  CustomFieldDefinitionUpdate,
+} from './requisitions'
+import type {
+  ApprovalChain,
+  ApprovalChainInsert,
+  ApprovalChainUpdate,
+  ApprovalChainStep,
+  ApprovalChainStepInsert,
+  ApprovalChainStepUpdate,
+  Approval,
+  ApprovalInsert,
+  ApprovalUpdate,
+  ApprovalStep,
+  ApprovalStepInsert,
+  ApprovalStepUpdate,
+  ApprovalAuditLog,
+  ApprovalAuditLogInsert,
+} from './approvals'
+import type {
+  WebhookSubscription,
+  WebhookSubscriptionInsert,
+  WebhookSubscriptionUpdate,
+  WebhookDelivery,
+  WebhookDeliveryInsert,
+} from './webhooks'
+import type {
+  UserIntegration,
+  UserIntegrationInsert,
+  UserIntegrationUpdate,
+} from './integrations'
+
 export type CandidateStatus =
   | 'active'
   | 'on_hold'
@@ -880,6 +945,127 @@ export type Database = {
         Row: { id: string; user_id: string; org_id: string; key: string; value: unknown; updated_at: string; created_at: string }
         Insert: { user_id: string; org_id: string; key: string; value: unknown; updated_at?: string }
         Update: { value?: unknown; updated_at?: string }
+        Relationships: []
+      }
+      // ── Requisition module (migrations 032–039) ──
+      users: {
+        Row: Indexify<ReqUser>
+        Insert: Indexify<ReqUserInsert>
+        Update: Indexify<ReqUserUpdate>
+        Relationships: []
+      }
+      org_members: {
+        Row: Indexify<OrgMember>
+        Insert: Indexify<OrgMemberInsert>
+        Update: Indexify<OrgMemberUpdate>
+        Relationships: []
+      }
+      departments: {
+        Row: Indexify<Department>
+        Insert: Indexify<DepartmentInsert>
+        Update: Indexify<DepartmentUpdate>
+        Relationships: []
+      }
+      locations: {
+        Row: Indexify<ReqLocation>
+        Insert: Indexify<LocationInsert>
+        Update: Indexify<LocationUpdate>
+        Relationships: []
+      }
+      compensation_bands: {
+        Row: Indexify<CompensationBand>
+        Insert: Indexify<CompensationBandInsert>
+        Update: Indexify<CompensationBandUpdate>
+        Relationships: []
+      }
+      openings: {
+        Row: Indexify<Opening>
+        Insert: Indexify<OpeningInsert>
+        Update: Indexify<OpeningUpdate>
+        Relationships: []
+      }
+      jobs: {
+        Row: Indexify<ReqJob>
+        Insert: Indexify<JobInsert>
+        Update: Indexify<JobUpdate>
+        Relationships: []
+      }
+      job_openings: {
+        Row: Indexify<JobOpening>
+        Insert: Indexify<JobOpening>
+        Update: Indexify<Partial<JobOpening>>
+        Relationships: []
+      }
+      job_postings: {
+        Row: Indexify<JobPosting>
+        Insert: Indexify<JobPostingInsert>
+        Update: Indexify<JobPostingUpdate>
+        Relationships: []
+      }
+      hiring_teams: {
+        Row: Indexify<HiringTeam>
+        Insert: Indexify<HiringTeamInsert>
+        Update: Indexify<HiringTeamUpdate>
+        Relationships: []
+      }
+      hiring_team_members: {
+        Row: Indexify<HiringTeamMember>
+        Insert: Indexify<HiringTeamMemberInsert>
+        Update: Indexify<Partial<HiringTeamMemberInsert>>
+        Relationships: []
+      }
+      approval_chains: {
+        Row: Indexify<ApprovalChain>
+        Insert: Indexify<ApprovalChainInsert>
+        Update: Indexify<ApprovalChainUpdate>
+        Relationships: []
+      }
+      approval_chain_steps: {
+        Row: Indexify<ApprovalChainStep>
+        Insert: Indexify<ApprovalChainStepInsert>
+        Update: Indexify<ApprovalChainStepUpdate>
+        Relationships: []
+      }
+      approvals: {
+        Row: Indexify<Approval>
+        Insert: Indexify<ApprovalInsert>
+        Update: Indexify<ApprovalUpdate>
+        Relationships: []
+      }
+      approval_steps: {
+        Row: Indexify<ApprovalStep>
+        Insert: Indexify<ApprovalStepInsert>
+        Update: Indexify<ApprovalStepUpdate>
+        Relationships: []
+      }
+      approval_audit_log: {
+        Row: Indexify<ApprovalAuditLog>
+        Insert: Indexify<ApprovalAuditLogInsert>
+        Update: Indexify<Partial<ApprovalAuditLogInsert>>
+        Relationships: []
+      }
+      custom_field_definitions: {
+        Row: Indexify<CustomFieldDefinition>
+        Insert: Indexify<CustomFieldDefinitionInsert>
+        Update: Indexify<CustomFieldDefinitionUpdate>
+        Relationships: []
+      }
+      webhook_subscriptions: {
+        Row: Indexify<WebhookSubscription>
+        Insert: Indexify<WebhookSubscriptionInsert>
+        Update: Indexify<WebhookSubscriptionUpdate>
+        Relationships: []
+      }
+      webhook_deliveries: {
+        Row: Indexify<WebhookDelivery>
+        Insert: Indexify<WebhookDeliveryInsert>
+        Update: Indexify<Partial<WebhookDeliveryInsert>>
+        Relationships: []
+      }
+      user_integrations: {
+        Row: Indexify<UserIntegration>
+        Insert: Indexify<UserIntegrationInsert>
+        Update: Indexify<UserIntegrationUpdate>
         Relationships: []
       }
     }

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
 import { verifyOAuthState } from '@/lib/api/oauth-state'
-import { encrypt } from '@/lib/crypto'
+import { saveTokens } from '@/lib/integrations/store'
 import { logger } from '@/lib/logger'
 
-// GET /api/zoom/callback — Zoom sends user here after OAuth consent
+// GET /api/zoom/callback — per-user integration. Writes tokens to user_integrations.
 export async function GET(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!
   const { searchParams } = new URL(request.url)
@@ -21,33 +20,27 @@ export async function GET(request: NextRequest) {
 
   if (!state) {
     logger.error('[zoom-oauth] missing state parameter')
-    return NextResponse.redirect(
-      `${appUrl}/settings?zoom=error&reason=missing_state`
-    )
+    return NextResponse.redirect(`${appUrl}/settings?zoom=error&reason=missing_state`)
   }
 
   const verified = verifyOAuthState(state)
-  if (!verified) {
-    logger.error('[zoom-oauth] invalid or expired state parameter')
-    return NextResponse.redirect(
-      `${appUrl}/settings?zoom=error&reason=invalid_state`
-    )
+  if (!verified || !verified.userId) {
+    logger.error('[zoom-oauth] invalid/expired state or missing userId')
+    return NextResponse.redirect(`${appUrl}/settings?zoom=error&reason=invalid_state`)
   }
 
-  const orgId = verified.orgId
+  const { orgId, userId } = verified as { orgId: string; userId: string }
 
   const clientId     = process.env.ZOOM_CLIENT_ID
   const clientSecret = process.env.ZOOM_CLIENT_SECRET
   if (!clientId || !clientSecret) {
     logger.error('[zoom-oauth] ZOOM_CLIENT_ID or ZOOM_CLIENT_SECRET not set')
-    return NextResponse.redirect(
-      `${appUrl}/settings?zoom=error&reason=missing_env`
-    )
+    return NextResponse.redirect(`${appUrl}/settings?zoom=error&reason=missing_env`)
   }
 
   const redirectUri = `${appUrl}/api/zoom/callback`
 
-  // Exchange authorization code for tokens (Zoom uses Basic auth)
+  // Zoom uses Basic auth for the token exchange
   const tokenRes = await fetch('https://zoom.us/oauth/token', {
     method: 'POST',
     headers: {
@@ -70,9 +63,10 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const access_token  = tokenData.access_token  as string
-  const refresh_token = tokenData.refresh_token as string
-  const expires_in    = (tokenData.expires_in   as number) ?? 3600
+  const access_token  = tokenData.access_token as string
+  const refresh_token = (tokenData.refresh_token as string | undefined) ?? null
+  const expires_in    = (tokenData.expires_in as number) ?? 3600
+  const scope_str     = (tokenData.scope as string | undefined) ?? ''
   const token_expiry  = new Date(Date.now() + expires_in * 1000).toISOString()
 
   // Fetch connected Zoom user info
@@ -83,32 +77,21 @@ export async function GET(request: NextRequest) {
   const connected_email = (userInfo.email as string) ?? null
   const account_id      = (userInfo.account_id as string) ?? null
 
-  // Encrypt tokens before storing
-  const encryptedAccess  = process.env.TOKEN_ENCRYPTION_KEY ? encrypt(access_token) : access_token
-  const encryptedRefresh = process.env.TOKEN_ENCRYPTION_KEY && refresh_token ? encrypt(refresh_token) : refresh_token
-
-  // Persist tokens in org_settings
-  const supabase = createAdminClient()
-  const { error: upsertError } = await supabase
-    .from('org_settings')
-    .upsert(
-      {
-        org_id:               orgId,
-        zoom_access_token:    encryptedAccess,
-        zoom_refresh_token:   encryptedRefresh,
-        zoom_token_expiry:    token_expiry,
-        zoom_account_id:      account_id,
-        zoom_connected_email: connected_email,
-        updated_at:           new Date().toISOString(),
-      },
-      { onConflict: 'org_id' }
-    )
-
-  if (upsertError) {
-    logger.error('[zoom-oauth] upsert failed', upsertError)
-    return NextResponse.redirect(
-      `${appUrl}/settings?zoom=error&reason=db_${encodeURIComponent(upsertError.code ?? 'unknown')}`
-    )
+  try {
+    await saveTokens({
+      user_id: userId,
+      org_id: orgId,
+      provider: 'zoom',
+      access_token,
+      refresh_token,
+      token_expiry,
+      connected_email,
+      scopes: scope_str ? scope_str.split(' ').filter(Boolean) : [],
+      account_id,
+    })
+  } catch (err) {
+    logger.error('[zoom-oauth] saveTokens failed', err, { userId })
+    return NextResponse.redirect(`${appUrl}/settings?zoom=error&reason=db_save`)
   }
 
   return NextResponse.redirect(`${appUrl}/settings?zoom=connected`)

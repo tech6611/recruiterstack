@@ -1,41 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
-import { getValidAccessToken, queryMSFreeBusy, type MSTokens } from '@/lib/microsoft/calendar'
-import { decryptSafe, encrypt } from '@/lib/crypto'
+import { requireOrgAndUser } from '@/lib/auth'
+import {
+  ensureValidMSTokensForUser,
+  queryMSFreeBusy,
+  MicrosoftNotConnectedError,
+} from '@/lib/microsoft/calendar'
 import { logger } from '@/lib/logger'
 
 /**
  * GET /api/microsoft/availability
  *
- * Query free/busy slots via Microsoft Graph getSchedule API.
- * Supports multi-user availability natively.
- *
- * Query params: emails (comma-separated), time_min, time_max (ISO), timezone (IANA)
- * Response: { data: { [email]: [{ start, end }] }, connected_email }
+ * Query free/busy via Microsoft Graph getSchedule, using the CURRENT USER's
+ * Microsoft connection.
  */
 export async function GET(req: NextRequest) {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
-  const { data: settings } = await supabase
-    .from('org_settings')
-    .select('ms_access_token, ms_refresh_token, ms_token_expiry, ms_connected_email')
-    .eq('org_id', orgId)
-    .single()
-
-  const decryptedAccess  = decryptSafe(settings?.ms_access_token ?? null)
-  const decryptedRefresh = decryptSafe(settings?.ms_refresh_token ?? null)
-
-  if (!decryptedAccess || !decryptedRefresh) {
-    return NextResponse.json(
-      { error: 'Microsoft is not connected. Visit Settings → Integrations to connect.' },
-      { status: 409 }
-    )
-  }
+  const { userId } = authResult
 
   const { searchParams } = req.nextUrl
   const emailsParam = searchParams.get('emails') ?? ''
@@ -48,37 +29,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'emails param is required' }, { status: 400 })
   }
 
-  let accessToken: string
-  let freshTokens: MSTokens
+  let access_token: string
+  let connected_email: string | null
   try {
-    const result = await getValidAccessToken({
-      access_token:  decryptedAccess,
-      refresh_token: decryptedRefresh,
-      token_expiry:  settings!.ms_token_expiry ?? null,
-    })
-    accessToken = result.access_token
-    freshTokens = result.tokens
-
-    if (freshTokens.access_token !== decryptedAccess) {
-      await supabase
-        .from('org_settings')
-        .update({
-          ms_access_token: process.env.TOKEN_ENCRYPTION_KEY ? encrypt(freshTokens.access_token) : freshTokens.access_token,
-          ms_token_expiry: freshTokens.token_expiry,
-        })
-        .eq('org_id', orgId)
-    }
+    const ctx = await ensureValidMSTokensForUser(userId)
+    access_token    = ctx.access_token
+    connected_email = ctx.connected_email
   } catch (e) {
+    if (e instanceof MicrosoftNotConnectedError) {
+      return NextResponse.json(
+        { error: 'Microsoft is not connected for your account. Visit Settings → Integrations to connect.' },
+        { status: 409 },
+      )
+    }
     logger.error('[ms-availability] token refresh failed', e)
     return NextResponse.json({ error: 'Microsoft token refresh failed. Please reconnect.' }, { status: 401 })
   }
 
   try {
-    const connectedEmail = (settings?.ms_connected_email as string | null) ?? null
-    const busyMap = await queryMSFreeBusy(accessToken, emails, timeMin, timeMax, timezone)
+    const busyMap = await queryMSFreeBusy(access_token, emails, timeMin, timeMax, timezone)
     return NextResponse.json(
-      { data: busyMap, connected_email: connectedEmail },
-      { headers: { 'Cache-Control': 'no-store' } }
+      { data: busyMap, connected_email },
+      { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (e) {
     logger.error('[ms-availability] free/busy query failed', e)

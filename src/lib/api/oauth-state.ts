@@ -6,13 +6,23 @@ function getSecret(): string {
   return process.env.OAUTH_STATE_SECRET || process.env.CLERK_SECRET_KEY || ''
 }
 
+export interface OAuthStatePayload {
+  orgId: string
+  userId?: string                    // optional — Slack doesn't need per-user binding
+}
+
 /**
- * Generate a signed OAuth state token containing the orgId.
+ * Generate a signed OAuth state token containing orgId and (optionally) userId.
+ * userId is REQUIRED for per-member integrations (Google/MS/Zoom); it's the
+ * binding between the callback and which user's tokens to write.
+ * Slack callbacks pass orgId only — the install is org-wide.
+ *
  * Format: base64url(payload) + "." + HMAC-SHA256 signature
  */
-export function generateOAuthState(orgId: string): string {
+export function generateOAuthState(params: OAuthStatePayload): string {
   const payload = JSON.stringify({
-    orgId,
+    orgId: params.orgId,
+    userId: params.userId,
     nonce: crypto.randomBytes(16).toString('hex'),
     exp: Date.now() + STATE_TTL_MS,
   })
@@ -27,15 +37,15 @@ export function generateOAuthState(orgId: string): string {
 }
 
 /**
- * Verify an OAuth state token. Returns { orgId } if valid, null otherwise.
+ * Verify an OAuth state token. Returns { orgId, userId? } if valid, null otherwise.
+ * Callers that need userId must check for its presence themselves.
  */
-export function verifyOAuthState(state: string): { orgId: string } | null {
+export function verifyOAuthState(state: string): OAuthStatePayload | null {
   const parts = state.split('.')
   if (parts.length !== 2) return null
 
   const [encoded, signature] = parts
 
-  // Verify HMAC signature
   const expectedSig = crypto
     .createHmac('sha256', getSecret())
     .update(encoded)
@@ -47,12 +57,11 @@ export function verifyOAuthState(state: string): { orgId: string } | null {
     return null
   }
 
-  // Decode and check expiry
   try {
     const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString())
     if (!payload.orgId || !payload.exp) return null
     if (Date.now() > payload.exp) return null
-    return { orgId: payload.orgId }
+    return { orgId: payload.orgId, userId: payload.userId }
   } catch {
     return null
   }

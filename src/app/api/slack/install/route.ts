@@ -18,7 +18,7 @@ export async function GET() {
     `${process.env.NEXT_PUBLIC_APP_URL}/api/slack/callback`
   )
 
-  const state = encodeURIComponent(generateOAuthState(orgId))
+  const state = encodeURIComponent(generateOAuthState({ orgId }))
 
   const url =
     `https://slack.com/oauth/v2/authorize` +

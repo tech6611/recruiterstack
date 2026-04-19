@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
-import { requireOrg } from '@/lib/auth'
+import { requireOrgAndUser } from '@/lib/auth'
 import { generateOAuthState } from '@/lib/api/oauth-state'
 
-// GET /api/microsoft/connect — redirects to Microsoft OAuth authorization page
+// GET /api/microsoft/connect — redirects to Microsoft OAuth authorization page.
+// State embeds orgId + current user's internal id for per-user token storage.
 export async function GET() {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
 
   const clientId = process.env.MS_CLIENT_ID
   if (!clientId) {
@@ -17,15 +18,12 @@ export async function GET() {
     `${process.env.NEXT_PUBLIC_APP_URL}/api/microsoft/callback`
   )
 
-  // Scopes: Calendars.ReadWrite covers event creation with Teams links via isOnlineMeeting.
-  // OnlineMeetings.ReadWrite is excluded — it's enterprise-only and fails for personal accounts.
   const scopes = encodeURIComponent(
     'Calendars.ReadWrite User.Read offline_access'
   )
 
-  const state = encodeURIComponent(generateOAuthState(orgId))
+  const state = encodeURIComponent(generateOAuthState({ orgId, userId }))
 
-  // Use "common" tenant to support both work/school and personal accounts
   const url =
     `https://login.microsoftonline.com/common/oauth2/v2.0/authorize` +
     `?client_id=${clientId}` +

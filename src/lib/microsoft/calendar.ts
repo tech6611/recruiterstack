@@ -11,6 +11,7 @@
  */
 
 import type { FreeBusySlot } from '@/lib/google/calendar'
+import { getTokens, updateAfterRefresh, markRefreshFailure } from '@/lib/integrations/store'
 
 export interface MSTokens {
   access_token: string
@@ -79,6 +80,49 @@ export async function getValidAccessToken(
   }
 
   return { access_token: tokens.access_token, tokens }
+}
+
+// ── User-aware helper (preferred going forward) ────────────────────────────
+
+export interface ValidMSContext {
+  access_token: string
+  connected_email: string | null
+}
+
+export class MicrosoftNotConnectedError extends Error {
+  constructor(public userId: string) {
+    super(`Microsoft is not connected for user ${userId}`)
+    this.name = 'MicrosoftNotConnectedError'
+  }
+}
+
+export async function ensureValidMSTokensForUser(userId: string): Promise<ValidMSContext> {
+  const stored = await getTokens(userId, 'microsoft')
+  if (!stored || !stored.refresh_token) {
+    throw new MicrosoftNotConnectedError(userId)
+  }
+
+  try {
+    const { access_token, tokens } = await getValidAccessToken({
+      access_token:  stored.access_token,
+      refresh_token: stored.refresh_token,
+      token_expiry:  stored.token_expiry,
+    })
+
+    if (tokens.access_token !== stored.access_token) {
+      // Microsoft rotates the refresh token on each refresh — persist it too.
+      await updateAfterRefresh(userId, 'microsoft', {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        token_expiry: tokens.token_expiry,
+      })
+    }
+
+    return { access_token, connected_email: stored.connected_email }
+  } catch (err) {
+    await markRefreshFailure(userId, 'microsoft', err instanceof Error ? err.message : String(err))
+    throw err
+  }
 }
 
 // ── Create Calendar Event with Teams Meeting ─────────────────────────────────

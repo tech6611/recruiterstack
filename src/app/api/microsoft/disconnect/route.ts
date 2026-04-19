@@ -1,31 +1,21 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { requireOrgAndUser } from '@/lib/auth'
+import { clearTokens } from '@/lib/integrations/store'
 
-// POST /api/microsoft/disconnect — clears stored Microsoft OAuth tokens
-// Note: Microsoft identity platform v2.0 does not offer a simple token revocation endpoint.
-// Clearing the DB is sufficient — the refresh token becomes useless once removed.
+// POST /api/microsoft/disconnect — clears this user's Microsoft tokens.
+// Microsoft v2.0 doesn't expose a simple revoke endpoint; deleting the row is sufficient.
 export async function POST() {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { userId } = authResult
 
-  const supabase = createAdminClient()
-
-  const { error } = await supabase
-    .from('org_settings')
-    .update({
-      ms_access_token:    null,
-      ms_refresh_token:   null,
-      ms_token_expiry:    null,
-      ms_tenant_id:       null,
-      ms_connected_email: null,
-      updated_at:         new Date().toISOString(),
-    })
-    .eq('org_id', orgId)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    await clearTokens(userId, 'microsoft')
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to disconnect' },
+      { status: 500 },
+    )
   }
 
   return NextResponse.json({ success: true })

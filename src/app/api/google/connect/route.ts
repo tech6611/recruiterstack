@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
-import { requireOrg } from '@/lib/auth'
+import { requireOrgAndUser } from '@/lib/auth'
 import { generateOAuthState } from '@/lib/api/oauth-state'
 
-// GET /api/google/connect — redirects to Google OAuth authorization page
+// GET /api/google/connect — redirects to Google OAuth authorization page.
+// The state embeds both orgId and the current user's internal id, so the
+// callback can write tokens to the per-user user_integrations table.
 export async function GET() {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
 
   const clientId = process.env.GOOGLE_CLIENT_ID
   if (!clientId) {
@@ -31,7 +33,7 @@ export async function GET() {
     ].join(' ')
   )
 
-  const state = encodeURIComponent(generateOAuthState(orgId))
+  const state = encodeURIComponent(generateOAuthState({ orgId, userId }))
 
   const url =
     `https://accounts.google.com/o/oauth2/v2/auth` +

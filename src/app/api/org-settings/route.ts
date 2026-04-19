@@ -1,39 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { requireOrg, requireOrgAndUser } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { cached, cacheKey, invalidate } from '@/lib/api/cache'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { orgSettingsUpdateSchema } from '@/lib/validations/org-settings'
 
-// GET /api/org-settings — returns current settings for the org
+// GET /api/org-settings — returns connection status for the current user.
+// Google / Microsoft / Zoom are per-user (user_integrations).
+// Slack stays org-level (shared bot install).
+//
+// Cache is keyed by (orgId, userId) because Google/MS/Zoom state differs per user.
 export async function GET() {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
 
-  const settingsData = await cached(cacheKey(orgId, 'org-settings'), 300, async () => {
+  const settingsData = await cached(cacheKey(orgId, `org-settings:${userId}`), 300, async () => {
     const supabase = createAdminClient()
-    const { data, error } = await supabase
-      .from('org_settings')
-      .select('slack_webhook_url, slack_bot_token, slack_team_name, google_oauth_access_token, google_connected_email, zoom_access_token, zoom_connected_email, ms_access_token, ms_connected_email')
-      .eq('org_id', orgId)
-      .single()
 
-    if (error && error.code !== 'PGRST116') {
-      logger.error('[org-settings] GET query failed — missing DB column or schema mismatch', error)
+    // Org-level: Slack
+    const { data: orgRow, error: orgErr } = await supabase
+      .from('org_settings')
+      .select('slack_webhook_url, slack_bot_token, slack_team_name')
+      .eq('org_id', orgId)
+      .maybeSingle()
+
+    if (orgErr && orgErr.code !== 'PGRST116') {
+      logger.error('[org-settings] org_settings query failed', orgErr)
+    }
+
+    // Per-user: Google / Microsoft / Zoom
+    const { data: integrations, error: intErr } = await supabase
+      .from('user_integrations')
+      .select('provider, connected_email')
+      .eq('user_id', userId)
+
+    if (intErr) {
+      logger.error('[org-settings] user_integrations query failed', intErr)
+    }
+
+    const byProvider = new Map<string, { connected_email: string | null }>()
+    for (const row of (integrations ?? []) as Array<{ provider: string; connected_email: string | null }>) {
+      byProvider.set(row.provider, { connected_email: row.connected_email })
     }
 
     return {
-      slack_webhook_url:      data?.slack_webhook_url      ?? null,
-      slack_connected:        !!data?.slack_bot_token,
-      slack_team_name:        data?.slack_team_name        ?? null,
-      google_connected:       !!data?.google_oauth_access_token,
-      google_connected_email: data?.google_connected_email ?? null,
-      zoom_connected:         !!data?.zoom_access_token,
-      zoom_connected_email:   data?.zoom_connected_email   ?? null,
-      ms_connected:           !!data?.ms_access_token,
-      ms_connected_email:     data?.ms_connected_email     ?? null,
+      slack_webhook_url:      orgRow?.slack_webhook_url ?? null,
+      slack_connected:        !!orgRow?.slack_bot_token,
+      slack_team_name:        orgRow?.slack_team_name   ?? null,
+      google_connected:       byProvider.has('google'),
+      google_connected_email: byProvider.get('google')?.connected_email ?? null,
+      zoom_connected:         byProvider.has('zoom'),
+      zoom_connected_email:   byProvider.get('zoom')?.connected_email ?? null,
+      ms_connected:           byProvider.has('microsoft'),
+      ms_connected_email:     byProvider.get('microsoft')?.connected_email ?? null,
     }
   })
 
@@ -61,8 +82,13 @@ export async function PATCH(request: NextRequest) {
 
   if (error) return handleSupabaseError(error)
 
-  // Invalidate cached settings so the next GET fetches fresh data
-  await invalidate(cacheKey(orgId, 'org-settings'))
+  // Slack changes are org-wide — the cache key embeds userId, so we'd have to
+  // scan N keys. Keep this simple: only invalidate the current user's entry;
+  // other users' cached copies expire naturally at 5 min.
+  const authForInvalidate = await requireOrgAndUser()
+  if (!(authForInvalidate instanceof NextResponse)) {
+    await invalidate(cacheKey(orgId, `org-settings:${authForInvalidate.userId}`))
+  }
 
   return NextResponse.json({ data })
 }

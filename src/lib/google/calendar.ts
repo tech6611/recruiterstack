@@ -9,6 +9,8 @@
  * All functions are server-side only (never imported into client bundles).
  */
 
+import { getTokens, updateAfterRefresh, markRefreshFailure } from '@/lib/integrations/store'
+
 export interface GoogleTokens {
   access_token: string
   refresh_token: string
@@ -85,6 +87,58 @@ export async function getValidAccessToken(
   }
 
   return { access_token: tokens.access_token, tokens }
+}
+
+// ── User-aware helper (the preferred API going forward) ───────────────────
+
+export interface ValidGoogleContext {
+  access_token: string
+  connected_email: string | null
+}
+
+export class GoogleNotConnectedError extends Error {
+  constructor(public userId: string) {
+    super(`Google Calendar is not connected for user ${userId}`)
+    this.name = 'GoogleNotConnectedError'
+  }
+}
+
+/**
+ * Reads this user's Google tokens from user_integrations, refreshes if needed,
+ * writes refreshed tokens back, and returns a usable access token.
+ *
+ * Throws GoogleNotConnectedError if the user has never connected Google.
+ * Throws other errors if the refresh call itself fails (refresh token revoked,
+ * network issues, etc.) — callers like the interview route use this distinction
+ * for the host-fallback chain.
+ */
+export async function ensureValidGoogleTokensForUser(userId: string): Promise<ValidGoogleContext> {
+  const stored = await getTokens(userId, 'google')
+  if (!stored || !stored.refresh_token) {
+    throw new GoogleNotConnectedError(userId)
+  }
+
+  try {
+    const { access_token, tokens } = await getValidAccessToken({
+      access_token:  stored.access_token,
+      refresh_token: stored.refresh_token,
+      token_expiry:  stored.token_expiry,
+    })
+
+    // Persist refreshed tokens only if they actually changed.
+    if (tokens.access_token !== stored.access_token) {
+      await updateAfterRefresh(userId, 'google', {
+        access_token: tokens.access_token,
+        token_expiry: tokens.token_expiry,
+        // Google only rotates the refresh token occasionally; pass undefined to preserve the existing one.
+      })
+    }
+
+    return { access_token, connected_email: stored.connected_email }
+  } catch (err) {
+    await markRefreshFailure(userId, 'google', err instanceof Error ? err.message : String(err))
+    throw err
+  }
 }
 
 // ── Create Calendar Event with Meet ─────────────────────────────────────────

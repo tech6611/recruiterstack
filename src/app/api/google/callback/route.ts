@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
 import { verifyOAuthState } from '@/lib/api/oauth-state'
-import { encrypt } from '@/lib/crypto'
+import { saveTokens } from '@/lib/integrations/store'
 import { logger } from '@/lib/logger'
 
-// GET /api/google/callback — Google sends user here after OAuth consent
+// GET /api/google/callback — Google sends user here after OAuth consent.
+// State carries orgId + userId (our internal UUID, set by /api/google/connect).
+// Tokens are written into user_integrations, not org_settings.
 export async function GET(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!
   const { searchParams } = new URL(request.url)
@@ -19,31 +20,24 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Verify CSRF state
   if (!state) {
     logger.error('[google-oauth] missing state parameter')
-    return NextResponse.redirect(
-      `${appUrl}/settings?google=error&reason=missing_state`
-    )
+    return NextResponse.redirect(`${appUrl}/settings?google=error&reason=missing_state`)
   }
 
   const verified = verifyOAuthState(state)
-  if (!verified) {
-    logger.error('[google-oauth] invalid or expired state parameter')
-    return NextResponse.redirect(
-      `${appUrl}/settings?google=error&reason=invalid_state`
-    )
+  if (!verified || !verified.userId) {
+    logger.error('[google-oauth] invalid/expired state or missing userId')
+    return NextResponse.redirect(`${appUrl}/settings?google=error&reason=invalid_state`)
   }
 
-  const orgId = verified.orgId
+  const { orgId, userId } = verified as { orgId: string; userId: string }
 
   const clientId     = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
   if (!clientId || !clientSecret) {
     logger.error('[google-oauth] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not set')
-    return NextResponse.redirect(
-      `${appUrl}/settings?google=error&reason=missing_env`
-    )
+    return NextResponse.redirect(`${appUrl}/settings?google=error&reason=missing_env`)
   }
 
   const redirectUri = `${appUrl}/api/google/callback`
@@ -71,42 +65,32 @@ export async function GET(request: NextRequest) {
   }
 
   const access_token  = tokenData.access_token  as string
-  const refresh_token = tokenData.refresh_token as string
+  const refresh_token = (tokenData.refresh_token as string | undefined) ?? null
   const expires_in    = (tokenData.expires_in   as number) ?? 3600
+  const scope_str     = (tokenData.scope as string | undefined) ?? ''
   const token_expiry  = new Date(Date.now() + expires_in * 1000).toISOString()
 
-  // Fetch the connected Google email for display in settings
-  const userInfoRes  = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+  // Fetch the connected Google email
+  const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { Authorization: `Bearer ${access_token}` },
   })
   const userInfo = await userInfoRes.json()
   const connected_email = (userInfo.email as string) ?? null
 
-  // Encrypt tokens before storing
-  const encryptedAccess  = process.env.TOKEN_ENCRYPTION_KEY ? encrypt(access_token) : access_token
-  const encryptedRefresh = process.env.TOKEN_ENCRYPTION_KEY && refresh_token ? encrypt(refresh_token) : refresh_token
-
-  // Persist tokens in org_settings
-  const supabase = createAdminClient()
-  const { error: upsertError } = await supabase
-    .from('org_settings')
-    .upsert(
-      {
-        org_id:                      orgId,
-        google_oauth_access_token:   encryptedAccess,
-        google_oauth_refresh_token:  encryptedRefresh,
-        google_oauth_token_expiry:   token_expiry,
-        google_connected_email:      connected_email,
-        updated_at:                  new Date().toISOString(),
-      },
-      { onConflict: 'org_id' }
-    )
-
-  if (upsertError) {
-    logger.error('[google-oauth] upsert failed', upsertError)
-    return NextResponse.redirect(
-      `${appUrl}/settings?google=error&reason=db_${encodeURIComponent(upsertError.code ?? 'unknown')}`
-    )
+  try {
+    await saveTokens({
+      user_id: userId,
+      org_id: orgId,
+      provider: 'google',
+      access_token,
+      refresh_token,
+      token_expiry,
+      connected_email,
+      scopes: scope_str ? scope_str.split(' ').filter(Boolean) : [],
+    })
+  } catch (err) {
+    logger.error('[google-oauth] saveTokens failed', err, { userId })
+    return NextResponse.redirect(`${appUrl}/settings?google=error&reason=db_save`)
   }
 
   return NextResponse.redirect(`${appUrl}/settings?google=connected`)
