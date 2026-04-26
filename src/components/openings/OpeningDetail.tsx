@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Archive, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Archive, Pencil, X, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { ApprovalProgress } from '@/components/approvals/ApprovalProgress'
 import { cn } from '@/lib/utils'
 import type {
   Opening,
@@ -45,8 +46,12 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
   const [form, setForm]       = useState(initFormFromOpening(opening))
   const [saving, setSaving]   = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
-  const canEdit = opening.status === 'draft'
+  const canEdit   = opening.status === 'draft'
+  const canSubmit = opening.status === 'draft' && (opening.justification?.trim().length ?? 0) >= 50
+  const canCancel = opening.status === 'pending_approval' && opening.approval_id != null
 
   const userById = useMemo(() => new Map(users.map(u => [u.id, u])), [users])
   const deptById = useMemo(() => new Map(departments.map(d => [d.id, d])), [departments])
@@ -97,6 +102,34 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
     router.push('/openings')
   }
 
+  async function submitForApproval() {
+    setSubmitting(true)
+    const res = await fetch(`/api/openings/${opening.id}/submit`, { method: 'POST' })
+    setSubmitting(false)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      toast.error(body.error ?? 'Submit failed')
+      return
+    }
+    toast.success(body.auto_approved ? 'Auto-approved (you were the only approver).' : 'Submitted for approval.')
+    router.refresh()
+  }
+
+  async function cancelApproval() {
+    if (!opening.approval_id) return
+    if (!confirm('Cancel this approval? The opening will return to draft.')) return
+    setCancelling(true)
+    const res = await fetch(`/api/approvals/${opening.approval_id}/cancel`, { method: 'POST' })
+    setCancelling(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      toast.error(body.error ?? 'Cancel failed')
+      return
+    }
+    toast.success('Approval cancelled')
+    router.refresh()
+  }
+
   const hm        = opening.hiring_manager_id ? userById.get(opening.hiring_manager_id) : null
   const recruiter = opening.recruiter_id      ? userById.get(opening.recruiter_id)      : null
   const dept      = opening.department_id     ? deptById.get(opening.department_id)     : null
@@ -123,6 +156,16 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
           <p className="text-xs text-slate-400 mt-1">Created {new Date(opening.created_at).toLocaleDateString()}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {canSubmit && (
+            <Button size="sm" onClick={submitForApproval} loading={submitting}>
+              <Send className="h-4 w-4" /> Submit for approval
+            </Button>
+          )}
+          {canCancel && (
+            <Button variant="outline" size="sm" onClick={cancelApproval} loading={cancelling}>
+              Cancel approval
+            </Button>
+          )}
           {canEdit && !editing && (
             <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
               <Pencil className="h-4 w-4" /> Edit
@@ -196,11 +239,12 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
           <Card>
             <CardHeader><CardTitle className="text-sm">Approval</CardTitle></CardHeader>
             <CardContent>
-              {opening.approval_id ? (
-                <p className="text-xs text-slate-500">An approval exists. (Approval UI comes in Phase F.)</p>
-              ) : (
-                <p className="text-xs text-slate-400">Not submitted yet.</p>
-              )}
+              {opening.approval_id
+                ? <ApprovalProgress approvalId={opening.approval_id} />
+                : canSubmit
+                  ? <p className="text-xs text-slate-400">Click &ldquo;Submit for approval&rdquo; when ready.</p>
+                  : <p className="text-xs text-slate-400">Add a justification (≥ 50 chars) to enable submit.</p>
+              }
             </CardContent>
           </Card>
         </div>

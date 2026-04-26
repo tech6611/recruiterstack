@@ -7,6 +7,7 @@ import {
   Users,
   Briefcase,
   ClipboardList,
+  CheckSquare,
   Settings,
   Zap,
   BarChart2,
@@ -29,6 +30,8 @@ const NAV_ITEMS = [
   { href: '/sequences',   label: 'Sequences',  icon: Mail },
   { href: '/analytics',   label: 'Analytics',  icon: BarChart2 },
   { href: '/inbox',       label: 'Inbox',      icon: Inbox },
+  { href: '/approvals/inbox', label: 'Approvals', icon: CheckSquare },
+  { href: '/admin/approvals', label: 'Approval chains', icon: ClipboardList },
   { href: '/settings',    label: 'Settings',   icon: Settings },
 ]
 
