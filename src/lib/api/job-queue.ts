@@ -21,6 +21,7 @@ export type JobType =
   | 'slack_notify'
   | 'sequence_email'
   | 'approval_sla_check'
+  | 'webhook_delivery'
 
 export interface EnqueueOptions {
   orgId: string

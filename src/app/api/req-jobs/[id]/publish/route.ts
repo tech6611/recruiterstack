@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { emitWebhook } from '@/lib/webhooks/emit'
+import { logger } from '@/lib/logger'
 
 /**
  * POST /api/req-jobs/:id/publish — flip status from 'approved' to 'open'.
@@ -68,6 +70,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     .eq('id', params.id)
     .eq('org_id', orgId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  emitWebhook(orgId, 'job.published', { job_id: params.id })
+    .catch(e => logger.error('[req-jobs publish] emit failed', e))
 
   return NextResponse.json({ ok: true, status: 'open' })
 }

@@ -38,6 +38,34 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     )
   }
 
+  // Required custom fields must be present.
+  const { data: defsRaw } = await supabase
+    .from('custom_field_definitions')
+    .select('field_key, label, field_type')
+    .eq('org_id', orgId)
+    .eq('object_type', 'opening')
+    .eq('is_active', true)
+    .eq('required', true)
+  const required = (defsRaw ?? []) as Array<{ field_key: string; label: string; field_type: string }>
+  const cf = (opening.custom_fields ?? {}) as Record<string, unknown>
+  const missing: string[] = []
+  for (const def of required) {
+    const v = cf[def.field_key]
+    if (
+      v === null || v === undefined ||
+      (typeof v === 'string' && v.trim() === '') ||
+      (Array.isArray(v) && v.length === 0)
+    ) {
+      missing.push(def.label)
+    }
+  }
+  if (missing.length > 0) {
+    return NextResponse.json(
+      { error: `Required custom fields missing: ${missing.join(', ')}.` },
+      { status: 400 },
+    )
+  }
+
   let result
   try {
     result = await submitForApproval({

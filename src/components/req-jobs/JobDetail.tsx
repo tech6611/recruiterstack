@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ApprovalProgress } from '@/components/approvals/ApprovalProgress'
+import { AuditLogTab } from '@/components/approvals/AuditLogTab'
 import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { cn } from '@/lib/utils'
@@ -38,7 +39,7 @@ interface Props {
   linkedOpenings:  Pick<Opening, 'id' | 'title' | 'status' | 'comp_min' | 'comp_max' | 'comp_currency' | 'target_start_date'>[]
 }
 
-type Tab = 'overview' | 'postings'
+type Tab = 'overview' | 'postings' | 'audit'
 
 export function JobDetail({ job, department, linkedOpenings }: Props) {
   const router = useRouter()
@@ -137,7 +138,7 @@ export function JobDetail({ job, department, linkedOpenings }: Props) {
 
       <div className="border-b border-slate-200 mb-4">
         <nav className="flex gap-4">
-          {(['overview', 'postings'] as Tab[]).map(t => (
+          {(['overview', 'postings', 'audit'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -146,7 +147,7 @@ export function JobDetail({ job, department, linkedOpenings }: Props) {
                 tab === t ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900',
               )}
             >
-              {t}
+              {t === 'audit' ? 'Audit log' : t}
             </button>
           ))}
         </nav>
@@ -242,6 +243,8 @@ export function JobDetail({ job, department, linkedOpenings }: Props) {
       {tab === 'postings' && (
         <PostingsTab jobId={job.id} jobStatus={job.status} />
       )}
+
+      {tab === 'audit' && <AuditLogTab targetType="job" targetId={job.id} />}
 
       {linkOpen && (
         <LinkOpeningDialog

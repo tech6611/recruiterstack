@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ApprovalProgress } from '@/components/approvals/ApprovalProgress'
+import { AuditLogTab } from '@/components/approvals/AuditLogTab'
 import { cn } from '@/lib/utils'
 import type {
   Opening,
@@ -48,6 +49,7 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
   const [archiving, setArchiving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [tab, setTab] = useState<'overview' | 'audit'>('overview')
 
   const canEdit   = opening.status === 'draft'
   const canSubmit = opening.status === 'draft' && (opening.justification?.trim().length ?? 0) >= 50
@@ -179,6 +181,26 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
         </div>
       </div>
 
+      <div className="border-b border-slate-200 mb-4">
+        <nav className="flex gap-4">
+          {(['overview', 'audit'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={cn(
+                'border-b-2 px-1 pb-2 text-sm font-medium capitalize transition-colors',
+                tab === t ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900',
+              )}
+            >
+              {t === 'audit' ? 'Audit log' : t}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {tab === 'audit' && <AuditLogTab targetType="opening" targetId={opening.id} />}
+
+      {tab === 'overview' && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main */}
         <div className="lg:col-span-2 space-y-4">
@@ -249,6 +271,7 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
           </Card>
         </div>
       </div>
+      )}
     </>
   )
 }

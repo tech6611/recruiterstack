@@ -12,6 +12,7 @@ import { evaluateCondition } from './condition'
 import { writeAudit } from './audit'
 import { notifyStepActivated, notifyStepDecided, notifyApprovalCompleted } from './notifications'
 import { enqueue } from '@/lib/api/job-queue'
+import { emitWebhook } from '@/lib/webhooks/emit'
 import { logger } from '@/lib/logger'
 import type {
   ApprovalChainStep,
@@ -128,6 +129,10 @@ export async function submitForApproval(input: SubmitInput): Promise<SubmitResul
     metadata:      { chain_id: chain.id },
   })
 
+  emitWebhook(input.orgId, `${input.targetType}.submitted` as 'opening.submitted' | 'job.submitted', {
+    target_type: input.targetType, target_id: input.targetId, approval_id: approvalId, chain_id: chain.id,
+  }).catch(e => logger.error('[engine] emit submitted', e))
+
   // Activate the first applicable step (and walk it forward if auto-approval applies).
   const result = await activateNextStep(approvalId, input.requesterId)
   return result
@@ -194,6 +199,12 @@ async function activateNextStep(approvalId: string, requesterId: string): Promis
       requesterId: await fetchRequester(approvalId),
       targetType: approval.target_type, targetId: approval.target_id,
     }).catch(e => logger.error('[engine] notify completed', e))
+    emitWebhook(approval.org_id, `${approval.target_type}.approved` as 'opening.approved' | 'job.approved', {
+      target_type: approval.target_type, target_id: approval.target_id, approval_id: approvalId,
+    }).catch(e => logger.error('[engine] emit approved', e))
+    emitWebhook(approval.org_id, 'approval.completed', {
+      approval_id: approvalId, target_type: approval.target_type, target_id: approval.target_id,
+    }).catch(e => logger.error('[engine] emit completed', e))
     return { approvalId, currentStepIndex: approval.current_step_index, status: 'approved', autoApproved: false }
   }
 
@@ -395,6 +406,12 @@ export async function decideOnStep(input: {
       requesterId: approval.requested_by,
       targetType: approval.target_type, targetId: approval.target_id,
     }).catch(e => logger.error('[engine] notify reject', e))
+    emitWebhook(approval.org_id, 'approval.step.decided', {
+      approval_id: approval.id, step_id: step.id, decision: 'rejected', actor_user_id: input.userId,
+    }).catch(e => logger.error('[engine] emit decided', e))
+    emitWebhook(approval.org_id, `${approval.target_type}.rejected` as 'opening.rejected' | 'job.approved', {
+      target_type: approval.target_type, target_id: approval.target_id, approval_id: approval.id,
+    }).catch(e => logger.error('[engine] emit rejected', e))
     return { status: 'rejected' }
   }
 
@@ -459,6 +476,9 @@ export async function cancelApproval(approvalId: string, userId: string): Promis
     actor_user_id: userId, action: 'cancelled', to_state: 'cancelled',
   })
   await applyDraftToTarget(approval.target_type, approval.target_id)
+  emitWebhook(approval.org_id, `${approval.target_type}.cancelled` as 'opening.cancelled' | 'job.approved', {
+    target_type: approval.target_type, target_id: approval.target_id, approval_id: approval.id,
+  }).catch(e => logger.error('[engine] emit cancelled', e))
 }
 
 // ── Target status updates ────────────────────────────────────────────

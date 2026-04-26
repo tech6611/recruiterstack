@@ -6,6 +6,7 @@
 
 import { registerHandler, enqueue, type QueuedJob } from './job-queue'
 import { handleSlaCheck } from '@/lib/approvals/sla-handler'
+import { handleWebhookDelivery } from '@/lib/webhooks/delivery'
 import { runAutopilot } from '@/lib/ai/autopilot'
 import { matchCandidateToRole } from '@/lib/ai/matcher'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -418,4 +419,5 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
 // SLA deadline; sla-handler re-checks the step and sends escalations if still
 // pending. Enqueue is exported for use in the engine.
 registerHandler('approval_sla_check', handleSlaCheck)
+registerHandler('webhook_delivery',   handleWebhookDelivery)
 export { enqueue as enqueueJob }

@@ -9,12 +9,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { CustomFieldsBlock } from '@/components/openings/CustomFieldsBlock'
 import type {
   Department,
   Location as LocationRow,
   CompensationBand,
   EmploymentType,
   OpeningInsert,
+  CustomFieldDefinition,
 } from '@/lib/types/requisitions'
 
 interface TeamMemberLite {
@@ -53,12 +55,15 @@ export function NewOpeningForm() {
   const [locs,  setLocs]      = useState<LocationRow[]>([])
   const [bands, setBands]     = useState<CompensationBand[]>([])
   const [members, setMembers] = useState<TeamMemberLite[]>([])
+  const [defs, setDefs]       = useState<CustomFieldDefinition[]>([])
+  const [customValues, setCustomValues] = useState<Record<string, unknown>>({})
   const [saving, setSaving]   = useState(false)
 
   useEffect(() => {
     fetch('/api/departments').then(r => r.json()).then(({ data }) => setDepts(data ?? []))
     fetch('/api/locations').then(r => r.json()).then(({ data }) => setLocs(data ?? []))
     fetch('/api/team').then(r => r.json()).then(({ data }) => setMembers(data ?? []))
+    fetch('/api/admin/custom-fields?object_type=opening').then(r => r.json()).then(({ data }) => setDefs(data ?? []))
   }, [])
 
   // Refresh comp bands when dept/location changes, auto-fill if exactly one match.
@@ -108,6 +113,7 @@ export function NewOpeningForm() {
       hiring_manager_id: form.hiring_manager_id || null,
       recruiter_id:      form.recruiter_id || null,
       justification:     form.justification.trim() || null,
+      custom_fields:     customValues,
     }
     const res = await fetch('/api/openings', {
       method: 'POST',
@@ -231,6 +237,8 @@ export function NewOpeningForm() {
             <Label>Target start date</Label>
             <Input type="date" value={form.target_start_date} onChange={e => setForm(f => ({ ...f, target_start_date: e.target.value }))} />
           </div>
+
+          <CustomFieldsBlock definitions={defs} values={customValues} onChange={setCustomValues} />
 
           <div className="space-y-1.5">
             <Label htmlFor="justification">Justification</Label>
