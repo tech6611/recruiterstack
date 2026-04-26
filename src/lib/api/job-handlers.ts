@@ -5,6 +5,7 @@
  */
 
 import { registerHandler, enqueue, type QueuedJob } from './job-queue'
+import { handleSlaCheck } from '@/lib/approvals/sla-handler'
 import { runAutopilot } from '@/lib/ai/autopilot'
 import { matchCandidateToRole } from '@/lib/ai/matcher'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -411,3 +412,10 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     jobId: job.id, enrollmentId, stageId: stage.id, candidateEmail: candidate.email,
   })
 })
+
+// ── Approval SLA breach check ─────────────────────────────────────────────────
+// Enqueued at step activation with scheduled_at = due_at. Worker fires at the
+// SLA deadline; sla-handler re-checks the step and sends escalations if still
+// pending. Enqueue is exported for use in the engine.
+registerHandler('approval_sla_check', handleSlaCheck)
+export { enqueue as enqueueJob }

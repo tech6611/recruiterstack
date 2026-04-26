@@ -10,6 +10,9 @@ import { selectChain } from './chain-selector'
 import { resolveApprovers } from './approver-resolver'
 import { evaluateCondition } from './condition'
 import { writeAudit } from './audit'
+import { notifyStepActivated, notifyStepDecided, notifyApprovalCompleted } from './notifications'
+import { enqueue } from '@/lib/api/job-queue'
+import { logger } from '@/lib/logger'
 import type {
   ApprovalChainStep,
   ApprovalStep,
@@ -185,6 +188,12 @@ async function activateNextStep(approvalId: string, requesterId: string): Promis
       action: 'approved', to_state: 'approved',
     })
     await applyApprovedToTarget(approval.target_type, approval.target_id)
+    // Notify requester (best-effort).
+    notifyApprovalCompleted({
+      orgId: approval.org_id,
+      requesterId: await fetchRequester(approvalId),
+      targetType: approval.target_type, targetId: approval.target_id,
+    }).catch(e => logger.error('[engine] notify completed', e))
     return { approvalId, currentStepIndex: approval.current_step_index, status: 'approved', autoApproved: false }
   }
 
@@ -223,6 +232,25 @@ async function activateNextStep(approvalId: string, requesterId: string): Promis
         parallel_group_id: step.parallel_group_id ?? null,
       },
     })
+    notifyStepActivated({
+      orgId: approval.org_id,
+      approvalId, stepId: step.id, stepName: cs.name,
+      approverIds: approvers.map(a => a.user_id),
+      requesterId,
+      targetType: approval.target_type, targetId: approval.target_id,
+      dueAt: due,
+    }).catch(e => logger.error('[engine] notify step_activated', e))
+
+    // Enqueue an SLA check that fires at due_at if a deadline is set.
+    if (due) {
+      const delaySec = Math.max(60, Math.floor((new Date(due).getTime() - Date.now()) / 1000))
+      enqueue({
+        orgId: approval.org_id,
+        jobType: 'approval_sla_check',
+        payload: { org_id: approval.org_id, approval_id: approvalId, step_id: step.id },
+        delaySeconds: delaySec,
+      }).catch(e => logger.error('[engine] sla enqueue', e))
+    }
   }
 
   await supabase
@@ -338,6 +366,14 @@ export async function decideOnStep(input: {
   const now = new Date().toISOString()
   const newDecisions = [...step.decisions, { user_id: input.userId, decision: input.decision, comment: input.comment, at: now }]
 
+  // Fetch the chain step name for notification copy.
+  const { data: csNameRow } = await supabase
+    .from('approval_chain_steps')
+    .select('name')
+    .eq('id', step.chain_step_id)
+    .maybeSingle()
+  const stepName = (csNameRow as { name: string } | null)?.name ?? `Step ${step.step_index + 1}`
+
   if (input.decision === 'rejected') {
     await supabase.from('approval_steps')
       .update({ status: 'rejected', decisions: newDecisions, completed_at: now })
@@ -353,6 +389,12 @@ export async function decideOnStep(input: {
       metadata: { step_index: step.step_index, comment: input.comment },
     })
     await applyRejectedToTarget(approval.target_type, approval.target_id)
+    notifyStepDecided({
+      orgId: approval.org_id, decision: 'rejected', stepName,
+      approverId: input.userId, comment: input.comment,
+      requesterId: approval.requested_by,
+      targetType: approval.target_type, targetId: approval.target_id,
+    }).catch(e => logger.error('[engine] notify reject', e))
     return { status: 'rejected' }
   }
 
@@ -369,6 +411,12 @@ export async function decideOnStep(input: {
       action: 'step_decided',
       metadata: { step_index: step.step_index, decision: 'approved', comment: input.comment },
     })
+    notifyStepDecided({
+      orgId: approval.org_id, decision: 'approved', stepName,
+      approverId: input.userId, comment: input.comment,
+      requesterId: approval.requested_by,
+      targetType: approval.target_type, targetId: approval.target_id,
+    }).catch(e => logger.error('[engine] notify approve', e))
     const result = await activateNextStep(approval.id, approval.requested_by)
     return { status: result.status }
   }
@@ -423,6 +471,12 @@ async function applyApprovedToTarget(targetType: ApprovalTargetType, targetId: s
     await supabase.from('jobs').update({ status: 'approved' }).eq('id', targetId)
   }
 }
+async function fetchRequester(approvalId: string): Promise<string> {
+  const supabase = createAdminClient()
+  const { data } = await supabase.from('approvals').select('requested_by').eq('id', approvalId).maybeSingle()
+  return (data as { requested_by: string } | null)?.requested_by ?? ''
+}
+
 async function applyRejectedToTarget(targetType: ApprovalTargetType, targetId: string): Promise<void> {
   const supabase = createAdminClient()
   if (targetType === 'opening') {

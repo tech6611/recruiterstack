@@ -33,7 +33,8 @@ function isClerkBypassed(req: NextRequest): boolean {
   return (
     req.nextUrl.pathname.startsWith('/api/queue') ||
     req.nextUrl.pathname.startsWith('/api/sequences/process') ||
-    req.nextUrl.pathname.startsWith('/api/webhooks/clerk')
+    req.nextUrl.pathname.startsWith('/api/webhooks/clerk') ||
+    req.nextUrl.pathname.startsWith('/api/slack/interactions')
   )
 }
 

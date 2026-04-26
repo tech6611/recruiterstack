@@ -20,6 +20,7 @@ export type JobType =
   | 'matching'
   | 'slack_notify'
   | 'sequence_email'
+  | 'approval_sla_check'
 
 export interface EnqueueOptions {
   orgId: string
