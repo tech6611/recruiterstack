@@ -24,6 +24,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell'
 const NAV_ITEMS = [
   { href: '/dashboard',   label: 'Dashboard',  icon: LayoutDashboard },
   { href: '/openings',    label: 'Openings',   icon: ClipboardList },
+  { href: '/req-jobs',    label: 'Pipelines',  icon: Briefcase },
   { href: '/jobs',        label: 'Jobs',       icon: Briefcase },
   { href: '/candidates',  label: 'Candidates', icon: Users },
   { href: '/sourcing',    label: 'Sourcing',   icon: Search },
