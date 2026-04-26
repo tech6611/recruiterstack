@@ -15,11 +15,12 @@ export interface User {
   avatar_url: string | null
   delegate_user_id: string | null
   deactivated_at: string | null
+  out_of_office_until: string | null
   created_at: string
   updated_at: string
 }
 
-export interface UserInsert extends Omit<User, 'id' | 'created_at' | 'updated_at' | 'first_name' | 'last_name' | 'full_name' | 'avatar_url' | 'delegate_user_id' | 'deactivated_at'> {
+export interface UserInsert extends Omit<User, 'id' | 'created_at' | 'updated_at' | 'first_name' | 'last_name' | 'full_name' | 'avatar_url' | 'delegate_user_id' | 'deactivated_at' | 'out_of_office_until'> {
   id?: string
   first_name?: string | null
   last_name?: string | null
@@ -27,6 +28,7 @@ export interface UserInsert extends Omit<User, 'id' | 'created_at' | 'updated_at
   avatar_url?: string | null
   delegate_user_id?: string | null
   deactivated_at?: string | null
+  out_of_office_until?: string | null
   created_at?: string
   updated_at?: string
 }

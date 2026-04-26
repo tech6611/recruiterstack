@@ -14,6 +14,44 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import type { ApproverType, ApproverValue, ResolvedApprover } from '@/lib/types/approvals'
 
+const MAX_DELEGATE_HOPS = 5
+
+/**
+ * If `userId` is OOO (out_of_office_until > now()) or deactivated, return the
+ * delegate. Recurses up to MAX_DELEGATE_HOPS to handle delegate-of-delegate
+ * chains. Returns null if no usable user is found.
+ */
+async function applyDelegation(userId: string, depth = 0): Promise<string | null> {
+  if (depth >= MAX_DELEGATE_HOPS) return null
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('users')
+    .select('id, deactivated_at, out_of_office_until, delegate_user_id')
+    .eq('id', userId)
+    .maybeSingle()
+  const u = data as { id: string; deactivated_at: string | null; out_of_office_until: string | null; delegate_user_id: string | null } | null
+  if (!u) return null
+
+  const isDeactivated = u.deactivated_at !== null
+  const isOoo = u.out_of_office_until !== null && new Date(u.out_of_office_until).getTime() > Date.now()
+  if (!isDeactivated && !isOoo) return u.id
+  if (!u.delegate_user_id) return null
+  return applyDelegation(u.delegate_user_id, depth + 1)
+}
+
+async function applyDelegationToList(userIds: string[]): Promise<string[]> {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const id of userIds) {
+    const resolved = await applyDelegation(id)
+    if (resolved && !seen.has(resolved)) {
+      out.push(resolved)
+      seen.add(resolved)
+    }
+  }
+  return out
+}
+
 interface ResolveContext {
   orgId:      string
   targetType: 'opening' | 'job' | 'offer'
@@ -25,18 +63,34 @@ export async function resolveApprovers(
   value:   ApproverValue,
   ctx:     ResolveContext,
 ): Promise<ResolvedApprover[]> {
+  // 1) Compute raw user_ids per approver type
+  const raw = await rawApproverIds(type, value, ctx)
+  // 2) Apply OOO/deactivation delegation; dedupe; wrap as ResolvedApprover
+  const final = await applyDelegationToList(raw)
+  return final.map(user_id => ({ user_id }))
+}
+
+/**
+ * Returns user_ids before delegation processing. Pure lookup per approver
+ * type — kept separate so applyDelegationToList can run uniformly on the
+ * combined list, regardless of resolution path.
+ */
+async function rawApproverIds(
+  type: ApproverType,
+  value: ApproverValue,
+  ctx: ResolveContext,
+): Promise<string[]> {
   const supabase = createAdminClient()
 
   switch (type) {
     case 'user': {
       const userId = (value as { user_id?: string }).user_id
-      return userId ? [{ user_id: userId }] : []
+      return userId ? [userId] : []
     }
 
     case 'role': {
       const role = (value as { role?: string }).role
       if (!role) return []
-      // role is supplied dynamically (any of our 4 OrgRoles); cast for the eq().
       const { data } = await supabase
         .from('org_members')
         .select('user_id')
@@ -46,16 +100,13 @@ export async function resolveApprovers(
         .eq('is_active', true)
         .order('created_at', { ascending: true })
         .limit(1)
-      return (data ?? []).map(r => ({ user_id: (r as { user_id: string }).user_id }))
+      return (data ?? []).map(r => (r as { user_id: string }).user_id)
     }
 
     case 'hiring_team_member': {
       const teamRole = (value as { role?: string }).role
       if (!teamRole) return []
 
-      // Resolve via the target's hiring team. For Openings: target → linked job(s)
-      // → hiring team. We pick the first job linked to the opening; if none, fall
-      // back to the opening's hiring_manager_id when role='hiring_manager'.
       if (ctx.targetType === 'opening') {
         const { data: link } = await supabase
           .from('job_openings')
@@ -79,11 +130,10 @@ export async function resolveApprovers(
               .eq('hiring_team_id', teamId)
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .eq('role', teamRole as any)
-            return (members ?? []).map(m => ({ user_id: (m as { user_id: string }).user_id }))
+            return (members ?? []).map(m => (m as { user_id: string }).user_id)
           }
         }
 
-        // Fallback: opening's own hiring_manager_id
         if (teamRole === 'hiring_manager') {
           const { data: opening } = await supabase
             .from('openings')
@@ -91,12 +141,11 @@ export async function resolveApprovers(
             .eq('id', ctx.targetId)
             .maybeSingle()
           const hmId = (opening as { hiring_manager_id: string | null } | null)?.hiring_manager_id
-          return hmId ? [{ user_id: hmId }] : []
+          return hmId ? [hmId] : []
         }
         return []
       }
 
-      // Job target: read directly from its hiring team.
       if (ctx.targetType === 'job') {
         const { data: job } = await supabase
           .from('jobs')
@@ -111,26 +160,21 @@ export async function resolveApprovers(
           .eq('hiring_team_id', teamId)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .eq('role', teamRole as any)
-        return (members ?? []).map(m => ({ user_id: (m as { user_id: string }).user_id }))
+        return (members ?? []).map(m => (m as { user_id: string }).user_id)
       }
 
       return []
     }
 
     case 'group': {
-      // Phase F doesn't have a concrete groups table — interpret group_id as a
-      // role string for now ("group of recruiters" etc.). Phase G adds a real
-      // groups table with explicit memberships.
+      // Phase G: real approval_groups + approval_group_members tables.
       const groupId = (value as { group_id?: string }).group_id
       if (!groupId) return []
       const { data } = await supabase
-        .from('org_members')
+        .from('approval_group_members')
         .select('user_id')
-        .eq('org_id', ctx.orgId)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .eq('role', groupId as any)        // best-effort interpretation
-        .eq('is_active', true)
-      return (data ?? []).map(r => ({ user_id: (r as { user_id: string }).user_id }))
+        .eq('group_id', groupId)
+      return (data ?? []).map(r => (r as { user_id: string }).user_id)
     }
 
     default:

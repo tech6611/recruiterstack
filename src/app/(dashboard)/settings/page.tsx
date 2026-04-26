@@ -12,6 +12,7 @@ import { TeamCard } from '@/components/settings/TeamCard'
 import { DepartmentsCard } from '@/components/settings/DepartmentsCard'
 import { LocationsCard } from '@/components/settings/LocationsCard'
 import { CompBandsCard } from '@/components/settings/CompBandsCard'
+import { GroupsCard } from '@/components/settings/GroupsCard'
 
 export default function SettingsPage() {
   const { settings, save, loaded } = useSettings()
@@ -743,6 +744,7 @@ export default function SettingsPage() {
           <DepartmentsCard />
           <LocationsCard />
           <CompBandsCard />
+          <GroupsCard />
           <TeamCard />
         </div>
       )}

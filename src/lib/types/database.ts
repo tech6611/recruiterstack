@@ -65,6 +65,13 @@ import type {
   UserIntegrationInsert,
   UserIntegrationUpdate,
 } from './integrations'
+import type {
+  ApprovalGroup,
+  ApprovalGroupInsert,
+  ApprovalGroupUpdate,
+  ApprovalGroupMember,
+  ApprovalGroupMemberInsert,
+} from './approval-groups'
 
 export type CandidateStatus =
   | 'active'
@@ -1075,6 +1082,18 @@ export type Database = {
         Row: Indexify<UserIntegration>
         Insert: Indexify<UserIntegrationInsert>
         Update: Indexify<UserIntegrationUpdate>
+        Relationships: []
+      }
+      approval_groups: {
+        Row: Indexify<ApprovalGroup>
+        Insert: Indexify<ApprovalGroupInsert>
+        Update: Indexify<ApprovalGroupUpdate>
+        Relationships: []
+      }
+      approval_group_members: {
+        Row: Indexify<ApprovalGroupMember>
+        Insert: Indexify<ApprovalGroupMemberInsert>
+        Update: Indexify<Partial<ApprovalGroupMemberInsert>>
         Relationships: []
       }
     }

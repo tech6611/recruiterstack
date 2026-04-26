@@ -131,9 +131,16 @@ export async function submitForApproval(input: SubmitInput): Promise<SubmitResul
 }
 
 /**
- * Activate the next pending step (in step_index order).
- * If the only resolved approver is the original requester, auto-approve and recurse.
- * Returns the final state after walking auto-approves.
+ * Activate the next pending block (sequential step OR parallel group).
+ *
+ * A "block" is the set of pending+inactive steps with the lowest step_index,
+ * grouped by parallel_group_id (NULL = singleton). All steps in the chosen
+ * block are activated together. The block is complete when every step in it
+ * is non-pending; only then does activateNextStep advance further.
+ *
+ * If the requester is the sole approver of any step in the block (with
+ * min_approvals=1), that step auto-approves. If auto-approval completes the
+ * block, the engine recurses to activate the next block.
  */
 async function activateNextStep(approvalId: string, requesterId: string): Promise<SubmitResult> {
   const supabase = createAdminClient()
@@ -152,17 +159,21 @@ async function activateNextStep(approvalId: string, requesterId: string): Promis
     return { approvalId, currentStepIndex: approval.current_step_index, status: approval.status, autoApproved: false }
   }
 
-  // Find the next non-not_applicable, non-completed step.
   const { data: stepsRaw } = await supabase
     .from('approval_steps')
-    .select('id, step_index, status, chain_step_id')
+    .select('id, step_index, status, chain_step_id, parallel_group_id, activated_at')
     .eq('approval_id', approvalId)
     .order('step_index', { ascending: true })
-  const steps = (stepsRaw ?? []) as Pick<ApprovalStep, 'id' | 'step_index' | 'status' | 'chain_step_id'>[]
-  const next = steps.find(s => s.status === 'pending' && (s as { activated_at?: string | null }).activated_at == null)
-    ?? steps.find(s => s.status === 'pending')
+  const allSteps = (stepsRaw ?? []) as Array<Pick<ApprovalStep, 'id' | 'step_index' | 'status' | 'chain_step_id' | 'parallel_group_id' | 'activated_at'>>
 
-  if (!next) {
+  // Mid-block: any active+pending step means we're still waiting on this block.
+  const stillWaiting = allSteps.some(s => s.status === 'pending' && s.activated_at != null)
+  if (stillWaiting) {
+    return { approvalId, currentStepIndex: approval.current_step_index, status: 'pending', autoApproved: false }
+  }
+
+  const block = nextBlock(allSteps)
+  if (block.length === 0) {
     // No more pending steps — approval complete.
     await supabase
       .from('approvals')
@@ -177,61 +188,108 @@ async function activateNextStep(approvalId: string, requesterId: string): Promis
     return { approvalId, currentStepIndex: approval.current_step_index, status: 'approved', autoApproved: false }
   }
 
-  // Resolve approvers + activate.
-  const { data: chainStepRaw } = await supabase
+  // Pull chain step metadata for every step in the block.
+  const chainStepIds = block.map(s => s.chain_step_id)
+  const { data: chainStepsRaw } = await supabase
     .from('approval_chain_steps')
-    .select('approver_type, approver_value, sla_hours, name, min_approvals')
-    .eq('id', next.chain_step_id)
-    .single()
-  const chainStep = chainStepRaw as Pick<ApprovalChainStep, 'approver_type' | 'approver_value' | 'sla_hours' | 'name' | 'min_approvals'>
+    .select('id, approver_type, approver_value, sla_hours, name, min_approvals')
+    .in('id', chainStepIds)
+  const chainStepById = new Map<string, Pick<ApprovalChainStep, 'id' | 'approver_type' | 'approver_value' | 'sla_hours' | 'name' | 'min_approvals'>>()
+  for (const cs of (chainStepsRaw ?? []) as Array<Pick<ApprovalChainStep, 'id' | 'approver_type' | 'approver_value' | 'sla_hours' | 'name' | 'min_approvals'>>) {
+    chainStepById.set(cs.id, cs)
+  }
 
-  const approvers = await resolveApprovers(chainStep.approver_type, chainStep.approver_value, {
-    orgId: approval.org_id, targetType: approval.target_type, targetId: approval.target_id,
-  })
+  const now = new Date().toISOString()
 
-  const due = chainStep.sla_hours ? new Date(Date.now() + chainStep.sla_hours * 3600 * 1000).toISOString() : null
-
-  await supabase
-    .from('approval_steps')
-    .update({ approvers, activated_at: new Date().toISOString(), due_at: due })
-    .eq('id', next.id)
-
-  await supabase
-    .from('approvals')
-    .update({ current_step_index: next.step_index })
-    .eq('id', approvalId)
-
-  await writeAudit({
-    org_id: approval.org_id, approval_id: approvalId,
-    target_type: approval.target_type, target_id: approval.target_id,
-    action: 'step_activated',
-    metadata: { step_index: next.step_index, name: chainStep.name, approvers: approvers.map(a => a.user_id) },
-  })
-
-  // Auto-approve if the requester is among the approvers AND only one approval is needed.
-  // Per-org config could turn this off later; default on per the prompt.
-  const requesterIsApprover = approvers.some(a => a.user_id === requesterId)
-  if (requesterIsApprover && chainStep.min_approvals === 1) {
-    const completedAt = new Date().toISOString()
+  // Activate every step in the block.
+  for (const step of block) {
+    const cs = chainStepById.get(step.chain_step_id)
+    if (!cs) continue
+    const approvers = await resolveApprovers(cs.approver_type, cs.approver_value, {
+      orgId: approval.org_id, targetType: approval.target_type, targetId: approval.target_id,
+    })
+    const due = cs.sla_hours ? new Date(Date.now() + cs.sla_hours * 3600 * 1000).toISOString() : null
     await supabase
       .from('approval_steps')
-      .update({
-        status: 'approved',
-        decisions: [{ user_id: requesterId, decision: 'approved', comment: 'Auto-approved (requester is approver).', at: completedAt }],
-        completed_at: completedAt,
-      })
-      .eq('id', next.id)
+      .update({ approvers, activated_at: now, due_at: due })
+      .eq('id', step.id)
     await writeAudit({
       org_id: approval.org_id, approval_id: approvalId,
       target_type: approval.target_type, target_id: approval.target_id,
-      actor_user_id: requesterId,
-      action: 'auto_approved',
-      metadata: { step_index: next.step_index },
+      action: 'step_activated',
+      metadata: {
+        step_index: step.step_index, name: cs.name,
+        approvers: approvers.map(a => a.user_id),
+        parallel_group_id: step.parallel_group_id ?? null,
+      },
     })
+  }
+
+  await supabase
+    .from('approvals')
+    .update({ current_step_index: block[0].step_index })
+    .eq('id', approvalId)
+
+  // Auto-approve walk: any step in the block where requester is the sole
+  // approver auto-approves. If every step in the block clears that way, recurse.
+  let blockCompletedByAutoApprove = true
+  for (const step of block) {
+    const cs = chainStepById.get(step.chain_step_id)
+    if (!cs) { blockCompletedByAutoApprove = false; continue }
+    const { data: live } = await supabase
+      .from('approval_steps')
+      .select('approvers')
+      .eq('id', step.id)
+      .single()
+    const approvers = (live as { approvers: Array<{ user_id: string }> } | null)?.approvers ?? []
+    const requesterIsApprover = approvers.some(a => a.user_id === requesterId)
+
+    if (requesterIsApprover && cs.min_approvals === 1) {
+      const completedAt = new Date().toISOString()
+      await supabase
+        .from('approval_steps')
+        .update({
+          status: 'approved',
+          decisions: [{ user_id: requesterId, decision: 'approved', comment: 'Auto-approved (requester is approver).', at: completedAt }],
+          completed_at: completedAt,
+        })
+        .eq('id', step.id)
+      await writeAudit({
+        org_id: approval.org_id, approval_id: approvalId,
+        target_type: approval.target_type, target_id: approval.target_id,
+        actor_user_id: requesterId,
+        action: 'auto_approved',
+        metadata: { step_index: step.step_index },
+      })
+    } else {
+      blockCompletedByAutoApprove = false
+    }
+  }
+
+  if (blockCompletedByAutoApprove) {
     return await activateNextStep(approvalId, requesterId)
   }
 
-  return { approvalId, currentStepIndex: next.step_index, status: 'pending', autoApproved: false }
+  return { approvalId, currentStepIndex: block[0].step_index, status: 'pending', autoApproved: false }
+}
+
+/**
+ * The next block of steps to activate. A block:
+ *  - contains only pending+inactive steps
+ *  - is grouped by parallel_group_id (NULL = singleton)
+ *  - is anchored by the lowest step_index among pending+inactive steps
+ *  - includes ALL pending+inactive steps sharing that group_id
+ */
+function nextBlock<T extends { id: string; step_index: number; status: string; parallel_group_id: string | null; activated_at: string | null }>(
+  steps: T[],
+): T[] {
+  const candidates = steps
+    .filter(s => s.status === 'pending' && s.activated_at == null)
+    .sort((a, b) => a.step_index - b.step_index)
+  if (candidates.length === 0) return []
+  const head = candidates[0]
+  if (head.parallel_group_id == null) return [head]
+  return candidates.filter(s => s.parallel_group_id === head.parallel_group_id)
 }
 
 /**

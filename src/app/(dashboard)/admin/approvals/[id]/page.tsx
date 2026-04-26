@@ -6,8 +6,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { ChainBuilder } from '@/components/approvals/ChainBuilder'
 import type { ApprovalChain, ApprovalChainStep } from '@/lib/types/approvals'
 
-// ChainBuilder UI only exposes these three types in Phase F (group lands later).
-type BuilderApproverType = 'user' | 'role' | 'hiring_team_member'
+type BuilderApproverType = 'user' | 'role' | 'hiring_team_member' | 'group'
+type BuilderConditionOp  = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists'
 
 export default async function EditChainPage({ params }: { params: { id: string } }) {
   const { orgId } = auth()
@@ -30,19 +30,44 @@ export default async function EditChainPage({ params }: { params: { id: string }
     .eq('chain_id', params.id)
     .order('step_index', { ascending: true })
 
-  const steps = ((stepsRaw ?? []) as ApprovalChainStep[]).map(s => {
+  // Reconstruct "parallel with previous" from parallel_group_id values: any
+  // step that shares a group_id with the immediately-previous step becomes
+  // "parallel with previous" in the builder.
+  const rawSteps = (stepsRaw ?? []) as ApprovalChainStep[]
+
+  const steps = rawSteps.map((s, i) => {
     const v = s.approver_value as Record<string, unknown>
-    // 'group' isn't editable in the F builder; show it as 'user' so the admin can re-pick.
-    const builderType: BuilderApproverType = s.approver_type === 'group' ? 'user' : s.approver_type
+    const builderType: BuilderApproverType = s.approver_type
+    const prev = i > 0 ? rawSteps[i - 1] : null
+    const parallelWithPrev = !!(prev && s.parallel_group_id && s.parallel_group_id === prev.parallel_group_id)
+
+    // Pull the simple (single-leaf) condition back out, if present and shaped like one.
+    let cond_field: string | undefined
+    let cond_op:    BuilderConditionOp | undefined
+    let cond_val:   string | undefined
+    if (s.condition && typeof s.condition === 'object' && 'field' in s.condition && 'op' in s.condition) {
+      const leaf = s.condition as { field: string; op: BuilderConditionOp; value?: unknown }
+      cond_field = leaf.field
+      cond_op    = leaf.op
+      if (leaf.op !== 'exists' && leaf.value !== undefined && leaf.value !== null) {
+        cond_val = String(leaf.value)
+      }
+    }
+
     return {
       step_index:    s.step_index,
       name:          s.name,
       approver_type: builderType,
-      approver_user_id:    typeof v.user_id === 'string' ? v.user_id : undefined,
-      approver_role:       s.approver_type === 'role' && typeof v.role === 'string' ? v.role : undefined,
-      approver_team_role:  s.approver_type === 'hiring_team_member' && typeof v.role === 'string' ? v.role : undefined,
+      approver_user_id:    typeof v.user_id  === 'string' ? v.user_id  : undefined,
+      approver_role:       s.approver_type === 'role'              && typeof v.role     === 'string' ? v.role     : undefined,
+      approver_team_role:  s.approver_type === 'hiring_team_member' && typeof v.role     === 'string' ? v.role     : undefined,
+      approver_group_id:   s.approver_type === 'group'             && typeof v.group_id === 'string' ? v.group_id : undefined,
       min_approvals: s.min_approvals,
       sla_hours:     s.sla_hours ?? undefined,
+      parallel_with_previous: parallelWithPrev,
+      condition_field: cond_field,
+      condition_op:    cond_op,
+      condition_value: cond_val,
     }
   })
 
