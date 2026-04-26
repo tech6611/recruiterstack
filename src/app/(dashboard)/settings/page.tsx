@@ -9,6 +9,9 @@ import type { AppSettings } from '@/lib/hooks/useSettings'
 import { CompanyInfoCard } from '@/components/settings/CompanyInfoCard'
 import { AgentsCard } from '@/components/settings/AgentsCard'
 import { TeamCard } from '@/components/settings/TeamCard'
+import { DepartmentsCard } from '@/components/settings/DepartmentsCard'
+import { LocationsCard } from '@/components/settings/LocationsCard'
+import { CompBandsCard } from '@/components/settings/CompBandsCard'
 
 export default function SettingsPage() {
   const { settings, save, loaded } = useSettings()
@@ -737,6 +740,9 @@ export default function SettingsPage() {
         <div className="space-y-4">
           <CompanyInfoCard />
           <AgentsCard />
+          <DepartmentsCard />
+          <LocationsCard />
+          <CompBandsCard />
           <TeamCard />
         </div>
       )}
