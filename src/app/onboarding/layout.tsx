@@ -2,13 +2,17 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { Zap } from 'lucide-react'
 import Link from 'next/link'
-import { resolveUserIdFromClerk } from '@/lib/auth'
+import { getOrgId, resolveUserIdFromClerk } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 
 export default async function OnboardingLayout({ children }: { children: React.ReactNode }) {
-  const { userId: clerkUserId, orgId } = auth()
+  const { userId: clerkUserId } = auth()
   if (!clerkUserId) redirect('/sign-in?redirect_url=/onboarding')
-  if (!orgId)        redirect('/org-setup')
+  // Use getOrgId() instead of raw auth().orgId so we fall back to the Clerk
+  // Management API when the JWT cookie hasn't been refreshed with the active
+  // org yet (race condition documented in lib/auth.ts).
+  const orgId = await getOrgId()
+  if (!orgId) redirect('/org-setup')
 
   const userId = await resolveUserIdFromClerk(clerkUserId).catch(() => null)
   if (!userId) redirect('/sign-in?redirect_url=/onboarding')
