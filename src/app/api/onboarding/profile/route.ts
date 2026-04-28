@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
       first_name: body.first_name,
       last_name:  body.last_name ?? null,
       full_name,
+      title:      body.title?.trim() ? body.title.trim() : null,
     })
     .eq('id', ctx.userId)
 

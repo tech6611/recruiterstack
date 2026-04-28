@@ -13,6 +13,7 @@ export interface User {
   last_name: string | null
   full_name: string | null
   avatar_url: string | null
+  title: string | null
   delegate_user_id: string | null
   deactivated_at: string | null
   out_of_office_until: string | null
@@ -20,12 +21,13 @@ export interface User {
   updated_at: string
 }
 
-export interface UserInsert extends Omit<User, 'id' | 'created_at' | 'updated_at' | 'first_name' | 'last_name' | 'full_name' | 'avatar_url' | 'delegate_user_id' | 'deactivated_at' | 'out_of_office_until'> {
+export interface UserInsert extends Omit<User, 'id' | 'created_at' | 'updated_at' | 'first_name' | 'last_name' | 'full_name' | 'avatar_url' | 'title' | 'delegate_user_id' | 'deactivated_at' | 'out_of_office_until'> {
   id?: string
   first_name?: string | null
   last_name?: string | null
   full_name?: string | null
   avatar_url?: string | null
+  title?: string | null
   delegate_user_id?: string | null
   deactivated_at?: string | null
   out_of_office_until?: string | null

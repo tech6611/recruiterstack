@@ -2,6 +2,16 @@
 
 import { useState, useEffect } from 'react'
 
+/**
+ * Local cache of user-facing settings.
+ *
+ * Source-of-truth for company info and the recruiter profile is the database
+ * (see /api/org-settings/company and /api/me/profile). Settings → General
+ * fetches from those endpoints on mount and write-through to this localStorage
+ * copy on save, so callers that read `settings.company_name` etc. (sequence
+ * editor, email drafts, role pages) keep getting fresh values without each
+ * having to hit the API.
+ */
 export interface AppSettings {
   company_name: string
   company_website: string

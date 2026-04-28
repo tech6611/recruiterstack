@@ -81,6 +81,30 @@ export default function SettingsPage() {
       .catch(() => {})
   }, [])
 
+  // Hydrate Company + Recruiter Profile cards from the DB.
+  // Onboarding writes company info to org_settings and recruiter info to users;
+  // we read those here so the cards auto-populate without the user having to
+  // re-enter what they already filled in. localStorage is kept in sync as a
+  // cache so other surfaces (email drafts, sequence editor) see the values too.
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/org-settings/company').then(r => r.json()).catch(() => ({ data: null })),
+      fetch('/api/me/profile').then(r => r.json()).catch(() => ({ data: null })),
+    ]).then(([companyRes, profileRes]) => {
+      const c = companyRes?.data ?? {}
+      const p = profileRes?.data ?? {}
+      const recruiterName = p.full_name ?? [p.first_name, p.last_name].filter(Boolean).join(' ')
+      setForm(f => ({
+        ...f,
+        company_name:    c.company_name ?? f.company_name ?? '',
+        company_website: c.website      ?? f.company_website ?? '',
+        recruiter_name:  recruiterName  || f.recruiter_name || '',
+        recruiter_email: p.email        ?? f.recruiter_email ?? '',
+        recruiter_title: p.title        ?? f.recruiter_title ?? '',
+      }))
+    })
+  }, [])
+
   // Load Slack + Google settings from server
   // Capture URL params at mount time so the closure doesn't go stale
   useEffect(() => {
@@ -195,9 +219,37 @@ export default function SettingsPage() {
     setForm(f => ({ ...f, kanban_card_fields: next }))
   }
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Cache locally first so other consumers see fresh values immediately.
     save(form)
+
+    // Persist Recruiter Profile (per-user, always allowed).
+    const profilePromise = fetch('/api/me/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        first_name: form.recruiter_name.trim().split(/\s+/)[0] || undefined,
+        last_name:  form.recruiter_name.trim().split(/\s+/).slice(1).join(' ') || null,
+        title:      form.recruiter_title.trim() || null,
+      }),
+    })
+
+    // Persist Company info (admin-only on the server).
+    const companyPromise = isAdmin
+      ? fetch('/api/org-settings', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company_name: form.company_name.trim() || undefined,
+            website:      form.company_website.trim() || null,
+          }),
+        })
+      : Promise.resolve(null)
+
+    await Promise.all([profilePromise, companyPromise]).catch(() => {})
+
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
@@ -390,8 +442,9 @@ export default function SettingsPage() {
                       <input
                         value={form.company_name}
                         onChange={e => set('company_name', e.target.value)}
+                        readOnly={!isAdmin}
                         placeholder="Acme Corp"
-                        className={inputCls}
+                        className={!isAdmin ? `${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed` : inputCls}
                       />
                     </div>
                     <div>
@@ -399,10 +452,14 @@ export default function SettingsPage() {
                       <input
                         value={form.company_website}
                         onChange={e => set('company_website', e.target.value)}
+                        readOnly={!isAdmin}
                         placeholder="https://acme.com"
-                        className={inputCls}
+                        className={!isAdmin ? `${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed` : inputCls}
                       />
                     </div>
+                    {!isAdmin && (
+                      <p className="text-[10px] text-slate-400">Only admins can change company info. Ask an admin if these need updating.</p>
+                    )}
                   </div>
                 </div>
 
@@ -440,10 +497,11 @@ export default function SettingsPage() {
                       <input
                         type="email"
                         value={form.recruiter_email}
-                        onChange={e => set('recruiter_email', e.target.value)}
+                        readOnly
                         placeholder="sarah@acme.com"
-                        className={inputCls}
+                        className={`${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed`}
                       />
+                      <p className="mt-1 text-[10px] text-slate-400">Managed by your account — change it via Profile in the top-right menu.</p>
                     </div>
                   </div>
                 </div>
@@ -542,8 +600,7 @@ export default function SettingsPage() {
 
               <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4">
                 <p className="text-xs text-slate-400">
-                  <span className="font-semibold text-slate-500">RecruiterStack</span> · Phase 2 · AI Matching ·{' '}
-                  Settings are saved locally in your browser.
+                  <span className="font-semibold text-slate-500">RecruiterStack</span> · Phase 2 · AI Matching
                 </p>
               </div>
             </form>

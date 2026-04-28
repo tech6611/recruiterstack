@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const profileSchema = z.object({
   first_name: z.string().trim().min(1).max(120),
   last_name:  z.string().trim().max(120).optional().nullable(),
+  title:      z.string().trim().max(120).optional().nullable(),
 })
 
 export const roleSchema = z.object({

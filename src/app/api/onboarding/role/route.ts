@@ -4,6 +4,7 @@ import { parseBody } from '@/lib/api/helpers'
 import { roleSchema } from '@/lib/validations/onboarding'
 import { requireOnboardingContext, ensureMemberRow } from '@/lib/onboarding/server'
 import { resolveEffectiveRole, nextStep } from '@/lib/onboarding/steps'
+import { getInvitePreferredRole } from '@/lib/clerk/invites'
 import type { OrgRole } from '@/lib/types/requisitions'
 
 /**
@@ -13,6 +14,12 @@ import type { OrgRole } from '@/lib/types/requisitions'
  *  - If an admin already exists and a non-admin tries to pick 'admin',
  *    reject with 409. Only an existing admin can grant admin (via Settings,
  *    a later phase).
+ *
+ * Inviter-locks-role rule:
+ *  - If this user came in via an invitation that carried a preferred_role,
+ *    the inviter's choice wins. We ignore the body and write that role.
+ *    The form is read-only client-side; this guard makes the contract
+ *    enforceable even if the payload is tampered with.
  */
 export async function POST(req: NextRequest) {
   const ctx = await requireOnboardingContext()
@@ -34,12 +41,33 @@ export async function POST(req: NextRequest) {
 
   const adminExists = (adminRows ?? []).length > 0
   let roleToWrite: OrgRole = body.role
+  let lockedByInvite = false
+
+  // Inviter's choice trumps user's pick (skip when this is the first member —
+  // there is no inviter in that case).
+  if (adminExists) {
+    const { data: meUser } = await supabase
+      .from('users')
+      .select('email')
+      .eq('id', ctx.userId)
+      .maybeSingle()
+    const email = (meUser as { email: string } | null)?.email
+    if (email) {
+      const locked = await getInvitePreferredRole(ctx.orgId, email)
+      if (locked) {
+        roleToWrite = locked
+        lockedByInvite = true
+      }
+    }
+  }
 
   if (!adminExists) {
     // Bootstrap: this user becomes admin regardless of pick.
     roleToWrite = 'admin'
-  } else if (body.role === 'admin') {
-    // Admin exists, non-admin asking for admin — refuse.
+  } else if (roleToWrite === 'admin' && !lockedByInvite) {
+    // Admin exists, non-admin self-selecting 'admin' — refuse. (When the
+    // inviter explicitly granted 'admin' via a locked invite, lockedByInvite
+    // is true and we trust their choice.)
     const isCurrentUserAdmin = (adminRows ?? []).some(r => (r as { user_id: string }).user_id === ctx.userId)
     if (!isCurrentUserAdmin) {
       return NextResponse.json(

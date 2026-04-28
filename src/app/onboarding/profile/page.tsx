@@ -19,11 +19,11 @@ export default async function ProfileStepPage() {
   const supabase = createAdminClient()
   const { data: me } = await supabase
     .from('users')
-    .select('first_name, last_name')
+    .select('first_name, last_name, title')
     .eq('id', userId)
     .single()
 
-  const defaults = me as Pick<User, 'first_name' | 'last_name'> | null
+  const defaults = me as Pick<User, 'first_name' | 'last_name' | 'title'> | null
 
   return (
     <OnboardingShell
@@ -32,7 +32,13 @@ export default async function ProfileStepPage() {
       title="Your profile"
       description="Quickly confirm the basics we pulled from your account."
     >
-      <ProfileForm defaults={{ first_name: defaults?.first_name ?? '', last_name: defaults?.last_name ?? '' }} />
+      <ProfileForm
+        defaults={{
+          first_name: defaults?.first_name ?? '',
+          last_name:  defaults?.last_name ?? '',
+          title:      defaults?.title ?? '',
+        }}
+      />
     </OnboardingShell>
   )
 }
