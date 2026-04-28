@@ -1,11 +1,13 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
+import { getOrgId } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { JobDetail } from '@/components/req-jobs/JobDetail'
 import type { Job, Department, Opening } from '@/lib/types/requisitions'
 
 export default async function JobDetailPage({ params }: { params: { id: string } }) {
-  const { orgId, userId } = auth()
+  const { userId } = auth()
+  const orgId = await getOrgId()
   if (!orgId || !userId) redirect('/sign-in')
 
   const supabase = createAdminClient()

@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
+import { getOrgId } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { OpeningDetail } from '@/components/openings/OpeningDetail'
 import type {
@@ -11,7 +12,8 @@ import type {
 } from '@/lib/types/requisitions'
 
 export default async function OpeningDetailPage({ params }: { params: { id: string } }) {
-  const { orgId, userId } = auth()
+  const { userId } = auth()
+  const orgId = await getOrgId()
   if (!orgId || !userId) redirect('/sign-in')
 
   const supabase = createAdminClient()

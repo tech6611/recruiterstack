@@ -4,13 +4,15 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { OrgGate } from '@/components/OrgGate'
 import { Copilot } from '@/components/Copilot'
 import { AnalyticsIdentify } from '@/components/AnalyticsIdentify'
-import { resolveUserIdFromClerk } from '@/lib/auth'
+import { getOrgId, resolveUserIdFromClerk } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { userId: clerkUserId, orgId } = auth()
-
+  const { userId: clerkUserId } = auth()
   if (!clerkUserId) redirect('/sign-in')
+  // Use getOrgId() so we fall back to Clerk Management API when the JWT
+  // cookie hasn't been refreshed with the active org yet.
+  const orgId = await getOrgId()
 
   // Gate dashboard on onboarding completion. If the user hasn't been synced
   // to our users table yet (new signup, webhook hasn't fired), send them to

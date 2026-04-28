@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import { getOrgId } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ChainBuilder } from '@/components/approvals/ChainBuilder'
 import type { ApprovalChain, ApprovalChainStep } from '@/lib/types/approvals'
@@ -10,7 +10,7 @@ type BuilderApproverType = 'user' | 'role' | 'hiring_team_member' | 'group'
 type BuilderConditionOp  = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists'
 
 export default async function EditChainPage({ params }: { params: { id: string } }) {
-  const { orgId } = auth()
+  const orgId = await getOrgId()
   if (!orgId) redirect('/sign-in')
 
   const supabase = createAdminClient()
