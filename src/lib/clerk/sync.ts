@@ -109,8 +109,31 @@ function mapClerkRole(clerkRole: string): 'recruiter' {
 }
 
 /**
+ * Fetch a single user from the Clerk Management API. Used by
+ * syncMembershipFromClerk when an organizationMembership.* event arrives
+ * before user.created (Clerk doesn't guarantee event ordering).
+ */
+async function fetchClerkUser(clerkUserId: string): Promise<ClerkUserPayload | null> {
+  const secret = process.env.CLERK_SECRET_KEY
+  if (!secret) return null
+  try {
+    const res = await fetch(`https://api.clerk.com/v1/users/${clerkUserId}`, {
+      headers: { Authorization: `Bearer ${secret}` },
+    })
+    if (!res.ok) return null
+    return (await res.json()) as ClerkUserPayload
+  } catch {
+    return null
+  }
+}
+
+/**
  * Sync an org membership from Clerk. Idempotent on (org_id, user_id).
- * Requires the user to already exist in users (call syncUserFromClerk first).
+ *
+ * Order-tolerant: if the user isn't in our DB yet (e.g., the membership.*
+ * event arrived before user.created, or the user pre-dates our DB and never
+ * fired user.created on this sign-in), we pull them from the Clerk Management
+ * API and sync them first.
  *
  * IMPORTANT: On UPDATE, we DO NOT touch `role`. Clerk fires
  * organizationMembership.updated for many reasons (avatar changes, metadata
@@ -124,17 +147,34 @@ function mapClerkRole(clerkRole: string): 'recruiter' {
 export async function syncMembershipFromClerk(membership: ClerkMembershipPayload): Promise<void> {
   const supabase = createAdminClient()
 
-  const { data: user, error: userErr } = await supabase
+  let { data: user } = await supabase
     .from('users')
     .select('id')
     .eq('clerk_user_id', membership.public_user_data.user_id)
-    .single()
+    .maybeSingle()
 
-  if (userErr || !user) {
-    throw new Error(
-      `Cannot sync membership: user ${membership.public_user_data.user_id} not found in users. Call syncUserFromClerk first.`,
-    )
+  if (!user) {
+    // Out-of-order webhook OR user pre-dated our DB. Pull from Clerk and sync.
+    const clerkUser = await fetchClerkUser(membership.public_user_data.user_id)
+    if (!clerkUser) {
+      throw new Error(
+        `Cannot sync membership: user ${membership.public_user_data.user_id} not found in users and Clerk Management API lookup failed.`,
+      )
+    }
+    await syncUserFromClerk(clerkUser)
+    const refetch = await supabase
+      .from('users')
+      .select('id')
+      .eq('clerk_user_id', membership.public_user_data.user_id)
+      .maybeSingle()
+    user = refetch.data
+    if (!user) {
+      throw new Error(
+        `Failed to sync user ${membership.public_user_data.user_id} from Clerk after fallback lookup.`,
+      )
+    }
   }
+
   const userId = (user as { id: string }).id
   const orgId = membership.organization.id
 
