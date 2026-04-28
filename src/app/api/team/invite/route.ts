@@ -44,6 +44,11 @@ export async function POST(req: NextRequest) {
           inviter_user_id: clerkUserId,
           role: invite.role === 'admin' ? 'org:admin' : 'org:member',
           public_metadata: { preferred_role: invite.role },
+          // Without redirect_url, Clerk lands invitees on its hosted
+          // default-redirect page (esp. on dev instances) instead of returning
+          // them to the app. Always send them to /sign-up where the invitation
+          // ticket is auto-consumed and they continue into onboarding.
+          redirect_url: `${process.env.NEXT_PUBLIC_APP_URL}/sign-up`,
         }),
       })
       if (!res.ok) {

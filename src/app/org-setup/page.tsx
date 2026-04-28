@@ -1,6 +1,6 @@
 'use client'
 
-import { CreateOrganization, OrganizationList } from '@clerk/nextjs'
+import { OrganizationList } from '@clerk/nextjs'
 import { Zap } from 'lucide-react'
 
 export default function OrgSetupPage() {
@@ -19,20 +19,22 @@ export default function OrgSetupPage() {
         Create a new workspace for your company, or join an existing one.
       </p>
 
-      {/* Show org list if user might already belong to orgs */}
-      <div className="mb-6 w-full max-w-md">
+      {/*
+       * <OrganizationList> shows existing memberships AND a "Create organization"
+       * button when the user has none. We previously rendered <CreateOrganization>
+       * separately below, which duplicated the create form for new users. Removed.
+       *
+       * Note: afterCreateOrganizationUrl points at /onboarding/profile so a brand
+       * new org flows through the 7-step onboarding. Members selecting an existing
+       * org go straight to /dashboard, where (dashboard)/layout.tsx will redirect
+       * them into onboarding if their member row hasn't been onboarded yet.
+       */}
+      <div className="w-full max-w-md">
         <OrganizationList
           hidePersonal
           afterSelectOrganizationUrl="/dashboard"
-          afterCreateOrganizationUrl="/dashboard"
+          afterCreateOrganizationUrl="/onboarding/profile"
         />
-      </div>
-
-      <div className="w-full max-w-md">
-        <p className="mb-4 text-center text-xs font-medium uppercase tracking-wide text-slate-600">
-          Or create a new workspace
-        </p>
-        <CreateOrganization afterCreateOrganizationUrl="/dashboard" />
       </div>
     </div>
   )

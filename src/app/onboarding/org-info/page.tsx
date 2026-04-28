@@ -1,14 +1,15 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
-import { resolveUserIdFromClerk } from '@/lib/auth'
+import { getOrgId, resolveUserIdFromClerk } from '@/lib/auth'
 import { resolveEffectiveRole, stepsForRole, nextStep } from '@/lib/onboarding/steps'
 import { OnboardingShell } from '@/components/onboarding/OnboardingShell'
 import { OrgInfoForm } from '@/components/onboarding/forms/OrgInfoForm'
 import type { CompanySize } from '@/lib/types/database'
 
 export default async function OrgInfoStepPage() {
-  const { userId: clerkUserId, orgId } = auth()
+  const { userId: clerkUserId } = auth()
+  const orgId = await getOrgId()
   if (!clerkUserId || !orgId) redirect('/sign-in')
 
   const userId = await resolveUserIdFromClerk(clerkUserId)

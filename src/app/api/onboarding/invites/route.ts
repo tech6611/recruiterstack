@@ -46,6 +46,10 @@ export async function POST(req: NextRequest) {
           // Clerk expects 'org:admin' or 'org:member' for its own role model.
           role: invite.role === 'admin' ? 'org:admin' : 'org:member',
           public_metadata: { preferred_role: invite.role },
+          // Send invitees back to our /sign-up so the ticket is consumed and
+          // they continue into onboarding, instead of Clerk's default-redirect
+          // landing page on dev instances.
+          redirect_url: `${process.env.NEXT_PUBLIC_APP_URL}/sign-up`,
         }),
       })
 

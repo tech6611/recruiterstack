@@ -1,12 +1,13 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { resolveUserIdFromClerk } from '@/lib/auth'
+import { getOrgId, resolveUserIdFromClerk } from '@/lib/auth'
 import { resolveEffectiveRole, stepsForRole, nextStep } from '@/lib/onboarding/steps'
 import { OnboardingShell } from '@/components/onboarding/OnboardingShell'
 import { InvitesForm } from '@/components/onboarding/forms/InvitesForm'
 
 export default async function InvitesStepPage() {
-  const { userId: clerkUserId, orgId } = auth()
+  const { userId: clerkUserId } = auth()
+  const orgId = await getOrgId()
   if (!clerkUserId || !orgId) redirect('/sign-in')
 
   const userId = await resolveUserIdFromClerk(clerkUserId)

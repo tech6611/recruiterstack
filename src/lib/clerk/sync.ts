@@ -109,8 +109,17 @@ function mapClerkRole(clerkRole: string): 'recruiter' {
 }
 
 /**
- * Upsert an org membership. Idempotent on (org_id, user_id).
+ * Sync an org membership from Clerk. Idempotent on (org_id, user_id).
  * Requires the user to already exist in users (call syncUserFromClerk first).
+ *
+ * IMPORTANT: On UPDATE, we DO NOT touch `role`. Clerk fires
+ * organizationMembership.updated for many reasons (avatar changes, metadata
+ * tweaks, periodic re-sync) and the previous .upsert always re-wrote
+ * role='recruiter', clobbering admin promotions made via onboarding or
+ * Settings. We INSERT-or-update split:
+ *   - If no row exists: INSERT with default role='recruiter' and is_active=true.
+ *   - If a row exists:  UPDATE only is_active. Role is owned by app-level flows
+ *                       (onboarding bootstrap + Settings → Team).
  */
 export async function syncMembershipFromClerk(membership: ClerkMembershipPayload): Promise<void> {
   const supabase = createAdminClient()
@@ -126,22 +135,36 @@ export async function syncMembershipFromClerk(membership: ClerkMembershipPayload
       `Cannot sync membership: user ${membership.public_user_data.user_id} not found in users. Call syncUserFromClerk first.`,
     )
   }
+  const userId = (user as { id: string }).id
+  const orgId = membership.organization.id
 
-  const { error } = await supabase
+  const { data: existing } = await supabase
     .from('org_members')
-    .upsert(
-      {
-        org_id: membership.organization.id,
-        user_id: user.id,
-        role: mapClerkRole(membership.role),
-        is_active: true,
-      },
-      { onConflict: 'org_id,user_id' },
-    )
+    .select('user_id')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  const error = existing
+    ? (await supabase
+        .from('org_members')
+        .update({ is_active: true })
+        .eq('org_id', orgId)
+        .eq('user_id', userId)
+      ).error
+    : (await supabase
+        .from('org_members')
+        .insert({
+          org_id: orgId,
+          user_id: userId,
+          role: mapClerkRole(membership.role),
+          is_active: true,
+        })
+      ).error
 
   if (error) {
     logger.error('Failed to sync membership from Clerk', error, {
-      orgId: membership.organization.id,
+      orgId,
       clerkUserId: membership.public_user_data.user_id,
     })
     throw error
