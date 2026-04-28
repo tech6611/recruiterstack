@@ -73,6 +73,19 @@ export async function submitForApproval(input: SubmitInput): Promise<SubmitResul
     throw new ApprovalError('Approval chain has no steps. Edit it in Settings.', 422)
   }
 
+  // Refuse to submit if every step's condition evaluates false. Without this
+  // guard, the downstream "no pending blocks → mark approval approved" branch
+  // in activateNextStep silently auto-approves a target whose chain doesn't
+  // actually apply to it — a serious safety hole. Fail loudly instead so the
+  // operator can fix the chain conditions or the target's data.
+  const anyApplicable = chainSteps.some(s => evaluateCondition(s.condition ?? null, input.target))
+  if (!anyApplicable) {
+    throw new ApprovalError(
+      'No approval steps apply to this target. Adjust the chain conditions or the target\u2019s data.',
+      422,
+    )
+  }
+
   // Create approval row (partial unique index on (target_type, target_id) WHERE status=pending
   // enforces "only one active approval per target" — we surface that as 409).
   const { data: created, error: createErr } = await supabase
