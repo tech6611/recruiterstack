@@ -4,7 +4,6 @@ import { ArrowLeft } from 'lucide-react'
 import { getOrgId } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ChainBuilder } from '@/components/approvals/ChainBuilder'
-import { ArchiveChainButton } from '@/components/approvals/ArchiveChainButton'
 import type { ApprovalChain, ApprovalChainStep } from '@/lib/types/approvals'
 
 type BuilderApproverType = 'user' | 'role' | 'hiring_team_member' | 'group'
@@ -77,17 +76,12 @@ export default async function EditChainPage({ params }: { params: { id: string }
       <Link href="/admin/approvals" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 mb-4">
         <ArrowLeft className="h-4 w-4" /> Back to chains
       </Link>
-      <div className="flex items-start justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Edit chain</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            {c.is_active
-              ? 'Edits to existing steps land in place; in-flight approvals keep running.'
-              : 'This chain is archived. Tick "Active" below and save to restore it.'}
-          </p>
-        </div>
-        <ArchiveChainButton chainId={params.id} isActive={c.is_active} />
-      </div>
+      <h1 className="text-2xl font-semibold text-slate-900">Edit chain</h1>
+      <p className="text-sm text-slate-500 mt-1 mb-6">
+        {c.is_active
+          ? 'Edits to existing steps land in place; in-flight approvals keep running.'
+          : 'This chain is archived. Restore it from the chains list to start using it again.'}
+      </p>
       <ChainBuilder
         mode="edit"
         chainId={params.id}
