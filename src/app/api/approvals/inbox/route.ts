@@ -11,7 +11,11 @@ import { requireOrgAndUser } from '@/lib/auth'
  *   - approvers (jsonb) contains an entry with this user_id
  *   - the user hasn't already decided
  *
- * We rely on Postgres' jsonb @> operator via .contains() in supabase-js.
+ * The jsonb @> filter is built via .filter('cs', JSON.stringify(...)) — using
+ * supabase-js's .contains() with an array-of-objects encodes it as a Postgres
+ * array literal ({[object Object]}) which Postgres rejects with
+ * "invalid input syntax for type json". The string form is the only reliable
+ * way to express jsonb @> for an array of objects via PostgREST.
  */
 export async function GET() {
   const auth = await requireOrgAndUser()
@@ -24,7 +28,7 @@ export async function GET() {
     .select('id, approval_id, step_index, approvers, decisions, activated_at, due_at')
     .eq('status', 'pending')
     .not('activated_at', 'is', null)
-    .contains('approvers', [{ user_id: userId }])
+    .filter('approvers', 'cs', JSON.stringify([{ user_id: userId }]))
     .order('activated_at', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
