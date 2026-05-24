@@ -9,6 +9,17 @@ import Anthropic from '@anthropic-ai/sdk'
 import sgMail from '@sendgrid/mail'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
+import {
+  countLegacyJobs,
+  createLegacyIntakeRequest,
+  createLegacyJobAndPipeline,
+  findLegacyJobsForAgent,
+  getLegacyJobById,
+  listLegacyJobsForAgent,
+  updateLegacyJob,
+} from '@/lib/domain/job-pipelines'
+import { fetchLegacyAnalyticsInputs } from '@/lib/domain/reporting'
+import type { HiringRequestUpdate } from '@/lib/types/database'
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
@@ -753,23 +764,15 @@ async function getJobPipeline(
 ): Promise<string> {
   const { job_id, job_title_query } = input
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let jobQuery: any = supabase
-    .from('hiring_requests')
-    .select('id, position_title, status, hiring_manager_name, department')
-    .eq('org_id', orgId)
-
-  if (job_id) {
-    jobQuery = jobQuery.eq('id', job_id)
-  } else if (job_title_query) {
-    jobQuery = jobQuery.ilike('position_title', `%${job_title_query}%`)
-  } else {
+  if (!job_id && !job_title_query) {
     return 'Error: provide either job_id or job_title_query'
   }
 
-  const { data: jobs, error: jobErr } = await jobQuery.limit(5)
-  if (jobErr) return `Error: ${jobErr.message}`
-  if (!jobs || jobs.length === 0) return `No job found matching "${job_title_query ?? job_id}".`
+  const jobs = await findLegacyJobsForAgent(supabase, orgId, {
+    jobId: job_id,
+    titleQuery: job_title_query,
+  })
+  if (jobs.length === 0) return `No job found matching "${job_title_query ?? job_id}".`
 
   if (jobs.length > 1 && !job_id) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -847,18 +850,8 @@ async function listJobs(
 ): Promise<string> {
   const { status_filter } = input
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = supabase
-    .from('hiring_requests')
-    .select('id, position_title, status, hiring_manager_name, department, created_at')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-
-  if (status_filter) q = q.eq('status', status_filter)
-
-  const { data: jobs, error } = await q
-  if (error) return `Error: ${error.message}`
-  if (!jobs || jobs.length === 0) return 'No jobs found.'
+  const jobs = await listLegacyJobsForAgent(supabase, orgId, status_filter)
+  if (jobs.length === 0) return 'No jobs found.'
 
   const jobIds = jobs.map((j: { id: string }) => j.id)
   const { data: appCounts } = await supabase
@@ -884,15 +877,15 @@ async function listJobs(
 }
 
 async function getDashboardStats(orgId: string, supabase: SupabaseClient): Promise<string> {
-  const [jobsRes, activeRes, interviewingRes, hiredRes] = await Promise.all([
-    supabase.from('hiring_requests').select('id', { count: 'exact', head: true }).eq('org_id', orgId),
+  const [totalJobs, activeRes, interviewingRes, hiredRes] = await Promise.all([
+    countLegacyJobs(supabase, orgId),
     supabase.from('candidates').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'active'),
     supabase.from('candidates').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'interviewing'),
     supabase.from('candidates').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'hired'),
   ])
 
   return `Recruiting overview:
-• Total jobs: ${jobsRes.count ?? 0}
+• Total jobs: ${totalJobs}
 • Active candidates: ${activeRes.count ?? 0}
 • Currently interviewing: ${interviewingRes.count ?? 0}
 • Total hired: ${hiredRes.count ?? 0}`
@@ -1135,30 +1128,17 @@ async function createJobAndPipeline(
     remote_ok = false,
   } = input
 
-  const { data: job, error } = await supabase
-    .from('hiring_requests')
-    .insert({
-      position_title,
-      hiring_manager_name,
-      location:              location      ?? null,
-      headcount,
-      department:            department    ?? null,
-      level:                 level         ?? null,
-      key_requirements:      key_requirements ?? null,
-      nice_to_haves:         nice_to_haves ?? null,
-      remote_ok,
-      filled_by_recruiter:   true,
-      status:                'jd_approved',
-      intake_token:          crypto.randomUUID(),
-      apply_link_token:      crypto.randomUUID(),
-      intake_submitted_at:   new Date().toISOString(),
-      auto_email_rejection:  false,
-      org_id:                orgId,
-    } as never)
-    .select('id, position_title, ticket_number')
-    .single()
-
-  if (error) return `Error creating job: ${error.message}`
+  const job = await createLegacyJobAndPipeline(supabase, orgId, {
+    positionTitle:     position_title,
+    hiringManagerName: hiring_manager_name,
+    location,
+    headcount,
+    department,
+    level,
+    keyRequirements:   key_requirements,
+    niceToHaves:       nice_to_haves,
+    remoteOk:          remote_ok,
+  })
 
   return `Created job "${job.position_title}"${job.ticket_number ? ` (${job.ticket_number})` : ''} — ID: ${job.id}. Pipeline stages are being auto-created.`
 }
@@ -1302,14 +1282,8 @@ async function bulkScoreApplications(
   const { job_id, min_score_threshold = 70 } = input
 
   // Fetch the hiring request (used as job context for scoring)
-  const { data: job, error: jobErr } = await supabase
-    .from('hiring_requests')
-    .select('*')
-    .eq('id', job_id)
-    .eq('org_id', orgId)
-    .single()
-
-  if (jobErr || !job) return `Job not found: ${jobErr?.message ?? 'not found'}`
+  const job = await getLegacyJobById(supabase, orgId, job_id)
+  if (!job) return 'Job not found.'
 
   // Fetch active, unscored applications with full candidate data
   const { data: apps, error: appsErr } = await supabase
@@ -1688,14 +1662,8 @@ async function updateJob(
 ): Promise<string> {
   const { job_id, status, position_title, hiring_manager_name, key_requirements, location, headcount } = input
 
-  const { data: job, error: fetchErr } = await supabase
-    .from('hiring_requests')
-    .select('id, position_title, status')
-    .eq('id', job_id)
-    .eq('org_id', orgId)
-    .single()
-
-  if (fetchErr || !job) return 'Job not found in your organization.'
+  const job = await getLegacyJobById(supabase, orgId, job_id)
+  if (!job) return 'Job not found in your organization.'
 
   // Build update payload only from provided fields
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1709,13 +1677,7 @@ async function updateJob(
 
   if (Object.keys(updates).length === 0) return 'No fields provided to update.'
 
-  const { error: updateErr } = await supabase
-    .from('hiring_requests')
-    .update(updates as never)
-    .eq('id', job_id)
-    .eq('org_id', orgId)
-
-  if (updateErr) return `Error updating job: ${updateErr.message}`
+  await updateLegacyJob(supabase, orgId, job_id, updates as HiringRequestUpdate)
 
   const changes = Object.entries(updates).map(([k, v]) => `${k}: "${v}"`).join(', ')
   return `Updated "${job.position_title}": ${changes}.`
@@ -1890,25 +1852,7 @@ async function getRecruitingAnalytics(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const [jobsRes, appsRes, stagesRes] = await Promise.all([
-    supabase
-      .from('hiring_requests')
-      .select('id, position_title, department, status')
-      .eq('org_id', orgId),
-    supabase
-      .from('applications')
-      .select('id, status, source, stage_id, applied_at, hiring_request_id, candidate_id')
-      .eq('org_id', orgId),
-    supabase
-      .from('pipeline_stages')
-      .select('id, name, order_index, hiring_request_id')
-      .eq('org_id', orgId)
-      .order('order_index'),
-  ])
-
-  const jobs   = jobsRes.data   ?? []
-  const apps   = appsRes.data   ?? []
-  const stages = stagesRes.data ?? []
+  const { jobs, apps, stages } = await fetchLegacyAnalyticsInputs(supabase, orgId)
 
   const ACTIVE_JOB_STATUSES = ['active', 'jd_approved', 'jd_sent', 'jd_generated', 'posted']
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2181,26 +2125,13 @@ async function createIntakeRequest(
     return 'Error: position_title, hiring_manager_name, and hiring_manager_email are required.'
   }
 
-  const { data: req, error } = await supabase
-    .from('hiring_requests')
-    .insert({
-      position_title:        position_title.trim(),
-      hiring_manager_name:   hiring_manager_name.trim(),
-      hiring_manager_email:  hiring_manager_email.trim(),
-      hiring_manager_slack:  hiring_manager_slack ?? null,
-      department:            department ?? null,
-      status:                'intake_pending',
-      filled_by_recruiter:   false,
-      intake_sent_at:        new Date().toISOString(),
-      org_id:                orgId,
-    } as never)
-    .select('id, intake_token, position_title')
-    .single()
-
-  if (error) return `Error creating intake request: ${error.message}`
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const r = req as any
+  const r = await createLegacyIntakeRequest(supabase, orgId, {
+    positionTitle:      position_title.trim(),
+    hiringManagerName:  hiring_manager_name.trim(),
+    hiringManagerEmail: hiring_manager_email.trim(),
+    hiringManagerSlack: hiring_manager_slack,
+    department,
+  })
   const appUrl    = process.env.NEXT_PUBLIC_APP_URL || 'https://app.recruiterstack.com'
   const intakeUrl = `${appUrl}/intake/${r.intake_token}`
 
