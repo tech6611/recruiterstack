@@ -84,9 +84,37 @@ export type CandidateStatus =
 
 export type RoleStatus = 'draft' | 'active' | 'paused' | 'closed'
 
+// Person — the canonical universal human record (identity that follows a human
+// across the apply → employee lifecycle). See docs/canonical-data-model.md.
+export interface Person {
+  id: string
+  org_id: string
+  name: string
+  email: string
+  phone: string | null
+  linkedin_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PersonInsert
+  extends Omit<Person, 'id' | 'created_at' | 'updated_at' | 'phone' | 'linkedin_url'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  phone?: string | null
+  linkedin_url?: string | null
+}
+
+export interface PersonUpdate extends Partial<PersonInsert> {}
+
+// `candidates` holds the candidate *profile* (resume, skills, status, ai_*) and
+// links to its Person via person_id. Identity fields (name/email/phone/linkedin)
+// are mirrored here for now but are owned by `people`.
 export interface Candidate {
   id: string
   org_id: string
+  person_id: string | null
   name: string
   email: string
   phone: string | null
@@ -104,10 +132,11 @@ export interface Candidate {
 }
 
 export interface CandidateInsert
-  extends Omit<Candidate, 'id' | 'created_at' | 'updated_at' | 'ai_summary' | 'ai_summary_generated_at' | 'phone' | 'resume_url' | 'current_title' | 'location' | 'linkedin_url'> {
+  extends Omit<Candidate, 'id' | 'created_at' | 'updated_at' | 'ai_summary' | 'ai_summary_generated_at' | 'phone' | 'resume_url' | 'current_title' | 'location' | 'linkedin_url' | 'person_id'> {
   id?: string
   created_at?: string
   updated_at?: string
+  person_id?: string | null
   ai_summary?: string | null
   ai_summary_generated_at?: string | null
   phone?: string | null
@@ -813,6 +842,12 @@ type Indexify<T> = { [K in keyof T]: T[K] }
 export type Database = {
   public: {
     Tables: {
+      people: {
+        Row: Indexify<Person>
+        Insert: Indexify<PersonInsert>
+        Update: Indexify<PersonUpdate>
+        Relationships: []
+      }
       candidates: {
         Row: Indexify<Candidate>
         Insert: Indexify<CandidateInsert>
