@@ -309,7 +309,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
                 >
                   <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                    <Phone className="h-3.5 w-3.5 text-blue-600" />
+                    <Phone className="h-3.5 w-3.5 text-emerald-600" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -344,7 +344,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
           </div>
           {candidate.resume_url && (
             <a href={candidate.resume_url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800">
+              className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800">
               <ExternalLink className="h-3 w-3" /> Download
             </a>
           )}

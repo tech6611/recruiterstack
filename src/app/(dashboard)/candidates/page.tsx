@@ -545,7 +545,7 @@ export default function CandidatesPage() {
           </button>
           <button
             onClick={() => setShowDrawer(true)}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
           >
             <Plus className="h-4 w-4" />
             Add Candidate
@@ -575,7 +575,7 @@ export default function CandidatesPage() {
               key={stat.label}
               onClick={() => { setFilterStatus(filterStatus === stat.filter ? 'all' : stat.filter); setPage(1) }}
               className={`rounded-xl border p-3.5 text-left transition-all hover:shadow-sm ${stat.color} ${
-                filterStatus === stat.filter ? 'ring-2 ring-offset-1 ring-blue-400' : ''
+                filterStatus === stat.filter ? 'ring-2 ring-offset-1 ring-emerald-400' : ''
               }`}
             >
               <p className="text-2xl font-bold">{stat.value}</p>
@@ -599,7 +599,7 @@ export default function CandidatesPage() {
               if (e.target.value.length > 2) trackEvent('candidates_searched', { query_length: e.target.value.length })
             }}
             placeholder="Search name, email, title…"
-            className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+            className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
@@ -614,7 +614,7 @@ export default function CandidatesPage() {
             setFilterStatus(val); setPage(1)
             if (val !== 'all') trackEvent('candidates_filtered', { filter_type: val })
           }}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
         >
           <option value="all">All statuses</option>
           {(Object.keys(STATUS_CONFIG) as CandidateStatus[]).map(s => (
@@ -668,7 +668,7 @@ export default function CandidatesPage() {
           <p className="text-xs text-slate-400 mt-1 mb-4">Add your first candidate to start building your talent pool</p>
           <button
             onClick={() => setShowDrawer(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Candidate
@@ -891,7 +891,7 @@ export default function CandidatesPage() {
                 {/* Skills */}
                 <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Skills</p>
-                  <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 min-h-[44px] focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition">
+                  <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 min-h-[44px] focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-emerald-100 transition">
                     {form.skills.map(skill => (
                       <span key={skill} className="flex items-center gap-1 rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 shadow-sm">
                         {skill}
@@ -926,7 +926,7 @@ export default function CandidatesPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors shadow-sm"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm"
                 >
                   {saving ? <><Loader2 className="h-4 w-4 animate-spin" />Saving…</> : 'Add Candidate'}
                 </button>

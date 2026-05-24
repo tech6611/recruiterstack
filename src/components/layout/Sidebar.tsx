@@ -69,7 +69,7 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className={`flex border-b border-slate-100 ${collapsed ? 'h-16 flex-col items-center justify-center gap-0.5 px-2' : 'h-14 items-center px-4'}`}>
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-600">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-600">
           <Zap className="h-3.5 w-3.5 text-white" />
         </div>
         {collapsed ? (
@@ -97,12 +97,12 @@ export function Sidebar() {
               title={collapsed ? label : undefined}
               className={`flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-all ${
                 isActive
-                  ? 'bg-blue-50 text-blue-700'
+                  ? 'bg-emerald-50 text-emerald-700'
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               <Icon
-                className={`h-[18px] w-[18px] shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}
+                className={`h-[18px] w-[18px] shrink-0 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`}
               />
               {!collapsed && <span className="truncate">{label}</span>}
             </Link>

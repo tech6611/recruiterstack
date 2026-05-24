@@ -53,8 +53,8 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
       >
         <div className="flex items-start gap-3">
           {/* Mail icon */}
-          <div className="h-7 w-7 rounded-full bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
-            <Mail className="h-3.5 w-3.5 text-blue-500" />
+          <div className="h-7 w-7 rounded-full bg-emerald-50 flex items-center justify-center shrink-0 mt-0.5">
+            <Mail className="h-3.5 w-3.5 text-emerald-500" />
           </div>
 
           <div className="flex-1 min-w-0">
@@ -104,7 +104,7 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
                 [&_p]:my-1 [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4
                 [&_li]:my-0.5 [&_strong]:font-semibold [&_em]:italic [&_u]:underline
                 [&_s]:line-through [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold
-                [&_a]:text-blue-600 [&_a]:underline"
+                [&_a]:text-emerald-600 [&_a]:underline"
               dangerouslySetInnerHTML={{ __html: bodyHtml }}
             />
           ) : (

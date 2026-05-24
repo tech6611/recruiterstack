@@ -157,7 +157,7 @@ export default function TaskScheduler({ candidateId, tasks, onTaskAdded, onTaskU
             autoFocus
             value={taskType}
             onChange={e => { setTaskType(e.target.value as typeof TASK_TYPES[number]); setCustomTitle('') }}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-400"
           >
             {TASK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
@@ -170,7 +170,7 @@ export default function TaskScheduler({ candidateId, tasks, onTaskAdded, onTaskU
               onChange={e => setCustomTitle(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && submit()}
               placeholder="Describe the task…"
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400"
             />
           )}
 
@@ -182,7 +182,7 @@ export default function TaskScheduler({ candidateId, tasks, onTaskAdded, onTaskU
                 type="date"
                 value={dueDate}
                 onChange={e => setDueDate(e.target.value)}
-                className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400"
+                className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-emerald-400"
               />
             </div>
             {/* Assignee */}
@@ -190,7 +190,7 @@ export default function TaskScheduler({ candidateId, tasks, onTaskAdded, onTaskU
               value={assignee}
               onChange={e => setAssignee(e.target.value)}
               placeholder="Assignee (optional)"
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400"
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-emerald-400"
             />
           </div>
 
@@ -200,7 +200,7 @@ export default function TaskScheduler({ candidateId, tasks, onTaskAdded, onTaskU
             <select
               value={newStatus}
               onChange={e => setNewStatus(e.target.value as TaskStatus)}
-              className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-400"
+              className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-emerald-400"
             >
               {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
@@ -213,7 +213,7 @@ export default function TaskScheduler({ candidateId, tasks, onTaskAdded, onTaskU
             <button
               onClick={submit}
               disabled={saving || (taskType === 'Other' && !customTitle.trim())}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               {saving ? 'Adding…' : 'Add Task'}
             </button>

@@ -81,7 +81,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
     setInput('')
   }
   return (
-    <div className="flex flex-wrap gap-2 p-2.5 rounded-xl border border-slate-200 bg-white min-h-[44px] focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition">
+    <div className="flex flex-wrap gap-2 p-2.5 rounded-xl border border-slate-200 bg-white min-h-[44px] focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-emerald-100 transition">
       {tags.map(t => (
         <span key={t} className="flex items-center gap-1 bg-slate-100 text-slate-700 text-xs rounded-full px-2.5 py-1">
           {t}
@@ -195,7 +195,7 @@ export default function IntakePage() {
       type="button"
       onClick={() => openFileImport(field)}
       disabled={importingField === field}
-      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-600 transition-colors mt-1.5"
+      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-600 transition-colors mt-1.5"
     >
       {importingField === field
         ? <Loader2 className="h-3 w-3 animate-spin" />
@@ -297,7 +297,7 @@ export default function IntakePage() {
         </p>
         <a
           href={`/intake/${token}/status`}
-          className="inline-block mt-4 text-sm text-blue-600 hover:underline"
+          className="inline-block mt-4 text-sm text-emerald-600 hover:underline"
         >
           Track request status →
         </a>
@@ -326,7 +326,7 @@ export default function IntakePage() {
         {statusUrl && (
           <a
             href={statusUrl}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
           >
             Track your request →
           </a>
@@ -374,7 +374,7 @@ export default function IntakePage() {
               <button
                 type="button"
                 onClick={() => setEditingTitle(true)}
-                className="flex items-center gap-1.5 text-base font-semibold text-slate-700 hover:text-blue-600 transition-colors group"
+                className="flex items-center gap-1.5 text-base font-semibold text-slate-700 hover:text-emerald-600 transition-colors group"
               >
                 {positionTitle}
                 <Pencil className="h-3.5 w-3.5 opacity-40 group-hover:opacity-100 transition-opacity" />
@@ -419,7 +419,7 @@ export default function IntakePage() {
               </div>
               <div className="flex flex-col justify-end">
                 <label className="flex items-center gap-2.5 cursor-pointer py-2.5">
-                  <input type="checkbox" checked={form.remote_ok} onChange={e => set('remote_ok', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+                  <input type="checkbox" checked={form.remote_ok} onChange={e => set('remote_ok', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
                   <span className="text-sm font-semibold text-slate-700">Remote OK</span>
                 </label>
               </div>

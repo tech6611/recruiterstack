@@ -108,6 +108,44 @@ export interface PersonInsert
 
 export interface PersonUpdate extends Partial<PersonInsert> {}
 
+// Employee Profile — a Person in their employee role. Created (PENDING) when a
+// candidacy is dispositioned hired, flips to ACTIVE when they join the org. The
+// same person_id spans candidate → employee. See docs/hire-to-employee-research.md.
+export type EmployeeStatus = 'pending' | 'active' | 'terminated'
+
+export interface EmployeeProfile {
+  id: string
+  org_id: string
+  person_id: string
+  candidate_id: string | null
+  application_id: string | null
+  department_id: string | null
+  status: EmployeeStatus
+  hired_at: string | null
+  start_date: string | null
+  joined_at: string | null
+  terminated_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EmployeeProfileInsert
+  extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  status?: EmployeeStatus
+  candidate_id?: string | null
+  application_id?: string | null
+  department_id?: string | null
+  hired_at?: string | null
+  start_date?: string | null
+  joined_at?: string | null
+  terminated_at?: string | null
+}
+
+export interface EmployeeProfileUpdate extends Partial<EmployeeProfileInsert> {}
+
 // `candidates` holds the candidate *profile* (resume, skills, status, ai_*) and
 // links to its Person via person_id. Identity fields (name/email/phone/linkedin)
 // are mirrored here for now but are owned by `people`.
@@ -846,6 +884,12 @@ export type Database = {
         Row: Indexify<Person>
         Insert: Indexify<PersonInsert>
         Update: Indexify<PersonUpdate>
+        Relationships: []
+      }
+      employee_profiles: {
+        Row: Indexify<EmployeeProfile>
+        Insert: Indexify<EmployeeProfileInsert>
+        Update: Indexify<EmployeeProfileUpdate>
         Relationships: []
       }
       candidates: {

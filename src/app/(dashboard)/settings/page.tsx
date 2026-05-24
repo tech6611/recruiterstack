@@ -415,7 +415,7 @@ export default function SettingsPage() {
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
-                <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
+                <Icon className={`h-4 w-4 ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
                 {t.label}
               </button>
             )
@@ -431,7 +431,7 @@ export default function SettingsPage() {
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                   <div className="flex items-center gap-2.5 mb-2">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                      <Building2 className="h-4 w-4 text-blue-600" />
+                      <Building2 className="h-4 w-4 text-emerald-600" />
                     </div>
                     <h2 className="text-sm font-semibold text-slate-800">Company</h2>
                   </div>
@@ -565,7 +565,7 @@ export default function SettingsPage() {
               {/* Save button */}
               <button
                 type="submit"
-                className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
               >
                 {saved ? (
                   <>
@@ -635,7 +635,7 @@ export default function SettingsPage() {
                     value={slackUrl}
                     onChange={e => setSlackUrl(e.target.value)}
                     placeholder="https://hooks.slack.com/services/..."
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
                   />
                   <p className="mt-1 text-xs text-slate-400">
                     Create a webhook at <span className="font-medium text-slate-500">api.slack.com/apps</span> and paste the URL here.
@@ -647,7 +647,7 @@ export default function SettingsPage() {
                     type="button"
                     onClick={saveSlack}
                     disabled={slackStatus === 'saving'}
-                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60"
+                    className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
                   >
                     {slackStatus === 'saving' ? 'Saving…' : slackStatus === 'saved' ? (
                       <><CheckCircle className="h-4 w-4" /> Saved!</>
@@ -736,7 +736,7 @@ export default function SettingsPage() {
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-2.5 mb-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                    <Calendar className="h-4 w-4 text-blue-600" />
+                    <Calendar className="h-4 w-4 text-emerald-600" />
                   </div>
                   <h2 className="text-sm font-semibold text-slate-800">Google Calendar &amp; Meet</h2>
                 </div>
@@ -785,7 +785,7 @@ export default function SettingsPage() {
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-2.5 mb-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                    <Video className="h-4 w-4 text-blue-600" />
+                    <Video className="h-4 w-4 text-emerald-600" />
                   </div>
                   <h2 className="text-sm font-semibold text-slate-800">Zoom</h2>
                 </div>
@@ -818,7 +818,7 @@ export default function SettingsPage() {
                       href="/api/zoom/connect"
                       className="inline-flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
                     >
-                      <Video className="h-4 w-4 text-blue-600" />
+                      <Video className="h-4 w-4 text-emerald-600" />
                       Connect Zoom
                     </a>
                   </div>

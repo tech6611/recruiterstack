@@ -135,7 +135,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
     setInput('')
   }
   return (
-    <div className="flex flex-wrap gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 min-h-[44px] focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition">
+    <div className="flex flex-wrap gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 min-h-[44px] focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-emerald-100 transition">
       {tags.map(t => (
         <span key={t} className="flex items-center gap-1 bg-white border border-slate-200 text-slate-700 text-xs rounded-full px-2.5 py-1 shadow-sm">
           {t}
@@ -178,7 +178,7 @@ function FileImportButton({ onExtract, field }: { onExtract: (text: string) => v
         type="button"
         onClick={() => ref.current?.click()}
         disabled={loading}
-        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-600 transition-colors mt-1.5"
+        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-600 transition-colors mt-1.5"
       >
         {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
         {loading ? 'Extracting…' : 'Import from PDF / TXT'}
@@ -365,7 +365,7 @@ export default function NewHiringRequestPage() {
             </button>
             <button
               onClick={() => router.push('/hiring-requests')}
-              className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+              className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
             >
               View All
             </button>
@@ -390,16 +390,16 @@ export default function NewHiringRequestPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <button
             onClick={() => setMode('send_to_hm')}
-            className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-blue-400 hover:shadow-sm transition-all"
+            className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-emerald-400 hover:shadow-sm transition-all"
           >
-            <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
-              <Send className="h-5 w-5 text-blue-600" />
+            <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
+              <Send className="h-5 w-5 text-emerald-600" />
             </div>
             <h3 className="font-bold text-slate-900 text-sm mb-1">Send to Hiring Manager</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
               You have the position title and HM details. They fill in the requirements and write the JD on their own form.
             </p>
-            <p className="text-xs text-blue-600 font-medium mt-3">→ Sends intake link to HM</p>
+            <p className="text-xs text-emerald-600 font-medium mt-3">→ Sends intake link to HM</p>
           </button>
           <button
             onClick={() => setMode('fill_myself')}
@@ -503,7 +503,7 @@ export default function NewHiringRequestPage() {
                 </div>
                 <div className="flex flex-col justify-end">
                   <label className="flex items-center gap-2 cursor-pointer py-2.5">
-                    <input type="checkbox" checked={remoteOk} onChange={e => setRemoteOk(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+                    <input type="checkbox" checked={remoteOk} onChange={e => setRemoteOk(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
                     <span className="text-sm font-semibold text-slate-700">Remote OK</span>
                   </label>
                 </div>
@@ -798,7 +798,7 @@ export default function NewHiringRequestPage() {
         <button
           type="submit"
           disabled={loading || (mode === 'fill_myself' && !jd.trim())}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors shadow-sm"
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm"
         >
           {loading ? (
             <><Loader2 className="h-4 w-4 animate-spin" />Creating request…</>

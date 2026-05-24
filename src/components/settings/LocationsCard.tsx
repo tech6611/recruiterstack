@@ -52,7 +52,7 @@ export function LocationsCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-blue-600" /> Locations
+          <MapPin className="h-4 w-4 text-emerald-600" /> Locations
         </CardTitle>
         <CardDescription>Where your team operates. Used by openings and posting feeds.</CardDescription>
       </CardHeader>

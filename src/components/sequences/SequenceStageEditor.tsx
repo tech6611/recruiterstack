@@ -362,12 +362,12 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 max={90}
                 value={delayDays}
                 onChange={e => setDelayDays(Number(e.target.value))}
-                className="w-14 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-center text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="w-14 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-center text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               />
               <select
                 value={businessDays ? 'business' : 'calendar'}
                 onChange={e => setBusinessDays(e.target.value === 'business')}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               >
                 <option value="calendar">{delayDays === 1 ? 'day' : 'days'}</option>
                 <option value="business">business {delayDays === 1 ? 'day' : 'days'}</option>
@@ -394,13 +394,13 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 type="time"
                 value={sendTime}
                 onChange={e => setSendTime(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               />
 
               <select
                 value={sendTz}
                 onChange={e => setSendTz(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               >
                 {TIMEZONES.map(tz => {
                   // Short labels for common timezones
@@ -438,7 +438,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                       value={c.value}
                       checked={condition === c.value}
                       onChange={() => setCondition(c.value as StageCondition | '')}
-                      className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                      className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
                     />
                     <div>
                       <p className={`text-xs font-semibold ${condition === c.value ? 'text-blue-700' : 'text-slate-700'}`}>
@@ -463,14 +463,14 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 value={soboName}
                 onChange={e => setSoboName(e.target.value)}
                 placeholder="e.g. Hiring Manager"
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               />
               <input
                 type="email"
                 value={soboEmail}
                 onChange={e => setSoboEmail(e.target.value)}
                 placeholder="e.g. hm@company.com"
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               />
             </div>
           </div>
@@ -522,7 +522,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
               value={subject}
               onChange={e => setSubject(e.target.value)}
               placeholder="Hi {{candidate_first_name}}, quick note about..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
             />
             <div className="flex flex-wrap gap-1 mt-2">
               {TOKENS.slice(0, 4).map(t => (
@@ -530,7 +530,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                   key={t.token}
                   type="button"
                   onClick={() => insertTokenInSubject(t.token)}
-                  className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+                  className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 hover:bg-emerald-100 transition-colors"
                 >
                   + {t.label}
                 </button>
@@ -555,7 +555,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                   key={t.token}
                   type="button"
                   onClick={() => insertTokenInBody(t.token)}
-                  className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+                  className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 hover:bg-emerald-100 transition-colors"
                 >
                   + {t.label}
                 </button>
@@ -595,7 +595,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
+              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isEdit ? 'Update Stage' : 'Add Stage'}

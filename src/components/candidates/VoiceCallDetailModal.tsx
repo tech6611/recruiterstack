@@ -87,7 +87,7 @@ export default function VoiceCallDetailModal({ callId, onClose }: Props) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
-              <Phone className="h-4 w-4 text-blue-600" />
+              <Phone className="h-4 w-4 text-emerald-600" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900">Phone Screen Details</h3>
@@ -198,7 +198,7 @@ export default function VoiceCallDetailModal({ callId, onClose }: Props) {
                             {isAI ? 'AI' : 'C'}
                           </div>
                           <div className={`rounded-xl px-3 py-2 text-xs leading-relaxed max-w-[80%]
-                            ${isAI ? 'bg-white border border-slate-100 text-slate-700' : 'bg-blue-600 text-white'}`}
+                            ${isAI ? 'bg-white border border-slate-100 text-slate-700' : 'bg-emerald-600 text-white'}`}
                           >
                             {turn.content}
                           </div>

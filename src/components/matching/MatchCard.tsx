@@ -69,7 +69,7 @@ export function MatchCard({ match, showCandidate = true, showRole = false, onDra
           {onDraftEmail && (
             <button
               onClick={() => onDraftEmail(match)}
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
               title="Draft outreach email"
             >
               <Mail className="h-3.5 w-3.5" />

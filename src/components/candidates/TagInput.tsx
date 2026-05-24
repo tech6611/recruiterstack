@@ -56,9 +56,9 @@ export default function TagInput({ candidateId, tags, onTagAdded, onTagRemoved }
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') add(); if (e.key === 'Escape') setShowInput(false) }}
             placeholder="Tag name"
-            className="w-20 rounded border border-slate-200 px-1.5 py-0.5 text-[11px] outline-none focus:border-blue-400"
+            className="w-20 rounded border border-slate-200 px-1.5 py-0.5 text-[11px] outline-none focus:border-emerald-400"
           />
-          <button onClick={add} disabled={adding || !input.trim()} className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50">Add</button>
+          <button onClick={add} disabled={adding || !input.trim()} className="text-[10px] font-semibold text-emerald-600 hover:text-emerald-800 disabled:opacity-50">Add</button>
           <button onClick={() => { setShowInput(false); setInput('') }} className="text-[10px] text-slate-400 hover:text-slate-600">✕</button>
         </div>
       ) : (

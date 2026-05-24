@@ -44,7 +44,7 @@ const STAGE_BAR: Record<StageColor, string> = {
 
 const STAGE_TEXT: Record<StageColor, string> = {
   slate:   'text-slate-600',
-  blue:    'text-blue-600',
+  blue:    'text-emerald-600',
   violet:  'text-violet-600',
   amber:   'text-amber-600',
   emerald: 'text-emerald-600',

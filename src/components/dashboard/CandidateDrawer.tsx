@@ -125,12 +125,12 @@ function AddNoteAction({ applicationId, onDone }: { applicationId: string; onDon
         onChange={e => setNote(e.target.value)}
         onKeyDown={e => e.key === 'Enter' && handleSubmit()}
         placeholder="Add a note..."
-        className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-300 focus:outline-none"
+        className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
       />
       <button
         onClick={handleSubmit}
         disabled={!note.trim() || saving}
-        className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
       >
         {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
       </button>
@@ -174,8 +174,8 @@ function MoveStageAction({
             disabled={isCurrent || saving}
             className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
               isCurrent
-                ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-300'
-                : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600'
+                ? 'bg-blue-100 text-blue-700 ring-1 ring-emerald-300'
+                : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600'
             } disabled:cursor-default`}
           >
             {stage.name}
@@ -245,20 +245,20 @@ function QuickEmailAction({
         value={subject}
         onChange={e => setSubject(e.target.value)}
         placeholder="Subject"
-        className="w-full rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-300 focus:outline-none"
+        className="w-full rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
       />
       <textarea
         value={body}
         onChange={e => setBody(e.target.value)}
         placeholder={`Hi ${candidateName.split(' ')[0]},...`}
         rows={3}
-        className="w-full rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-300 focus:outline-none resize-none"
+        className="w-full rounded border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none resize-none"
       />
       <div className="flex items-center gap-2">
         <button
           onClick={handleSend}
           disabled={!subject.trim() || !body.trim() || sending}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
         >
           {sending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
           Send
@@ -640,7 +640,7 @@ export function CandidateDrawer({ candidateId, onClose, onActionComplete }: Cand
               {/* Profile header */}
               <div className="px-5 py-4 border-b border-slate-100">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-emerald-600">
                     {data.candidate.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">

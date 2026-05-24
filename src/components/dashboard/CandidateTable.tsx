@@ -52,9 +52,9 @@ export function CandidateTable({ candidates, clickable = false }: CandidateTable
     if (sortField !== field)
       return <ChevronUp className="h-3.5 w-3.5 text-slate-300" />
     return sortDir === 'asc' ? (
-      <ChevronUp className="h-3.5 w-3.5 text-blue-600" />
+      <ChevronUp className="h-3.5 w-3.5 text-emerald-600" />
     ) : (
-      <ChevronDown className="h-3.5 w-3.5 text-blue-600" />
+      <ChevronDown className="h-3.5 w-3.5 text-emerald-600" />
     )
   }
 
@@ -93,7 +93,7 @@ export function CandidateTable({ candidates, clickable = false }: CandidateTable
             placeholder="Search name, skill, title…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-64 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+            className="w-64 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
           />
         </div>
       </div>
@@ -129,7 +129,7 @@ export function CandidateTable({ candidates, clickable = false }: CandidateTable
                 >
                   {/* Name + email */}
                   <td className="py-3.5 pl-6 pr-4">
-                    <div className="font-medium text-slate-900 group-hover:text-blue-700 transition-colors">
+                    <div className="font-medium text-slate-900 group-hover:text-emerald-700 transition-colors">
                       {candidate.name}
                     </div>
                     <div className="text-xs text-slate-400 mt-0.5">{candidate.email}</div>

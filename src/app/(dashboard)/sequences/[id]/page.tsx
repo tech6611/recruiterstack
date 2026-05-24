@@ -224,7 +224,7 @@ export default function SequenceDetailPage() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setShowAddCandidates(true)}
-            className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+            className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-emerald-100 transition-colors"
           >
             <Users className="h-4 w-4" /> Add Candidates
           </button>
@@ -280,7 +280,7 @@ export default function SequenceDetailPage() {
                 <div className="group rounded-2xl border border-slate-200 bg-white p-5 hover:border-slate-300 transition-all">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600 mt-0.5">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-emerald-600 mt-0.5">
                         {stage.order_index}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -325,7 +325,7 @@ export default function SequenceDetailPage() {
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                       <button
                         onClick={() => { setEditingStage(stage); setEditorOpen(true) }}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
                         title="Edit stage"
                       >
                         <Pencil className="h-3.5 w-3.5" />
@@ -355,7 +355,7 @@ export default function SequenceDetailPage() {
           <div className={stages.length > 0 ? 'pt-3' : ''}>
             <button
               onClick={() => { setEditingStage(null); setEditorOpen(true) }}
-              className="flex items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 px-4 py-3 text-sm font-medium text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors w-full justify-center"
+              className="flex items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 px-4 py-3 text-sm font-medium text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors w-full justify-center"
             >
               <Plus className="h-4 w-4" /> Add Stage
             </button>
@@ -453,7 +453,7 @@ export default function SequenceDetailPage() {
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
               {/* Sequence info */}
               <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
-                <p className="text-xs font-semibold text-blue-600">{seq.name}</p>
+                <p className="text-xs font-semibold text-emerald-600">{seq.name}</p>
                 <p className="text-[11px] text-blue-500">{stages.length} stages · {seq.status}</p>
               </div>
 
@@ -472,7 +472,7 @@ export default function SequenceDetailPage() {
                   value={candidateSearch}
                   onChange={e => searchCandidates(e.target.value)}
                   placeholder="Search by name, email, or skills..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                 />
               </div>
 
@@ -508,7 +508,7 @@ export default function SequenceDetailPage() {
                           <p className="text-xs text-slate-400 truncate">{c.email}{c.current_title ? ` · ${c.current_title}` : ''}</p>
                         </div>
                         {isSelected && (
-                          <span className="text-xs font-semibold text-blue-600">Selected</span>
+                          <span className="text-xs font-semibold text-emerald-600">Selected</span>
                         )}
                       </button>
                     )
@@ -544,7 +544,7 @@ export default function SequenceDetailPage() {
               <button
                 onClick={enrollSelected}
                 disabled={enrollingDirect || selectedCandidates.length === 0 || seq.status !== 'active'}
-                className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
               >
                 {enrollingDirect && <Loader2 className="h-4 w-4 animate-spin" />}
                 Enroll {selectedCandidates.length > 0 ? `(${selectedCandidates.length})` : ''}

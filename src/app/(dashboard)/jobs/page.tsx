@@ -96,7 +96,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
     setInput('')
   }
   return (
-    <div className="flex flex-wrap gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 min-h-[44px] focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition">
+    <div className="flex flex-wrap gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 min-h-[44px] focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-emerald-100 transition">
       {tags.map(t => (
         <span key={t} className="flex items-center gap-1 bg-white border border-slate-200 text-slate-700 text-xs rounded-full px-2.5 py-1 shadow-sm">
           {t}
@@ -134,7 +134,7 @@ function FileImportButton({ onExtract, field }: { onExtract: (text: string) => v
     <>
       <input ref={ref} type="file" accept=".pdf,.txt,.md" onChange={handle} className="hidden" id={`fi-${field}`} />
       <button type="button" onClick={() => ref.current?.click()} disabled={loading}
-        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-600 transition-colors mt-1.5">
+        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-600 transition-colors mt-1.5">
         {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
         {loading ? 'Extracting…' : 'Import from PDF / TXT'}
       </button>
@@ -287,7 +287,7 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
                 New Job
               </button>
               <button onClick={onClose}
-                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
+                className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
                 Done
               </button>
             </div>
@@ -305,13 +305,13 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button onClick={() => setMode('send_to_hm')}
-              className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-blue-400 hover:shadow-sm transition-all">
-              <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
-                <Send className="h-5 w-5 text-blue-600" />
+              className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-emerald-400 hover:shadow-sm transition-all">
+              <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
+                <Send className="h-5 w-5 text-emerald-600" />
               </div>
               <h3 className="font-bold text-slate-900 text-sm mb-1">Send to Hiring Manager</h3>
               <p className="text-xs text-slate-500 leading-relaxed">You have the position title and HM details. They fill in requirements and write the JD on their form.</p>
-              <p className="text-xs text-blue-600 font-medium mt-3">→ Sends intake link to HM</p>
+              <p className="text-xs text-emerald-600 font-medium mt-3">→ Sends intake link to HM</p>
             </button>
             <button onClick={() => setMode('fill_myself')}
               className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-violet-400 hover:shadow-sm transition-all">
@@ -399,7 +399,7 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
                   </div>
                   <div className="flex flex-col justify-end">
                     <label className="flex items-center gap-2 cursor-pointer py-2.5">
-                      <input type="checkbox" checked={remoteOk} onChange={e => setRemoteOk(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+                      <input type="checkbox" checked={remoteOk} onChange={e => setRemoteOk(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
                       <span className="text-sm font-semibold text-slate-700">Remote OK</span>
                     </label>
                   </div>
@@ -522,7 +522,7 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
           <button
             type="submit"
             disabled={loading || (mode === 'fill_myself' && !jd.trim())}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors shadow-sm"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm"
           >
             {loading ? (
               <><Loader2 className="h-4 w-4 animate-spin" />Creating request…</>
@@ -916,7 +916,7 @@ export default function JobsPage() {
               }}
               className={`flex items-center gap-0.5 rounded px-1 py-0.5 transition-colors shrink-0 ${
                 activeFilter
-                  ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-200'
+                  ? 'bg-blue-50 text-emerald-600 ring-1 ring-emerald-200'
                   : colDropdown?.colId === col.id
                   ? 'bg-slate-100 text-slate-600'
                   : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
@@ -1018,7 +1018,7 @@ export default function JobsPage() {
               value={jobSearch}
               onChange={e => setJobSearch(e.target.value)}
               placeholder="Search jobs…"
-              className={`h-9 w-52 rounded-xl border pl-8 pr-8 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              className={`h-9 w-52 rounded-xl border pl-8 pr-8 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
                 jobSearch
                   ? 'border-blue-300 bg-blue-50 text-slate-800'
                   : 'border-slate-200 bg-white text-slate-700 placeholder-slate-400'
@@ -1072,15 +1072,15 @@ export default function JobsPage() {
                       <div>
                         <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
                         <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-blue-400 transition" />
+                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
                       </div>
                       <div>
                         <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
                         <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-blue-400 transition" />
+                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
                       </div>
                       <button onClick={() => setShowTimePicker(false)}
-                        className="w-full text-xs bg-blue-600 text-white rounded-lg py-1.5 hover:bg-blue-700 transition-colors font-semibold">
+                        className="w-full text-xs bg-emerald-600 text-white rounded-lg py-1.5 hover:bg-emerald-700 transition-colors font-semibold">
                         Apply
                       </button>
                     </div>
@@ -1106,7 +1106,7 @@ export default function JobsPage() {
 
           <button
             onClick={() => setShowDrawer(true)}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
           >
             <Plus className="h-4 w-4" />
             New Job
@@ -1136,7 +1136,7 @@ export default function JobsPage() {
               key={stat.label}
               onClick={() => handleStatCard(stat.filter)}
               className={`rounded-xl border p-3.5 text-left transition-all hover:shadow-sm ${stat.color} ${
-                isStatActive(stat.filter) ? 'ring-2 ring-offset-1 ring-blue-400' : ''
+                isStatActive(stat.filter) ? 'ring-2 ring-offset-1 ring-emerald-400' : ''
               }`}
             >
               <p className="text-2xl font-bold">{stat.value}</p>
@@ -1158,7 +1158,7 @@ export default function JobsPage() {
             return (
               <span key={colId} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700 font-medium">
                 <span className="text-blue-400">{colDef?.label}:</span> {displayLabel}
-                <button onClick={() => clearColFilter(colId)} className="ml-0.5 hover:text-blue-900">
+                <button onClick={() => clearColFilter(colId)} className="ml-0.5 hover:text-emerald-900">
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -1167,7 +1167,7 @@ export default function JobsPage() {
           {timeFilter !== 'all' && (
             <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700 font-medium">
               <CalendarDays className="h-3 w-3" /> {timeLabel}
-              <button onClick={() => setTimeFilter('all')} className="ml-0.5 hover:text-blue-900">
+              <button onClick={() => setTimeFilter('all')} className="ml-0.5 hover:text-emerald-900">
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -1181,7 +1181,7 @@ export default function JobsPage() {
             </button>
           )}
           {manualOrder && (
-            <button onClick={() => setManualOrder(null)} className="text-xs text-blue-500 hover:text-blue-700 transition-colors">
+            <button onClick={() => setManualOrder(null)} className="text-xs text-blue-500 hover:text-emerald-700 transition-colors">
               Reset row order
             </button>
           )}
@@ -1221,7 +1221,7 @@ export default function JobsPage() {
           <p className="text-sm font-medium text-slate-500">No jobs yet</p>
           <p className="text-xs text-slate-400 mt-1 mb-4">Create your first job to get started</p>
           <button onClick={() => setShowDrawer(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
             <Plus className="h-3.5 w-3.5" />New Job
           </button>
         </div>
@@ -1326,7 +1326,7 @@ export default function JobsPage() {
                     }}
                     placeholder="e.g. RS-001…"
                     autoFocus
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition"
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100 transition"
                   />
                   {selCount > 0 && (
                     <button onClick={() => clearColFilter(colDropdown.colId)} className="text-xs text-red-500 hover:text-red-700 transition-colors">
@@ -1346,7 +1346,7 @@ export default function JobsPage() {
                         onChange={e => setColFilterSearch(e.target.value)}
                         placeholder="Search…"
                         autoFocus
-                        className="w-full pl-6 pr-2 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 transition"
+                        className="w-full pl-6 pr-2 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100 transition"
                       />
                     </div>
                   </div>
@@ -1358,7 +1358,7 @@ export default function JobsPage() {
                         type="checkbox"
                         checked={allSel}
                         onChange={() => allSel ? clearColFilter(colDropdown.colId) : selectAllInCol(colDropdown.colId)}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600"
                       />
                       <span className="text-xs font-semibold text-slate-600">{allSel ? 'Deselect all' : 'Select all'}</span>
                       {selCount > 0 && !allSel && (
@@ -1377,7 +1377,7 @@ export default function JobsPage() {
                             type="checkbox"
                             checked={selected}
                             onChange={() => toggleColFilter(colDropdown.colId, opt.value)}
-                            className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600"
                           />
                           {colDropdown.colId === 'status' ? (
                             <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_CONFIG[opt.value]?.color ?? ''}`}>
@@ -1431,7 +1431,7 @@ export default function JobsPage() {
                   checked={visibleCols.includes(col.id)}
                   disabled={col.required}
                   onChange={() => toggleCol(col.id)}
-                  className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 disabled:opacity-50"
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 disabled:opacity-50"
                 />
                 <span className="text-sm text-slate-700">{col.label}</span>
                 {col.required && <span className="text-xs text-slate-300 ml-auto">required</span>}

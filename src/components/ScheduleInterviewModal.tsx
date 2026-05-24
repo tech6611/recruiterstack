@@ -458,7 +458,7 @@ export default function ScheduleInterviewModal({
             </a>
             {location && !autoMeetLink && (
               <a href={location} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors">
+                className="flex items-center justify-center gap-2 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 hover:bg-emerald-100 transition-colors">
                 <ExternalLink className="h-4 w-4" /> Open meeting link
               </a>
             )}
@@ -518,7 +518,7 @@ export default function ScheduleInterviewModal({
               <span className="text-xs font-semibold text-slate-600">Interview Panel</span>
               <button
                 onClick={() => { setAddingMember(true); setNewMemberName(''); setNewMemberEmail('') }}
-                className="flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:text-emerald-800 transition-colors"
               >
                 <Plus className="h-3 w-3" /> Add interviewer
               </button>
@@ -542,9 +542,9 @@ export default function ScheduleInterviewModal({
                     disabled={!member.email}
                     className={`text-[10px] font-medium rounded-full px-2 py-0.5 border transition-colors ${
                       interviewer === member.name && interviewerEmail === member.email
-                        ? 'bg-blue-50 text-blue-600 border-blue-200'
+                        ? 'bg-blue-50 text-emerald-600 border-blue-200'
                         : member.email
-                        ? 'text-slate-400 border-slate-200 hover:border-blue-200 hover:text-blue-600 hover:bg-blue-50 bg-white'
+                        ? 'text-slate-400 border-slate-200 hover:border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50 bg-white'
                         : 'text-slate-300 border-slate-100 bg-white cursor-not-allowed'
                     }`}
                     title={member.email ? 'Set as primary interviewer (receives calendar invite)' : 'Add email to send invite'}
@@ -576,7 +576,7 @@ export default function ScheduleInterviewModal({
                   value={newMemberName}
                   onChange={e => setNewMemberName(e.target.value)}
                   placeholder="Name"
-                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 />
                 <input
                   type="email"
@@ -592,7 +592,7 @@ export default function ScheduleInterviewModal({
                     }
                     if (e.key === 'Escape') setAddingMember(false)
                   }}
-                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 />
                 <button
                   onClick={() => {
@@ -603,7 +603,7 @@ export default function ScheduleInterviewModal({
                     setAddingMember(false)
                   }}
                   disabled={!newMemberName.trim()}
-                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-40 transition-colors"
                 >
                   Add
                 </button>
@@ -624,7 +624,7 @@ export default function ScheduleInterviewModal({
               <select
                 value={hostEmail}
                 onChange={e => setHostEmail(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none"
               >
                 <option value="">Auto (first connected panelist)</option>
                 {panel.filter(m => m.email.trim()).map((m, i) => (
@@ -688,7 +688,7 @@ export default function ScheduleInterviewModal({
                 value={date}
                 min={toLocalDateStr(new Date())}
                 onChange={e => { setDate(e.target.value); setAvailWeekOffset(0) }}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               />
               {date && <p className="text-xs text-slate-400 mt-1">{fmtDate(date)}</p>}
             </div>
@@ -698,7 +698,7 @@ export default function ScheduleInterviewModal({
                 type="time"
                 value={time}
                 onChange={e => setTime(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               />
             </div>
           </div>
@@ -824,9 +824,9 @@ export default function ScheduleInterviewModal({
                                   style={{ height: 14 }}
                                   className={`w-full transition-colors ${blockRound} ${
                                     busy
-                                      ? (isSelected || isInBlock) ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed' : 'bg-red-100 cursor-not-allowed'
-                                      : isSelected ? 'bg-blue-600'
-                                      : isInBlock  ? 'bg-blue-200 hover:bg-blue-300 cursor-pointer'
+                                      ? (isSelected || isInBlock) ? 'bg-red-300 ring-1 ring-emerald-400 cursor-not-allowed' : 'bg-red-100 cursor-not-allowed'
+                                      : isSelected ? 'bg-emerald-600'
+                                      : isInBlock  ? 'bg-blue-200 hover:bg-emerald-300 cursor-pointer'
                                       : isWeekend  ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                       : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                                   }`}
@@ -842,7 +842,7 @@ export default function ScheduleInterviewModal({
                   <div className="flex items-center gap-3 px-3 py-1.5 border-t border-slate-100 bg-slate-50 flex-wrap">
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-100 border border-emerald-200" /> Free</span>
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-red-100" /> Busy</span>
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-blue-600" /> Start</span>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-600" /> Start</span>
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-blue-200" /> Duration block</span>
                   </div>
                 </div>
@@ -861,7 +861,7 @@ export default function ScheduleInterviewModal({
                   value={location}
                   onChange={e => setLocation(e.target.value)}
                   placeholder="Paste meeting link (Zoom, Meet, Teams…)"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 />
               ) : connectedPlatforms.length === 1 ? (
                 /* Exactly one connected — auto-selected, no selector needed */
@@ -883,7 +883,7 @@ export default function ScheduleInterviewModal({
                         className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-colors ${
                           activePlatform === p.id
                             ? 'border-blue-400 bg-blue-50 text-blue-700'
-                            : 'border-slate-200 text-slate-600 hover:border-blue-200 hover:bg-blue-50'
+                            : 'border-slate-200 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50'
                         }`}>
                         <span>{p.icon}</span> {p.label}
                         <span className="text-[9px] text-green-600 font-normal">Connected</span>
@@ -913,7 +913,7 @@ export default function ScheduleInterviewModal({
                 value={location}
                 onChange={e => setLocation(e.target.value)}
                 placeholder={interviewType === 'in_person' ? 'e.g. 4th floor, Room B' : 'e.g. +1 (555) 000-0000'}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               />
             </div>
           )}
@@ -938,12 +938,12 @@ export default function ScheduleInterviewModal({
                 />
                 <button
                   onClick={() => { navigator.clipboard.writeText(selfScheduleLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000) }}
-                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors"
                 >
                   {linkCopied ? '✓ Copied' : 'Copy'}
                 </button>
               </div>
-              <p className="text-[11px] text-blue-600 mt-1.5">Share this link with the candidate — they&apos;ll pick their own slot and get a calendar invite automatically.</p>
+              <p className="text-[11px] text-emerald-600 mt-1.5">Share this link with the candidate — they&apos;ll pick their own slot and get a calendar invite automatically.</p>
             </div>
           )}
 
@@ -963,12 +963,12 @@ export default function ScheduleInterviewModal({
           </button>
           {(googleConnected || msConnected || zoomConnected) && !selfScheduleLink && (
             <button onClick={handleSendLink} disabled={sendingLink || saving}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2.5 text-xs font-semibold transition-colors disabled:opacity-60 whitespace-nowrap">
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-emerald-100 text-blue-700 px-3 py-2.5 text-xs font-semibold transition-colors disabled:opacity-60 whitespace-nowrap">
               {sendingLink ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…</> : '🔗 Send scheduling link'}
             </button>
           )}
           <button onClick={handleSubmit} disabled={saving || sendingLink}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60">
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60">
             {saving ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</>
             ) : (
@@ -1079,9 +1079,9 @@ export default function ScheduleInterviewModal({
                               style={{ height: 20 }}
                               className={`w-full transition-colors ${blockRound} ${
                                 busy
-                                  ? (isSelected || isInBlock) ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed' : 'bg-red-100 cursor-not-allowed'
-                                  : isSelected ? 'bg-blue-600'
-                                  : isInBlock  ? 'bg-blue-200 hover:bg-blue-300 cursor-pointer'
+                                  ? (isSelected || isInBlock) ? 'bg-red-300 ring-1 ring-emerald-400 cursor-not-allowed' : 'bg-red-100 cursor-not-allowed'
+                                  : isSelected ? 'bg-emerald-600'
+                                  : isInBlock  ? 'bg-blue-200 hover:bg-emerald-300 cursor-pointer'
                                   : isWeekend  ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                   : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                               }`}
@@ -1100,7 +1100,7 @@ export default function ScheduleInterviewModal({
           <div className="flex items-center gap-4 px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 shrink-0">
             <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="inline-block h-3 w-5 rounded bg-emerald-100 border border-emerald-200" /> Free</span>
             <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="inline-block h-3 w-5 rounded bg-red-100" /> Busy</span>
-            <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="inline-block h-3 w-5 rounded bg-blue-600" /> Start</span>
+            <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="inline-block h-3 w-5 rounded bg-emerald-600" /> Start</span>
             <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="inline-block h-3 w-5 rounded bg-blue-200" /> Duration block</span>
             <span className="ml-auto text-xs text-slate-400">Esc to close</span>
           </div>

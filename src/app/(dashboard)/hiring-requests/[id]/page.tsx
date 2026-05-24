@@ -23,7 +23,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 }
 
 const JOB_BOARDS = [
-  { name: 'LinkedIn', icon: '💼', color: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' },
+  { name: 'LinkedIn', icon: '💼', color: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-emerald-100' },
   { name: 'Indeed', icon: '🔍', color: 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' },
   { name: 'Greenhouse', icon: '🌱', color: 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' },
   { name: 'Lever', icon: '⚙️', color: 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100' },

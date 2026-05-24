@@ -92,7 +92,7 @@ export default function SequenceAnalytics({ sequenceId }: Props) {
               {stages.map(s => (
                 <tr key={s.stage_id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-2.5">
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-emerald-600">
                       {s.order_index}
                     </span>
                     <span className="ml-2 text-xs text-slate-400">Day {s.delay_days}</span>
@@ -104,7 +104,7 @@ export default function SequenceAnalytics({ sequenceId }: Props) {
                     <span className="text-slate-400 ml-1 text-xs">{pct(s.opened, s.sent)}</span>
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    <span className="font-medium text-blue-600">{s.clicked}</span>
+                    <span className="font-medium text-emerald-600">{s.clicked}</span>
                     <span className="text-slate-400 ml-1 text-xs">{pct(s.clicked, s.sent)}</span>
                   </td>
                   <td className="px-4 py-2.5 text-right">

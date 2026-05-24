@@ -178,7 +178,7 @@ function CandidateCard({
       onClick={() => onClick(app)}
       style={accentColor ? { borderLeftColor: accentColor, borderLeftWidth: '3px' } : undefined}
       className={`cursor-pointer rounded-xl border bg-white px-3 py-2 shadow-sm hover:shadow-md transition-all select-none ${
-        isSelected ? 'border-blue-400 ring-2 ring-blue-200' : 'border-slate-200 hover:border-blue-200'
+        isSelected ? 'border-blue-400 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-emerald-200'
       }`}
     >
       <div className="flex items-center gap-1.5 min-w-0">
@@ -186,7 +186,7 @@ function CandidateCard({
         <div
           onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
           className={`h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
-            isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'
+            isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-emerald-400 bg-white'
           }`}
         >
           {isSelected && <Check className="h-2 w-2 text-white" />}
@@ -231,7 +231,7 @@ function CandidateCard({
           score:  'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
           reject: 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100',
           final:  'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-          move:   'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
+          move:   'border-blue-200 bg-blue-50 text-blue-700 hover:bg-emerald-100',
         }[suggestedAction.variant]
         return (
           <button
@@ -425,7 +425,7 @@ function StageColumn({
                   ? 'bg-blue-500 border-blue-500'
                   : someInStageSelected
                     ? 'bg-blue-100 border-blue-400'
-                    : 'border-slate-300 bg-white/70 hover:border-blue-400'
+                    : 'border-slate-300 bg-white/70 hover:border-emerald-400'
               }`}
             >
               {allInStageSelected  && <Check className="h-2.5 w-2.5 text-white" />}
@@ -793,7 +793,7 @@ function AddCandidateModal({
               onClick={() => setTab(t.key as 'new' | 'search')}
               className={`flex-1 py-3 text-sm font-medium transition-colors ${
                 tab === t.key
-                  ? 'text-blue-700 border-b-2 border-blue-600'
+                  ? 'text-blue-700 border-b-2 border-emerald-600'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -809,7 +809,7 @@ function AddCandidateModal({
             <select
               value={stageId}
               onChange={e => setStageId(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
@@ -869,13 +869,13 @@ function AddCandidateModal({
                       onChange={e => setLinkedInText(e.target.value)}
                       placeholder="Paste LinkedIn profile text, bio, or resume text here…"
                       rows={4}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                     />
                     <button
                       type="button"
                       onClick={handleLinkedInImport}
                       disabled={importLoading || !linkedInText.trim()}
-                      className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
                     >
                       {importLoading && showLinkedIn && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                       Extract Details
@@ -914,7 +914,7 @@ function AddCandidateModal({
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="Jane Smith"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div>
@@ -924,7 +924,7 @@ function AddCandidateModal({
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="jane@example.com"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div>
@@ -933,7 +933,7 @@ function AddCandidateModal({
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   placeholder="+1 (555) 000-0000"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
               <div>
@@ -941,7 +941,7 @@ function AddCandidateModal({
                 <select
                   value={source}
                   onChange={e => setSource(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <option value="manual">Manual Add</option>
                   <option value="sourced">Sourced</option>
@@ -959,7 +959,7 @@ function AddCandidateModal({
                 >
                   <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showImportedFields ? 'rotate-0' : '-rotate-90'}`} />
                   Additional Details
-                  {showImportedFields && <span className="ml-1 text-[10px] font-medium text-blue-600 bg-blue-50 rounded px-1.5 py-0.5">auto-filled</span>}
+                  {showImportedFields && <span className="ml-1 text-[10px] font-medium text-emerald-600 bg-blue-50 rounded px-1.5 py-0.5">auto-filled</span>}
                 </button>
 
                 {showImportedFields && (
@@ -971,7 +971,7 @@ function AddCandidateModal({
                           value={currentTitle}
                           onChange={e => setCurrentTitle(e.target.value)}
                           placeholder="e.g. Senior Engineer"
-                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                         />
                       </div>
                       <div>
@@ -980,7 +980,7 @@ function AddCandidateModal({
                           value={candidateLocation}
                           onChange={e => setCandidateLocation(e.target.value)}
                           placeholder="e.g. New York, US"
-                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                         />
                       </div>
                     </div>
@@ -994,7 +994,7 @@ function AddCandidateModal({
                           value={expYears}
                           onChange={e => setExpYears(e.target.value)}
                           placeholder="e.g. 5"
-                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                         />
                       </div>
                       <div>
@@ -1003,7 +1003,7 @@ function AddCandidateModal({
                           value={linkedinUrl}
                           onChange={e => setLinkedinUrl(e.target.value)}
                           placeholder="linkedin.com/in/…"
-                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                         />
                       </div>
                     </div>
@@ -1013,7 +1013,7 @@ function AddCandidateModal({
                         value={skillsRaw}
                         onChange={e => setSkillsRaw(e.target.value)}
                         placeholder="e.g. React, TypeScript, Node.js"
-                        className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                       />
                     </div>
                   </div>
@@ -1030,7 +1030,7 @@ function AddCandidateModal({
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   placeholder="Search by name, email, phone, title…"
-                  className="w-full rounded-xl border border-slate-200 pl-9 pr-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-slate-200 pl-9 pr-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
                 {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 animate-spin" />}
               </div>
@@ -1083,7 +1083,7 @@ function AddCandidateModal({
             <button
               onClick={addNew}
               disabled={saving}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60"
+              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               Add to Pipeline
@@ -1289,7 +1289,7 @@ function ScoringCriteriaModal({
                       📋 {candidateName ? `${candidateName}'s` : 'Latest'} scorecard
                     </p>
                   ) : hasScore ? (
-                    <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide">🤖 AI Analysis</p>
+                    <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wide">🤖 AI Analysis</p>
                   ) : (
                     <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">📐 Scoring breakdown</p>
                   )}
@@ -1348,7 +1348,7 @@ function ScoringCriteriaModal({
                       <button
                         onClick={() => onRescore(items)}
                         disabled={rescoring}
-                        className="shrink-0 text-[9px] font-semibold text-blue-500 hover:text-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                        className="shrink-0 text-[9px] font-semibold text-blue-500 hover:text-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                       >
                         <Loader2 className={`h-2.5 w-2.5 ${rescoring ? 'animate-spin' : ''}`} />
                         {rescoring ? 'Rescoring…' : 'Re-score'}
@@ -1365,7 +1365,7 @@ function ScoringCriteriaModal({
                     <button
                       onClick={() => onRescore(items)}
                       disabled={rescoring}
-                      className="shrink-0 text-[9px] font-semibold text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors rounded-md px-2 py-1 flex items-center gap-1"
+                      className="shrink-0 text-[9px] font-semibold text-white bg-blue-500 hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors rounded-md px-2 py-1 flex items-center gap-1"
                     >
                       <Loader2 className={`h-2.5 w-2.5 ${rescoring ? 'animate-spin' : ''}`} />
                       {rescoring ? 'Rescoring…' : 'Re-score now'}
@@ -1603,7 +1603,7 @@ function CandidateSlideOver({
               onClick={() => setTab(t.key as 'details' | 'scorecards')}
               className={`flex items-center gap-1.5 flex-1 py-3 text-sm font-medium transition-colors ${
                 tab === t.key
-                  ? 'text-blue-700 border-b-2 border-blue-600'
+                  ? 'text-blue-700 border-b-2 border-emerald-600'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -1623,7 +1623,7 @@ function CandidateSlideOver({
             <div className="px-6 py-5 space-y-5">
               {/* Contact */}
               <div className="space-y-1.5 text-sm">
-                <a href={`mailto:${c.email}`} className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors">
+                <a href={`mailto:${c.email}`} className="flex items-center gap-2 text-emerald-600 hover:text-emerald-800 transition-colors">
                   {c.email}
                 </a>
                 {c.phone && <p className="text-slate-600">{c.phone}</p>}
@@ -1637,7 +1637,7 @@ function CandidateSlideOver({
                   <select
                     value={app.stage_id ?? ''}
                     onChange={e => onStageChange(app.id, e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white pr-8"
+                    className="w-full appearance-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white pr-8"
                   >
                     {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
@@ -1669,7 +1669,7 @@ function CandidateSlideOver({
                   onChange={e => setNote(e.target.value)}
                   rows={3}
                   placeholder="Leave a note about this candidate…"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 />
                 <button
                   onClick={addNote}
@@ -1709,7 +1709,7 @@ function CandidateSlideOver({
                 <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2.5">
                   {/* Rescoring banner */}
                   {rescoring && (
-                    <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-100 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 text-xs text-emerald-600 bg-blue-100 rounded-lg px-3 py-2">
                       <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
                       <span>Rescoring with new criteria…</span>
                     </div>
@@ -1766,7 +1766,7 @@ function CandidateSlideOver({
                       <p className="text-[9px] font-semibold text-blue-400 uppercase tracking-wide mb-1.5">📊 Scored on</p>
                       <div className="flex flex-wrap gap-1">
                         {localCriteria.map(c => (
-                          <span key={c.id} className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium">
+                          <span key={c.id} className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-emerald-600 font-medium">
                             {c.name} {c.weight}%
                           </span>
                         ))}
@@ -2145,7 +2145,7 @@ function RankedView({
       <th
         onClick={() => handleSort(col)}
         className={`text-left text-xs font-semibold px-4 py-3 cursor-pointer select-none group transition-colors ${
-          active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
+          active ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
         } ${className}`}
       >
         <div className="flex items-center gap-1">
@@ -2180,7 +2180,7 @@ function RankedView({
                   className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
                     allSelected  ? 'bg-blue-500 border-blue-500' :
                     someSelected ? 'bg-blue-100 border-blue-400' :
-                    'border-slate-300 hover:border-blue-400 bg-white'
+                    'border-slate-300 hover:border-emerald-400 bg-white'
                   }`}
                 >
                   {allSelected  && <Check className="h-2.5 w-2.5 text-white" />}
@@ -2225,7 +2225,7 @@ function RankedView({
                     <div
                       onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
                       className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-blue-400 bg-white'
+                        isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-emerald-400 bg-white'
                       }`}
                     >
                       {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
@@ -2302,7 +2302,7 @@ function RankedView({
                         onClick={() => onMoveToStage(app.id, nextStage.id)}
                         className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
                           app.ai_recommendation === 'strong_yes' || app.ai_recommendation === 'yes'
-                            ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                            ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-emerald-100'
                             : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
                       >
@@ -2487,7 +2487,7 @@ function AutopilotDrawer({
             <span className="text-base leading-none mt-0.5">⚡</span>
             <div>
               <p className="text-xs font-semibold text-blue-800">Runs automatically on every new application</p>
-              <p className="text-xs text-blue-600 mt-0.5">
+              <p className="text-xs text-emerald-600 mt-0.5">
                 Sifter scores candidates the moment they apply — no manual trigger needed.
               </p>
             </div>
@@ -2544,7 +2544,7 @@ function AutopilotDrawer({
                 <button
                   type="button"
                   onClick={() => setAutoEmail(v => !v)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${autoEmail ? 'bg-blue-600' : 'bg-slate-200'}`}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${autoEmail ? 'bg-emerald-600' : 'bg-slate-200'}`}
                 >
                   <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${autoEmail ? 'translate-x-4' : 'translate-x-0.5'}`} />
                 </button>
@@ -2557,7 +2557,7 @@ function AutopilotDrawer({
                       value={recruiterName}
                       onChange={e => setRecruiterName(e.target.value)}
                       placeholder="e.g. Priya Sharma"
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                   <div>
@@ -2566,7 +2566,7 @@ function AutopilotDrawer({
                       value={companyName}
                       onChange={e => setCompanyName(e.target.value)}
                       placeholder="e.g. TalentOS"
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                   <p className="text-xs text-slate-400 italic">
@@ -2878,8 +2878,8 @@ function ScheduleInterviewModal({
   }, [gridExpanded, availLoading, availNoData])
 
   const MEETING_INTEGRATIONS = [
-    { id: 'gmeet',  label: 'Google Meet', color: 'hover:bg-blue-50 hover:border-blue-300',     url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
-    { id: 'zoom',   label: 'Zoom',        color: 'hover:bg-blue-50 hover:border-blue-300',     url: 'https://zoom.us/start/videomeeting',        placeholder: 'https://zoom.us/j/...' },
+    { id: 'gmeet',  label: 'Google Meet', color: 'hover:bg-emerald-50 hover:border-emerald-300',     url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
+    { id: 'zoom',   label: 'Zoom',        color: 'hover:bg-emerald-50 hover:border-emerald-300',     url: 'https://zoom.us/start/videomeeting',        placeholder: 'https://zoom.us/j/...' },
     { id: 'teams',  label: 'MS Teams',    color: 'hover:bg-violet-50 hover:border-violet-300', url: 'https://teams.microsoft.com/l/meeting/new', placeholder: 'https://teams.microsoft.com/l/...' },
   ] as const
 
@@ -3030,7 +3030,7 @@ function ScheduleInterviewModal({
                 href={location}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                className="flex items-center justify-center gap-2 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 hover:bg-emerald-100 transition-colors"
               >
                 <ExternalLink className="h-4 w-4" /> Open meeting link
               </a>
@@ -3089,7 +3089,7 @@ function ScheduleInterviewModal({
               <span className="text-xs font-semibold text-slate-600">Interview Panel</span>
               <button
                 onClick={() => { setAddingMember(true); setNewMemberName(''); setNewMemberEmail('') }}
-                className="flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 hover:text-emerald-800 transition-colors"
               >
                 <Plus className="h-3 w-3" /> Add interviewer
               </button>
@@ -3117,9 +3117,9 @@ function ScheduleInterviewModal({
                     disabled={!member.email}
                     className={`text-[10px] font-medium rounded-full px-2 py-0.5 border transition-colors ${
                       interviewer === member.name && interviewerEmail === member.email
-                        ? 'bg-blue-50 text-blue-600 border-blue-200'
+                        ? 'bg-blue-50 text-emerald-600 border-blue-200'
                         : member.email
-                        ? 'text-slate-400 border-slate-200 hover:border-blue-200 hover:text-blue-600 hover:bg-blue-50 bg-white'
+                        ? 'text-slate-400 border-slate-200 hover:border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50 bg-white'
                         : 'text-slate-300 border-slate-100 bg-white cursor-not-allowed'
                     }`}
                     title={member.email ? 'Set as primary interviewer (receives calendar invite)' : 'Add email to send invite'}
@@ -3154,7 +3154,7 @@ function ScheduleInterviewModal({
                   value={newMemberName}
                   onChange={e => setNewMemberName(e.target.value)}
                   placeholder="Name"
-                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 />
                 <input
                   type="email"
@@ -3171,7 +3171,7 @@ function ScheduleInterviewModal({
                     }
                     if (e.key === 'Escape') setAddingMember(false)
                   }}
-                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 />
                 <button
                   onClick={() => {
@@ -3183,7 +3183,7 @@ function ScheduleInterviewModal({
                     setAddingMember(false)
                   }}
                   disabled={!newMemberName.trim()}
-                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-40 transition-colors"
                 >
                   Add
                 </button>
@@ -3246,7 +3246,7 @@ function ScheduleInterviewModal({
                 value={date}
                 min={toLocalDateStr(new Date())}
                 onChange={e => { setDate(e.target.value); setAvailWeekOffset(0) }}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               />
               {date && <p className="text-xs text-slate-400 mt-1">{fmtDate(date)}</p>}
             </div>
@@ -3256,7 +3256,7 @@ function ScheduleInterviewModal({
                 type="time"
                 value={time}
                 onChange={e => setTime(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               />
             </div>
           </div>
@@ -3387,12 +3387,12 @@ function ScheduleInterviewModal({
                                   className={`w-full transition-colors ${blockRound} ${
                                     busy
                                       ? (isSelected || isInBlock)
-                                        ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed'
+                                        ? 'bg-red-300 ring-1 ring-emerald-400 cursor-not-allowed'
                                         : 'bg-red-100 cursor-not-allowed'
                                       : isSelected
-                                      ? 'bg-blue-600'
+                                      ? 'bg-emerald-600'
                                       : isInBlock
-                                      ? 'bg-blue-200 hover:bg-blue-300 cursor-pointer'
+                                      ? 'bg-blue-200 hover:bg-emerald-300 cursor-pointer'
                                       : isWeekend
                                       ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                       : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
@@ -3409,7 +3409,7 @@ function ScheduleInterviewModal({
                   <div className="flex items-center gap-3 px-3 py-1.5 border-t border-slate-100 bg-slate-50 flex-wrap">
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-100 border border-emerald-200" /> Free</span>
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-red-100" /> Busy</span>
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-blue-600" /> Start</span>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-600" /> Start</span>
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-blue-200" /> Duration block</span>
                   </div>
                 </div>
@@ -3467,7 +3467,7 @@ function ScheduleInterviewModal({
                           ? MEETING_INTEGRATIONS.find(p => p.id === activePlatform)?.placeholder ?? 'Paste meeting link...'
                           : 'Paste meeting link (Zoom, Meet, Teams…)'
                       }
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                     />
                   )}
                 </>
@@ -3485,7 +3485,7 @@ function ScheduleInterviewModal({
                 value={location}
                 onChange={e => setLocation(e.target.value)}
                 placeholder={interviewType === 'in_person' ? 'e.g. 4th floor, Room B' : 'e.g. +1 (555) 000-0000'}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               />
             </div>
           )}
@@ -3521,7 +3521,7 @@ function ScheduleInterviewModal({
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
           >
             {saving ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</>
@@ -3663,12 +3663,12 @@ function ScheduleInterviewModal({
                               className={`w-full transition-colors ${blockRound} ${
                                 busy
                                   ? (isSelected || isInBlock)
-                                    ? 'bg-red-300 ring-1 ring-blue-400 cursor-not-allowed'
+                                    ? 'bg-red-300 ring-1 ring-emerald-400 cursor-not-allowed'
                                     : 'bg-red-100 cursor-not-allowed'
                                   : isSelected
-                                  ? 'bg-blue-600'
+                                  ? 'bg-emerald-600'
                                   : isInBlock
-                                  ? 'bg-blue-200 hover:bg-blue-300 cursor-pointer'
+                                  ? 'bg-blue-200 hover:bg-emerald-300 cursor-pointer'
                                   : isWeekend
                                   ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                   : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
@@ -3694,7 +3694,7 @@ function ScheduleInterviewModal({
               <span className="inline-block h-3 w-5 rounded bg-red-100" /> Busy
             </span>
             <span className="flex items-center gap-1.5 text-xs text-slate-400">
-              <span className="inline-block h-3 w-5 rounded bg-blue-600" /> Start
+              <span className="inline-block h-3 w-5 rounded bg-emerald-600" /> Start
             </span>
             <span className="flex items-center gap-1.5 text-xs text-slate-400">
               <span className="inline-block h-3 w-5 rounded bg-blue-200" /> Duration block
@@ -4390,7 +4390,7 @@ export default function JobPipelinePage() {
 
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
           >
             <UserPlus className="h-4 w-4" />
             Add Candidate
@@ -4465,7 +4465,7 @@ export default function JobPipelinePage() {
             value={filterSearch}
             onChange={e => setFilterSearch(e.target.value)}
             placeholder="Search candidates…"
-            className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg w-52 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+            className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg w-52 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
           />
         </div>
 
@@ -4496,7 +4496,7 @@ export default function JobPipelinePage() {
                 <select
                   value={filterSource}
                   onChange={e => setFilterSource(e.target.value)}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
                 >
                   <option value="all">All sources</option>
                   <option value="applied">Applied</option>
@@ -4513,7 +4513,7 @@ export default function JobPipelinePage() {
                 <select
                   value={filterStage}
                   onChange={e => setFilterStage(e.target.value)}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
                 >
                   <option value="all">All stages</option>
                   {job.pipeline_stages.map(s => (
@@ -4528,7 +4528,7 @@ export default function JobPipelinePage() {
                 <select
                   value={filterScore}
                   onChange={e => setFilterScore(e.target.value)}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
                 >
                   <option value="all">All scores</option>
                   <option value="scored">Scored</option>
@@ -4542,7 +4542,7 @@ export default function JobPipelinePage() {
                 <select
                   value={filterSignal}
                   onChange={e => setFilterSignal(e.target.value)}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
                 >
                   <option value="all">All signals</option>
                   <option value="strong_yes">Strong Yes</option>
@@ -4558,7 +4558,7 @@ export default function JobPipelinePage() {
                 <select
                   value={filterAction}
                   onChange={e => setFilterAction(e.target.value)}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
                 >
                   <option value="all">All actions</option>
                   <option value="score_needed">Score needed</option>
@@ -4588,7 +4588,7 @@ export default function JobPipelinePage() {
         {selectedApps.size > 0 && (
           <button
             onClick={() => setSelectedApps(new Set())}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors font-medium"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-emerald-100 transition-colors font-medium"
           >
             {selectedApps.size} selected
             <X className="h-3 w-3" />

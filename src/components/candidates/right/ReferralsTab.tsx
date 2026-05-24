@@ -43,13 +43,13 @@ export default function ReferralsTab({ candidateId, referrals, onReferralAdded }
       </div>
 
       {showForm && (
-        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-2">
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Referrer name *" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400" />
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email (optional)" type="email" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400" />
-          <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Note (optional)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm resize-none outline-none focus:border-blue-400" />
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 space-y-2">
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Referrer name *" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email (optional)" type="email" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+          <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Note (optional)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm resize-none outline-none focus:border-emerald-400" />
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700">Cancel</button>
-            <button onClick={submit} disabled={saving || !name.trim()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+            <button onClick={submit} disabled={saving || !name.trim()} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
               {saving ? 'Saving…' : 'Add Referral'}
             </button>
           </div>

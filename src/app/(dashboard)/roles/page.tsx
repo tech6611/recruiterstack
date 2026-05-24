@@ -58,7 +58,7 @@ export default function RolesPage() {
         </div>
         <button
           onClick={() => setSlideOpen(true)}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
+          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
         >
           <Plus className="h-4 w-4" />
           Add Role
@@ -73,7 +73,7 @@ export default function RolesPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search roles by title, department, or location…"
-          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition-all"
+          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 transition-all"
         />
         {search && (
           <button
@@ -102,12 +102,12 @@ export default function RolesPage() {
               <button
                 key={role.id}
                 onClick={() => router.push(`/roles/${role.id}`)}
-                className="w-full text-left rounded-2xl border border-slate-200 bg-white shadow-sm p-5 hover:border-blue-300 hover:shadow-md transition-all group"
+                className="w-full text-left rounded-2xl border border-slate-200 bg-white shadow-sm p-5 hover:border-emerald-300 hover:shadow-md transition-all group"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-2 min-w-0">
                     <div className="flex items-center gap-2.5">
-                      <h3 className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors truncate">
+                      <h3 className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
                         {role.job_title}
                       </h3>
                       <StatusBadge status={role.status} variant="role" />
@@ -151,7 +151,7 @@ export default function RolesPage() {
                     )}
                   </div>
 
-                  <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-blue-400 shrink-0 mt-0.5 transition-colors" />
+                  <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-emerald-400 shrink-0 mt-0.5 transition-colors" />
                 </div>
               </button>
             )

@@ -235,7 +235,7 @@ export function RoleForm({ role, onSuccess }: RoleFormProps) {
         <button
           type="submit"
           disabled={loading}
-          className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
+          className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
         >
           {loading ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Role'}
         </button>

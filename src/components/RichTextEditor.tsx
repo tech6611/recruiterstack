@@ -101,7 +101,7 @@ export function RichTextEditor({
       Underline,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Placeholder.configure({ placeholder }),
-      Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-blue-600 underline cursor-pointer' } }),
+      Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-emerald-600 underline cursor-pointer' } }),
       Image.configure({ HTMLAttributes: { class: 'max-w-full rounded-lg my-2' } }),
     ],
     content: value || '',
@@ -123,7 +123,7 @@ export function RichTextEditor({
   const sz = 14 // icon size
 
   return (
-    <div className="rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-blue-400 overflow-hidden bg-white">
+    <div className="rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-emerald-400 overflow-hidden bg-white">
 
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-slate-100 bg-slate-50 flex-wrap">

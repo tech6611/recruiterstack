@@ -247,7 +247,7 @@ function ViewsSidebar({
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Views</span>
         <button
           onClick={onToggleEdit}
-          className={`text-xs font-medium transition-colors ${editMode ? 'text-blue-600' : 'text-slate-400 hover:text-slate-700'}`}
+          className={`text-xs font-medium transition-colors ${editMode ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-700'}`}
         >
           {editMode ? 'Done' : 'Edit'}
         </button>
@@ -503,14 +503,14 @@ function WidgetHeader({
             </button>
           )}
           {href && (
-            <Link href={href} className="text-xs font-medium text-slate-400 hover:text-blue-600 transition-colors">
+            <Link href={href} className="text-xs font-medium text-slate-400 hover:text-emerald-600 transition-colors">
               View all →
             </Link>
           )}
         </div>
       </div>
       {showSearch && onQueryChange && (
-        <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 focus-within:border-blue-300 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 focus-within:border-blue-300 focus-within:ring-1 focus-within:ring-emerald-100 transition-all">
           <Search className="h-3 w-3 shrink-0 text-slate-400" />
           <input
             autoFocus
@@ -590,7 +590,7 @@ function InterviewsWidget({ interviews, onCandidateClick }: { interviews: Upcomi
             </button>
           ))}
           {remaining > 0 && (
-            <Link href="/candidates" className="mt-2 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/candidates" className="mt-2 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               +{remaining} more interview{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -701,7 +701,7 @@ function TasksWidget({ tasks, onCandidateClick, onRefresh }: { tasks: DashboardD
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`flex shrink-0 items-center gap-1 border-b-2 px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
-              activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-700'
+              activeTab === tab.key ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-700'
             }`}
           >
             {tab.label}
@@ -777,7 +777,7 @@ function TasksWidget({ tasks, onCandidateClick, onRefresh }: { tasks: DashboardD
             )
           })}
           {remaining > 0 && (
-            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               +{remaining} more task{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -905,7 +905,7 @@ function JobsMiniWidget({ jobs }: { jobs: TopJob[] }) {
             </Link>
           ))}
           {remaining > 0 && (
-            <Link href="/jobs" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/jobs" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               +{remaining} more job{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -965,7 +965,7 @@ function JobsByDeptWidget({ departments }: { departments: JobByDept[] }) {
             </div>
           ))}
           {remaining > 0 && (
-            <Link href="/jobs" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/jobs" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               +{remaining} more department{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -1004,7 +1004,7 @@ function HmActionsWidget({ approvals }: { approvals: TaskApproval[] }) {
             </Link>
           ))}
           {remaining > 0 && (
-            <Link href="/jobs" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/jobs" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               +{remaining} more action{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -1043,7 +1043,7 @@ function RecentApplicationsWidget({ applications, onCandidateClick }: { applicat
             <button key={a.id} onClick={() => onCandidateClick(a.candidate_id)}
               className="flex w-full items-center gap-3 rounded-lg border-b border-slate-50 px-1 py-2 hover:bg-slate-50 transition-colors text-left"
             >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-emerald-600">
                 {a.candidate_name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -1066,7 +1066,7 @@ function RecentApplicationsWidget({ applications, onCandidateClick }: { applicat
             </button>
           ))}
           {remaining > 0 && (
-            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               +{remaining} more application{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -1130,7 +1130,7 @@ function TopScoredWidget({ candidates, onCandidateClick }: { candidates: TopScor
             )
           })}
           {remaining > 0 && (
-            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               +{remaining} more candidate{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -1211,7 +1211,7 @@ function OfferTrackerWidget({ offers, onCandidateClick }: { offers: OfferTracker
             </button>
           ))}
           {remaining > 0 && (
-            <Link href="/candidates" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/candidates" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               +{remaining} more offer{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -1231,7 +1231,7 @@ const EVENT_TYPE_ICONS: Record<string, string> = {
   applied: '→', stage_moved: '↑', note_added: '✎', status_changed: '⟳', email_sent: '✉',
 }
 const EVENT_TYPE_COLORS: Record<string, string> = {
-  applied: 'bg-blue-100 text-blue-600', stage_moved: 'bg-emerald-100 text-emerald-600',
+  applied: 'bg-blue-100 text-emerald-600', stage_moved: 'bg-emerald-100 text-emerald-600',
   note_added: 'bg-slate-100 text-slate-500', status_changed: 'bg-amber-100 text-amber-600',
   email_sent: 'bg-violet-100 text-violet-600',
 }
@@ -1282,7 +1282,7 @@ function RecentActivityWidget({ activity, onCandidateClick }: { activity: Recent
                   <span className="text-xs font-medium text-slate-800">{e.candidate_name}</span>
                   <span className="text-[10px] text-slate-400">{EVENT_TYPE_LABELS[e.event_type] ?? e.event_type}</span>
                   {e.to_stage && (
-                    <span className="text-[10px] font-medium text-blue-600">→ {e.to_stage}</span>
+                    <span className="text-[10px] font-medium text-emerald-600">→ {e.to_stage}</span>
                   )}
                 </div>
                 <p className="text-[10px] text-slate-400 truncate">{e.job_title}</p>
@@ -1291,7 +1291,7 @@ function RecentActivityWidget({ activity, onCandidateClick }: { activity: Recent
             </div>
           ))}
           {remaining > 0 && (
-            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/candidates" className="mt-1 flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               +{remaining} more event{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -1376,7 +1376,7 @@ function ActionQueueWidget({
       title: t.candidate_name, sub: `Feedback needed · ${t.job_title}`,
       openSince: t.moved_at,
       candidateId: t.candidate_id,
-      actionLabel: 'Review', actionColor: 'bg-blue-500 hover:bg-blue-600',
+      actionLabel: 'Review', actionColor: 'bg-blue-500 hover:bg-emerald-600',
       iconColor: 'bg-amber-100 text-amber-600',
       icon: <MessageSquare className="h-3 w-3" />,
     })
@@ -1515,7 +1515,7 @@ function StageFunnelWidget({ funnel }: { funnel: StageFunnelItem[] }) {
             )
           })}
           {remaining > 0 && (
-            <Link href="/pipeline" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+            <Link href="/pipeline" className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-slate-200 py-2 text-xs text-slate-400 hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               +{remaining} more stage{remaining !== 1 ? 's' : ''} →
             </Link>
           )}
@@ -1593,7 +1593,7 @@ function RightPanelCustomizer({
           )}
           <button
             onClick={handleDoneClick}
-            className="rounded-lg bg-blue-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-blue-700 transition-colors"
+            className="rounded-lg bg-emerald-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-emerald-700 transition-colors"
           >
             Done
           </button>
@@ -1614,7 +1614,7 @@ function RightPanelCustomizer({
               className="flex-1 rounded-lg border border-red-200 bg-white py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors"
             >Discard</button>
             <button onClick={onClose}
-              className="flex-1 rounded-lg bg-blue-600 py-1 text-[11px] font-medium text-white hover:bg-blue-700 transition-colors"
+              className="flex-1 rounded-lg bg-emerald-600 py-1 text-[11px] font-medium text-white hover:bg-emerald-700 transition-colors"
             >Save</button>
           </div>
         </div>
@@ -1639,7 +1639,7 @@ function RightPanelCustomizer({
               onDragEnd={handleDragEnd}
               className={`flex items-center gap-2 rounded-lg border bg-white px-2.5 py-2 cursor-grab active:cursor-grabbing transition-all ${
                 isDragging ? 'opacity-40 scale-95 border-blue-300' :
-                isDragOver ? 'border-blue-400 shadow-sm ring-1 ring-blue-300 -translate-y-0.5' :
+                isDragOver ? 'border-blue-400 shadow-sm ring-1 ring-emerald-300 -translate-y-0.5' :
                 'border-slate-200 hover:border-slate-300'
               }`}
             >
@@ -1681,7 +1681,7 @@ function RightPanelCustomizer({
                       <button
                         key={def.id}
                         onClick={() => onAdd(def.id)}
-                        className="flex w-full items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-2 text-left hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                        className="flex w-full items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-2 text-left hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
                       >
                         <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100">
                           <Icon className="h-3 w-3 text-slate-500" />
@@ -1735,7 +1735,7 @@ function ActivityPanel({
           title="Customise panel"
           className={`flex items-center justify-center rounded-lg border p-1.5 transition-colors ${
             rightPanelMode
-              ? 'border-blue-300 bg-blue-50 text-blue-600 cursor-default'
+              ? 'border-blue-300 bg-blue-50 text-emerald-600 cursor-default'
               : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700'
           }`}
         >
@@ -1874,7 +1874,7 @@ function WidgetCustomizer({
           )}
           <button
             onClick={handleDoneClick}
-            className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition-colors"
           >
             Done
           </button>
@@ -1906,7 +1906,7 @@ function WidgetCustomizer({
               </button>
               <button
                 onClick={onClose}
-                className="rounded-lg border border-blue-200 bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+                className="rounded-lg border border-blue-200 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition-colors"
               >
                 Save
               </button>
@@ -1935,7 +1935,7 @@ function WidgetCustomizer({
               onDragEnd={handleDragEnd}
               className={`flex items-center gap-3 rounded-lg border bg-white px-3 py-2.5 cursor-grab active:cursor-grabbing transition-all ${
                 isDragging  ? 'opacity-40 scale-95 border-blue-300' :
-                isDragOver  ? 'border-blue-400 shadow-md ring-1 ring-blue-300 -translate-y-0.5' :
+                isDragOver  ? 'border-blue-400 shadow-md ring-1 ring-emerald-300 -translate-y-0.5' :
                 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
               }`}
             >
@@ -1980,7 +1980,7 @@ function WidgetCustomizer({
                       <button
                         key={def.id}
                         onClick={() => onAdd(def.id)}
-                        className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2.5 text-left hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                        className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2.5 text-left hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
                       >
                         <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100">
                           <Icon className="h-3.5 w-3.5 text-slate-500" />
@@ -2275,7 +2275,7 @@ export default function DashboardPage() {
               title="Customise view"
               className={`flex items-center justify-center rounded-lg border p-1.5 transition-colors ${
                 widgetMode
-                  ? 'border-blue-300 bg-blue-50 text-blue-600 cursor-default'
+                  ? 'border-blue-300 bg-blue-50 text-emerald-600 cursor-default'
                   : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700'
               }`}
             >

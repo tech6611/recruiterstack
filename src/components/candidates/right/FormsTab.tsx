@@ -37,7 +37,7 @@ export default function FormsTab({ applications }: FormsTabProps) {
                 href={`/jobs/${job.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800"
               >
                 View Job <ExternalLink className="h-3 w-3" />
               </a>

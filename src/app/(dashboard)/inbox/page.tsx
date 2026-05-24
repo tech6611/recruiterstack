@@ -204,14 +204,14 @@ export default function InboxPage() {
                       <span className="flex items-center gap-1 text-xs text-slate-500">
                         <User className="h-3 w-3" />
                         {event.application?.id
-                          ? <Link href={`/applications/${event.application.id}`} className="hover:text-blue-600 hover:underline">{candidate.full_name}</Link>
+                          ? <Link href={`/applications/${event.application.id}`} className="hover:text-emerald-600 hover:underline">{candidate.full_name}</Link>
                           : candidate.full_name}
                       </span>
                     )}
                     {job && (
                       <span className="flex items-center gap-1 text-xs text-slate-400">
                         <Briefcase className="h-3 w-3" />
-                        <Link href={`/jobs/${job.id}`} className="hover:text-blue-600 hover:underline">{job.position_title}</Link>
+                        <Link href={`/jobs/${job.id}`} className="hover:text-emerald-600 hover:underline">{job.position_title}</Link>
                         {job.department && <span>· {job.department}</span>}
                       </span>
                     )}
@@ -260,7 +260,7 @@ export default function InboxPage() {
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/applications/${app.id}`}
-                          className="text-sm font-semibold text-slate-900 hover:text-blue-600 hover:underline truncate"
+                          className="text-sm font-semibold text-slate-900 hover:text-emerald-600 hover:underline truncate"
                         >
                           {app.candidate?.full_name ?? 'Unknown'}
                         </Link>
@@ -277,7 +277,7 @@ export default function InboxPage() {
                         {app.job && (
                           <span className="flex items-center gap-1 text-xs text-slate-400">
                             <Briefcase className="h-3 w-3" />
-                            <Link href={`/jobs/${app.job.id}`} className="hover:text-blue-600 hover:underline">
+                            <Link href={`/jobs/${app.job.id}`} className="hover:text-emerald-600 hover:underline">
                               {app.job.position_title}
                             </Link>
                           </span>

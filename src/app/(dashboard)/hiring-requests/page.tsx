@@ -91,7 +91,7 @@ export default function HiringRequestsPage() {
         </div>
         <Link
           href="/hiring-requests/new"
-          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm"
+          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
         >
           <Plus className="h-4 w-4" />
           New Request
@@ -123,7 +123,7 @@ export default function HiringRequestsPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search position, manager, ticket…"
-            className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+            className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
@@ -134,7 +134,7 @@ export default function HiringRequestsPage() {
         <select
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value as HiringRequestStatus | 'all')}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
         >
           <option value="all">All statuses</option>
           {(Object.keys(STATUS_CONFIG) as HiringRequestStatus[]).map(s => (
@@ -163,7 +163,7 @@ export default function HiringRequestsPage() {
           <p className="text-xs text-slate-400 mt-1 mb-4">Create your first request to get started</p>
           <Link
             href="/hiring-requests/new"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             New Request

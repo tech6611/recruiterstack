@@ -61,7 +61,7 @@ export default function AddToJobModal() {
                       <span className="font-mono text-xs text-slate-400">{job.ticket_number}</span>
                     )}
                     {addingToJob === job.id
-                      ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                      ? <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
                       : <Plus className="h-4 w-4 text-slate-300" />
                     }
                   </div>

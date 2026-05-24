@@ -776,7 +776,7 @@ export default function EmailDraftDrawer({
                                   <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
                                       onClick={e => { e.stopPropagation(); setRenamingId(t.id); setRenamingName(t.name) }}
-                                      className="p-1 rounded text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                                      className="p-1 rounded text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 transition-colors"
                                       title="Rename"
                                       aria-label="Rename template"
                                     >
@@ -934,7 +934,7 @@ export default function EmailDraftDrawer({
               <button
                 onClick={send}
                 disabled={sending || toEmails.length === 0 || !subject.trim() || isHtmlEmpty(body)}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
               >
                 {sending
                   ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>

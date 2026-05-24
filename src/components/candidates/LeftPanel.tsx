@@ -114,7 +114,7 @@ export default React.memo(function LeftPanel({
             <Mail className="h-4 w-4 shrink-0 text-slate-400" />
             <button
               onClick={onDraftEmail}
-              className="flex-1 min-w-0 text-left text-blue-600 hover:text-blue-800 transition-colors truncate text-sm"
+              className="flex-1 min-w-0 text-left text-emerald-600 hover:text-emerald-800 transition-colors truncate text-sm"
               title="Draft AI email to candidate"
             >
               {candidate.email}
@@ -150,7 +150,7 @@ export default React.memo(function LeftPanel({
               href={candidate.resume_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2.5 text-slate-600 hover:text-blue-700 transition-colors"
+              className="flex items-center gap-2.5 text-slate-600 hover:text-emerald-700 transition-colors"
             >
               <FileText className="h-4 w-4 shrink-0 text-slate-400" />
               <span className="flex items-center gap-1">Resume <ExternalLink className="h-3 w-3" /></span>
@@ -171,9 +171,9 @@ export default React.memo(function LeftPanel({
                     if (e.key === 'Escape') setEditLinkedin(false)
                   }}
                   placeholder="linkedin.com/in/…"
-                  className="flex-1 min-w-0 rounded-lg border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs focus:outline-none focus:border-blue-400"
+                  className="flex-1 min-w-0 rounded-lg border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs focus:outline-none focus:border-emerald-400"
                 />
-                <button onClick={saveLinkedin} aria-label="Save" className="text-blue-600 hover:text-blue-800 shrink-0">
+                <button onClick={saveLinkedin} aria-label="Save" className="text-emerald-600 hover:text-emerald-800 shrink-0">
                   <Check className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={() => setEditLinkedin(false)} aria-label="Cancel" className="text-slate-400 hover:text-slate-600 shrink-0">
@@ -186,7 +186,7 @@ export default React.memo(function LeftPanel({
                   href={candidate.linkedin_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:text-blue-800 truncate flex-1"
+                  className="text-sm text-emerald-600 hover:text-emerald-800 truncate flex-1"
                 >
                   LinkedIn ↗
                 </a>
@@ -201,7 +201,7 @@ export default React.memo(function LeftPanel({
             ) : (
               <button
                 onClick={() => { setLinkedinInput(''); setEditLinkedin(true) }}
-                className="text-xs text-slate-400 hover:text-blue-600 transition-colors"
+                className="text-xs text-slate-400 hover:text-emerald-600 transition-colors"
               >
                 Add LinkedIn…
               </button>
@@ -249,7 +249,7 @@ export default React.memo(function LeftPanel({
                   }
                 }}
                 placeholder="Add skill…"
-                className="rounded-lg border border-dashed border-slate-300 px-2.5 py-1 text-xs w-24 focus:outline-none focus:border-blue-400"
+                className="rounded-lg border border-dashed border-slate-300 px-2.5 py-1 text-xs w-24 focus:outline-none focus:border-emerald-400"
               />
             )}
             {candidate.skills.length === 0 && !editSkills && (
@@ -278,7 +278,7 @@ export default React.memo(function LeftPanel({
                       </div>
                       <a
                         href={`/jobs/${app.hiring_request_id}`}
-                        className="text-[10px] text-blue-600 hover:text-blue-800 shrink-0"
+                        className="text-[10px] text-emerald-600 hover:text-emerald-800 shrink-0"
                       >
                         View →
                       </a>

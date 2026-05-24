@@ -11,7 +11,7 @@ const EVENT_CONFIG: Record<string, { label: (e: ApplicationEvent) => string; ico
   applied: {
     label: e => `Applied · entered ${e.to_stage ?? 'pipeline'}`,
     icon: <Send className="h-3.5 w-3.5" />,
-    color: 'bg-blue-50 text-blue-600',
+    color: 'bg-blue-50 text-emerald-600',
   },
   stage_moved: {
     label: e => `Moved to ${e.to_stage ?? '?'}${e.from_stage ? ` from ${e.from_stage}` : ''}`,
@@ -31,7 +31,7 @@ const EVENT_CONFIG: Record<string, { label: (e: ApplicationEvent) => string; ico
   email_sent: {
     label: () => 'Email sent',
     icon: <Send className="h-3.5 w-3.5" />,
-    color: 'bg-blue-50 text-blue-600',
+    color: 'bg-blue-50 text-emerald-600',
   },
   interview_scheduled: {
     label: e => `Interview scheduled — ${e.note ? '' : 'see details'}`,
@@ -61,7 +61,7 @@ const EVENT_CONFIG: Record<string, { label: (e: ApplicationEvent) => string; ico
   offer_sent: {
     label: () => 'Offer sent to candidate',
     icon: <Send className="h-3.5 w-3.5" />,
-    color: 'bg-blue-50 text-blue-600',
+    color: 'bg-blue-50 text-emerald-600',
   },
   offer_accepted: {
     label: () => 'Offer accepted 🎉',

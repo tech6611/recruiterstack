@@ -190,7 +190,7 @@ export function NotificationBell({ collapsed }: { collapsed?: boolean }) {
             {unreadCount > 0 && (
               <button
                 onClick={markAllRead}
-                className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                className="flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-800 transition-colors"
               >
                 <CheckCheck className="h-3 w-3" />
                 Mark all read
@@ -222,7 +222,7 @@ export function NotificationBell({ collapsed }: { collapsed?: boolean }) {
                     className={`w-full text-left flex items-start gap-3 px-4 py-3 transition-colors ${
                       n.read
                         ? 'bg-white hover:bg-slate-50'
-                        : 'bg-blue-50/50 hover:bg-blue-50'
+                        : 'bg-blue-50/50 hover:bg-emerald-50'
                     } ${href ? 'cursor-pointer' : 'cursor-default'}`}
                   >
                     {/* Type icon */}

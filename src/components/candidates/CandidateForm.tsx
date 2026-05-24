@@ -148,7 +148,7 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="w-full rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center hover:border-blue-300 hover:bg-blue-50 transition-colors"
+            className="w-full rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
           >
             <UploadCloud className="h-6 w-6 text-slate-300 mx-auto mb-1.5" />
             <p className="text-sm text-slate-400">Click to upload PDF</p>
@@ -315,7 +315,7 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         <button
           type="submit"
           disabled={loading || parseState === 'parsing'}
-          className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 transition-colors"
+          className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
         >
           {loading ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Candidate'}
         </button>

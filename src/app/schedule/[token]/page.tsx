@@ -262,7 +262,7 @@ export default function SchedulePage() {
           <div className="flex flex-col gap-2.5 mb-6">
             {confirmed.meet_link && (
               <a href={confirmed.meet_link} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-sm font-medium transition-colors">
                 <ExternalLink className="h-4 w-4" />
                 Join {platformLabel(confirmed.meeting_platform)}
               </a>
@@ -279,7 +279,7 @@ export default function SchedulePage() {
                 setCopied(false)
                 navigator.clipboard.writeText(confirmed.reschedule_url).then(() => setCopied(true))
               }}
-              className="text-xs text-blue-600 hover:text-blue-800 underline"
+              className="text-xs text-emerald-600 hover:text-emerald-800 underline"
             >
               {copied ? '✓ Copied reschedule link' : 'Copy reschedule link'}
             </button>
@@ -298,7 +298,7 @@ export default function SchedulePage() {
       {/* Top bar */}
       <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center">
+          <div className="h-7 w-7 rounded-lg bg-emerald-600 flex items-center justify-center">
             <span className="text-white text-[11px] font-bold">RS</span>
           </div>
           <span className="text-sm font-semibold text-slate-700">RecruiterStack</span>
@@ -391,7 +391,7 @@ export default function SchedulePage() {
                           <th key={d.toISOString()}
                             className={`px-0.5 py-2 text-center font-semibold border-b border-slate-100 whitespace-nowrap ${isWeekend ? 'bg-slate-50 text-slate-400' : isToday ? 'bg-blue-50 text-blue-700' : 'bg-white text-slate-600'}`}>
                             <div>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                            <div className={`text-[11px] mt-0.5 ${isToday ? 'bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center mx-auto text-[10px]' : ''}`}>
+                            <div className={`text-[11px] mt-0.5 ${isToday ? 'bg-emerald-600 text-white rounded-full w-5 h-5 flex items-center justify-center mx-auto text-[10px]' : ''}`}>
                               {d.getDate()}
                             </div>
                           </th>
@@ -436,8 +436,8 @@ export default function SchedulePage() {
                                 className={`w-full rounded transition-colors ${
                                   past   ? 'bg-slate-100/50 cursor-not-allowed'
                                   : busy  ? 'bg-red-50 cursor-not-allowed'
-                                  : selected ? 'bg-blue-600 rounded-t'
-                                  : inBlock  ? 'bg-blue-200 hover:bg-blue-300 cursor-pointer rounded-none'
+                                  : selected ? 'bg-emerald-600 rounded-t'
+                                  : inBlock  ? 'bg-blue-200 hover:bg-emerald-300 cursor-pointer rounded-none'
                                   : clickable ? 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                                   : 'bg-slate-100 cursor-not-allowed'
                                 }`}
@@ -466,7 +466,7 @@ export default function SchedulePage() {
                   <span className="inline-block h-3 w-4 rounded bg-red-50 border border-red-100" /> Busy
                 </span>
                 <span className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                  <span className="inline-block h-3 w-4 rounded bg-blue-600" /> Selected
+                  <span className="inline-block h-3 w-4 rounded bg-emerald-600" /> Selected
                 </span>
                 <span className="flex items-center gap-1.5 text-[10px] text-slate-400">
                   <span className="inline-block h-3 w-4 rounded bg-blue-200" /> Duration
@@ -493,7 +493,7 @@ export default function SchedulePage() {
               <button
                 onClick={handleConfirm}
                 disabled={confirming}
-                className="shrink-0 flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
+                className="shrink-0 flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
               >
                 {confirming ? <><Loader2 className="h-4 w-4 animate-spin" /> Confirming…</> : 'Confirm interview'}
               </button>

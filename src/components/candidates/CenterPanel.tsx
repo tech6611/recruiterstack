@@ -95,7 +95,7 @@ export default React.memo(function CenterPanel({
         <button
           onClick={onPhoneScreen}
           disabled={!hasActiveApps}
-          className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <PhoneCall className="h-3.5 w-3.5" />
           Phone Screen

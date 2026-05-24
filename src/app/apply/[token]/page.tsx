@@ -191,7 +191,7 @@ export default function ApplyPage() {
       {/* Header */}
       <header className="bg-white border-b border-slate-200 py-4 px-6">
         <div className="max-w-2xl mx-auto flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600">
             <Zap className="h-3.5 w-3.5 text-white" />
           </div>
           <span className="text-sm font-bold text-slate-900">RecruiterStack</span>
@@ -241,7 +241,7 @@ export default function ApplyPage() {
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="Jane Smith"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
               <div>
@@ -254,7 +254,7 @@ export default function ApplyPage() {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="jane@example.com"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -268,7 +268,7 @@ export default function ApplyPage() {
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   placeholder="+1 (555) 000-0000"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
               <div>
@@ -278,7 +278,7 @@ export default function ApplyPage() {
                   value={linkedin}
                   onChange={e => setLinkedin(e.target.value)}
                   placeholder="https://linkedin.com/in/…"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -296,7 +296,7 @@ export default function ApplyPage() {
                   onClick={() => { setCvMode('upload'); setCvError('') }}
                   className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition-colors ${
                     cvMode === 'upload'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-emerald-600 text-white'
                       : 'bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
@@ -308,7 +308,7 @@ export default function ApplyPage() {
                   onClick={() => { setCvMode('drive'); setCvError('') }}
                   className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition-colors border-l border-slate-200 ${
                     cvMode === 'drive'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-emerald-600 text-white'
                       : 'bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
@@ -345,14 +345,14 @@ export default function ApplyPage() {
                     className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 cursor-pointer transition-colors ${
                       isDragging
                         ? 'border-blue-400 bg-blue-50'
-                        : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/40'
+                        : 'border-slate-200 bg-slate-50 hover:border-emerald-300 hover:bg-emerald-50/40'
                     }`}
                   >
                     <CloudUpload className={`h-8 w-8 ${isDragging ? 'text-blue-500' : 'text-slate-300'}`} />
                     <div className="text-center">
                       <p className="text-sm font-semibold text-slate-700">
                         Drag & drop or{' '}
-                        <span className="text-blue-600 underline underline-offset-2">browse</span>
+                        <span className="text-emerald-600 underline underline-offset-2">browse</span>
                       </p>
                       <p className="text-xs text-slate-400 mt-1">PDF, DOC, DOCX · max 10 MB</p>
                     </div>
@@ -381,7 +381,7 @@ export default function ApplyPage() {
                     value={cvDriveUrl}
                     onChange={e => setCvDriveUrl(e.target.value)}
                     placeholder="https://drive.google.com/file/d/…"
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   />
                   <p className="text-xs text-slate-400 mt-1.5">
                     Paste a shareable Google Drive link to your CV/resume.
@@ -408,7 +408,7 @@ export default function ApplyPage() {
                 onChange={e => setCoverLetter(e.target.value)}
                 rows={5}
                 placeholder="Tell us a bit about yourself and why you're excited about this role…"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
               />
             </div>
 
@@ -423,7 +423,7 @@ export default function ApplyPage() {
             <button
               type="submit"
               disabled={submitting || !name.trim() || !email.trim()}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-60 shadow-sm"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3.5 text-sm font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60 shadow-sm"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {submitting ? 'Submitting…' : 'Submit Application'}

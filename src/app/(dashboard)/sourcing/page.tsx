@@ -134,7 +134,7 @@ function DropZone({ onFile }: { onFile: (text: string, name: string) => void }) 
       }}
       onClick={() => inputRef.current?.click()}
       className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors select-none ${
-        dragging ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+        dragging ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-emerald-300 hover:bg-slate-50'
       }`}
     >
       <input
@@ -175,7 +175,7 @@ function PdfDropZone({ onFiles }: { onFiles: (files: File[]) => void }) {
       }}
       onClick={() => inputRef.current?.click()}
       className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors select-none ${
-        dragging ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+        dragging ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-emerald-300 hover:bg-slate-50'
       }`}
     >
       <input
@@ -269,7 +269,7 @@ function ConnectorCard({
           </ol>
           <button
             onClick={onUseCSV}
-            className="flex items-center gap-1.5 text-sm text-blue-600 font-semibold hover:text-blue-700 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-emerald-600 font-semibold hover:text-emerald-700 transition-colors"
           >
             <Upload className="w-3.5 h-3.5" />
             Use the Import CSV tab →
@@ -327,7 +327,7 @@ function CandidateTable({
           <button
             onClick={onAction}
             disabled={actionDisabled}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
           >
             {actionLoading
               ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -362,7 +362,7 @@ function CandidateTable({
                 <tr
                   key={idx}
                   onClick={() => onToggleRow(idx)}
-                  className={`cursor-pointer transition-colors hover:bg-blue-50 ${
+                  className={`cursor-pointer transition-colors hover:bg-emerald-50 ${
                     isSelected ? 'bg-white' : 'bg-slate-50/60 opacity-50'
                   }`}
                 >
@@ -719,7 +719,7 @@ export default function SourcingPage() {
               )}
               <button
                 onClick={() => setImportRes(null)}
-                className="mt-6 text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                className="mt-6 text-sm text-emerald-600 hover:text-emerald-700 font-semibold"
               >
                 Import another file →
               </button>
@@ -752,7 +752,7 @@ export default function SourcingPage() {
                   <span className="text-sm text-blue-700 font-medium flex-1">{fileName}</span>
                   <button
                     onClick={() => { setCsvText(''); setFileName('') }}
-                    className="text-blue-400 hover:text-blue-600"
+                    className="text-blue-400 hover:text-emerald-600"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -774,7 +774,7 @@ export default function SourcingPage() {
                     onChange={e => setCsvText(e.target.value)}
                     placeholder={`name,email,title,location,skills\nJohn Smith,john@example.com,Sr. Engineer,NYC,"React, Node, TypeScript"`}
                     rows={8}
-                    className="w-full text-sm font-mono border border-slate-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 resize-none text-slate-700 placeholder:text-slate-300"
+                    className="w-full text-sm font-mono border border-slate-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 resize-none text-slate-700 placeholder:text-slate-300"
                   />
                 </div>
               )}
@@ -783,7 +783,7 @@ export default function SourcingPage() {
                 <button
                   onClick={handleParse}
                   disabled={!csvText.trim() || parsing}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
                 >
                   {parsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                   {parsing ? 'Parsing with AI…' : 'Parse candidates'}
@@ -830,7 +830,7 @@ export default function SourcingPage() {
               )}
               <button
                 onClick={() => setCvImportRes(null)}
-                className="mt-6 text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                className="mt-6 text-sm text-emerald-600 hover:text-emerald-700 font-semibold"
               >
                 Upload more CVs →
               </button>
@@ -888,7 +888,7 @@ export default function SourcingPage() {
                 <button
                   onClick={handleCvParse}
                   disabled={cvParsing}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
                 >
                   {cvParsing
                     ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -938,7 +938,7 @@ export default function SourcingPage() {
               <p className="text-sm text-slate-500 mt-1">Candidate saved to your pipeline</p>
               <button
                 onClick={() => setSavedName(null)}
-                className="mt-6 text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                className="mt-6 text-sm text-emerald-600 hover:text-emerald-700 font-semibold"
               >
                 Add another →
               </button>
@@ -992,7 +992,7 @@ export default function SourcingPage() {
                       href={extracted.linkedin_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline text-xs break-all"
+                      className="text-emerald-600 hover:underline text-xs break-all"
                     >
                       {extracted.linkedin_url}
                     </a>
@@ -1023,7 +1023,7 @@ export default function SourcingPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
                   Save to candidates
@@ -1051,7 +1051,7 @@ export default function SourcingPage() {
                 onChange={e => setProfileText(e.target.value)}
                 placeholder={`John Smith\nSenior Software Engineer at Stripe\nSan Francisco Bay Area\n\nExperience: 8 years\nSkills: Python, Go, Kubernetes, PostgreSQL, AWS\n\nPreviously at: Uber, Lyft`}
                 rows={11}
-                className="w-full text-sm border border-slate-200 rounded-xl p-3.5 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 resize-none text-slate-700 placeholder:text-slate-300 leading-relaxed"
+                className="w-full text-sm border border-slate-200 rounded-xl p-3.5 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 resize-none text-slate-700 placeholder:text-slate-300 leading-relaxed"
               />
               {profileErr && (
                 <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
@@ -1062,7 +1062,7 @@ export default function SourcingPage() {
               <button
                 onClick={handleExtract}
                 disabled={!profileText.trim() || extracting}
-                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
               >
                 {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
                 {extracting ? 'Extracting with AI…' : 'Extract candidate →'}

@@ -48,7 +48,7 @@ export default function NotesTab({ applicationId, notes, onNoteAdded }: NotesTab
             onChange={e => setText(e.target.value)}
             rows={2}
             placeholder="Add a note…"
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
           />
           <div className="flex justify-end mt-1.5">
             <button

@@ -11,6 +11,15 @@ entries on top.
 
 ## 2026-05-24
 
+### Changed
+- Extended the emerald brand theme across the app (52 files: landing page, public
+  apply/schedule/intake flows, dashboard pages, and shared components). Converted
+  brand/interactive blue — buttons, hover/focus states, focus rings, gradients,
+  link text — to emerald. **Categorical status colors were deliberately
+  preserved** (e.g. candidate `active`, pipeline stages, scorecard `yes`/`Good`
+  ratings) so distinct states stay visually distinct. Light-blue decorative
+  panels (`bg-blue-50` callouts) were left as-is and can be greened later.
+
 ### Docs
 - Rewrote `README.md` into a real first-look entry point with a "Start here"
   reading path to `CLAUDE.md` and the canonical data-model docs.
