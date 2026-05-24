@@ -19,7 +19,14 @@ import {
   updateLegacyJob,
 } from '@/lib/domain/job-pipelines'
 import { fetchLegacyAnalyticsInputs } from '@/lib/domain/reporting'
-import type { HiringRequestUpdate } from '@/lib/types/database'
+import {
+  getEmployeeByPerson,
+  listEmployees,
+  markEmployeeJoined,
+  markEmployeeTerminated,
+} from '@/lib/domain/employees'
+import { findPersonByEmail } from '@/lib/domain/people'
+import type { EmployeeProfile, EmployeeStatus, HiringRequestUpdate } from '@/lib/types/database'
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
@@ -634,6 +641,39 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
       required: ['application_id', 'candidate_id', 'hiring_request_id', 'interviewer_name'],
     },
   },
+  {
+    name: 'list_employees',
+    description: 'List people who have moved from candidate to employee. "pending" = hired, serving notice, not yet started; "active" = has joined the org; "terminated" = left. Each row includes the employee_id used by mark_employee_joined.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['pending', 'active', 'terminated'], description: 'Filter by employee status' },
+      },
+    },
+  },
+  {
+    name: 'mark_employee_joined',
+    description: 'Mark a pre-hire (pending) employee as having joined the org — flips them to active and sets their start date. This is the moment a hired candidate becomes a working employee. Identify them by employee_id (from list_employees) or by person_email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string', description: 'UUID of the employee_profile (from list_employees)' },
+        person_email: { type: 'string', description: 'Email of the person, used to find their employee record if employee_id is not known' },
+        start_date:   { type: 'string', description: 'First working day (YYYY-MM-DD). Defaults to today.' },
+      },
+    },
+  },
+  {
+    name: 'mark_employee_terminated',
+    description: 'End an employee\'s employment (sets status to terminated). Identify them by employee_id (from list_employees) or by person_email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string', description: 'UUID of the employee_profile (from list_employees)' },
+        person_email: { type: 'string', description: 'Email of the person, used to find their employee record if employee_id is not known' },
+      },
+    },
+  },
 ]
 
 // ── Tool executor ─────────────────────────────────────────────────────────────
@@ -689,6 +729,10 @@ export async function executeTool(
       case 'get_offers':                 return await getOffers(input, orgId, supabase)
       case 'send_assessment':            return await sendAssessment(input, orgId, supabase)
       case 'create_self_schedule_invite': return await createSelfScheduleInvite(input, orgId, supabase)
+      // Employee lifecycle tools
+      case 'list_employees':             return await listEmployeesTool(input, orgId, supabase)
+      case 'mark_employee_joined':       return await markEmployeeJoinedTool(input, orgId, supabase)
+      case 'mark_employee_terminated':   return await markEmployeeTerminatedTool(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -2450,4 +2494,106 @@ async function createSelfScheduleInvite(
   } as never)
 
   return `Self-schedule invite created. Share this link with the candidate: /schedule/${token} (expires in ${expires_in_days ?? 7} days)`
+}
+
+// ── Employee lifecycle tools ──────────────────────────────────────────────────
+
+async function listEmployeesTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const status = input.status as EmployeeStatus | undefined
+  const employees = await listEmployees(supabase, orgId, status)
+  if (employees.length === 0) {
+    return status ? `No ${status} employees found.` : 'No employees found yet.'
+  }
+
+  // Resolve names from the canonical person record.
+  const personIds = Array.from(new Set(employees.map(e => e.person_id)))
+  const { data: people } = await supabase
+    .from('people')
+    .select('id, name, email')
+    .in('id', personIds)
+  const nameById = new Map(
+    (people ?? []).map(p => [(p as { id: string }).id, p as { id: string; name: string; email: string }]),
+  )
+
+  const lines = employees.map(e => {
+    const person = nameById.get(e.person_id)
+    const who = person ? `${person.name} (${person.email})` : e.person_id
+    const when =
+      e.status === 'active' ? ` | started ${e.start_date ?? '—'}`
+      : e.status === 'terminated' ? ` | left ${e.terminated_at?.slice(0, 10) ?? '—'}`
+      : ` | hired ${e.hired_at?.slice(0, 10) ?? '—'}, not yet joined`
+    return `• ${who} — ${e.status}${when} [employee_id: ${e.id}]`
+  })
+
+  return `${employees.length} employee(s):\n${lines.join('\n')}`
+}
+
+// Resolve an employee_profile from either an explicit id or a person's email.
+async function resolveEmployee(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<EmployeeProfile | string> {
+  if (input.employee_id) {
+    const { data, error } = await supabase
+      .from('employee_profiles')
+      .select('*')
+      .eq('id', input.employee_id as string)
+      .eq('org_id', orgId)
+      .maybeSingle()
+    if (error) return `Error: ${error.message}`
+    if (!data) return `No employee found with id ${input.employee_id}.`
+    return data as EmployeeProfile
+  }
+
+  if (input.person_email) {
+    const person = await findPersonByEmail(supabase, orgId, input.person_email as string)
+    if (!person) return `No person found with email ${input.person_email}.`
+    const employee = await getEmployeeByPerson(supabase, orgId, person.id)
+    if (!employee) return `${person.name} has no employee record (are they marked hired?).`
+    return employee
+  }
+
+  return 'Provide either employee_id or person_email.'
+}
+
+async function markEmployeeJoinedTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const resolved = await resolveEmployee(input, orgId, supabase)
+  if (typeof resolved === 'string') return resolved
+
+  if (resolved.status === 'active') {
+    return `Already active — joined ${resolved.start_date ?? 'previously'}.`
+  }
+  if (resolved.status === 'terminated') {
+    return 'Cannot mark a terminated employee as joined.'
+  }
+
+  const updated = await markEmployeeJoined(supabase, orgId, resolved.id, input.start_date ?? null)
+  return `Marked employee as joined — now active, start date ${updated.start_date}. They are officially an employee.`
+}
+
+async function markEmployeeTerminatedTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const resolved = await resolveEmployee(input, orgId, supabase)
+  if (typeof resolved === 'string') return resolved
+
+  if (resolved.status === 'terminated') return 'Employee is already terminated.'
+
+  await markEmployeeTerminated(supabase, orgId, resolved.id)
+  return 'Employee marked as terminated.'
 }
