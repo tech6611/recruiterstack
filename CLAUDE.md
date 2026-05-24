@@ -13,12 +13,22 @@ npm run test         # Vitest (watch mode)
 npm run test:run     # Vitest (single run)
 npm run test:coverage # Vitest with coverage
 npm run gen:types    # Regenerate Supabase types
+npm run audit:canonical # Report direct table access by migration status
 ```
+
+> **New to the codebase?** Read this file, then the canonical data-model docs in
+> [`docs/`](./docs) (see [Canonical Data Model](#canonical-data-model) below).
+
+> **Changelog convention:** when you make a meaningful change — a new feature, a
+> fix, a schema/migration, a UI/color change — add a short entry to
+> [`CHANGELOG.md`](./CHANGELOG.md) under the current date before finishing. Keep
+> it concrete and grouped by type (`Added` / `Changed` / `Fixed` / `Removed` /
+> `Schema` / `Docs`). Treat it as part of "done," like updating tests.
 
 ## Stack
 
 - **Framework:** Next.js 14 (App Router), React 18, TypeScript 5
-- **Database:** Supabase (PostgreSQL), 27 migrations in `supabase/migrations/`
+- **Database:** Supabase (PostgreSQL), 48+ migrations in `supabase/migrations/`
 - **Auth:** Clerk (user auth + org management), multi-tenant via org_id
 - **AI:** Anthropic SDK — Claude Sonnet for quality tasks, Claude Haiku for speed/cost
 - **Email:** SendGrid
@@ -53,12 +63,13 @@ src/
 │   ├── apply/[token]/      # Public job application
 │   ├── intake/[token]/     # Hiring manager intake form
 │   ├── schedule/[token]/   # Self-service interview scheduling
-│   └── api/                # 60+ API endpoints
+│   └── api/                # 130+ API endpoints
 ├── components/             # React components (layout, candidates, dashboard, etc.)
 ├── lib/
 │   ├── ai/                 # AI logic (jd-generator, job-scorer, matcher, autopilot)
 │   ├── api/                # API helpers (cache, rate-limit, search, csv, etc.)
-│   ├── copilot-tools.ts    # 20+ Anthropic tool definitions for copilot
+│   ├── copilot-tools.ts    # ~38 Anthropic tool definitions for copilot
+│   ├── domain/             # Canonical domain facades (people, candidates, applications, openings, job-pipelines, ...)
 │   ├── supabase/           # Supabase clients (browser + server)
 │   ├── google/             # Google Calendar integration
 │   ├── microsoft/          # Outlook integration
@@ -89,10 +100,26 @@ src/
 
 ### Database
 
-- Supabase PostgreSQL with 27 migrations in `supabase/migrations/`
+- Supabase PostgreSQL with 48+ migrations in `supabase/migrations/`
 - Core tables: candidates, hiring_requests, applications, application_events, pipeline_stages, interviews, offers, scorecards, candidate_tasks, candidate_tags, org_settings, notifications
+- Canonical (requisition/HRIS) tables: openings, jobs, job_openings, job_postings, departments, locations, compensation_bands, approval_*, people
 - Types defined in `src/lib/types/database.ts`
 - Regenerate types: `npm run gen:types`
+
+### Canonical Data Model
+
+The schema is mid-migration from a lean ATS model (`hiring_requests`, `candidates`)
+toward a canonical lifecycle spine (Person → Candidate Profile → Application →
+Interview → Offer → Employee Profile). **Before adding model-heavy features, read:**
+
+- [`docs/canonical-data-model.md`](./docs/canonical-data-model.md) — target architecture & engineering rules
+- [`docs/canonical-ownership-matrix.md`](./docs/canonical-ownership-matrix.md) — per-route/table/tool migration status
+- [`docs/canonical-completion-plan.md`](./docs/canonical-completion-plan.md) — the active Slice 0→5 build plan
+
+**Conventions for new work:**
+- Storage changes hide behind `src/lib/domain/*` facades — call the facade, not raw `supabase.from(...)`.
+- Don't add new core workflows to legacy `hiring_requests`; create canonical `jobs`/`openings`.
+- Run `npm run audit:canonical` after touching model-heavy routes to confirm progress (status should improve, never regress).
 
 ### Security
 
@@ -121,4 +148,4 @@ Optional (features degrade gracefully):
 
 ## Testing
 
-13 test files covering API helpers, auth, crypto, validations, and search. Run with `npm run test:run`.
+37 test files covering API helpers, auth, crypto, validations, search, and domain facades. Run with `npm run test:run`.
