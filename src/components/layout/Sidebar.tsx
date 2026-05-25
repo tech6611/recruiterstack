@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
+  UserCog,
   Briefcase,
   ClipboardList,
   CheckSquare,
@@ -20,20 +21,53 @@ import {
 import { UserButton, useOrganization } from '@clerk/nextjs'
 import { useEffect, useState } from 'react'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
+import { flags } from '@/lib/flags'
 
-const NAV_ITEMS = [
-  { href: '/dashboard',   label: 'Dashboard',  icon: LayoutDashboard },
-  { href: '/openings',    label: 'Openings',   icon: ClipboardList },
-  { href: '/req-jobs',    label: 'Pipelines',  icon: Briefcase },
-  { href: '/jobs',        label: 'Jobs',       icon: Briefcase },
-  { href: '/candidates',  label: 'Candidates', icon: Users },
-  { href: '/sourcing',    label: 'Sourcing',   icon: Search },
-  { href: '/sequences',   label: 'Sequences',  icon: Mail },
-  { href: '/analytics',   label: 'Analytics',  icon: BarChart2 },
-  { href: '/inbox',       label: 'Inbox',      icon: Inbox },
-  { href: '/approvals/inbox', label: 'Approvals', icon: CheckSquare },
-  { href: '/admin/approvals', label: 'Approval chains', icon: ClipboardList },
-  { href: '/settings',    label: 'Settings',   icon: Settings },
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard }
+type NavSection = { section: string | null; items: NavItem[] }
+
+// Grouped into platform modules so the suite structure is visible.
+const NAV_SECTIONS: NavSection[] = [
+  {
+    section: null, // ungrouped top items
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    section: 'Recruiting',
+    items: [
+      { href: '/openings',   label: 'Openings',   icon: ClipboardList },
+      { href: '/req-jobs',   label: 'Pipelines',  icon: Briefcase },
+      { href: '/jobs',       label: 'Jobs',       icon: Briefcase },
+      { href: '/candidates', label: 'Candidates', icon: Users },
+      { href: '/sourcing',   label: 'Sourcing',   icon: Search },
+      { href: '/sequences',  label: 'Sequences',  icon: Mail },
+    ],
+  },
+  ...(flags.hris
+    ? [{
+        section: 'HRIS',
+        items: [
+          { href: '/hris/employees', label: 'Employees', icon: UserCog },
+        ],
+      }]
+    : []),
+  {
+    section: 'Insights',
+    items: [
+      { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+      { href: '/inbox',     label: 'Inbox',     icon: Inbox },
+    ],
+  },
+  {
+    section: 'Admin',
+    items: [
+      { href: '/approvals/inbox', label: 'Approvals',       icon: CheckSquare },
+      { href: '/admin/approvals', label: 'Approval chains', icon: ClipboardList },
+      { href: '/settings',        label: 'Settings',        icon: Settings },
+    ],
+  },
 ]
 
 const LS_KEY = 'rs_sidebar_collapsed'
@@ -86,28 +120,40 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-4">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive =
-            href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
+        {NAV_SECTIONS.map(({ section, items }, idx) => (
+          <div key={section ?? `top-${idx}`} className={idx > 0 ? 'pt-3' : undefined}>
+            {section && !collapsed && (
+              <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                {section}
+              </p>
+            )}
+            {section && collapsed && idx > 0 && (
+              <div className="mx-2 mb-1 border-t border-slate-100" />
+            )}
+            {items.map(({ href, label, icon: Icon }) => {
+              const isActive =
+                href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
 
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              className={`flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-all ${
-                isActive
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <Icon
-                className={`h-[18px] w-[18px] shrink-0 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`}
-              />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </Link>
-          )
-        })}
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  title={collapsed ? label : undefined}
+                  className={`flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <Icon
+                    className={`h-[18px] w-[18px] shrink-0 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`}
+                  />
+                  {!collapsed && <span className="truncate">{label}</span>}
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Footer — user + org + notifications */}

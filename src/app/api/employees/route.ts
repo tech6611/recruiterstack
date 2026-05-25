@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
-import { listEmployees } from '@/lib/domain/employees'
+import { listEmployeesWithPerson } from '@/lib/domain/employees'
 import type { EmployeeStatus } from '@/lib/types/database'
 
 const VALID_STATUSES: EmployeeStatus[] = ['pending', 'active', 'terminated']
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminClient()
   try {
-    const data = await listEmployees(supabase, orgId, status)
+    const data = await listEmployeesWithPerson(supabase, orgId, status)
     return NextResponse.json({ data })
   } catch (err) {
     return NextResponse.json(

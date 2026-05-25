@@ -44,6 +44,28 @@ export async function listEmployees(
   return (data ?? []) as EmployeeProfile[]
 }
 
+export interface EmployeeWithPerson extends EmployeeProfile {
+  person: { name: string; email: string } | null
+}
+
+// Same list, enriched with the canonical person's name/email for display.
+export async function listEmployeesWithPerson(
+  supabase: Supabase,
+  orgId: string,
+  statusFilter?: EmployeeStatus,
+): Promise<EmployeeWithPerson[]> {
+  let q = supabase
+    .from('employee_profiles')
+    .select('*, person:people(name, email)')
+    .eq('org_id', orgId)
+
+  if (statusFilter) q = q.eq('status', statusFilter)
+
+  const { data, error } = await q.order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as unknown as EmployeeWithPerson[]
+}
+
 // Pre-hire joins the org: flip PENDING → ACTIVE and stamp their first day.
 // This is the moment a hired candidate literally becomes an employee.
 export async function markEmployeeJoined(
