@@ -28,6 +28,7 @@ import { getValidAccessToken, createMeetEvent, queryFreeBusy } from '@/lib/googl
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
+import { getLegacyCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
 
 interface ScheduleInterviewBody {
   // Required
@@ -92,20 +93,13 @@ export async function POST(req: NextRequest) {
   const supabase = createAdminClient()
 
   // ── Fetch candidate + hiring request context ─────────────────────────────
-  const [candidateRes, hiringReqRes] = await Promise.all([
-    supabase.from('candidates').select('name, email, current_title, location').eq('id', candidate_id).single() as unknown as Promise<{ data: { name: string; email: string; current_title: string | null; location: string | null } | null; error: unknown }>,
-    supabase.from('hiring_requests').select('position_title, ticket_number').eq('id', hiring_request_id).single() as unknown as Promise<{ data: { position_title: string; ticket_number: string | null } | null; error: unknown }>,
-  ])
-
-  if (!candidateRes.data) {
-    return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
-  }
-  if (!hiringReqRes.data) {
-    return NextResponse.json({ error: 'Hiring request not found' }, { status: 404 })
+  const context = await getLegacyCandidateJobContext(supabase, orgId, candidate_id, hiring_request_id)
+  if (!context) {
+    return NextResponse.json({ error: 'Candidate or hiring request not found' }, { status: 404 })
   }
 
-  const candidate  = candidateRes.data
-  const hiringReq  = hiringReqRes.data
+  const candidate  = context.candidate
+  const hiringReq  = context.job
 
   // ── Fetch org settings (Google tokens, Slack config) ─────────────────────
   const { data: orgSettings } = await (supabase

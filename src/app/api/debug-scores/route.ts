@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOrg } from '@/lib/auth'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
+import { getLegacyJobScoringContext } from '@/modules/ats/domain/job-pipelines'
 import type { Candidate, HiringRequest } from '@/lib/types/database'
 
 // GET /api/debug-scores?job_id=xxx[&app_id=yyy&dry_run=1]
@@ -14,6 +16,10 @@ import type { Candidate, HiringRequest } from '@/lib/types/database'
 // This tells you exactly where the chain breaks without side effects.
 
 export async function GET(req: NextRequest) {
+  const authResult = await requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
   const jobId   = req.nextUrl.searchParams.get('job_id') ?? ''
   const appId   = req.nextUrl.searchParams.get('app_id')    // optional
@@ -32,6 +38,7 @@ export async function GET(req: NextRequest) {
   const { data: apps, error: appsErr } = await supabase
     .from('applications')
     .select('id, ai_score, ai_recommendation, ai_scored_at, ai_criterion_scores, candidate:candidates(name)')
+    .eq('org_id', orgId)
     .eq('hiring_request_id', jobId)
     .limit(20)
 
@@ -56,20 +63,17 @@ export async function GET(req: NextRequest) {
       const { data: appRow } = await supabase
         .from('applications')
         .select('*, candidate:candidates(*)')
+        .eq('org_id', orgId)
         .eq('id', appId)
         .single()
 
-      const { data: jobRow } = await supabase
-        .from('hiring_requests')
-        .select('*')
-        .eq('id', jobId)
-        .single()
+      const context = await getLegacyJobScoringContext(supabase, orgId, jobId)
 
-      if (!appRow || !jobRow) {
+      if (!appRow || !context) {
         dryRunError = 'Could not load app or job row'
       } else {
         const candidate = (appRow as Record<string, unknown>).candidate as Candidate
-        const job       = jobRow as HiringRequest
+        const job       = context.job as HiringRequest
 
         const result = await scoreApplicationForJob(candidate, job)
         dryRunResult = {

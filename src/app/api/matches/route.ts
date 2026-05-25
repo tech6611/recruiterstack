@@ -6,7 +6,8 @@ import { matchCandidateToRole } from '@/lib/ai/matcher'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runInBackground } from '@/lib/api/background'
 import { enqueue } from '@/lib/api/job-queue'
-import type { Candidate, Role, Match } from '@/lib/types/database'
+import { getRoleMatchingInputs, getRoleProfile, updateCandidateStatusesForRoleDecision } from '@/modules/ats/domain/role-profiles'
+import type { Match } from '@/lib/types/database'
 import { logger } from '@/lib/logger'
 
 const matchBodySchema = z.object({
@@ -21,14 +22,8 @@ export const POST = withOrg(async (_req, orgId, supabase) => {
   if (body instanceof NextResponse) return body
 
   // Verify role exists before starting background work
-  const { data: role, error: roleError } = await supabase
-    .from('roles')
-    .select('id')
-    .eq('id', body.role_id)
-    .eq('org_id', orgId)
-    .single()
-
-  if (roleError || !role) {
+  const role = await getRoleProfile(supabase, orgId, body.role_id)
+  if (!role) {
     return NextResponse.json({ error: 'Role not found' }, { status: 404 })
   }
 
@@ -58,22 +53,13 @@ export const POST = withOrg(async (_req, orgId, supabase) => {
 async function runMatchingJob(roleId: string, orgId: string) {
   const supabase = createAdminClient()
 
-  const [roleRes, candsRes] = await Promise.all([
-    supabase.from('roles').select('*').eq('id', roleId).eq('org_id', orgId).single(),
-    supabase.from('candidates').select('*').eq('org_id', orgId),
-  ])
-
-  if (roleRes.error || !roleRes.data) {
+  const inputs = await getRoleMatchingInputs(supabase, orgId, roleId)
+  if (!inputs) {
     logger.error('Matching job: role not found', undefined, { roleId })
     return
   }
-  if (candsRes.error) {
-    logger.error('Matching job: candidates query failed', candsRes.error, { roleId })
-    return
-  }
 
-  const role = roleRes.data as Role
-  const candidates = (candsRes.data ?? []) as Candidate[]
+  const { role, candidates } = inputs
 
   const results = await Promise.allSettled(
     candidates.map(async (candidate) => {
@@ -122,14 +108,10 @@ async function runMatchingJob(roleId: string, orgId: string) {
       }
     }
 
-    await Promise.all([
-      ...toAdvance.map((id) =>
-        supabase.from('candidates').update({ status: 'interviewing' }).eq('id', id).eq('org_id', orgId),
-      ),
-      ...toReject.map((id) =>
-        supabase.from('candidates').update({ status: 'rejected' }).eq('id', id).eq('org_id', orgId),
-      ),
-    ])
+    await updateCandidateStatusesForRoleDecision(supabase, orgId, {
+      interviewingIds: toAdvance,
+      rejectedIds: toReject,
+    })
   }
 
   logger.info('Matching job complete', {

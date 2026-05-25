@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { parseBody } from '@/lib/api/helpers'
 import { employeeTransitionSchema } from '@/lib/validations/employees'
-import { markEmployeeJoined, markEmployeeTerminated } from '@/lib/domain/employees'
+import { markEmployeeJoined, markEmployeeTerminated } from '@/modules/hris/domain/employees'
 
 // PATCH /api/employees/[id] — [id] is the employee_profile id.
 // "join" flips a pre-hire to active (the hired candidate literally becomes an

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { applicationInsertSchema } from '@/lib/validations/applications'
 import { createNotification } from '@/lib/api/notify'
+import { findOrCreateCandidateProfile } from '@/modules/ats/domain/candidates'
+import { createApplication, recordApplicationEvent } from '@/modules/ats/domain/applications'
 
 // POST /api/applications
 // Adds a candidate to a job pipeline.
@@ -15,36 +17,17 @@ export const POST = withOrg(async (req, orgId, supabase) => {
 
   // ── Upsert candidate if candidate_data provided ───────────────────────────
   if (!resolvedCandidateId && candidate_data) {
-    const { data: existingData } = await supabase
-      .from('candidates')
-      .select('id')
-      .eq('email', candidate_data.email)
-      .eq('org_id', orgId)
-      .single()
-    const existing = existingData as { id: string } | null
-
-    if (existing) {
-      resolvedCandidateId = existing.id
-    } else {
-      const { data: createdData, error: createErr } = await supabase
-        .from('candidates')
-        .insert({
-          org_id: orgId,
-          name: candidate_data.name,
-          email: candidate_data.email,
-          phone: candidate_data.phone ?? null,
-          current_title: candidate_data.current_title ?? null,
-          location: candidate_data.location ?? null,
-          skills: [],
-          experience_years: 0,
-          status: 'active',
-        })
-        .select('id')
-        .single()
-
-      if (createErr) return handleSupabaseError(createErr)
-      const created = createdData as { id: string }
-      resolvedCandidateId = created.id
+    try {
+      const candidate = await findOrCreateCandidateProfile(supabase, orgId, {
+        name: candidate_data.name,
+        email: candidate_data.email,
+        phone: candidate_data.phone ?? null,
+        current_title: candidate_data.current_title ?? null,
+        location: candidate_data.location ?? null,
+      })
+      resolvedCandidateId = candidate.id
+    } catch (err) {
+      return handleSupabaseError(err as { code: string; message: string })
     }
   }
 
@@ -78,27 +61,22 @@ export const POST = withOrg(async (req, orgId, supabase) => {
   }
 
   // ── Create application ────────────────────────────────────────────────────
-  const { data: appData, error: appErr } = await supabase
-    .from('applications')
-    .insert({
-      org_id: orgId,
-      candidate_id: resolvedCandidateId,
-      hiring_request_id,
-      stage_id: resolvedStageId ?? null,
-      status: 'active',
+  let app: Awaited<ReturnType<typeof createApplication>>
+  try {
+    app = await createApplication(supabase, {
+      orgId,
+      candidateId: resolvedCandidateId,
+      hiringRequestId: hiring_request_id,
+      stageId: resolvedStageId ?? null,
       source,
-      source_detail: source_detail ?? null,
+      sourceDetail: source_detail ?? null,
     })
-    .select('*')
-    .single()
-
-  if (appErr) return handleSupabaseError(appErr)
-  const app = appData as Record<string, unknown> & { id: string; candidate?: { name: string } }
+  } catch (err) {
+    return handleSupabaseError(err as { code: string; message: string })
+  }
 
   // ── Record timeline event ─────────────────────────────────────────────────
-  await supabase
-    .from('application_events')
-    .insert({
+  await recordApplicationEvent(supabase, {
       application_id: app.id,
       event_type: 'applied',
       to_stage: stageName,
@@ -107,7 +85,7 @@ export const POST = withOrg(async (req, orgId, supabase) => {
     })
 
   // ── In-app notification ─────────────────────────────────────────────────
-  const candidateName = app.candidate?.name ?? 'Candidate'
+  const candidateName = candidate_data?.name ?? 'Candidate'
   await createNotification({
     orgId,
     type: 'candidate_applied',

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireOrg } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { toCsvResponse } from '@/lib/api/csv'
+import { fetchLegacyPipelineExportInputs } from '@/modules/ats/domain/reporting'
 
 const CSV_HEADERS = [
   'Job Title', 'Department', 'Stage Name', 'Stage Order',
@@ -16,26 +17,11 @@ export async function GET() {
 
   const supabase = createAdminClient()
 
-  const [jobsRes, stagesRes, appsRes] = await Promise.all([
-    supabase
-      .from('hiring_requests')
-      .select('id, position_title, department')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('pipeline_stages')
-      .select('id, hiring_request_id, name, order_index')
-      .eq('org_id', orgId)
-      .order('order_index'),
-    supabase
-      .from('applications')
-      .select('hiring_request_id, stage_id, status')
-      .eq('org_id', orgId),
-  ])
+  const inputs = await fetchLegacyPipelineExportInputs(supabase, orgId)
 
-  const jobs = (jobsRes.data ?? []) as { id: string; position_title: string; department: string | null }[]
-  const stages = (stagesRes.data ?? []) as { id: string; hiring_request_id: string; name: string; order_index: number }[]
-  const apps = (appsRes.data ?? []) as { hiring_request_id: string; stage_id: string | null; status: string }[]
+  const jobs = inputs.jobs as { id: string; position_title: string; department: string | null }[]
+  const stages = inputs.stages as { id: string; hiring_request_id: string; name: string; order_index: number }[]
+  const apps = inputs.apps as { hiring_request_id: string; stage_id: string | null; status: string }[]
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rows: unknown[][] = []

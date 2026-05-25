@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
-import type { Candidate, Role } from '@/lib/types/database'
+import { requireOrg } from '@/lib/auth'
+import { getCandidateRoleMatchContext } from '@/modules/ats/domain/role-profiles'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // POST /api/email/draft  { candidate_id, role_id, company_name?, recruiter_name?, recruiter_title?, recruiter_email? }
 // Returns { subject, body }
 export async function POST(request: NextRequest) {
+  const authResult = await requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
   const supabase = createAdminClient()
 
   let body: {
@@ -31,28 +36,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Fetch candidate, role, and match in parallel
-  const [candRes, roleRes, matchRes] = await Promise.all([
-    supabase.from('candidates').select('*').eq('id', body.candidate_id).single() as unknown as Promise<{ data: Candidate | null; error: unknown }>,
-    supabase.from('roles').select('*').eq('id', body.role_id).single() as unknown as Promise<{ data: Role | null; error: unknown }>,
-    supabase
-      .from('matches')
-      .select('score, strengths, reasoning')
-      .eq('candidate_id', body.candidate_id)
-      .eq('role_id', body.role_id)
-      .single() as unknown as Promise<{ data: { score: number; strengths: string[]; reasoning: string } | null; error: unknown }>,
-  ])
+  const context = await getCandidateRoleMatchContext(supabase, orgId, body.candidate_id, body.role_id)
+  if (!context) return NextResponse.json({ error: 'Candidate or role not found' }, { status: 404 })
 
-  if (candRes.error || !candRes.data) {
-    return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
-  }
-  if (roleRes.error || !roleRes.data) {
-    return NextResponse.json({ error: 'Role not found' }, { status: 404 })
-  }
-
-  const candidate = candRes.data
-  const role = roleRes.data
-  const match = matchRes.data
+  const { candidate, role, match } = context
 
   const salaryRange =
     role.salary_min && role.salary_max

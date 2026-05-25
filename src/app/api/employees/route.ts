@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
-import { listEmployeesWithPerson } from '@/lib/domain/employees'
+import { listEmployeesWithPerson } from '@/modules/hris/domain/employees'
 import type { EmployeeStatus } from '@/lib/types/database'
 
 const VALID_STATUSES: EmployeeStatus[] = ['pending', 'active', 'terminated']

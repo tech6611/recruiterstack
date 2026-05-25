@@ -8,6 +8,7 @@ import { createTeamsMeeting } from '@/lib/microsoft/calendar'
 import { resolveHost, HostTokenUnavailableError, type ResolvableProvider } from '@/lib/integrations/host-resolver'
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
 import { logger } from '@/lib/logger'
+import { getLegacyCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
 import type { InterviewInsert, ApplicationEventInsert } from '@/lib/types/database'
 
 interface PanelMember { name?: string; email: string }
@@ -85,12 +86,9 @@ export async function POST(req: NextRequest) {
 
   if (interview_type === 'video' || interview_type === 'panel' || interview_type === 'technical') {
     // Fetch candidate + hiring request info (needed for event summary)
-    const [{ data: candidateRaw }, { data: hiringReqRaw }] = await Promise.all([
-      supabase.from('candidates').select('name, email').eq('id', candidate_id).single(),
-      supabase.from('hiring_requests').select('position_title').eq('id', hiring_request_id).single(),
-    ])
-    const candidate = candidateRaw as { name: string; email: string } | null
-    const hiringReq = hiringReqRaw as { position_title: string } | null
+    const context = await getLegacyCandidateJobContext(supabase, orgId, candidate_id, hiring_request_id)
+    const candidate = context?.candidate ?? null
+    const hiringReq = context?.job ?? null
 
     const attendeeEmails: string[] = []
     if (candidate?.email)          attendeeEmails.push(candidate.email)
@@ -214,6 +212,7 @@ export async function POST(req: NextRequest) {
   // ── Log application event ────────────────────────────────────────────────
   await supabase.from('application_events').insert({
     application_id,
+    org_id:       orgId,
     event_type:   'interview_scheduled',
     from_stage:   null,
     to_stage:     null,
@@ -226,12 +225,9 @@ export async function POST(req: NextRequest) {
   // Fetch recruiter + candidate info for notification copy
   ;(async () => {
     try {
-      const [candidateRes2, hiringReqRes2] = await Promise.all([
-        supabase.from('candidates').select('name, email').eq('id', candidate_id).single(),
-        supabase.from('hiring_requests').select('position_title').eq('id', hiring_request_id).single(),
-      ])
-      const candData = candidateRes2.data as { name: string; email: string } | null
-      const hrData = hiringReqRes2.data as { position_title: string } | null
+      const context = await getLegacyCandidateJobContext(supabase, orgId, candidate_id, hiring_request_id)
+      const candData = context?.candidate ?? null
+      const hrData = context?.job ?? null
 
       await notifyInterviewScheduled({
         orgId,

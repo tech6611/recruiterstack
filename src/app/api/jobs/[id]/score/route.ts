@@ -15,6 +15,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import { createNotification } from '@/lib/api/notify'
+import { getLegacyJobScoringContext } from '@/modules/ats/domain/job-pipelines'
 import type { Candidate, HiringRequest, PipelineStage, Application, ApplicationUpdate, ApplicationEventInsert } from '@/lib/types/database'
 
 export const maxDuration = 300 // 5 min — needed for large pipelines on Vercel
@@ -42,29 +43,18 @@ export async function POST(
   } catch { /* no body — score all */ }
 
   // ── 1. Fetch job, stages, and active applications ──────────────────────────
-  const [jobRes, stagesRes, appsRes] = await Promise.all([
-    supabase.from('hiring_requests').select('*').eq('id', jobId).eq('org_id', orgId).single(),
-    supabase
-      .from('pipeline_stages')
-      .select('*')
-      .eq('hiring_request_id', jobId)
-      .eq('org_id', orgId)
-      .order('order_index'),
-    supabase
-      .from('applications')
-      .select('*, candidate:candidates(*)')
-      .eq('hiring_request_id', jobId)
-      .eq('org_id', orgId)
-      .eq('status', 'active'),
-  ])
-
-  if (jobRes.error || !(jobRes as { data: unknown }).data) {
+  let context
+  try {
+    context = await getLegacyJobScoringContext(supabase, orgId, jobId)
+  } catch {
     return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   }
 
-  const job    = (jobRes as { data: unknown }).data as HiringRequest
-  const stages = (stagesRes.data ?? []) as PipelineStage[]
-  const allApps = (appsRes.data ?? []) as unknown as (Application & { candidate: Candidate })[]
+  if (!context) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+
+  const job    = context.job
+  const stages = context.stages
+  const allApps = context.applications
 
   // Filter by application_id or stage_id if requested
   let apps = allApps

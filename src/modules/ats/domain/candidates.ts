@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Candidate, CandidateInsert, Database } from '@/lib/types/database'
-import { findOrCreatePerson } from '@/lib/domain/people'
+import { findOrCreatePerson } from '@/modules/core/domain/people'
 
 type Supabase = SupabaseClient<Database>
 

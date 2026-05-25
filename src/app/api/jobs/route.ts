@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
-import type { HiringRequest, StageColor } from '@/lib/types/database'
+import { listLegacyJobPipelineSummaries } from '@/modules/ats/domain/job-pipelines'
 
 // GET /api/jobs — list all hiring requests with candidate counts per stage
 export async function GET() {
@@ -10,51 +10,13 @@ export async function GET() {
   const { orgId } = authResult
 
   const supabase = createAdminClient()
-
-  const [jobsRes, stagesRes, appsRes] = await Promise.all([
-    supabase
-      .from('hiring_requests')
-      .select('*')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('pipeline_stages')
-      .select('id, hiring_request_id, name, color, order_index')
-      .eq('org_id', orgId),
-    supabase
-      .from('applications')
-      .select('id, hiring_request_id, stage_id, status')
-      .eq('org_id', orgId),
-  ])
-
-  if (jobsRes.error) {
-    return NextResponse.json({ error: jobsRes.error.message }, { status: 500 })
-  }
-
-  const stages = (stagesRes.data ?? []) as { id: string; hiring_request_id: string; name: string; color: StageColor; order_index: number }[]
-  const apps = (appsRes.data ?? []) as { id: string; hiring_request_id: string; stage_id: string | null; status: string }[]
-
-  const data = ((jobsRes.data ?? []) as HiringRequest[]).map(job => {
-    const jobStages = stages
-      .filter(s => s.hiring_request_id === job.id)
-      .sort((a, b) => a.order_index - b.order_index)
-    const jobApps = apps.filter(
-      a => a.hiring_request_id === job.id && a.status === 'active'
+  try {
+    const data = await listLegacyJobPipelineSummaries(supabase, orgId)
+    return NextResponse.json({ data })
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to list jobs' },
+      { status: 500 },
     )
-
-    const stage_counts = jobStages.map(s => ({
-      stage_id: s.id,
-      stage_name: s.name,
-      color: s.color as StageColor,
-      count: jobApps.filter(a => a.stage_id === s.id).length,
-    }))
-
-    return {
-      ...job,
-      total_candidates: apps.filter(a => a.hiring_request_id === job.id).length,
-      stage_counts,
-    }
-  })
-
-  return NextResponse.json({ data })
+  }
 }

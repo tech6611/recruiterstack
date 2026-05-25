@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getOrgId } from '@/lib/auth'
 import { cached, cacheKey } from '@/lib/api/cache'
 import { checkAuthRateLimit } from '@/lib/api/rate-limit'
+import { fetchLegacyDashboardInputs } from '@/modules/ats/domain/reporting'
 import type { CandidateStatus, StageColor } from '@/lib/types/database'
 
 const INTERVIEW_KEYWORDS = ['interview', 'screen', 'technical', 'phone', 'video', 'onsite', 'call']
@@ -38,53 +39,17 @@ export async function GET() {
   const dashboardData = await cached(cacheKey(orgId, 'dashboard'), 60, async () => {
   const supabase = createAdminClient()
 
-  const [jobsRes, stagesRes, appsRes, candidatesRes, eventsRes] = await Promise.all([
-    supabase
-      .from('hiring_requests')
-      .select('*')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false }),
-
-    supabase
-      .from('pipeline_stages')
-      .select('*')
-      .eq('org_id', orgId)
-      .order('order_index'),
-
-    supabase
-      .from('applications')
-      .select('id, candidate_id, hiring_request_id, stage_id, status, applied_at, ai_score, ai_recommendation, source')
-      .eq('org_id', orgId),
-
-    supabase
-      .from('candidates')
-      .select('id, name, status, current_title')
-      .eq('org_id', orgId),
-
-    // Increased limit + include application_id for task derivation; keep joins for activity feed
-    supabase
-      .from('application_events')
-      .select(`
-        id, application_id, event_type, to_stage, note, created_at,
-        applications (
-          candidates ( name ),
-          hiring_requests ( position_title )
-        )
-      `)
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false })
-      .limit(100),
-  ])
+  const inputs = await fetchLegacyDashboardInputs(supabase, orgId)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const jobs       = (jobsRes.data       ?? []) as any[]
+  const jobs       = inputs.jobs as any[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stages     = (stagesRes.data     ?? []) as any[]
-  const apps       = appsRes.data        ?? []
+  const stages     = inputs.stages as any[]
+  const apps       = inputs.apps
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const candidates = (candidatesRes.data ?? []) as any[]
+  const candidates = inputs.candidates as any[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const events     = (eventsRes.data     ?? []) as any[]
+  const events     = inputs.events as any[]
 
   // ── Lookup maps ─────────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

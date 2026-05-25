@@ -17,15 +17,15 @@ import {
   getLegacyJobById,
   listLegacyJobsForAgent,
   updateLegacyJob,
-} from '@/lib/domain/job-pipelines'
-import { fetchLegacyAnalyticsInputs } from '@/lib/domain/reporting'
+} from '@/modules/ats/domain/job-pipelines'
+import { fetchLegacyAnalyticsInputs } from '@/modules/ats/domain/reporting'
 import {
   getEmployeeByPerson,
   listEmployees,
   markEmployeeJoined,
   markEmployeeTerminated,
-} from '@/lib/domain/employees'
-import { findPersonByEmail } from '@/lib/domain/people'
+} from '@/modules/hris/domain/employees'
+import { findPersonByEmail } from '@/modules/core/domain/people'
 import type { EmployeeProfile, EmployeeStatus, HiringRequestUpdate } from '@/lib/types/database'
 
 // ── Tool definitions ──────────────────────────────────────────────────────────

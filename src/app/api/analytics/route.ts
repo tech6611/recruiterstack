@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getOrgId } from '@/lib/auth'
 import { cached, cacheKey } from '@/lib/api/cache'
+import { fetchLegacyAnalyticsInputs } from '@/modules/ats/domain/reporting'
 import type { HiringRequest, PipelineStage, Candidate } from '@/lib/types/database'
 
 // GET /api/analytics — pipeline funnel, source breakdown, time-in-stage
@@ -16,31 +17,12 @@ export async function GET() {
   const analyticsData = await cached(cacheKey(orgId, 'analytics'), 60, async () => {
   const supabase = createAdminClient()
 
-  const [jobsRes, appsRes, stagesRes, candsRes] = await Promise.all([
-    supabase
-      .from('hiring_requests')
-      .select('id, position_title, department, status')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('applications')
-      .select('id, status, source, stage_id, applied_at, hiring_request_id, candidate_id')
-      .eq('org_id', orgId),
-    supabase
-      .from('pipeline_stages')
-      .select('id, name, color, order_index, hiring_request_id')
-      .eq('org_id', orgId)
-      .order('order_index'),
-    supabase
-      .from('candidates')
-      .select('id, status')
-      .eq('org_id', orgId),
-  ])
+  const inputs = await fetchLegacyAnalyticsInputs(supabase, orgId)
 
-  const jobs   = (jobsRes.data   ?? []) as Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'status'>[]
-  const apps   = (appsRes.data   ?? []) as { id: string; status: string; source: string; stage_id: string | null; applied_at: string; hiring_request_id: string; candidate_id: string }[]
-  const stages = (stagesRes.data ?? []) as Pick<PipelineStage, 'id' | 'name' | 'color' | 'order_index' | 'hiring_request_id'>[]
-  const cands  = (candsRes.data  ?? []) as Pick<Candidate, 'id' | 'status'>[]
+  const jobs   = inputs.jobs as Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'status'>[]
+  const apps   = inputs.apps as { id: string; status: string; source: string; stage_id: string | null; applied_at: string; hiring_request_id: string; candidate_id: string }[]
+  const stages = inputs.stages as Pick<PipelineStage, 'id' | 'name' | 'color' | 'order_index' | 'hiring_request_id'>[]
+  const cands  = inputs.candidates as Pick<Candidate, 'id' | 'status'>[]
 
   // ── 1. Jobs funnel ────────────────────────────────────────────────────────
   const ACTIVE_JOB_STATUSES = ['active', 'jd_approved', 'jd_sent', 'jd_generated', 'posted']

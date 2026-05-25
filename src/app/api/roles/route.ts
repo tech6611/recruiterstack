@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { buildSearchFilter } from '@/lib/api/search'
+import { createRoleProfile, listRoleProfiles } from '@/modules/ats/domain/role-profiles'
 import type { RoleInsert, RoleStatus } from '@/lib/types/database'
 
 // GET /api/roles?status=active&limit=50&offset=0&search=engineer
@@ -18,26 +19,26 @@ export async function GET(request: NextRequest) {
   const offset = Number(searchParams.get('offset') ?? 0)
   const search = searchParams.get('search')
 
-  let query = supabase
-    .from('roles')
-    .select('*', { count: 'exact' })
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1)
-
-  if (status) query = query.eq('status', status)
+  let searchFilter: string | null = null
   if (search) {
     const filter = buildSearchFilter(search, ['job_title', 'department', 'location'])
-    if (filter) query = query.or(filter)
+    if (filter) searchFilter = filter
   }
 
-  const { data, error, count } = await query
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    const { data, count } = await listRoleProfiles(supabase, orgId, {
+      status,
+      limit,
+      offset,
+      searchFilter,
+    })
+    return NextResponse.json({ data, count, limit, offset })
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to list roles' },
+      { status: 500 },
+    )
   }
-
-  return NextResponse.json({ data, count, limit, offset })
 }
 
 // POST /api/roles
@@ -59,16 +60,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'job_title is required' }, { status: 400 })
   }
 
-  const { data, error } = await supabase
-    .from('roles')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .insert({ ...body, org_id: orgId } as any)
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    const data = await createRoleProfile(supabase, orgId, body)
+    return NextResponse.json({ data }, { status: 201 })
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to create role' },
+      { status: 500 },
+    )
   }
-
-  return NextResponse.json({ data }, { status: 201 })
 }
