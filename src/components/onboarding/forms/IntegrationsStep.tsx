@@ -32,28 +32,28 @@ export function IntegrationsStep({ isAdmin, google, microsoft, zoom, slack, next
           description="Your personal Google Calendar for scheduling interviews."
           connected={google.connected}
           connectedEmail={google.email}
-          connectHref="/api/google/connect"
+          connectHref="/api/google/connect?origin=onboarding"
         />
         <IntegrationCard
           title="Microsoft Outlook"
           description="Your personal Outlook / Teams for scheduling interviews."
           connected={microsoft.connected}
           connectedEmail={microsoft.email}
-          connectHref="/api/microsoft/connect"
+          connectHref="/api/microsoft/connect?origin=onboarding"
         />
         <IntegrationCard
           title="Zoom"
           description="Your personal Zoom for hosting interviews."
           connected={zoom.connected}
           connectedEmail={zoom.email}
-          connectHref="/api/zoom/connect"
+          connectHref="/api/zoom/connect?origin=onboarding"
         />
         <IntegrationCard
           title="Slack"
           description="Org-wide Slack for teammate notifications."
           connected={slack.connected}
           connectedEmail={slack.teamName}
-          connectHref="/api/slack/install"
+          connectHref="/api/slack/install?origin=onboarding"
           locked={!isAdmin}
           lockedMessage={!isAdmin && !slack.connected ? "Ask your admin to connect Slack for the whole workspace." : undefined}
         />

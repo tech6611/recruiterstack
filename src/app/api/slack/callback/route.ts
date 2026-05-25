@@ -97,6 +97,6 @@ export async function GET(request: NextRequest) {
   // decide whether to land on settings or resume onboarding.
   const { userId: clerkUserId } = auth()
   const userId = clerkUserId ? await resolveUserIdFromClerk(clerkUserId).catch(() => null) : null
-  const base = await postOAuthRedirectBase(orgId, userId)
+  const base = await postOAuthRedirectBase(orgId, userId, verified.origin)
   return NextResponse.redirect(`${appUrl}${base}?slack=connected`)
 }

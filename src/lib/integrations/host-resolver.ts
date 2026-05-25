@@ -170,7 +170,7 @@ export async function resolveHost(
 ): Promise<ResolvedHost> {
   // 1) Map panel emails → user_ids in panel order (skipping externals).
   const emails = panelEmails.map(e => e.trim().toLowerCase()).filter(Boolean)
-  let userIdsInOrder: string[] = []
+  const userIdsInOrder: string[] = []
   if (emails.length > 0) {
     const supabase = createAdminClient()
     const { data: users } = await supabase

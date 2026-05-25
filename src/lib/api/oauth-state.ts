@@ -6,9 +6,19 @@ function getSecret(): string {
   return process.env.OAUTH_STATE_SECRET || process.env.CLERK_SECRET_KEY || ''
 }
 
+/**
+ * Where the OAuth flow was initiated from. Threaded through the signed state so
+ * the callback can decide where to send the user back WITHOUT inferring it from
+ * org_members.onboarded_at (which now gets stamped before the integrations step
+ * is finished — see lib/onboarding/server.ts). 'onboarding' keeps the user on
+ * the integrations step; anything else falls back to the settings page.
+ */
+export type OAuthOrigin = 'onboarding' | 'settings'
+
 export interface OAuthStatePayload {
   orgId: string
   userId?: string                    // optional — Slack doesn't need per-user binding
+  origin?: OAuthOrigin               // optional — defaults to settings-style behavior
 }
 
 /**
@@ -23,6 +33,7 @@ export function generateOAuthState(params: OAuthStatePayload): string {
   const payload = JSON.stringify({
     orgId: params.orgId,
     userId: params.userId,
+    origin: params.origin,
     nonce: crypto.randomBytes(16).toString('hex'),
     exp: Date.now() + STATE_TTL_MS,
   })
@@ -61,7 +72,9 @@ export function verifyOAuthState(state: string): OAuthStatePayload | null {
     const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString())
     if (!payload.orgId || !payload.exp) return null
     if (Date.now() > payload.exp) return null
-    return { orgId: payload.orgId, userId: payload.userId }
+    const origin: OAuthOrigin | undefined =
+      payload.origin === 'onboarding' || payload.origin === 'settings' ? payload.origin : undefined
+    return { orgId: payload.orgId, userId: payload.userId, origin }
   } catch {
     return null
   }

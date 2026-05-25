@@ -94,6 +94,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${appUrl}/settings?google=error&reason=db_save`)
   }
 
-  const base = await postOAuthRedirectBase(orgId, userId)
+  const base = await postOAuthRedirectBase(orgId, userId, verified.origin)
   return NextResponse.redirect(`${appUrl}${base}?google=connected`)
 }

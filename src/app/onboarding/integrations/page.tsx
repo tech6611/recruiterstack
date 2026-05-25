@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getOrgId, resolveUserIdFromClerk } from '@/lib/auth'
 import { resolveEffectiveRole, stepsForRole, nextStep } from '@/lib/onboarding/steps'
+import { markOnboarded, requiredStepsComplete } from '@/lib/onboarding/server'
 import { OnboardingShell } from '@/components/onboarding/OnboardingShell'
 import { IntegrationsStep } from '@/components/onboarding/forms/IntegrationsStep'
 
@@ -15,6 +16,15 @@ export default async function IntegrationsStepPage() {
   const role   = await resolveEffectiveRole(orgId, userId)
   const steps  = stepsForRole(role)
   const isAdmin = role === 'admin' || role === 'pending-admin'
+
+  // Integrations is the last substantive step; everything before it is done by
+  // the time the user lands here. Stamp completion now so dropping off on this
+  // step — the classic "connect Slack, then close the tab" path — still counts
+  // as onboarded and doesn't loop them back here on the next login. Guarded so
+  // a direct-URL visit that skipped required steps isn't marked complete.
+  if (await requiredStepsComplete(orgId, userId, role)) {
+    await markOnboarded(orgId, userId)
+  }
 
   const supabase = createAdminClient()
   const [{ data: integrations }, { data: org }] = await Promise.all([

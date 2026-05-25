@@ -11,6 +11,22 @@ entries on top.
 
 ## 2026-05-24
 
+### Fixed
+- Onboarding no longer loops users who set up their workspace but didn't click
+  through to the final "All set" screen. `onboarded_at` was stamped only by the
+  done step's client-side effect, so connecting an integration mid-onboarding
+  (which bounced the user back to the integrations step) and then closing the
+  tab left it `null` forever — every subsequent login re-ran onboarding even
+  though, e.g., Slack was already connected. Now completion is stamped
+  server-side and idempotently (`markOnboarded`) once the required steps are
+  persisted (`requiredStepsComplete`): on *reaching* the integrations step and
+  again on the done screen as a backstop.
+- OAuth connect/install flows started from the onboarding integrations step now
+  carry an explicit `origin=onboarding` signal through the signed OAuth state,
+  so callbacks return the user to that step instead of inferring the
+  destination from `onboarded_at` (which is now set earlier). Settings-initiated
+  connects are unchanged.
+
 ### Changed
 - Extended the emerald brand theme across the app (52 files: landing page, public
   apply/schedule/intake flows, dashboard pages, and shared components). Converted
