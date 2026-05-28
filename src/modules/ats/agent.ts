@@ -22,6 +22,7 @@ const HRIS_TOOL_NAMES = new Set([
   'record_employee_note',
   'get_employee_compensation',
   'record_employee_compensation',
+  'get_direct_reports',
 ])
 const ORCHESTRATOR_ONLY = new Set(['request_approval'])
 

@@ -209,6 +209,51 @@ export async function listEmployeeEvents(
   return (data ?? []) as EmploymentEvent[]
 }
 
+// ── Org chart reads ──────────────────────────────────────────────────────────
+// Two queries we expose: one for "who reports to this person?" (detail page +
+// agent), and one for the full chart (flat list with manager_id so the page
+// builds the tree client-side; fine at current scale).
+
+export async function listDirectReports(
+  supabase: Supabase,
+  orgId: string,
+  managerEmployeeId: string,
+): Promise<EmployeeWithPerson[]> {
+  const { data, error } = await supabase
+    .from('employee_profiles')
+    .select('*, person:people(name, email)')
+    .eq('org_id', orgId)
+    .eq('manager_id', managerEmployeeId)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return (data ?? []) as unknown as EmployeeWithPerson[]
+}
+
+export interface OrgChartNode {
+  id: string
+  status: EmployeeStatus
+  manager_id: string | null
+  person: { name: string; email: string } | null
+}
+
+// Live people in the org chart (pending + active). Terminated are excluded so
+// the tree reflects the current reporting structure.
+export async function listOrgChart(
+  supabase: Supabase,
+  orgId: string,
+): Promise<OrgChartNode[]> {
+  const { data, error } = await supabase
+    .from('employee_profiles')
+    .select('id, status, manager_id, person:people(name, email)')
+    .eq('org_id', orgId)
+    .in('status', ['pending', 'active'])
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return (data ?? []) as unknown as OrgChartNode[]
+}
+
 // Append a manual note to an employee's timeline. The trigger-driven events
 // (hired/joined/manager_changed/terminated) are written by the data layer;
 // this is for human/agent observations that aren't a structural transition.

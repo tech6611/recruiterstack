@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   UserCog,
+  Network,
   Briefcase,
   ClipboardList,
   CheckSquare,
@@ -49,7 +50,8 @@ const NAV_SECTIONS: NavSection[] = [
     ? [{
         section: 'HRIS',
         items: [
-          { href: '/hris/employees', label: 'Employees', icon: UserCog },
+          { href: '/hris/employees',  label: 'Employees', icon: UserCog },
+          { href: '/hris/org-chart',  label: 'Org chart', icon: Network },
         ],
       }]
     : []),

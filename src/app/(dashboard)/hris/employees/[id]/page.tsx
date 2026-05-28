@@ -36,6 +36,18 @@ type EmployeeEvent = {
   recorded_by: string | null
 }
 
+type DirectReport = {
+  id: string
+  status: EmployeeStatus
+  person: { name: string; email: string } | null
+}
+
+const REPORT_STATUS_DOT: Record<EmployeeStatus, string> = {
+  pending:    'bg-amber-400',
+  active:     'bg-emerald-500',
+  terminated: 'bg-slate-300',
+}
+
 const STATUS_BADGE: Record<EmployeeStatus, string> = {
   pending:    'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
   active:     'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
@@ -105,21 +117,23 @@ export default function EmployeeDetailPage() {
   const { id }    = useParams<{ id: string }>()
   const { orgId } = useAuth()
   const router    = useRouter()
-  const [employee, setEmployee]     = useState<EmployeeDetail | null>(null)
-  const [events, setEvents]         = useState<EmployeeEvent[]>([])
+  const [employee, setEmployee]       = useState<EmployeeDetail | null>(null)
+  const [events, setEvents]           = useState<EmployeeEvent[]>([])
   const [currentComp, setCurrentComp] = useState<CompensationRecord | null>(null)
-  const [loading, setLoading]       = useState(true)
-  const [busy, setBusy]             = useState(false)
-  const [notFound, setNotFound]     = useState(false)
+  const [reports, setReports]         = useState<DirectReport[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [busy, setBusy]               = useState(false)
+  const [notFound, setNotFound]       = useState(false)
 
   const fetchAll = useCallback(async () => {
     if (!id) return
     setLoading(true)
     setNotFound(false)
-    const [empRes, evRes, compRes] = await Promise.all([
+    const [empRes, evRes, compRes, reportsRes] = await Promise.all([
       fetch(`/api/employees/${id}`),
       fetch(`/api/employees/${id}/events`),
       fetch(`/api/employees/${id}/compensation`),
+      fetch(`/api/employees/${id}/direct-reports`),
     ])
     if (empRes.status === 404) {
       setNotFound(true)
@@ -137,6 +151,10 @@ export default function EmployeeDetailPage() {
     if (compRes.ok) {
       const j = await compRes.json()
       setCurrentComp((j.data?.current ?? null) as CompensationRecord | null)
+    }
+    if (reportsRes.ok) {
+      const j = await reportsRes.json()
+      setReports((j.data ?? []) as DirectReport[])
     }
     setLoading(false)
   }, [id])
@@ -252,6 +270,33 @@ export default function EmployeeDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Direct reports */}
+          {reports.length > 0 && (
+            <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
+              <h2 className="mb-1 text-lg font-semibold text-slate-900">Direct reports</h2>
+              <p className="mb-4 text-xs text-slate-500">
+                {reports.length} {reports.length === 1 ? 'person reports' : 'people report'} to {employee.person?.name ?? 'this employee'}.
+              </p>
+              <ul className="divide-y divide-slate-100">
+                {reports.map(r => (
+                  <li key={r.id}>
+                    <Link
+                      href={`/hris/employees/${r.id}`}
+                      className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-slate-50"
+                    >
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${REPORT_STATUS_DOT[r.status]}`} />
+                      <span className="min-w-0 flex-1">
+                        <span className="font-medium text-slate-800">{r.person?.name ?? 'Unknown'}</span>
+                        <span className="ml-2 text-xs text-slate-400">{r.person?.email ?? ''}</span>
+                      </span>
+                      <span className="shrink-0 text-xs text-slate-400">{STATUS_LABEL[r.status]}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Timeline */}
           <div className="rounded-xl border border-slate-200 bg-white p-6">

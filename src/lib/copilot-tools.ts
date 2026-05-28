@@ -21,6 +21,7 @@ import {
 import { fetchLegacyAnalyticsInputs } from '@/modules/ats/domain/reporting'
 import {
   getEmployeeByPerson,
+  listDirectReports,
   listEmployeeEvents,
   listEmployees,
   markEmployeeJoined,
@@ -734,6 +735,17 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'get_direct_reports',
+    description: 'List the people who report directly to a given employee (their direct reports / team). Identify the manager by employee_id or person_email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string', description: 'UUID of the manager\'s employee_profile' },
+        person_email: { type: 'string', description: 'Email of the manager (alternative to employee_id)' },
+      },
+    },
+  },
+  {
     name: 'record_employee_compensation',
     description: 'Record a NEW compensation record for an employee — every change is a new row with an effective date (immutable history). The change auto-appears on the employee timeline. The orchestrator must request_approval BEFORE calling this.',
     input_schema: {
@@ -817,6 +829,7 @@ export async function executeTool(
       case 'record_employee_note':       return await recordEmployeeNoteTool(input, orgId, supabase)
       case 'get_employee_compensation':  return await getEmployeeCompensationTool(input, orgId, supabase)
       case 'record_employee_compensation': return await recordEmployeeCompensationTool(input, orgId, supabase)
+      case 'get_direct_reports':         return await getDirectReportsTool(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -2822,6 +2835,35 @@ async function getEmployeeCompensationTool(
     history.length > 1 ? `\nHistory (${history.length} record${history.length === 1 ? '' : 's'}):` : '',
     ...lines,
   ].filter(Boolean).join('\n')
+}
+
+async function getDirectReportsTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const resolved = await resolveEmployee(input, orgId, supabase)
+  if (typeof resolved === 'string') return resolved
+
+  const reports = await listDirectReports(supabase, orgId, resolved.id)
+  if (reports.length === 0) {
+    return 'No direct reports.'
+  }
+
+  const personIds = Array.from(new Set(reports.map(r => r.person_id).filter((p): p is string => Boolean(p))))
+  const { data: people } = await supabase
+    .from('people')
+    .select('id, name, email')
+    .in('id', personIds)
+  const byId = new Map((people ?? []).map(p => [(p as { id: string }).id, p as { id: string; name: string; email: string }]))
+
+  const lines = reports.map(r => {
+    const person = r.person_id ? byId.get(r.person_id) : null
+    const who = person ? `${person.name} (${person.email})` : (r.person_id ?? r.id)
+    return `• ${who} — ${r.status} [employee_id: ${r.id}]`
+  })
+  return `${reports.length} direct report${reports.length === 1 ? '' : 's'}:\n${lines.join('\n')}`
 }
 
 async function recordEmployeeCompensationTool(
