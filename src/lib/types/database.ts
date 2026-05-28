@@ -121,6 +121,7 @@ export interface EmployeeProfile {
   application_id: string | null
   department_id: string | null
   manager_id: string | null
+  user_id: string | null
   status: EmployeeStatus
   hired_at: string | null
   start_date: string | null
@@ -202,7 +203,7 @@ export interface CompensationRecordInsert
 export interface CompensationRecordUpdate extends Partial<CompensationRecordInsert> {}
 
 export interface EmployeeProfileInsert
-  extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
+  extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'user_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
   id?: string
   created_at?: string
   updated_at?: string
@@ -211,6 +212,7 @@ export interface EmployeeProfileInsert
   application_id?: string | null
   department_id?: string | null
   manager_id?: string | null
+  user_id?: string | null
   hired_at?: string | null
   start_date?: string | null
   joined_at?: string | null

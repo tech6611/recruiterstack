@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 
-type ApproverType = 'user' | 'role' | 'hiring_team_member' | 'group'
+type ApproverType = 'user' | 'role' | 'hiring_team_member' | 'group' | 'manager'
 type TargetType   = 'opening' | 'job' | 'offer'
 type ConditionOp  = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists'
 
@@ -127,6 +127,7 @@ export function ChainBuilder({ mode, chainId, initial }: Props) {
           s.approver_type === 'user'                ? { user_id: s.approver_user_id }
           : s.approver_type === 'role'              ? { role: s.approver_role }
           : s.approver_type === 'group'             ? { group_id: s.approver_group_id }
+          : s.approver_type === 'manager'           ? {}
           : /* hiring_team_member */                  { role: s.approver_team_role },
         min_approvals: s.min_approvals,
         sla_hours:     s.sla_hours ?? null,
@@ -232,6 +233,7 @@ export function ChainBuilder({ mode, chainId, initial }: Props) {
                       <option value="role">Org role</option>
                       <option value="hiring_team_member">Hiring team role</option>
                       <option value="group">Approval group</option>
+                      <option value="manager">Requester&rsquo;s manager (HRIS)</option>
                     </Select>
                   </div>
 
@@ -282,6 +284,17 @@ export function ChainBuilder({ mode, chainId, initial }: Props) {
                           <option key={g.id} value={g.id}>{g.name} · {g.member_count} member{g.member_count === 1 ? '' : 's'}</option>
                         ))}
                       </Select>
+                    </div>
+                  )}
+
+                  {s.approver_type === 'manager' && (
+                    <div className="space-y-1 col-span-2">
+                      <Label className="text-xs">Resolution</Label>
+                      <p className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-900">
+                        Routes to the requester&rsquo;s direct manager from the HRIS reporting structure
+                        (resolved at step activation). Requires the requester to have an employee record
+                        with a manager set, and the manager to be a user in this org.
+                      </p>
                     </div>
                   )}
                 </div>

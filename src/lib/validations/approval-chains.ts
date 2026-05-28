@@ -18,7 +18,8 @@ export const chainStepInputSchema = z.object({
   step_type:         z.enum(['sequential', 'parallel']).default('sequential'),
   parallel_group_id: z.string().uuid().nullable().optional(),
   condition:         conditionNode.nullable().optional(),
-  approver_type:     z.enum(['user', 'role', 'hiring_team_member', 'group']),
+  approver_type:     z.enum(['user', 'role', 'hiring_team_member', 'group', 'manager']),
+  // `manager` carries no value (requester is the context); `{}` is valid.
   approver_value:    z.record(z.string(), z.unknown()),
   min_approvals:     z.number().int().min(1).default(1),
   sla_hours:         z.number().int().min(1).nullable().optional(),

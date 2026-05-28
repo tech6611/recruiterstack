@@ -239,7 +239,10 @@ async function activateNextStep(approvalId: string, requesterId: string): Promis
     const cs = chainStepById.get(step.chain_step_id)
     if (!cs) continue
     const approvers = await resolveApprovers(cs.approver_type, cs.approver_value, {
-      orgId: approval.org_id, targetType: approval.target_type, targetId: approval.target_id,
+      orgId:       approval.org_id,
+      targetType:  approval.target_type,
+      targetId:    approval.target_id,
+      requesterId,
     })
     const due = cs.sla_hours ? new Date(Date.now() + cs.sla_hours * 3600 * 1000).toISOString() : null
     await supabase

@@ -6,7 +6,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { ChainBuilder } from '@/components/approvals/ChainBuilder'
 import type { ApprovalChain, ApprovalChainStep } from '@/lib/types/approvals'
 
-type BuilderApproverType = 'user' | 'role' | 'hiring_team_member' | 'group'
+type BuilderApproverType = 'user' | 'role' | 'hiring_team_member' | 'group' | 'manager'
 type BuilderConditionOp  = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists'
 
 export default async function EditChainPage({ params }: { params: { id: string } }) {

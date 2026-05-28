@@ -53,9 +53,12 @@ async function applyDelegationToList(userIds: string[]): Promise<string[]> {
 }
 
 interface ResolveContext {
-  orgId:      string
-  targetType: 'opening' | 'job' | 'offer'
-  targetId:   string
+  orgId:       string
+  targetType:  'opening' | 'job' | 'offer'
+  targetId:    string
+  // requester's user_id — used by approver_type='manager' to walk the HRIS
+  // reporting structure to the requester's manager at activation time.
+  requesterId: string
 }
 
 export async function resolveApprovers(
@@ -175,6 +178,38 @@ async function rawApproverIds(
         .select('user_id')
         .eq('group_id', groupId)
       return (data ?? []).map(r => (r as { user_id: string }).user_id)
+    }
+
+    case 'manager': {
+      // Route to the requester's direct manager via the HRIS reporting line.
+      // Bridge: users(requesterId) → employee_profile(user_id) → manager_id
+      // → manager's employee_profile(user_id). Returns empty if any link is
+      // missing (requester has no employee record, no manager set, or the
+      // manager has no Clerk user) — the engine will surface an empty step.
+      if (!ctx.requesterId) return []
+
+      const { data: requesterEmp } = await supabase
+        .from('employee_profiles')
+        .select('manager_id')
+        .eq('org_id',  ctx.orgId)
+        .eq('user_id', ctx.requesterId)
+        .in('status', ['pending', 'active'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const managerEmpId = (requesterEmp as { manager_id: string | null } | null)?.manager_id
+      if (!managerEmpId) return []
+
+      const { data: manager } = await supabase
+        .from('employee_profiles')
+        .select('user_id')
+        .eq('id',     managerEmpId)
+        .eq('org_id', ctx.orgId)
+        .maybeSingle()
+
+      const managerUserId = (manager as { user_id: string | null } | null)?.user_id
+      return managerUserId ? [managerUserId] : []
     }
 
     default:

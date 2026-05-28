@@ -40,14 +40,16 @@ export type ApprovalStepStatus =
   | 'skipped'
   | 'not_applicable'
 
-export type ApproverType = 'user' | 'role' | 'hiring_team_member' | 'group'
+export type ApproverType = 'user' | 'role' | 'hiring_team_member' | 'group' | 'manager'
 export type ChainStepType = 'sequential' | 'parallel'
 
 // Shape of approver_value JSONB — varies by approver_type.
+// `manager` carries no value (requester is the context); shape is `{}`.
 export type ApproverValue =
   | { user_id: string }                                     // user
   | { role: string }                                        // role (org role) OR hiring_team_member (role-in-team)
   | { group_id: string }                                    // group
+  | Record<string, never>                                   // manager — empty {}
 
 // Shape of approval_steps.approvers JSONB
 export interface ResolvedApprover {
