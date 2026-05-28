@@ -23,6 +23,9 @@ const HRIS_TOOL_NAMES = new Set([
   'get_employee_compensation',
   'record_employee_compensation',
   'get_direct_reports',
+  'request_time_off',
+  'list_time_off',
+  'decide_time_off',
 ])
 const ORCHESTRATOR_ONLY = new Set(['request_approval'])
 

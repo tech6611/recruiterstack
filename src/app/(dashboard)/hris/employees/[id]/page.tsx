@@ -8,13 +8,24 @@ import {
   ArrowLeft,
   BadgeCheck,
   Briefcase,
+  Calendar,
+  Check,
   DollarSign,
   GitBranch,
   LogOut,
   StickyNote,
+  X,
 } from 'lucide-react'
 import { flags } from '@/lib/flags'
-import type { CompensationRecord, EmployeeStatus, EmploymentEventType } from '@/lib/types/database'
+import { inputCls, labelCls } from '@/lib/ui/styles'
+import type {
+  CompensationRecord,
+  EmployeeStatus,
+  EmploymentEventType,
+  TimeOffRequest,
+  TimeOffRequestType,
+  TimeOffStatus,
+} from '@/lib/types/database'
 
 type EmployeeDetail = {
   id: string
@@ -61,12 +72,23 @@ const STATUS_LABEL: Record<EmployeeStatus, string> = {
 }
 
 const EVENT_META: Record<EmploymentEventType, { icon: typeof BadgeCheck; tone: string; ring: string; title: string }> = {
-  hired:           { icon: Briefcase,  tone: 'text-amber-600',   ring: 'ring-amber-200',   title: 'Hired (pre-hire)' },
-  joined:          { icon: BadgeCheck, tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Joined the org' },
-  manager_changed: { icon: GitBranch,  tone: 'text-blue-600',    ring: 'ring-blue-200',    title: 'Manager changed' },
-  comp_changed:    { icon: DollarSign, tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Compensation changed' },
-  terminated:      { icon: LogOut,     tone: 'text-slate-500',   ring: 'ring-slate-200',   title: 'Terminated' },
-  note:            { icon: StickyNote, tone: 'text-slate-600',   ring: 'ring-slate-200',   title: 'Note' },
+  hired:               { icon: Briefcase,  tone: 'text-amber-600',   ring: 'ring-amber-200',   title: 'Hired (pre-hire)' },
+  joined:              { icon: BadgeCheck, tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Joined the org' },
+  manager_changed:     { icon: GitBranch,  tone: 'text-blue-600',    ring: 'ring-blue-200',    title: 'Manager changed' },
+  comp_changed:        { icon: DollarSign, tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Compensation changed' },
+  terminated:          { icon: LogOut,     tone: 'text-slate-500',   ring: 'ring-slate-200',   title: 'Terminated' },
+  note:                { icon: StickyNote, tone: 'text-slate-600',   ring: 'ring-slate-200',   title: 'Note' },
+  time_off_requested:  { icon: Calendar,   tone: 'text-blue-600',    ring: 'ring-blue-200',    title: 'Time-off requested' },
+  time_off_approved:   { icon: Check,      tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Time-off approved' },
+  time_off_rejected:   { icon: X,          tone: 'text-rose-600',    ring: 'ring-rose-200',    title: 'Time-off rejected' },
+  time_off_cancelled:  { icon: X,          tone: 'text-slate-500',   ring: 'ring-slate-200',   title: 'Time-off cancelled' },
+}
+
+const TIMEOFF_STATUS_BADGE: Record<TimeOffStatus, string> = {
+  pending:    'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+  approved:   'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  rejected:   'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
+  cancelled:  'bg-slate-100 text-slate-500 ring-1 ring-slate-200',
 }
 
 function fmtMoney(amount: number | null | undefined, currency: string | null | undefined): string {
@@ -108,6 +130,17 @@ function eventDetail(e: EmployeeEvent): string | null {
       const suffix = [freq && `(${freq})`, reason].filter(Boolean).join(' · ')
       return suffix ? `${change} — ${suffix}` : change
     }
+    case 'time_off_requested':
+    case 'time_off_approved':
+    case 'time_off_rejected':
+    case 'time_off_cancelled': {
+      const type = (e.details?.request_type as string) ?? 'time off'
+      const start = (e.details?.start_date as string) ?? ''
+      const end   = (e.details?.end_date as string) ?? ''
+      const range = start === end ? start : `${start} → ${end}`
+      const note  = (e.details?.decided_note as string | null) ?? null
+      return `${type} · ${range}${note ? ` — ${note}` : ''}`
+    }
     default:
       return null
   }
@@ -121,19 +154,29 @@ export default function EmployeeDetailPage() {
   const [events, setEvents]           = useState<EmployeeEvent[]>([])
   const [currentComp, setCurrentComp] = useState<CompensationRecord | null>(null)
   const [reports, setReports]         = useState<DirectReport[]>([])
+  const [timeOff, setTimeOff]         = useState<TimeOffRequest[]>([])
   const [loading, setLoading]         = useState(true)
   const [busy, setBusy]               = useState(false)
   const [notFound, setNotFound]       = useState(false)
+
+  // Inline "request time off" form state.
+  const [showTimeOffForm, setShowTimeOffForm] = useState(false)
+  const [toType, setToType]           = useState<TimeOffRequestType>('vacation')
+  const [toStart, setToStart]         = useState('')
+  const [toEnd, setToEnd]             = useState('')
+  const [toReason, setToReason]       = useState('')
+  const [submittingTO, setSubmittingTO] = useState(false)
 
   const fetchAll = useCallback(async () => {
     if (!id) return
     setLoading(true)
     setNotFound(false)
-    const [empRes, evRes, compRes, reportsRes] = await Promise.all([
+    const [empRes, evRes, compRes, reportsRes, timeOffRes] = await Promise.all([
       fetch(`/api/employees/${id}`),
       fetch(`/api/employees/${id}/events`),
       fetch(`/api/employees/${id}/compensation`),
       fetch(`/api/employees/${id}/direct-reports`),
+      fetch(`/api/employees/${id}/time-off`),
     ])
     if (empRes.status === 404) {
       setNotFound(true)
@@ -156,6 +199,10 @@ export default function EmployeeDetailPage() {
       const j = await reportsRes.json()
       setReports((j.data ?? []) as DirectReport[])
     }
+    if (timeOffRes.ok) {
+      const j = await timeOffRes.json()
+      setTimeOff((j.data ?? []) as TimeOffRequest[])
+    }
     setLoading(false)
   }, [id])
 
@@ -172,6 +219,36 @@ export default function EmployeeDetailPage() {
     })
     if (res.ok) await fetchAll()
     setBusy(false)
+  }
+
+  async function submitTimeOff() {
+    if (!toStart || !toEnd) return
+    setSubmittingTO(true)
+    const res = await fetch(`/api/employees/${id}/time-off`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        request_type: toType,
+        start_date: toStart,
+        end_date: toEnd,
+        reason: toReason || null,
+      }),
+    })
+    if (res.ok) {
+      setShowTimeOffForm(false)
+      setToType('vacation'); setToStart(''); setToEnd(''); setToReason('')
+      await fetchAll()
+    }
+    setSubmittingTO(false)
+  }
+
+  async function decideTimeOff(requestId: string, action: 'approve' | 'reject' | 'cancel') {
+    const res = await fetch(`/api/time-off/${requestId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    if (res.ok) await fetchAll()
   }
 
   if (!flags.hris) {
@@ -297,6 +374,107 @@ export default function EmployeeDetailPage() {
               </ul>
             </div>
           )}
+
+          {/* Time off */}
+          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Time off</h2>
+                <p className="text-xs text-slate-500">
+                  Requests auto-route to the manager set in the HRIS reporting structure.
+                </p>
+              </div>
+              {!showTimeOffForm && (
+                <button
+                  onClick={() => setShowTimeOffForm(true)}
+                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                >
+                  Request time off
+                </button>
+              )}
+            </div>
+
+            {showTimeOffForm && (
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div>
+                    <label className={labelCls}>Type</label>
+                    <select className={inputCls} value={toType} onChange={e => setToType(e.target.value as TimeOffRequestType)}>
+                      <option value="vacation">Vacation</option>
+                      <option value="sick">Sick</option>
+                      <option value="personal">Personal</option>
+                      <option value="unpaid">Unpaid</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Start</label>
+                    <input type="date" className={inputCls} value={toStart} onChange={e => setToStart(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>End</label>
+                    <input type="date" className={inputCls} value={toEnd} onChange={e => setToEnd(e.target.value)} />
+                  </div>
+                  <div className="sm:col-span-1">
+                    <label className={labelCls}>Reason (optional)</label>
+                    <input className={inputCls} value={toReason} onChange={e => setToReason(e.target.value)} placeholder="Anniversary" />
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    onClick={() => setShowTimeOffForm(false)}
+                    disabled={submittingTO}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={submitTimeOff}
+                    disabled={!toStart || !toEnd || submittingTO}
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {submittingTO ? 'Submitting…' : 'Submit request'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {timeOff.length === 0 ? (
+              <p className="py-2 text-sm text-slate-400">No time-off requests yet.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {timeOff.map(r => (
+                  <li key={r.id} className="flex items-center gap-3 px-2 py-2 text-sm">
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium text-slate-800 capitalize">{r.request_type}</span>
+                      <span className="ml-2 text-slate-500">
+                        {r.start_date === r.end_date ? r.start_date : `${r.start_date} → ${r.end_date}`}
+                      </span>
+                      {r.reason && <span className="ml-2 text-xs text-slate-400">— {r.reason}</span>}
+                    </span>
+                    <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TIMEOFF_STATUS_BADGE[r.status]}`}>
+                      {r.status}
+                    </span>
+                    {r.status === 'pending' && (
+                      <span className="flex shrink-0 gap-1">
+                        <button
+                          onClick={() => decideTimeOff(r.id, 'approve')}
+                          className="rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                        >Approve</button>
+                        <button
+                          onClick={() => decideTimeOff(r.id, 'reject')}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                        >Reject</button>
+                        <button
+                          onClick={() => decideTimeOff(r.id, 'cancel')}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                        >Cancel</button>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           {/* Timeline */}
           <div className="rounded-xl border border-slate-200 bg-white p-6">

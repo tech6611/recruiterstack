@@ -35,8 +35,22 @@ import {
   listCompensationHistory,
   recordCompensation,
 } from '@/modules/hris/domain/compensation'
+import {
+  approveTimeOffRequest,
+  cancelTimeOffRequest,
+  createTimeOffRequest,
+  formatTimeOffRange,
+  listTimeOffRequests,
+  rejectTimeOffRequest,
+} from '@/modules/hris/domain/time-off'
 import { findPersonByEmail } from '@/modules/core/domain/people'
-import type { EmployeeProfile, EmployeeStatus, HiringRequestUpdate } from '@/lib/types/database'
+import type {
+  EmployeeProfile,
+  EmployeeStatus,
+  HiringRequestUpdate,
+  TimeOffRequestType,
+  TimeOffStatus,
+} from '@/lib/types/database'
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
@@ -735,6 +749,48 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'request_time_off',
+    description: 'Submit a time-off request for an employee. The approver is auto-set to their manager (from the HRIS reporting structure). The orchestrator must request_approval BEFORE calling this.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string', description: 'UUID of the employee' },
+        person_email: { type: 'string', description: 'Email of the employee (alternative to employee_id)' },
+        request_type: { type: 'string', enum: ['vacation', 'sick', 'personal', 'unpaid'] },
+        start_date:   { type: 'string', description: 'First day off (YYYY-MM-DD)' },
+        end_date:     { type: 'string', description: 'Last day off, inclusive (YYYY-MM-DD)' },
+        hours_total:  { type: 'number', description: 'Total hours (optional; useful for partial-day or hourly schedules)' },
+        reason:       { type: 'string', description: 'Optional reason / note' },
+      },
+      required: ['request_type', 'start_date', 'end_date'],
+    },
+  },
+  {
+    name: 'list_time_off',
+    description: 'List time-off requests for an employee, optionally filtered by status (pending | approved | rejected | cancelled).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string' },
+        person_email: { type: 'string' },
+        status:       { type: 'string', enum: ['pending', 'approved', 'rejected', 'cancelled'] },
+      },
+    },
+  },
+  {
+    name: 'decide_time_off',
+    description: 'Approve, reject, or cancel a pending time-off request. Identify by request_id (from list_time_off).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        request_id: { type: 'string', description: 'UUID of the time_off_request' },
+        action:     { type: 'string', enum: ['approve', 'reject', 'cancel'] },
+        note:       { type: 'string', description: 'Optional note explaining the decision' },
+      },
+      required: ['request_id', 'action'],
+    },
+  },
+  {
     name: 'get_direct_reports',
     description: 'List the people who report directly to a given employee (their direct reports / team). Identify the manager by employee_id or person_email.',
     input_schema: {
@@ -830,6 +886,9 @@ export async function executeTool(
       case 'get_employee_compensation':  return await getEmployeeCompensationTool(input, orgId, supabase)
       case 'record_employee_compensation': return await recordEmployeeCompensationTool(input, orgId, supabase)
       case 'get_direct_reports':         return await getDirectReportsTool(input, orgId, supabase)
+      case 'request_time_off':           return await requestTimeOffTool(input, orgId, supabase)
+      case 'list_time_off':              return await listTimeOffTool(input, orgId, supabase)
+      case 'decide_time_off':            return await decideTimeOffTool(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -2716,6 +2775,17 @@ function formatEventLine(e: { event_type: string; occurred_at: string; details: 
         : `set to ${cur} ${(to ?? 0).toLocaleString()}`
       return `${when} — comp changed (${change}${freq ? ` / ${freq}` : ''}${reason ? `, ${reason}` : ''})`
     }
+    case 'time_off_requested':
+    case 'time_off_approved':
+    case 'time_off_rejected':
+    case 'time_off_cancelled': {
+      const type   = (e.details?.request_type as string) ?? 'time off'
+      const start  = (e.details?.start_date as string) ?? ''
+      const end    = (e.details?.end_date as string) ?? ''
+      const range  = start === end ? start : `${start} → ${end}`
+      const verb   = e.event_type.replace('time_off_', '')
+      return `${when} — ${type} ${verb} (${range})`
+    }
     default:                return `${when} — ${e.event_type}`
   }
 }
@@ -2896,4 +2966,83 @@ async function recordEmployeeCompensationTool(
   })
 
   return `Compensation recorded: ${formatComp(created)} effective ${created.effective_date}. A comp_changed event was logged on the timeline.`
+}
+
+// ── Time-off tools (HRIS depth — time-off slice) ─────────────────────────────
+
+async function requestTimeOffTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const resolved = await resolveEmployee(input, orgId, supabase)
+  if (typeof resolved === 'string') return resolved
+
+  const rt = input.request_type as TimeOffRequestType | undefined
+  if (!rt) return 'Provide request_type (vacation | sick | personal | unpaid).'
+  if (typeof input.start_date !== 'string' || typeof input.end_date !== 'string') {
+    return 'Provide start_date and end_date (YYYY-MM-DD).'
+  }
+
+  const created = await createTimeOffRequest(supabase, orgId, {
+    employeeId:  resolved.id,
+    requestType: rt,
+    startDate:   input.start_date,
+    endDate:     input.end_date,
+    hoursTotal:  input.hours_total ?? null,
+    reason:      input.reason      ?? null,
+  })
+
+  const approverLine = created.approver_user_id
+    ? `Awaiting approval from the employee's manager.`
+    : `No manager set on the employee record — request is pending and an admin can decide it.`
+  return `Time-off requested: ${rt}, ${formatTimeOffRange(created)} [request_id: ${created.id}]. ${approverLine}`
+}
+
+async function listTimeOffTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const resolved = await resolveEmployee(input, orgId, supabase)
+  if (typeof resolved === 'string') return resolved
+
+  const status = input.status as TimeOffStatus | undefined
+  const requests = await listTimeOffRequests(supabase, orgId, { employeeId: resolved.id, status })
+  if (requests.length === 0) {
+    return status ? `No ${status} time-off requests.` : 'No time-off requests on record.'
+  }
+
+  const lines = requests.map(r => {
+    const reason = r.reason ? ` — ${r.reason}` : ''
+    return `• ${r.request_type} | ${formatTimeOffRange(r)} | ${r.status}${reason} [request_id: ${r.id}]`
+  })
+  return `${requests.length} request${requests.length === 1 ? '' : 's'}:\n${lines.join('\n')}`
+}
+
+async function decideTimeOffTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const requestId = typeof input.request_id === 'string' ? input.request_id : ''
+  if (!requestId) return 'Provide request_id (from list_time_off).'
+
+  const action = input.action as 'approve' | 'reject' | 'cancel' | undefined
+  if (!action) return 'Provide action: approve | reject | cancel.'
+
+  const note = typeof input.note === 'string' ? input.note : null
+  try {
+    const fn =
+      action === 'approve' ? approveTimeOffRequest
+      : action === 'reject' ? rejectTimeOffRequest
+      :                       cancelTimeOffRequest
+    const updated = await fn(supabase, orgId, requestId, { note })
+    return `Time-off request ${updated.status}: ${updated.request_type}, ${formatTimeOffRange(updated)}.`
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Failed to decide on the request.'
+  }
 }

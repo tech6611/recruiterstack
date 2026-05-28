@@ -141,6 +141,10 @@ export type EmploymentEventType =
   | 'terminated'
   | 'note'
   | 'comp_changed'
+  | 'time_off_requested'
+  | 'time_off_approved'
+  | 'time_off_rejected'
+  | 'time_off_cancelled'
 
 export interface EmploymentEvent {
   id: string
@@ -201,6 +205,50 @@ export interface CompensationRecordInsert
 }
 
 export interface CompensationRecordUpdate extends Partial<CompensationRecordInsert> {}
+
+// Time-off requests — lightweight per-request approval, NOT routed through the
+// formal approvals engine. Approver is auto-resolved at create time to the
+// requester's manager via employee_profiles.user_id (bridge from migration 050).
+export type TimeOffRequestType = 'vacation' | 'sick' | 'personal' | 'unpaid'
+export type TimeOffStatus      = 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+export interface TimeOffRequest {
+  id: string
+  org_id: string
+  employee_id: string
+  request_type: TimeOffRequestType
+  start_date: string                    // YYYY-MM-DD
+  end_date: string                      // YYYY-MM-DD
+  hours_total: number | null
+  reason: string | null
+  status: TimeOffStatus
+  approver_user_id: string | null
+  decided_at: string | null
+  decided_by: string | null
+  decided_note: string | null
+  requested_at: string
+  requested_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TimeOffRequestInsert
+  extends Omit<TimeOffRequest, 'id' | 'created_at' | 'updated_at' | 'requested_at' | 'hours_total' | 'reason' | 'status' | 'approver_user_id' | 'decided_at' | 'decided_by' | 'decided_note' | 'requested_by'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  requested_at?: string
+  hours_total?: number | null
+  reason?: string | null
+  status?: TimeOffStatus
+  approver_user_id?: string | null
+  decided_at?: string | null
+  decided_by?: string | null
+  decided_note?: string | null
+  requested_by?: string | null
+}
+
+export interface TimeOffRequestUpdate extends Partial<TimeOffRequestInsert> {}
 
 export interface EmployeeProfileInsert
   extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'user_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
@@ -977,6 +1025,12 @@ export type Database = {
         Row: Indexify<CompensationRecord>
         Insert: Indexify<CompensationRecordInsert>
         Update: Indexify<CompensationRecordUpdate>
+        Relationships: []
+      }
+      time_off_requests: {
+        Row: Indexify<TimeOffRequest>
+        Insert: Indexify<TimeOffRequestInsert>
+        Update: Indexify<TimeOffRequestUpdate>
         Relationships: []
       }
       candidates: {
