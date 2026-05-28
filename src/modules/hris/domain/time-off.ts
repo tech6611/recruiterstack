@@ -6,6 +6,7 @@ import type {
   TimeOffRequestType,
   TimeOffStatus,
 } from '@/lib/types/database'
+import { createNotification } from '@/lib/api/notify'
 
 type Supabase = SupabaseClient<Database>
 
@@ -74,7 +75,26 @@ export async function createTimeOffRequest(
     .single()
 
   if (error) throw error
-  return data as TimeOffRequest
+  const created = data as TimeOffRequest
+
+  // Notify the assigned approver (manager). Fire-and-forget — notification
+  // failure must never block the request itself.
+  if (created.approver_user_id) {
+    const range = created.start_date === created.end_date
+      ? created.start_date
+      : `${created.start_date} → ${created.end_date}`
+    void createNotification({
+      orgId:        orgId,
+      userId:       created.approver_user_id,
+      type:         'time_off_requested',
+      title:        `New ${created.request_type} request`,
+      body:         range,
+      resourceType: 'time_off_request',
+      resourceId:   created.id,
+    })
+  }
+
+  return created
 }
 
 export interface ListTimeOffFilter {
@@ -134,7 +154,25 @@ async function transitionTimeOff(
   if (!data) {
     throw new Error('Request not found or not in pending status (already decided?).')
   }
-  return data as TimeOffRequest
+  const updated = data as TimeOffRequest
+
+  // Notify the requester that their request was decided. fire-and-forget.
+  if (updated.requested_by) {
+    const range = updated.start_date === updated.end_date
+      ? updated.start_date
+      : `${updated.start_date} → ${updated.end_date}`
+    void createNotification({
+      orgId,
+      userId:       updated.requested_by,
+      type:         'time_off_decided',
+      title:        `Your ${updated.request_type} request was ${status}`,
+      body:         range,
+      resourceType: 'time_off_request',
+      resourceId:   updated.id,
+    })
+  }
+
+  return updated
 }
 
 export async function approveTimeOffRequest(

@@ -5,6 +5,7 @@ import type {
   Database,
   PayFrequency,
 } from '@/lib/types/database'
+import { createNotification } from '@/lib/api/notify'
 
 type Supabase = SupabaseClient<Database>
 
@@ -93,7 +94,30 @@ export async function recordCompensation(
     .single()
 
   if (error) throw error
-  return data as CompensationRecord
+  const created = data as CompensationRecord
+
+  // Notify the affected employee (if they're a Clerk user) that their
+  // compensation was updated. fire-and-forget.
+  const { data: emp } = await supabase
+    .from('employee_profiles')
+    .select('user_id')
+    .eq('id', created.employee_id)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  const empUserId = (emp as { user_id: string | null } | null)?.user_id ?? null
+  if (empUserId) {
+    void createNotification({
+      orgId,
+      userId:       empUserId,
+      type:         'comp_changed',
+      title:        'Your compensation was updated',
+      body:         `${formatComp(created)} effective ${created.effective_date}`,
+      resourceType: 'compensation_record',
+      resourceId:   created.id,
+    })
+  }
+
+  return created
 }
 
 export function formatComp(c: CompensationRecord | null | undefined): string {

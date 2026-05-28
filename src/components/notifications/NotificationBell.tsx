@@ -12,6 +12,8 @@ import {
   ArrowRight,
   AlertCircle,
   Clock,
+  DollarSign,
+  GitBranch,
   Info,
 } from 'lucide-react'
 import { timeAgo } from '@/lib/ui/date-utils'
@@ -38,17 +40,25 @@ const TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string }> = 
   stage_moved:          { icon: ArrowRight,   color: 'bg-emerald-500' },
   offer_extended:       { icon: Check,        color: 'bg-green-500' },
   task_due:             { icon: Clock,        color: 'bg-red-500' },
-  system:              { icon: Info,          color: 'bg-slate-500' },
+  system:               { icon: Info,         color: 'bg-slate-500' },
+  // HRIS:
+  time_off_requested:   { icon: Calendar,     color: 'bg-amber-500' },
+  time_off_decided:     { icon: Check,        color: 'bg-emerald-500' },
+  manager_changed:      { icon: GitBranch,    color: 'bg-blue-500' },
+  comp_changed:         { icon: DollarSign,   color: 'bg-emerald-500' },
 }
 
 function resourceHref(type: string | null, id: string | null): string | null {
   if (!type || !id) return null
   switch (type) {
-    case 'candidate':    return `/candidates/${id}`
-    case 'application':  return `/candidates/${id}`
-    case 'job':          return `/jobs/${id}`
-    case 'role':         return `/roles/${id}`
-    default:             return null
+    case 'candidate':           return `/candidates/${id}`
+    case 'application':         return `/candidates/${id}`
+    case 'job':                 return `/jobs/${id}`
+    case 'role':                return `/roles/${id}`
+    case 'time_off_request':    return '/me/time-off'
+    case 'employee':            return `/hris/employees/${id}`
+    case 'compensation_record': return '/me' // overview shows current comp
+    default:                    return null
   }
 }
 

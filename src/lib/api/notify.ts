@@ -9,6 +9,11 @@ export type NotificationType =
   | 'offer_extended'
   | 'task_due'
   | 'system'
+  // HRIS notifications (wired from the HRIS domain write paths):
+  | 'time_off_requested'    // sent to the assigned approver when a request is submitted
+  | 'time_off_decided'      // sent to the requester when their request is approved/rejected/cancelled
+  | 'manager_changed'       // sent to the new manager when someone starts reporting to them
+  | 'comp_changed'          // sent to the affected employee when their compensation is updated
 
 interface CreateNotificationParams {
   orgId: string

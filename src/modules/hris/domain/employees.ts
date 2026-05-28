@@ -5,6 +5,7 @@ import type {
   EmployeeStatus,
   EmploymentEvent,
 } from '@/lib/types/database'
+import { createNotification } from '@/lib/api/notify'
 
 type Supabase = SupabaseClient<Database>
 
@@ -210,7 +211,41 @@ export async function setEmployeeManager(
     .single()
 
   if (error) throw error
-  return data as EmployeeProfile
+  const updated = data as EmployeeProfile
+
+  // Notify the new manager (if any, and if they're a Clerk user) that a
+  // direct report now reports to them. The report's own timeline already
+  // records the change via the DB trigger from migration 048.
+  if (managerId) {
+    const { data: mgr } = await supabase
+      .from('employee_profiles')
+      .select('user_id')
+      .eq('id', managerId)
+      .eq('org_id', orgId)
+      .maybeSingle()
+    const mgrUserId = (mgr as { user_id: string | null } | null)?.user_id ?? null
+
+    let reportName: string | null = null
+    if (updated.person_id) {
+      const { data: p } = await supabase
+        .from('people').select('name').eq('id', updated.person_id).maybeSingle()
+      reportName = (p as { name: string | null } | null)?.name ?? null
+    }
+
+    if (mgrUserId) {
+      void createNotification({
+        orgId,
+        userId:       mgrUserId,
+        type:         'manager_changed',
+        title:        `${reportName ?? 'A new employee'} now reports to you`,
+        body:         'Visit /hris/employees to see their record.',
+        resourceType: 'employee',
+        resourceId:   employeeId,
+      })
+    }
+  }
+
+  return updated
 }
 
 // ── Employment audit log (the timeline) ──────────────────────────────────────
