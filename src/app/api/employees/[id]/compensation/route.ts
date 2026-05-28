@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { requireOrgAndUser } from '@/lib/auth'
 import { parseBody } from '@/lib/api/helpers'
+import { assertAdmin, assertCanViewSensitive, getViewerScope } from '@/lib/rbac'
 import { compensationInsertSchema } from '@/lib/validations/employees'
 import {
   getCurrentCompensation,
@@ -9,18 +10,21 @@ import {
   recordCompensation,
 } from '@/modules/hris/domain/compensation'
 
-// GET /api/employees/[id]/compensation
-// Returns { current, history } — current = most recent record by effective_date,
-// history = all records (newest first).
+// GET /api/employees/[id]/compensation — admin or self only (sensitive).
+// Returns { current, history }.
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
 
   const supabase = createAdminClient()
+  const scope = await getViewerScope(supabase, orgId, userId)
+  const guard = assertCanViewSensitive(scope, params.id)
+  if (guard) return guard
+
   try {
     const [current, history] = await Promise.all([
       getCurrentCompensation(supabase, orgId, params.id),
@@ -35,20 +39,24 @@ export async function GET(
   }
 }
 
-// POST /api/employees/[id]/compensation — record a new comp. Immutable history:
+// POST /api/employees/[id]/compensation — admin only. Immutable history:
 // corrections go in as a new corrective record, never as an update.
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
+
+  const supabase = createAdminClient()
+  const scope = await getViewerScope(supabase, orgId, userId)
+  const guard = assertAdmin(scope)
+  if (guard) return guard
 
   const parsed = await parseBody(req, compensationInsertSchema)
   if (parsed instanceof NextResponse) return parsed
 
-  const supabase = createAdminClient()
   try {
     const data = await recordCompensation(supabase, orgId, {
       employeeId:       params.id,

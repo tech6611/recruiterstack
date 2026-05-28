@@ -28,9 +28,10 @@ import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { flags } from '@/lib/flags'
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard }
-type NavSection = { section: string | null; items: NavItem[] }
+type NavSection = { section: string | null; items: NavItem[]; adminOnly?: boolean }
 
-// Grouped into platform modules so the suite structure is visible.
+// Grouped into platform modules so the suite structure is visible. Admin-only
+// sections are filtered out at render time for non-admin viewers.
 const NAV_SECTIONS: NavSection[] = [
   {
     section: null, // ungrouped top items
@@ -63,6 +64,7 @@ const NAV_SECTIONS: NavSection[] = [
   ...(flags.hris
     ? [{
         section: 'HRIS',
+        adminOnly: true,
         items: [
           { href: '/hris/employees',  label: 'Employees', icon: UserCog },
           { href: '/hris/org-chart',  label: 'Org chart', icon: Network },
@@ -78,6 +80,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     section: 'Admin',
+    adminOnly: true,
     items: [
       { href: '/approvals/inbox', label: 'Approvals',       icon: CheckSquare },
       { href: '/admin/approvals', label: 'Approval chains', icon: ClipboardList },
@@ -93,6 +96,7 @@ export function Sidebar() {
   const { organization }            = useOrganization()
   const [collapsed, setCollapsed]   = useState(false)
   const [hydrated,  setHydrated]    = useState(false)
+  const [isAdmin,   setIsAdmin]     = useState<boolean | null>(null)
 
   // Hydrate from localStorage after mount to avoid SSR mismatch
   useEffect(() => {
@@ -101,6 +105,20 @@ export function Sidebar() {
     } catch {}
     setHydrated(true)
   }, [])
+
+  // Fetch admin status so we can hide admin-only sections (HRIS, Admin) for
+  // non-admins. Until we know, optimistically show non-admin layout to avoid
+  // a flash of admin sections for employees.
+  useEffect(() => {
+    let alive = true
+    fetch('/api/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (alive) setIsAdmin(Boolean(j?.data?.is_admin)) })
+      .catch(() => { if (alive) setIsAdmin(false) })
+    return () => { alive = false }
+  }, [])
+
+  const sections = NAV_SECTIONS.filter(s => !s.adminOnly || isAdmin === true)
 
   function toggleCollapsed() {
     setCollapsed(prev => {
@@ -136,7 +154,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-4">
-        {NAV_SECTIONS.map(({ section, items }, idx) => (
+        {sections.map(({ section, items }, idx) => (
           <div key={section ?? `top-${idx}`} className={idx > 0 ? 'pt-3' : undefined}>
             {section && !collapsed && (
               <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">

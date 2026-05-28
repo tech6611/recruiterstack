@@ -1,22 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { requireOrgAndUser } from '@/lib/auth'
+import { assertAdmin, getViewerScope } from '@/lib/rbac'
 import { listEmployeesWithPerson } from '@/modules/hris/domain/employees'
 import type { EmployeeStatus } from '@/lib/types/database'
 
 const VALID_STATUSES: EmployeeStatus[] = ['pending', 'active', 'terminated']
 
+// Admin-only: org-wide list of employees. Non-admins use /me for self-data.
 export async function GET(req: NextRequest) {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
+
+  const supabase = createAdminClient()
+  const scope = await getViewerScope(supabase, orgId, userId)
+  const guard = assertAdmin(scope)
+  if (guard) return guard
 
   const statusParam = req.nextUrl.searchParams.get('status')
   const status = VALID_STATUSES.includes(statusParam as EmployeeStatus)
     ? (statusParam as EmployeeStatus)
     : undefined
 
-  const supabase = createAdminClient()
   try {
     const data = await listEmployeesWithPerson(supabase, orgId, status)
     return NextResponse.json({ data })
