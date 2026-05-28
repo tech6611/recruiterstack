@@ -53,6 +53,55 @@ export interface EmployeeWithPerson extends EmployeeProfile {
   person: { name: string; email: string } | null
 }
 
+export interface EmployeeManagerSummary {
+  id: string
+  name: string | null
+  email: string | null
+}
+
+export interface EmployeeDetail extends EmployeeWithPerson {
+  manager: EmployeeManagerSummary | null
+}
+
+// Single-employee read enriched with the person's name/email AND a flat
+// summary of their manager (if any). Two queries so we don't depend on a
+// generated FK relationship name for the self-join in Supabase's embed syntax.
+export async function getEmployeeDetail(
+  supabase: Supabase,
+  orgId: string,
+  employeeId: string,
+): Promise<EmployeeDetail | null> {
+  const { data: emp, error } = await supabase
+    .from('employee_profiles')
+    .select('*, person:people(name, email)')
+    .eq('id', employeeId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!emp) return null
+
+  const row = emp as unknown as EmployeeWithPerson
+  let manager: EmployeeManagerSummary | null = null
+
+  if (row.manager_id) {
+    const { data: mgr, error: mgrErr } = await supabase
+      .from('employee_profiles')
+      .select('id, person:people(name, email)')
+      .eq('id', row.manager_id)
+      .eq('org_id', orgId)
+      .maybeSingle()
+
+    if (mgrErr) throw mgrErr
+    if (mgr) {
+      const m = mgr as unknown as { id: string; person: { name: string; email: string } | null }
+      manager = { id: m.id, name: m.person?.name ?? null, email: m.person?.email ?? null }
+    }
+  }
+
+  return { ...row, manager }
+}
+
 // Same list, enriched with the canonical person's name/email for display.
 export async function listEmployeesWithPerson(
   supabase: Supabase,

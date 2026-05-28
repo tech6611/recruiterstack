@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { UserCog, BadgeCheck, Clock, LogOut } from 'lucide-react'
 import { flags } from '@/lib/flags'
@@ -36,6 +37,7 @@ function fmt(date: string | null): string {
 
 export default function EmployeesPage() {
   const { orgId } = useAuth()
+  const router    = useRouter()
   const [employees, setEmployees] = useState<EmployeeRow[]>([])
   const [loading, setLoading]     = useState(true)
   const [filter, setFilter]       = useState<EmployeeStatus | 'all'>('all')
@@ -142,7 +144,11 @@ export default function EmployeesPage() {
               </td></tr>
             ) : (
               visible.map(emp => (
-                <tr key={emp.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                <tr
+                  key={emp.id}
+                  onClick={() => router.push(`/hris/employees/${emp.id}`)}
+                  className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-900">{emp.person?.name ?? 'Unknown'}</div>
                     <div className="text-xs text-slate-400">{emp.person?.email ?? '—'}</div>
@@ -154,7 +160,7 @@ export default function EmployeesPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-600">{fmt(emp.hired_at)}</td>
                   <td className="px-4 py-3 text-slate-600">{fmt(emp.start_date)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                     {emp.status === 'pending' ? (
                       <button
                         onClick={() => markJoined(emp.id)}
