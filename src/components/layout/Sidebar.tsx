@@ -6,10 +6,13 @@ import {
   LayoutDashboard,
   Users,
   UserCog,
+  UserCircle,
   Network,
   Briefcase,
+  Calendar,
   ClipboardList,
   CheckSquare,
+  Clock,
   Settings,
   Zap,
   BarChart2,
@@ -35,6 +38,17 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     ],
   },
+  ...(flags.hris
+    ? [{
+        section: 'Me',
+        items: [
+          { href: '/me',           label: 'Overview',  icon: UserCircle },
+          { href: '/me/time-off',  label: 'Time off',  icon: Calendar },
+          { href: '/me/timeline',  label: 'Timeline',  icon: Clock },
+          { href: '/me/approvals', label: 'Approvals', icon: Inbox },
+        ],
+      }]
+    : []),
   {
     section: 'Recruiting',
     items: [

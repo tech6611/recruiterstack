@@ -14,6 +14,29 @@ type Supabase = SupabaseClient<Database>
 // lives in one place and can't be bypassed by a TA surface. This module owns
 // reads and the forward lifecycle transitions (pending → active → terminated).
 
+// Self-service "who am I as an employee?" — resolves the calling user's
+// employee_profile via the bridge column added in migration 050. Returns null
+// when the user is in the org but has no employee record yet (e.g. admins,
+// recruiters who haven't been hired through the ATS flow).
+export async function getMyEmployeeProfile(
+  supabase: Supabase,
+  orgId: string,
+  userId: string,
+): Promise<EmployeeProfile | null> {
+  const { data, error } = await supabase
+    .from('employee_profiles')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .in('status', ['pending', 'active'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return (data as EmployeeProfile) ?? null
+}
+
 export async function getEmployeeByPerson(
   supabase: Supabase,
   orgId: string,
