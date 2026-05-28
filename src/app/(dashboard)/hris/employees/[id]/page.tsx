@@ -8,14 +8,13 @@ import {
   ArrowLeft,
   BadgeCheck,
   Briefcase,
-  Clock,
+  DollarSign,
   GitBranch,
   LogOut,
   StickyNote,
-  UserCog,
 } from 'lucide-react'
 import { flags } from '@/lib/flags'
-import type { EmployeeStatus, EmploymentEventType } from '@/lib/types/database'
+import type { CompensationRecord, EmployeeStatus, EmploymentEventType } from '@/lib/types/database'
 
 type EmployeeDetail = {
   id: string
@@ -53,8 +52,14 @@ const EVENT_META: Record<EmploymentEventType, { icon: typeof BadgeCheck; tone: s
   hired:           { icon: Briefcase,  tone: 'text-amber-600',   ring: 'ring-amber-200',   title: 'Hired (pre-hire)' },
   joined:          { icon: BadgeCheck, tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Joined the org' },
   manager_changed: { icon: GitBranch,  tone: 'text-blue-600',    ring: 'ring-blue-200',    title: 'Manager changed' },
+  comp_changed:    { icon: DollarSign, tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Compensation changed' },
   terminated:      { icon: LogOut,     tone: 'text-slate-500',   ring: 'ring-slate-200',   title: 'Terminated' },
   note:            { icon: StickyNote, tone: 'text-slate-600',   ring: 'ring-slate-200',   title: 'Note' },
+}
+
+function fmtMoney(amount: number | null | undefined, currency: string | null | undefined): string {
+  if (amount == null) return '—'
+  return `${currency ?? ''} ${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`.trim()
 }
 
 function fmtDate(date: string | null): string {
@@ -79,6 +84,18 @@ function eventDetail(e: EmployeeEvent): string | null {
       const to   = e.details?.to_manager_id   ? 'a new manager' : 'no manager'
       return `From ${from} to ${to}`
     }
+    case 'comp_changed': {
+      const from   = e.details?.from_salary as number | null | undefined
+      const to     = e.details?.to_salary as number | undefined
+      const cur    = (e.details?.currency as string | null) ?? null
+      const freq   = (e.details?.pay_frequency as string | null) ?? null
+      const reason = (e.details?.reason as string | null) ?? null
+      const change = from != null
+        ? `${fmtMoney(from, cur)} → ${fmtMoney(to, cur)}`
+        : `Set to ${fmtMoney(to, cur)}`
+      const suffix = [freq && `(${freq})`, reason].filter(Boolean).join(' · ')
+      return suffix ? `${change} — ${suffix}` : change
+    }
     default:
       return null
   }
@@ -88,19 +105,21 @@ export default function EmployeeDetailPage() {
   const { id }    = useParams<{ id: string }>()
   const { orgId } = useAuth()
   const router    = useRouter()
-  const [employee, setEmployee] = useState<EmployeeDetail | null>(null)
-  const [events, setEvents]     = useState<EmployeeEvent[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [busy, setBusy]         = useState(false)
-  const [notFound, setNotFound] = useState(false)
+  const [employee, setEmployee]     = useState<EmployeeDetail | null>(null)
+  const [events, setEvents]         = useState<EmployeeEvent[]>([])
+  const [currentComp, setCurrentComp] = useState<CompensationRecord | null>(null)
+  const [loading, setLoading]       = useState(true)
+  const [busy, setBusy]             = useState(false)
+  const [notFound, setNotFound]     = useState(false)
 
   const fetchAll = useCallback(async () => {
     if (!id) return
     setLoading(true)
     setNotFound(false)
-    const [empRes, evRes] = await Promise.all([
+    const [empRes, evRes, compRes] = await Promise.all([
       fetch(`/api/employees/${id}`),
       fetch(`/api/employees/${id}/events`),
+      fetch(`/api/employees/${id}/compensation`),
     ])
     if (empRes.status === 404) {
       setNotFound(true)
@@ -114,6 +133,10 @@ export default function EmployeeDetailPage() {
     if (evRes.ok) {
       const j = await evRes.json()
       setEvents((j.data ?? []) as EmployeeEvent[])
+    }
+    if (compRes.ok) {
+      const j = await compRes.json()
+      setCurrentComp((j.data?.current ?? null) as CompensationRecord | null)
     }
     setLoading(false)
   }, [id])
@@ -191,7 +214,7 @@ export default function EmployeeDetailPage() {
             </div>
 
             {/* Key facts */}
-            <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-slate-100 pt-4 text-sm sm:grid-cols-4">
+            <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-slate-100 pt-4 text-sm sm:grid-cols-3 lg:grid-cols-5">
               <div>
                 <p className="text-xs font-semibold text-slate-400">Hired</p>
                 <p className="mt-0.5 text-slate-800">{fmtDate(employee.hired_at)}</p>
@@ -215,6 +238,17 @@ export default function EmployeeDetailPage() {
                     <span className="text-slate-400">— (no manager set)</span>
                   )}
                 </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-400">Compensation</p>
+                {currentComp ? (
+                  <p className="mt-0.5 text-slate-800">
+                    {fmtMoney(currentComp.base_salary, currentComp.currency)}{' '}
+                    <span className="text-xs text-slate-400">/ {currentComp.pay_frequency}</span>
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-slate-400">— (none set)</p>
+                )}
               </div>
             </div>
           </div>

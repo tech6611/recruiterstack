@@ -28,6 +28,12 @@ import {
   recordEmployeeNote,
   setEmployeeManager,
 } from '@/modules/hris/domain/employees'
+import {
+  formatComp,
+  getCurrentCompensation,
+  listCompensationHistory,
+  recordCompensation,
+} from '@/modules/hris/domain/compensation'
 import { findPersonByEmail } from '@/modules/core/domain/people'
 import type { EmployeeProfile, EmployeeStatus, HiringRequestUpdate } from '@/lib/types/database'
 
@@ -716,6 +722,37 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
       required: ['note'],
     },
   },
+  {
+    name: 'get_employee_compensation',
+    description: 'Get an employee\'s current compensation and their full comp history (every change with effective date and reason). Identify by employee_id or person_email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string' },
+        person_email: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'record_employee_compensation',
+    description: 'Record a NEW compensation record for an employee — every change is a new row with an effective date (immutable history). The change auto-appears on the employee timeline. The orchestrator must request_approval BEFORE calling this.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:        { type: 'string' },
+        person_email:       { type: 'string' },
+        effective_date:     { type: 'string', description: 'When this comp takes effect (YYYY-MM-DD)' },
+        base_salary:        { type: 'number', description: 'Base salary amount in the given currency' },
+        currency:           { type: 'string', description: '3-letter ISO code, default USD (e.g. USD, INR, GBP)' },
+        pay_frequency:      { type: 'string', enum: ['annual', 'monthly', 'hourly'], description: 'Default annual' },
+        bonus_amount:       { type: 'number', description: 'Bonus amount (annual/target), optional' },
+        equity_notes:       { type: 'string', description: 'Free-text equity terms, optional' },
+        variable_pay_notes: { type: 'string', description: 'Free-text variable comp / commission notes, optional' },
+        reason:             { type: 'string', description: 'Why: hire, promotion, annual_review, market_adjustment, or free text' },
+      },
+      required: ['effective_date', 'base_salary'],
+    },
+  },
 ]
 
 // ── Tool executor ─────────────────────────────────────────────────────────────
@@ -778,6 +815,8 @@ export async function executeTool(
       case 'get_employee_history':       return await getEmployeeHistoryTool(input, orgId, supabase)
       case 'set_employee_manager':       return await setEmployeeManagerTool(input, orgId, supabase)
       case 'record_employee_note':       return await recordEmployeeNoteTool(input, orgId, supabase)
+      case 'get_employee_compensation':  return await getEmployeeCompensationTool(input, orgId, supabase)
+      case 'record_employee_compensation': return await recordEmployeeCompensationTool(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -2653,6 +2692,17 @@ function formatEventLine(e: { event_type: string; occurred_at: string; details: 
     case 'manager_changed': return `${when} — manager changed`
     case 'terminated':      return `${when} — terminated`
     case 'note':            return `${when} — note: ${(e.details?.note as string) ?? ''}`
+    case 'comp_changed': {
+      const from = e.details?.from_salary as number | null | undefined
+      const to   = e.details?.to_salary as number | undefined
+      const cur  = (e.details?.currency as string) ?? ''
+      const freq = (e.details?.pay_frequency as string) ?? ''
+      const reason = (e.details?.reason as string) ?? ''
+      const change = from != null
+        ? `${cur} ${from.toLocaleString()} → ${cur} ${(to ?? 0).toLocaleString()}`
+        : `set to ${cur} ${(to ?? 0).toLocaleString()}`
+      return `${when} — comp changed (${change}${freq ? ` / ${freq}` : ''}${reason ? `, ${reason}` : ''})`
+    }
     default:                return `${when} — ${e.event_type}`
   }
 }
@@ -2743,4 +2793,65 @@ async function recordEmployeeNoteTool(
 
   await recordEmployeeNote(supabase, orgId, resolved.id, note, 'agent')
   return 'Note recorded on the employee\'s timeline.'
+}
+
+// ── Compensation tools (HRIS depth, slice 2) ─────────────────────────────────
+
+async function getEmployeeCompensationTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const resolved = await resolveEmployee(input, orgId, supabase)
+  if (typeof resolved === 'string') return resolved
+
+  const [current, history] = await Promise.all([
+    getCurrentCompensation(supabase, orgId, resolved.id),
+    listCompensationHistory(supabase, orgId, resolved.id),
+  ])
+
+  if (!current) return 'No compensation records yet for this employee.'
+
+  const lines = history.slice(0, 10).map(h => {
+    const reason = h.reason ? `, ${h.reason}` : ''
+    return `• ${h.effective_date} — ${formatComp(h)}${reason}`
+  })
+  return [
+    `Current: ${formatComp(current)} (effective ${current.effective_date})`,
+    history.length > 1 ? `\nHistory (${history.length} record${history.length === 1 ? '' : 's'}):` : '',
+    ...lines,
+  ].filter(Boolean).join('\n')
+}
+
+async function recordEmployeeCompensationTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const resolved = await resolveEmployee(input, orgId, supabase)
+  if (typeof resolved === 'string') return resolved
+
+  if (typeof input.effective_date !== 'string' || !input.effective_date) {
+    return 'Provide effective_date (YYYY-MM-DD).'
+  }
+  if (typeof input.base_salary !== 'number' || !(input.base_salary > 0)) {
+    return 'Provide a positive base_salary.'
+  }
+
+  const created = await recordCompensation(supabase, orgId, {
+    employeeId:       resolved.id,
+    effectiveDate:    input.effective_date,
+    baseSalary:       input.base_salary,
+    currency:         input.currency,
+    payFrequency:     input.pay_frequency,
+    bonusAmount:      input.bonus_amount       ?? null,
+    equityNotes:      input.equity_notes       ?? null,
+    variablePayNotes: input.variable_pay_notes ?? null,
+    reason:           input.reason             ?? null,
+    recordedBy:       'agent',
+  })
+
+  return `Compensation recorded: ${formatComp(created)} effective ${created.effective_date}. A comp_changed event was logged on the timeline.`
 }

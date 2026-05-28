@@ -139,6 +139,7 @@ export type EmploymentEventType =
   | 'manager_changed'
   | 'terminated'
   | 'note'
+  | 'comp_changed'
 
 export interface EmploymentEvent {
   id: string
@@ -161,6 +162,44 @@ export interface EmploymentEventInsert
 }
 
 export interface EmploymentEventUpdate extends Partial<EmploymentEventInsert> {}
+
+// Compensation records — immutable history. The current comp is the most
+// recent record by effective_date. Each insert auto-writes a comp_changed
+// event onto employee_events (via DB trigger; see migration 049).
+export type PayFrequency = 'annual' | 'monthly' | 'hourly'
+
+export interface CompensationRecord {
+  id: string
+  org_id: string
+  employee_id: string
+  effective_date: string                 // ISO date (YYYY-MM-DD)
+  base_salary: number
+  currency: string                       // 3-letter ISO
+  pay_frequency: PayFrequency
+  bonus_amount: number | null
+  equity_notes: string | null
+  variable_pay_notes: string | null
+  reason: string | null
+  recorded_at: string
+  recorded_by: string | null
+  created_at: string
+}
+
+export interface CompensationRecordInsert
+  extends Omit<CompensationRecord, 'id' | 'created_at' | 'recorded_at' | 'currency' | 'pay_frequency' | 'bonus_amount' | 'equity_notes' | 'variable_pay_notes' | 'reason' | 'recorded_by'> {
+  id?: string
+  created_at?: string
+  recorded_at?: string
+  currency?: string
+  pay_frequency?: PayFrequency
+  bonus_amount?: number | null
+  equity_notes?: string | null
+  variable_pay_notes?: string | null
+  reason?: string | null
+  recorded_by?: string | null
+}
+
+export interface CompensationRecordUpdate extends Partial<CompensationRecordInsert> {}
 
 export interface EmployeeProfileInsert
   extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
@@ -930,6 +969,12 @@ export type Database = {
         Row: Indexify<EmploymentEvent>
         Insert: Indexify<EmploymentEventInsert>
         Update: Indexify<EmploymentEventUpdate>
+        Relationships: []
+      }
+      compensation_records: {
+        Row: Indexify<CompensationRecord>
+        Insert: Indexify<CompensationRecordInsert>
+        Update: Indexify<CompensationRecordUpdate>
         Relationships: []
       }
       candidates: {

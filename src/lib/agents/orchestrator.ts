@@ -82,6 +82,7 @@ APPROVAL GATES — call request_approval BEFORE delegating any task that will:
 - Create offers
 - Schedule interviews
 - Terminate an employee
+- Change or set employee compensation (any new comp record)
 
 For simple read/lookup requests, delegate immediately — no approval needed.
 
