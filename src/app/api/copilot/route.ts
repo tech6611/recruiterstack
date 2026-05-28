@@ -18,48 +18,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
-import { COPILOT_TOOLS, executeTool } from '@/lib/copilot-tools'
+import {
+  ORCHESTRATOR_TOOLS,
+  ORCHESTRATOR_SYSTEM_PROMPT,
+  executeOrchestratorTool,
+} from '@/lib/agents/orchestrator'
 import { checkAuthRateLimit } from '@/lib/api/rate-limit'
 import { trackUsage } from '@/lib/ai/track-usage'
+
+const MODEL = 'claude-opus-4-6'
 
 export const maxDuration = 120
 
 // ── Human-readable labels for in-progress tool chips ─────────────────────────
+// The orchestrator only exposes delegate + approval tools to the UI; the inner
+// sub-agent's tool calls happen non-streamed inside runSubAgent.
 function toolLabel(name: string): string {
   const labels: Record<string, string> = {
-    search_candidates:         '🔍 Searching candidates...',
-    get_job_pipeline:          '📋 Fetching pipeline...',
-    list_jobs:                 '📄 Loading jobs...',
-    get_dashboard_stats:       '📊 Getting stats...',
-    find_stale_applications:   '⏰ Checking for stale applications...',
-    get_candidate:             '👤 Looking up candidate...',
-    move_application_to_stage: '➡️  Moving to stage...',
-    add_note_to_application:   '📝 Adding note...',
-    // Autonomous workflow tools
-    create_job_and_pipeline:   '🏗️  Creating job & pipeline...',
-    search_candidate_pool:     '🔎 Sourcing candidates...',
-    bulk_add_to_pipeline:      '➕ Adding candidates to pipeline...',
-    bulk_score_applications:   '🤖 AI scoring applicants...',
-    send_outreach_email:       '✉️  Sending outreach email...',
-    request_approval:          '⏸️  Awaiting your approval...',
-    // Extended action tools
-    create_candidate:          '👤 Creating candidate...',
-    update_candidate_status:   '🔄 Updating candidate status...',
-    update_application_status: '📋 Updating application status...',
-    bulk_move_to_stage:        '➡️  Moving candidates to stage...',
-    bulk_reject_below_score:   '🚫 Rejecting low-score applicants...',
-    get_application_events:    '📜 Fetching activity history...',
-    update_job:                '✏️  Updating job details...',
-    get_scorecard:             '🗒️  Loading scorecard...',
-    // Gap-fill tools
-    list_roles:                '📂 Loading roles...',
-    create_role:               '🆕 Creating role...',
-    update_role:               '✏️  Updating role...',
-    get_recruiting_analytics:  '📈 Pulling analytics...',
-    get_inbox:                 '📬 Loading inbox...',
-    create_scorecard:          '📝 Logging scorecard...',
-    draft_application_email:   '✍️  Drafting email...',
-    create_intake_request:     '📋 Creating intake request...',
+    delegate_to_ats:   '🤝 Asking the recruiting agent...',
+    delegate_to_hris:  '🤝 Asking the HRIS agent...',
+    request_approval:  '⏸️  Awaiting your approval...',
   }
   return labels[name] ?? `⚙️ Running ${name}...`
 }
@@ -96,63 +74,6 @@ export async function POST(request: NextRequest) {
   const supabase = createAdminClient()
   const client   = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-  const systemPrompt = `You are an AI recruiting copilot inside RecruiterStack, a modern ATS. Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
-
-You help recruiters manage their full recruiting workflow end-to-end.
-- Be concise and direct. Prefer bullet points over prose when listing data.
-- Always use names (not IDs) in your responses — IDs are for tool calls only.
-- When you complete a write action (move stage, add note, reject, hire), confirm briefly what you did.
-- If you're unsure which candidate or job the recruiter means, ask for clarification rather than guessing.
-- If asked to do something you have no tool for, say so clearly and suggest what the recruiter can do in the app instead.
-
-CAPABILITIES (what you can do):
-- Query: search candidates, get pipeline, list jobs, get stats, find stale apps, get candidate profile, view activity history, view scorecards, get inbox/activity feed, get analytics, list roles
-- Write (single): move stage, add note, create candidate, update candidate status, update application status (reject/hire/withdraw), update job, create/update roles, log interview scorecard, create intake request
-- Bulk write: add candidates to pipeline, AI-score applications, bulk move to stage, bulk reject below score, send outreach emails
-- Draft: generate interview invite / rejection / offer / follow-up emails for any application
-- Orchestrate: create job + pipeline, source candidates, run full hiring workflows
-
-BEHAVIOR MODES:
-
-1. SIMPLE QUERIES (lookup, single action):
-   Execute immediately. No plan needed.
-   Examples: "Show me active jobs", "Move John to interview stage", "What's stale?"
-
-2. COMPLEX GOALS (multi-step workflows, hiring initiatives):
-   First, ask clarifying questions if critical info is missing (role level, location, hiring manager, tech stack, etc.) — never guess required fields.
-   Then generate a structured plan covering the ENTIRE workflow end-to-end. Embed it in your response exactly like this:
-
-   <!-- PLAN: {"summary":"...","steps":[{"number":1,"description":"...","tools":["tool_name"],"needs_approval":false,"status":"pending"},{"number":2,"description":"...","tools":["tool_name"],"needs_approval":true,"status":"pending"}]} -->
-
-   Then call request_approval so the recruiter can review, edit, and approve the plan before execution.
-
-   Plan rules:
-   - Cover the full funnel: job creation → sourcing → scoring → outreach → screens → interviews → offers
-   - Mark needs_approval: true for: sending emails, creating jobs, bulk actions (3+ candidates), rejections, offers, scheduling interviews
-   - Steps depending on async results (phone screens, interview feedback) use "status": "queued" with a "depends_on" field explaining the dependency
-   - Keep step descriptions concise but specific (include numbers, names, criteria)
-
-3. AFTER PLAN APPROVAL:
-   Execute each step sequentially, reporting progress. Pause at steps with needs_approval: true and call request_approval before proceeding.
-   If the user edited the plan, follow their edited version exactly.
-   After completing all executable steps, summarize what was accomplished and note any queued steps with their dependencies.
-
-APPROVAL GATES — always call request_approval before:
-- Sending any emails
-- Creating jobs
-- Bulk actions affecting 3+ candidates
-- Rejecting or withdrawing candidates
-- Creating offers
-- Scheduling interviews
-
-EMAILS — DRAFTING vs SENDING:
-- draft_application_email ONLY generates text — it does NOT send anything.
-- send_outreach_email ACTUALLY sends via SendGrid.
-- To send any email (offer, rejection, interview invite, follow-up): first call draft_application_email to generate the content, then call send_outreach_email with that subject and body to deliver it. Never tell the user an email was sent if you only drafted it.
-- When calling send_outreach_email, YOU write the subject and body — warm, professional, personalized to the candidate's specific skills/title and how they match the role. 3-4 short paragraphs.
-
-search_candidate_pool returns internal candidates only. If the pool is too small, tell the recruiter and suggest they add candidates via the app.`
-
   const stream = new ReadableStream({
     async start(controller) {
       const enc  = new TextEncoder()
@@ -170,11 +91,11 @@ search_candidate_pool returns internal candidates only. If the pool is too small
         // Agentic loop — max 6 iterations to prevent runaway
         for (let iteration = 0; iteration < 15; iteration++) {
           const claudeStream = client.messages.stream({
-            model:    'claude-opus-4-6',
+            model:    MODEL,
             max_tokens: 4096,
             thinking: { type: 'adaptive' },
-            system:   systemPrompt,
-            tools:    COPILOT_TOOLS,
+            system:   ORCHESTRATOR_SYSTEM_PROMPT,
+            tools:    ORCHESTRATOR_TOOLS,
             messages: conversationMessages,
           })
 
@@ -222,7 +143,7 @@ search_candidate_pool returns internal candidates only. If the pool is too small
 
           // Get the full message (includes thinking blocks for next iteration)
           const finalMsg = await claudeStream.finalMessage()
-          trackUsage('copilot', 'claude-opus-4-6', finalMsg.usage)
+          trackUsage('copilot', MODEL, finalMsg.usage)
           conversationMessages.push({ role: 'assistant', content: finalMsg.content })
 
           // ── Plan detection — look for <!-- PLAN: {...} --> in text output ──
@@ -263,7 +184,9 @@ search_candidate_pool returns internal candidates only. If the pool is too small
               parsedInput = {}
             }
 
-            const result = await executeTool(tc.name, parsedInput, orgId, supabase)
+            const result = await executeOrchestratorTool(tc.name, parsedInput, {
+              client, model: MODEL, orgId, supabase,
+            })
             send({ type: 'tool_done', id: tc.id, name: tc.name, summary: toolSummary(tc.name, result) })
 
             toolResults.push({
