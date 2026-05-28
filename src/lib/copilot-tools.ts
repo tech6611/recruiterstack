@@ -21,9 +21,12 @@ import {
 import { fetchLegacyAnalyticsInputs } from '@/modules/ats/domain/reporting'
 import {
   getEmployeeByPerson,
+  listEmployeeEvents,
   listEmployees,
   markEmployeeJoined,
   markEmployeeTerminated,
+  recordEmployeeNote,
+  setEmployeeManager,
 } from '@/modules/hris/domain/employees'
 import { findPersonByEmail } from '@/modules/core/domain/people'
 import type { EmployeeProfile, EmployeeStatus, HiringRequestUpdate } from '@/lib/types/database'
@@ -674,6 +677,45 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
       },
     },
   },
+  {
+    name: 'get_employee_history',
+    description: 'Get an employee\'s full timeline: hire → joined → manager changes → termination → manual notes. Identify by employee_id or person_email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string', description: 'UUID of the employee_profile' },
+        person_email: { type: 'string', description: 'Email of the person — used if employee_id is not known' },
+        limit:        { type: 'number', description: 'Max events to return (default 50)' },
+      },
+    },
+  },
+  {
+    name: 'set_employee_manager',
+    description: 'Set who an employee reports to (the org-chart reporting line). Identify the employee by employee_id or person_email. Identify the new manager by manager_employee_id or manager_email. Set clear=true to remove the current manager (no reporting line).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:         { type: 'string', description: 'UUID of the employee being updated' },
+        person_email:        { type: 'string', description: 'Email of the employee being updated (alternative to employee_id)' },
+        manager_employee_id: { type: 'string', description: 'UUID of the manager\'s employee_profile' },
+        manager_email:       { type: 'string', description: 'Email of the manager (alternative to manager_employee_id)' },
+        clear:               { type: 'boolean', description: 'Set true to remove the current manager (no reporting line)' },
+      },
+    },
+  },
+  {
+    name: 'record_employee_note',
+    description: 'Add a manual note to an employee\'s timeline — an observation, decision, or context that isn\'t a structural transition. Identify by employee_id or person_email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string' },
+        person_email: { type: 'string' },
+        note:         { type: 'string', description: 'The note text to record on the timeline.' },
+      },
+      required: ['note'],
+    },
+  },
 ]
 
 // ── Tool executor ─────────────────────────────────────────────────────────────
@@ -733,6 +775,9 @@ export async function executeTool(
       case 'list_employees':             return await listEmployeesTool(input, orgId, supabase)
       case 'mark_employee_joined':       return await markEmployeeJoinedTool(input, orgId, supabase)
       case 'mark_employee_terminated':   return await markEmployeeTerminatedTool(input, orgId, supabase)
+      case 'get_employee_history':       return await getEmployeeHistoryTool(input, orgId, supabase)
+      case 'set_employee_manager':       return await setEmployeeManagerTool(input, orgId, supabase)
+      case 'record_employee_note':       return await recordEmployeeNoteTool(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -2596,4 +2641,106 @@ async function markEmployeeTerminatedTool(
 
   await markEmployeeTerminated(supabase, orgId, resolved.id)
   return 'Employee marked as terminated.'
+}
+
+// ── HRIS depth: history, manager, notes ──────────────────────────────────────
+
+function formatEventLine(e: { event_type: string; occurred_at: string; details: Record<string, unknown> | null }): string {
+  const when = e.occurred_at.slice(0, 10)
+  switch (e.event_type) {
+    case 'hired':           return `${when} — hired (pre-hire)`
+    case 'joined':          return `${when} — joined the org${(e.details?.start_date as string) ? ` (start ${e.details?.start_date})` : ''}`
+    case 'manager_changed': return `${when} — manager changed`
+    case 'terminated':      return `${when} — terminated`
+    case 'note':            return `${when} — note: ${(e.details?.note as string) ?? ''}`
+    default:                return `${when} — ${e.event_type}`
+  }
+}
+
+async function getEmployeeHistoryTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const resolved = await resolveEmployee(input, orgId, supabase)
+  if (typeof resolved === 'string') return resolved
+
+  const limit  = typeof input.limit === 'number' ? input.limit : 50
+  const events = await listEmployeeEvents(supabase, orgId, resolved.id, limit)
+  if (events.length === 0) return 'No employment events on record yet.'
+
+  const lines = events.map(formatEventLine)
+  return `Timeline (${events.length} events):\n${lines.join('\n')}`
+}
+
+// Resolve a manager employee_profile from either an id, an email, or the
+// explicit clear flag (which returns null = "no manager").
+async function resolveManager(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<{ managerId: string | null } | string> {
+  if (input.clear === true) return { managerId: null }
+
+  if (input.manager_employee_id) {
+    const { data, error } = await supabase
+      .from('employee_profiles')
+      .select('id')
+      .eq('id', input.manager_employee_id as string)
+      .eq('org_id', orgId)
+      .maybeSingle()
+    if (error) return `Error: ${error.message}`
+    if (!data) return `No manager found with employee_id ${input.manager_employee_id}.`
+    return { managerId: (data as { id: string }).id }
+  }
+
+  if (input.manager_email) {
+    const person = await findPersonByEmail(supabase, orgId, input.manager_email as string)
+    if (!person) return `No person found with email ${input.manager_email}.`
+    const mgr = await getEmployeeByPerson(supabase, orgId, person.id)
+    if (!mgr) return `${person.name} (${input.manager_email}) is not an employee yet.`
+    return { managerId: mgr.id }
+  }
+
+  return 'Provide manager_employee_id, manager_email, or clear=true to remove the manager.'
+}
+
+async function setEmployeeManagerTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const employee = await resolveEmployee(input, orgId, supabase)
+  if (typeof employee === 'string') return employee
+
+  const mgr = await resolveManager(input, orgId, supabase)
+  if (typeof mgr === 'string') return mgr
+
+  if (mgr.managerId === employee.id) {
+    return 'An employee cannot report to themselves.'
+  }
+
+  await setEmployeeManager(supabase, orgId, employee.id, mgr.managerId)
+  return mgr.managerId
+    ? 'Reporting line updated.'
+    : 'Manager cleared (no reporting line).'
+}
+
+async function recordEmployeeNoteTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const note = typeof input.note === 'string' ? input.note.trim() : ''
+  if (!note) return 'Provide a non-empty note.'
+
+  const resolved = await resolveEmployee(input, orgId, supabase)
+  if (typeof resolved === 'string') return resolved
+
+  await recordEmployeeNote(supabase, orgId, resolved.id, note, 'agent')
+  return 'Note recorded on the employee\'s timeline.'
 }

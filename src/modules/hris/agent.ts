@@ -14,6 +14,9 @@ const HRIS_TOOL_NAMES = new Set([
   'list_employees',
   'mark_employee_joined',
   'mark_employee_terminated',
+  'get_employee_history',
+  'set_employee_manager',
+  'record_employee_note',
 ])
 
 export const HRIS_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
@@ -34,7 +37,12 @@ CAPABILITIES:
 - list_employees — list employees, optionally filtered by status (pending | active | terminated).
 - mark_employee_joined — flip a pre-hire to active and set their start date. Identify by employee_id (from list_employees) or by person_email. This is the moment a hired candidate becomes a working employee.
 - mark_employee_terminated — end employment.
+- get_employee_history — show an employee's full timeline (hire → joined → manager changes → termination → notes).
+- set_employee_manager — set or clear who an employee reports to (the org-chart reporting line). Changes are auto-logged on the timeline.
+- record_employee_note — append a manual note to an employee's timeline for observations or context that aren't structural transitions.
 
 You do NOT create employees. That happens automatically when a candidacy is dispositioned hired (DB trigger). If the user wants to mark someone hired, that's an ATS action and the orchestrator will route there.
 
-If asked to do something outside this scope (e.g. payroll, comp changes, org chart), say so clearly — those modules don't exist yet.`
+Manager changes, status flips, and hires all auto-write timeline events via the data layer — don't try to record those as manual notes; just perform the action.
+
+If asked about payroll, time-off, or comp changes, say so clearly — those modules don't exist yet.`

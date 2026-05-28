@@ -120,6 +120,7 @@ export interface EmployeeProfile {
   candidate_id: string | null
   application_id: string | null
   department_id: string | null
+  manager_id: string | null
   status: EmployeeStatus
   hired_at: string | null
   start_date: string | null
@@ -129,8 +130,40 @@ export interface EmployeeProfile {
   updated_at: string
 }
 
+// Per-employee audit log: every employment transition becomes a row here. New
+// event_types extend the lifecycle (comp_changed, transferred, etc.) without
+// adding new columns. See migration 048.
+export type EmploymentEventType =
+  | 'hired'
+  | 'joined'
+  | 'manager_changed'
+  | 'terminated'
+  | 'note'
+
+export interface EmploymentEvent {
+  id: string
+  org_id: string
+  employee_id: string
+  event_type: EmploymentEventType
+  details: Record<string, unknown> | null
+  occurred_at: string
+  recorded_by: string | null
+  created_at: string
+}
+
+export interface EmploymentEventInsert
+  extends Omit<EmploymentEvent, 'id' | 'created_at' | 'details' | 'occurred_at' | 'recorded_by'> {
+  id?: string
+  created_at?: string
+  details?: Record<string, unknown> | null
+  occurred_at?: string
+  recorded_by?: string | null
+}
+
+export interface EmploymentEventUpdate extends Partial<EmploymentEventInsert> {}
+
 export interface EmployeeProfileInsert
-  extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
+  extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
   id?: string
   created_at?: string
   updated_at?: string
@@ -138,6 +171,7 @@ export interface EmployeeProfileInsert
   candidate_id?: string | null
   application_id?: string | null
   department_id?: string | null
+  manager_id?: string | null
   hired_at?: string | null
   start_date?: string | null
   joined_at?: string | null
@@ -890,6 +924,12 @@ export type Database = {
         Row: Indexify<EmployeeProfile>
         Insert: Indexify<EmployeeProfileInsert>
         Update: Indexify<EmployeeProfileUpdate>
+        Relationships: []
+      }
+      employee_events: {
+        Row: Indexify<EmploymentEvent>
+        Insert: Indexify<EmploymentEventInsert>
+        Update: Indexify<EmploymentEventUpdate>
         Relationships: []
       }
       candidates: {

@@ -17,6 +17,9 @@ const HRIS_TOOL_NAMES = new Set([
   'list_employees',
   'mark_employee_joined',
   'mark_employee_terminated',
+  'get_employee_history',
+  'set_employee_manager',
+  'record_employee_note',
 ])
 const ORCHESTRATOR_ONLY = new Set(['request_approval'])
 

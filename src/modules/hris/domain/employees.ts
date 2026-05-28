@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database, EmployeeProfile, EmployeeStatus } from '@/lib/types/database'
+import type {
+  Database,
+  EmployeeProfile,
+  EmployeeStatus,
+  EmploymentEvent,
+} from '@/lib/types/database'
 
 type Supabase = SupabaseClient<Database>
 
@@ -109,4 +114,74 @@ export async function markEmployeeTerminated(
 
   if (error) throw error
   return data as EmployeeProfile
+}
+
+// ── Org chart primitive: who reports to whom ─────────────────────────────────
+// Setting manager_id fires the manager-change trigger, which writes a
+// 'manager_changed' event onto the timeline automatically.
+export async function setEmployeeManager(
+  supabase: Supabase,
+  orgId: string,
+  employeeId: string,
+  managerId: string | null,
+): Promise<EmployeeProfile> {
+  if (managerId === employeeId) {
+    throw new Error('An employee cannot be their own manager.')
+  }
+
+  const { data, error } = await supabase
+    .from('employee_profiles')
+    .update({ manager_id: managerId } as never)
+    .eq('id', employeeId)
+    .eq('org_id', orgId)
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return data as EmployeeProfile
+}
+
+// ── Employment audit log (the timeline) ──────────────────────────────────────
+export async function listEmployeeEvents(
+  supabase: Supabase,
+  orgId: string,
+  employeeId: string,
+  limit = 100,
+): Promise<EmploymentEvent[]> {
+  const { data, error } = await supabase
+    .from('employee_events')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('employee_id', employeeId)
+    .order('occurred_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data ?? []) as EmploymentEvent[]
+}
+
+// Append a manual note to an employee's timeline. The trigger-driven events
+// (hired/joined/manager_changed/terminated) are written by the data layer;
+// this is for human/agent observations that aren't a structural transition.
+export async function recordEmployeeNote(
+  supabase: Supabase,
+  orgId: string,
+  employeeId: string,
+  note: string,
+  recordedBy: string,
+): Promise<EmploymentEvent> {
+  const { data, error } = await supabase
+    .from('employee_events')
+    .insert({
+      org_id: orgId,
+      employee_id: employeeId,
+      event_type: 'note',
+      details: { note },
+      recorded_by: recordedBy,
+    } as never)
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return data as EmploymentEvent
 }
