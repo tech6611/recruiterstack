@@ -10,6 +10,7 @@ import {
   Network,
   Briefcase,
   Calendar,
+  ClipboardCheck,
   ClipboardList,
   CheckSquare,
   Clock,
@@ -43,10 +44,11 @@ const NAV_SECTIONS: NavSection[] = [
     ? [{
         section: 'Me',
         items: [
-          { href: '/me',           label: 'Overview',  icon: UserCircle },
-          { href: '/me/time-off',  label: 'Time off',  icon: Calendar },
-          { href: '/me/timeline',  label: 'Timeline',  icon: Clock },
-          { href: '/me/approvals', label: 'Approvals', icon: Inbox },
+          { href: '/me',            label: 'Overview',   icon: UserCircle },
+          { href: '/me/onboarding', label: 'Onboarding', icon: ClipboardCheck },
+          { href: '/me/time-off',   label: 'Time off',   icon: Calendar },
+          { href: '/me/timeline',   label: 'Timeline',   icon: Clock },
+          { href: '/me/approvals',  label: 'Approvals',  icon: Inbox },
         ],
       }]
     : []),
@@ -67,8 +69,9 @@ const NAV_SECTIONS: NavSection[] = [
         section: 'HRIS',
         adminOnly: true,
         items: [
-          { href: '/hris/employees',  label: 'Employees', icon: UserCog },
-          { href: '/hris/org-chart',  label: 'Org chart', icon: Network },
+          { href: '/hris/employees',  label: 'Employees',  icon: UserCog },
+          { href: '/hris/org-chart',  label: 'Org chart',  icon: Network },
+          { href: '/hris/onboarding', label: 'Onboarding', icon: ClipboardCheck },
         ],
       }]
     : []),

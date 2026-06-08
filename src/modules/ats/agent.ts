@@ -26,6 +26,11 @@ const HRIS_TOOL_NAMES = new Set([
   'request_time_off',
   'list_time_off',
   'decide_time_off',
+  'list_onboarding_templates',
+  'list_onboarding_plans',
+  'start_onboarding',
+  'get_employee_onboarding',
+  'complete_onboarding_task',
 ])
 const ORCHESTRATOR_ONLY = new Set(['request_approval'])
 

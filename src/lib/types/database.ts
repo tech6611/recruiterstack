@@ -250,6 +250,108 @@ export interface TimeOffRequestInsert
 
 export interface TimeOffRequestUpdate extends Partial<TimeOffRequestInsert> {}
 
+// Onboarding — template + instance model (mirrors approval_chains shape).
+// Templates are reusable per-org checklists; plans are instantiated per new
+// hire from a template with tasks snapshotted at creation time (so editing the
+// template later doesn't mutate in-flight plans). See migration 052.
+export type OnboardingAssigneeRole = 'new_hire' | 'admin'
+export type OnboardingPlanStatus = 'in_progress' | 'completed' | 'cancelled'
+export type OnboardingTaskStatus = 'pending' | 'completed'
+
+export interface OnboardingTemplate {
+  id: string
+  org_id: string
+  name: string
+  description: string | null
+  is_default: boolean
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+export interface OnboardingTemplateInsert
+  extends Omit<OnboardingTemplate, 'id' | 'created_at' | 'updated_at' | 'description' | 'is_default' | 'is_active'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  description?: string | null
+  is_default?: boolean
+  is_active?: boolean
+}
+export interface OnboardingTemplateUpdate extends Partial<OnboardingTemplateInsert> {}
+
+export interface OnboardingTemplateTask {
+  id: string
+  template_id: string
+  sort_order: number
+  title: string
+  description: string | null
+  assignee_role: OnboardingAssigneeRole
+  due_offset_days: number
+  created_at: string
+}
+export interface OnboardingTemplateTaskInsert
+  extends Omit<OnboardingTemplateTask, 'id' | 'created_at' | 'description'> {
+  id?: string
+  created_at?: string
+  description?: string | null
+}
+export interface OnboardingTemplateTaskUpdate extends Partial<OnboardingTemplateTaskInsert> {}
+
+export interface OnboardingPlan {
+  id: string
+  org_id: string
+  employee_id: string
+  template_id: string | null
+  template_name: string
+  start_date: string                           // YYYY-MM-DD
+  status: OnboardingPlanStatus
+  started_at: string
+  completed_at: string | null
+  started_by: string | null
+  created_at: string
+  updated_at: string
+}
+export interface OnboardingPlanInsert
+  extends Omit<OnboardingPlan, 'id' | 'created_at' | 'updated_at' | 'started_at' | 'status' | 'completed_at' | 'started_by' | 'template_id'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  started_at?: string
+  status?: OnboardingPlanStatus
+  completed_at?: string | null
+  started_by?: string | null
+  template_id?: string | null
+}
+export interface OnboardingPlanUpdate extends Partial<OnboardingPlanInsert> {}
+
+export interface OnboardingTask {
+  id: string
+  org_id: string
+  plan_id: string
+  sort_order: number
+  title: string
+  description: string | null
+  assignee_role: OnboardingAssigneeRole
+  due_date: string | null                      // YYYY-MM-DD
+  status: OnboardingTaskStatus
+  completed_at: string | null
+  completed_by: string | null
+  created_at: string
+  updated_at: string
+}
+export interface OnboardingTaskInsert
+  extends Omit<OnboardingTask, 'id' | 'created_at' | 'updated_at' | 'description' | 'due_date' | 'status' | 'completed_at' | 'completed_by'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  description?: string | null
+  due_date?: string | null
+  status?: OnboardingTaskStatus
+  completed_at?: string | null
+  completed_by?: string | null
+}
+export interface OnboardingTaskUpdate extends Partial<OnboardingTaskInsert> {}
+
 export interface EmployeeProfileInsert
   extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'user_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
   id?: string
@@ -1031,6 +1133,30 @@ export type Database = {
         Row: Indexify<TimeOffRequest>
         Insert: Indexify<TimeOffRequestInsert>
         Update: Indexify<TimeOffRequestUpdate>
+        Relationships: []
+      }
+      onboarding_templates: {
+        Row: Indexify<OnboardingTemplate>
+        Insert: Indexify<OnboardingTemplateInsert>
+        Update: Indexify<OnboardingTemplateUpdate>
+        Relationships: []
+      }
+      onboarding_template_tasks: {
+        Row: Indexify<OnboardingTemplateTask>
+        Insert: Indexify<OnboardingTemplateTaskInsert>
+        Update: Indexify<OnboardingTemplateTaskUpdate>
+        Relationships: []
+      }
+      onboarding_plans: {
+        Row: Indexify<OnboardingPlan>
+        Insert: Indexify<OnboardingPlanInsert>
+        Update: Indexify<OnboardingPlanUpdate>
+        Relationships: []
+      }
+      onboarding_tasks: {
+        Row: Indexify<OnboardingTask>
+        Insert: Indexify<OnboardingTaskInsert>
+        Update: Indexify<OnboardingTaskUpdate>
         Relationships: []
       }
       candidates: {

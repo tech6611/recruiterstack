@@ -22,6 +22,8 @@ import type {
   CompensationRecord,
   EmployeeStatus,
   EmploymentEventType,
+  OnboardingPlan,
+  OnboardingTemplate,
   TimeOffRequest,
   TimeOffRequestType,
   TimeOffStatus,
@@ -167,6 +169,14 @@ export default function EmployeeDetailPage() {
   const [toReason, setToReason]       = useState('')
   const [submittingTO, setSubmittingTO] = useState(false)
 
+  // Onboarding state.
+  const [activePlan, setActivePlan]   = useState<OnboardingPlan | null>(null)
+  const [showOnboardingForm, setShowOnboardingForm] = useState(false)
+  const [templates, setTemplates]     = useState<OnboardingTemplate[]>([])
+  const [obTemplateId, setObTemplateId] = useState<string>('')
+  const [obStartDate, setObStartDate] = useState<string>('')
+  const [submittingOB, setSubmittingOB] = useState(false)
+
   const fetchAll = useCallback(async () => {
     if (!id) return
     setLoading(true)
@@ -202,6 +212,13 @@ export default function EmployeeDetailPage() {
     if (timeOffRes.ok) {
       const j = await timeOffRes.json()
       setTimeOff((j.data ?? []) as TimeOffRequest[])
+    }
+    // Active onboarding plan for this employee (admin-only endpoint; will 200 here).
+    const obPlanRes = await fetch('/api/hris/onboarding/plans?status=in_progress')
+    if (obPlanRes.ok) {
+      const j = await obPlanRes.json()
+      const list = (j.data ?? []) as Array<OnboardingPlan & { employee_id: string }>
+      setActivePlan(list.find(p => p.employee_id === id) ?? null)
     }
     setLoading(false)
   }, [id])
@@ -249,6 +266,36 @@ export default function EmployeeDetailPage() {
       body: JSON.stringify({ action }),
     })
     if (res.ok) await fetchAll()
+  }
+
+  async function openOnboardingForm() {
+    if (templates.length === 0) {
+      const res = await fetch('/api/hris/onboarding/templates')
+      if (res.ok) {
+        const j = await res.json()
+        const list = (j.data ?? []) as OnboardingTemplate[]
+        setTemplates(list)
+        const def = list.find(t => t.is_default) ?? list[0]
+        if (def) setObTemplateId(def.id)
+      }
+    }
+    setShowOnboardingForm(true)
+  }
+
+  async function startOnboarding() {
+    if (!obTemplateId) return
+    setSubmittingOB(true)
+    const res = await fetch(`/api/employees/${id}/onboarding`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template_id: obTemplateId, start_date: obStartDate || null }),
+    })
+    if (res.ok) {
+      setShowOnboardingForm(false)
+      setObStartDate('')
+      await fetchAll()
+    }
+    setSubmittingOB(false)
   }
 
   if (!flags.hris) {
@@ -374,6 +421,79 @@ export default function EmployeeDetailPage() {
               </ul>
             </div>
           )}
+
+          {/* Onboarding */}
+          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Onboarding</h2>
+                <p className="text-xs text-slate-500">
+                  {activePlan
+                    ? <>Active plan: <span className="font-medium text-slate-700">{activePlan.template_name}</span> · started {activePlan.start_date}</>
+                    : 'No active onboarding plan.'}
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                {activePlan ? (
+                  <Link
+                    href={`/hris/onboarding`}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    View all plans
+                  </Link>
+                ) : !showOnboardingForm ? (
+                  <button
+                    onClick={openOnboardingForm}
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                  >
+                    Start onboarding
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {showOnboardingForm && !activePlan && (
+              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    <label className={labelCls}>Template</label>
+                    <select
+                      className={inputCls}
+                      value={obTemplateId}
+                      onChange={e => setObTemplateId(e.target.value)}
+                    >
+                      <option value="" disabled>Pick a template…</option>
+                      {templates.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}{t.is_default ? ' (default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Start date (optional)</label>
+                    <input type="date" className={inputCls} value={obStartDate} onChange={e => setObStartDate(e.target.value)} />
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    onClick={() => setShowOnboardingForm(false)}
+                    disabled={submittingOB}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={startOnboarding}
+                    disabled={!obTemplateId || submittingOB}
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {submittingOB ? 'Starting…' : 'Start plan'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Time off */}
           <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">

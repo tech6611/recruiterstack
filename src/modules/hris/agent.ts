@@ -23,6 +23,11 @@ const HRIS_TOOL_NAMES = new Set([
   'request_time_off',
   'list_time_off',
   'decide_time_off',
+  'list_onboarding_templates',
+  'list_onboarding_plans',
+  'start_onboarding',
+  'get_employee_onboarding',
+  'complete_onboarding_task',
 ])
 
 export const HRIS_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
@@ -52,6 +57,11 @@ CAPABILITIES:
 - request_time_off — submit a PTO/sick/personal/unpaid request for an employee. The approver auto-resolves to the requester's manager (HRIS reporting line); if no manager is set, the request goes to admin. Required: request_type (vacation|sick|personal|unpaid), start_date, end_date.
 - list_time_off — list an employee's time-off requests, optionally filtered by status (pending | approved | rejected | cancelled).
 - decide_time_off — approve / reject / cancel a pending request by its request_id (from list_time_off).
+- list_onboarding_templates — list reusable onboarding templates in this org (each has an id you pass to start_onboarding).
+- list_onboarding_plans — org-wide list of active/completed onboarding plans with progress (admin-only view).
+- start_onboarding — start an onboarding plan for an employee from a template (the orchestrator must request_approval first). Tasks are snapshotted with computed due dates from start_date + template offsets.
+- get_employee_onboarding — show the active onboarding plan + all its tasks (with status) for an employee.
+- complete_onboarding_task — mark a single task as completed by task_id. The plan auto-completes when its last task is done.
 
 You do NOT create employees. That happens automatically when a candidacy is dispositioned hired (DB trigger). If the user wants to mark someone hired, that's an ATS action and the orchestrator will route there.
 

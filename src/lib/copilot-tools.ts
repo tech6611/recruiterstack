@@ -43,6 +43,14 @@ import {
   listTimeOffRequests,
   rejectTimeOffRequest,
 } from '@/modules/hris/domain/time-off'
+import {
+  completeTask as completeOnboardingTask,
+  createPlanFromTemplate,
+  getActivePlanForEmployee,
+  listPlanTasks,
+  listPlans as listOnboardingPlans,
+  listTemplates as listOnboardingTemplates,
+} from '@/modules/hris/domain/onboarding'
 import { findPersonByEmail } from '@/modules/core/domain/people'
 import type {
   EmployeeProfile,
@@ -802,6 +810,57 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'list_onboarding_templates',
+    description: 'List the active onboarding templates in this org. Each org has at least one default template (seeded). Returns id + name so you can pass an id to start_onboarding.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'list_onboarding_plans',
+    description: 'List onboarding plans across the org with progress counts. Optionally filter by status.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['in_progress', 'completed', 'cancelled'] },
+      },
+    },
+  },
+  {
+    name: 'start_onboarding',
+    description: 'Start an onboarding plan for an employee from a template. The plan instantiates all template tasks with computed due dates anchored to start_date (defaults to the employee\'s start_date or today). The new hire is notified. The orchestrator must request_approval BEFORE calling this.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string' },
+        person_email: { type: 'string' },
+        template_id:  { type: 'string', description: 'UUID of the template (from list_onboarding_templates)' },
+        start_date:   { type: 'string', description: 'Override anchor date (YYYY-MM-DD). Defaults to employee start_date or today.' },
+      },
+      required: ['template_id'],
+    },
+  },
+  {
+    name: 'get_employee_onboarding',
+    description: 'Get the active onboarding plan and all its tasks (with status) for a given employee. Returns null when there is no in-progress plan.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string' },
+        person_email: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'complete_onboarding_task',
+    description: 'Mark an onboarding task as completed. Identify by task_id (from get_employee_onboarding or list_onboarding_plans). The plan auto-completes when all its tasks are done.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string' },
+      },
+      required: ['task_id'],
+    },
+  },
+  {
     name: 'record_employee_compensation',
     description: 'Record a NEW compensation record for an employee — every change is a new row with an effective date (immutable history). The change auto-appears on the employee timeline. The orchestrator must request_approval BEFORE calling this.',
     input_schema: {
@@ -889,6 +948,11 @@ export async function executeTool(
       case 'request_time_off':           return await requestTimeOffTool(input, orgId, supabase)
       case 'list_time_off':              return await listTimeOffTool(input, orgId, supabase)
       case 'decide_time_off':            return await decideTimeOffTool(input, orgId, supabase)
+      case 'list_onboarding_templates':  return await listOnboardingTemplatesTool(orgId, supabase)
+      case 'list_onboarding_plans':      return await listOnboardingPlansTool(input, orgId, supabase)
+      case 'start_onboarding':           return await startOnboardingTool(input, orgId, supabase)
+      case 'get_employee_onboarding':    return await getEmployeeOnboardingTool(input, orgId, supabase)
+      case 'complete_onboarding_task':   return await completeOnboardingTaskTool(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -3044,5 +3108,118 @@ async function decideTimeOffTool(
     return `Time-off request ${updated.status}: ${updated.request_type}, ${formatTimeOffRange(updated)}.`
   } catch (err) {
     return err instanceof Error ? err.message : 'Failed to decide on the request.'
+  }
+}
+
+// ── Onboarding tools (HRIS depth — onboarding slice) ─────────────────────────
+
+async function listOnboardingTemplatesTool(
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const templates = await listOnboardingTemplates(supabase, orgId)
+  if (templates.length === 0) return 'No active onboarding templates.'
+  const lines = templates.map(t =>
+    `• ${t.name}${t.is_default ? ' (default)' : ''} — ${t.description ?? 'no description'} [template_id: ${t.id}]`,
+  )
+  return `${templates.length} template(s):\n${lines.join('\n')}`
+}
+
+async function listOnboardingPlansTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const status = input.status as 'in_progress' | 'completed' | 'cancelled' | undefined
+  const plans = await listOnboardingPlans(supabase, orgId, status)
+  if (plans.length === 0) return status ? `No ${status} plans.` : 'No onboarding plans yet.'
+
+  // Resolve employee names for context.
+  const empIds = Array.from(new Set(plans.map(p => p.employee_id)))
+  const { data: emps } = await supabase
+    .from('employee_profiles')
+    .select('id, person:people(name, email)')
+    .in('id', empIds)
+  const byEmp = new Map(
+    (emps ?? []).map(e => {
+      const row = e as unknown as { id: string; person: { name: string; email: string } | null }
+      return [row.id, row.person]
+    }),
+  )
+
+  const lines = plans.map(p => {
+    const who = byEmp.get(p.employee_id)
+    const pct = p.total_tasks > 0 ? Math.round((p.completed_tasks / p.total_tasks) * 100) : 0
+    return `• ${who?.name ?? p.employee_id} (${who?.email ?? '—'}) — ${p.template_name} | ${p.status} | ${p.completed_tasks}/${p.total_tasks} (${pct}%) [plan_id: ${p.id}]`
+  })
+  return `${plans.length} plan(s):\n${lines.join('\n')}`
+}
+
+async function startOnboardingTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const employee = await resolveEmployee(input, orgId, supabase)
+  if (typeof employee === 'string') return employee
+
+  const templateId = typeof input.template_id === 'string' ? input.template_id : null
+  if (!templateId) return 'Provide template_id (from list_onboarding_templates).'
+
+  try {
+    const { plan, tasks } = await createPlanFromTemplate(supabase, orgId, {
+      employeeId: employee.id,
+      templateId,
+      startDate:  input.start_date ?? null,
+    })
+    return `Started "${plan.template_name}" for the employee — ${tasks.length} task${tasks.length === 1 ? '' : 's'} anchored to ${plan.start_date} [plan_id: ${plan.id}]. The new hire was notified.`
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Failed to start onboarding'
+  }
+}
+
+async function getEmployeeOnboardingTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const employee = await resolveEmployee(input, orgId, supabase)
+  if (typeof employee === 'string') return employee
+
+  const plan = await getActivePlanForEmployee(supabase, orgId, employee.id)
+  if (!plan) return 'No active onboarding plan for this employee.'
+
+  const tasks = await listPlanTasks(supabase, orgId, plan.id)
+  const done  = tasks.filter(t => t.status === 'completed').length
+  const pct   = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0
+  const lines = tasks.map(t => {
+    const mark = t.status === 'completed' ? '✓' : '○'
+    const due  = t.due_date ? ` (due ${t.due_date})` : ''
+    return `  ${mark} ${t.title} — ${t.assignee_role}${due} [task_id: ${t.id}]`
+  })
+  return [
+    `${plan.template_name} | ${plan.status} | ${done}/${tasks.length} (${pct}%)`,
+    `Anchored to ${plan.start_date}.`,
+    '',
+    lines.join('\n'),
+  ].join('\n')
+}
+
+async function completeOnboardingTaskTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const taskId = typeof input.task_id === 'string' ? input.task_id : ''
+  if (!taskId) return 'Provide task_id.'
+  try {
+    const updated = await completeOnboardingTask(supabase, orgId, taskId, 'agent')
+    return `Marked "${updated.title}" as completed.`
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Failed to complete task'
   }
 }
