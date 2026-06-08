@@ -27,6 +27,11 @@ export default function MyTaxDeclarationsPage() {
     section_80d:      0,
     section_80ccd_1b: 0,
   })
+  // v1.1 — open jsonb keys (24b / 80e / 80g / 80tta).
+  const [otherDraft, setOtherDraft] = useState<{ '24b': number; '80e': number; '80g': number; '80tta': number }>({
+    '24b': 0, '80e': 0, '80g': 0, '80tta': 0,
+  })
+  const [showMore, setShowMore]     = useState(false)
   const [saving, setSaving]         = useState(false)
   const [err, setErr]               = useState<string | null>(null)
   const [savedAt, setSavedAt]       = useState<Date | null>(null)
@@ -52,6 +57,16 @@ export default function MyTaxDeclarationsPage() {
           section_80d:      Number(current.section_80d),
           section_80ccd_1b: Number(current.section_80ccd_1b),
         })
+        const other = (current.other_exemptions ?? {}) as Record<string, number>
+        const otherLoaded = {
+          '24b':   Number(other['24b']   ?? 0),
+          '80e':   Number(other['80e']   ?? 0),
+          '80g':   Number(other['80g']   ?? 0),
+          '80tta': Number(other['80tta'] ?? 0),
+        }
+        setOtherDraft(otherLoaded)
+        // Auto-expand if any v1.1 field has a value, so saved data is visible.
+        if (Object.values(otherLoaded).some(v => v > 0)) setShowMore(true)
       }
     }
     setLoading(false)
@@ -75,7 +90,7 @@ export default function MyTaxDeclarationsPage() {
       const res = await fetch('/api/me/tax-declarations', {
         method:  'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ fy, ...draft }),
+        body:    JSON.stringify({ fy, ...draft, other_exemptions: otherDraft }),
       })
       const j = await res.json()
       if (!res.ok) { setErr(j.error ?? 'Failed to save'); return }
@@ -156,6 +171,46 @@ export default function MyTaxDeclarationsPage() {
               <DecField label="Section 80C (₹1.5L cap)" hint="EPF + ELSS + PPF + LIC + ULIP + principal on home loan + 5-yr FD. Your EPF is auto-added by the engine." value={draft.section_80c}      onChange={v => setDraft({ ...draft, section_80c: v })} />
               <DecField label="Section 80D (₹25k self / ₹50k senior)" hint="Health insurance premiums for self / family / parents." value={draft.section_80d}      onChange={v => setDraft({ ...draft, section_80d: v })} />
               <DecField label="Section 80CCD(1B) (₹50k cap)" hint="NPS contribution above the 80C limit. Tier-I only." value={draft.section_80ccd_1b} onChange={v => setDraft({ ...draft, section_80ccd_1b: v })} />
+            </div>
+
+            {/* v1.1 — More exemptions (collapsed by default) */}
+            <div className="mt-6 border-t border-slate-200 pt-4">
+              <button
+                onClick={() => setShowMore(s => !s)}
+                className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-700"
+              >
+                <span>{showMore ? '▼' : '▶'}</span>
+                <span>More exemptions ({Object.values(otherDraft).filter(v => v > 0).length} claimed)</span>
+              </button>
+
+              {showMore && (
+                <div className="mt-4 space-y-4">
+                  <DecField
+                    label="Section 24(b) — Home loan interest (₹2L cap, self-occupied)"
+                    hint="Interest paid on a home loan for a property you live in. Let-out properties follow different rules."
+                    value={otherDraft['24b']}
+                    onChange={v => setOtherDraft({ ...otherDraft, '24b': v })}
+                  />
+                  <DecField
+                    label="Section 80E — Education loan interest (no cap)"
+                    hint="Interest on an education loan for self / spouse / children / legal ward. Available 8 years from start of repayment."
+                    value={otherDraft['80e']}
+                    onChange={v => setOtherDraft({ ...otherDraft, '80e': v })}
+                  />
+                  <DecField
+                    label="Section 80G — Donations (50% simplification)"
+                    hint="Enter total donations to approved charities. RecruiterStack applies a flat 50% deductibility for simplicity — real rule splits 100%/50% donees and caps some at 10% of gross. Reconcile with your CA."
+                    value={otherDraft['80g']}
+                    onChange={v => setOtherDraft({ ...otherDraft, '80g': v })}
+                  />
+                  <DecField
+                    label="Section 80TTA — Savings account interest (₹10k cap)"
+                    hint="Interest from savings accounts in banks / co-op banks / post offices. Under 60 only. Excludes FD interest."
+                    value={otherDraft['80tta']}
+                    onChange={v => setOtherDraft({ ...otherDraft, '80tta': v })}
+                  />
+                </div>
+              )}
             </div>
 
             {err && <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>}

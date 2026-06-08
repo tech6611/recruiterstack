@@ -12,6 +12,27 @@ entries on top.
 ## 2026-06-08
 
 ### Added
+- **Payroll v1.1 — old-regime extras.** Four more Chapter VI-A sections in
+  the India engine, no migration needed (uses the existing
+  `other_exemptions` jsonb column):
+  - **Section 24(b)** — home loan interest, ₹2L cap (self-occupied)
+  - **Section 80E** — education loan interest, no cap
+  - **Section 80G** — donations, applied as flat 50% deductibility (working-
+    tool simplification documented in code + UI + payslip meta). Real rule
+    splits 100%/50% donees and caps some at 10% of gross
+  - **Section 80TTA** — savings account interest, ₹10k cap
+  - New regime continues to ignore all exemptions
+  - Engine surfaces a payslip note when 80G is claimed, flagging the
+    simplification
+  - 11 new unit tests pin the math (28 total India tests passing)
+  - UI: `/me/tax-declarations` gets a collapsible "More exemptions"
+    section with per-field cap hints. Auto-expands if any v1.1 field is
+    already populated
+  - API: known-key whitelist sanitizer on both `/api/me/tax-declarations`
+    and `/api/payroll/employees/[id]/declarations` — drops anything
+    outside the engine's known keys, keeps the open jsonb safe
+
+### Added
 - **Payroll module v1 — India tax engine.** Compute joins the ledger:
   pluggable `TaxEngine` interface + one concrete implementation (India,
   FY 2026-27, both regimes). The compute orchestrator pre-fills draft

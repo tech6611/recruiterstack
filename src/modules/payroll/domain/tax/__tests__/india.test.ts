@@ -198,6 +198,124 @@ describe('fyFromDate', () => {
   })
 })
 
+// ── v1.1 sections: 24(b) / 80E / 80G / 80TTA ─────────────────────────────────
+//
+// Baseline for old-regime ₹15L: from the engine — Basic 7.5L, HRA 3.75L
+// (no rent declared so HRA exemption = 0), PF 90k counts toward 80C.
+// Without v1.1 sections, taxable = 15L − 50k − min(150k, 0 + 90k=90k)
+//                                = 15L − 50k − 90k = 13,60,000
+// Old slabs on 13,60,000: 2.5L*0 + 2.5L*5% + 5L*20% + 3.6L*30%
+//                       = 12,500 + 1,00,000 + 1,08,000 = 2,20,500
+// > 5L → no 87A. Cess 4% → 2,29,320. We use this as the baseline below.
+//
+// Each section reduces taxable; tax saved on the marginal slab (30%) plus
+// cess (×1.04). Asserting on annualTDS keeps the test resilient if we
+// later change rounding.
+
+describe('India engine — v1.1 sections (old regime extras)', () => {
+  const baseDecl = {
+    rent_paid_annual:  0,
+    section_80c:       0,
+    section_80d:       0,
+    section_80ccd_1b:  0,
+  }
+  const baseInput = {
+    annualBaseSalary: 1_500_000,
+    regime:           'old' as const,
+  }
+
+  function tdsFor(other: Record<string, number>): number {
+    const out = indiaTaxEngine.compute(input({
+      ...baseInput,
+      declaration: { ...baseDecl, other_exemptions: other },
+    }))
+    return annualTDS(out)
+  }
+
+  // Sanity baseline — re-derive the no-extras number so a regression in the
+  // baseline math surfaces here too.
+  const BASELINE = tdsFor({})
+  it('baseline (no v1.1 sections) ≈ ₹2,29,320', () => {
+    expect(BASELINE).toBeCloseTo(2_29_320, -2)
+  })
+
+  // ── 24(b) — home loan interest, ₹2L cap ─────────────────────────────────
+  it('24(b) ₹2L home-loan interest → tax saved ≈ ₹62,400', () => {
+    // 2L × 30% slab = 60k, ×1.04 cess = 62,400
+    expect(BASELINE - tdsFor({ '24b': 200_000 })).toBeCloseTo(62_400, -1)
+  })
+
+  it('24(b) caps at ₹2L — claiming ₹5L = same as claiming ₹2L', () => {
+    expect(tdsFor({ '24b': 500_000 })).toBe(tdsFor({ '24b': 200_000 }))
+  })
+
+  // ── 80E — education loan, no cap ────────────────────────────────────────
+  it('80E ₹3L education-loan interest → tax saved ≈ ₹93,600 (uncapped)', () => {
+    // 3L × 30% × 1.04 = 93,600
+    expect(BASELINE - tdsFor({ '80e': 300_000 })).toBeCloseTo(93_600, -1)
+  })
+
+  // ── 80G — donations, simplified 50% rule ────────────────────────────────
+  it('80G ₹1L donations → tax saved ≈ ₹15,600 (₹50k effective deduction)', () => {
+    // 1L × 50% rule = 50k effective deduction; 50k × 30% × 1.04 = 15,600
+    expect(BASELINE - tdsFor({ '80g': 100_000 })).toBeCloseTo(15_600, -1)
+  })
+
+  it('80G surfaces a simplification note on the payslip', () => {
+    const out = indiaTaxEngine.compute(input({
+      ...baseInput,
+      declaration: { ...baseDecl, other_exemptions: { '80g': 100_000 } },
+    }))
+    expect(out.meta.notes?.some(n => n.includes('80G'))).toBe(true)
+  })
+
+  // ── 80TTA — savings interest, ₹10k cap ──────────────────────────────────
+  it('80TTA ₹10k → tax saved ≈ ₹3,120', () => {
+    // 10k × 30% × 1.04 = 3,120
+    expect(BASELINE - tdsFor({ '80tta': 10_000 })).toBeCloseTo(3_120, -1)
+  })
+
+  it('80TTA caps at ₹10k — claiming ₹20k = same as ₹10k', () => {
+    expect(tdsFor({ '80tta': 20_000 })).toBe(tdsFor({ '80tta': 10_000 }))
+  })
+
+  // ── All four together — additive across slab boundaries ────────────────
+  it('24(b)+80E+80G+80TTA combined → ₹1,53,920 saved (crosses ₹10L slab)', () => {
+    const saved = BASELINE - tdsFor({
+      '24b':   200_000,                                         // → 2,00,000 deduction
+      '80e':   300_000,                                         // → 3,00,000 deduction
+      '80g':   100_000,                                         // → 50,000 deduction (50% rule)
+      '80tta':  10_000,                                         // → 10,000 deduction
+    })
+    // Total deduction = 5,60,000. Baseline taxable 13,60,000 → new 8,00,000.
+    // Slab savings: 3.6L at 30% off (1,08,000) + 2L at 20% off (40,000)
+    //             = 1,48,000 → with 4% cess = 1,53,920.
+    expect(saved).toBeCloseTo(1_53_920, -1)
+  })
+
+  // ── New regime ignores all v1.1 sections ────────────────────────────────
+  it('new regime ignores other_exemptions entirely', () => {
+    const withExtras = indiaTaxEngine.compute(input({
+      regime: 'new',
+      declaration: { ...baseDecl, other_exemptions: { '24b': 200_000, '80e': 300_000 } },
+    }))
+    const without = indiaTaxEngine.compute(input({
+      regime: 'new',
+      declaration: null,
+    }))
+    expect(annualTDS(withExtras)).toBe(annualTDS(without))
+  })
+
+  // ── Unknown jsonb keys are ignored (forward compat) ─────────────────────
+  it('unknown keys in other_exemptions are silently ignored', () => {
+    const out = indiaTaxEngine.compute(input({
+      ...baseInput,
+      declaration: { ...baseDecl, other_exemptions: { 'made_up_section': 999_999 } },
+    }))
+    expect(annualTDS(out)).toBe(BASELINE)
+  })
+})
+
 // ── helpers ────────────────────────────────────────────────────────────────
 function annualTDS(out: ReturnType<typeof indiaTaxEngine.compute>): number {
   const tds = out.deductions.find(d => d.code === 'tds')

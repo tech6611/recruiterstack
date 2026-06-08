@@ -85,6 +85,19 @@ const CAP_80C       = 150_000
 const CAP_80D       =  25_000      // self+family below 60; senior is 50k — not split in v1
 const CAP_80CCD_1B  =  50_000      // additional NPS over 80C
 
+// v1.1 — additional Chapter VI-A sections + house property
+// Section 24(b): home loan interest, self-occupied. Let-out has no cap but
+// also has rental-income offset rules — we treat the input as self-occupied.
+const CAP_24B       = 200_000
+// 80E: education loan interest. No upper cap. Available up to 8 years.
+const CAP_80E       = Infinity
+// 80TTA: savings account interest. Under-60 only. ₹10k cap.
+const CAP_80TTA     =  10_000
+// 80G: donations. Real rule has 50%/100% and 10%-of-gross caps depending
+// on the donee. We apply a flat 50% deductibility with no gross cap as a
+// working-tool simplification; UI + payslip note flag this clearly.
+const RATE_80G      = 0.50
+
 // ── State PT engines ─────────────────────────────────────────────────────────
 // Karnataka raised threshold to ₹25,000/month in Apr 2025; ₹200/month above.
 // (Feb has ₹300 statutorily, but most payroll software smooths to ₹200 ×12 +
@@ -204,6 +217,10 @@ export const indiaTaxEngine: TaxEngine = {
     })
     const tdsPeriod = tdsAnnual / periodsPerYear
 
+    // 80G simplification note: only fire when the user actually claimed it.
+    const claimed80g = regime === 'old'
+      && Number(declaration?.other_exemptions?.['80g'] ?? 0) > 0
+
     // ── Step 8: Assemble deduction lines ─────────────────────────────────
     const deductions: TaxLine[] = []
     if (pfAmount > 0) deductions.push({
@@ -248,6 +265,7 @@ export const indiaTaxEngine: TaxEngine = {
     const notes: string[] = []
     if (regime === 'old' && !declaration) notes.push('Old regime selected but no declaration on file — no exemptions applied.')
     if (input.payFrequency !== 'monthly')  notes.push(`Pay frequency is "${input.payFrequency}"; TDS projection uses ${periodsPerYear} periods/year.`)
+    if (claimed80g)                        notes.push('80G applied as flat 50% deduction (no 10%-of-gross cap). Real rule splits 100%/50% donees; reconcile with your CA.')
 
     return {
       earnings,
@@ -270,6 +288,16 @@ export const indiaTaxEngine: TaxEngine = {
 
 // ── TDS — annual ─────────────────────────────────────────────────────────────
 // Pure function; unit-tested. Inputs are annual amounts.
+// Known keys we look up in declaration.other_exemptions.
+// Unknown keys are ignored — the jsonb column is open so future engines can
+// stash anything without breaking this one.
+export type OtherExemptions = Partial<{
+  '24b':    number   // home loan interest, self-occupied
+  '80e':    number   // education loan interest
+  '80g':    number   // donations (we apply 50% rule)
+  '80tta':  number   // savings account interest
+}>
+
 export function computeAnnualTDS(args: {
   annualGross:  number
   basicAnnual:  number
@@ -277,7 +305,13 @@ export function computeAnnualTDS(args: {
   pfAnnual:     number                                          // for 80C inclusion under old regime
   regime:       'new' | 'old'
   metro:        boolean
-  declaration:  { rent_paid_annual: number; section_80c: number; section_80d: number; section_80ccd_1b: number } | null
+  declaration:  {
+    rent_paid_annual: number
+    section_80c:      number
+    section_80d:      number
+    section_80ccd_1b: number
+    other_exemptions?: OtherExemptions
+  } | null
 }): number {
   let taxable: number
   let slabs: Slab[]
@@ -291,6 +325,7 @@ export function computeAnnualTDS(args: {
     rebate         = REBATE_87A_NEW
   } else {
     // Old regime: standard deduction + HRA exemption + 80C (incl. EPF) + 80D + 80CCD(1B)
+    //   + v1.1 sections: 24(b), 80E, 80G (50% simplified), 80TTA
     const d = args.declaration ?? { rent_paid_annual: 0, section_80c: 0, section_80d: 0, section_80ccd_1b: 0 }
 
     // HRA exemption (least of three):
@@ -310,11 +345,22 @@ export function computeAnnualTDS(args: {
     const ded80d     = Math.min(CAP_80D,      d.section_80d)
     const ded80ccd1b = Math.min(CAP_80CCD_1B, d.section_80ccd_1b)
 
+    // v1.1 sections — read from open jsonb. Coerce non-numeric / negative to 0.
+    const oe = d.other_exemptions ?? {}
+    const ded24b   = Math.min(CAP_24B,   Math.max(0, Number(oe['24b']    ?? 0) || 0))
+    const ded80e   = Math.min(CAP_80E,   Math.max(0, Number(oe['80e']    ?? 0) || 0))
+    const ded80tta = Math.min(CAP_80TTA, Math.max(0, Number(oe['80tta']  ?? 0) || 0))
+    // 80G simplification: 50% of input, no 10%-of-gross cap. Real rule splits
+    // into 100% / 50% donees and applies a gross cap on some categories. Note
+    // this on the payslip via the engine's `notes` array.
+    const ded80g   = Math.max(0, Number(oe['80g'] ?? 0) || 0) * RATE_80G
+
     taxable = Math.max(0,
       args.annualGross
       - STD_DED_OLD
       - hraExemption
-      - ded80c - ded80d - ded80ccd1b,
+      - ded80c - ded80d - ded80ccd1b
+      - ded24b - ded80e - ded80g - ded80tta,
     )
     slabs          = OLD_REGIME_SLABS
     surchargeTiers = SURCHARGE_TIERS_OLD

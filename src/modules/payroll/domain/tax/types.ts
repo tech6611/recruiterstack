@@ -57,12 +57,17 @@ export interface TaxComputeInput {
   lwpDays: number
   /** Org-level engine config. */
   settings: PayrollOrgSettings
-  /** Old-regime only; engine ignores under 'new'. */
+  /** Old-regime only; engine ignores under 'new'.
+   *  `other_exemptions` carries country-engine-specific extras as an open
+   *  jsonb-shaped record. India v1.1 reads keys: '24b', '80e', '80g',
+   *  '80tta'. Unknown keys are ignored — adding new sections later is
+   *  additive in the engine, no type change here. */
   declaration?: {
-    rent_paid_annual: number
-    section_80c:      number
-    section_80d:      number
-    section_80ccd_1b: number
+    rent_paid_annual:  number
+    section_80c:       number
+    section_80d:       number
+    section_80ccd_1b:  number
+    other_exemptions?: Record<string, number>
   } | null
 }
 

@@ -39,6 +39,7 @@ export async function PUT(req: NextRequest) {
     section_80c?: number
     section_80d?: number
     section_80ccd_1b?: number
+    other_exemptions?: Record<string, number>
     notes?: string | null
   }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
@@ -55,6 +56,7 @@ export async function PUT(req: NextRequest) {
       section_80c:      body.section_80c,
       section_80d:      body.section_80d,
       section_80ccd_1b: body.section_80ccd_1b,
+      other_exemptions: sanitizeOtherExemptions(body.other_exemptions),
       notes:            body.notes,
     })
     return NextResponse.json({ data })
@@ -64,4 +66,18 @@ export async function PUT(req: NextRequest) {
       { status: 400 },
     )
   }
+}
+
+// Whitelist known v1.1 keys and coerce values to non-negative numbers. Unknown
+// keys are dropped — keeps a hostile client from packing arbitrary jsonb into
+// the column. New engine sections add to this list.
+const KNOWN_EXEMPTION_KEYS = ['24b', '80e', '80g', '80tta'] as const
+function sanitizeOtherExemptions(raw: Record<string, number> | undefined): Record<string, number> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const out: Record<string, number> = {}
+  for (const k of KNOWN_EXEMPTION_KEYS) {
+    const v = Number(raw[k])
+    if (Number.isFinite(v) && v > 0) out[k] = v
+  }
+  return out
 }

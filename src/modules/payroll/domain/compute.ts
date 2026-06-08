@@ -159,6 +159,7 @@ export async function planRunCompute(
               section_80c:      Number(declaration.section_80c),
               section_80d:      Number(declaration.section_80d),
               section_80ccd_1b: Number(declaration.section_80ccd_1b),
+              other_exemptions: declaration.other_exemptions ?? {},
             }
           : null,
       })
