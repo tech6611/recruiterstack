@@ -12,6 +12,32 @@ entries on top.
 ## 2026-06-08
 
 ### Added
+- **Payroll module v1 — India tax engine.** Compute joins the ledger:
+  pluggable `TaxEngine` interface + one concrete implementation (India,
+  FY 2026-27, both regimes). The compute orchestrator pre-fills draft
+  payslips from current compensation, runs the engine, deducts LWP
+  pulled from HRIS approved unpaid leave, and writes — preview-then-write
+  modal on the run-detail page. Honest scope: working-tool accuracy, not
+  statutory compliance (disclaimer banners everywhere).
+  - Schema: `payroll_org_settings` (country, state, regime, salary
+    decomposition %, PF/ESI/PT config) + `employee_profiles.tax_regime` +
+    `employee_tax_declarations` (per FY: rent, 80C, 80D, 80CCD(1B)).
+    Migration 058.
+  - Engine math: Basic/HRA/Special decomposition, PF (12% of Basic, optional
+    ₹15k cap), ESI (0.75% if gross ≤ ₹21k), state PT (KA/MH/TN/DL/HR),
+    TDS new + old regime with 87A rebate / surcharge tiers / 4% cess.
+    Karnataka PT default reflects the Apr 2025 threshold change to
+    ₹25,000/month.
+  - 17/17 unit tests pin the math; will fail loudly when slabs change after
+    a future budget.
+  - LWP from HRIS — the unified-data moat made concrete: approved unpaid
+    leave overlapping the pay period deducts proportionally from net.
+  - New UI: `/settings/payroll` (admin) + `/me/tax-declarations` (employee
+    self-service: regime picker + per-FY exemption entry).
+  - Agent prompt updated to describe v1 engine + limits; agent stays
+    read-only (compute writes go through the admin UI).
+
+### Added
 - **Payroll module v0 — payslip ledger.** The fourth real module is live (no
   longer a placeholder). Records what each employee was paid in each pay
   period; no payroll math is computed here. Pillars:

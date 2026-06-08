@@ -127,6 +127,9 @@ export interface EmployeeProfile {
   start_date: string | null
   joined_at: string | null
   terminated_at: string | null
+  // Payroll v1 (migration 058): per-employee tax regime override.
+  // Defaults to 'new' to match the govt default since FY 2023-24.
+  tax_regime: 'new' | 'old'
   created_at: string
   updated_at: string
 }
@@ -613,6 +616,65 @@ export interface PayslipInsert
   notes?:                    string | null
 }
 export interface PayslipUpdate extends Partial<PayslipInsert> {}
+
+// Payroll v1 — country tax engine (migration 058).
+// v1 ships one engine (India, FY 2026-27, both regimes). Future country engines
+// plug into the same TaxEngine interface in src/modules/payroll/domain/tax/
+// without schema changes.
+export type TaxRegime  = 'new' | 'old'
+export type CountryCode = 'IN'                                  // expand as engines land
+
+export interface PayrollOrgSettings {
+  org_id:                   string
+  country_code:             CountryCode
+  default_state:            string                              // ISO subdivision (KA, MH, TN, DL, …)
+  default_tax_regime:       TaxRegime
+  metro:                    boolean
+  basic_pct:                number                              // 0.5 = 50% of monthly gross is Basic
+  hra_pct_metro:            number                              // 0.5 = HRA is 50% of Basic in metros
+  hra_pct_non_metro:        number                              // 0.4 = HRA is 40% of Basic non-metro
+  pf_employee_pct:          number                              // 0.12 = 12% of Basic
+  pf_wage_ceiling_enabled:  boolean
+  pf_wage_ceiling:          number                              // 15000 default per Budget 2026
+  esi_threshold:            number                              // 21000 — gross at/below pays ESI
+  esi_employee_pct:         number                              // 0.0075 = 0.75%
+  notes:                    string | null
+  created_at:               string
+  updated_at:               string
+}
+export interface PayrollOrgSettingsInsert
+  extends Partial<Omit<PayrollOrgSettings, 'org_id' | 'created_at' | 'updated_at'>> {
+  org_id: string
+}
+export interface PayrollOrgSettingsUpdate extends Partial<PayrollOrgSettingsInsert> {}
+
+export interface EmployeeTaxDeclaration {
+  id:                       string
+  org_id:                   string
+  employee_id:              string
+  fy:                       string                              // '2026-27'
+  rent_paid_annual:         number
+  section_80c:              number
+  section_80d:              number
+  section_80ccd_1b:         number
+  other_exemptions:         Record<string, number>
+  notes:                    string | null
+  created_at:               string
+  updated_at:               string
+}
+export interface EmployeeTaxDeclarationInsert
+  extends Omit<EmployeeTaxDeclaration, 'id' | 'created_at' | 'updated_at' | 'rent_paid_annual' | 'section_80c' | 'section_80d' | 'section_80ccd_1b' | 'other_exemptions' | 'notes'> {
+  id?:                       string
+  created_at?:               string
+  updated_at?:               string
+  rent_paid_annual?:         number
+  section_80c?:              number
+  section_80d?:              number
+  section_80ccd_1b?:         number
+  other_exemptions?:         Record<string, number>
+  notes?:                    string | null
+}
+export interface EmployeeTaxDeclarationUpdate extends Partial<EmployeeTaxDeclarationInsert> {}
 
 export interface EmployeeProfileInsert
   extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'user_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
@@ -1473,6 +1535,18 @@ export type Database = {
         Row: Indexify<Payslip>
         Insert: Indexify<PayslipInsert>
         Update: Indexify<PayslipUpdate>
+        Relationships: []
+      }
+      payroll_org_settings: {
+        Row: Indexify<PayrollOrgSettings>
+        Insert: Indexify<PayrollOrgSettingsInsert>
+        Update: Indexify<PayrollOrgSettingsUpdate>
+        Relationships: []
+      }
+      employee_tax_declarations: {
+        Row: Indexify<EmployeeTaxDeclaration>
+        Insert: Indexify<EmployeeTaxDeclarationInsert>
+        Update: Indexify<EmployeeTaxDeclarationUpdate>
         Relationships: []
       }
       candidates: {

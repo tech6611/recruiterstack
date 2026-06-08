@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useAuth } from '@clerk/nextjs'
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CheckCircle2, Trash2, Lock } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Trash2, Lock, Sparkles, X } from 'lucide-react'
 import { flags } from '@/lib/flags'
 import type { EmployeeStatus, Payslip, PayrollRun, PayslipBreakdown } from '@/lib/types/database'
 
@@ -31,6 +31,12 @@ export default function PayrollRunDetailPage({ params }: { params: Promise<{ id:
   const [deductions, setDeductions]     = useState<string>('0')
   const [notes, setNotes]               = useState<string>('')
   const [saving, setSaving]             = useState(false)
+
+  // Compute (v1) — preview-then-write modal
+  const [showCompute, setShowCompute]   = useState(false)
+  const [plan, setPlan]                 = useState<ComputePlan | null>(null)
+  const [computing, setComputing]       = useState(false)
+  const [preserveExisting, setPreserveExisting] = useState(true)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -106,6 +112,32 @@ export default function PayrollRunDetailPage({ params }: { params: Promise<{ id:
     await refresh()
   }
 
+  // ── Compute (v1) ─────────────────────────────────────────────────────────
+  async function openCompute() {
+    setErr(null); setShowCompute(true); setComputing(true); setPlan(null)
+    const res = await fetch(`/api/payroll/runs/${id}/compute`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ preview: true }),
+    })
+    setComputing(false)
+    if (!res.ok) { setErr((await res.json()).error ?? 'Compute failed'); setShowCompute(false); return }
+    setPlan(((await res.json()).data.plan) as ComputePlan)
+  }
+
+  async function commitCompute() {
+    setComputing(true)
+    const res = await fetch(`/api/payroll/runs/${id}/compute`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ preview: false, preserveExisting }),
+    })
+    setComputing(false)
+    if (!res.ok) { setErr((await res.json()).error ?? 'Compute failed'); return }
+    setShowCompute(false); setPlan(null)
+    await refresh()
+  }
+
   if (!flags.payroll) return <div className="p-8 text-sm text-slate-500">The Payroll module is not enabled.</div>
   if (loading) return <div className="p-8 text-sm text-slate-400">Loading…</div>
   if (!run)    return <div className="p-8 text-sm text-slate-500">Payroll run not found.</div>
@@ -130,6 +162,15 @@ export default function PayrollRunDetailPage({ params }: { params: Promise<{ id:
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {!locked && (
+            <button
+              onClick={openCompute}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              title="Generate draft payslips from current compensation + tax rules"
+            >
+              <Sparkles className="h-4 w-4 text-emerald-600" /> Generate from employees
+            </button>
+          )}
           {locked ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
               <Lock className="h-3 w-3" /> Finalized
@@ -243,8 +284,128 @@ export default function PayrollRunDetailPage({ params }: { params: Promise<{ id:
           </tbody>
         </table>
       </div>
+
+      {/* ── Compute preview modal ─────────────────────────────────────── */}
+      {showCompute && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-emerald-600" />
+                <h2 className="text-base font-semibold text-slate-900">Generate from employees — preview</h2>
+              </div>
+              <button onClick={() => setShowCompute(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4" style={{ maxHeight: 'calc(85vh - 130px)' }}>
+              {computing && <div className="py-8 text-center text-sm text-slate-500">Computing…</div>}
+              {!computing && plan && (
+                <>
+                  <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <strong>{plan.engine}</strong> · FY {plan.fy} · regime default <strong>{plan.regime_default}</strong>.
+                    These figures are a working-tool estimate, not statutory compliance. Reconcile with your CA.
+                  </div>
+                  <div className="mb-3 text-sm text-slate-600">
+                    {plan.scored} employee{plan.scored === 1 ? '' : 's'} computed
+                    {plan.skipped > 0 && <> · {plan.skipped} skipped (no comp record)</>}
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+                        <th className="px-3 py-2">Employee</th>
+                        <th className="px-3 py-2 text-right">Gross</th>
+                        <th className="px-3 py-2 text-right">Deductions</th>
+                        <th className="px-3 py-2 text-right">Net</th>
+                        <th className="px-3 py-2">LWP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plan.plans.map(p => (
+                        <tr key={p.employee_id} className="border-b border-slate-100 last:border-0">
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-slate-900">{p.employee_name ?? '(unknown)'}</div>
+                            <div className="text-xs text-slate-400">{p.employee_email ?? ''}</div>
+                            {p.skip_reason && (
+                              <div className="mt-0.5 text-xs text-rose-600">Skipped: {p.error}</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right text-slate-700">
+                            {p.computed ? fmtMoney(p.computed.gross, run.currency) : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right text-slate-700">
+                            {p.computed ? fmtMoney(p.computed.deductionsTotal, run.currency) : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium text-slate-900">
+                            {p.computed ? fmtMoney(p.computed.net, run.currency) : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-slate-500">
+                            {(p.lwp_days ?? 0) > 0 ? `${p.lwp_days} day(s)` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4">
+              <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={!preserveExisting}
+                  onChange={e => setPreserveExisting(!e.target.checked)}
+                />
+                Overwrite existing payslips
+              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowCompute(false)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={commitCompute}
+                  disabled={!plan || computing || (plan?.scored ?? 0) === 0}
+                  className="rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {computing ? 'Writing…' : 'Write payslips'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+// ── Compute plan shape (from /api/payroll/runs/[id]/compute) ───────────────
+interface ComputePlanRow {
+  employee_id:    string
+  employee_name:  string | null
+  employee_email: string | null
+  skip_reason?:   string
+  error?:         string
+  lwp_days?:      number
+  computed?: {
+    gross:           number
+    deductionsTotal: number
+    net:             number
+  }
+}
+interface ComputePlan {
+  run_id:        string
+  period_start:  string
+  period_end:    string
+  period_days:   number
+  fy:            string
+  engine:        string
+  regime_default: 'new' | 'old'
+  plans:         ComputePlanRow[]
+  scored:        number
+  skipped:       number
 }
 
 function Stat({ label, value, bold = false }: { label: string; value: string; bold?: boolean }) {
