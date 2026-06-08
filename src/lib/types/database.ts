@@ -352,6 +352,65 @@ export interface OnboardingTaskInsert
 }
 export interface OnboardingTaskUpdate extends Partial<OnboardingTaskInsert> {}
 
+// HR cases — lightweight helpdesk with an AI first-responder. On creation the
+// HRIS sub-agent attempts to answer from unified data; ai_attempted_at marks
+// whether it ran. Only genuinely-human cases escalate. See migration 053.
+export type HrCaseCategory =
+  | 'leave' | 'comp' | 'benefits' | 'docs' | 'manager' | 'onboarding' | 'other'
+export type HrCaseStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+export type HrCaseAuthorRole = 'employee' | 'hr' | 'agent' | 'system'
+
+export interface HrCase {
+  id: string
+  org_id: string
+  requester_user_id: string
+  requester_employee_id: string | null
+  category: HrCaseCategory
+  subject: string
+  body: string
+  status: HrCaseStatus
+  assigned_to_user_id: string | null
+  sla_due_at: string
+  ai_attempted_at: string | null
+  resolved_at: string | null
+  resolved_by_user_id: string | null
+  satisfaction_rating: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface HrCaseInsert
+  extends Omit<HrCase, 'id' | 'created_at' | 'updated_at' | 'status' | 'assigned_to_user_id' | 'ai_attempted_at' | 'resolved_at' | 'resolved_by_user_id' | 'satisfaction_rating' | 'requester_employee_id'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  status?: HrCaseStatus
+  assigned_to_user_id?: string | null
+  ai_attempted_at?: string | null
+  resolved_at?: string | null
+  resolved_by_user_id?: string | null
+  satisfaction_rating?: number | null
+  requester_employee_id?: string | null
+}
+export interface HrCaseUpdate extends Partial<HrCaseInsert> {}
+
+export interface HrCaseMessage {
+  id: string
+  org_id: string
+  case_id: string
+  author_user_id: string | null
+  author_role: HrCaseAuthorRole
+  body: string
+  created_at: string
+}
+export interface HrCaseMessageInsert
+  extends Omit<HrCaseMessage, 'id' | 'created_at' | 'author_user_id'> {
+  id?: string
+  created_at?: string
+  author_user_id?: string | null
+}
+export interface HrCaseMessageUpdate extends Partial<HrCaseMessageInsert> {}
+
 export interface EmployeeProfileInsert
   extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'user_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
   id?: string
@@ -1157,6 +1216,18 @@ export type Database = {
         Row: Indexify<OnboardingTask>
         Insert: Indexify<OnboardingTaskInsert>
         Update: Indexify<OnboardingTaskUpdate>
+        Relationships: []
+      }
+      hr_cases: {
+        Row: Indexify<HrCase>
+        Insert: Indexify<HrCaseInsert>
+        Update: Indexify<HrCaseUpdate>
+        Relationships: []
+      }
+      hr_case_messages: {
+        Row: Indexify<HrCaseMessage>
+        Insert: Indexify<HrCaseMessageInsert>
+        Update: Indexify<HrCaseMessageUpdate>
         Relationships: []
       }
       candidates: {
