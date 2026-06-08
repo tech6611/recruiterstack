@@ -28,6 +28,9 @@ const HRIS_TOOL_NAMES = new Set([
   'start_onboarding',
   'get_employee_onboarding',
   'complete_onboarding_task',
+  'list_employee_documents',
+  'list_org_documents',
+  'list_expiring_documents',
 ])
 
 export const HRIS_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
@@ -62,6 +65,9 @@ CAPABILITIES:
 - start_onboarding — start an onboarding plan for an employee from a template (the orchestrator must request_approval first). Tasks are snapshotted with computed due dates from start_date + template offsets.
 - get_employee_onboarding — show the active onboarding plan + all its tasks (with status) for an employee.
 - complete_onboarding_task — mark a single task as completed by task_id. The plan auto-completes when its last task is done.
+- list_employee_documents — list documents on file for a person (offer letter, ID, certifications, contracts, payslips). Use when asked "where is X?" or "do I have a current ID on file?".
+- list_org_documents — list org-level documents available to everyone (handbook, policies). Use for "where's the handbook?" / policy questions.
+- list_expiring_documents — list documents expiring soon across the org (admin compliance view).
 
 You do NOT create employees. That happens automatically when a candidacy is dispositioned hired (DB trigger). If the user wants to mark someone hired, that's an ATS action and the orchestrator will route there.
 

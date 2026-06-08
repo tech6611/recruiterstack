@@ -12,6 +12,7 @@ import {
   Calendar,
   ClipboardCheck,
   ClipboardList,
+  FileText,
   LifeBuoy,
   CheckSquare,
   Clock,
@@ -48,6 +49,7 @@ const NAV_SECTIONS: NavSection[] = [
           { href: '/me',            label: 'Overview',   icon: UserCircle },
           { href: '/me/onboarding', label: 'Onboarding', icon: ClipboardCheck },
           { href: '/me/time-off',   label: 'Time off',   icon: Calendar },
+          { href: '/me/documents',  label: 'Documents',  icon: FileText },
           { href: '/me/cases',      label: 'HR cases',   icon: LifeBuoy },
           { href: '/me/timeline',   label: 'Timeline',   icon: Clock },
           { href: '/me/approvals',  label: 'Approvals',  icon: Inbox },
@@ -74,6 +76,7 @@ const NAV_SECTIONS: NavSection[] = [
           { href: '/hris/employees',  label: 'Employees',  icon: UserCog },
           { href: '/hris/org-chart',  label: 'Org chart',  icon: Network },
           { href: '/hris/onboarding', label: 'Onboarding', icon: ClipboardCheck },
+          { href: '/hris/documents',  label: 'Documents',  icon: FileText },
           { href: '/hris/cases',      label: 'HR cases',   icon: LifeBuoy },
         ],
       }]

@@ -32,6 +32,10 @@ const HRIS_READ_TOOL_NAMES = new Set([
   'get_employee_onboarding',
   'list_onboarding_templates',
   'list_onboarding_plans',
+  // Documents — so "where's the handbook?" / "do I have a current ID on file?" are answerable.
+  'list_employee_documents',
+  'list_org_documents',
+  'list_expiring_documents',
 ])
 const HRIS_READ_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
   HRIS_READ_TOOL_NAMES.has(t.name),

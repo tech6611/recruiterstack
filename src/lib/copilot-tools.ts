@@ -51,6 +51,11 @@ import {
   listPlans as listOnboardingPlans,
   listTemplates as listOnboardingTemplates,
 } from '@/modules/hris/domain/onboarding'
+import {
+  listAllDocuments,
+  listExpiringSoon,
+  listVisibleForEmployee,
+} from '@/modules/hris/domain/documents'
 import { findPersonByEmail } from '@/modules/core/domain/people'
 import type {
   EmployeeProfile,
@@ -861,6 +866,38 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'list_employee_documents',
+    description: 'List documents on file for an employee (offer letter, ID, certifications, contracts, payslips, etc.). Returns title, category, URL, optional expiry date. Use this when someone asks "where is X document?" or "do I have a current ID on file?".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string' },
+        person_email: { type: 'string' },
+        category:     { type: 'string', enum: ['offer_letter','id_proof','contract','certification','policy','payslip','tax_form','other'] },
+      },
+    },
+  },
+  {
+    name: 'list_org_documents',
+    description: 'List org-level documents available to all employees: handbook, policies, codes of conduct, anything in the "policy" category. Use this when someone asks "where\'s the handbook?" or "what\'s our policy on X?".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', enum: ['offer_letter','id_proof','contract','certification','policy','payslip','tax_form','other'] },
+      },
+    },
+  },
+  {
+    name: 'list_expiring_documents',
+    description: 'List employee documents expiring soon (default within 30 days). Useful for compliance / renewals reviews.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        days_ahead: { type: 'number', description: 'Look-ahead window in days (default 30)' },
+      },
+    },
+  },
+  {
     name: 'record_employee_compensation',
     description: 'Record a NEW compensation record for an employee — every change is a new row with an effective date (immutable history). The change auto-appears on the employee timeline. The orchestrator must request_approval BEFORE calling this.',
     input_schema: {
@@ -953,6 +990,9 @@ export async function executeTool(
       case 'start_onboarding':           return await startOnboardingTool(input, orgId, supabase)
       case 'get_employee_onboarding':    return await getEmployeeOnboardingTool(input, orgId, supabase)
       case 'complete_onboarding_task':   return await completeOnboardingTaskTool(input, orgId, supabase)
+      case 'list_employee_documents':    return await listEmployeeDocumentsTool(input, orgId, supabase)
+      case 'list_org_documents':         return await listOrgDocumentsTool(input, orgId, supabase)
+      case 'list_expiring_documents':    return await listExpiringDocumentsTool(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -3223,3 +3263,57 @@ async function completeOnboardingTaskTool(
     return err instanceof Error ? err.message : 'Failed to complete task'
   }
 }
+
+// ── Document tools (read-only) ───────────────────────────────────────────────
+
+function formatDoc(d: { title: string; category: string; url: string; expires_at: string | null; id: string }): string {
+  const exp = d.expires_at ? ` · expires ${d.expires_at}` : ''
+  return `• ${d.title} — ${d.category}${exp}\n  ${d.url} [doc_id: ${d.id}]`
+}
+
+async function listEmployeeDocumentsTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const employee = await resolveEmployee(input, orgId, supabase)
+  if (typeof employee === 'string') return employee
+
+  const docs = await listAllDocuments(supabase, orgId, {
+    employeeId: employee.id,
+    category:   input.category,
+  })
+  if (docs.length === 0) return 'No documents on file for this employee.'
+  return `${docs.length} document(s):\n${docs.map(formatDoc).join('\n')}`
+}
+
+async function listOrgDocumentsTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const docs = await listAllDocuments(supabase, orgId, {
+    employeeId: null,
+    category:   input.category,
+  })
+  if (docs.length === 0) return 'No org-level documents on file.'
+  return `${docs.length} org-level document(s):\n${docs.map(formatDoc).join('\n')}`
+}
+
+async function listExpiringDocumentsTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const days = typeof input.days_ahead === 'number' ? input.days_ahead : 30
+  const docs = await listExpiringSoon(supabase, orgId, days)
+  if (docs.length === 0) return `No documents expiring in the next ${days} days.`
+  return `${docs.length} document(s) expiring in the next ${days} days:\n${docs.map(formatDoc).join('\n')}`
+}
+
+// Reference listVisibleForEmployee so the import isn't dropped (used for type
+// inference and future "my docs" tool). Keeps the import live.
+void listVisibleForEmployee

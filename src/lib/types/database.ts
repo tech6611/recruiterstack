@@ -411,6 +411,44 @@ export interface HrCaseMessageInsert
 }
 export interface HrCaseMessageUpdate extends Partial<HrCaseMessageInsert> {}
 
+// HR documents (link-based v1) — metadata + a URL. employee_id NULL = org-level.
+// Categories employees can self-upload (vs HR-only) are enforced in domain code.
+export type HrDocumentCategory =
+  | 'offer_letter' | 'id_proof' | 'contract' | 'certification'
+  | 'policy' | 'payslip' | 'tax_form' | 'other'
+export type HrDocumentVisibility = 'employee' | 'admin'
+export type HrDocumentUploaderRole = 'admin' | 'employee'
+
+export interface HrDocument {
+  id: string
+  org_id: string
+  employee_id: string | null
+  title: string
+  description: string | null
+  category: HrDocumentCategory
+  url: string
+  visibility: HrDocumentVisibility
+  uploaded_by_user_id: string | null
+  uploaded_by_role: HrDocumentUploaderRole
+  expires_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface HrDocumentInsert
+  extends Omit<HrDocument, 'id' | 'created_at' | 'updated_at' | 'description' | 'visibility' | 'expires_at' | 'employee_id' | 'uploaded_by_user_id'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  description?: string | null
+  visibility?: HrDocumentVisibility
+  expires_at?: string | null
+  employee_id?: string | null
+  uploaded_by_user_id?: string | null
+}
+
+export interface HrDocumentUpdate extends Partial<HrDocumentInsert> {}
+
 export interface EmployeeProfileInsert
   extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'user_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
   id?: string
@@ -1228,6 +1266,12 @@ export type Database = {
         Row: Indexify<HrCaseMessage>
         Insert: Indexify<HrCaseMessageInsert>
         Update: Indexify<HrCaseMessageUpdate>
+        Relationships: []
+      }
+      hr_documents: {
+        Row: Indexify<HrDocument>
+        Insert: Indexify<HrDocumentInsert>
+        Update: Indexify<HrDocumentUpdate>
         Relationships: []
       }
       candidates: {
