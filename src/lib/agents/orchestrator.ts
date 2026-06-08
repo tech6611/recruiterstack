@@ -13,6 +13,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ATS_SYSTEM_PROMPT, ATS_TOOLS } from '@/modules/ats/agent'
 import { HRIS_SYSTEM_PROMPT, HRIS_TOOLS } from '@/modules/hris/agent'
+import { CRM_SYSTEM_PROMPT, CRM_TOOLS } from '@/modules/crm/agent'
 import { runSubAgent } from '@/lib/agents/sub-agent'
 
 export const ORCHESTRATOR_TOOLS: Anthropic.Tool[] = [
@@ -48,6 +49,21 @@ export const ORCHESTRATOR_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'delegate_to_crm',
+    description:
+      'Delegate an outreach/sequence/CRM task to the CRM sub-agent. Use for listing outreach sequences, fetching sequence details and stages, or checking a candidate\'s enrollment history. v1 is read-only — sequence writes/enrollment go through the app UI.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task: {
+          type: 'string',
+          description: 'The complete CRM/outreach task, in natural language.',
+        },
+      },
+      required: ['task'],
+    },
+  },
+  {
     name: 'request_approval',
     description:
       'Pause and ask the recruiter to approve a significant action before delegating. Use BEFORE delegating any task that involves: sending emails, creating jobs, bulk actions affecting 3+ candidates, rejecting/withdrawing candidates, creating offers, scheduling interviews, or terminating an employee.',
@@ -65,11 +81,12 @@ export const ORCHESTRATOR_TOOLS: Anthropic.Tool[] = [
 
 export const ORCHESTRATOR_SYSTEM_PROMPT = `You are the top-level RecruiterStack copilot. Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
 
-RecruiterStack is a unified ATS + HRIS suite — one person record flows from candidate to hire to employee. You don't do the work yourself; you decide which module sub-agent to delegate to, gate risky actions behind the recruiter's approval, and compose answers.
+RecruiterStack is a unified ATS + CRM + HRIS suite — one person record flows from lead to candidate to hire to employee. You don't do the work yourself; you decide which module sub-agent to delegate to, gate risky actions behind the recruiter's approval, and compose answers.
 
 ROUTING — pick the right delegate:
-- delegate_to_ats: candidates, jobs, pipelines, applications, interviews, offers, scoring, sourcing, sequences, recruiting analytics, intake, scorecards, recruiter outreach emails.
-- delegate_to_hris: employees, pre-hires, marking someone joined, terminating, anything post-hire.
+- delegate_to_ats: candidates, jobs, pipelines, applications, interviews, offers, scoring, sourcing, recruiting analytics, intake, scorecards, recruiter outreach emails to specific applications.
+- delegate_to_crm: outreach sequences (list, detail, stages), a candidate's enrollment history across sequences. v1 is read-only.
+- delegate_to_hris: employees, pre-hires, marking someone joined, terminating, comp, time-off, onboarding, HR cases, documents, leave balances, OKRs — anything post-hire / people-platform.
 - Cross-module tasks ("hire Jane AND mark her joined Monday"): delegate to ATS for the hire, then to HRIS for the join. Do them in sequence in your response.
 
 When delegating, pass a clear self-contained task in natural language — include all the specifics (names, filters, criteria) the sub-agent needs. The sub-agent's reply comes back as a tool result; relay the useful parts to the user concisely.
@@ -134,6 +151,17 @@ export async function executeOrchestratorTool(
         model:        ctx.model,
         tools:        HRIS_TOOLS,
         systemPrompt: HRIS_SYSTEM_PROMPT,
+        task,
+        orgId:        ctx.orgId,
+        supabase:     ctx.supabase,
+      })
+
+    case 'delegate_to_crm':
+      return runSubAgent({
+        client:       ctx.client,
+        model:        ctx.model,
+        tools:        CRM_TOOLS,
+        systemPrompt: CRM_SYSTEM_PROMPT,
         task,
         orgId:        ctx.orgId,
         supabase:     ctx.supabase,

@@ -68,6 +68,11 @@ import {
   updateKeyResult as updateOkrKr,
   updateOkr,
 } from '@/modules/hris/domain/okrs'
+import {
+  getSequence as getCrmSequence,
+  listCandidateEnrollments as listCrmCandidateEnrollments,
+  listSequences as listCrmSequences,
+} from '@/modules/crm/domain/sequences'
 import { findPersonByEmail } from '@/modules/core/domain/people'
 import type {
   EmployeeProfile,
@@ -827,6 +832,31 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'list_sequences',
+    description: 'List every outreach sequence in this org with stage count, enrollment count, and reply count. Use this when someone asks "what sequences are running?" or for an overview of outreach activity.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_sequence',
+    description: 'Fetch one sequence with its full ordered stage list (subject, body, delay) and enrollment/reply counts. Identify by sequence_id (from list_sequences).',
+    input_schema: {
+      type: 'object',
+      properties: { sequence_id: { type: 'string' } },
+      required: ['sequence_id'],
+    },
+  },
+  {
+    name: 'list_candidate_sequence_history',
+    description: 'List every sequence a specific candidate has been enrolled in — across all sequences — with enrollment status, current stage, and next-send time. Use when asked "is this candidate still in our outreach?" / "what sequences has X been in?".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        candidate_id: { type: 'string', description: 'UUID of the candidate' },
+      },
+      required: ['candidate_id'],
+    },
+  },
+  {
     name: 'list_onboarding_templates',
     description: 'List the active onboarding templates in this org. Each org has at least one default template (seeded). Returns id + name so you can pass an id to start_onboarding.',
     input_schema: { type: 'object', properties: {} },
@@ -1106,6 +1136,9 @@ export async function executeTool(
       case 'list_expiring_documents':    return await listExpiringDocumentsTool(input, orgId, supabase)
       case 'get_employee_leave_balance': return await getEmployeeLeaveBalanceTool(input, orgId, supabase)
       case 'list_holidays':              return await listHolidaysTool(input, orgId, supabase)
+      case 'list_sequences':             return await listSequencesTool(orgId, supabase)
+      case 'get_sequence':               return await getSequenceTool(input, orgId, supabase)
+      case 'list_candidate_sequence_history': return await listCandidateSequenceHistoryTool(input, orgId, supabase)
       case 'list_employee_okrs':         return await listEmployeeOkrsTool(input, orgId, supabase)
       case 'get_okr':                    return await getOkrTool(input, orgId, supabase)
       case 'create_okr':                 return await createOkrTool(input, orgId, supabase)
@@ -3597,4 +3630,59 @@ async function updateOkrStatusTool(
   } catch (err) {
     return err instanceof Error ? err.message : 'Failed to update OKR status.'
   }
+}
+
+// ── CRM tools (read-only) ────────────────────────────────────────────────────
+
+async function listSequencesTool(orgId: string, supabase: SupabaseClient): Promise<string> {
+  const seqs = await listCrmSequences(supabase, orgId)
+  if (seqs.length === 0) return 'No sequences yet.'
+  const lines = seqs.map(s => {
+    const reply = s.enrollment_count > 0
+      ? ` · ${s.reply_count}/${s.enrollment_count} replied (${Math.round((s.reply_count / s.enrollment_count) * 100)}%)`
+      : ''
+    return `• ${s.name} — ${s.status} · ${s.stage_count} stage${s.stage_count === 1 ? '' : 's'}${reply} [sequence_id: ${s.id}]`
+  })
+  return `${seqs.length} sequence(s):\n${lines.join('\n')}`
+}
+
+async function getSequenceTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const seqId = typeof input.sequence_id === 'string' ? input.sequence_id : ''
+  if (!seqId) return 'Provide sequence_id.'
+
+  const seq = await getCrmSequence(supabase, orgId, seqId)
+  if (!seq) return 'Sequence not found.'
+
+  const header = `${seq.name} — ${seq.status} · ${seq.enrollment_count} enrolled, ${seq.reply_count} replied`
+  const desc   = seq.description ? `\n${seq.description}` : ''
+  const stages = seq.stages.length === 0
+    ? '\n  (no stages yet)'
+    : '\n' + seq.stages.map(s => {
+        const delay = s.delay_days === 0 ? 'Day 0' : `+${s.delay_days}d`
+        return `  ${s.order_index}. ${delay} — ${s.subject}`
+      }).join('\n')
+  return `${header}${desc}\n\nStages:${stages}`
+}
+
+async function listCandidateSequenceHistoryTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const candidateId = typeof input.candidate_id === 'string' ? input.candidate_id : ''
+  if (!candidateId) return 'Provide candidate_id.'
+
+  const history = await listCrmCandidateEnrollments(supabase, orgId, candidateId)
+  if (history.length === 0) return 'This candidate has never been enrolled in a sequence.'
+  const lines = history.map(h => {
+    const next = h.next_send_at ? ` · next send ${h.next_send_at.slice(0, 16).replace('T', ' ')}` : ''
+    return `• ${h.sequence_name} — ${h.status} · stage ${h.current_stage_index}${next} [enrollment_id: ${h.enrollment_id}]`
+  })
+  return `${history.length} enrollment(s):\n${lines.join('\n')}`
 }

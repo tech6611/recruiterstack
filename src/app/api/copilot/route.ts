@@ -37,6 +37,7 @@ function toolLabel(name: string): string {
   const labels: Record<string, string> = {
     delegate_to_ats:   '🤝 Asking the recruiting agent...',
     delegate_to_hris:  '🤝 Asking the HRIS agent...',
+    delegate_to_crm:   '🤝 Asking the CRM agent...',
     request_approval:  '⏸️  Awaiting your approval...',
   }
   return labels[name] ?? `⚙️ Running ${name}...`

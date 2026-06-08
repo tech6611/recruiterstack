@@ -45,8 +45,17 @@ const HRIS_TOOL_NAMES = new Set([
 ])
 const ORCHESTRATOR_ONLY = new Set(['request_approval'])
 
+// CRM tools live in their own sub-agent (modules/crm/agent.ts).
+const CRM_TOOL_NAMES = new Set([
+  'list_sequences',
+  'get_sequence',
+  'list_candidate_sequence_history',
+])
+
 export const ATS_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(
-  t => !HRIS_TOOL_NAMES.has(t.name) && !ORCHESTRATOR_ONLY.has(t.name),
+  t => !HRIS_TOOL_NAMES.has(t.name)
+    && !CRM_TOOL_NAMES.has(t.name)
+    && !ORCHESTRATOR_ONLY.has(t.name),
 )
 
 export const ATS_SYSTEM_PROMPT = `You are the ATS sub-agent inside RecruiterStack — focused on the recruiting half of the platform (candidates, jobs/pipelines, applications, interviews, offers, scoring, sourcing, sequences, analytics). The orchestrator delegates recruiting questions to you and returns your answer to the user.
