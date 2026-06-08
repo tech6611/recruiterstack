@@ -60,6 +60,14 @@ import {
   getLeaveBalance,
   listHolidays,
 } from '@/modules/hris/domain/leave-balances'
+import {
+  addKeyResult as addOkrKr,
+  createOkr,
+  getOkrDetail,
+  listOkrsForEmployee,
+  updateKeyResult as updateOkrKr,
+  updateOkr,
+} from '@/modules/hris/domain/okrs'
 import { findPersonByEmail } from '@/modules/core/domain/people'
 import type {
   EmployeeProfile,
@@ -870,6 +878,84 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'list_employee_okrs',
+    description: 'List an employee\'s OKRs (Objectives + Key Results) for a cycle (e.g. "2026-Q3"). Returns each objective with its computed progress (avg of KR progress).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string' },
+        person_email: { type: 'string' },
+        cycle:        { type: 'string', description: 'Filter to a specific cycle. Omit to return all cycles for that employee.' },
+      },
+    },
+  },
+  {
+    name: 'get_okr',
+    description: 'Get a single OKR with its key results and current progress. Identify by okr_id.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        okr_id: { type: 'string' },
+      },
+      required: ['okr_id'],
+    },
+  },
+  {
+    name: 'create_okr',
+    description: 'Create a new objective for an employee in a cycle. Optionally seed key results in a follow-up call to add_okr_key_result.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string' },
+        person_email: { type: 'string' },
+        title:        { type: 'string' },
+        description:  { type: 'string' },
+        cycle:        { type: 'string', description: 'e.g. 2026-Q3, 2026-H1' },
+        status:       { type: 'string', enum: ['draft','active','achieved','missed','abandoned'] },
+      },
+      required: ['title', 'cycle'],
+    },
+  },
+  {
+    name: 'add_okr_key_result',
+    description: 'Add a key result to an objective.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        okr_id:        { type: 'string' },
+        title:         { type: 'string' },
+        description:   { type: 'string' },
+        target_metric: { type: 'string', description: 'Free-text target ("hit $50k MRR", "ship v2")' },
+        progress:      { type: 'number', description: '0–100; defaults to 0' },
+      },
+      required: ['okr_id', 'title'],
+    },
+  },
+  {
+    name: 'update_kr_progress',
+    description: 'Update the progress on a key result (0–100).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        key_result_id: { type: 'string' },
+        progress:      { type: 'number', description: '0–100' },
+      },
+      required: ['key_result_id', 'progress'],
+    },
+  },
+  {
+    name: 'update_okr_status',
+    description: 'Update an OKR\'s status (draft / active / achieved / missed / abandoned). Use at end of cycle to close out objectives.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        okr_id: { type: 'string' },
+        status: { type: 'string', enum: ['draft','active','achieved','missed','abandoned'] },
+      },
+      required: ['okr_id', 'status'],
+    },
+  },
+  {
     name: 'get_employee_leave_balance',
     description: 'Get an employee\'s current-year leave balance broken down by type (vacation, sick, personal, unpaid): granted, used (approved), pending, and available days. Use this when anyone asks "how many vacation days do I have left?" or similar.',
     input_schema: {
@@ -1020,6 +1106,12 @@ export async function executeTool(
       case 'list_expiring_documents':    return await listExpiringDocumentsTool(input, orgId, supabase)
       case 'get_employee_leave_balance': return await getEmployeeLeaveBalanceTool(input, orgId, supabase)
       case 'list_holidays':              return await listHolidaysTool(input, orgId, supabase)
+      case 'list_employee_okrs':         return await listEmployeeOkrsTool(input, orgId, supabase)
+      case 'get_okr':                    return await getOkrTool(input, orgId, supabase)
+      case 'create_okr':                 return await createOkrTool(input, orgId, supabase)
+      case 'add_okr_key_result':         return await addOkrKeyResultTool(input, orgId, supabase)
+      case 'update_kr_progress':         return await updateKrProgressTool(input, orgId, supabase)
+      case 'update_okr_status':          return await updateOkrStatusTool(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -3375,4 +3467,134 @@ async function listHolidaysTool(
   const holidays = await listHolidays(supabase, orgId, { from: today, limit })
   if (holidays.length === 0) return 'No upcoming holidays on the calendar.'
   return `${holidays.length} upcoming holiday(s):\n${holidays.map(h => `• ${h.date} — ${h.name}${h.country ? ` (${h.country})` : ''}`).join('\n')}`
+}
+
+// ── OKR tools ────────────────────────────────────────────────────────────────
+
+async function listEmployeeOkrsTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const employee = await resolveEmployee(input, orgId, supabase)
+  if (typeof employee === 'string') return employee
+
+  const cycle = typeof input.cycle === 'string' ? input.cycle : undefined
+  const okrs = await listOkrsForEmployee(supabase, orgId, employee.id, cycle)
+  if (okrs.length === 0) {
+    return cycle ? `No OKRs for cycle "${cycle}".` : 'No OKRs on file.'
+  }
+  const lines = okrs.map(o =>
+    `• [${o.cycle}] ${o.title} — ${o.status}, ${o.computed_progress}% (${o.key_result_count} KR${o.key_result_count === 1 ? '' : 's'}) [okr_id: ${o.id}]`,
+  )
+  return `${okrs.length} OKR(s):\n${lines.join('\n')}`
+}
+
+async function getOkrTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const okrId = typeof input.okr_id === 'string' ? input.okr_id : ''
+  if (!okrId) return 'Provide okr_id.'
+  const detail = await getOkrDetail(supabase, orgId, okrId)
+  if (!detail) return 'OKR not found.'
+
+  const header = `[${detail.cycle}] ${detail.title} — ${detail.status}, ${detail.computed_progress}%`
+  const desc   = detail.description ? `\n${detail.description}` : ''
+  const krs    = detail.key_results.length === 0
+    ? '\n  (no key results yet)'
+    : '\n' + detail.key_results.map(k => {
+        const t = k.target_metric ? ` (${k.target_metric})` : ''
+        return `  • ${k.progress}% — ${k.title}${t} [kr_id: ${k.id}]`
+      }).join('\n')
+  return `${header}${desc}${krs}`
+}
+
+async function createOkrTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const employee = await resolveEmployee(input, orgId, supabase)
+  if (typeof employee === 'string') return employee
+
+  if (typeof input.title !== 'string' || !input.title.trim()) return 'Provide a title.'
+  if (typeof input.cycle !== 'string' || !input.cycle.trim()) return 'Provide a cycle (e.g. 2026-Q3).'
+
+  try {
+    const created = await createOkr(supabase, orgId, {
+      ownerEmployeeId: employee.id,
+      title:           input.title,
+      description:     input.description ?? null,
+      cycle:           input.cycle,
+      status:          input.status,
+    })
+    return `Created OKR "${created.title}" for ${created.cycle}. [okr_id: ${created.id}]. Add key results with add_okr_key_result.`
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Failed to create OKR.'
+  }
+}
+
+async function addOkrKeyResultTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const okrId = typeof input.okr_id === 'string' ? input.okr_id : ''
+  if (!okrId) return 'Provide okr_id.'
+  if (typeof input.title !== 'string' || !input.title.trim()) return 'Provide a KR title.'
+
+  try {
+    const kr = await addOkrKr(supabase, orgId, {
+      okrId,
+      title:        input.title,
+      description:  input.description ?? null,
+      progress:     typeof input.progress === 'number' ? input.progress : undefined,
+      targetMetric: input.target_metric ?? null,
+    })
+    return `Added KR "${kr.title}" at ${kr.progress}%. [kr_id: ${kr.id}]`
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Failed to add KR.'
+  }
+}
+
+async function updateKrProgressTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const krId = typeof input.key_result_id === 'string' ? input.key_result_id : ''
+  if (!krId) return 'Provide key_result_id.'
+  if (typeof input.progress !== 'number') return 'Provide progress (0–100).'
+
+  try {
+    const updated = await updateOkrKr(supabase, orgId, krId, { progress: input.progress })
+    return `Progress updated to ${updated.progress}% on "${updated.title}".`
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Failed to update KR.'
+  }
+}
+
+async function updateOkrStatusTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const okrId = typeof input.okr_id === 'string' ? input.okr_id : ''
+  if (!okrId) return 'Provide okr_id.'
+  if (typeof input.status !== 'string') return 'Provide status.'
+
+  try {
+    const updated = await updateOkr(supabase, orgId, okrId, { status: input.status as never })
+    return `OKR "${updated.title}" → ${updated.status}.`
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Failed to update OKR status.'
+  }
 }

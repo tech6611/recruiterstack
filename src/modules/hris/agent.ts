@@ -33,6 +33,12 @@ const HRIS_TOOL_NAMES = new Set([
   'list_expiring_documents',
   'get_employee_leave_balance',
   'list_holidays',
+  'list_employee_okrs',
+  'get_okr',
+  'create_okr',
+  'add_okr_key_result',
+  'update_kr_progress',
+  'update_okr_status',
 ])
 
 export const HRIS_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
@@ -72,6 +78,12 @@ CAPABILITIES:
 - list_expiring_documents — list documents expiring soon across the org (admin compliance view).
 - get_employee_leave_balance — current-year balance broken down by leave_type: granted, used, pending, available. Use this for "how many vacation days do I have left?" / "what's my sick leave balance?" type questions.
 - list_holidays — upcoming organization holidays from today onwards.
+- list_employee_okrs — list someone's OKRs (Objectives + Key Results) for a cycle or across all cycles. Each objective comes with a computed progress (avg of KR progress).
+- get_okr — fetch one OKR with its full key-result detail.
+- create_okr — create a new objective for an employee in a cycle.
+- add_okr_key_result — add a KR to an objective.
+- update_kr_progress — update a KR's progress (0–100).
+- update_okr_status — set an OKR's status (draft / active / achieved / missed / abandoned).
 
 You do NOT create employees. That happens automatically when a candidacy is dispositioned hired (DB trigger). If the user wants to mark someone hired, that's an ATS action and the orchestrator will route there.
 

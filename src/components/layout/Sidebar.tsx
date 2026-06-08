@@ -23,6 +23,7 @@ import {
   Inbox,
   Search,
   Mail,
+  Target,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -49,6 +50,7 @@ const NAV_SECTIONS: NavSection[] = [
         items: [
           { href: '/me',            label: 'Overview',   icon: UserCircle },
           { href: '/me/onboarding', label: 'Onboarding', icon: ClipboardCheck },
+          { href: '/me/okrs',       label: 'OKRs',       icon: Target },
           { href: '/me/time-off',   label: 'Time off',   icon: Calendar },
           { href: '/me/documents',  label: 'Documents',  icon: FileText },
           { href: '/me/cases',      label: 'HR cases',   icon: LifeBuoy },
@@ -77,6 +79,7 @@ const NAV_SECTIONS: NavSection[] = [
           { href: '/hris/employees',       label: 'Employees',       icon: UserCog },
           { href: '/hris/org-chart',       label: 'Org chart',       icon: Network },
           { href: '/hris/onboarding',      label: 'Onboarding',      icon: ClipboardCheck },
+          { href: '/hris/okrs',            label: 'OKRs',            icon: Target },
           { href: '/hris/documents',       label: 'Documents',       icon: FileText },
           { href: '/hris/cases',           label: 'HR cases',        icon: LifeBuoy },
           { href: '/hris/leave-policies',  label: 'Leave policies',  icon: CalendarDays },

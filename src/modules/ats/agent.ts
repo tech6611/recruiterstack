@@ -36,6 +36,12 @@ const HRIS_TOOL_NAMES = new Set([
   'list_expiring_documents',
   'get_employee_leave_balance',
   'list_holidays',
+  'list_employee_okrs',
+  'get_okr',
+  'create_okr',
+  'add_okr_key_result',
+  'update_kr_progress',
+  'update_okr_status',
 ])
 const ORCHESTRATOR_ONLY = new Set(['request_approval'])
 

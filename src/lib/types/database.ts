@@ -488,6 +488,58 @@ export interface HolidayInsert
 }
 export interface HolidayUpdate extends Partial<HolidayInsert> {}
 
+// OKRs — per-employee Objectives + Key Results. Objective progress is computed
+// at read time as the average of its KRs' progress. Cycle is free-text so each
+// org can pick its own convention ('2026-Q3', '2026-H1', etc.).
+export type OkrStatus = 'draft' | 'active' | 'achieved' | 'missed' | 'abandoned'
+
+export interface Okr {
+  id: string
+  org_id: string
+  owner_employee_id: string
+  title: string
+  description: string | null
+  cycle: string
+  status: OkrStatus
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+export interface OkrInsert
+  extends Omit<Okr, 'id' | 'created_at' | 'updated_at' | 'description' | 'status' | 'sort_order'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  description?: string | null
+  status?: OkrStatus
+  sort_order?: number
+}
+export interface OkrUpdate extends Partial<OkrInsert> {}
+
+export interface OkrKeyResult {
+  id: string
+  org_id: string
+  okr_id: string
+  title: string
+  description: string | null
+  progress: number
+  target_metric: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+export interface OkrKeyResultInsert
+  extends Omit<OkrKeyResult, 'id' | 'created_at' | 'updated_at' | 'description' | 'progress' | 'target_metric' | 'sort_order'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  description?: string | null
+  progress?: number
+  target_metric?: string | null
+  sort_order?: number
+}
+export interface OkrKeyResultUpdate extends Partial<OkrKeyResultInsert> {}
+
 export interface EmployeeProfileInsert
   extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'user_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
   id?: string
@@ -1323,6 +1375,18 @@ export type Database = {
         Row: Indexify<Holiday>
         Insert: Indexify<HolidayInsert>
         Update: Indexify<HolidayUpdate>
+        Relationships: []
+      }
+      okrs: {
+        Row: Indexify<Okr>
+        Insert: Indexify<OkrInsert>
+        Update: Indexify<OkrUpdate>
+        Relationships: []
+      }
+      okr_key_results: {
+        Row: Indexify<OkrKeyResult>
+        Insert: Indexify<OkrKeyResultInsert>
+        Update: Indexify<OkrKeyResultUpdate>
         Relationships: []
       }
       candidates: {
