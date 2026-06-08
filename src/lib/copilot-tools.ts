@@ -73,6 +73,14 @@ import {
   listCandidateEnrollments as listCrmCandidateEnrollments,
   listSequences as listCrmSequences,
 } from '@/modules/crm/domain/sequences'
+import {
+  getRun  as getPayrollRun,
+  listRuns as listPayrollRuns,
+} from '@/modules/payroll/domain/runs'
+import {
+  listEmployeePayslips,
+  listPayslipsForRun,
+} from '@/modules/payroll/domain/payslips'
 import { findPersonByEmail } from '@/modules/core/domain/people'
 import type {
   EmployeeProfile,
@@ -1058,6 +1066,38 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
       required: ['effective_date', 'base_salary'],
     },
   },
+  {
+    name: 'list_payroll_runs',
+    description: 'List payroll runs for this org with computed totals (gross/deductions/net) per run. Use for "show me recent payroll runs" or "what did we pay out last month?". Optional status filter (draft | finalized).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['draft', 'finalized'] },
+        limit:  { type: 'number', description: 'Max rows to return (default 20)' },
+      },
+    },
+  },
+  {
+    name: 'get_payroll_run',
+    description: 'Fetch one payroll run with its full payslip list (per-employee gross/deductions/net). Identify by run_id (from list_payroll_runs).',
+    input_schema: {
+      type: 'object',
+      properties: { run_id: { type: 'string' } },
+      required: ['run_id'],
+    },
+  },
+  {
+    name: 'get_employee_payslips',
+    description: "Fetch one employee's payslip history across runs (newest first). Identify by employee_id or person_email. Use for 'what has Asha been paid this year?'.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string' },
+        person_email: { type: 'string', description: 'Alternative to employee_id' },
+        limit:        { type: 'number', description: 'Max payslips to return (default 24)' },
+      },
+    },
+  },
 ]
 
 // ── Tool executor ─────────────────────────────────────────────────────────────
@@ -1145,6 +1185,9 @@ export async function executeTool(
       case 'add_okr_key_result':         return await addOkrKeyResultTool(input, orgId, supabase)
       case 'update_kr_progress':         return await updateKrProgressTool(input, orgId, supabase)
       case 'update_okr_status':          return await updateOkrStatusTool(input, orgId, supabase)
+      case 'list_payroll_runs':          return await listPayrollRunsTool(input, orgId, supabase)
+      case 'get_payroll_run':            return await getPayrollRunTool(input, orgId, supabase)
+      case 'get_employee_payslips':      return await getEmployeePayslipsTool(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -3685,4 +3728,82 @@ async function listCandidateSequenceHistoryTool(
     return `• ${h.sequence_name} — ${h.status} · stage ${h.current_stage_index}${next} [enrollment_id: ${h.enrollment_id}]`
   })
   return `${history.length} enrollment(s):\n${lines.join('\n')}`
+}
+
+// ── Payroll (read-only) ─────────────────────────────────────────────────────
+
+function fmtPayrollMoney(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount)
+  } catch {
+    return `${currency} ${amount.toFixed(0)}`
+  }
+}
+
+async function listPayrollRunsTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const status = input.status === 'draft' || input.status === 'finalized' ? input.status : undefined
+  const limit  = typeof input.limit === 'number' ? input.limit : 20
+  const runs   = await listPayrollRuns(supabase, orgId, { status, limit })
+  if (runs.length === 0) return 'No payroll runs yet.'
+  const lines = runs.map(r => {
+    const period = `${r.period_start} → ${r.period_end}`
+    return `• ${period} — ${r.status} · ${r.totals.payslip_count} payslip(s) · gross ${fmtPayrollMoney(r.totals.gross_total, r.currency)} · net ${fmtPayrollMoney(r.totals.net_total, r.currency)} [run_id: ${r.id}]`
+  })
+  return `${runs.length} payroll run(s):\n${lines.join('\n')}`
+}
+
+async function getPayrollRunTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const runId = typeof input.run_id === 'string' ? input.run_id : ''
+  if (!runId) return 'Provide run_id.'
+
+  const run = await getPayrollRun(supabase, orgId, runId)
+  if (!run) return 'Payroll run not found.'
+
+  const slips = await listPayslipsForRun(supabase, orgId, runId)
+  const header = `Payroll run ${run.period_start} → ${run.period_end} — ${run.status} (${run.currency})`
+  const totals = `Totals: ${run.totals.payslip_count} payslip(s), gross ${fmtPayrollMoney(run.totals.gross_total, run.currency)}, deductions ${fmtPayrollMoney(run.totals.deductions_total, run.currency)}, net ${fmtPayrollMoney(run.totals.net_total, run.currency)}`
+  const lines = slips.length === 0
+    ? '\n  (no payslips on this run yet)'
+    : '\n' + slips.map(s =>
+        `  • ${s.employee_name ?? '(unknown)'} — gross ${fmtPayrollMoney(Number(s.gross), run.currency)} · net ${fmtPayrollMoney(Number(s.net), run.currency)}`,
+      ).join('\n')
+  return `${header}\n${totals}\n\nPayslips:${lines}`
+}
+
+async function getEmployeePayslipsTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  let employeeId = typeof input.employee_id === 'string' ? input.employee_id : ''
+
+  if (!employeeId && typeof input.person_email === 'string') {
+    const person = await findPersonByEmail(supabase, orgId, input.person_email)
+    if (!person) return `No person with email ${input.person_email}.`
+    const emp = await getEmployeeByPerson(supabase, orgId, person.id)
+    if (!emp) return `${person.email} has no employee profile.`
+    employeeId = emp.id
+  }
+  if (!employeeId) return 'Provide employee_id or person_email.'
+
+  const limit = typeof input.limit === 'number' ? input.limit : 24
+  const slips = await listEmployeePayslips(supabase, orgId, employeeId, limit)
+  if (slips.length === 0) return 'No payslips for this employee yet.'
+
+  const lines = slips.map(s => {
+    const period = `${s.run.period_start} → ${s.run.period_end}`
+    return `• ${period} — gross ${fmtPayrollMoney(Number(s.gross), s.run.currency)} · net ${fmtPayrollMoney(Number(s.net), s.run.currency)} (${s.run.status}) [payslip_id: ${s.id}]`
+  })
+  return `${slips.length} payslip(s):\n${lines.join('\n')}`
 }

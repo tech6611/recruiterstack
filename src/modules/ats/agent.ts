@@ -52,9 +52,17 @@ const CRM_TOOL_NAMES = new Set([
   'list_candidate_sequence_history',
 ])
 
+// Payroll tools live in their own sub-agent (modules/payroll/agent.ts).
+const PAYROLL_TOOL_NAMES = new Set([
+  'list_payroll_runs',
+  'get_payroll_run',
+  'get_employee_payslips',
+])
+
 export const ATS_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(
   t => !HRIS_TOOL_NAMES.has(t.name)
     && !CRM_TOOL_NAMES.has(t.name)
+    && !PAYROLL_TOOL_NAMES.has(t.name)
     && !ORCHESTRATOR_ONLY.has(t.name),
 )
 

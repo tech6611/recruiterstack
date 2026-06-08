@@ -17,6 +17,7 @@ import {
   LifeBuoy,
   CheckSquare,
   Clock,
+  Wallet,
   Settings,
   Zap,
   BarChart2,
@@ -54,6 +55,7 @@ const NAV_SECTIONS: NavSection[] = [
           { href: '/me/time-off',   label: 'Time off',   icon: Calendar },
           { href: '/me/documents',  label: 'Documents',  icon: FileText },
           { href: '/me/cases',      label: 'HR cases',   icon: LifeBuoy },
+          { href: '/me/payslips',   label: 'Payslips',   icon: Wallet },
           { href: '/me/timeline',   label: 'Timeline',   icon: Clock },
           { href: '/me/approvals',  label: 'Approvals',  icon: Inbox },
         ],
@@ -83,6 +85,15 @@ const NAV_SECTIONS: NavSection[] = [
           { href: '/hris/documents',       label: 'Documents',       icon: FileText },
           { href: '/hris/cases',           label: 'HR cases',        icon: LifeBuoy },
           { href: '/hris/leave-policies',  label: 'Leave policies',  icon: CalendarDays },
+        ],
+      }]
+    : []),
+  ...(flags.payroll
+    ? [{
+        section: 'Payroll',
+        adminOnly: true,
+        items: [
+          { href: '/payroll/runs', label: 'Payroll runs', icon: Wallet },
         ],
       }]
     : []),

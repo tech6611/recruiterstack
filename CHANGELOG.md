@@ -11,6 +11,27 @@ entries on top.
 
 ## 2026-06-08
 
+### Added
+- **Payroll module v0 — payslip ledger.** The fourth real module is live (no
+  longer a placeholder). Records what each employee was paid in each pay
+  period; no payroll math is computed here. Pillars:
+  - Schema: `payroll_runs` + `payslips` (migration 057). Run totals computed
+    on read; payslip rows snapshot employee name/email at write time.
+  - Domain: `modules/payroll/domain/{runs,payslips}.ts` — full CRUD + finalize.
+    Finalized runs are immutable from the API/UI.
+  - Admin UI: `/payroll/runs` (list with totals), `/payroll/runs/[id]` (detail
+    with editable payslip rows while draft, locked once finalized).
+  - Self-service UI: `/me/payslips` (history), `/me/payslips/[id]` (printable
+    detail). User-scoped via `employee_profiles.user_id`; never leaks across
+    employees.
+  - Sub-agent: `delegate_to_payroll` joins ATS / CRM / HRIS in the orchestrator
+    with 3 read-only tools — `list_payroll_runs`, `get_payroll_run`,
+    `get_employee_payslips`.
+  - Flag: `NEXT_PUBLIC_PAYROLL_ENABLED` (default on); sidebar gates admin nav
+    + employee "Payslips" item.
+  - Scope deliberately excluded for v0: tax/statutory engine, bank
+    disbursement, CSV import, PDF generation. All additive in v1.
+
 ### Changed
 - Sidebar nav rearranged for clearer planning/execution separation. Under
   **Recruiting**, items now read `Openings → Jobs → Pipelines → Candidates →

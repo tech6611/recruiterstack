@@ -7,7 +7,9 @@
  */
 export const flags = {
   /** HRIS module surfaces (Employees page, etc.). */
-  hris: process.env.NEXT_PUBLIC_HRIS_ENABLED !== 'false',
+  hris:    process.env.NEXT_PUBLIC_HRIS_ENABLED    !== 'false',
+  /** Payroll module surfaces (admin runs + employee self-service payslips). */
+  payroll: process.env.NEXT_PUBLIC_PAYROLL_ENABLED !== 'false',
 } as const
 
 export type FeatureFlag = keyof typeof flags

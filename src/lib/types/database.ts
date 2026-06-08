@@ -540,6 +540,80 @@ export interface OkrKeyResultInsert
 }
 export interface OkrKeyResultUpdate extends Partial<OkrKeyResultInsert> {}
 
+// Payroll — payslip ledger (migration 057). We do NOT compute payroll here in
+// v0; the org runs payroll wherever they already do and stores the resulting
+// payslips here. `breakdown` is freeform jsonb so this works in any country
+// without baking statutory rules; v1 can switch to a typed payslip_lines table
+// additively.
+export type PayrollRunStatus = 'draft' | 'finalized'
+
+export interface PayrollRun {
+  id:           string
+  org_id:       string
+  period_start: string                   // YYYY-MM-DD
+  period_end:   string                   // YYYY-MM-DD
+  pay_date:     string | null
+  currency:     string                   // 'INR' default
+  status:       PayrollRunStatus
+  notes:        string | null
+  finalized_at: string | null
+  finalized_by: string | null
+  created_at:   string
+  updated_at:   string
+}
+export interface PayrollRunInsert
+  extends Omit<PayrollRun, 'id' | 'created_at' | 'updated_at' | 'currency' | 'status' | 'pay_date' | 'notes' | 'finalized_at' | 'finalized_by'> {
+  id?:           string
+  created_at?:   string
+  updated_at?:   string
+  currency?:     string
+  status?:       PayrollRunStatus
+  pay_date?:     string | null
+  notes?:        string | null
+  finalized_at?: string | null
+  finalized_by?: string | null
+}
+export interface PayrollRunUpdate extends Partial<PayrollRunInsert> {}
+
+export interface PayslipBreakdownLine {
+  label:  string
+  amount: number
+}
+export interface PayslipBreakdown {
+  earnings?:   PayslipBreakdownLine[]
+  deductions?: PayslipBreakdownLine[]
+}
+
+export interface Payslip {
+  id:                      string
+  org_id:                  string
+  run_id:                  string
+  employee_id:             string
+  employee_name_snapshot:  string | null
+  employee_email_snapshot: string | null
+  gross:                   number
+  deductions_total:        number
+  net:                     number
+  breakdown:               PayslipBreakdown
+  notes:                   string | null
+  created_at:              string
+  updated_at:              string
+}
+export interface PayslipInsert
+  extends Omit<Payslip, 'id' | 'created_at' | 'updated_at' | 'employee_name_snapshot' | 'employee_email_snapshot' | 'gross' | 'deductions_total' | 'net' | 'breakdown' | 'notes'> {
+  id?:                       string
+  created_at?:               string
+  updated_at?:               string
+  employee_name_snapshot?:   string | null
+  employee_email_snapshot?:  string | null
+  gross?:                    number
+  deductions_total?:         number
+  net?:                      number
+  breakdown?:                PayslipBreakdown
+  notes?:                    string | null
+}
+export interface PayslipUpdate extends Partial<PayslipInsert> {}
+
 export interface EmployeeProfileInsert
   extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'user_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
   id?: string
@@ -1387,6 +1461,18 @@ export type Database = {
         Row: Indexify<OkrKeyResult>
         Insert: Indexify<OkrKeyResultInsert>
         Update: Indexify<OkrKeyResultUpdate>
+        Relationships: []
+      }
+      payroll_runs: {
+        Row: Indexify<PayrollRun>
+        Insert: Indexify<PayrollRunInsert>
+        Update: Indexify<PayrollRunUpdate>
+        Relationships: []
+      }
+      payslips: {
+        Row: Indexify<Payslip>
+        Insert: Indexify<PayslipInsert>
+        Update: Indexify<PayslipUpdate>
         Relationships: []
       }
       candidates: {
