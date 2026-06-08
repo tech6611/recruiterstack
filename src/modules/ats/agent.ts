@@ -34,6 +34,8 @@ const HRIS_TOOL_NAMES = new Set([
   'list_employee_documents',
   'list_org_documents',
   'list_expiring_documents',
+  'get_employee_leave_balance',
+  'list_holidays',
 ])
 const ORCHESTRATOR_ONLY = new Set(['request_approval'])
 

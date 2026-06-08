@@ -31,6 +31,8 @@ const HRIS_TOOL_NAMES = new Set([
   'list_employee_documents',
   'list_org_documents',
   'list_expiring_documents',
+  'get_employee_leave_balance',
+  'list_holidays',
 ])
 
 export const HRIS_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
@@ -68,6 +70,8 @@ CAPABILITIES:
 - list_employee_documents — list documents on file for a person (offer letter, ID, certifications, contracts, payslips). Use when asked "where is X?" or "do I have a current ID on file?".
 - list_org_documents — list org-level documents available to everyone (handbook, policies). Use for "where's the handbook?" / policy questions.
 - list_expiring_documents — list documents expiring soon across the org (admin compliance view).
+- get_employee_leave_balance — current-year balance broken down by leave_type: granted, used, pending, available. Use this for "how many vacation days do I have left?" / "what's my sick leave balance?" type questions.
+- list_holidays — upcoming organization holidays from today onwards.
 
 You do NOT create employees. That happens automatically when a candidacy is dispositioned hired (DB trigger). If the user wants to mark someone hired, that's an ATS action and the orchestrator will route there.
 

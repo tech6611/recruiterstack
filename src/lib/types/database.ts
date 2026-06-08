@@ -449,6 +449,45 @@ export interface HrDocumentInsert
 
 export interface HrDocumentUpdate extends Partial<HrDocumentInsert> {}
 
+// Leave policies (annual-grant) + holidays. Balances are computed at read time
+// (sum of approved+pending time-off days for the current year against the grant),
+// not stored — see migration 055.
+export interface LeavePolicy {
+  id: string
+  org_id: string
+  leave_type: TimeOffRequestType
+  annual_days: number
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+export interface LeavePolicyInsert
+  extends Omit<LeavePolicy, 'id' | 'created_at' | 'updated_at' | 'description' | 'is_active'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  description?: string | null
+  is_active?: boolean
+}
+export interface LeavePolicyUpdate extends Partial<LeavePolicyInsert> {}
+
+export interface Holiday {
+  id: string
+  org_id: string
+  date: string
+  name: string
+  country: string | null
+  created_at: string
+}
+export interface HolidayInsert
+  extends Omit<Holiday, 'id' | 'created_at' | 'country'> {
+  id?: string
+  created_at?: string
+  country?: string | null
+}
+export interface HolidayUpdate extends Partial<HolidayInsert> {}
+
 export interface EmployeeProfileInsert
   extends Omit<EmployeeProfile, 'id' | 'created_at' | 'updated_at' | 'candidate_id' | 'application_id' | 'department_id' | 'manager_id' | 'user_id' | 'hired_at' | 'start_date' | 'joined_at' | 'terminated_at' | 'status'> {
   id?: string
@@ -1272,6 +1311,18 @@ export type Database = {
         Row: Indexify<HrDocument>
         Insert: Indexify<HrDocumentInsert>
         Update: Indexify<HrDocumentUpdate>
+        Relationships: []
+      }
+      leave_policies: {
+        Row: Indexify<LeavePolicy>
+        Insert: Indexify<LeavePolicyInsert>
+        Update: Indexify<LeavePolicyUpdate>
+        Relationships: []
+      }
+      holidays: {
+        Row: Indexify<Holiday>
+        Insert: Indexify<HolidayInsert>
+        Update: Indexify<HolidayUpdate>
         Relationships: []
       }
       candidates: {

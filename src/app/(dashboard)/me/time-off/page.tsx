@@ -7,6 +7,22 @@ import { flags } from '@/lib/flags'
 import { inputCls, labelCls } from '@/lib/ui/styles'
 import type { TimeOffRequest, TimeOffRequestType, TimeOffStatus } from '@/lib/types/database'
 
+type BalanceByType = Record<TimeOffRequestType, { granted: number; used: number; pending: number; available: number }>
+
+const TYPE_TONE: Record<TimeOffRequestType, string> = {
+  vacation: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  sick:     'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+  personal: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+  unpaid:   'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
+}
+
+const TYPE_LABEL: Record<TimeOffRequestType, string> = {
+  vacation: 'Vacation',
+  sick:     'Sick',
+  personal: 'Personal',
+  unpaid:   'Unpaid',
+}
+
 const STATUS_BADGE: Record<TimeOffStatus, string> = {
   pending:    'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
   approved:   'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
@@ -17,6 +33,7 @@ const STATUS_BADGE: Record<TimeOffStatus, string> = {
 export default function MyTimeOffPage() {
   const { orgId } = useAuth()
   const [requests, setRequests] = useState<TimeOffRequest[]>([])
+  const [balance, setBalance]   = useState<BalanceByType | null>(null)
   const [loading, setLoading]   = useState(true)
   const [hasEmployee, setHasEmployee] = useState(true)
 
@@ -34,10 +51,17 @@ export default function MyTimeOffPage() {
       const j = await meRes.json()
       setHasEmployee(Boolean(j.data?.employee))
     }
-    const res = await fetch('/api/me/time-off')
-    if (res.ok) {
-      const j = await res.json()
+    const [reqRes, balRes] = await Promise.all([
+      fetch('/api/me/time-off'),
+      fetch('/api/me/leave-balance'),
+    ])
+    if (reqRes.ok) {
+      const j = await reqRes.json()
       setRequests((j.data ?? []) as TimeOffRequest[])
+    }
+    if (balRes.ok) {
+      const j = await balRes.json()
+      setBalance((j.data?.by_type ?? null) as BalanceByType | null)
     }
     setLoading(false)
   }, [])
@@ -77,6 +101,31 @@ export default function MyTimeOffPage() {
         </div>
       ) : (
         <>
+          {/* Balance tiles */}
+          {balance && (
+            <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {(['vacation', 'sick', 'personal', 'unpaid'] as TimeOffRequestType[]).map(t => {
+                const b = balance[t]
+                const pct = b.granted > 0 ? Math.round(((b.granted - b.used - b.pending) / b.granted) * 100) : 0
+                return (
+                  <div key={t} className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${TYPE_TONE[t]}`}>{TYPE_LABEL[t]}</span>
+                      {b.pending > 0 && <span className="text-[10px] text-amber-600">{b.pending} pending</span>}
+                    </div>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{b.available}<span className="ml-1 text-sm font-normal text-slate-400">/ {b.granted}</span></p>
+                    <p className="text-xs text-slate-500">{b.used} used · days remaining</p>
+                    {b.granted > 0 && (
+                      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           {/* Request form */}
           <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Request time off</h2>

@@ -56,6 +56,10 @@ import {
   listExpiringSoon,
   listVisibleForEmployee,
 } from '@/modules/hris/domain/documents'
+import {
+  getLeaveBalance,
+  listHolidays,
+} from '@/modules/hris/domain/leave-balances'
 import { findPersonByEmail } from '@/modules/core/domain/people'
 import type {
   EmployeeProfile,
@@ -866,6 +870,27 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'get_employee_leave_balance',
+    description: 'Get an employee\'s current-year leave balance broken down by type (vacation, sick, personal, unpaid): granted, used (approved), pending, and available days. Use this when anyone asks "how many vacation days do I have left?" or similar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        employee_id:  { type: 'string' },
+        person_email: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'list_holidays',
+    description: 'List upcoming organization holidays from today onwards.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max holidays to return (default 20)' },
+      },
+    },
+  },
+  {
     name: 'list_employee_documents',
     description: 'List documents on file for an employee (offer letter, ID, certifications, contracts, payslips, etc.). Returns title, category, URL, optional expiry date. Use this when someone asks "where is X document?" or "do I have a current ID on file?".',
     input_schema: {
@@ -993,6 +1018,8 @@ export async function executeTool(
       case 'list_employee_documents':    return await listEmployeeDocumentsTool(input, orgId, supabase)
       case 'list_org_documents':         return await listOrgDocumentsTool(input, orgId, supabase)
       case 'list_expiring_documents':    return await listExpiringDocumentsTool(input, orgId, supabase)
+      case 'get_employee_leave_balance': return await getEmployeeLeaveBalanceTool(input, orgId, supabase)
+      case 'list_holidays':              return await listHolidaysTool(input, orgId, supabase)
       default:                      return `Unknown tool: ${name}`
     }
   } catch (err) {
@@ -3317,3 +3344,35 @@ async function listExpiringDocumentsTool(
 // Reference listVisibleForEmployee so the import isn't dropped (used for type
 // inference and future "my docs" tool). Keeps the import live.
 void listVisibleForEmployee
+
+// ── Leave balance tools (read-only) ──────────────────────────────────────────
+
+async function getEmployeeLeaveBalanceTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const employee = await resolveEmployee(input, orgId, supabase)
+  if (typeof employee === 'string') return employee
+
+  const balance = await getLeaveBalance(supabase, orgId, employee.id)
+  const lines = Object.values(balance.by_type).map(b => {
+    const pending = b.pending > 0 ? ` (${b.pending} pending)` : ''
+    return `• ${b.leave_type}: ${b.available}/${b.granted} days available — ${b.used} used${pending}`
+  })
+  return `Leave balance for ${balance.year}:\n${lines.join('\n')}`
+}
+
+async function listHolidaysTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const limit = typeof input.limit === 'number' ? input.limit : 20
+  const today = new Date().toISOString().slice(0, 10)
+  const holidays = await listHolidays(supabase, orgId, { from: today, limit })
+  if (holidays.length === 0) return 'No upcoming holidays on the calendar.'
+  return `${holidays.length} upcoming holiday(s):\n${holidays.map(h => `• ${h.date} — ${h.name}${h.country ? ` (${h.country})` : ''}`).join('\n')}`
+}

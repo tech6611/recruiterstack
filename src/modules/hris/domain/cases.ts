@@ -36,6 +36,9 @@ const HRIS_READ_TOOL_NAMES = new Set([
   'list_employee_documents',
   'list_org_documents',
   'list_expiring_documents',
+  // Leave balances + holidays — so "how many vacation days do I have left?" / "when's the next holiday?" are answerable.
+  'get_employee_leave_balance',
+  'list_holidays',
 ])
 const HRIS_READ_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
   HRIS_READ_TOOL_NAMES.has(t.name),
