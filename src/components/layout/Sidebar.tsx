@@ -54,11 +54,12 @@ const NAV_SECTIONS: NavSection[] = [
     section: 'Recruiting',
     items: [
       { href: '/openings',   label: 'Openings',   icon: ClipboardList },
-      { href: '/req-jobs',   label: 'Pipelines',  icon: Briefcase },
       { href: '/jobs',       label: 'Jobs',       icon: Briefcase },
+      { href: '/req-jobs',   label: 'Pipelines',  icon: Briefcase },
       { href: '/candidates', label: 'Candidates', icon: Users },
       { href: '/sourcing',   label: 'Sourcing',   icon: Search },
       { href: '/sequences',  label: 'Sequences',  icon: Mail },
+      { href: '/inbox',      label: 'Inbox',      icon: Inbox },
     ],
   },
   ...(flags.hris
@@ -75,7 +76,6 @@ const NAV_SECTIONS: NavSection[] = [
     section: 'Insights',
     items: [
       { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-      { href: '/inbox',     label: 'Inbox',     icon: Inbox },
     ],
   },
   {

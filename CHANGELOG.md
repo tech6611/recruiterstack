@@ -9,6 +9,17 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-08
+
+### Changed
+- Sidebar nav rearranged for clearer planning/execution separation. Under
+  **Recruiting**, items now read `Openings → Jobs → Pipelines → Candidates →
+  Sourcing → Sequences → Inbox` (Jobs before Pipelines reflects the legacy/
+  canonical ordering; Inbox joined Recruiting since it's an action feed, not
+  analytics). **Insights** is now `Analytics` only. HRIS / Me / Admin sections
+  unchanged. Openings stayed in Recruiting (not HRIS) because HRIS is
+  admin-only and Openings must remain visible to recruiters.
+
 ## 2026-05-24
 
 ### Fixed
