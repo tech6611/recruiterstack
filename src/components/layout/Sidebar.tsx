@@ -207,6 +207,12 @@ export function Sidebar() {
       </>
     )
 
+    function toggleClick() {
+      if (openTimer.current)  { clearTimeout(openTimer.current);  openTimer.current  = null }
+      if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
+      setOpenSection(prev => prev === s.section ? null : s.section)
+    }
+
     return (
       <div
         className="relative"
@@ -215,7 +221,7 @@ export function Sidebar() {
       >
         {s.href
           ? <Link  href={s.href} className={cls}>{inner}</Link>
-          : <button type="button" className={cls} aria-haspopup="menu" aria-expanded={isOpen}>{inner}</button>}
+          : <button type="button" className={cls} onClick={toggleClick} aria-haspopup="menu" aria-expanded={isOpen}>{inner}</button>}
 
         {hasFlyout && isOpen && (
           <div
@@ -306,8 +312,10 @@ export function Sidebar() {
           </span>
         </div>
 
-        {/* Buckets */}
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
+        {/* Buckets. overflow-visible is required so flyouts (absolutely
+            positioned to the right of each bucket) aren't clipped by the
+            nav's overflow box. 7 buckets fit comfortably without scrolling. */}
+        <nav className="flex-1 space-y-0.5 overflow-visible px-2 py-3">
           {sections.map(s => <Bucket key={s.section} s={s} />)}
         </nav>
 

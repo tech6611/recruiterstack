@@ -11,6 +11,19 @@ entries on top.
 
 ## 2026-06-10
 
+### Fixed
+- **Sidebar flyouts were invisible / buckets felt dead on click.** Two
+  bugs in the new buckets-only rail:
+  - The rail's `<nav>` had `overflow-y-auto`, which clipped the absolutely-
+    positioned flyout panels — they rendered but were hidden behind the
+    overflow boundary. Switched to `overflow-visible` (7 buckets fit
+    without scrolling).
+  - Bucket buttons with no direct route (Me, Recruiting, HRIS, Payroll,
+    Insights, Admin) had no `onClick` handler — they only opened on
+    hover. Click now toggles the flyout immediately (bypassing the
+    150ms open delay), giving a deterministic fallback for trackpads
+    where hover is finicky. Hover still works as before.
+
 ### Added
 - **Payroll: Singapore tax engine (second country).** Validates the
   pluggable `TaxEngine` interface with a structurally different
