@@ -11,6 +11,23 @@ entries on top.
 
 ## 2026-06-10
 
+### Changed
+- **Sidebar redesigned: buckets-only rail + hover flyouts.** The desktop
+  sidebar now shows only top-level buckets (Dashboard, Me, Recruiting,
+  HRIS, Payroll, Insights, Admin) at a fixed 140px rail. Hovering a bucket
+  (150ms delay) opens a flyout panel to the right with that bucket's
+  flat list of items. Dashboard navigates directly on click (no flyout
+  since it has no children). Settings stays inside the Admin flyout.
+  Active highlighting bubbles up: the bucket lights emerald when any of
+  its items matches the current route.
+  - Mobile (below md): the rail is hidden and replaced with a fixed
+    top-left hamburger that opens an off-canvas drawer containing the
+    full nested list (no hover required).
+  - Removed: the manual collapse/expand toggle and its localStorage key
+    (`rs_sidebar_collapsed`) — the rail is always the compact form now.
+  - No item overlaps were renamed (Onboarding / OKRs / Documents / HR
+    cases still appear in both Me and HRIS — intentional, scope deferred).
+
 ### Added
 - **Cross-module people analytics — `/analytics/people`.** Four metrics
   that each join data from at least two modules in one query. The
