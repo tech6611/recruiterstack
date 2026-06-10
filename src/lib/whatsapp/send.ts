@@ -136,7 +136,13 @@ export async function sendWhatsApp(opts: SendWhatsAppOptions): Promise<SendWhats
     }
     usedTemplate = account!.outreachTemplate
     const params = opts.templateParams ?? deriveTemplateParams(opts.body, recipientName, context)
-    return sendTemplateMessage(account!, waPhone, account!.outreachTemplate, account!.templateLanguage, params)
+    let res = await sendTemplateMessage(account!, waPhone, account!.outreachTemplate, account!.templateLanguage, params)
+    // Param-count mismatch (error 100) — e.g. Meta's zero-param hello_world
+    // test template. Retry once with no body params before giving up.
+    if (!res.ok && res.errorCode === 100 && params.length > 0) {
+      res = await sendTemplateMessage(account!, waPhone, account!.outreachTemplate, account!.templateLanguage, [])
+    }
+    return res
   }
 
   if (inWindow) {
