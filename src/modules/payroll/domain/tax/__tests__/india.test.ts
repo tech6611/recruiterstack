@@ -316,6 +316,95 @@ describe('India engine — v1.1 sections (old regime extras)', () => {
   })
 })
 
+// ── v1.2: 80U / 80DD / 80DDB — severity + senior caps ──────────────────────
+//
+// Same ₹15L baseline as v1.1 (taxable = 13,60,000 → TDS ≈ ₹2,29,320). The
+// caps in this block determine how much of each input gets deducted. All
+// savings inside this block fall in the 30% slab + 4% cess (because none
+// of these deductions cross the ₹10L slab boundary alone).
+//   1 rupee saved = 1 × 0.30 × 1.04 = ₹0.312 in tax.
+// So 75k cap → 23,400 saved; 1.25L cap → 39,000 saved; 40k → 12,480;
+// 1L → 31,200. We use these as the assertion targets below.
+
+describe('India engine — v1.2 sections (disability / specified diseases)', () => {
+  const baseDecl = {
+    rent_paid_annual:  0,
+    section_80c:       0,
+    section_80d:       0,
+    section_80ccd_1b:  0,
+  }
+  const baseInput = {
+    annualBaseSalary: 1_500_000,
+    regime:           'old' as const,
+  }
+
+  function tdsFor(other: Record<string, number>): number {
+    const out = indiaTaxEngine.compute(input({
+      ...baseInput,
+      declaration: { ...baseDecl, other_exemptions: other },
+    }))
+    return annualTDS(out)
+  }
+  const BASELINE = tdsFor({})
+
+  // ── 80U self disability ─────────────────────────────────────────────────
+  it('80U normal: ₹75k cap → ₹23,400 saved', () => {
+    expect(BASELINE - tdsFor({ '80u': 75_000 })).toBeCloseTo(23_400, -1)
+  })
+  it('80U normal: claim over cap clamps to ₹75k', () => {
+    expect(tdsFor({ '80u': 200_000 })).toBe(tdsFor({ '80u': 75_000 }))
+  })
+  it('80U severe: cap jumps to ₹1.25L → ₹39,000 saved', () => {
+    expect(BASELINE - tdsFor({ '80u': 1_25_000, '80u_severe': 1 })).toBeCloseTo(39_000, -1)
+  })
+  it('80U severe: claim over ₹1.25L still clamps to ₹1.25L', () => {
+    expect(tdsFor({ '80u': 200_000, '80u_severe': 1 })).toBe(tdsFor({ '80u': 1_25_000, '80u_severe': 1 }))
+  })
+
+  // ── 80DD disabled dependent ─────────────────────────────────────────────
+  it('80DD severe: cap jumps to ₹1.25L → ₹39,000 saved', () => {
+    expect(BASELINE - tdsFor({ '80dd': 1_25_000, '80dd_severe': 1 })).toBeCloseTo(39_000, -1)
+  })
+
+  // ── 80DDB specified diseases ────────────────────────────────────────────
+  it('80DDB under 60: ₹40k cap → ₹12,480 saved', () => {
+    expect(BASELINE - tdsFor({ '80ddb': 40_000 })).toBeCloseTo(12_480, -1)
+  })
+  it('80DDB senior: cap jumps to ₹1L → ₹31,200 saved', () => {
+    expect(BASELINE - tdsFor({ '80ddb': 1_00_000, '80ddb_senior': 1 })).toBeCloseTo(31_200, -1)
+  })
+  it('80DDB senior: claim over ₹1L clamps to ₹1L', () => {
+    expect(tdsFor({ '80ddb': 5_00_000, '80ddb_senior': 1 })).toBe(tdsFor({ '80ddb': 1_00_000, '80ddb_senior': 1 }))
+  })
+
+  // ── New regime ignores these too ────────────────────────────────────────
+  it('new regime ignores 80U/80DD/80DDB completely', () => {
+    const withClaims = indiaTaxEngine.compute(input({
+      regime: 'new',
+      declaration: { ...baseDecl, other_exemptions: { '80u': 1_25_000, '80u_severe': 1, '80ddb': 1_00_000, '80ddb_senior': 1 } },
+    }))
+    const without = indiaTaxEngine.compute(input({ regime: 'new', declaration: null }))
+    expect(annualTDS(withClaims)).toBe(annualTDS(without))
+  })
+
+  // ── Combined v1.1 + v1.2 — all eight sections fire additively ───────────
+  it('combined v1.1 + v1.2 sections — additive deductions cross ₹10L boundary', () => {
+    const saved = BASELINE - tdsFor({
+      '24b':         200_000,  // → 2,00,000
+      '80e':         300_000,  // → 3,00,000
+      '80g':         100_000,  // → 50,000 (50% rule)
+      '80tta':        10_000,  // → 10,000
+      '80u':          75_000,  // → 75,000
+      '80dd':         75_000,  // → 75,000
+      '80ddb':        40_000,  // → 40,000
+    })
+    // Total deduction = 7,50,000. Taxable: 13,60,000 → 6,10,000.
+    // Slab savings: 3.6L at 30% off (1,08,000) + 3.9L at 20% off (78,000)
+    //             = 1,86,000 → with 4% cess = 1,93,440.
+    expect(saved).toBeCloseTo(1_93_440, -1)
+  })
+})
+
 // ── helpers ────────────────────────────────────────────────────────────────
 function annualTDS(out: ReturnType<typeof indiaTaxEngine.compute>): number {
   const tds = out.deductions.find(d => d.code === 'tds')

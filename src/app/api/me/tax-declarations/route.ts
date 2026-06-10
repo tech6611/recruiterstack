@@ -71,13 +71,18 @@ export async function PUT(req: NextRequest) {
 // Whitelist known v1.1 keys and coerce values to non-negative numbers. Unknown
 // keys are dropped — keeps a hostile client from packing arbitrary jsonb into
 // the column. New engine sections add to this list.
-const KNOWN_EXEMPTION_KEYS = ['24b', '80e', '80g', '80tta'] as const
+// Amount keys → must be > 0 to be stored. Flag keys → store as 1 only if truthy.
+const AMOUNT_KEYS = ['24b', '80e', '80g', '80tta', '80u', '80dd', '80ddb'] as const
+const FLAG_KEYS   = ['80u_severe', '80dd_severe', '80ddb_senior']           as const
 function sanitizeOtherExemptions(raw: Record<string, number> | undefined): Record<string, number> | undefined {
   if (!raw || typeof raw !== 'object') return undefined
   const out: Record<string, number> = {}
-  for (const k of KNOWN_EXEMPTION_KEYS) {
+  for (const k of AMOUNT_KEYS) {
     const v = Number(raw[k])
     if (Number.isFinite(v) && v > 0) out[k] = v
+  }
+  for (const k of FLAG_KEYS) {
+    if (Number(raw[k]) > 0) out[k] = 1
   }
   return out
 }

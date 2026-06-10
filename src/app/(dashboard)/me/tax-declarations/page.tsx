@@ -27,9 +27,17 @@ export default function MyTaxDeclarationsPage() {
     section_80d:      0,
     section_80ccd_1b: 0,
   })
-  // v1.1 — open jsonb keys (24b / 80e / 80g / 80tta).
-  const [otherDraft, setOtherDraft] = useState<{ '24b': number; '80e': number; '80g': number; '80tta': number }>({
+  // v1.1 + v1.2 — open jsonb keys (amounts + 0/1 flags).
+  const [otherDraft, setOtherDraft] = useState<{
+    '24b': number; '80e': number; '80g': number; '80tta': number
+    '80u': number; '80u_severe': number
+    '80dd': number; '80dd_severe': number
+    '80ddb': number; '80ddb_senior': number
+  }>({
     '24b': 0, '80e': 0, '80g': 0, '80tta': 0,
+    '80u': 0, '80u_severe': 0,
+    '80dd': 0, '80dd_severe': 0,
+    '80ddb': 0, '80ddb_senior': 0,
   })
   const [showMore, setShowMore]     = useState(false)
   const [saving, setSaving]         = useState(false)
@@ -59,13 +67,19 @@ export default function MyTaxDeclarationsPage() {
         })
         const other = (current.other_exemptions ?? {}) as Record<string, number>
         const otherLoaded = {
-          '24b':   Number(other['24b']   ?? 0),
-          '80e':   Number(other['80e']   ?? 0),
-          '80g':   Number(other['80g']   ?? 0),
-          '80tta': Number(other['80tta'] ?? 0),
+          '24b':         Number(other['24b']         ?? 0),
+          '80e':         Number(other['80e']         ?? 0),
+          '80g':         Number(other['80g']         ?? 0),
+          '80tta':       Number(other['80tta']       ?? 0),
+          '80u':         Number(other['80u']         ?? 0),
+          '80u_severe':  Number(other['80u_severe']  ?? 0),
+          '80dd':        Number(other['80dd']        ?? 0),
+          '80dd_severe': Number(other['80dd_severe'] ?? 0),
+          '80ddb':       Number(other['80ddb']       ?? 0),
+          '80ddb_senior':Number(other['80ddb_senior']?? 0),
         }
         setOtherDraft(otherLoaded)
-        // Auto-expand if any v1.1 field has a value, so saved data is visible.
+        // Auto-expand if any v1.1/v1.2 amount field has a value, so saved data is visible.
         if (Object.values(otherLoaded).some(v => v > 0)) setShowMore(true)
       }
     }
@@ -209,6 +223,53 @@ export default function MyTaxDeclarationsPage() {
                     value={otherDraft['80tta']}
                     onChange={v => setOtherDraft({ ...otherDraft, '80tta': v })}
                   />
+
+                  {/* ── v1.2: Disability / specified diseases ─────────────── */}
+                  <div className="mt-2 border-t border-dashed border-slate-200 pt-4">
+                    <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      Disability / specified diseases
+                    </div>
+
+                    <DecField
+                      label={`Section 80U — Self disability (cap ₹${otherDraft['80u_severe'] ? '1,25,000' : '75,000'})`}
+                      hint="For an assessee with disability per Form 10-IA. Severity ≥80% raises the cap. Medical certification is your responsibility."
+                      value={otherDraft['80u']}
+                      onChange={v => setOtherDraft({ ...otherDraft, '80u': v })}
+                    />
+                    <FlagToggle
+                      checked={otherDraft['80u_severe'] > 0}
+                      onChange={v => setOtherDraft({ ...otherDraft, '80u_severe': v ? 1 : 0 })}
+                      label="Severe disability (≥80%) — raises 80U cap to ₹1,25,000"
+                    />
+
+                    <div className="mt-3">
+                      <DecField
+                        label={`Section 80DD — Disabled dependent maintenance (cap ₹${otherDraft['80dd_severe'] ? '1,25,000' : '75,000'})`}
+                        hint="For maintenance / medical of a disabled dependent (spouse / child / parent / sibling). Cap mirrors 80U."
+                        value={otherDraft['80dd']}
+                        onChange={v => setOtherDraft({ ...otherDraft, '80dd': v })}
+                      />
+                      <FlagToggle
+                        checked={otherDraft['80dd_severe'] > 0}
+                        onChange={v => setOtherDraft({ ...otherDraft, '80dd_severe': v ? 1 : 0 })}
+                        label="Dependent has severe disability (≥80%) — raises 80DD cap to ₹1,25,000"
+                      />
+                    </div>
+
+                    <div className="mt-3">
+                      <DecField
+                        label={`Section 80DDB — Specified diseases (cap ₹${otherDraft['80ddb_senior'] ? '1,00,000' : '40,000'})`}
+                        hint="Treatment for specified diseases (cancer, neurological, AIDS, etc.) for self or dependent. Cap rises when patient is 60+."
+                        value={otherDraft['80ddb']}
+                        onChange={v => setOtherDraft({ ...otherDraft, '80ddb': v })}
+                      />
+                      <FlagToggle
+                        checked={otherDraft['80ddb_senior'] > 0}
+                        onChange={v => setOtherDraft({ ...otherDraft, '80ddb_senior': v ? 1 : 0 })}
+                        label="Patient is 60+ years — raises 80DDB cap to ₹1,00,000"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -263,6 +324,20 @@ function prevFy(): string {
   const cur = currentFy()
   const s = parseInt(cur.slice(0, 4))
   return `${s - 1}-${(s % 100).toString().padStart(2, '0')}`
+}
+
+function FlagToggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label className="mt-1 inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+        className="h-3.5 w-3.5"
+      />
+      <span>{label}</span>
+    </label>
+  )
 }
 
 function DecField({ label, hint, value, onChange }: { label: string; hint?: string; value: number; onChange: (v: number) => void }) {

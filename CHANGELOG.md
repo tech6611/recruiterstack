@@ -9,6 +9,30 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-10
+
+### Added
+- **Payroll v1.2 — disability / specified diseases.** Three more Chapter
+  VI-A sections in the India engine: **80U** (self disability), **80DD**
+  (disabled dependent maintenance), **80DDB** (treatment of specified
+  diseases — cancer, neurological, AIDS, etc.). No migration —
+  reuses the existing `other_exemptions` jsonb column.
+  - 80U / 80DD caps: ₹75,000 normal, ₹1,25,000 if severe (≥80% disability).
+  - 80DDB caps: ₹40,000 under-60, ₹1,00,000 if patient is 60+.
+  - Severity / senior flags stored as 0/1 in jsonb (`80u_severe`,
+    `80dd_severe`, `80ddb_senior`). Engine reads them, picks the cap,
+    then clamps the amount.
+  - 10 new unit tests pin the math, including cap-clamp behaviour,
+    new-regime-ignores-all, and a combined v1.1+v1.2 scenario.
+  - UI: `/me/tax-declarations` "More exemptions" gets a sub-section
+    "Disability / specified diseases" with an amount field plus a
+    severity/senior checkbox per section. Cap in the field label
+    updates live based on the toggle.
+  - API: amount-key + flag-key whitelists on both routes — flags
+    coerced to 0/1, unknown keys dropped.
+  - Honest scope: no medical-certificate verification (Form 10-IA),
+    no patient-DOB derivation (we trust the senior checkbox).
+
 ## 2026-06-08
 
 ### Added

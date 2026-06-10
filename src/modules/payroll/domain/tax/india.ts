@@ -98,6 +98,20 @@ const CAP_80TTA     =  10_000
 // working-tool simplification; UI + payslip note flag this clearly.
 const RATE_80G      = 0.50
 
+// v1.2 — disability / specified disease sections.
+// 80U (self disability) and 80DD (disabled dependent) both step up from
+// ₹75k to ₹1.25L when severity is "severe" (≥80% disability per Form 10-IA).
+// 80DDB (specified diseases like cancer, neurological, AIDS) steps up from
+// ₹40k to ₹1L when the patient is 60+. We accept the severity / senior
+// flags as 0/1 in `other_exemptions`; medical-certificate verification is
+// out of scope (real filing needs Form 10-IA, treatment records, etc.).
+const CAP_80U_NORMAL      =  75_000
+const CAP_80U_SEVERE      = 1_25_000
+const CAP_80DD_NORMAL     =  75_000
+const CAP_80DD_SEVERE     = 1_25_000
+const CAP_80DDB_UNDER_60  =  40_000
+const CAP_80DDB_SENIOR    = 1_00_000
+
 // ── State PT engines ─────────────────────────────────────────────────────────
 // Karnataka raised threshold to ₹25,000/month in Apr 2025; ₹200/month above.
 // (Feb has ₹300 statutorily, but most payroll software smooths to ₹200 ×12 +
@@ -292,10 +306,17 @@ export const indiaTaxEngine: TaxEngine = {
 // Unknown keys are ignored — the jsonb column is open so future engines can
 // stash anything without breaking this one.
 export type OtherExemptions = Partial<{
-  '24b':    number   // home loan interest, self-occupied
-  '80e':    number   // education loan interest
-  '80g':    number   // donations (we apply 50% rule)
-  '80tta':  number   // savings account interest
+  '24b':         number   // home loan interest, self-occupied
+  '80e':         number   // education loan interest
+  '80g':         number   // donations (we apply 50% rule)
+  '80tta':       number   // savings account interest
+  // v1.2 — disability / specified diseases. Flags are 0/1 numbers (jsonb-friendly).
+  '80u':          number  // self disability amount
+  '80u_severe':   number  // 1 if severe (80%+) — cap jumps to ₹1.25L
+  '80dd':         number  // dependent disability maintenance amount
+  '80dd_severe':  number  // 1 if severe — cap jumps to ₹1.25L
+  '80ddb':        number  // specified-disease treatment amount
+  '80ddb_senior': number  // 1 if patient is 60+ — cap jumps to ₹1L
 }>
 
 export function computeAnnualTDS(args: {
@@ -355,12 +376,25 @@ export function computeAnnualTDS(args: {
     // this on the payslip via the engine's `notes` array.
     const ded80g   = Math.max(0, Number(oe['80g'] ?? 0) || 0) * RATE_80G
 
+    // v1.2 — disability / specified diseases. Cap depends on severity (80U,
+    // 80DD) or patient's age (80DDB); flags are read as 0/1 from jsonb.
+    const u80Severe   = Number(oe['80u_severe']   ?? 0) > 0
+    const dd80Severe  = Number(oe['80dd_severe']  ?? 0) > 0
+    const ddb80Senior = Number(oe['80ddb_senior'] ?? 0) > 0
+    const cap80u   = u80Severe   ? CAP_80U_SEVERE     : CAP_80U_NORMAL
+    const cap80dd  = dd80Severe  ? CAP_80DD_SEVERE    : CAP_80DD_NORMAL
+    const cap80ddb = ddb80Senior ? CAP_80DDB_SENIOR   : CAP_80DDB_UNDER_60
+    const ded80u   = Math.min(cap80u,   Math.max(0, Number(oe['80u']   ?? 0) || 0))
+    const ded80dd  = Math.min(cap80dd,  Math.max(0, Number(oe['80dd']  ?? 0) || 0))
+    const ded80ddb = Math.min(cap80ddb, Math.max(0, Number(oe['80ddb'] ?? 0) || 0))
+
     taxable = Math.max(0,
       args.annualGross
       - STD_DED_OLD
       - hraExemption
       - ded80c - ded80d - ded80ccd1b
-      - ded24b - ded80e - ded80g - ded80tta,
+      - ded24b - ded80e - ded80g - ded80tta
+      - ded80u - ded80dd - ded80ddb,
     )
     slabs          = OLD_REGIME_SLABS
     surchargeTiers = SURCHARGE_TIERS_OLD
