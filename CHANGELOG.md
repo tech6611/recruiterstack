@@ -12,6 +12,12 @@ entries on top.
 ## 2026-06-10
 
 ### Added
+- **CSV export on `/analytics/people` cards.** Download icon next to each
+  card's subtitle exports that card's data as a timestamped CSV (RFC 4180
+  escaping, UTF-8 BOM for Excel). Cost card includes per-employee
+  breakdown rows. New helper `src/lib/api/csv-export.ts`.
+
+### Added
 - **DOB on `employee_profiles` (migration 059) + auto-derive 80DDB senior
   flag.** Optional `date_of_birth DATE` column. Payroll compute orchestrator
   now sets `80ddb_senior=1` automatically when the employee was 60+ at the

@@ -2,7 +2,8 @@
 
 import { useAuth } from '@clerk/nextjs'
 import { useCallback, useEffect, useState } from 'react'
-import { BarChart3, TrendingUp, Wallet, Users, AlertCircle, Sparkles } from 'lucide-react'
+import { BarChart3, TrendingUp, Wallet, Users, AlertCircle, Sparkles, Download } from 'lucide-react'
+import { downloadCsv, todayStamp } from '@/lib/api/csv-export'
 
 // ── Shape returned by /api/analytics/people ────────────────────────────────
 // Each metric wrapped in { data | error } so one failing query doesn't
@@ -121,28 +122,32 @@ export default function PeopleAnalyticsPage() {
         {/* 1. Conversion funnel */}
         <Card icon={<Users className="h-4 w-4 text-emerald-600" />}
               title="Conversion funnel"
-              subtitle={`Last ${days} days · ATS → HRIS`}>
+              subtitle={`Last ${days} days · ATS → HRIS`}
+              onExport={data?.conversion_funnel.data ? () => exportFunnel(data.conversion_funnel.data!, days) : undefined}>
           <FunnelCard wrapped={data?.conversion_funnel} loading={loading} />
         </Card>
 
         {/* 2. Time-to-hire */}
         <Card icon={<TrendingUp className="h-4 w-4 text-emerald-600" />}
               title="Time-to-hire"
-              subtitle={`Last ${days} days · applied_at → hired_at`}>
+              subtitle={`Last ${days} days · applied_at → hired_at`}
+              onExport={data?.time_to_hire.data ? () => exportTimeToHire(data.time_to_hire.data!, days) : undefined}>
           <TimeToHireCard wrapped={data?.time_to_hire} loading={loading} />
         </Card>
 
         {/* 3. Cost per active hire */}
         <Card icon={<Wallet className="h-4 w-4 text-emerald-600" />}
               title="Real cost per active hire"
-              subtitle={`Last ${days} days · Payroll × HRIS cohort`}>
+              subtitle={`Last ${days} days · Payroll × HRIS cohort`}
+              onExport={data?.cost_per_active_hire.data ? () => exportCost(data.cost_per_active_hire.data!, days) : undefined}>
           <CostCard wrapped={data?.cost_per_active_hire} loading={loading} />
         </Card>
 
         {/* 4. Tenure distribution */}
         <Card icon={<BarChart3 className="h-4 w-4 text-emerald-600" />}
               title="Tenure distribution"
-              subtitle="All current actives · HRIS">
+              subtitle="All current actives · HRIS"
+              onExport={data?.tenure_distribution.data ? () => exportTenure(data.tenure_distribution.data!) : undefined}>
           <TenureCard wrapped={data?.tenure_distribution} loading={loading} />
         </Card>
       </div>
@@ -151,15 +156,32 @@ export default function PeopleAnalyticsPage() {
 }
 
 // ── Card scaffold ──────────────────────────────────────────────────────────
-function Card({ icon, title, subtitle, children }: { icon: React.ReactNode; title: string; subtitle: string; children: React.ReactNode }) {
+function Card({ icon, title, subtitle, onExport, children }: {
+  icon: React.ReactNode
+  title: string
+  subtitle: string
+  onExport?: () => void
+  children: React.ReactNode
+}) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <div className="mb-4 flex items-start justify-between">
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           {icon}
           <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
         </div>
-        <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">{subtitle}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">{subtitle}</span>
+          {onExport && (
+            <button
+              onClick={onExport}
+              className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              title="Download CSV"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
       {children}
     </div>
@@ -299,6 +321,54 @@ function TenureCard({ wrapped, loading }: { wrapped: Wrapped<Tenure> | undefined
       </div>
     </div>
   )
+}
+
+// ── CSV exporters ──────────────────────────────────────────────────────────
+// One function per card. Each shapes its card's data into rows + headers
+// and triggers a browser download via the shared helper.
+
+function exportFunnel(d: ConversionFunnel, days: number) {
+  downloadCsv(`funnel-${days}d-${todayStamp()}.csv`, [
+    ['Step', 'Count', 'Conversion from previous'],
+    ['Applications', d.apps_total,  ''],
+    ['Hired',        d.apps_hired,  d.hire_rate   !== null ? `${Math.round(d.hire_rate   * 100)}%` : ''],
+    ['Joined',       d.apps_joined, d.join_rate   !== null ? `${Math.round(d.join_rate   * 100)}%` : ''],
+    ['Still active', d.apps_active, d.active_rate !== null ? `${Math.round(d.active_rate * 100)}%` : ''],
+  ])
+}
+
+function exportTimeToHire(d: TimeToHire, days: number) {
+  downloadCsv(`time-to-hire-${days}d-${todayStamp()}.csv`, [
+    ['Metric',     'Days'],
+    ['Median',     d.median_days ?? ''],
+    ['p25',        d.p25_days    ?? ''],
+    ['p75',        d.p75_days    ?? ''],
+    ['Min',        d.min_days    ?? ''],
+    ['Max',        d.max_days    ?? ''],
+    ['Sample size', d.sample_size],
+  ])
+}
+
+function exportCost(d: CostHire, days: number) {
+  const header = [['Employee', 'Email', 'Joined at', 'Payslip count', 'Total net paid (INR)']]
+  const body   = d.hires.map(h => [h.name ?? '', h.email ?? '', h.joined_at ?? '', h.payslip_count, h.total_net_paid])
+  const footer = [
+    [],
+    ['Cohort size', d.active_hires],
+    ['Total net paid', d.total_net_paid],
+    ['Avg per hire',   d.avg_per_hire ?? ''],
+  ]
+  downloadCsv(`cost-per-hire-${days}d-${todayStamp()}.csv`, [...header, ...body, ...footer])
+}
+
+function exportTenure(d: Tenure) {
+  downloadCsv(`tenure-${todayStamp()}.csv`, [
+    ['Bucket', 'Count'],
+    ...d.buckets.map(b => [b.label, b.count]),
+    [],
+    ['Total active',   d.total_active],
+    ['Median months',  d.median_months ?? ''],
+  ])
 }
 
 // ── small ──────────────────────────────────────────────────────────────────
