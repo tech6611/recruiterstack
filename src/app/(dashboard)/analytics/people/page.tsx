@@ -2,8 +2,18 @@
 
 import { useAuth } from '@clerk/nextjs'
 import { useCallback, useEffect, useState } from 'react'
-import { BarChart3, TrendingUp, Wallet, Users, AlertCircle, Sparkles, Download, ArrowUpRight, GitBranch } from 'lucide-react'
+import { BarChart3, TrendingUp, Wallet, Users, AlertCircle, Sparkles, Download, ArrowUpRight, GitBranch, LineChart as LineChartIcon } from 'lucide-react'
 import { downloadCsv, todayStamp } from '@/lib/api/csv-export'
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 
 // ── Shape returned by /api/analytics/people ────────────────────────────────
 // Each metric wrapped in { data | error } so one failing query doesn't
@@ -78,6 +88,9 @@ interface SourceRetention {
   rows:       SourceRow[]
 }
 
+interface MonthlyPoint { month: string; apps: number; hired: number; joined: number }
+interface MonthlyTrends { months: number; points: MonthlyPoint[] }
+
 interface AnalyticsResponse {
   window_days:           number
   conversion_funnel:     Wrapped<ConversionFunnel>
@@ -86,6 +99,7 @@ interface AnalyticsResponse {
   tenure_distribution:   Wrapped<Tenure>
   comp_drift:            Wrapped<CompDrift>
   source_retention:      Wrapped<SourceRetention>
+  monthly_trends:        Wrapped<MonthlyTrends>
 }
 
 function fmtMoney(n: number): string {
@@ -201,6 +215,16 @@ export default function PeopleAnalyticsPage() {
                 subtitle="All-time · ATS source × HRIS current status"
                 onExport={data?.source_retention.data ? () => exportSource(data.source_retention.data!) : undefined}>
             <SourceRetentionCard wrapped={data?.source_retention} loading={loading} />
+          </Card>
+        </div>
+
+        {/* 7. Monthly hiring trends — full width line chart */}
+        <div className="md:col-span-2">
+          <Card icon={<LineChartIcon className="h-4 w-4 text-emerald-600" />}
+                title="Hiring trends (last 12 months)"
+                subtitle="ATS apps · ATS hires · HRIS joins, monthly"
+                onExport={data?.monthly_trends.data ? () => exportTrends(data.monthly_trends.data!) : undefined}>
+            <TrendsCard wrapped={data?.monthly_trends} loading={loading} />
           </Card>
         </div>
       </div>
@@ -492,6 +516,45 @@ function RateBar({ rate, color }: { rate: number | null; color: string }) {
   )
 }
 
+// ── 7. Monthly hiring trends (Recharts) ─────────────────────────────────────
+// Three lines on one chart: applications, hires, joins. Same Y-axis so the
+// funnel collapse is visible (apps should always be highest, joins lowest).
+// Month labels are short "Jul 25" form so 12 fit comfortably.
+function TrendsCard({ wrapped, loading }: { wrapped: Wrapped<MonthlyTrends> | undefined; loading: boolean }) {
+  if (loading)       return <LoadingRow />
+  if (!wrapped)      return null
+  if (wrapped.error) return <ErrorRow msg={wrapped.error} />
+  const d = wrapped.data!
+  const hasAny = d.points.some(p => p.apps > 0 || p.hired > 0 || p.joined > 0)
+  if (!hasAny) return <div className="text-sm text-slate-400">No activity in the last 12 months.</div>
+
+  // Format YYYY-MM → "Jul 25"
+  const chartData = d.points.map(p => ({
+    ...p,
+    label: new Date(p.month + '-01T00:00:00Z').toLocaleString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' }),
+  }))
+
+  return (
+    <div className="h-64 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+          <Tooltip
+            contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+            labelStyle={{ fontWeight: 600, color: '#0f172a' }}
+          />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Line type="monotone" dataKey="apps"   name="Applications" stroke="#94a3b8" strokeWidth={2} dot={{ r: 2 }} />
+          <Line type="monotone" dataKey="hired"  name="Hired"        stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} />
+          <Line type="monotone" dataKey="joined" name="Joined"       stroke="#0ea5e9" strokeWidth={2} dot={{ r: 2 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 // ── CSV exporters ──────────────────────────────────────────────────────────
 // One function per card. Each shapes its card's data into rows + headers
 // and triggers a browser download via the shared helper.
@@ -566,6 +629,13 @@ function exportSource(d: SourceRetention) {
     ]),
     [],
     ['Total apps', d.total_apps],
+  ])
+}
+
+function exportTrends(d: MonthlyTrends) {
+  downloadCsv(`hiring-trends-${todayStamp()}.csv`, [
+    ['Month', 'Applications', 'Hired', 'Joined'],
+    ...d.points.map(p => [p.month, p.apps, p.hired, p.joined]),
   ])
 }
 

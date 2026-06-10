@@ -12,6 +12,13 @@ entries on top.
 ## 2026-06-10
 
 ### Added
+- **Hiring trends chart on `/analytics/people`.** Recharts line chart
+  showing apps / hires / joins by calendar month for the last 12 months.
+  Three lines on shared Y-axis so funnel collapse is visible. Months with
+  zero activity still render (no chart holes). Full-width card. New
+  domain function `getMonthlyHiringTrends`; added `recharts` dep.
+
+### Added
 - **Source → retention card on `/analytics/people`.** *The* killer
   cross-module chart. For every application source value (applied /
   sourced / referral / imported / manual), shows hire rate (apps →

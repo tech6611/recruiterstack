@@ -6,6 +6,7 @@ import {
   getCompDrift,
   getConversionFunnel,
   getCostPerActiveHire,
+  getMonthlyHiringTrends,
   getSourceRetention,
   getTenureDistribution,
   getTimeToHire,
@@ -28,13 +29,14 @@ export async function GET(req: NextRequest) {
   const daysParam = req.nextUrl.searchParams.get('days')
   const days = clampDays(daysParam ? Number(daysParam) : 90)
 
-  const [fS, tS, cS, nS, dS, sS] = await Promise.allSettled([
+  const [fS, tS, cS, nS, dS, sS, mS] = await Promise.allSettled([
     getConversionFunnel    (supabase, orgId, days),
     getTimeToHire          (supabase, orgId, days),
     getCostPerActiveHire   (supabase, orgId, days),
     getTenureDistribution  (supabase, orgId),
     getCompDrift           (supabase, orgId),
     getSourceRetention     (supabase, orgId),
+    getMonthlyHiringTrends (supabase, orgId, 12),                // last 12 months
   ])
 
   return NextResponse.json({
@@ -46,6 +48,7 @@ export async function GET(req: NextRequest) {
       tenure_distribution:  unwrap(nS),
       comp_drift:           unwrap(dS),
       source_retention:     unwrap(sS),
+      monthly_trends:       unwrap(mS),
     },
   })
 }

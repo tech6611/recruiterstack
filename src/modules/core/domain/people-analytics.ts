@@ -517,6 +517,91 @@ export async function getSourceRetention(
   return { total_apps: apps.length, rows }
 }
 
+// ── 7. Monthly hiring trends ────────────────────────────────────────────────
+// Rolls up applications / hires / joined by calendar month for the last N
+// months. UI plots three lines on one chart so you see the funnel move
+// through time. Same canonical joins as the funnel card — but bucketed
+// instead of summed.
+//
+// Bucketing is done in JS because Supabase doesn't give us a portable
+// date_trunc('month') across the client lib without an RPC. The dataset
+// is small (months × org), so this is fine.
+
+export interface MonthlyTrendPoint {
+  month:    string                              // YYYY-MM
+  apps:     number
+  hired:    number
+  joined:   number
+}
+
+export interface MonthlyHiringTrends {
+  months: number
+  points: MonthlyTrendPoint[]                   // oldest-first, length === months
+}
+
+function monthKey(iso: string): string {
+  // YYYY-MM from any ISO timestamp / YYYY-MM-DD string
+  return iso.slice(0, 7)
+}
+
+export async function getMonthlyHiringTrends(
+  supabase: Supabase,
+  orgId:    string,
+  months:   number = 12,
+): Promise<MonthlyHiringTrends> {
+  // Window covers the last N full months including current; align to the
+  // first day of (current month - N + 1) so a Jun 10 view of 12 months
+  // shows Jul of the previous year through Jun of this year.
+  const now    = new Date()
+  const start  = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1))
+  const startISO = start.toISOString()
+
+  // 1. All applications in the window (apps + hired counts derived here).
+  const appsRes = await supabase
+    .from('applications')
+    .select('id, status, applied_at')
+    .eq('org_id', orgId)
+    .gte('applied_at', startISO)
+  if (appsRes.error) throw appsRes.error
+  type AppRow = { id: string; status: string; applied_at: string }
+  const apps = (appsRes.data ?? []) as AppRow[]
+
+  // 2. Joined dates from employee_profiles overlapping the window.
+  const empRes = await supabase
+    .from('employee_profiles')
+    .select('joined_at')
+    .eq('org_id', orgId)
+    .gte('joined_at', startISO)
+    .not('joined_at', 'is', null)
+  if (empRes.error) throw empRes.error
+  type EmpRow = { joined_at: string }
+  const joins = (empRes.data ?? []) as EmpRow[]
+
+  // 3. Build N empty buckets in chronological order so months with zero
+  //    activity still render (avoids a hole in the chart).
+  const points: MonthlyTrendPoint[] = []
+  for (let i = 0; i < months; i++) {
+    const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1))
+    points.push({ month: monthKey(d.toISOString()), apps: 0, hired: 0, joined: 0 })
+  }
+  const idxByMonth = new Map(points.map((p, i) => [p.month, i]))
+
+  // 4. Fill counts.
+  for (const a of apps) {
+    const idx = idxByMonth.get(monthKey(a.applied_at))
+    if (idx === undefined) continue
+    points[idx].apps += 1
+    if (a.status === 'hired') points[idx].hired += 1
+  }
+  for (const j of joins) {
+    const idx = idxByMonth.get(monthKey(j.joined_at))
+    if (idx === undefined) continue
+    points[idx].joined += 1
+  }
+
+  return { months, points }
+}
+
 // ── helpers ─────────────────────────────────────────────────────────────────
 function round1(n: number): number { return Math.round(n * 10) / 10 }
 function round2(n: number): number { return Math.round(n * 100) / 100 }
