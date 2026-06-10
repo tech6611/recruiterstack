@@ -12,6 +12,34 @@ entries on top.
 ## 2026-06-10
 
 ### Added
+- **Cross-module people analytics — `/analytics/people`.** Four metrics
+  that each join data from at least two modules in one query. The
+  unified-data moat in actual numbers, not a system prompt claim.
+  - **Conversion funnel** — applications → hired → joined → still-active
+    for the time window. Joins ATS `applications` to HRIS
+    `employee_profiles` via `application_id`.
+  - **Time-to-hire** — median / p25 / p75 days from `applied_at` to
+    `hired_at`. Uses the trigger-stamped HRIS timestamp; ATS doesn't
+    track this on its own.
+  - **Real cost per active hire** — for active employees whose
+    application landed in the window, sum of `payslips.net` ÷ headcount.
+    Includes per-employee breakdown. Cross-vendor-impossible: Greenhouse
+    can't see payslips, Rippling can't see application date.
+  - **Tenure distribution** — current actives bucketed into <3mo /
+    3–12mo / 1–2y / 2–5y / 5y+ with a median months number.
+  - Domain: `src/modules/core/domain/people-analytics.ts` (lives in
+    core because every metric crosses module boundaries; modules can't
+    import from siblings).
+  - API: `GET /api/analytics/people?days=N` runs all four in parallel via
+    `Promise.allSettled` — a failure on one metric doesn't sink the
+    page; each card surfaces its own error.
+  - UI: 4-card grid with a window picker (30 / 90 / 180 / 365 days), a
+    unified-data callout banner explaining the joins. Cost card has a
+    drill-down list by employee. Sidebar entry under Insights.
+
+## 2026-06-10
+
+### Added
 - **Payroll v1.2 — disability / specified diseases.** Three more Chapter
   VI-A sections in the India engine: **80U** (self disability), **80DD**
   (disabled dependent maintenance), **80DDB** (treatment of specified
