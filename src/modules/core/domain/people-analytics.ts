@@ -31,6 +31,39 @@ function windowStart(days: number): string {
   return d.toISOString()
 }
 
+// ── Filters ─────────────────────────────────────────────────────────────────
+// v1: filters narrow EMPLOYEE-SIDE metrics only (cost-per-hire / tenure /
+// comp drift). Application-side metrics (funnel / time-to-hire / source /
+// trends) stay org-wide because applications don't carry a department or
+// manager directly. Adding app-side filtering needs a cleaner
+// application→hiring_request→department join, which the canonical-model
+// migration is heading toward anyway; v1 is honest about this.
+//
+// Manager filter is "direct reports only" — we don't yet walk the reporting
+// tree. The transitive form (all reports of N, recursively) is a follow-up.
+export interface AnalyticsFilters {
+  department_id?: string
+  manager_id?:    string
+}
+
+/** Narrows an employee_profiles query by the active filters. Returns the same
+ *  builder so chaining stays one expression. */
+function applyEmployeeFilters<T>(q: T, f?: AnalyticsFilters): T {
+  if (!f) return q
+  // We treat the supabase builder as `unknown` to avoid wiring through
+  // its complex generic type — the runtime methods exist regardless of the
+  // narrow types we resolve to.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const builder = q as any
+  if (f.department_id) return builder.eq('department_id', f.department_id)
+  return q
+}
+function applyManagerFilter<T>(q: T, f?: AnalyticsFilters): T {
+  if (!f?.manager_id) return q
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (q as any).eq('manager_id', f.manager_id)
+}
+
 // ── 1. Conversion funnel ────────────────────────────────────────────────────
 // Apps → hired → joined → still-active. Each step counts the *applications*
 // (not the people), so the funnel reads as a clean cascade. The transitions
@@ -217,11 +250,12 @@ export async function getCostPerActiveHire(
   supabase: Supabase,
   orgId:    string,
   days:     number = 90,
+  filters?: AnalyticsFilters,
 ): Promise<CostPerActiveHire> {
   const since = windowStart(days)
 
   // 1. Active employees whose linked application landed in the window.
-  const empRes = await supabase
+  let q = supabase
     .from('employee_profiles')
     .select(`
       id, application_id, joined_at,
@@ -231,6 +265,9 @@ export async function getCostPerActiveHire(
     .eq('org_id', orgId)
     .eq('status', 'active')
     .not('application_id', 'is', null)
+  q = applyEmployeeFilters(q, filters)
+  q = applyManagerFilter (q, filters)
+  const empRes = await q
   if (empRes.error) throw empRes.error
   type EmpRow = {
     id: string; application_id: string | null; joined_at: string | null
@@ -304,13 +341,17 @@ const TENURE_BUCKET_SPECS: Array<{ label: string; min_months: number; max_months
 export async function getTenureDistribution(
   supabase: Supabase,
   orgId:    string,
+  filters?: AnalyticsFilters,
 ): Promise<TenureDistribution> {
-  const res = await supabase
+  let q = supabase
     .from('employee_profiles')
     .select('joined_at')
     .eq('org_id', orgId)
     .eq('status', 'active')
     .not('joined_at', 'is', null)
+  q = applyEmployeeFilters(q, filters)
+  q = applyManagerFilter (q, filters)
+  const res = await q
   if (res.error) throw res.error
   const rows = (res.data ?? []) as Array<{ joined_at: string }>
 
@@ -365,13 +406,17 @@ export interface CompDrift {
 export async function getCompDrift(
   supabase: Supabase,
   orgId:    string,
+  filters?: AnalyticsFilters,
 ): Promise<CompDrift> {
   // 1. All active employees with display name/email.
-  const empRes = await supabase
+  let q = supabase
     .from('employee_profiles')
     .select('id, joined_at, person:people(name, email)')
     .eq('org_id', orgId)
     .eq('status', 'active')
+  q = applyEmployeeFilters(q, filters)
+  q = applyManagerFilter (q, filters)
+  const empRes = await q
   if (empRes.error) throw empRes.error
   type EmpRow = { id: string; joined_at: string | null; person: { name: string | null; email: string | null } | null }
   const employees = (empRes.data ?? []) as unknown as EmpRow[]

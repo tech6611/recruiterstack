@@ -116,20 +116,42 @@ const WINDOWS = [
   { label: '365 days', days: 365 },
 ]
 
+interface DeptOpt { id: string; name: string }
+interface EmpOpt  { id: string; person: { name: string | null; email: string | null } | null }
+
 export default function PeopleAnalyticsPage() {
   const { orgId } = useAuth()
   const [data, setData]       = useState<AnalyticsResponse | null>(null)
   const [days, setDays]       = useState(90)
+  const [departmentId, setDepartmentId] = useState<string>('')
+  const [managerId,    setManagerId]    = useState<string>('')
+  const [depts,     setDepts]    = useState<DeptOpt[]>([])
+  const [managers,  setManagers] = useState<EmpOpt[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Populate filter dropdowns once.
+  useEffect(() => {
+    if (!orgId) return
+    fetch('/api/departments').then(r => r.ok ? r.json() : null).then(j => {
+      if (j?.data) setDepts(j.data as DeptOpt[])
+    })
+    fetch('/api/employees?status=active').then(r => r.ok ? r.json() : null).then(j => {
+      if (j?.data) setManagers(j.data as EmpOpt[])
+    })
+  }, [orgId])
 
   const refresh = useCallback(async () => {
     setLoading(true)
-    const res = await fetch(`/api/analytics/people?days=${days}`)
+    const params = new URLSearchParams({ days: String(days) })
+    if (departmentId) params.set('department_id', departmentId)
+    if (managerId)    params.set('manager_id',    managerId)
+    const res = await fetch(`/api/analytics/people?${params}`)
     if (res.ok) setData(((await res.json()).data) as AnalyticsResponse)
     setLoading(false)
-  }, [days])
+  }, [days, departmentId, managerId])
 
   useEffect(() => { if (orgId) refresh() }, [orgId, refresh])
+  const filtersActive = Boolean(departmentId || managerId)
 
   return (
     <div className="p-8">
@@ -143,7 +165,7 @@ export default function PeopleAnalyticsPage() {
             <p className="text-sm text-slate-500">Cross-module metrics — joins ATS funnel data with HRIS retention and Payroll cost.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold text-slate-500">Window:</span>
           {WINDOWS.map(w => (
             <button
@@ -154,8 +176,46 @@ export default function PeopleAnalyticsPage() {
               {w.label}
             </button>
           ))}
+          <span className="mx-1 h-4 w-px bg-slate-200" />
+          <select
+            value={departmentId}
+            onChange={e => setDepartmentId(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+          >
+            <option value="">All departments</option>
+            {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+          <select
+            value={managerId}
+            onChange={e => setManagerId(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+          >
+            <option value="">All managers</option>
+            {managers.map(m => (
+              <option key={m.id} value={m.id}>{m.person?.name ?? m.person?.email ?? m.id}</option>
+            ))}
+          </select>
+          {filtersActive && (
+            <button
+              onClick={() => { setDepartmentId(''); setManagerId('') }}
+              className="rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
+
+      {filtersActive && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-none" />
+          <div>
+            Filters narrow the <strong>cohort cards</strong> (cost-per-hire, tenure, comp drift).
+            Application-side cards (funnel, time-to-hire, source, trends) stay org-wide — applications
+            don&apos;t carry department / manager directly. Filter-aware app-side cards are a follow-up.
+          </div>
+        </div>
+      )}
 
       {/* Unified-data framing — explicit about what's being joined and why this is */}
       {/* not possible in a single-vendor stack. */}

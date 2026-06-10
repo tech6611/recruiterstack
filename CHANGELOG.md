@@ -12,6 +12,18 @@ entries on top.
 ## 2026-06-10
 
 ### Added
+- **Department + manager filters on `/analytics/people`.** Two dropdowns
+  next to the window picker. Filters narrow the cohort cards
+  (cost-per-hire, tenure, comp drift) which are employee-side. Amber
+  banner appears when filters are active explaining that app-side cards
+  (funnel, time-to-hire, source, trends) stay org-wide because
+  applications don't carry department/manager directly yet — filter-
+  aware app-side metrics are a follow-up that needs cleaner
+  application→hiring_request joins. Role filter skipped entirely (text
+  field, doesn't dedupe usefully). Manager filter is direct-reports
+  only; transitive walk is a follow-up.
+
+### Added
 - **Hiring trends chart on `/analytics/people`.** Recharts line chart
   showing apps / hires / joins by calendar month for the last 12 months.
   Three lines on shared Y-axis so funnel collapse is visible. Months with

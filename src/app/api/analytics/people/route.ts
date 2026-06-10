@@ -26,15 +26,23 @@ export async function GET(req: NextRequest) {
   const guard = assertAdmin(scope)
   if (guard) return guard
 
-  const daysParam = req.nextUrl.searchParams.get('days')
+  const sp = req.nextUrl.searchParams
+  const daysParam = sp.get('days')
   const days = clampDays(daysParam ? Number(daysParam) : 90)
+
+  // Employee-side filters. App-side metrics ignore these in v1 — see the
+  // AnalyticsFilters comment in modules/core/domain/people-analytics.ts.
+  const filters = {
+    department_id: sp.get('department_id') ?? undefined,
+    manager_id:    sp.get('manager_id')    ?? undefined,
+  }
 
   const [fS, tS, cS, nS, dS, sS, mS] = await Promise.allSettled([
     getConversionFunnel    (supabase, orgId, days),
     getTimeToHire          (supabase, orgId, days),
-    getCostPerActiveHire   (supabase, orgId, days),
-    getTenureDistribution  (supabase, orgId),
-    getCompDrift           (supabase, orgId),
+    getCostPerActiveHire   (supabase, orgId, days, filters),
+    getTenureDistribution  (supabase, orgId,       filters),
+    getCompDrift           (supabase, orgId,       filters),
     getSourceRetention     (supabase, orgId),
     getMonthlyHiringTrends (supabase, orgId, 12),                // last 12 months
   ])
