@@ -334,6 +334,103 @@ export async function getTenureDistribution(
   }
 }
 
+// ── 5. Compensation drift ───────────────────────────────────────────────────
+// For every active employee with at least TWO comp records on file, compute
+// the % change from the earliest record (usually the offer) to the latest
+// record (their current comp). Returns aggregate stats + a per-employee
+// list. This is the immutable-history table doing actual work — same DB
+// holds the offer AND the current pay AND who that person is.
+
+export interface CompDriftRow {
+  employee_id:  string
+  name:         string | null
+  email:        string | null
+  joined_at:    string | null
+  records:      number                          // count of comp_records on file
+  first_amount: number                          // earliest base_salary
+  current_amount: number                        // latest base_salary
+  first_date:   string                          // earliest effective_date
+  current_date: string                          // latest effective_date
+  pct_change:   number                          // (current - first) / first × 100, rounded to 0.1
+}
+
+export interface CompDrift {
+  with_history: number                          // employees with 2+ records (the denominator)
+  median_pct:   number | null
+  p25_pct:      number | null
+  p75_pct:      number | null
+  rows:         CompDriftRow[]                  // sorted by pct_change desc
+}
+
+export async function getCompDrift(
+  supabase: Supabase,
+  orgId:    string,
+): Promise<CompDrift> {
+  // 1. All active employees with display name/email.
+  const empRes = await supabase
+    .from('employee_profiles')
+    .select('id, joined_at, person:people(name, email)')
+    .eq('org_id', orgId)
+    .eq('status', 'active')
+  if (empRes.error) throw empRes.error
+  type EmpRow = { id: string; joined_at: string | null; person: { name: string | null; email: string | null } | null }
+  const employees = (empRes.data ?? []) as unknown as EmpRow[]
+  if (employees.length === 0) return { with_history: 0, median_pct: null, p25_pct: null, p75_pct: null, rows: [] }
+
+  // 2. Their comp records in one round-trip. Order by effective_date ASC so
+  //    earliest is at the head; we'll bucket per employee in JS.
+  const empIds = employees.map(e => e.id)
+  const compRes = await supabase
+    .from('compensation_records')
+    .select('employee_id, base_salary, effective_date')
+    .eq('org_id', orgId)
+    .in('employee_id', empIds)
+    .order('effective_date', { ascending: true })
+  if (compRes.error) throw compRes.error
+  type CompRow = { employee_id: string; base_salary: number; effective_date: string }
+  const recordsByEmp = new Map<string, CompRow[]>()
+  for (const r of ((compRes.data ?? []) as CompRow[])) {
+    const arr = recordsByEmp.get(r.employee_id) ?? []
+    arr.push(r); recordsByEmp.set(r.employee_id, arr)
+  }
+
+  // 3. Compute drift per employee that has ≥ 2 records.
+  const rows: CompDriftRow[] = []
+  for (const e of employees) {
+    const list = recordsByEmp.get(e.id) ?? []
+    if (list.length < 2) continue
+    const first   = list[0]
+    const current = list[list.length - 1]
+    const firstAmt   = Number(first.base_salary)
+    const currentAmt = Number(current.base_salary)
+    if (firstAmt <= 0) continue                                 // avoid div-by-zero on bad data
+    rows.push({
+      employee_id:  e.id,
+      name:         e.person?.name  ?? null,
+      email:        e.person?.email ?? null,
+      joined_at:    e.joined_at,
+      records:      list.length,
+      first_amount: firstAmt,
+      current_amount: currentAmt,
+      first_date:   first.effective_date,
+      current_date: current.effective_date,
+      pct_change:   round1(((currentAmt - firstAmt) / firstAmt) * 100),
+    })
+  }
+  rows.sort((a, b) => b.pct_change - a.pct_change)
+
+  // 4. Distribution stats. Median + IQR is more honest than mean for comp.
+  const sorted = rows.map(r => r.pct_change).sort((a, b) => a - b)
+  const pct = (q: number) => sorted.length > 0 ? sorted[Math.floor(q * (sorted.length - 1))] : null
+  return {
+    with_history: rows.length,
+    median_pct:   pct(0.50),
+    p25_pct:      pct(0.25),
+    p75_pct:      pct(0.75),
+    rows,
+  }
+}
+
 // ── helpers ─────────────────────────────────────────────────────────────────
 function round1(n: number): number { return Math.round(n * 10) / 10 }
 function round2(n: number): number { return Math.round(n * 100) / 100 }

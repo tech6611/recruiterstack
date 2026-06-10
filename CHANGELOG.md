@@ -12,6 +12,15 @@ entries on top.
 ## 2026-06-10
 
 ### Added
+- **Comp drift card on `/analytics/people`.** Fifth analytics card. For
+  every active employee with 2+ `compensation_records` on file, shows
+  the % change from earliest record (typically the offer) to the latest.
+  Aggregate stats (median / p25 / p75) + per-employee drill-down. Exits
+  gracefully when nobody has a comp history yet ("drift surfaces once
+  people receive their first raise"). Uses the immutable-history pattern
+  from migration 049 — no new schema.
+
+### Added
 - **CSV export on `/analytics/people` cards.** Download icon next to each
   card's subtitle exports that card's data as a timestamped CSV (RFC 4180
   escaping, UTF-8 BOM for Excel). Cost card includes per-employee

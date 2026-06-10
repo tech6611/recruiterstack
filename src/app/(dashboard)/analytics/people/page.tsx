@@ -2,7 +2,7 @@
 
 import { useAuth } from '@clerk/nextjs'
 import { useCallback, useEffect, useState } from 'react'
-import { BarChart3, TrendingUp, Wallet, Users, AlertCircle, Sparkles, Download } from 'lucide-react'
+import { BarChart3, TrendingUp, Wallet, Users, AlertCircle, Sparkles, Download, ArrowUpRight } from 'lucide-react'
 import { downloadCsv, todayStamp } from '@/lib/api/csv-export'
 
 // ── Shape returned by /api/analytics/people ────────────────────────────────
@@ -45,12 +45,32 @@ interface Tenure {
   buckets:       TenureBucket[]
   median_months: number | null
 }
+interface CompDriftRow {
+  employee_id:    string
+  name:           string | null
+  email:          string | null
+  records:        number
+  first_amount:   number
+  current_amount: number
+  first_date:     string
+  current_date:   string
+  pct_change:     number
+}
+interface CompDrift {
+  with_history: number
+  median_pct:   number | null
+  p25_pct:      number | null
+  p75_pct:      number | null
+  rows:         CompDriftRow[]
+}
+
 interface AnalyticsResponse {
   window_days:           number
   conversion_funnel:     Wrapped<ConversionFunnel>
   time_to_hire:          Wrapped<TimeToHire>
   cost_per_active_hire:  Wrapped<CostHire>
   tenure_distribution:   Wrapped<Tenure>
+  comp_drift:            Wrapped<CompDrift>
 }
 
 function fmtMoney(n: number): string {
@@ -149,6 +169,14 @@ export default function PeopleAnalyticsPage() {
               subtitle="All current actives · HRIS"
               onExport={data?.tenure_distribution.data ? () => exportTenure(data.tenure_distribution.data!) : undefined}>
           <TenureCard wrapped={data?.tenure_distribution} loading={loading} />
+        </Card>
+
+        {/* 5. Comp drift */}
+        <Card icon={<ArrowUpRight className="h-4 w-4 text-emerald-600" />}
+              title="Compensation drift"
+              subtitle="All actives w/ 2+ comp records · HRIS"
+              onExport={data?.comp_drift.data ? () => exportDrift(data.comp_drift.data!) : undefined}>
+          <CompDriftCard wrapped={data?.comp_drift} loading={loading} />
         </Card>
       </div>
     </div>
@@ -323,6 +351,56 @@ function TenureCard({ wrapped, loading }: { wrapped: Wrapped<Tenure> | undefined
   )
 }
 
+// ── 5. Comp drift ──────────────────────────────────────────────────────────
+function CompDriftCard({ wrapped, loading }: { wrapped: Wrapped<CompDrift> | undefined; loading: boolean }) {
+  if (loading)       return <LoadingRow />
+  if (!wrapped)      return null
+  if (wrapped.error) return <ErrorRow msg={wrapped.error} />
+  const d = wrapped.data!
+  if (d.with_history === 0) {
+    return (
+      <div className="text-sm text-slate-400">
+        No employees with multiple comp records yet — drift surfaces once people receive their first raise.
+      </div>
+    )
+  }
+  const fmtPct = (n: number | null) => n === null ? '—' : (n >= 0 ? `+${n}%` : `${n}%`)
+  return (
+    <div className="space-y-3">
+      <div className="flex items-baseline gap-3">
+        <div className={`text-3xl font-bold ${(d.median_pct ?? 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+          {fmtPct(d.median_pct)}
+        </div>
+        <div className="text-sm text-slate-500">median change · first → current</div>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <Stat label="p25"   value={fmtPct(d.p25_pct)} />
+        <Stat label="p75"   value={fmtPct(d.p75_pct)} />
+        <Stat label="n"     value={String(d.with_history)} />
+      </div>
+      {d.rows.length > 0 && (
+        <details className="text-xs">
+          <summary className="cursor-pointer font-medium text-slate-500 hover:text-slate-700">By employee</summary>
+          <div className="mt-2 space-y-1">
+            {d.rows.slice(0, 8).map(r => (
+              <div key={r.employee_id} className="flex items-center justify-between text-slate-600">
+                <span className="truncate">
+                  {r.name ?? '(unknown)'}
+                  <span className="ml-1 text-slate-400">· {r.records} records</span>
+                </span>
+                <span className={`shrink-0 font-medium ${r.pct_change >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {fmtPct(r.pct_change)}
+                </span>
+              </div>
+            ))}
+            {d.rows.length > 8 && <div className="text-slate-400">… and {d.rows.length - 8} more</div>}
+          </div>
+        </details>
+      )}
+    </div>
+  )
+}
+
 // ── CSV exporters ──────────────────────────────────────────────────────────
 // One function per card. Each shapes its card's data into rows + headers
 // and triggers a browser download via the shared helper.
@@ -368,6 +446,18 @@ function exportTenure(d: Tenure) {
     [],
     ['Total active',   d.total_active],
     ['Median months',  d.median_months ?? ''],
+  ])
+}
+
+function exportDrift(d: CompDrift) {
+  downloadCsv(`comp-drift-${todayStamp()}.csv`, [
+    ['Employee', 'Email', 'Records', 'First amount', 'First date', 'Current amount', 'Current date', '% change'],
+    ...d.rows.map(r => [r.name ?? '', r.email ?? '', r.records, r.first_amount, r.first_date, r.current_amount, r.current_date, r.pct_change]),
+    [],
+    ['Employees with history', d.with_history],
+    ['Median %',  d.median_pct ?? ''],
+    ['p25 %',     d.p25_pct    ?? ''],
+    ['p75 %',     d.p75_pct    ?? ''],
   ])
 }
 
