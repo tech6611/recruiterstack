@@ -12,6 +12,28 @@ entries on top.
 ## 2026-06-10
 
 ### Added
+- **Payroll: Singapore tax engine (second country).** Validates the
+  pluggable `TaxEngine` interface with a structurally different
+  implementation. Effective Jan 2026 CPF rates (employee 20%, employer
+  17%, OW ceiling S$8,000/month) and IRAS YA2026 resident slabs.
+  - Singapore has no monthly TDS — employees file annually with IRAS.
+    The engine deducts CPF only and emits a projected annual income
+    tax as an *informational* line that doesn't reduce net.
+  - Settings: country picker on `/settings/payroll`; India-only fields
+    (state / regime / metro / PF / ESI / decomposition) hidden when
+    Singapore is selected. Country-aware disclaimer banner.
+  - 12 unit tests pin CPF math at / below / above the OW ceiling, LWP
+    integration, and honest-scope guards (no-monthly-TDS note, AW note
+    above the annual ceiling, hourly throws).
+  - Schema: migration 060 widens `payroll_org_settings.country_code`
+    CHECK to allow 'SG'.
+  - Honest scope NOT shipped: CPF age tiers above 55, Additional Wages
+    (bonus / 13th-month) CPF math, non-resident rates, SDL employer
+    deduction, personal reliefs in the tax projection.
+  - Sub-agent prompt updated to describe both engines + per-country
+    limits.
+
+### Added
 - **Department + manager filters on `/analytics/people`.** Two dropdowns
   next to the window picker. Filters narrow the cohort cards
   (cost-per-hire, tenure, comp drift) which are employee-side. Amber

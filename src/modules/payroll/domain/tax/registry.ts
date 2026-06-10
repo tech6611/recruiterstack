@@ -8,10 +8,12 @@
 
 import type { CountryCode } from '@/lib/types/database'
 import type { TaxEngine } from './types'
-import { indiaTaxEngine } from './india'
+import { indiaTaxEngine }     from './india'
+import { singaporeTaxEngine } from './singapore'
 
 const REGISTRY: Record<CountryCode, TaxEngine> = {
   IN: indiaTaxEngine,
+  SG: singaporeTaxEngine,
 }
 
 export function getTaxEngine(country: CountryCode): TaxEngine {

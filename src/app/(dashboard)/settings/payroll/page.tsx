@@ -70,13 +70,20 @@ export default function PayrollSettingsPage() {
         </div>
       </div>
 
-      {/* Disclaimer */}
+      {/* Disclaimer (country-aware) */}
       <div className="mb-6 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
         <div>
-          RecruiterStack&apos;s India engine implements FY 2026-27 rules at a working-tool accuracy level —
-          slabs, 87A rebate, surcharge, cess, PF/ESI/PT. It is <strong>not statutory compliance software</strong>.
-          Reconcile every run with your CA before filing.
+          {settings.country_code === 'IN' ? (
+            <>RecruiterStack&apos;s India engine implements FY 2026-27 rules at a working-tool accuracy level —
+              slabs, 87A rebate, surcharge, cess, PF/ESI/PT. It is <strong>not statutory compliance software</strong>.
+              Reconcile every run with your CA before filing.</>
+          ) : (
+            <>RecruiterStack&apos;s Singapore engine implements Jan 2026 CPF rules + an IRAS YA2026 annual tax
+              projection. It is <strong>not statutory compliance software</strong> — Additional Wages (bonus / 13th-month) CPF
+              math, age-tier rates above 55, non-resident rates, and personal reliefs are not modelled.
+              Reconcile annual filings with your tax advisor.</>
+          )}
         </div>
       </div>
 
@@ -84,14 +91,21 @@ export default function PayrollSettingsPage() {
 
       <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-6">
 
-        {/* Country (locked to IN for now) */}
-        <Field label="Country" hint="Only India supported in v1. Other engines plug into the same interface.">
-          <select disabled value={settings.country_code} className="w-48 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-sm">
-            <option value="IN">India</option>
+        {/* Country */}
+        <Field label="Country" hint="Each country uses its own engine. India deducts PF/ESI/PT/TDS monthly; Singapore deducts CPF only (income tax is filed annually with IRAS).">
+          <select
+            value={settings.country_code}
+            onChange={e => patch('country_code', e.target.value as 'IN' | 'SG')}
+            className="w-48 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm"
+          >
+            <option value="IN">India — FY 2026-27</option>
+            <option value="SG">Singapore — Jan 2026</option>
           </select>
         </Field>
 
-        {/* State (PT) */}
+        {/* India-only settings ────────────────────────────────────── */}
+        {settings.country_code === 'IN' && (
+          <>
         <Field label="Default state" hint="Used for professional tax. Karnataka raised the PT threshold to ₹25,000/mo in Apr 2025.">
           <select
             value={settings.default_state}
@@ -163,6 +177,21 @@ export default function PayrollSettingsPage() {
             className="w-32 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm"
           />
         </Field>
+          </>
+        )}
+
+        {/* Singapore-only info — engine settings are hard-coded so the form
+            stays empty; explain what's active. */}
+        {settings.country_code === 'SG' && (
+          <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            <div className="font-semibold">Singapore engine (Jan 2026)</div>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+              <li>CPF: employee 20% / employer 17% (up to age 55), Ordinary Wages capped at S$8,000/month.</li>
+              <li>No monthly income tax withholding — employees file annually with IRAS.</li>
+              <li>The settings below (state / regime / PF / ESI / metro / salary decomposition) are India-specific and ignored under Singapore.</li>
+            </ul>
+          </div>
+        )}
 
         <Field label="Notes" hint="Free-form; shown on the settings page only, not on payslips.">
           <textarea

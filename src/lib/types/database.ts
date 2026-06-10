@@ -626,7 +626,7 @@ export interface PayslipUpdate extends Partial<PayslipInsert> {}
 // plug into the same TaxEngine interface in src/modules/payroll/domain/tax/
 // without schema changes.
 export type TaxRegime  = 'new' | 'old'
-export type CountryCode = 'IN'                                  // expand as engines land
+export type CountryCode = 'IN' | 'SG'                            // expand as engines land
 
 export interface PayrollOrgSettings {
   org_id:                   string
