@@ -7,6 +7,7 @@ import type {
   WhatsAppMessage,
   WhatsAppMessageInsert,
   WhatsAppMessageStatus,
+  WhatsAppProvider,
 } from '@/lib/types/database'
 import { encrypt, decryptSafe } from '@/lib/crypto'
 import { digitsOnly } from '@/lib/whatsapp/phone'
@@ -18,11 +19,15 @@ type Supabase = SupabaseClient<Database>
 // pre-approved templates go through.
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000
 
-// Account with secrets decrypted, ready for Graph API calls.
+// Account with secrets decrypted, ready for provider API calls.
+// phoneNumberId doubles as the provider channel key: Meta phone number id, or
+// Vobiz channel_id (their webhook envelope carries channel_id).
 export interface WhatsAppCredentials {
+  provider: WhatsAppProvider
   phoneNumberId: string
-  wabaId: string
-  accessToken: string
+  wabaId: string | null
+  authId: string | null           // vobiz X-Auth-ID
+  accessToken: string             // meta Graph token · vobiz X-Auth-Token (also Vobiz callback HMAC key)
   appSecret: string | null
   displayPhone: string | null
   outreachTemplate: string | null
@@ -31,8 +36,10 @@ export interface WhatsAppCredentials {
 }
 
 export interface WhatsAppAccountInput {
+  provider?: WhatsAppProvider
   phoneNumberId: string
-  wabaId: string
+  wabaId?: string | null
+  authId?: string | null
   displayPhone?: string | null
   accessToken: string
   appSecret?: string | null
@@ -42,8 +49,10 @@ export interface WhatsAppAccountInput {
 
 function toCredentials(row: WhatsAppAccount): WhatsAppCredentials {
   return {
+    provider: row.provider ?? 'meta',
     phoneNumberId: row.phone_number_id,
     wabaId: row.waba_id,
+    authId: row.auth_id,
     accessToken: decryptSafe(row.access_token) ?? row.access_token,
     appSecret: row.app_secret ? (decryptSafe(row.app_secret) ?? row.app_secret) : null,
     displayPhone: row.display_phone,
@@ -93,8 +102,10 @@ export async function upsertWhatsAppAccount(
   const { error } = await supabase.from('whatsapp_accounts').upsert(
     {
       org_id: orgId,
+      provider: input.provider ?? 'meta',
       phone_number_id: input.phoneNumberId,
-      waba_id: input.wabaId,
+      waba_id: input.wabaId ?? null,
+      auth_id: input.authId ?? null,
       display_phone: input.displayPhone ?? null,
       access_token: encrypt(input.accessToken),
       app_secret: input.appSecret ? encrypt(input.appSecret) : null,

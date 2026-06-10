@@ -12,7 +12,7 @@ const GRAPH_BASE = 'https://graph.facebook.com/v21.0'
 export interface WaSendResult {
   ok: boolean
   waMessageId?: string
-  errorCode?: number
+  errorCode?: number | string // Meta codes are numeric, Vobiz codes are strings
   error?: string
 }
 

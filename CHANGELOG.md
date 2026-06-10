@@ -12,6 +12,25 @@ entries on top.
 ## 2026-06-10
 
 ### Added
+- **WhatsApp provider adapter — Vobiz support.** The org's Meta business
+  account is blocked from claiming apps, so WhatsApp now routes through a
+  provider layer: Meta Cloud API (direct) or Vobiz (BSP, whose telephony we
+  already use). New `lib/whatsapp/vobiz.ts` client
+  (`api.vobiz.ai/v1/messaging/messages`, X-Auth-ID/X-Auth-Token), Vobiz
+  callback signature verification (HMAC-SHA256 base64 over callbackUrl+nonce,
+  X-Vobiz-Signature-V2/V3), webhook handles both payload shapes on the same
+  endpoint, and the settings card gets a provider toggle with conditional
+  fields. Vobiz's inbound `data` schema isn't published — the parser is
+  tolerant and logs unparseable payloads verbatim for correction from the
+  first live event.
+
+### Schema
+- **Migration 063 — WhatsApp providers.** `whatsapp_accounts.provider`
+  ('meta'|'vobiz'), `auth_id` (Vobiz X-Auth-ID); `waba_id` now nullable.
+  For Vobiz rows, `phone_number_id` holds the channel_id and `access_token`
+  holds the auth token (also the callback HMAC key).
+
+### Added
 - **WhatsApp messaging (Meta Cloud API) — two-way conversational.** Agents can
   now talk to candidates on WhatsApp:
   - New copilot tool `send_whatsapp_message` (Scout outreach, mirrors

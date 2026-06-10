@@ -9,15 +9,28 @@ import {
   disconnectWhatsAppAccount,
 } from '@/modules/crm/domain/whatsapp'
 
-const upsertSchema = z.object({
-  phone_number_id: z.string().min(1),
-  waba_id: z.string().min(1),
-  display_phone: z.string().optional().nullable(),
-  access_token: z.string().min(1),
-  app_secret: z.string().optional().nullable(),
-  outreach_template: z.string().optional().nullable(),
-  template_language: z.string().min(2).max(10).optional(),
-})
+const upsertSchema = z
+  .object({
+    provider: z.enum(['meta', 'vobiz']).default('meta'),
+    // meta: Meta phone number id · vobiz: channel_id
+    phone_number_id: z.string().min(1),
+    // meta: Graph API token · vobiz: X-Auth-Token
+    access_token: z.string().min(1),
+    waba_id: z.string().optional().nullable(),    // meta only
+    app_secret: z.string().optional().nullable(), // meta only
+    auth_id: z.string().optional().nullable(),    // vobiz only
+    display_phone: z.string().optional().nullable(),
+    outreach_template: z.string().optional().nullable(),
+    template_language: z.string().min(2).max(10).optional(),
+  })
+  .refine((v) => v.provider !== 'meta' || !!v.waba_id, {
+    message: 'waba_id is required for the Meta provider',
+    path: ['waba_id'],
+  })
+  .refine((v) => v.provider !== 'vobiz' || !!v.auth_id, {
+    message: 'auth_id is required for the Vobiz provider',
+    path: ['auth_id'],
+  })
 
 async function requireAdmin(): Promise<
   NextResponse | { orgId: string; userId: string; supabase: ReturnType<typeof createAdminClient> }
@@ -53,8 +66,10 @@ export async function GET() {
       ? {
           connected: account.status === 'connected',
           status: account.status,
+          provider: account.provider,
           phone_number_id: account.phoneNumberId,
           waba_id: account.wabaId,
+          auth_id: account.authId,
           display_phone: account.displayPhone,
           outreach_template: account.outreachTemplate,
           template_language: account.templateLanguage,
@@ -74,8 +89,10 @@ export async function PUT(request: NextRequest) {
 
   try {
     await upsertWhatsAppAccount(supabase, orgId, {
+      provider: parsed.provider,
       phoneNumberId: parsed.phone_number_id,
-      wabaId: parsed.waba_id,
+      wabaId: parsed.waba_id ?? null,
+      authId: parsed.auth_id ?? null,
       displayPhone: parsed.display_phone ?? null,
       accessToken: parsed.access_token,
       appSecret: parsed.app_secret ?? null,

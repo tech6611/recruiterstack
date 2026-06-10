@@ -17,6 +17,7 @@ import {
   type WhatsAppCredentials,
 } from '@/modules/crm/domain/whatsapp'
 import { sendTextMessage, sendTemplateMessage } from './client'
+import { sendVobizText, sendVobizTemplate } from './vobiz'
 import { normalizePhone } from './phone'
 
 type Supabase = SupabaseClient<Database>
@@ -123,6 +124,15 @@ export async function sendWhatsApp(opts: SendWhatsAppOptions): Promise<SendWhats
   const context = { ...conversation.context, ...(opts.context ?? {}) }
   const inWindow = isWithinServiceWindow(conversation)
 
+  // Provider dispatch — Vobiz and Meta share payload semantics, only the
+  // transport differs (see lib/whatsapp/vobiz.ts vs client.ts).
+  const isVobiz = account.provider === 'vobiz'
+  const sendText = isVobiz ? sendVobizText : sendTextMessage
+  const sendTemplate = isVobiz ? sendVobizTemplate : sendTemplateMessage
+  // Param-count mismatch codes: Meta 100, Vobiz PARAMETER_ERROR.
+  const isParamMismatch = (code: number | string | undefined) =>
+    code === 100 || code === 'PARAMETER_ERROR'
+
   let result
   let usedTemplate: string | null = null
 
@@ -136,18 +146,19 @@ export async function sendWhatsApp(opts: SendWhatsAppOptions): Promise<SendWhats
     }
     usedTemplate = account!.outreachTemplate
     const params = opts.templateParams ?? deriveTemplateParams(opts.body, recipientName, context)
-    let res = await sendTemplateMessage(account!, waPhone, account!.outreachTemplate, account!.templateLanguage, params)
-    // Param-count mismatch (error 100) — e.g. Meta's zero-param hello_world
-    // test template. Retry once with no body params before giving up.
-    if (!res.ok && res.errorCode === 100 && params.length > 0) {
-      res = await sendTemplateMessage(account!, waPhone, account!.outreachTemplate, account!.templateLanguage, [])
+    let res = await sendTemplate(account!, waPhone, account!.outreachTemplate, account!.templateLanguage, params)
+    // Param-count mismatch (e.g. Meta's zero-param hello_world test template):
+    // retry once with no body params before giving up.
+    if (!res.ok && isParamMismatch(res.errorCode) && params.length > 0) {
+      res = await sendTemplate(account!, waPhone, account!.outreachTemplate, account!.templateLanguage, [])
     }
     return res
   }
 
   if (inWindow) {
-    result = await sendTextMessage(account, waPhone, opts.body)
-    // Window can lapse between our check and Meta's — fall back to template once.
+    result = await sendText(account, waPhone, opts.body)
+    // Window can lapse between our check and the provider's — fall back to
+    // template once (Meta signals this with error 131047).
     if (!result.ok && result.errorCode === 131047) {
       result = await sendAsTemplate()
     }

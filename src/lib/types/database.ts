@@ -2002,11 +2002,13 @@ export interface StageAnalytics {
   bounced: number
 }
 
-// ── WhatsApp (Meta Cloud API) ────────────────────────────────────────────────
-// Two-way conversational messaging. Accounts hold per-org Meta credentials
-// (access_token/app_secret encrypted via lib/crypto). Conversations track the
-// 24h customer-service window via last_inbound_at.
+// ── WhatsApp ─────────────────────────────────────────────────────────────────
+// Two-way conversational messaging via Meta Cloud API (direct) or Vobiz (BSP).
+// Accounts hold per-org credentials (access_token/app_secret encrypted via
+// lib/crypto). Conversations track the 24h customer-service window via
+// last_inbound_at. Column mapping per provider is documented in migration 063.
 
+export type WhatsAppProvider = 'meta' | 'vobiz'
 export type WhatsAppAccountStatus = 'connected' | 'disconnected' | 'error'
 export type WhatsAppConversationStatus = 'active' | 'opted_out' | 'closed' | 'escalated'
 export type WhatsAppMessageDirection = 'inbound' | 'outbound'
@@ -2021,11 +2023,13 @@ export type WhatsAppMessageStatus =
 export interface WhatsAppAccount {
   id: string
   org_id: string
-  phone_number_id: string
-  waba_id: string
+  provider: WhatsAppProvider
+  phone_number_id: string         // meta: phone number id · vobiz: channel_id
+  waba_id: string | null          // meta only
+  auth_id: string | null          // vobiz X-Auth-ID
   display_phone: string | null
-  access_token: string            // encrypted at rest
-  app_secret: string | null       // encrypted at rest
+  access_token: string            // encrypted at rest (meta: Graph token · vobiz: X-Auth-Token)
+  app_secret: string | null       // encrypted at rest (meta webhook HMAC only)
   outreach_template: string | null
   template_language: string
   status: WhatsAppAccountStatus
@@ -2035,10 +2039,11 @@ export interface WhatsAppAccount {
 }
 
 export interface WhatsAppAccountInsert
-  extends Omit<WhatsAppAccount, 'id' | 'created_at' | 'updated_at'> {
+  extends Omit<WhatsAppAccount, 'id' | 'created_at' | 'updated_at' | 'provider'> {
   id?: string
   created_at?: string
   updated_at?: string
+  provider?: WhatsAppProvider
 }
 
 export interface WhatsAppAccountUpdate extends Partial<WhatsAppAccountInsert> {}
