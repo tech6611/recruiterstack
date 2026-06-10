@@ -319,9 +319,53 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'send_whatsapp_message',
+    description:
+      'Send a WhatsApp message to one candidate about a job. YOU write the body — warm, specific, 2-4 short sentences, plain text (no markdown). Requires the org to have WhatsApp connected and the candidate to have a phone number. If the candidate has not messaged us within the last 24 hours, Meta rules require the org\'s pre-approved outreach template to be sent instead of your free-form text — the result will tell you which happened.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        application_id:  { type: 'string', description: 'UUID of the application' },
+        body:            { type: 'string', description: 'Message text (you write this — personalized, 2-4 short sentences, plain text)' },
+        template_params: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional explicit params for the outreach template (first name, recruiter name, company, job title, apply link). Derived automatically if omitted.',
+        },
+      },
+      required: ['application_id', 'body'],
+    },
+  },
+  {
+    name: 'send_whatsapp_reply',
+    description:
+      'Reply within an existing WhatsApp conversation (used when responding to an inbound candidate message). Short, plain text, one message.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        conversation_id: { type: 'string', description: 'UUID of the WhatsApp conversation' },
+        body:            { type: 'string', description: 'Reply text — short, plain, conversational' },
+      },
+      required: ['conversation_id', 'body'],
+    },
+  },
+  {
+    name: 'escalate_to_recruiter',
+    description:
+      'Hand a WhatsApp conversation to a human recruiter and mute the AI responder. Use when the candidate asks for a human, asks about compensation/offers, seems frustrated, or asks something you cannot answer from context.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        conversation_id: { type: 'string', description: 'UUID of the WhatsApp conversation' },
+        reason:          { type: 'string', description: 'Why this needs a human, e.g. "Candidate asked about salary range"' },
+      },
+      required: ['conversation_id', 'reason'],
+    },
+  },
+  {
     name: 'request_approval',
     description:
-      'Pause the workflow and ask the recruiter to approve before taking a bulk or irreversible action (sending emails, creating jobs, moving many candidates). ALWAYS call this before affecting 3+ candidates or sending any emails.',
+      'Pause the workflow and ask the recruiter to approve before taking a bulk or irreversible action (sending emails or WhatsApp messages, creating jobs, moving many candidates). ALWAYS call this before affecting 3+ candidates or sending any emails or WhatsApp messages.',
     input_schema: {
       type: 'object',
       properties: {
@@ -1125,6 +1169,9 @@ export async function executeTool(
       case 'bulk_add_to_pipeline':      return await bulkAddToPipeline(input, orgId, supabase)
       case 'bulk_score_applications':   return await bulkScoreApplications(input, orgId, supabase)
       case 'send_outreach_email':       return await sendOutreachEmail(input, orgId, supabase)
+      case 'send_whatsapp_message':     return await sendWhatsAppMessageTool(input, orgId, supabase)
+      case 'send_whatsapp_reply':       return await sendWhatsAppReplyTool(input, orgId, supabase)
+      case 'escalate_to_recruiter':     return await escalateToRecruiterTool(input, orgId, supabase)
       case 'request_approval':
         return `CHECKPOINT: ${input.action_summary}. Impact: ${input.impact}.${input.details ? ' ' + input.details : ''}`
       // Extended platform tools
@@ -1208,11 +1255,25 @@ async function searchCandidates(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q: any = supabase
     .from('candidates')
-    .select('id, name, email, current_title, status, skills, experience_years, location')
+    .select('id, current_title, status, skills, experience_years, location, person:people(name, email)')
     .eq('org_id', orgId)
 
   if (query) {
-    q = q.or(`name.ilike.%${query}%,current_title.ilike.%${query}%`)
+    // Name now lives on people; resolve matching person ids first and OR with
+    // the candidate-side title filter so the AI agent still gets relevant results.
+    const { data: people } = await supabase
+      .from('people')
+      .select('id')
+      .eq('org_id', orgId)
+      .ilike('name', `%${query}%`)
+      .limit(200)
+    const personIds = ((people ?? []) as Array<{ id: string }>).map(p => p.id)
+    const titleClause = `current_title.ilike.%${query}%`
+    if (personIds.length > 0) {
+      q = q.or(`${titleClause},person_id.in.(${personIds.join(',')})`)
+    } else {
+      q = q.or(titleClause)
+    }
   }
   if (status) q = q.eq('status', status)
 
@@ -1242,11 +1303,11 @@ async function searchCandidates(
   const lines = data.map((c: any) => {
     const jobs = appsByCandidate[c.id] ?? []
     return [
-      `• ${c.name}`,
+      `• ${c.person?.name ?? '(unknown)'}`,
       c.current_title ?? 'No title',
       `${c.experience_years ?? 0}y exp`,
       `status: ${c.status}`,
-      c.email,
+      c.person?.email ?? '',
       jobs.length > 0 ? `active in: ${jobs.join(', ')}` : null,
       `ID: ${c.id}`,
     ].filter(Boolean).join(' | ')
@@ -1894,6 +1955,100 @@ async function sendOutreachEmail(
   return `Email sent to ${candidate.name} (${candidate.email}) re: ${job?.position_title ?? 'the role'}.`
 }
 
+// ── WhatsApp tools ────────────────────────────────────────────────────────────
+
+async function sendWhatsAppMessageTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { application_id, body, template_params } = input
+
+  const { data: app, error: appErr } = await supabase
+    .from('applications')
+    .select('id, candidate_id, hiring_request:hiring_requests(position_title)')
+    .eq('id', application_id)
+    .eq('org_id', orgId)
+    .single()
+
+  if (appErr || !app) return 'Application not found or not in your organization.'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const job = app.hiring_request as any
+
+  const { sendWhatsApp } = await import('@/lib/whatsapp/send')
+  const result = await sendWhatsApp({
+    supabase,
+    orgId,
+    candidateId: app.candidate_id as string,
+    applicationId: application_id,
+    body,
+    templateParams: template_params,
+    sender: 'agent:scout',
+    context: job?.position_title ? { job_title: job.position_title } : undefined,
+  })
+
+  return result.message
+}
+
+async function sendWhatsAppReplyTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { conversation_id, body } = input
+
+  const { getConversationById } = await import('@/modules/crm/domain/whatsapp')
+  const conversation = await getConversationById(supabase, orgId, conversation_id)
+  if (!conversation) return 'WhatsApp conversation not found.'
+
+  const { sendWhatsApp } = await import('@/lib/whatsapp/send')
+  const result = await sendWhatsApp({
+    supabase,
+    orgId,
+    toPhone: conversation.wa_phone,
+    candidateId: conversation.candidate_id ?? undefined,
+    applicationId: conversation.application_id ?? undefined,
+    body,
+    sender: 'agent:responder',
+  })
+
+  return result.message
+}
+
+async function escalateToRecruiterTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { conversation_id, reason } = input
+
+  const { getConversationById, updateConversation } = await import('@/modules/crm/domain/whatsapp')
+  const conversation = await getConversationById(supabase, orgId, conversation_id)
+  if (!conversation) return 'WhatsApp conversation not found.'
+
+  await updateConversation(supabase, orgId, conversation_id, {
+    status: 'escalated',
+    agent_enabled: false,
+  })
+
+  const { notify } = await import('@/lib/notifications')
+  await notify({
+    orgId,
+    type: 'system',
+    title: 'WhatsApp conversation needs a human',
+    body: reason,
+    slackText: `📱 A WhatsApp conversation needs recruiter attention: ${reason}`,
+    resourceType: 'whatsapp_conversation',
+    resourceId: conversation_id,
+  })
+
+  return 'Escalated to a recruiter — the AI responder is muted for this conversation.'
+}
+
 // ── Extended platform tools ───────────────────────────────────────────────────
 
 async function createCandidate(
@@ -1904,37 +2059,26 @@ async function createCandidate(
 ): Promise<string> {
   const { name, email, current_title, location, experience_years, skills, phone, linkedin_url } = input
 
-  // Duplicate check
-  const { data: existing } = await supabase
-    .from('candidates')
-    .select('id, name')
-    .eq('email', email)
-    .eq('org_id', orgId)
-    .maybeSingle()
-
-  if (existing) {
-    return `A candidate with email ${email} already exists: ${existing.name} (ID: ${existing.id})`
-  }
-
-  const { data: candidate, error } = await supabase
-    .from('candidates')
-    .insert({
-      name,
-      email,
-      current_title:    current_title    ?? null,
-      location:         location         ?? null,
+  // Post-Party-Model: identity lives on people; this routes through the
+  // canonical write path which creates / reuses a people row first.
+  const { findOrCreateCandidateProfile } = await import('@/modules/ats/domain/candidates')
+  try {
+    const result = await findOrCreateCandidateProfile(supabase, orgId, {
+      name, email,
+      phone:            phone         ?? null,
+      current_title:    current_title ?? null,
+      location:         location      ?? null,
+      linkedin_url:     linkedin_url  ?? null,
+      skills:           skills        ?? [],
       experience_years: experience_years ?? 0,
-      skills:           skills           ?? [],
-      phone:            phone            ?? null,
-      linkedin_url:     linkedin_url     ?? null,
-      status:           'active',
-      org_id:           orgId,
-    } as never)
-    .select('id, name')
-    .single()
-
-  if (error) return `Error creating candidate: ${error.message}`
-  return `Created candidate ${candidate.name} (ID: ${candidate.id}).`
+    })
+    if (!result.created) {
+      return `A candidate with email ${email} already exists: ${name} (ID: ${result.id}).`
+    }
+    return `Created candidate ${name} (ID: ${result.id}).`
+  } catch (err) {
+    return `Error creating candidate: ${err instanceof Error ? err.message : 'unknown'}`
+  }
 }
 
 async function updateCandidateStatus(

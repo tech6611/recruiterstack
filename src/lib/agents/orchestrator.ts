@@ -82,7 +82,7 @@ export const ORCHESTRATOR_TOOLS: Anthropic.Tool[] = [
   {
     name: 'request_approval',
     description:
-      'Pause and ask the recruiter to approve a significant action before delegating. Use BEFORE delegating any task that involves: sending emails, creating jobs, bulk actions affecting 3+ candidates, rejecting/withdrawing candidates, creating offers, scheduling interviews, or terminating an employee.',
+      'Pause and ask the recruiter to approve a significant action before delegating. Use BEFORE delegating any task that involves: sending emails or WhatsApp messages, creating jobs, bulk actions affecting 3+ candidates, rejecting/withdrawing candidates, creating offers, scheduling interviews, or terminating an employee.',
     input_schema: {
       type: 'object',
       properties: {
@@ -100,7 +100,7 @@ export const ORCHESTRATOR_SYSTEM_PROMPT = `You are the top-level RecruiterStack 
 RecruiterStack is a unified ATS + CRM + HRIS + Payroll suite — one person record flows from lead to candidate to hire to employee to paid employee. You don't do the work yourself; you decide which module sub-agent to delegate to, gate risky actions behind the recruiter's approval, and compose answers.
 
 ROUTING — pick the right delegate:
-- delegate_to_ats: candidates, jobs, pipelines, applications, interviews, offers, scoring, sourcing, recruiting analytics, intake, scorecards, recruiter outreach emails to specific applications.
+- delegate_to_ats: candidates, jobs, pipelines, applications, interviews, offers, scoring, sourcing, recruiting analytics, intake, scorecards, recruiter outreach emails or WhatsApp messages to specific applications.
 - delegate_to_crm: outreach sequences (list, detail, stages), a candidate's enrollment history across sequences. v1 is read-only.
 - delegate_to_hris: employees, pre-hires, marking someone joined, terminating, comp, time-off, onboarding, HR cases, documents, leave balances, OKRs — anything post-hire / people-platform.
 - delegate_to_payroll: payroll runs, payslips, what an employee was paid in a period, gross/deductions/net totals across the org. v0 is read-only.
@@ -109,7 +109,7 @@ ROUTING — pick the right delegate:
 When delegating, pass a clear self-contained task in natural language — include all the specifics (names, filters, criteria) the sub-agent needs. The sub-agent's reply comes back as a tool result; relay the useful parts to the user concisely.
 
 APPROVAL GATES — call request_approval BEFORE delegating any task that will:
-- Send emails to candidates
+- Send emails or WhatsApp messages to candidates
 - Create jobs or intake requests
 - Bulk-act on 3+ candidates (move/reject/score)
 - Reject or withdraw candidates

@@ -45,6 +45,11 @@ const HRIS_TOOL_NAMES = new Set([
 ])
 const ORCHESTRATOR_ONLY = new Set(['request_approval'])
 
+// Used only by the WhatsApp responder agent (lib/whatsapp/responder.ts), which
+// replies inside an existing candidate conversation. The ATS sub-agent sends
+// fresh outreach via send_whatsapp_message instead.
+const WHATSAPP_RESPONDER_ONLY = new Set(['send_whatsapp_reply', 'escalate_to_recruiter'])
+
 // CRM tools live in their own sub-agent (modules/crm/agent.ts).
 const CRM_TOOL_NAMES = new Set([
   'list_sequences',
@@ -63,7 +68,8 @@ export const ATS_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(
   t => !HRIS_TOOL_NAMES.has(t.name)
     && !CRM_TOOL_NAMES.has(t.name)
     && !PAYROLL_TOOL_NAMES.has(t.name)
-    && !ORCHESTRATOR_ONLY.has(t.name),
+    && !ORCHESTRATOR_ONLY.has(t.name)
+    && !WHATSAPP_RESPONDER_ONLY.has(t.name),
 )
 
 export const ATS_SYSTEM_PROMPT = `You are the ATS sub-agent inside RecruiterStack — focused on the recruiting half of the platform (candidates, jobs/pipelines, applications, interviews, offers, scoring, sourcing, sequences, analytics). The orchestrator delegates recruiting questions to you and returns your answer to the user.
@@ -75,6 +81,7 @@ CAPABILITIES:
 - Write (single): move stage, add note, create candidate, update candidate status, update application status (reject/hire/withdraw), update job, create/update roles, log interview scorecard, create intake request
 - Bulk: add candidates to pipeline, AI-score applications, bulk move to stage, bulk reject below score, send outreach emails
 - Draft & send email: draft_application_email generates text only — send_outreach_email actually delivers via SendGrid. To send: draft first, then send with that subject and body. Never claim an email was sent if you only drafted it. When sending, you write subject/body — warm, professional, personalized, 3–4 short paragraphs.
+- WhatsApp outreach: send_whatsapp_message delivers a WhatsApp message to one candidate (needs a phone number on file and the org's WhatsApp connection). You write the body — 2–4 short sentences, plain text, no markdown. Outside Meta's 24-hour reply window the org's approved template is sent instead of your text; the tool result says which happened — relay that honestly.
 
 APPROVAL: the orchestrator handles approval gates before delegating risky actions to you. Once delegated, execute the work the orchestrator described. Do not call request_approval yourself — you don't have that tool.
 

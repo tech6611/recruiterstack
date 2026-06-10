@@ -7,6 +7,7 @@ import FeedTab from './right/FeedTab'
 import NotesTab from './right/NotesTab'
 import FeedbackTab from './right/FeedbackTab'
 import EmailsTab from './right/EmailsTab'
+import WhatsAppTab from './right/WhatsAppTab'
 import ReferralsTab from './right/ReferralsTab'
 import FormsTab from './right/FormsTab'
 
@@ -15,7 +16,7 @@ type ApplicationWithJobInfo = Application & {
   hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number' | 'key_requirements' | 'nice_to_haves' | 'team_context'> | null
 }
 
-const RIGHT_TABS = ['Feed', 'Notes', 'Feedback', 'Emails', 'Referrals', 'Forms'] as const
+const RIGHT_TABS = ['Feed', 'Notes', 'Feedback', 'Emails', 'WhatsApp', 'Referrals', 'Forms'] as const
 type RightTab = typeof RIGHT_TABS[number]
 
 interface RightPanelProps {
@@ -97,6 +98,7 @@ export default React.memo(function RightPanel({
             onDraftEmail={onDraftEmail}
           />
         )}
+        {activeTab === 'WhatsApp' && <WhatsAppTab candidateId={candidateId} />}
         {activeTab === 'Referrals' && (
           <ReferralsTab
             candidateId={candidateId}

@@ -420,4 +420,10 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
 // pending. Enqueue is exported for use in the engine.
 registerHandler('approval_sla_check', handleSlaCheck)
 registerHandler('webhook_delivery',   handleWebhookDelivery)
+
+// ── WhatsApp inbound (AI responder) ───────────────────────────────────────────
+registerHandler('whatsapp_inbound', async (job: QueuedJob) => {
+  const { handleWhatsAppInbound } = await import('@/lib/whatsapp/responder')
+  await handleWhatsAppInbound(job)
+})
 export { enqueue as enqueueJob }

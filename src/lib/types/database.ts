@@ -1836,6 +1836,24 @@ export type Database = {
         Update: Indexify<Partial<ApprovalGroupMemberInsert>>
         Relationships: []
       }
+      whatsapp_accounts: {
+        Row: Indexify<WhatsAppAccount>
+        Insert: Indexify<WhatsAppAccountInsert>
+        Update: Indexify<WhatsAppAccountUpdate>
+        Relationships: []
+      }
+      whatsapp_conversations: {
+        Row: Indexify<WhatsAppConversation>
+        Insert: Indexify<WhatsAppConversationInsert>
+        Update: Indexify<WhatsAppConversationUpdate>
+        Relationships: []
+      }
+      whatsapp_messages: {
+        Row: Indexify<WhatsAppMessage>
+        Insert: Indexify<WhatsAppMessageInsert>
+        Update: Indexify<WhatsAppMessageUpdate>
+        Relationships: []
+      }
     }
     Views: Record<never, never>
     Functions: Record<never, never>
@@ -1983,3 +2001,126 @@ export interface StageAnalytics {
   replied: number
   bounced: number
 }
+
+// ── WhatsApp (Meta Cloud API) ────────────────────────────────────────────────
+// Two-way conversational messaging. Accounts hold per-org Meta credentials
+// (access_token/app_secret encrypted via lib/crypto). Conversations track the
+// 24h customer-service window via last_inbound_at.
+
+export type WhatsAppAccountStatus = 'connected' | 'disconnected' | 'error'
+export type WhatsAppConversationStatus = 'active' | 'opted_out' | 'closed' | 'escalated'
+export type WhatsAppMessageDirection = 'inbound' | 'outbound'
+export type WhatsAppMessageStatus =
+  | 'pending'
+  | 'sent'
+  | 'delivered'
+  | 'read'
+  | 'failed'
+  | 'received'
+
+export interface WhatsAppAccount {
+  id: string
+  org_id: string
+  phone_number_id: string
+  waba_id: string
+  display_phone: string | null
+  access_token: string            // encrypted at rest
+  app_secret: string | null       // encrypted at rest
+  outreach_template: string | null
+  template_language: string
+  status: WhatsAppAccountStatus
+  last_error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WhatsAppAccountInsert
+  extends Omit<WhatsAppAccount, 'id' | 'created_at' | 'updated_at'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface WhatsAppAccountUpdate extends Partial<WhatsAppAccountInsert> {}
+
+export interface WhatsAppConversation {
+  id: string
+  org_id: string
+  person_id: string | null
+  candidate_id: string | null
+  application_id: string | null
+  wa_phone: string                // E.164 with leading '+'
+  status: WhatsAppConversationStatus
+  agent_enabled: boolean
+  last_inbound_at: string | null  // anchors Meta's 24h customer-service window
+  last_outbound_at: string | null
+  agent_turns: number
+  context: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface WhatsAppConversationInsert
+  extends Omit<
+    WhatsAppConversation,
+    | 'id'
+    | 'created_at'
+    | 'updated_at'
+    | 'person_id'
+    | 'candidate_id'
+    | 'application_id'
+    | 'status'
+    | 'agent_enabled'
+    | 'last_inbound_at'
+    | 'last_outbound_at'
+    | 'agent_turns'
+    | 'context'
+  > {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  person_id?: string | null
+  candidate_id?: string | null
+  application_id?: string | null
+  status?: WhatsAppConversationStatus
+  agent_enabled?: boolean
+  last_inbound_at?: string | null
+  last_outbound_at?: string | null
+  agent_turns?: number
+  context?: Record<string, unknown>
+}
+
+export interface WhatsAppConversationUpdate extends Partial<WhatsAppConversationInsert> {}
+
+export interface WhatsAppMessage {
+  id: string
+  conversation_id: string
+  org_id: string
+  direction: WhatsAppMessageDirection
+  body: string | null
+  template_name: string | null
+  wa_message_id: string | null    // Meta wamid.* — webhook idempotency key
+  status: WhatsAppMessageStatus
+  sender: string | null           // 'candidate' | 'agent:scout' | 'agent:responder' | user id
+  error: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface WhatsAppMessageInsert
+  extends Omit<
+    WhatsAppMessage,
+    'id' | 'created_at' | 'body' | 'template_name' | 'wa_message_id' | 'status' | 'sender' | 'error' | 'metadata'
+  > {
+  id?: string
+  created_at?: string
+  body?: string | null
+  template_name?: string | null
+  wa_message_id?: string | null
+  status?: WhatsAppMessageStatus
+  sender?: string | null
+  error?: string | null
+  metadata?: Record<string, unknown>
+}
+
+export interface WhatsAppMessageUpdate extends Partial<WhatsAppMessageInsert> {}

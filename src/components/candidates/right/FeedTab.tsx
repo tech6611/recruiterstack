@@ -2,7 +2,7 @@
 
 import {
   Send, ChevronRight, FileText, AlertCircle, Calendar,
-  BadgeCheck, Ban, Gift, ClipboardList, Clock,
+  BadgeCheck, Ban, Gift, ClipboardList, Clock, MessageCircle,
 } from 'lucide-react'
 import type { ApplicationEvent } from '@/lib/types/database'
 import { fmtRelative, fmtDate } from '@/lib/ui/date-utils'
@@ -80,6 +80,21 @@ const EVENT_CONFIG: Record<string, { label: (e: ApplicationEvent) => string; ico
   },
   rejected: {
     label: e => `Rejected${e.note ? '' : ''}`,
+    icon: <Ban className="h-3.5 w-3.5" />,
+    color: 'bg-red-50 text-red-600',
+  },
+  whatsapp_sent: {
+    label: () => 'WhatsApp message sent',
+    icon: <MessageCircle className="h-3.5 w-3.5" />,
+    color: 'bg-green-50 text-green-600',
+  },
+  whatsapp_received: {
+    label: () => 'WhatsApp reply received',
+    icon: <MessageCircle className="h-3.5 w-3.5" />,
+    color: 'bg-green-50 text-green-700',
+  },
+  whatsapp_opt_out: {
+    label: () => 'Opted out of WhatsApp',
     icon: <Ban className="h-3.5 w-3.5" />,
     color: 'bg-red-50 text-red-600',
   },

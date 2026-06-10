@@ -9,7 +9,7 @@
 import {
   Send, ChevronRight, FileText, Calendar,
   BadgeCheck, Ban, Gift, ClipboardList, Clock,
-  AlertCircle, Mail, Users, GitBranch,
+  AlertCircle, Mail, Users, GitBranch, MessageCircle,
 } from 'lucide-react'
 import type { ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import { fmtRelative, fmtDateTime } from '@/lib/ui/date-utils'
@@ -53,6 +53,9 @@ const EVENT_ICON: Record<string, { icon: React.ReactNode; bg: string; title: (e:
   rejected:             { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-500',     title: () => 'Application rejected' },
   scorecard_added:      { icon: <ClipboardList className="h-3.5 w-3.5" />,bg: 'bg-violet-500',  title: () => 'Scorecard submitted' },
   referral_added:       { icon: <Users className="h-3.5 w-3.5" />,        bg: 'bg-pink-500',    title: () => 'Referral added' },
+  whatsapp_sent:        { icon: <MessageCircle className="h-3.5 w-3.5" />,bg: 'bg-green-500',   title: () => 'WhatsApp message sent' },
+  whatsapp_received:    { icon: <MessageCircle className="h-3.5 w-3.5" />,bg: 'bg-green-600',   title: () => 'WhatsApp reply received' },
+  whatsapp_opt_out:     { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-400',     title: () => 'Opted out of WhatsApp' },
 }
 
 // Build a synthetic "added to pipeline" event per application

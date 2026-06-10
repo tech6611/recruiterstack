@@ -24,6 +24,8 @@ export interface SubAgentOptions {
   task: string
   orgId: string
   supabase: SupabaseClient
+  /** Override the tool-loop cap (default 8). */
+  maxIterations?: number
 }
 
 export async function runSubAgent(opts: SubAgentOptions): Promise<string> {
@@ -31,7 +33,8 @@ export async function runSubAgent(opts: SubAgentOptions): Promise<string> {
     { role: 'user', content: opts.task },
   ]
 
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
+  const maxIterations = opts.maxIterations ?? MAX_ITERATIONS
+  for (let i = 0; i < maxIterations; i++) {
     const msg = await opts.client.messages.create({
       model:      opts.model,
       max_tokens: MAX_TOKENS,

@@ -14,6 +14,7 @@ import { LocationsCard } from '@/components/settings/LocationsCard'
 import { CompBandsCard } from '@/components/settings/CompBandsCard'
 import { GroupsCard } from '@/components/settings/GroupsCard'
 import { CustomFieldsCard } from '@/components/settings/CustomFieldsCard'
+import { WhatsAppCard } from '@/components/settings/WhatsAppCard'
 
 type TabId = 'general' | 'integrations' | 'workspace' | 'team'
 
@@ -731,6 +732,9 @@ export default function SettingsPage() {
                 )}
               </div>
               )}
+
+              {/* WhatsApp (Meta Cloud API) */}
+              <WhatsAppCard isAdmin={isAdmin} />
 
               {/* Google Calendar / Meet */}
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">

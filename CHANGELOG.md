@@ -11,7 +11,32 @@ entries on top.
 
 ## 2026-06-10
 
+### Added
+- **WhatsApp messaging (Meta Cloud API) — two-way conversational.** Agents can
+  now talk to candidates on WhatsApp:
+  - New copilot tool `send_whatsapp_message` (Scout outreach, mirrors
+    `send_outreach_email`); orchestrator approval gates now cover WhatsApp.
+  - Inbound webhook `/api/webhooks/whatsapp` (Meta handshake + HMAC-verified
+    POSTs); replies are answered by an AI responder agent (Haiku, bounded
+    toolset) via the job queue, with guardrails: STOP opt-out, unknown-sender
+    escalation, 10-turn cap, per-conversation mute, recruiter notifications.
+  - 24-hour customer-service window handled automatically: free-form text in
+    window, the org's pre-approved outreach template outside it.
+  - Settings → Integrations → WhatsApp card (per-org credentials, encrypted at
+    rest; webhook URL + test send) backed by `/api/org-settings/whatsapp`.
+  - Candidate profile right panel gets a WhatsApp thread tab (bubbles, delivery
+    ticks, AI-responder toggle) via `/api/candidates/[id]/whatsapp`; timeline
+    renders `whatsapp_sent` / `whatsapp_received` / `whatsapp_opt_out` events.
+  - New env vars (optional, feature degrades gracefully):
+    `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`,
+    `WHATSAPP_DEFAULT_COUNTRY`.
+
 ### Schema
+- **Migration 061 — WhatsApp tables.** `whatsapp_accounts` (per-org Meta
+  credentials, tokens AES-encrypted), `whatsapp_conversations` (one per
+  org+phone, tracks 24h window + responder state), `whatsapp_messages`
+  (idempotent on Meta `wamid`), plus `digits_only()` helper + expression index
+  on `people` for inbound phone → person matching.
 - **Migration 062 — Party Model enforcement on `candidates`.** `people` is now
   the DB-enforced canonical source of identity (name / email / phone /
   linkedin_url). On the `candidates` table:

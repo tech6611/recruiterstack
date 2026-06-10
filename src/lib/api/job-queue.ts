@@ -22,6 +22,7 @@ export type JobType =
   | 'sequence_email'
   | 'approval_sla_check'
   | 'webhook_delivery'
+  | 'whatsapp_inbound'
 
 export interface EnqueueOptions {
   orgId: string

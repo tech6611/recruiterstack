@@ -145,6 +145,7 @@ Optional (features degrade gracefully):
 - `NEXT_PUBLIC_SENTRY_DSN` (error tracking)
 - `TOKEN_ENCRYPTION_KEY` (OAuth token encryption, 32-byte hex)
 - `OAUTH_STATE_SECRET` (CSRF protection)
+- `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_DEFAULT_COUNTRY` (WhatsApp via Meta Cloud API; per-org credentials live in `whatsapp_accounts`)
 
 ## Testing
 
