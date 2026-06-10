@@ -3,6 +3,7 @@ import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { buildSearchFilter } from '@/lib/api/search'
 import { candidateInsertSchema } from '@/lib/validations/candidates'
 import { candidateStatusEnum } from '@/lib/validations/common'
+import { findOrCreateCandidateProfile } from '@/modules/ats/domain/candidates'
 import type { CandidateListItem } from '@/lib/types/database'
 
 // GET /api/candidates?status=active&limit=50&offset=0
@@ -28,8 +29,34 @@ export const GET = withOrg(async (req, orgId, supabase) => {
 
   if (status) query = query.eq('status', status as import('@/lib/types/database').CandidateStatus)
   if (search) {
-    const filter = buildSearchFilter(search, ['name', 'email', 'current_title', 'phone', 'location'])
-    if (filter) query = query.or(filter)
+    // Identity-side search (name / email / phone) lives on `people` post-cleanup;
+    // role-side search (current_title / location) stays on candidates. We do a
+    // two-step: pre-resolve people ids that match the term, then OR with the
+    // candidate-side filter. Cheaper than a forced join + RLS-safe.
+    const peopleFilter = buildSearchFilter(search, ['name', 'email', 'phone'])
+    const candidateFilter = buildSearchFilter(search, ['current_title', 'location'])
+    let personIds: string[] = []
+    if (peopleFilter) {
+      const { data: ps } = await supabase
+        .from('people')
+        .select('id')
+        .eq('org_id', orgId)
+        .or(peopleFilter)
+        .limit(500)
+      personIds = ((ps ?? []) as Array<{ id: string }>).map(p => p.id)
+    }
+    if (candidateFilter && personIds.length > 0) {
+      // candidates whose person_id matches OR whose current_title/location matches.
+      query = query.or(`${candidateFilter},person_id.in.(${personIds.join(',')})`)
+    } else if (candidateFilter) {
+      query = query.or(candidateFilter)
+    } else if (personIds.length > 0) {
+      query = query.in('person_id', personIds)
+    } else {
+      // Search term matched nothing on the people side and no candidate-side filter
+      // applies → return empty for the search.
+      query = query.eq('id', '00000000-0000-0000-0000-000000000000')
+    }
   }
 
   // Run in parallel: paginated candidates + all active application candidate_ids
@@ -56,17 +83,38 @@ export const GET = withOrg(async (req, orgId, supabase) => {
 })
 
 // POST /api/candidates
+// Goes through the canonical domain function so a `people` row is found-or-
+// created first, then the candidate. Identity (name/email/phone/linkedin)
+// lives on people post-Party-Model cleanup; only role-specific fields are
+// stored on candidates.
 export const POST = withOrg(async (req, orgId, supabase) => {
   const body = await parseBody(req, candidateInsertSchema)
   if (body instanceof NextResponse) return body
 
-  const { data, error } = await supabase
-    .from('candidates')
-    .insert({ ...body, org_id: orgId })
-    .select()
-    .single()
-
-  if (error) return handleSupabaseError(error)
-
-  return NextResponse.json({ data }, { status: 201 })
+  try {
+    const result = await findOrCreateCandidateProfile(supabase, orgId, {
+      name:             body.name,
+      email:            body.email,
+      phone:            body.phone        ?? null,
+      resume_url:       body.resume_url   ?? null,
+      current_title:    body.current_title ?? null,
+      location:         body.location     ?? null,
+      linkedin_url:     body.linkedin_url ?? null,
+      skills:           body.skills       ?? [],
+      experience_years: body.experience_years ?? 0,
+    })
+    // Re-fetch the joined row to return the same shape the GET returns.
+    const { data, error } = await supabase
+      .from('candidates')
+      .select('*, person:people(name, email, phone, linkedin_url)')
+      .eq('id', result.id).eq('org_id', orgId)
+      .single()
+    if (error) return handleSupabaseError(error)
+    return NextResponse.json({ data }, { status: result.created ? 201 : 200 })
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to create candidate' },
+      { status: 400 },
+    )
+  }
 })

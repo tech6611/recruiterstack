@@ -21,11 +21,22 @@ export async function findCandidateByEmailForOrg(
   orgId: string,
   email: string,
 ): Promise<Pick<Candidate, 'id'> | null> {
+  // Identity (email) lives canonically on `people`; candidates table no longer
+  // holds it. Resolve the person first, then look up the candidate by person_id.
+  const { data: person, error: personErr } = await supabase
+    .from('people')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('email', email)
+    .maybeSingle()
+  if (personErr) throw personErr
+  if (!person) return null
+
   const { data, error } = await supabase
     .from('candidates')
     .select('id')
     .eq('org_id', orgId)
-    .eq('email', email)
+    .eq('person_id', (person as { id: string }).id)
     .maybeSingle()
 
   if (error) throw error
@@ -46,20 +57,22 @@ export async function createCandidateProfile(
     linkedinUrl: input.linkedin_url ?? null,
   })
 
-  const row: CandidateInsert = {
+  // Identity fields (name / email / phone / linkedin_url) live ONLY on `people`
+  // post-Party-Model cleanup (migration 062). The BEFORE INSERT trigger on
+  // candidates fills any NULL identity values from the linked people row, so
+  // we no longer pass them here. Cast is needed because the CandidateInsert
+  // type still requires them — a follow-up slice updates types/database.ts
+  // to make them optional once the WhatsApp branch merges.
+  const row = {
     org_id: orgId,
     person_id: person.id,
-    name: input.name,
-    email: input.email,
-    phone: input.phone ?? null,
     resume_url: input.resume_url ?? null,
     current_title: input.current_title ?? null,
     location: input.location ?? null,
-    linkedin_url: input.linkedin_url ?? null,
     skills: input.skills ?? [],
     experience_years: input.experience_years ?? 0,
-    status: 'active',
-  }
+    status: 'active' as const,
+  } as unknown as CandidateInsert
 
   const { data, error } = await supabase
     .from('candidates')

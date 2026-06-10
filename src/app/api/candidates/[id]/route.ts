@@ -84,20 +84,58 @@ export async function PATCH(
   const parsed = await parseBody(request, candidateUpdateSchema)
   if (parsed instanceof NextResponse) return parsed
 
-  const { data, error } = await supabase
-    .from('candidates')
-    .update(parsed as import('@/lib/types/database').CandidateUpdate)
-    .eq('id', params.id)
-    .eq('org_id', orgId)
-    .select()
-    .single()
-
-  if (error) {
-    const status = error.code === 'PGRST116' ? 404 : 500
-    return NextResponse.json({ error: error.message }, { status })
+  // Post-Party-Model: identity fields (name/email/phone/linkedin_url) belong on
+  // `people`; everything else stays on candidates. Split the patch.
+  const identityPatch: Record<string, unknown> = {}
+  const candidatePatch: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(parsed)) {
+    if (v === undefined) continue
+    if (k === 'name' || k === 'email' || k === 'phone' || k === 'linkedin_url') {
+      identityPatch[k] = v
+    } else {
+      candidatePatch[k] = v
+    }
   }
 
-  return NextResponse.json({ data })
+  // Update the candidate first so we know it exists + get its person_id.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let candidate: any
+  if (Object.keys(candidatePatch).length > 0) {
+    const { data, error } = await supabase
+      .from('candidates')
+      .update(candidatePatch as import('@/lib/types/database').CandidateUpdate)
+      .eq('id', params.id)
+      .eq('org_id', orgId)
+      .select('*, person_id')
+      .single()
+    if (error) {
+      const status = error.code === 'PGRST116' ? 404 : 500
+      return NextResponse.json({ error: error.message }, { status })
+    }
+    candidate = data
+  } else {
+    const { data, error } = await supabase
+      .from('candidates')
+      .select('*, person_id')
+      .eq('id', params.id).eq('org_id', orgId)
+      .single()
+    if (error) {
+      const status = error.code === 'PGRST116' ? 404 : 500
+      return NextResponse.json({ error: error.message }, { status })
+    }
+    candidate = data
+  }
+
+  // Mirror identity changes to people (if any).
+  if (Object.keys(identityPatch).length > 0 && candidate?.person_id) {
+    const { error: pErr } = await supabase
+      .from('people')
+      .update(identityPatch as never)
+      .eq('id', candidate.person_id).eq('org_id', orgId)
+    if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ data: candidate })
 }
 
 // DELETE /api/candidates/:id

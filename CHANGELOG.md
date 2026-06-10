@@ -11,6 +11,42 @@ entries on top.
 
 ## 2026-06-10
 
+### Schema
+- **Migration 062 — Party Model enforcement on `candidates`.** `people` is now
+  the DB-enforced canonical source of identity (name / email / phone /
+  linkedin_url). On the `candidates` table:
+  - Dropped `NOT NULL` on `name` + `email` so writers can stop passing them.
+  - Added `BEFORE INSERT/UPDATE` trigger that fills any NULL identity field
+    from the linked `people` row.
+  - Added `AFTER UPDATE` trigger on `people` that propagates identity edits
+    to every linked `candidates` row.
+  - Backfilled candidates with null `person_id` by linking to (or creating) a
+    matching `people` row.
+
+### Added
+- **Party Model rule documented** in `docs/canonical-data-model.md`. Identity
+  on `people`; role tables (candidates, employee_profiles, future leads /
+  alumni) carry only role-specific facts + non-null `person_id`. New person-
+  role tables MUST follow this rule.
+- **`docs/data-inventory.md`** — full schema inventory (67 tables, 8
+  categories, 7 overlap zones), cross-module spine diagram, homepage-pillar
+  guidance. The motivating context for the Party Model rule above.
+
+### Changed
+- **Canonical write path for candidates.** `findOrCreateCandidateProfile`
+  creates the `people` row first and inserts the candidate with only
+  `person_id` + role-specific attrs. Trigger fills identity. Existing
+  reads keep working (denormalized columns still present, kept in sync).
+- **`POST /api/candidates`**, **`PATCH /api/candidates/[id]`**,
+  **`/api/sourcing/confirm`** all route through the canonical write path.
+  PATCH splits identity edits into a `people` update; role edits stay on
+  `candidates`. Sourcing CSV import loses chunked batching in favour of
+  per-row canonical writes — sourcing is admin-triggered, throughput
+  isn't critical, the architectural consistency is.
+- **`/api/candidates` search** queries `people` for name/email/phone
+  matches first, then ORs with candidate-side fields (current_title /
+  location). Replaces the previous all-on-candidates search.
+
 ### Fixed
 - **Sidebar flyouts were invisible / buckets felt dead on click.** Two
   bugs in the new buckets-only rail:

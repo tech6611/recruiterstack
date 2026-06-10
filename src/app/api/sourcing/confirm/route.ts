@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
+import { findOrCreateCandidateProfile } from '@/modules/ats/domain/candidates'
 
 type ParsedCandidate = {
   name?:             string
@@ -16,6 +17,12 @@ type ParsedCandidate = {
 // POST /api/sourcing/confirm
 // Body: { candidates: ParsedCandidate[] }
 // Returns: { created: number, skipped: number, errors: string[] }
+//
+// Post-Party-Model cleanup: each row goes through findOrCreateCandidateProfile,
+// which creates the canonical people row first and then the candidate. We lose
+// the previous chunked bulk-insert optimization, but sourcing is admin-triggered
+// (one CSV at a time, dozens to a few hundred rows), so the round-trip cost is
+// fine for the architectural win of one write path.
 export async function POST(request: NextRequest) {
   const authResult = await requireOrg()
   if (authResult instanceof NextResponse) return authResult
@@ -35,67 +42,32 @@ export async function POST(request: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // Build normalized rows
-  const rows = candidates.map(c => ({
-    name:             (c.name ?? c.email ?? 'Unknown').trim(),
-    email:            c.email?.toLowerCase().trim() ?? '',
-    phone:            c.phone?.trim()                ?? null,
-    current_title:    c.current_title?.trim()        ?? null,
-    location:         c.location?.trim()             ?? null,
-    experience_years: typeof c.experience_years === 'number' ? c.experience_years : 0,
-    skills:           Array.isArray(c.skills) ? c.skills : [],
-    linkedin_url:     c.linkedin_url?.trim()         ?? null,
-    status:           'active' as const,
-    org_id:           orgId,
-  }))
-
-  // 1. Find which emails already exist in this org to calculate skipped count
-  const emails = rows.map(r => r.email).filter((e): e is string => Boolean(e))
-  let skipped = 0
-
-  if (emails.length > 0) {
-    const { data: existing } = await supabase
-      .from('candidates')
-      .select('email')
-      .eq('org_id', orgId)
-      .in('email', emails)
-
-    const existingSet = new Set((existing ?? []).map(e => e.email))
-
-    // Mark duplicates
-    for (const row of rows) {
-      if (row.email && existingSet.has(row.email)) skipped++
-    }
-  }
-
-  // 2. Bulk insert — skip candidates whose email already exists (no-email rows always insert)
-  let created = 0
+  let created = 0, skipped = 0
   const errors: string[] = []
 
-  // Split into chunks of 25 to avoid payload limits
-  const CHUNK = 25
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK)
-
-    const { data, error } = await supabase
-      .from('candidates')
-      .insert(chunk)
-      .select('id')
-
-    if (error) {
-      if (error.code === '23505') {
-        // Batch had a duplicate — fall back to one-by-one for this chunk
-        for (const row of chunk) {
-          const { error: e } = await supabase.from('candidates').insert(row).select('id').single()
-          if (!e) created++
-          // duplicates already counted above; other errors tracked
-          else if (e.code !== '23505') errors.push(`${row.name}: ${e.message}`)
-        }
-      } else {
-        errors.push(error.message)
-      }
-    } else {
-      created += data?.length ?? 0
+  for (const c of candidates) {
+    const email = c.email?.toLowerCase().trim() ?? ''
+    if (!email) {
+      // No-email rows can't dedupe — skip them. (Old behaviour was to always
+      // insert; post-cleanup, we need an identity anchor on people.)
+      skipped += 1
+      continue
+    }
+    try {
+      const result = await findOrCreateCandidateProfile(supabase, orgId, {
+        name:             (c.name ?? email).trim(),
+        email,
+        phone:            c.phone?.trim()         ?? null,
+        current_title:    c.current_title?.trim() ?? null,
+        location:         c.location?.trim()      ?? null,
+        linkedin_url:     c.linkedin_url?.trim()  ?? null,
+        skills:           Array.isArray(c.skills) ? c.skills : [],
+        experience_years: typeof c.experience_years === 'number' ? c.experience_years : 0,
+      })
+      if (result.created) created += 1
+      else                skipped += 1
+    } catch (err) {
+      errors.push(`${c.name ?? email}: ${err instanceof Error ? err.message : 'unknown error'}`)
     }
   }
 
