@@ -2,7 +2,7 @@
 
 import { useAuth } from '@clerk/nextjs'
 import { useCallback, useEffect, useState } from 'react'
-import { BarChart3, TrendingUp, Wallet, Users, AlertCircle, Sparkles, Download, ArrowUpRight } from 'lucide-react'
+import { BarChart3, TrendingUp, Wallet, Users, AlertCircle, Sparkles, Download, ArrowUpRight, GitBranch } from 'lucide-react'
 import { downloadCsv, todayStamp } from '@/lib/api/csv-export'
 
 // ── Shape returned by /api/analytics/people ────────────────────────────────
@@ -64,6 +64,20 @@ interface CompDrift {
   rows:         CompDriftRow[]
 }
 
+interface SourceRow {
+  source:         string
+  apps:           number
+  hired:          number
+  active_now:     number
+  terminated:     number
+  hire_rate:      number | null
+  retention_rate: number | null
+}
+interface SourceRetention {
+  total_apps: number
+  rows:       SourceRow[]
+}
+
 interface AnalyticsResponse {
   window_days:           number
   conversion_funnel:     Wrapped<ConversionFunnel>
@@ -71,6 +85,7 @@ interface AnalyticsResponse {
   cost_per_active_hire:  Wrapped<CostHire>
   tenure_distribution:   Wrapped<Tenure>
   comp_drift:            Wrapped<CompDrift>
+  source_retention:      Wrapped<SourceRetention>
 }
 
 function fmtMoney(n: number): string {
@@ -178,6 +193,16 @@ export default function PeopleAnalyticsPage() {
               onExport={data?.comp_drift.data ? () => exportDrift(data.comp_drift.data!) : undefined}>
           <CompDriftCard wrapped={data?.comp_drift} loading={loading} />
         </Card>
+
+        {/* 6. Source-to-retention — full width because this is *the* killer chart */}
+        <div className="md:col-span-2">
+          <Card icon={<GitBranch className="h-4 w-4 text-emerald-600" />}
+                title="Source → retention"
+                subtitle="All-time · ATS source × HRIS current status"
+                onExport={data?.source_retention.data ? () => exportSource(data.source_retention.data!) : undefined}>
+            <SourceRetentionCard wrapped={data?.source_retention} loading={loading} />
+          </Card>
+        </div>
       </div>
     </div>
   )
@@ -401,6 +426,72 @@ function CompDriftCard({ wrapped, loading }: { wrapped: Wrapped<CompDrift> | und
   )
 }
 
+// ── 6. Source-to-retention ─────────────────────────────────────────────────
+// Horizontal grouped bars: per source, show hire-rate alongside retention-rate.
+// The two metrics are intentionally on the same scale (both 0–100%) so the
+// eye can compare without thinking. Total app count is shown next to each
+// row to ground the percentages — 100% retention from one hire is noise.
+function SourceRetentionCard({ wrapped, loading }: { wrapped: Wrapped<SourceRetention> | undefined; loading: boolean }) {
+  if (loading)       return <LoadingRow />
+  if (!wrapped)      return null
+  if (wrapped.error) return <ErrorRow msg={wrapped.error} />
+  const d = wrapped.data!
+  if (d.total_apps === 0) return <div className="text-sm text-slate-400">No applications yet.</div>
+
+  return (
+    <div className="space-y-3">
+      <div className="text-xs text-slate-500">
+        Two bars per source — <span className="font-semibold text-emerald-700">hire rate</span> (apps → hired)
+        and <span className="font-semibold text-sky-700">retention rate</span> (hired → still active).
+        Sources with few apps have noisy rates; the n column grounds it.
+      </div>
+      <div className="overflow-hidden rounded-lg border border-slate-200">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+              <th className="px-4 py-2 w-32">Source</th>
+              <th className="px-4 py-2 text-right w-16">n apps</th>
+              <th className="px-4 py-2 text-right w-16">hired</th>
+              <th className="px-4 py-2">Hire rate</th>
+              <th className="px-4 py-2 text-right w-16">active</th>
+              <th className="px-4 py-2">Retention</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.rows.map(r => (
+              <tr key={r.source} className="border-b border-slate-100 last:border-0">
+                <td className="px-4 py-2 font-medium capitalize text-slate-800">{r.source}</td>
+                <td className="px-4 py-2 text-right text-slate-700">{r.apps}</td>
+                <td className="px-4 py-2 text-right text-slate-700">{r.hired}</td>
+                <td className="px-4 py-2">
+                  <RateBar rate={r.hire_rate} color="bg-emerald-500" />
+                </td>
+                <td className="px-4 py-2 text-right text-slate-700">{r.active_now}</td>
+                <td className="px-4 py-2">
+                  <RateBar rate={r.retention_rate} color="bg-sky-500" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function RateBar({ rate, color }: { rate: number | null; color: string }) {
+  if (rate === null) return <span className="text-xs text-slate-400">—</span>
+  const pctStr = `${Math.round(rate * 100)}%`
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${color}`} style={{ width: pctStr }} />
+      </div>
+      <span className="text-xs text-slate-600">{pctStr}</span>
+    </div>
+  )
+}
+
 // ── CSV exporters ──────────────────────────────────────────────────────────
 // One function per card. Each shapes its card's data into rows + headers
 // and triggers a browser download via the shared helper.
@@ -458,6 +549,23 @@ function exportDrift(d: CompDrift) {
     ['Median %',  d.median_pct ?? ''],
     ['p25 %',     d.p25_pct    ?? ''],
     ['p75 %',     d.p75_pct    ?? ''],
+  ])
+}
+
+function exportSource(d: SourceRetention) {
+  downloadCsv(`source-retention-${todayStamp()}.csv`, [
+    ['Source', 'Apps', 'Hired', 'Hire rate %', 'Active now', 'Terminated', 'Retention rate %'],
+    ...d.rows.map(r => [
+      r.source,
+      r.apps,
+      r.hired,
+      r.hire_rate      !== null ? Math.round(r.hire_rate      * 100) : '',
+      r.active_now,
+      r.terminated,
+      r.retention_rate !== null ? Math.round(r.retention_rate * 100) : '',
+    ]),
+    [],
+    ['Total apps', d.total_apps],
   ])
 }
 

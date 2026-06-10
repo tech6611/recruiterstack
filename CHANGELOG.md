@@ -12,6 +12,17 @@ entries on top.
 ## 2026-06-10
 
 ### Added
+- **Source → retention card on `/analytics/people`.** *The* killer
+  cross-module chart. For every application source value (applied /
+  sourced / referral / imported / manual), shows hire rate (apps →
+  hired) alongside retention rate (hired → still active). Two horizontal
+  bars per row in matching colors so the eye can compare side-by-side.
+  Window-free on purpose — retention only means something across
+  historical cohorts. Full-width card so it's the visual anchor of the
+  page. Cross-vendor-impossible: ATS knows source, HRIS knows current
+  status, same DB joins them.
+
+### Added
 - **Comp drift card on `/analytics/people`.** Fifth analytics card. For
   every active employee with 2+ `compensation_records` on file, shows
   the % change from earliest record (typically the offer) to the latest.

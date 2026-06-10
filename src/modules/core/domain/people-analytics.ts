@@ -431,6 +431,92 @@ export async function getCompDrift(
   }
 }
 
+// ── 6. Source-to-retention ──────────────────────────────────────────────────
+// Groups historical applications by their `source` value (applied / sourced /
+// referral / imported / manual), then per-source asks: what % were hired, and
+// of those, what % are still active today? This is the cross-vendor moat made
+// concrete: the ATS knows source, the HRIS knows current status. Same DB →
+// one query.
+//
+// Window-free on purpose. Retention only means something when you can look
+// back across hire cohorts; restricting to the window would hide the signal.
+// Each source row carries its own counts so the UI can show absolute numbers
+// alongside the rates (a 100% retention rate from one hire is meaningless;
+// the UI surfaces the n).
+
+export interface SourceRetentionRow {
+  source:        string
+  apps:          number                         // total applications with this source
+  hired:         number                         // ...whose status reached 'hired'
+  active_now:    number                         // ...whose linked employee_profile is currently active
+  terminated:    number                         // ...whose employee_profile is terminated
+  hire_rate:     number | null                  // hired / apps
+  retention_rate: number | null                 // active_now / (active_now + terminated)
+}
+
+export interface SourceRetention {
+  total_apps:  number
+  rows:        SourceRetentionRow[]             // sorted by hire_rate desc (then by apps desc)
+}
+
+export async function getSourceRetention(
+  supabase: Supabase,
+  orgId:    string,
+): Promise<SourceRetention> {
+  // 1. All applications (all time) with source + their linked employee status.
+  const appsRes = await supabase
+    .from('applications')
+    .select(`
+      id, source, status,
+      employee:employee_profiles!employee_profiles_application_id_fkey (status)
+    `)
+    .eq('org_id', orgId)
+  if (appsRes.error) throw appsRes.error
+  type AppRow = {
+    id: string
+    source: string
+    status: string
+    // The join can return an array (one-to-many side) — defensive.
+    employee: { status: string } | { status: string }[] | null
+  }
+  const apps = (appsRes.data ?? []) as unknown as AppRow[]
+  if (apps.length === 0) return { total_apps: 0, rows: [] }
+
+  // 2. Tally per source.
+  const tally = new Map<string, { apps: number; hired: number; active: number; terminated: number }>()
+  for (const a of apps) {
+    const src = a.source || 'unknown'
+    const t = tally.get(src) ?? { apps: 0, hired: 0, active: 0, terminated: 0 }
+    t.apps += 1
+    if (a.status === 'hired') t.hired += 1
+    // employee may be the join result — single object, array, or null.
+    const empStatus = Array.isArray(a.employee) ? a.employee[0]?.status : a.employee?.status
+    if (empStatus === 'active')     t.active     += 1
+    if (empStatus === 'terminated') t.terminated += 1
+    tally.set(src, t)
+  }
+
+  const rows: SourceRetentionRow[] = []
+  for (const [source, t] of Array.from(tally.entries())) {
+    const denom = t.active + t.terminated
+    rows.push({
+      source,
+      apps:           t.apps,
+      hired:          t.hired,
+      active_now:     t.active,
+      terminated:     t.terminated,
+      hire_rate:      t.apps  > 0 ? round1((t.hired   / t.apps)  * 100) / 100 : null,
+      retention_rate: denom   > 0 ? round1((t.active  / denom)   * 100) / 100 : null,
+    })
+  }
+  rows.sort((a, b) =>
+    (b.hire_rate ?? 0) - (a.hire_rate ?? 0)
+    || b.apps - a.apps,
+  )
+
+  return { total_apps: apps.length, rows }
+}
+
 // ── helpers ─────────────────────────────────────────────────────────────────
 function round1(n: number): number { return Math.round(n * 10) / 10 }
 function round2(n: number): number { return Math.round(n * 100) / 100 }
