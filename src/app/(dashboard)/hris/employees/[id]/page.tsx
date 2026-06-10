@@ -36,6 +36,7 @@ type EmployeeDetail = {
   start_date: string | null
   joined_at: string | null
   terminated_at: string | null
+  date_of_birth: string | null
   manager_id: string | null
   person: { name: string; email: string } | null
   manager: { id: string; name: string | null; email: string | null } | null
@@ -370,6 +371,14 @@ export default function EmployeeDetailPage() {
                 <p className="mt-0.5 text-slate-800">{fmtDate(employee.joined_at)}</p>
               </div>
               <div>
+                <p className="text-xs font-semibold text-slate-400">Date of birth</p>
+                <DobEditor
+                  employeeId={employee.id}
+                  current={employee.date_of_birth}
+                  onSaved={dob => setEmployee(e => e ? { ...e, date_of_birth: dob } : e)}
+                />
+              </div>
+              <div>
                 <p className="text-xs font-semibold text-slate-400">Reports to</p>
                 <p className="mt-0.5 text-slate-800">
                   {employee.manager ? (
@@ -632,6 +641,62 @@ export default function EmployeeDetailPage() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// Inline DOB editor — click the value to edit, save inline, propagate up.
+// Used by Payroll v1.2 to derive the 80DDB senior flag for taxpayers 60+.
+function DobEditor({ employeeId, current, onSaved }: { employeeId: string; current: string | null; onSaved: (dob: string | null) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue]     = useState(current ?? '')
+  const [saving, setSaving]   = useState(false)
+  const [err, setErr]         = useState<string | null>(null)
+
+  async function save() {
+    setErr(null); setSaving(true)
+    try {
+      const next = value || null
+      const res = await fetch(`/api/employees/${employeeId}/dob`, {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ date_of_birth: next }),
+      })
+      const j = await res.json()
+      if (!res.ok) { setErr(j.error ?? 'Save failed'); return }
+      onSaved(next)
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => { setValue(current ?? ''); setEditing(true) }}
+        className="mt-0.5 text-left text-slate-800 hover:text-emerald-700"
+        title="Click to edit"
+      >
+        {current
+          ? new Date(current + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+          : <span className="text-slate-400">— click to set</span>}
+      </button>
+    )
+  }
+  return (
+    <div className="mt-0.5 flex items-center gap-1">
+      <input
+        type="date"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-xs"
+      />
+      <button onClick={save} disabled={saving} className="rounded-md bg-slate-900 px-2 py-0.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+        {saving ? '…' : '✓'}
+      </button>
+      <button onClick={() => setEditing(false)} className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-50">×</button>
+      {err && <span className="ml-1 text-xs text-rose-600">{err}</span>}
     </div>
   )
 }

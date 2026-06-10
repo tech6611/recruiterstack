@@ -116,7 +116,8 @@ const NAV_SECTIONS: NavSection[] = [
     section: 'Insights',
     icon:    BarChart2,
     items: [
-      { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+      { href: '/analytics',        label: 'Analytics',        icon: BarChart2 },
+      { href: '/analytics/people', label: 'People analytics', icon: BarChart2 },
     ],
   },
   {

@@ -11,6 +11,19 @@ entries on top.
 
 ## 2026-06-10
 
+### Added
+- **DOB on `employee_profiles` (migration 059) + auto-derive 80DDB senior
+  flag.** Optional `date_of_birth DATE` column. Payroll compute orchestrator
+  now sets `80ddb_senior=1` automatically when the employee was 60+ at the
+  pay-period end date — saves them ticking the checkbox per FY. Explicit
+  user-set value wins (e.g. a senior treating a non-senior dependent).
+  - Admin UI: inline DOB editor on `/hris/employees/[id]` next to Hired /
+    Start date / Joined.
+  - API: `PUT /api/employees/[id]/dob` (admin-only, validates ISO date,
+    rejects future / >120yr past).
+  - Re-added `/analytics/people` to the Insights sidebar bucket — the
+    redesign dropped it.
+
 ### Changed
 - **Sidebar redesigned: buckets-only rail + hover flyouts.** The desktop
   sidebar now shows only top-level buckets (Dashboard, Me, Recruiting,

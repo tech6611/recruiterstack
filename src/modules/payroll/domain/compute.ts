@@ -67,6 +67,29 @@ function daysInclusive(start: string, end: string): number {
   return Math.max(1, diff + 1)
 }
 
+// Derive Payroll v1.2's 80DDB senior flag from DOB if the employee hasn't set
+// it explicitly. Returns a shallow-merged copy. An explicit 80ddb_senial=1 in
+// other_exemptions is preserved (employee may be claiming treatment for a
+// senior dependent while themselves being under 60).
+function deriveOtherExemptions(
+  existing: Record<string, number> | undefined,
+  dob:      string | null,
+  asOf:     string,                                             // YYYY-MM-DD; use the period_end so claims line up with the run
+): Record<string, number> {
+  const out = { ...(existing ?? {}) }
+  // Explicit value wins.
+  if (out['80ddb_senior'] !== undefined && Number(out['80ddb_senior']) > 0) return out
+  if (!dob) return out
+
+  const dobMs   = new Date(dob + 'T00:00:00Z').getTime()
+  const asOfMs  = new Date(asOf + 'T00:00:00Z').getTime()
+  if (!Number.isFinite(dobMs) || !Number.isFinite(asOfMs)) return out
+
+  const ageYears = (asOfMs - dobMs) / (365.25 * 86_400_000)
+  if (ageYears >= 60) out['80ddb_senior'] = 1
+  return out
+}
+
 // Read latest compensation record directly from the canonical DB. We don't
 // import from hris/ (boundary rule); the canonical schema is shared.
 async function currentCompFor(
@@ -110,14 +133,14 @@ export async function planRunCompute(
   const periodDays = daysInclusive(r.period_start, r.period_end)
   const fy = fyFromDate(r.period_start)
 
-  // 2. Active employees with display name/email
+  // 2. Active employees with display name/email + DOB (for 80DDB derivation).
   const { data: empData, error: empErr } = await supabase
     .from('employee_profiles')
-    .select('id, status, tax_regime, person:people(name, email)')
+    .select('id, status, tax_regime, date_of_birth, person:people(name, email)')
     .eq('org_id', orgId)
     .eq('status', 'active')
   if (empErr) throw empErr
-  type EmpRow = Pick<EmployeeProfile, 'id' | 'status' | 'tax_regime'> & {
+  type EmpRow = Pick<EmployeeProfile, 'id' | 'status' | 'tax_regime' | 'date_of_birth'> & {
     person: { name: string | null; email: string | null } | null
   }
   const employees = (empData ?? []) as unknown as EmpRow[]
@@ -159,7 +182,11 @@ export async function planRunCompute(
               section_80c:      Number(declaration.section_80c),
               section_80d:      Number(declaration.section_80d),
               section_80ccd_1b: Number(declaration.section_80ccd_1b),
-              other_exemptions: declaration.other_exemptions ?? {},
+              // Auto-derive 80DDB senior flag from DOB when the employee
+              // hasn't ticked the checkbox themselves. Explicit takes
+              // precedence: a senior treating a non-senior dependent might
+              // legitimately leave the flag off.
+              other_exemptions: deriveOtherExemptions(declaration.other_exemptions, e.date_of_birth, r.period_end),
             }
           : null,
       })

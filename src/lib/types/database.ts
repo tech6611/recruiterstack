@@ -130,6 +130,10 @@ export interface EmployeeProfile {
   // Payroll v1 (migration 058): per-employee tax regime override.
   // Defaults to 'new' to match the govt default since FY 2023-24.
   tax_regime: 'new' | 'old'
+  // Migration 059: optional DOB. Used by Payroll v1.2 to derive the 80DDB
+  // senior flag automatically when the patient is 60+; also future age-cohort
+  // analytics + retirement workflows.
+  date_of_birth: string | null
   created_at: string
   updated_at: string
 }
