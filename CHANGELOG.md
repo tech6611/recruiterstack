@@ -11,6 +11,24 @@ entries on top.
 
 ## 2026-06-14
 
+### Schema
+- **Migration 064 — Canonical Slice 3: link applications to canonical jobs.**
+  Adds nullable `applications.job_id` (→`jobs`) and `opening_id` (→`openings`)
+  plus indexes. Forward-only dual-write: `createApplication` now accepts optional
+  `jobId`/`openingId` and only references those columns when set, so the legacy
+  apply/intake flow is untouched and deploys stay safe even if the migration
+  lags. `hiring_request_id` stays NOT NULL for now. This is the link that lets
+  canonical `jobs` pipelines hold candidates for new data.
+
+### Added
+- **Canonical Slice 5 — drift guard.** `scripts/audit-canonical-model.mjs --check`
+  (npm `audit:canonical:check`) exits non-zero when a caller file
+  (`src/app`/`src/lib`/`src/components`) accesses a legacy table directly outside
+  an explicit `LEGACY_ALLOWLIST` (the 5 frozen intake/`hiring_requests` routes).
+  Wired into CI via `.github/workflows/canonical-guard.yml` (dependency-free).
+  New core work that bypasses canonical services / domain facades now fails the
+  build.
+
 ### Changed
 - **Canonical Slice 2 — copilot + job-queue storage access moved behind domain
   facades.** `src/lib/copilot-tools.ts` and `src/lib/api/job-handlers.ts` no
@@ -19,9 +37,9 @@ entries on top.
   reads/writes on those tables now route through `@/modules/ats/domain/*` facades
   (`candidates`, `applications`, `job-pipelines`, `role-profiles`, `interviews`,
   `offers`). Behavior is byte-identical — every agent-facing return string, error
-  message, ordering, limit, and filter is preserved. One out-of-scope
-  `hiring_requests` token-population read remains in the sequence-email handler
-  (no facade specified for it yet).
+  message, ordering, limit, and filter is preserved. Both files are now off the
+  canonical audit's `legacy` list (legacy 7 → 5; the remaining 5 are the
+  intake/`hiring_requests` routes frozen by decision).
 - **Sidebar IA — TA-professional-only restructure (Phase 1).** The product is the
   cockpit for a centralized TA team (recruiting + HR-ops, access-gated); employee
   self-service ships as a separate variant. So `Sidebar.tsx` `NAV_SECTIONS` now:

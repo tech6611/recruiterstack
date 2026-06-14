@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "audit:canonical": "node scripts/audit-canonical-model.mjs",
+    "audit:canonical:check": "node scripts/audit-canonical-model.mjs --check",
     "check:boundaries": "node scripts/check-module-boundaries.mjs",
     "gen:types": "npx supabase gen types --lang=typescript --project-id=$SUPABASE_PROJECT_ID > src/lib/types/supabase.ts"
   },

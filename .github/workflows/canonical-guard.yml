@@ -1,0 +1,23 @@
+name: Canonical drift guard
+
+# Slice 5 of the canonical data-model completion: fail the build if any caller
+# file (src/app, src/lib, src/components) accesses a legacy table directly
+# outside the approved compatibility allowlist. New core work must route through
+# canonical services / domain facades. See docs/canonical-completion-plan.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  drift-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # The guard script uses only Node built-ins (fs/path) — no install needed.
+      - name: Canonical drift guard
+        run: node scripts/audit-canonical-model.mjs --check
