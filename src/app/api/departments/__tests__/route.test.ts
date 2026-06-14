@@ -31,8 +31,9 @@ describe('Workspace mutations', () => {
       expect(res.status).toBe(201)
     })
 
-    it('rejects non-admin', async () => {
-      mock.results.set('org_members', { data: { role: 'recruiter', is_active: true }, error: null })
+    it('rejects a member without settings:edit', async () => {
+      // No RBAC role assignment → empty capability set → settings:edit denied.
+      mock.results.set('rbac_member_roles', { data: [], error: null })
       const req = createMockRequest('POST', 'http://localhost:3000/api/departments', { name: 'Eng' })
       const res = await CREATE_DEPT(req)
       expect(res.status).toBe(403)

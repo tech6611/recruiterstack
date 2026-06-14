@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
+import type { Capability } from '@/lib/permissions'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import {
   getWhatsAppAccount,
@@ -32,7 +34,7 @@ const upsertSchema = z
     path: ['auth_id'],
   })
 
-async function requireAdmin(): Promise<
+async function requireWhatsAppAccess(capability: Capability): Promise<
   NextResponse | { orgId: string; userId: string; supabase: ReturnType<typeof createAdminClient> }
 > {
   const authResult = await requireOrgAndUser()
@@ -40,23 +42,16 @@ async function requireAdmin(): Promise<
   const { orgId, userId } = authResult
 
   const supabase = createAdminClient()
-  const { data: me } = await supabase
-    .from('org_members')
-    .select('role')
-    .eq('org_id', orgId)
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if ((me as { role: string } | null)?.role !== 'admin') {
-    return NextResponse.json({ error: 'Only admins can manage WhatsApp settings.' }, { status: 403 })
-  }
+  const scope = await getViewerScope(supabase, orgId, userId)
+  const denied = assertCapability(scope, capability)
+  if (denied) return denied
 
   return { orgId, userId, supabase }
 }
 
 // GET /api/org-settings/whatsapp — connection status. Never returns secrets.
 export async function GET() {
-  const auth = await requireAdmin()
+  const auth = await requireWhatsAppAccess('settings:view')
   if (auth instanceof NextResponse) return auth
   const { orgId, supabase } = auth
 
@@ -80,7 +75,7 @@ export async function GET() {
 
 // PUT /api/org-settings/whatsapp — connect / update credentials.
 export async function PUT(request: NextRequest) {
-  const auth = await requireAdmin()
+  const auth = await requireWhatsAppAccess('settings:edit')
   if (auth instanceof NextResponse) return auth
   const { orgId, supabase } = auth
 
@@ -109,7 +104,7 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/org-settings/whatsapp — disconnect.
 export async function DELETE() {
-  const auth = await requireAdmin()
+  const auth = await requireWhatsAppAccess('settings:edit')
   if (auth instanceof NextResponse) return auth
   const { orgId, supabase } = auth
 

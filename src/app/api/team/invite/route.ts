@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrgAndUser } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth-admin'
 import { parseBody } from '@/lib/api/helpers'
 import { invitesSchema } from '@/lib/validations/onboarding-invites'
 import { logger } from '@/lib/logger'
@@ -9,20 +9,11 @@ import { logger } from '@/lib/logger'
 // preferred role in public_metadata. Batch up to 10 (shared constraint with
 // onboarding). Per-invite failures are reported but don't fail the batch.
 export async function POST(req: NextRequest) {
-  const authResult = await requireOrgAndUser()
+  const authResult = await requireCapability('settings:edit')
   if (authResult instanceof NextResponse) return authResult
-  const { orgId, userId, clerkUserId } = authResult
+  const { orgId, clerkUserId } = authResult
 
   const supabase = createAdminClient()
-  const { data: caller } = await supabase
-    .from('org_members')
-    .select('role')
-    .eq('org_id', orgId)
-    .eq('user_id', userId)
-    .maybeSingle()
-  if ((caller as { role: string } | null)?.role !== 'admin') {
-    return NextResponse.json({ error: 'Only admins can invite teammates.' }, { status: 403 })
-  }
 
   const body = await parseBody(req, invitesSchema)
   if (body instanceof NextResponse) return body

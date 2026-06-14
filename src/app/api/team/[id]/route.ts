@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrgAndUser } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth-admin'
 import { parseBody } from '@/lib/api/helpers'
 import { memberPatchSchema } from '@/lib/validations/team'
 
@@ -10,23 +10,11 @@ import { memberPatchSchema } from '@/lib/validations/team'
  * (we'd lock the org out of admin access).
  */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const authResult = await requireOrgAndUser()
+  const authResult = await requireCapability('settings:edit')
   if (authResult instanceof NextResponse) return authResult
-  const { orgId, userId } = authResult
+  const { orgId } = authResult
 
   const supabase = createAdminClient()
-
-  // Gate: caller must be admin.
-  const { data: caller } = await supabase
-    .from('org_members')
-    .select('role')
-    .eq('org_id', orgId)
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if ((caller as { role: string } | null)?.role !== 'admin') {
-    return NextResponse.json({ error: 'Only admins can change team roles.' }, { status: 403 })
-  }
 
   const body = await parseBody(req, memberPatchSchema)
   if (body instanceof NextResponse) return body
