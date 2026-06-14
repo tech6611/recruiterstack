@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { withCapability, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { buildSearchFilter } from '@/lib/api/search'
 import { candidateInsertSchema } from '@/lib/validations/candidates'
 import { candidateStatusEnum } from '@/lib/validations/common'
@@ -7,7 +7,7 @@ import { findOrCreateCandidateProfile } from '@/modules/ats/domain/candidates'
 import type { CandidateListItem } from '@/lib/types/database'
 
 // GET /api/candidates?status=active&limit=50&offset=0
-export const GET = withOrg(async (req, orgId, supabase) => {
+export const GET = withCapability('recruiting:view', async (req, orgId, supabase) => {
   const { searchParams } = new URL(req.url)
 
   const status = searchParams.get('status')
@@ -87,7 +87,7 @@ export const GET = withOrg(async (req, orgId, supabase) => {
 // created first, then the candidate. Identity (name/email/phone/linkedin)
 // lives on people post-Party-Model cleanup; only role-specific fields are
 // stored on candidates.
-export const POST = withOrg(async (req, orgId, supabase) => {
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase) => {
   const body = await parseBody(req, candidateInsertSchema)
   if (body instanceof NextResponse) return body
 

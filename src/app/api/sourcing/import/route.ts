@@ -1,16 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { requireOrg } from '@/lib/auth'
+import { withCapability } from '@/lib/api/helpers'
 
 export const maxDuration = 60
 
 // POST /api/sourcing/import
 // Body: { csv_text: string }
 // Returns: { candidates: ParsedCandidate[], count: number }
-export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-
+export const POST = withCapability('recruiting:edit', async (request) => {
   let body: { csv_text: string }
   try {
     body = await request.json()
@@ -77,4 +74,4 @@ ${csv_text.slice(0, 10000)}`
   } catch {
     return NextResponse.json({ error: 'CSV parsing failed — check your API key and CSV format' }, { status: 500 })
   }
-}
+})

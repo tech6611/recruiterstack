@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 import { randomBytes } from 'crypto'
 import { createMeetEvent } from '@/lib/google/calendar'
 import { createZoomMeeting } from '@/lib/zoom/meetings'
@@ -22,12 +21,7 @@ function stripHtml(html: string): string {
     .replace(/\n{3,}/g, '\n\n').trim()
 }
 
-export async function GET(req: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (req, orgId, supabase) => {
   const { searchParams } = req.nextUrl
   const application_id      = searchParams.get('application_id')
   const candidate_id        = searchParams.get('candidate_id')
@@ -48,13 +42,9 @@ export async function GET(req: NextRequest) {
   const { data, error } = await q.order('scheduled_at', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data: data ?? [] })
-}
+})
 
-export async function POST(req: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase) => {
   const body = await req.json()
   const {
     application_id, candidate_id, hiring_request_id, stage_id,
@@ -68,8 +58,6 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     )
   }
-
-  const supabase = createAdminClient()
 
   // Generate self-schedule token if requested
   const self_schedule_token   = generate_self_schedule ? randomBytes(20).toString('hex') : null
@@ -255,4 +243,4 @@ export async function POST(req: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
   const selfScheduleLink = self_schedule_token ? `${appUrl}/schedule/${self_schedule_token}` : null
   return NextResponse.json({ data: { ...interviewData, meet_link: meetLink, meeting_link: meetLink, meeting_platform: resolvedPlatform, google_meet_error: googleMeetError, self_schedule_link: selfScheduleLink } }, { status: 201 })
-}
+})

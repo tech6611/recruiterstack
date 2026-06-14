@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { withCapability } from '@/lib/api/helpers'
 import { parseAiJson } from '@/lib/ai/parse-ai-response'
 import { emailDraftResponseSchema } from '@/lib/ai/schemas'
 import { trackUsage } from '@/lib/ai/track-usage'
@@ -16,14 +15,7 @@ const TEMPLATE_DESC: Record<TemplateKey, string> = {
 }
 
 // POST /api/applications/[id]/email-draft
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const POST = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return NextResponse.json(
@@ -47,7 +39,6 @@ export async function POST(
   }
 
   // ── Fetch application context ──────────────────────────────────────────────
-  const supabase = createAdminClient()
   const { data: app, error } = await supabase
     .from('applications')
     .select(`
@@ -115,4 +106,4 @@ Respond with ONLY a valid JSON object in this exact format, nothing else:
   } catch {
     return NextResponse.json({ error: 'AI generation failed — check your API key and try again.' }, { status: 500 })
   }
-}
+})

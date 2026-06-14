@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { assertAdmin, getViewerScope } from '@/lib/rbac'
+import { assertCapability, getViewerScope } from '@/lib/rbac'
 import { listTemplates } from '@/modules/hris/domain/onboarding'
 
 // GET /api/hris/onboarding/templates — admin only.
@@ -12,7 +12,7 @@ export async function GET() {
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'onboarding:view')
   if (guard) return guard
 
   try {

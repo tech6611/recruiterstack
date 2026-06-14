@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { postingCreateSchema } from '@/lib/validations/postings'
 
@@ -8,9 +9,12 @@ import { postingCreateSchema } from '@/lib/validations/postings'
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
-  const { orgId } = auth
+  const { orgId, userId } = auth
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'recruiting:view')
+  if (denied) return denied
+
   const { data: job } = await supabase
     .from('jobs').select('id').eq('id', params.id).eq('org_id', orgId).maybeSingle()
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
@@ -34,6 +38,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (body instanceof NextResponse) return body
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'recruiting:edit')
+  if (denied) return denied
+
   const { data: job } = await supabase
     .from('jobs').select('id').eq('id', params.id).eq('org_id', orgId).maybeSingle()
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })

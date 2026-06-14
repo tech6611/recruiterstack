@@ -1,19 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 
 // GET /api/candidates/[id]/tasks
 // Returns tasks ordered: incomplete first (by due_date asc), then completed (by completed_at desc)
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   const { data, error } = await supabase
     .from('candidate_tasks')
     .select('*')
@@ -28,17 +18,10 @@ export async function GET(
   }
 
   return NextResponse.json({ data: data ?? [] })
-}
+})
 
 // POST /api/candidates/[id]/tasks
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
   let body: Record<string, unknown>
   try {
     body = await req.json()
@@ -50,8 +33,6 @@ export async function POST(
   if (!title) {
     return NextResponse.json({ error: 'title is required' }, { status: 400 })
   }
-
-  const supabase = createAdminClient()
 
   const baseInsert = {
     org_id:         orgId,
@@ -87,4 +68,4 @@ export async function POST(
   }
 
   return NextResponse.json({ data }, { status: 201 })
-}
+})

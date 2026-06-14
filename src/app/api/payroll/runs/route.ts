@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { assertAdmin, getViewerScope } from '@/lib/rbac'
+import { assertCapability, getViewerScope } from '@/lib/rbac'
 import { listRuns, createRun } from '@/modules/payroll/domain/runs'
 import type { PayrollRunStatus } from '@/lib/types/database'
 
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'payroll:view')
   if (guard) return guard
 
   const sp = req.nextUrl.searchParams
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'payroll:edit')
   if (guard) return guard
 
   let body: { period_start?: string; period_end?: string; pay_date?: string | null; currency?: string; notes?: string | null }

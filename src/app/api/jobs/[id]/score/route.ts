@@ -10,9 +10,8 @@
  *   { type: 'complete', total, scored, auto_advanced, auto_rejected, emails_sent }
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import { createNotification } from '@/lib/api/notify'
 import { getLegacyJobScoringContext } from '@/modules/ats/domain/job-pipelines'
@@ -20,15 +19,7 @@ import type { Candidate, HiringRequest, PipelineStage, Application, ApplicationU
 
 export const maxDuration = 300 // 5 min — needed for large pipelines on Vercel
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
   const jobId = params.id
 
   // Optional filters from request body
@@ -292,4 +283,4 @@ export async function POST(
       'Connection':    'keep-alive',
     },
   })
-}
+})

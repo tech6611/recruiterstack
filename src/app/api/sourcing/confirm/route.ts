@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 import { findOrCreateCandidateProfile } from '@/modules/ats/domain/candidates'
 
 type ParsedCandidate = {
@@ -23,11 +22,7 @@ type ParsedCandidate = {
 // the previous chunked bulk-insert optimization, but sourcing is admin-triggered
 // (one CSV at a time, dozens to a few hundred rows), so the round-trip cost is
 // fine for the architectural win of one write path.
-export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const POST = withCapability('recruiting:edit', async (request, orgId, supabase) => {
   let body: { candidates: ParsedCandidate[] }
   try {
     body = await request.json()
@@ -39,8 +34,6 @@ export async function POST(request: NextRequest) {
   if (!Array.isArray(candidates) || candidates.length === 0) {
     return NextResponse.json({ error: 'candidates array is required' }, { status: 400 })
   }
-
-  const supabase = createAdminClient()
 
   let created = 0, skipped = 0
   const errors: string[] = []
@@ -72,4 +65,4 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ created, skipped, errors })
-}
+})

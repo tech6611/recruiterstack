@@ -1,25 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 
 // PATCH /api/candidates/[id]/tasks/[taskId]
 // Accepts: title, description, due_date, assignee_name, completed (boolean)
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string; taskId: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const PATCH = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
   let body: Record<string, unknown>
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
-
-  const supabase = createAdminClient()
 
   const updates: Record<string, unknown> = {}
   if (body.title         !== undefined) updates.title         = (body.title as string).trim()
@@ -87,19 +77,10 @@ export async function PATCH(
   }
 
   return NextResponse.json({ data })
-}
+})
 
 // DELETE /api/candidates/[id]/tasks/[taskId]
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: { id: string; taskId: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const DELETE = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }) => {
   const { error } = await supabase
     .from('candidate_tasks')
     .delete()
@@ -112,4 +93,4 @@ export async function DELETE(
   }
 
   return new NextResponse(null, { status: 204 })
-}
+})

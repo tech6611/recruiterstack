@@ -1,20 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 
 // POST /api/sequences/[id]/stages — create a new stage
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
   let body: Record<string, unknown>
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-
-  const supabase = createAdminClient()
 
   // Verify sequence belongs to org
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,4 +43,4 @@ export async function POST(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ data }, { status: 201 })
-}
+})

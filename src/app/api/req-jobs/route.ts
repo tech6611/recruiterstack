@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { jobCreateSchema } from '@/lib/validations/jobs'
 
@@ -21,7 +22,10 @@ import { jobCreateSchema } from '@/lib/validations/jobs'
 export async function GET(req: NextRequest) {
   const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
-  const { orgId } = auth
+  const { orgId, userId } = auth
+
+  const denied = assertCapability(await getViewerScope(createAdminClient(), orgId, userId), 'recruiting:view')
+  if (denied) return denied
 
   const { searchParams } = req.nextUrl
   const limit  = Math.min(200, Math.max(1, parseInt(searchParams.get('limit')  ?? '50', 10)))
@@ -75,6 +79,9 @@ export async function POST(req: NextRequest) {
   const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
   const { orgId, userId } = auth
+
+  const denied = assertCapability(await getViewerScope(createAdminClient(), orgId, userId), 'recruiting:edit')
+  if (denied) return denied
 
   const body = await parseBody(req, jobCreateSchema)
   if (body instanceof NextResponse) return body

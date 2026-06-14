@@ -1,18 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 
 // DELETE /api/candidates/[id]/tags/[tagId]
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: { id: string; tagId: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const DELETE = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }) => {
   const { error } = await supabase
     .from('candidate_tags')
     .delete()
@@ -25,4 +15,4 @@ export async function DELETE(
   }
 
   return new NextResponse(null, { status: 204 })
-}
+})

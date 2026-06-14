@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { emitWebhook } from '@/lib/webhooks/emit'
 import { logger } from '@/lib/logger'
 
@@ -17,9 +18,11 @@ import { logger } from '@/lib/logger'
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
-  const { orgId } = auth
+  const { orgId, userId } = auth
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'recruiting:edit')
+  if (denied) return denied
 
   const { data: job } = await supabase
     .from('jobs')

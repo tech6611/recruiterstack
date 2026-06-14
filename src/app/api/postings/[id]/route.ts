@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { postingUpdateSchema } from '@/lib/validations/postings'
 
@@ -21,6 +22,9 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   if (auth instanceof NextResponse) return auth
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, auth.orgId, auth.userId), 'recruiting:view')
+  if (denied) return denied
+
   const { data: row } = await supabase
     .from('job_postings').select('*').eq('id', params.id).maybeSingle()
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -34,6 +38,9 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
+
+  const denied = assertCapability(await getViewerScope(createAdminClient(), auth.orgId, auth.userId), 'recruiting:edit')
+  if (denied) return denied
 
   const owner = await checkPostingOrg(params.id, auth.orgId)
   if (!owner) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -55,6 +62,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
+
+  const denied = assertCapability(await getViewerScope(createAdminClient(), auth.orgId, auth.userId), 'recruiting:edit')
+  if (denied) return denied
 
   const owner = await checkPostingOrg(params.id, auth.orgId)
   if (!owner) return NextResponse.json({ error: 'Not found' }, { status: 404 })

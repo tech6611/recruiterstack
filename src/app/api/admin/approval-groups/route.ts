@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { requireAdmin } from '@/lib/auth-admin'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { groupCreateSchema } from '@/lib/validations/approval-groups'
 
@@ -38,13 +38,15 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAdmin()
+  const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
+
+  const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, auth.orgId, auth.userId), 'settings:edit')
+  if (denied) return denied
 
   const body = await parseBody(req, groupCreateSchema)
   if (body instanceof NextResponse) return body
-
-  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('approval_groups')
     .insert({

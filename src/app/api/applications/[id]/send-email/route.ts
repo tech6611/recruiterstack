@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import sgMail from '@sendgrid/mail'
 import { auth } from '@clerk/nextjs/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { withCapability } from '@/lib/api/helpers'
 
 interface SendEmailBody {
   subject:    string
@@ -16,13 +15,7 @@ interface SendEmailBody {
 }
 
 // POST /api/applications/[id]/send-email
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+export const POST = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
   const { userId } = auth()
 
   const apiKey   = process.env.SENDGRID_API_KEY
@@ -43,8 +36,6 @@ export async function POST(
   if (!body.subject?.trim() || !body.body?.trim()) {
     return NextResponse.json({ error: 'subject and body are required' }, { status: 400 })
   }
-
-  const supabase = createAdminClient()
 
   // Fetch application + candidate email
   const { data: app, error: appErr } = await supabase
@@ -131,4 +122,4 @@ export async function POST(
   }
 
   return NextResponse.json({ data: event ?? null })
-}
+})

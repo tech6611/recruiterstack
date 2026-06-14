@@ -1,22 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { withCapability } from '@/lib/api/helpers'
 import { enqueue } from '@/lib/api/job-queue'
 import { runInBackground } from '@/lib/api/background'
 import { logger } from '@/lib/logger'
 import { trackUsage } from '@/lib/ai/track-usage'
 
 // GET /api/candidates/[id]/ai-summary — poll for generated summary
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   const { data, error } = await supabase
     .from('candidates')
     .select('ai_summary, ai_summary_generated_at')
@@ -34,20 +26,11 @@ export async function GET(
       generated_at: data.ai_summary_generated_at ?? null,
     },
   })
-}
+})
 
 // POST /api/candidates/[id]/ai-summary
 // Kicks off AI summary generation in the background and returns 202 immediately.
-export async function POST(
-  _req: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const POST = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }) => {
   // Quick check: candidate exists
   const { data: candCheck, error: candErr } = await supabase
     .from('candidates')
@@ -87,7 +70,7 @@ export async function POST(
     { data: { status: 'processing', candidate_id: params.id } },
     { status: 202 },
   )
-}
+})
 
 /** Generate AI summary and write it to the candidates table */
 async function generateAndStoreSummary(candidateId: string, orgId: string, apiKey: string) {

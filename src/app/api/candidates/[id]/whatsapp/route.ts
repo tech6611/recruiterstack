@@ -1,8 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg, requireOrgAndUser } from '@/lib/auth'
-import { parseBody } from '@/lib/api/helpers'
+import { withCapability, parseBody } from '@/lib/api/helpers'
 import {
   findConversationByCandidate,
   getConversationHistory,
@@ -12,12 +10,7 @@ import {
 import { sendWhatsApp } from '@/lib/whatsapp/send'
 
 // GET /api/candidates/[id]/whatsapp — conversation thread for a candidate.
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   const conversation = await findConversationByCandidate(supabase, orgId, params.id)
   if (!conversation) {
     return NextResponse.json({ data: { conversation: null, messages: [], within_window: false } })
@@ -31,20 +24,15 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       within_window: isWithinServiceWindow(conversation),
     },
   })
-}
+})
 
 const sendSchema = z.object({ body: z.string().min(1).max(4000) })
 
 // POST /api/candidates/[id]/whatsapp — recruiter sends a message in the thread.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const authResult = await requireOrgAndUser()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId, userId } = authResult
-
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase, { params }, _scope, userId) => {
   const parsed = await parseBody(req, sendSchema)
   if (parsed instanceof NextResponse) return parsed
 
-  const supabase = createAdminClient()
   const result = await sendWhatsApp({
     supabase,
     orgId,
@@ -57,20 +45,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     { data: { ok: result.ok, message: result.message } },
     { status: result.ok ? 200 : 422 },
   )
-}
+})
 
 const patchSchema = z.object({ agent_enabled: z.boolean() })
 
 // PATCH /api/candidates/[id]/whatsapp — toggle the AI responder for the thread.
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const PATCH = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
   const parsed = await parseBody(req, patchSchema)
   if (parsed instanceof NextResponse) return parsed
 
-  const supabase = createAdminClient()
   const conversation = await findConversationByCandidate(supabase, orgId, params.id)
   if (!conversation) {
     return NextResponse.json({ error: 'No WhatsApp conversation for this candidate.' }, { status: 404 })
@@ -83,4 +66,4 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   })
 
   return NextResponse.json({ data: { agent_enabled: parsed.agent_enabled } })
-}
+})

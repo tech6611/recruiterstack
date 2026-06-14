@@ -1,18 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 import { getSequence } from '@/modules/crm/domain/sequences'
 
 // GET /api/sequences/[id] — fetch sequence with stages + enrollment counts.
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   try {
     const data = await getSequence(supabase, orgId, params.id)
     if (!data) return NextResponse.json({ error: 'Sequence not found' }, { status: 404 })
@@ -23,17 +14,10 @@ export async function GET(
       { status: 500 },
     )
   }
-}
+})
 
 // PATCH /api/sequences/[id] — update sequence (name, status, description)
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const PATCH = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
   let body: Record<string, unknown>
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
@@ -49,8 +33,6 @@ export async function PATCH(
 
   update.updated_at = new Date().toISOString()
 
-  const supabase = createAdminClient()
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.from('sequences') as any)
     .update(update)
@@ -62,4 +44,4 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ data })
-}
+})

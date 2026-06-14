@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { assertAdmin, getViewerScope } from '@/lib/rbac'
+import { assertCapability, getViewerScope } from '@/lib/rbac'
 
 // PUT /api/payroll/employees/[id]/regime — admin only. Sets the employee's
 // tax_regime ('new' | 'old'). Lives under payroll/ because the regime is a
@@ -13,7 +13,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'payroll:edit')
   if (guard) return guard
 
   let body: { tax_regime?: 'new' | 'old' }

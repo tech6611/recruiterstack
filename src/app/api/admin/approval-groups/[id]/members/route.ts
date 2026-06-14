@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-admin'
+import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { groupMembersSetSchema } from '@/lib/validations/approval-groups'
 
@@ -10,13 +11,15 @@ import { groupMembersSetSchema } from '@/lib/validations/approval-groups'
  * group, set its full member list, save.
  */
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = await requireAdmin()
+  const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
+
+  const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, auth.orgId, auth.userId), 'settings:edit')
+  if (denied) return denied
 
   const body = await parseBody(req, groupMembersSetSchema)
   if (body instanceof NextResponse) return body
-
-  const supabase = createAdminClient()
 
   // Confirm group belongs to this org.
   const { data: group } = await supabase

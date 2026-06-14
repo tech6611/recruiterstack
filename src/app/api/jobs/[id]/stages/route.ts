@@ -1,21 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 
 // POST /api/jobs/[id]/stages
 // body: { action: 'create', name, color }
 //     | { action: 'reorder', stages: [{id, order_index}] }
 //     | { action: 'update', id, name?, color? }
 //     | { action: 'delete', id }
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const POST = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
   const jobId = params.id
 
   let body: Record<string, unknown>
@@ -37,6 +28,7 @@ export async function POST(
       .from('pipeline_stages')
       .select('order_index')
       .eq('hiring_request_id', jobId)
+      .eq('org_id', orgId)
       .order('order_index', { ascending: false })
       .limit(1)
 
@@ -63,6 +55,7 @@ export async function POST(
         .update({ order_index: s.order_index })
         .eq('id', s.id)
         .eq('hiring_request_id', jobId)
+        .eq('org_id', orgId)
     )
     await Promise.all(updates)
     return NextResponse.json({ ok: true })
@@ -82,6 +75,7 @@ export async function POST(
       .update(patch)
       .eq('id', id)
       .eq('hiring_request_id', jobId)
+      .eq('org_id', orgId)
       .select()
       .single()
 
@@ -99,16 +93,19 @@ export async function POST(
       .from('applications')
       .update({ stage_id: null })
       .eq('stage_id', id)
+      .eq('hiring_request_id', jobId)
+      .eq('org_id', orgId)
 
     const { error } = await supabase
       .from('pipeline_stages')
       .delete()
       .eq('id', id)
       .eq('hiring_request_id', jobId)
+      .eq('org_id', orgId)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
-}
+})

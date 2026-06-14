@@ -1,16 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { getOrgId } from '@/lib/auth'
+import { withCapability } from '@/lib/api/helpers'
 
 // GET /api/inbox — recent activity feed + needs-attention queue
-export async function GET() {
-  const orgId = await getOrgId()
-  if (!orgId) {
-    return NextResponse.json({ data: { activity: [], needs_attention: [] } })
-  }
-
-  const supabase = createAdminClient()
-
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase) => {
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
   const [eventsRes, staleRes] = await Promise.all([
@@ -51,4 +43,4 @@ export async function GET() {
       needs_attention: staleRes.data   ?? [],
     },
   })
-}
+})

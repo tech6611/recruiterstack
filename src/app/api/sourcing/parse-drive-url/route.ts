@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { requireOrg } from '@/lib/auth'
-import { createAdminClient } from '@/lib/supabase/server'
+import { withCapability } from '@/lib/api/helpers'
 import { getValidAccessToken } from '@/lib/google/calendar'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 
@@ -27,11 +26,7 @@ function extractDriveFileId(url: string): string | null {
   return null
 }
 
-export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const POST = withCapability('recruiting:edit', async (request, orgId, supabase) => {
   let body: { url: string }
   try {
     body = await request.json()
@@ -53,7 +48,6 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Get org's stored Google OAuth token ─────────────────────────────────────
-  const supabase = createAdminClient()
   const { data: settings } = await supabase
     .from('org_settings')
     .select('google_oauth_access_token, google_oauth_refresh_token, google_oauth_token_expiry')
@@ -207,4 +201,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     )
   }
-}
+})

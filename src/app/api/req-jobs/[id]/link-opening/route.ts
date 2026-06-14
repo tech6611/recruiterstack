@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { linkOpeningSchema } from '@/lib/validations/jobs'
 
@@ -19,6 +20,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (body instanceof NextResponse) return body
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'recruiting:edit')
+  if (denied) return denied
 
   // Verify ownership before linking.
   const [{ data: job }, { data: opening }] = await Promise.all([

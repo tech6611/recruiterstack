@@ -1,16 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { requireOrg } from '@/lib/auth'
+import { withCapability } from '@/lib/api/helpers'
 
 export const maxDuration = 30
 
 // POST /api/sourcing/parse-profile
 // Body: { text: string }
 // Returns: { candidate: ParsedCandidate }
-export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-
+export const POST = withCapability('recruiting:edit', async (request) => {
   let body: { text: string }
   try {
     body = await request.json()
@@ -68,4 +65,4 @@ ${text.slice(0, 6000)}`
   } catch {
     return NextResponse.json({ error: 'Profile parsing failed — try pasting more structured text' }, { status: 500 })
   }
-}
+})

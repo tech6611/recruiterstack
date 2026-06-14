@@ -1,18 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 import { getSequenceAnalytics } from '@/modules/crm/domain/sequences'
 
 // GET /api/sequences/[id]/analytics — sequence performance analytics.
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   try {
     const data = await getSequenceAnalytics(supabase, orgId, params.id)
     if (!data) return NextResponse.json({ error: 'Sequence not found' }, { status: 404 })
@@ -23,4 +14,4 @@ export async function GET(
       { status: 500 },
     )
   }
-}
+})

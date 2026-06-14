@@ -1,15 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
-import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { NextResponse } from 'next/server'
+import { withCapability, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { offerInsertSchema } from '@/lib/validations/offers'
 
-export async function GET(req: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (req, orgId, supabase) => {
   const { searchParams } = req.nextUrl
   const application_id    = searchParams.get('application_id')
   const candidate_id      = searchParams.get('candidate_id')
@@ -30,17 +23,11 @@ export async function GET(req: NextRequest) {
   const { data, error } = await q.order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data: data ?? [] })
-}
+})
 
-export async function POST(req: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase) => {
   const parsed = await parseBody(req, offerInsertSchema)
   if (parsed instanceof NextResponse) return parsed
-
-  const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('offers')
@@ -71,4 +58,4 @@ export async function POST(req: NextRequest) {
     .eq('org_id', orgId)
 
   return NextResponse.json({ data }, { status: 201 })
-}
+})

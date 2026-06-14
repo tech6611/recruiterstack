@@ -1,19 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { auth } from '@clerk/nextjs/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { withCapability } from '@/lib/api/helpers'
 import { enqueue } from '@/lib/api/job-queue'
 import { logger } from '@/lib/logger'
 
 // POST /api/sequences/[id]/enroll — enroll candidates
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
   const { userId } = auth()
 
   let body: { candidate_ids: string[]; application_id?: string }
@@ -22,8 +15,6 @@ export async function POST(
   if (!body.candidate_ids?.length) {
     return NextResponse.json({ error: 'candidate_ids required' }, { status: 400 })
   }
-
-  const supabase = createAdminClient()
 
   // Verify sequence exists, is active, and belongs to org
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -202,4 +193,4 @@ export async function POST(
       },
     },
   }, { status: 201 })
-}
+})

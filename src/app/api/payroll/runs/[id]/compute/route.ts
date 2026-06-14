@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { assertAdmin, getViewerScope } from '@/lib/rbac'
+import { assertCapability, getViewerScope } from '@/lib/rbac'
 import { planRunCompute, writeRunCompute } from '@/modules/payroll/domain/compute'
 
 // POST /api/payroll/runs/[id]/compute — admin only.
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'payroll:edit')
   if (guard) return guard
 
   let body: { preview?: boolean; preserveExisting?: boolean } = {}

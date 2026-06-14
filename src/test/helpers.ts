@@ -16,6 +16,14 @@ type MockResult = { data: unknown; error: unknown; count?: number }
 export function createMockSupabase() {
   const results = new Map<string, MockResult>()
 
+  // Default the RBAC resolver (getViewerScope → resolveMemberPermissions) to an
+  // Owner assignment so route tests that don't care about permissions pass the
+  // capability gate — matching the prior "test user is an admin" assumption.
+  // Override per-test (e.g. results.set('rbac_member_roles', { data: [], ... }))
+  // to simulate a member without a capability.
+  results.set('rbac_member_roles', { data: [{ role_id: 'test-owner-role' }], error: null })
+  results.set('rbac_roles', { data: [{ is_owner: true }], error: null })
+
   function createQueryBuilder(table: string) {
     const defaultResult: MockResult = { data: [], error: null }
 

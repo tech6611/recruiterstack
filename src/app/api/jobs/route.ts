@@ -1,15 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { withCapability } from '@/lib/api/helpers'
 import { listLegacyJobPipelineSummaries } from '@/modules/ats/domain/job-pipelines'
 
 // GET /api/jobs — list all hiring requests with candidate counts per stage
-export async function GET() {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase) => {
   try {
     const data = await listLegacyJobPipelineSummaries(supabase, orgId)
     return NextResponse.json({ data })
@@ -19,4 +13,4 @@ export async function GET() {
       { status: 500 },
     )
   }
-}
+})

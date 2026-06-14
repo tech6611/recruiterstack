@@ -1,16 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { requireOrg } from '@/lib/auth'
+import { withCapability } from '@/lib/api/helpers'
 
 export const maxDuration = 30
 
 // POST /api/sourcing/parse-cv
 // Body: multipart/form-data { file: PDF }
 // Returns: { candidate: ParsedCandidate }
-export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-
+export const POST = withCapability('recruiting:edit', async (request) => {
   let formData: FormData
   try {
     formData = await request.formData()
@@ -86,4 +83,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})

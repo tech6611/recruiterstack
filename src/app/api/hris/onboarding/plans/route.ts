@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { assertAdmin, getViewerScope } from '@/lib/rbac'
+import { assertCapability, getViewerScope } from '@/lib/rbac'
 import { listPlans } from '@/modules/hris/domain/onboarding'
 import type { OnboardingPlanStatus } from '@/lib/types/database'
 
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'onboarding:view')
   if (guard) return guard
 
   const statusParam = req.nextUrl.searchParams.get('status')

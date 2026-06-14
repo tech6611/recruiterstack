@@ -1,21 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 import { notifySlack, notifySlackDM } from '@/lib/notifications'
 import { applicationStatusEnum } from '@/lib/validations/common'
 import type { ApplicationUpdate } from '@/lib/types/database'
 
 // GET /api/applications/[id]
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   const [appRes, eventsRes] = await Promise.all([
     supabase
       .from('applications')
@@ -37,22 +27,13 @@ export async function GET(
   return NextResponse.json({
     data: { ...appRes.data, events: eventsRes.data ?? [] },
   })
-}
+})
 
 // PATCH /api/applications/[id]
 // body: { stage_id }                  → move to stage
 //     | { status }                    → reject / withdraw / hire
 //     | { note, event_type? }         → add note
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const PATCH = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
   let body: Record<string, unknown>
   try {
     body = await request.json()
@@ -220,4 +201,4 @@ export async function PATCH(
   }
 
   return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
-}
+})

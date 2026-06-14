@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { parseBody } from '@/lib/api/helpers'
-import { assertAdmin, assertCanViewEmployee, getViewerScope } from '@/lib/rbac'
+import { assertCapability, assertCanViewEmployee, getViewerScope } from '@/lib/rbac'
 import { employeeTransitionSchema } from '@/lib/validations/employees'
 import {
   getEmployeeDetail,
@@ -47,7 +47,7 @@ export async function PATCH(
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'people:edit')
   if (guard) return guard
 
   const parsed = await parseBody(req, employeeTransitionSchema)

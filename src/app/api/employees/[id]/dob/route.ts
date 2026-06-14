@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { assertAdmin, getViewerScope } from '@/lib/rbac'
+import { assertCapability, getViewerScope } from '@/lib/rbac'
 
 // PUT /api/employees/[id]/dob — admin only. Sets / clears date_of_birth.
 // Body: { date_of_birth: 'YYYY-MM-DD' | null }
@@ -15,7 +15,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'people:edit')
   if (guard) return guard
 
   let body: { date_of_birth?: string | null }

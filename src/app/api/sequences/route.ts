@@ -1,15 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 import { listSequences } from '@/modules/crm/domain/sequences'
 
 // GET /api/sequences — list all sequences for the org.
-export async function GET() {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase) => {
   try {
     const data = await listSequences(supabase, orgId)
     return NextResponse.json({ data })
@@ -19,21 +13,15 @@ export async function GET() {
       { status: 500 },
     )
   }
-}
+})
 
 // POST /api/sequences — create a new sequence. (Writes still live in the route
 // for v1 — domain extraction was reads-only to keep the migration mechanical.)
-export async function POST(req: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase) => {
   let body: { name?: string; stages?: { order_index: number; delay_days: number; subject: string; body: string }[] }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
   const name = body.name?.trim() || 'Untitled Sequence'
-
-  const supabase = createAdminClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: seq, error: seqErr } = await (supabase.from('sequences') as any)
@@ -56,4 +44,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ data: seq }, { status: 201 })
-}
+})

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { parseBody } from '@/lib/api/helpers'
-import { assertAdmin, assertCanViewEmployee, getViewerScope } from '@/lib/rbac'
+import { assertCapability, assertCanViewEmployee, getViewerScope } from '@/lib/rbac'
 import { timeOffCreateSchema } from '@/lib/validations/time-off'
 import { createTimeOffRequest, listTimeOffRequests } from '@/modules/hris/domain/time-off'
 import type { TimeOffStatus } from '@/lib/types/database'
@@ -51,7 +51,7 @@ export async function POST(
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'leave:edit')
   if (guard) return guard
 
   const parsed = await parseBody(req, timeOffCreateSchema)

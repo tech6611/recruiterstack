@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { requireAdmin } from '@/lib/auth-admin'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { groupUpdateSchema } from '@/lib/validations/approval-groups'
 
@@ -27,13 +27,16 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = await requireAdmin()
+  const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
+
+  const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, auth.orgId, auth.userId), 'settings:edit')
+  if (denied) return denied
 
   const body = await parseBody(req, groupUpdateSchema)
   if (body instanceof NextResponse) return body
 
-  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('approval_groups')
     .update(body)
@@ -46,10 +49,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = await requireAdmin()
+  const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, auth.orgId, auth.userId), 'settings:edit')
+  if (denied) return denied
+
   const { error } = await supabase
     .from('approval_groups')
     .update({ is_active: false })

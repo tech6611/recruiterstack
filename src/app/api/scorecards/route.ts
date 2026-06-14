@@ -1,18 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 
-export async function GET(req: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const GET = withCapability('recruiting:view', async (req, orgId, supabase) => {
   const application_id = req.nextUrl.searchParams.get('application_id')
   if (!application_id) {
     return NextResponse.json({ error: 'application_id required' }, { status: 400 })
   }
 
-  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('scorecards')
     .select('*')
@@ -22,13 +16,9 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data: data ?? [] })
-}
+})
 
-export async function POST(req: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase) => {
   const body = await req.json()
   const { application_id, interviewer_name, stage_name, recommendation, scores, overall_notes } = body
 
@@ -39,7 +29,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('scorecards')
     .insert({
@@ -56,4 +45,4 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data }, { status: 201 })
-}
+})

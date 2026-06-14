@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { assertAdmin, getViewerScope } from '@/lib/rbac'
+import { assertCapability, getViewerScope } from '@/lib/rbac'
 import { deletePayslip, getPayslip } from '@/modules/payroll/domain/payslips'
 
 // GET /api/payroll/runs/[id]/payslips/[payslipId] — admin only.
@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string;
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'payroll:view')
   if (guard) return guard
 
   try {
@@ -37,7 +37,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'payroll:edit')
   if (guard) return guard
 
   try {

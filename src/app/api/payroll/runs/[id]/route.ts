@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { assertAdmin, getViewerScope } from '@/lib/rbac'
+import { assertCapability, getViewerScope } from '@/lib/rbac'
 import { getRun, updateRun, finalizeRun, deleteRun } from '@/modules/payroll/domain/runs'
 import { listPayslipsForRun } from '@/modules/payroll/domain/payslips'
 
@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'payroll:view')
   if (guard) return guard
 
   try {
@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'payroll:edit')
   if (guard) return guard
 
   let body: { action?: 'finalize'; period_start?: string; period_end?: string; pay_date?: string | null; currency?: string; notes?: string | null }
@@ -74,7 +74,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'payroll:edit')
   if (guard) return guard
 
   try {

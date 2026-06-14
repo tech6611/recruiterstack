@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { openingCreateSchema } from '@/lib/validations/openings'
 import type { Opening } from '@/lib/types/requisitions'
@@ -17,7 +18,10 @@ type StatusFilter = Opening['status']
 export async function GET(req: NextRequest) {
   const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
+
+  const denied = assertCapability(await getViewerScope(createAdminClient(), orgId, userId), 'openings:view')
+  if (denied) return denied
 
   const { searchParams } = req.nextUrl
   const limit  = Math.min(200, Math.max(1, parseInt(searchParams.get('limit')  ?? '50', 10)))
@@ -64,6 +68,9 @@ export async function POST(req: NextRequest) {
   const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
   const { orgId, userId } = authResult
+
+  const denied = assertCapability(await getViewerScope(createAdminClient(), orgId, userId), 'openings:edit')
+  if (denied) return denied
 
   const body = await parseBody(req, openingCreateSchema)
   if (body instanceof NextResponse) return body

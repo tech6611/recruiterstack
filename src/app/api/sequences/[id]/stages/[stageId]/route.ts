@@ -1,19 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 
 // POST /api/sequences/[id]/stages — create a new stage (stageId is ignored for POST, route reuse)
 // Actual create endpoint is /api/sequences/[id]/stages with stageId='create' or handled at parent level
 
 // PATCH /api/sequences/[id]/stages/[stageId] — update a stage
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string; stageId: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const PATCH = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
   let body: Record<string, unknown>
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
@@ -31,8 +23,6 @@ export async function PATCH(
   }
 
   update.updated_at = new Date().toISOString()
-
-  const supabase = createAdminClient()
 
   // Verify sequence belongs to org
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,19 +45,10 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ data })
-}
+})
 
 // DELETE /api/sequences/[id]/stages/[stageId] — delete a stage
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: { id: string; stageId: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const DELETE = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }) => {
   // Verify sequence belongs to org
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: seq } = await (supabase.from('sequences') as any)
@@ -87,4 +68,4 @@ export async function DELETE(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return new NextResponse(null, { status: 204 })
-}
+})

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { withCapability, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { applicationInsertSchema } from '@/lib/validations/applications'
 import { createNotification } from '@/lib/api/notify'
 import { findOrCreateCandidateProfile } from '@/modules/ats/domain/candidates'
@@ -7,7 +7,7 @@ import { createApplication, recordApplicationEvent } from '@/modules/ats/domain/
 
 // POST /api/applications
 // Adds a candidate to a job pipeline.
-export const POST = withOrg(async (req, orgId, supabase) => {
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase) => {
   const body = await parseBody(req, applicationInsertSchema)
   if (body instanceof NextResponse) return body
 

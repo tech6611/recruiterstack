@@ -1,16 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
-import { parseBody } from '@/lib/api/helpers'
+import { NextResponse } from 'next/server'
+import { withCapability, parseBody } from '@/lib/api/helpers'
 import { candidateUpdateSchema } from '@/lib/validations/candidates'
 
 // GET /api/candidates/:id — candidate + all applications (with job + stage) + all events + tags + tasks + referrals
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   const { id } = params
 
   const [candRes, appsRes, tagsRes, tasksRes, referralsRes] = await Promise.all([
@@ -68,19 +61,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       referrals:    referralsRes.data ?? [],
     },
   })
-}
+})
 
 // PATCH /api/candidates/:id
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const PATCH = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
   const parsed = await parseBody(request, candidateUpdateSchema)
   if (parsed instanceof NextResponse) return parsed
 
@@ -136,19 +120,10 @@ export async function PATCH(
   }
 
   return NextResponse.json({ data: candidate })
-}
+})
 
 // DELETE /api/candidates/:id
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const DELETE = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }) => {
   const { error } = await supabase
     .from('candidates')
     .delete()
@@ -160,4 +135,4 @@ export async function DELETE(
   }
 
   return new NextResponse(null, { status: 204 })
-}
+})

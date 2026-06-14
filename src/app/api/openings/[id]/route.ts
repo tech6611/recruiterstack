@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { openingUpdateSchema } from '@/lib/validations/openings'
 import { cancelApproval, ApprovalError } from '@/lib/approvals/engine'
@@ -10,9 +11,12 @@ import type { Opening } from '@/lib/types/requisitions'
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'openings:view')
+  if (denied) return denied
+
   const { data, error } = await supabase
     .from('openings')
     .select('*')
@@ -37,6 +41,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body instanceof NextResponse) return body
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'openings:edit')
+  if (denied) return denied
 
   // Fetch existing row + its approval state.
   const { data: existing, error: fetchErr } = await supabase
@@ -121,9 +127,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'openings:edit')
+  if (denied) return denied
+
   const { data, error } = await supabase
     .from('openings')
     .update({ status: 'archived' })

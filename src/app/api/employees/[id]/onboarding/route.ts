@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { parseBody } from '@/lib/api/helpers'
-import { assertAdmin, getViewerScope } from '@/lib/rbac'
+import { assertCapability, getViewerScope } from '@/lib/rbac'
 import { createPlanFromTemplate } from '@/modules/hris/domain/onboarding'
 
 const startSchema = z.object({
@@ -24,7 +24,7 @@ export async function POST(
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'onboarding:edit')
   if (guard) return guard
 
   const parsed = await parseBody(req, startSchema)

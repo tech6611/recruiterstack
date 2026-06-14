@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { parseBody } from '@/lib/api/helpers'
-import { assertAdmin, getViewerScope } from '@/lib/rbac'
+import { assertCapability, getViewerScope } from '@/lib/rbac'
 import { hrDocumentUpdateSchema } from '@/lib/validations/hr-documents'
 import { deleteDocument, getDocument, updateDocument } from '@/modules/hris/domain/documents'
 
@@ -17,7 +17,7 @@ export async function GET(
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'documents:view')
   if (guard) return guard
 
   try {
@@ -43,7 +43,7 @@ export async function PATCH(
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'documents:edit')
   if (guard) return guard
 
   const parsed = await parseBody(req, hrDocumentUpdateSchema)
@@ -71,7 +71,7 @@ export async function DELETE(
 
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, orgId, userId)
-  const guard = assertAdmin(scope)
+  const guard = assertCapability(scope, 'documents:edit')
   if (guard) return guard
 
   try {

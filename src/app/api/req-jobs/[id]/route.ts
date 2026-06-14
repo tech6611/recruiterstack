@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { jobUpdateSchema } from '@/lib/validations/jobs'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
-  const { orgId } = auth
+  const { orgId, userId } = auth
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'recruiting:view')
+  if (denied) return denied
+
   const { data, error } = await supabase
     .from('jobs')
     .select('*')
@@ -24,12 +28,15 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
-  const { orgId } = auth
+  const { orgId, userId } = auth
 
   const body = await parseBody(req, jobUpdateSchema)
   if (body instanceof NextResponse) return body
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'recruiting:edit')
+  if (denied) return denied
+
   const { data: existing } = await supabase
     .from('jobs').select('id, status').eq('id', params.id).eq('org_id', orgId).maybeSingle()
   const row = existing as { id: string; status: string } | null
@@ -53,9 +60,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
-  const { orgId } = auth
+  const { orgId, userId } = auth
 
   const supabase = createAdminClient()
+  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'recruiting:edit')
+  if (denied) return denied
+
   const { data, error } = await supabase
     .from('jobs')
     .update({ status: 'archived' })
