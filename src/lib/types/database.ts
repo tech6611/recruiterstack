@@ -859,6 +859,11 @@ export interface Application {
   org_id: string
   candidate_id: string
   hiring_request_id: string
+  // Canonical links (migration 064, Slice 3). Nullable; populated for
+  // applications created against a canonical job pipeline. Legacy apply flow
+  // leaves these null and uses hiring_request_id only.
+  job_id: string | null
+  opening_id: string | null
   stage_id: string | null
   status: ApplicationStatus
   review_status: ApplicationReviewStatus
@@ -1313,10 +1318,12 @@ export interface PipelineStageUpdate extends Partial<PipelineStageInsert> {}
 // Application Row type (without optional joined relations)
 type ApplicationRow = Omit<Application, 'candidate' | 'stage' | 'hiring_request'>
 
-export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at' | 'resume_url' | 'cover_letter' | 'ai_score' | 'ai_recommendation' | 'ai_strengths' | 'ai_gaps' | 'ai_scored_at' | 'ai_criterion_scores' | 'source_detail' | 'credited_to' | 'stage_id' | 'review_status'> {
+export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at' | 'resume_url' | 'cover_letter' | 'ai_score' | 'ai_recommendation' | 'ai_strengths' | 'ai_gaps' | 'ai_scored_at' | 'ai_criterion_scores' | 'source_detail' | 'credited_to' | 'stage_id' | 'review_status' | 'job_id' | 'opening_id'> {
   id?: string
   created_at?: string
   applied_at?: string
+  job_id?: string | null
+  opening_id?: string | null
   resume_url?: string | null
   cover_letter?: string | null
   ai_score?: number | null

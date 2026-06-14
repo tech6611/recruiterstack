@@ -12,6 +12,10 @@ export interface CreateApplicationInput {
   orgId: string
   candidateId: string
   hiringRequestId: string
+  /** Canonical links (Slice 3). Optional; set when the application is created
+   *  against a canonical job pipeline. Legacy apply flow leaves them unset. */
+  jobId?: string | null
+  openingId?: string | null
   stageId?: string | null
   status?: Application['status']
   source: Application['source']
@@ -29,6 +33,10 @@ export async function createApplication(
     org_id: input.orgId,
     candidate_id: input.candidateId,
     hiring_request_id: input.hiringRequestId,
+    // Only reference the canonical link columns when set, so legacy inserts
+    // never touch them (deploy stays safe even if migration 064 lags).
+    ...(input.jobId ? { job_id: input.jobId } : {}),
+    ...(input.openingId ? { opening_id: input.openingId } : {}),
     stage_id: input.stageId ?? null,
     status: input.status ?? 'active',
     source: input.source,
