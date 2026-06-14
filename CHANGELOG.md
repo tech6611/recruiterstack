@@ -12,6 +12,18 @@ entries on top.
 ## 2026-06-14
 
 ### Added
+- **Per-member RBAC — Slice 1 (API enforcement).** Capability gates now enforced
+  across guarded API routes (130 route-methods, via a multi-agent workflow + a
+  reviewed pass over 35 flagged routes). Foundation: `getViewerScope` resolves
+  effective capabilities; `assertCapability(scope, cap)`; a `withCapability(cap,
+  handler)` route wrapper and `requireCapability(cap)` helper; `ensureDefaultMemberRole`
+  assigns new members their default role (admin→Owner, else Recruiter) so nobody
+  is locked out. Behavior-preserving for the two current populations (Owner = all
+  caps; Recruiter = recruiting/openings/analytics): admin-only surfaces map to
+  Owner-only capabilities, recruiting surfaces to caps every member already holds.
+  Relationship gates (canViewEmployee/Sensitive), `/me/**`, public, webhook, and
+  copilot routes untouched. Open recruiter-UX reference reads (departments/
+  locations lists, dropdowns) deliberately left open.
 - **Per-member RBAC — Slice 0 (model & resolver).** Hybrid model: named roles
   (capability bundles) + per-member allow/deny overrides; capability =
   `<module>:<action>`. New `src/lib/permissions.ts` (capability registry + pure
