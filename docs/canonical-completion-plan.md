@@ -20,25 +20,46 @@ RecruiterStack's two differentiators both rest on this model:
 
 So this is one project, not two. Person is the linchpin for both.
 
-## Current state (verified 2026-05-24)
+## Completion status (verified 2026-06-14)
 
-- **Canonical & done:** `openings`, `jobs`, `job_postings`, `job_openings`,
-  `departments`, `locations`, `compensation_bands`, `approval_*` (migrations 032–044).
-- **Bridged, not migrated:** `applications`, `candidates`, `interviews`, `offers`
-  still anchor to legacy `hiring_requests`.
-- **Sketch only:** `src/lib/domain/people.ts` — a `CanonicalPerson` type + one
-  mapper. No `people` table. `PersonSource` is hardcoded to `'candidate_record'`.
-- **Missing:** no `people`, no `employee_profiles`.
-- **Confirmed blockers / constraints:**
-  - `candidates.email` is **globally UNIQUE** (migration 001, never changed by 007).
-    Two orgs cannot share a candidate email — a multi-tenancy bug and a hard
-    blocker for a per-org Person model.
-  - **No `hiring_requests → jobs` correspondence exists.** The only `job_id` FK
-    added in migration 035 is on `hiring_teams`. Legacy pipelines were never
-    migrated into canonical `jobs`, so there is no row-level mapping to backfill
-    `applications.job_id` from `hiring_request_id`. Slice 3 must account for this.
-  - `org_id` is `TEXT` (Clerk org id) everywhere — new tables must match.
-- Latest migration: `044_users_title.sql`. New migrations start at `045`.
+**All slices 0–5 are DONE.** The canonical spine (Person → Candidate Profile →
+Application → Interview → Offer → Employee Profile) exists end-to-end, the agent
+layer routes through domain facades, and a CI drift guard prevents regression.
+
+| Slice | Status | Landed by |
+| --- | --- | --- |
+| 0 — candidate email per-org | ✅ done | migration 045 |
+| 1 — `people` + identity split | ✅ done | migrations 046 (people, backfill) + 062 (Party Model triggers) |
+| 4 — `employee_profiles` | ✅ done | migration 047 |
+| 2 — domain facades + agent re-point | ✅ done | `copilot-tools.ts` + `job-handlers.ts` now call `src/modules/ats/domain/*`; both off the audit's `legacy` list |
+| 3 — `applications` → canonical jobs | ✅ done | migration 064 (`applications.job_id`/`opening_id`) + dual-write in `createApplication` |
+| 5 — drift guard | ✅ done | `audit:canonical:check` + `.github/workflows/canonical-guard.yml` (fails CI on new legacy access) |
+
+**Audit:** `mixed: 0, legacy: 5, compatibility: 20, canonical: 20`. The remaining
+5 `legacy` files are the intake/`hiring_requests` routes frozen by decision (see
+Resolved decisions #2) — allowlisted in the drift guard.
+
+### Notes carried forward
+- **`applications.job_id` is forward-only.** No `hiring_requests → jobs` row-level
+  mapping exists, so legacy applications keep `hiring_request_id` only. New
+  canonical-job applications populate `job_id`. A `hiring_requests → jobs`
+  converter (for a true backfill, and the eventual single-"Jobs" nav collapse —
+  see `nav-consolidation-roadmap.md`) remains a separate future project.
+- **`hiring_request_id` is still `NOT NULL`** on `applications`; a later cleanup
+  slice can relax it once a canonical apply path exists.
+- **Two intentional Slice-2 micro-drifts** (error-string-only, genuine-DB-fault
+  paths only, more accurate): the `matching` queue handler and
+  `move_application_to_stage` now surface real DB errors instead of masking them
+  as "Role/Stage not found". Success/no-row paths are byte-identical.
+
+<details><summary>Historical pre-work state (verified 2026-05-24)</summary>
+
+- Canonical & done at that time: `openings`, `jobs`, `job_postings`,
+  `job_openings`, `departments`, `locations`, `compensation_bands`, `approval_*`.
+- `applications`/`candidates`/`interviews`/`offers` still anchored to
+  `hiring_requests`; no `people`/`employee_profiles`; `candidates.email` globally
+  unique; latest migration was `044`.
+</details>
 
 ## Guardrails (apply to every slice)
 
