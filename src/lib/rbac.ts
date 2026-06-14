@@ -197,6 +197,12 @@ export function assertCapability(
   return scope.capabilities.has(capability) ? null : forbidden(`Missing permission: ${capability}`)
 }
 
+/** 403 unless the viewer is an Owner. Permission management is Owner-only so a
+ *  non-owner can't grant themselves capabilities (privilege escalation). */
+export function assertOwner(scope: ViewerScope): NextResponse | null {
+  return scope.isOwner ? null : forbidden('Owner access required')
+}
+
 /**
  * Ensure a member has at least their default RBAC role assignment, so new
  * members (created after the migration backfill) aren't locked out once

@@ -12,6 +12,14 @@ entries on top.
 ## 2026-06-14
 
 ### Added
+- **Per-member RBAC — Slice 4 (admin UI).** New "Team & Permissions" page at
+  `/admin/permissions` (Owner-only). Roles section lists system roles (badged,
+  read-only) and custom roles (editable/deletable) with a capability grid
+  (rows = modules, columns = view/edit/approve, built from `CAPABILITIES`) plus
+  create/edit forms. Members section lists active org members with role chips
+  (add via a role picker, remove via the chip's ✕) and surfaces per-member
+  override counts. Added a "Permissions" entry to the sidebar Admin section
+  (`settings:edit`-gated).
 - **Per-member RBAC — Slice 1 (API enforcement).** Capability gates now enforced
   across guarded API routes (130 route-methods, via a multi-agent workflow + a
   reviewed pass over 35 flagged routes). Foundation: `getViewerScope` resolves

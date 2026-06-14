@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
-import { getViewerScope, assertCapability } from '@/lib/rbac'
+import { getViewerScope, assertCapability, assertOwner } from '@/lib/rbac'
 import type { Capability } from '@/lib/permissions'
 
 /**
@@ -43,6 +43,24 @@ export async function requireCapability(capability: Capability): Promise<
   const supabase = createAdminClient()
   const scope = await getViewerScope(supabase, auth.orgId, auth.userId)
   const denied = assertCapability(scope, capability)
+  if (denied) return denied
+  return auth
+}
+
+/**
+ * Owner-only gate for permission management (managing roles/assignments must
+ * not be doable by a non-owner, or they could grant themselves anything).
+ * Returns { orgId, userId, clerkUserId } or a 401/403 NextResponse.
+ */
+export async function requireOwner(): Promise<
+  { orgId: string; userId: string; clerkUserId: string } | NextResponse
+> {
+  const auth = await requireOrgAndUser()
+  if (auth instanceof NextResponse) return auth
+
+  const supabase = createAdminClient()
+  const scope = await getViewerScope(supabase, auth.orgId, auth.userId)
+  const denied = assertOwner(scope)
   if (denied) return denied
   return auth
 }

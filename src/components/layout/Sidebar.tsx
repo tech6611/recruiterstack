@@ -105,6 +105,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/approvals/inbox', label: 'Approvals',       icon: CheckSquare,   cap: 'approvals:view' },
       { href: '/admin/approvals', label: 'Approval chains', icon: ClipboardList, cap: 'settings:edit' },
+      { href: '/admin/permissions', label: 'Permissions',   icon: UserCog,       cap: 'settings:edit' },
       { href: '/settings',        label: 'Settings',        icon: Settings,      cap: 'settings:view' },
     ],
   },
