@@ -12,6 +12,22 @@ entries on top.
 ## 2026-06-14
 
 ### Added
+- **Per-member RBAC — Slice 5 (cleanup).** Remaining coarse admin gates
+  (`requireAdmin()` on departments / locations / compensation-bands) migrated to
+  `requireCapability('settings:edit')`; added resolver-precedence and tool-gate
+  tests. `requireAdmin`/`is_admin` retained as deprecated back-compat (admin↔Owner
+  still holds). Onboarding-invite + field-level org-settings gates intentionally
+  left as-is. **All RBAC slices 0–5 complete.**
+- **Per-member RBAC — Slice 3 (agent enforcement).** `executeTool` capability-gates
+  each tool (75-tool `TOOL_CAPABILITIES` map) when given a capability set; the
+  user copilot threads the caller's caps (orchestrator → sub-agent → executeTool),
+  while background jobs (WhatsApp responder, HR-case auto-answer) omit them and run
+  unrestricted. Closes the hole where the agent bypassed the route-level gates.
+- **Per-member RBAC — Slice 2 (capability-driven nav).** `/api/me` returns the
+  viewer's `capabilities`; the sidebar shows only items whose capability is held
+  (sections hide when empty), replacing the coarse `adminOnly` flag. `AdminOnlyGuard`
+  admits the `/hris` area on any People-area capability so granular grants reach
+  their pages.
 - **Per-member RBAC — Slice 4 (admin UI).** New "Team & Permissions" page at
   `/admin/permissions` (Owner-only). Roles section lists system roles (badged,
   read-only) and custom roles (editable/deletable) with a capability grid

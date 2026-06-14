@@ -134,15 +134,15 @@ Owner" guards.
 | --- | --- | --- |
 | **0 — Model & resolver** ✅ DONE (2026-06-14) | Migration 065 (`rbac_roles`/`rbac_role_capabilities`/`rbac_member_roles`/`rbac_member_overrides` — prefixed to avoid the legacy `roles` table); capability registry + pure resolver in `src/lib/permissions.ts`; `getPermissionSet`/`can`/`assertCan` in `rbac.ts` (standalone, **not** wired into `getViewerScope` yet); seed Owner + Recruiter per org; backfill admins→Owner, others→Recruiter. **No enforcement.** | Additive, reversible. Resolver dormant — deploy-safe before/after the migration. |
 | **1 — Enforce at API** ✅ DONE (2026-06-14) | Capability gates on guarded routes via a multi-agent workflow (130 route-methods) + reviewed dispositions for 35 flagged routes (Slice 1b). Foundation: `getViewerScope` resolves capabilities; `assertCapability(scope,cap)`; `withCapability(cap,handler)` wrapper; `requireCapability(cap)` (auth-admin); `ensureDefaultMemberRole` on member creation. Open recruiter-UX reads + engine/relationship gates left as-is by review. | Behavior-preserving for Owner + Recruiter populations; 5/5 parity PASS, 362 tests, guard green. |
-| **2 — Enforce at nav** | Capability-driven sidebar; `/api/me` returns caps; drop `adminOnly`. | Visible parity check against current sidebar. |
-| **3 — Enforce in agent** | Orchestrator + sub-agent tools gate on the acting user's caps. | Closes the "ask the AI to bypass" hole. |
-| **4 — Admin UI** | Team & Permissions screen (roles + assignments + overrides). | First point where access can actually be *customized*. Can be pulled earlier to configure before enforcing. |
-| **5 — Cleanup** | Deprecate the legacy `org_members.role` coarse gating; tests for the resolver/precedence; optional drift note. | |
+| **2 — Enforce at nav** ✅ DONE (2026-06-14) | `/api/me` returns the capability set; each `NAV_SECTIONS` item carries a required capability and sections show only their visible items (replaces `adminOnly`). `AdminOnlyGuard` allows the `/hris` area on any People-area capability. | Behavior-preserving (Owner/Recruiter). |
+| **3 — Enforce in agent** ✅ DONE (2026-06-14) | `executeTool` takes an optional capability set + `TOOL_CAPABILITIES` map (75 tools); user copilot threads the caller's caps (orchestrator → sub-agent → executeTool); background jobs omit them → unrestricted. | Closes the "ask the AI to bypass" hole. |
+| **4 — Admin UI** ✅ DONE (2026-06-14) | Owner-only Team & Permissions page at `/admin/permissions` (roles + capability grid + member role assignment); domain `roles.ts`; CRUD API under `/api/admin/roles` + `/api/admin/members` (all `requireOwner`). | Built via workflow. |
+| **5 — Cleanup** ✅ DONE (2026-06-14) | Remaining `requireAdmin()` callers (departments/locations/comp-bands) → `requireCapability('settings:edit')`; resolver-precedence + tool-gate tests. `requireAdmin`/`is_admin` kept as deprecated back-compat (still valid: admin↔Owner). Onboarding-invites + org-settings field-level gates left as-is (timing/custom logic). | |
 
 **Sequencing:** 0 first. Because Slice 0's backfill preserves current behavior,
 1/2/3 can land in any order without breaking anyone (defaults = today). 4 needs
 0; pull it before 1–3 if you want to configure roles before flipping enforcement.
-**Recommended:** 0 → 1 → 2 → 3 → 4 → 5.
+**Recommended:** 0 → 1 → 2 → 3 → 4 → 5. **All slices complete (2026-06-14).**
 
 ## Guardrails
 
