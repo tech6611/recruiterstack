@@ -9,6 +9,33 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-14
+
+### Changed
+- **Sidebar IA — TA-professional-only restructure (Phase 1).** The product is the
+  cockpit for a centralized TA team (recruiting + HR-ops, access-gated); employee
+  self-service ships as a separate variant. So `Sidebar.tsx` `NAV_SECTIONS` now:
+  removes the entire `Me` self-service bucket (all `/me/*`); drops the duplicate
+  `Pipelines` (`/req-jobs`) entry so legacy `/jobs` is the single "Jobs" surface
+  (Option A — it's the only board with candidates until canonical Slice 3);
+  renames `HRIS` → `People`. HR-ops modules (OKRs, Documents, HR cases, Leave
+  policies, Payroll) stay as admin/org views. Per-module RBAC (vs the current
+  coarse `adminOnly`) is a noted follow-up. See `docs/nav-consolidation-roadmap.md`.
+
+### Removed
+- Orphaned `Me`-only icon imports (`UserCircle`, `Calendar`, `Clock`) from `Sidebar.tsx`.
+
+### Docs
+- **Navigation consolidation roadmap.** New `docs/nav-consolidation-roadmap.md`
+  ties the sidebar IA cleanup to the canonical migration. Establishes the
+  TA-professional-only product principle (employee HRIS/Payroll self-service is a
+  separate variant → the `Me` bucket leaves this nav), documents the
+  Openings/Jobs/Pipelines overlap as "2 real concepts + 1 legacy duplicate"
+  (legacy `hiring_requests` still holds all candidates because `applications` has
+  no `job_id`), explains the canonical Job-vs-Opening distinction, and sequences
+  the work: nav now → canonical Slices 0–3 → final nav collapse once candidates
+  are re-anchored onto canonical `jobs`.
+
 ## 2026-06-10
 
 ### Added

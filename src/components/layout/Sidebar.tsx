@@ -6,17 +6,14 @@ import {
   LayoutDashboard,
   Users,
   UserCog,
-  UserCircle,
   Network,
   Briefcase,
-  Calendar,
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
   FileText,
   LifeBuoy,
   CheckSquare,
-  Clock,
   Wallet,
   Receipt,
   Settings,
@@ -54,31 +51,12 @@ const NAV_SECTIONS: NavSection[] = [
     href:    '/dashboard',
     items:   [],
   },
-  ...(flags.hris
-    ? [{
-        section: 'Me',
-        icon:    UserCircle,
-        items: [
-          { href: '/me',                  label: 'Overview',         icon: UserCircle },
-          { href: '/me/onboarding',       label: 'Onboarding',       icon: ClipboardCheck },
-          { href: '/me/okrs',             label: 'OKRs',             icon: Target },
-          { href: '/me/time-off',         label: 'Time off',         icon: Calendar },
-          { href: '/me/documents',        label: 'Documents',        icon: FileText },
-          { href: '/me/cases',            label: 'HR cases',         icon: LifeBuoy },
-          { href: '/me/payslips',         label: 'Payslips',         icon: Wallet },
-          { href: '/me/tax-declarations', label: 'Tax declarations', icon: Receipt },
-          { href: '/me/timeline',         label: 'Timeline',         icon: Clock },
-          { href: '/me/approvals',        label: 'Approvals',        icon: Inbox },
-        ],
-      } satisfies NavSection]
-    : []),
   {
     section: 'Recruiting',
     icon:    Briefcase,
     items: [
       { href: '/openings',   label: 'Openings',   icon: ClipboardList },
       { href: '/jobs',       label: 'Jobs',       icon: Briefcase },
-      { href: '/req-jobs',   label: 'Pipelines',  icon: Briefcase },
       { href: '/candidates', label: 'Candidates', icon: Users },
       { href: '/sourcing',   label: 'Sourcing',   icon: Search },
       { href: '/sequences',  label: 'Sequences',  icon: Mail },
@@ -87,7 +65,7 @@ const NAV_SECTIONS: NavSection[] = [
   },
   ...(flags.hris
     ? [{
-        section:   'HRIS',
+        section:   'People',
         icon:      UserCog,
         adminOnly: true,
         items: [
