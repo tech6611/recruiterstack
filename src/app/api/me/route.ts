@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
+import { getPermissionSet } from '@/lib/rbac'
 import { getEmployeeDetail, getMyEmployeeProfile } from '@/modules/hris/domain/employees'
 import type { OrgRole } from '@/lib/types/requisitions'
 
@@ -19,7 +20,7 @@ export async function GET() {
   const { orgId, userId, clerkUserId } = authResult
 
   const supabase = createAdminClient()
-  const [{ data: member }, employee] = await Promise.all([
+  const [{ data: member }, employee, capabilities] = await Promise.all([
     supabase
       .from('org_members')
       .select('role, is_active, onboarded_at')
@@ -30,6 +31,7 @@ export async function GET() {
       const profile = await getMyEmployeeProfile(supabase, orgId, userId)
       return profile ? await getEmployeeDetail(supabase, orgId, profile.id) : null
     })(),
+    getPermissionSet(supabase, orgId, userId),
   ])
 
   const row = member as { role: OrgRole; is_active: boolean; onboarded_at: string | null } | null
@@ -43,6 +45,7 @@ export async function GET() {
       is_active:      row?.is_active ?? true,
       onboarded_at:   row?.onboarded_at ?? null,
       is_admin:       row?.role === 'admin',
+      capabilities:   Array.from(capabilities),       // effective RBAC capabilities
       employee,                                       // null when not bridged yet
     },
   })

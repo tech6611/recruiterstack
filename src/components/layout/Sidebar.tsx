@@ -31,9 +31,10 @@ import { UserButton, useOrganization } from '@clerk/nextjs'
 import { useEffect, useRef, useState } from 'react'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { flags } from '@/lib/flags'
+import type { Capability } from '@/lib/permissions'
 
 type IconType = typeof LayoutDashboard
-type NavItem = { href: string; label: string; icon: IconType }
+type NavItem = { href: string; label: string; icon: IconType; cap?: Capability }
 type NavSection = {
   section: string
   icon: IconType
@@ -41,7 +42,9 @@ type NavSection = {
   href?: string
   /** Empty array = no flyout (bucket navigates directly via `href`). */
   items: NavItem[]
-  adminOnly?: boolean
+  /** Capability gating the bucket's direct route (sections with items derive
+   *  visibility from their visible items instead). */
+  cap?: Capability
 }
 
 const NAV_SECTIONS: NavSection[] = [
@@ -55,27 +58,26 @@ const NAV_SECTIONS: NavSection[] = [
     section: 'Recruiting',
     icon:    Briefcase,
     items: [
-      { href: '/openings',   label: 'Openings',   icon: ClipboardList },
-      { href: '/jobs',       label: 'Jobs',       icon: Briefcase },
-      { href: '/candidates', label: 'Candidates', icon: Users },
-      { href: '/sourcing',   label: 'Sourcing',   icon: Search },
-      { href: '/sequences',  label: 'Sequences',  icon: Mail },
-      { href: '/inbox',      label: 'Inbox',      icon: Inbox },
+      { href: '/openings',   label: 'Openings',   icon: ClipboardList, cap: 'openings:view' },
+      { href: '/jobs',       label: 'Jobs',       icon: Briefcase,     cap: 'recruiting:view' },
+      { href: '/candidates', label: 'Candidates', icon: Users,         cap: 'recruiting:view' },
+      { href: '/sourcing',   label: 'Sourcing',   icon: Search,        cap: 'recruiting:view' },
+      { href: '/sequences',  label: 'Sequences',  icon: Mail,          cap: 'recruiting:view' },
+      { href: '/inbox',      label: 'Inbox',      icon: Inbox,         cap: 'recruiting:view' },
     ],
   },
   ...(flags.hris
     ? [{
         section:   'People',
         icon:      UserCog,
-        adminOnly: true,
         items: [
-          { href: '/hris/employees',      label: 'Employees',      icon: UserCog },
-          { href: '/hris/org-chart',      label: 'Org chart',      icon: Network },
-          { href: '/hris/onboarding',     label: 'Onboarding',     icon: ClipboardCheck },
-          { href: '/hris/okrs',           label: 'OKRs',           icon: Target },
-          { href: '/hris/documents',      label: 'Documents',      icon: FileText },
-          { href: '/hris/cases',          label: 'HR cases',       icon: LifeBuoy },
-          { href: '/hris/leave-policies', label: 'Leave policies', icon: CalendarDays },
+          { href: '/hris/employees',      label: 'Employees',      icon: UserCog,        cap: 'people:view' },
+          { href: '/hris/org-chart',      label: 'Org chart',      icon: Network,        cap: 'people:view' },
+          { href: '/hris/onboarding',     label: 'Onboarding',     icon: ClipboardCheck, cap: 'onboarding:view' },
+          { href: '/hris/okrs',           label: 'OKRs',           icon: Target,         cap: 'okrs:view' },
+          { href: '/hris/documents',      label: 'Documents',      icon: FileText,       cap: 'documents:view' },
+          { href: '/hris/cases',          label: 'HR cases',       icon: LifeBuoy,       cap: 'hr_cases:view' },
+          { href: '/hris/leave-policies', label: 'Leave policies', icon: CalendarDays,   cap: 'leave:view' },
         ],
       } satisfies NavSection]
     : []),
@@ -83,10 +85,9 @@ const NAV_SECTIONS: NavSection[] = [
     ? [{
         section:   'Payroll',
         icon:      Wallet,
-        adminOnly: true,
         items: [
-          { href: '/payroll/runs',     label: 'Payroll runs', icon: Wallet },
-          { href: '/settings/payroll', label: 'Tax settings', icon: Receipt },
+          { href: '/payroll/runs',     label: 'Payroll runs', icon: Wallet,  cap: 'payroll:view' },
+          { href: '/settings/payroll', label: 'Tax settings', icon: Receipt, cap: 'payroll:view' },
         ],
       } satisfies NavSection]
     : []),
@@ -94,18 +95,17 @@ const NAV_SECTIONS: NavSection[] = [
     section: 'Insights',
     icon:    BarChart2,
     items: [
-      { href: '/analytics',        label: 'Analytics',        icon: BarChart2 },
-      { href: '/analytics/people', label: 'People analytics', icon: BarChart2 },
+      { href: '/analytics',        label: 'Analytics',        icon: BarChart2, cap: 'analytics:view' },
+      { href: '/analytics/people', label: 'People analytics', icon: BarChart2, cap: 'people:view' },
     ],
   },
   {
     section:   'Admin',
     icon:      ShieldCheck,
-    adminOnly: true,
     items: [
-      { href: '/approvals/inbox', label: 'Approvals',       icon: CheckSquare },
-      { href: '/admin/approvals', label: 'Approval chains', icon: ClipboardList },
-      { href: '/settings',        label: 'Settings',        icon: Settings },
+      { href: '/approvals/inbox', label: 'Approvals',       icon: CheckSquare,   cap: 'approvals:view' },
+      { href: '/admin/approvals', label: 'Approval chains', icon: ClipboardList, cap: 'settings:edit' },
+      { href: '/settings',        label: 'Settings',        icon: Settings,      cap: 'settings:view' },
     ],
   },
 ]
@@ -116,21 +116,22 @@ const CLOSE_DELAY_MS = 120
 export function Sidebar() {
   const pathname              = usePathname()
   const { organization }      = useOrganization()
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+  const [caps, setCaps] = useState<Set<string> | null>(null)
   const [openSection, setOpenSection] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen]   = useState(false)
 
   const openTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Fetch admin status so adminOnly sections are hidden for non-admins.
-  // Initial render assumes non-admin to avoid a flash of admin chrome.
+  // Fetch the viewer's capabilities so the sidebar shows only accessible
+  // modules. Initial render assumes none, to avoid a flash of chrome the
+  // member can't access.
   useEffect(() => {
     let alive = true
     fetch('/api/me')
       .then(r => r.ok ? r.json() : null)
-      .then(j => { if (alive) setIsAdmin(Boolean(j?.data?.is_admin)) })
-      .catch(() => { if (alive) setIsAdmin(false) })
+      .then(j => { if (alive) setCaps(new Set<string>(j?.data?.capabilities ?? [])) })
+      .catch(() => { if (alive) setCaps(new Set<string>()) })
     return () => { alive = false }
   }, [])
 
@@ -142,7 +143,12 @@ export function Sidebar() {
   // Close any open flyout / mobile drawer on navigation.
   useEffect(() => { setOpenSection(null); setMobileOpen(false) }, [pathname])
 
-  const sections = NAV_SECTIONS.filter(s => !s.adminOnly || isAdmin === true)
+  // A section with items shows iff it has ≥1 capability-visible item; a direct
+  // bucket (Dashboard) shows if its own capability (if any) is held.
+  const hasCap = (cap?: Capability) => !cap || (caps?.has(cap) ?? false)
+  const sections = NAV_SECTIONS
+    .map(s => ({ ...s, items: s.items.filter(it => hasCap(it.cap)) }))
+    .filter(s => s.items.length > 0 || (!!s.href && hasCap(s.cap)))
 
   function scheduleOpen(name: string) {
     if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
