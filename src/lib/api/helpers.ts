@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { type ZodType, ZodError } from 'zod'
 import * as Sentry from '@sentry/nextjs'
-import { requireOrg } from '@/lib/auth'
+import { requireOrg, requireOrgAndUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getViewerScope, assertCapability, type ViewerScope } from '@/lib/rbac'
+import type { Capability } from '@/lib/permissions'
 import { logger } from '@/lib/logger'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,6 +36,54 @@ export function withOrg(handler: OrgHandler) {
       const supabase = createAdminClient()
       const response = await handler(req, orgId, supabase, ctx ?? { params: {} })
 
+      logger.info(`${method} ${path}`, { orgId, status: response.status, ms: Date.now() - start })
+      return response
+    } catch (err) {
+      Sentry.captureException(err)
+      logger.error(`${method} ${path} failed`, err, { ms: Date.now() - start })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    }
+  }
+}
+
+type CapabilityHandler = (
+  req: NextRequest,
+  orgId: string,
+  supabase: SupabaseClient,
+  ctx: { params: Record<string, string> },
+  scope: ViewerScope,
+  userId: string,
+) => Promise<NextResponse | Response>
+
+/**
+ * Like `withOrg`, but additionally resolves the caller's RBAC scope and enforces
+ * a capability (RBAC Slice 1). Returns 403 if the capability is missing. The
+ * handler receives the resolved `scope` (for any further self/manager checks)
+ * and the viewer's `userId`. Migrate a guarded route by swapping
+ * `withOrg(async (req, orgId, supabase) => …)` →
+ * `withCapability('module:action', async (req, orgId, supabase) => …)`.
+ */
+export function withCapability(capability: Capability, handler: CapabilityHandler) {
+  return async (req: NextRequest, ctx?: { params: Record<string, string> }) => {
+    const start = Date.now()
+    const method = req.method
+    const path = new URL(req.url).pathname
+
+    try {
+      const auth = await requireOrgAndUser()
+      if (auth instanceof NextResponse) return auth
+      const { orgId, userId } = auth
+
+      Sentry.setTag('org_id', orgId)
+      const supabase = createAdminClient()
+      const scope = await getViewerScope(supabase, orgId, userId)
+      const denied = assertCapability(scope, capability)
+      if (denied) {
+        logger.info(`${method} ${path}`, { orgId, status: 403, ms: Date.now() - start })
+        return denied
+      }
+
+      const response = await handler(req, orgId, supabase, ctx ?? { params: {} }, scope, userId)
       logger.info(`${method} ${path}`, { orgId, status: response.status, ms: Date.now() - start })
       return response
     } catch (err) {

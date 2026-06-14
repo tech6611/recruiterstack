@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { ensureDefaultMemberRole } from '@/lib/rbac'
 import type { EffectiveRole } from '@/lib/onboarding/steps'
 
 export interface OnboardingContext {
@@ -34,6 +35,9 @@ export async function ensureMemberRow(ctx: OnboardingContext): Promise<void> {
       { org_id: ctx.orgId, user_id: ctx.userId, role: 'recruiter' },
       { onConflict: 'org_id,user_id', ignoreDuplicates: true },
     )
+  // Give the new member their default RBAC role so they aren't locked out once
+  // capability enforcement is on (admin → Owner, else Recruiter). Idempotent.
+  await ensureDefaultMemberRole(supabase, ctx.orgId, ctx.userId)
 }
 
 /**

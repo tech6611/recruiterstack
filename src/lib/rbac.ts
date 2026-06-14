@@ -24,6 +24,8 @@ type Supabase = SupabaseClient<Database>
 
 export interface ViewerScope {
   isAdmin:      boolean
+  isOwner:      boolean         // an RBAC Owner role — grants every capability
+  capabilities: Set<Capability> // effective per-member capabilities (RBAC Slice 1)
   employeeId:   string | null   // the viewer's own employee_profile id, if bridged
   reportIds:    Set<string>     // employee_profile ids of the viewer's direct reports
 }
@@ -64,8 +66,12 @@ export async function getViewerScope(
     reportIds = new Set((reports ?? []).map(r => (r as { id: string }).id))
   }
 
+  const { capabilities, isOwner } = await resolveMemberPermissions(supabase, orgId, userId)
+
   return {
     isAdmin:    memberRow?.is_active === true && memberRow?.role === 'admin',
+    isOwner,
+    capabilities,
     employeeId,
     reportIds,
   }
@@ -116,15 +122,15 @@ export function assertCanViewSensitive(
 // tables aren't in the generated Database type yet (formalize via gen:types).
 
 /**
- * Effective capability set for a member: union of assigned-role capabilities,
- * plus per-member allow/deny overrides; Owner roles grant everything.
+ * Effective capabilities + owner flag for a member: union of assigned-role
+ * capabilities plus per-member allow/deny overrides; Owner roles grant all.
  * See `resolveCapabilities` in src/lib/permissions.ts for the precedence rules.
  */
-export async function getPermissionSet(
+async function resolveMemberPermissions(
   supabase: Supabase,
   orgId: string,
   userId: string,
-): Promise<Set<Capability>> {
+): Promise<{ capabilities: Set<Capability>; isOwner: boolean }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any
 
@@ -152,21 +158,86 @@ export async function getPermissionSet(
     .eq('org_id', orgId)
     .eq('user_id', userId)
 
-  return resolveCapabilities({
+  return {
+    capabilities: resolveCapabilities({
+      isOwner,
+      roleCapabilities,
+      overrides: (overrides ?? []) as CapabilityOverride[],
+    }),
     isOwner,
-    roleCapabilities,
-    overrides: (overrides ?? []) as CapabilityOverride[],
-  })
+  }
+}
+
+/** Effective capability set for a member (standalone; prefer `getViewerScope`). */
+export async function getPermissionSet(
+  supabase: Supabase,
+  orgId: string,
+  userId: string,
+): Promise<Set<Capability>> {
+  return (await resolveMemberPermissions(supabase, orgId, userId)).capabilities
 }
 
 export function can(capabilities: Set<Capability>, capability: Capability): boolean {
   return capabilities.has(capability)
 }
 
-/** Convenience: returns the 403 to return-as-is, or null if allowed. */
+/** 403 to return-as-is, or null if allowed. Use with a capability set. */
 export function assertCan(
   capabilities: Set<Capability>,
   capability: Capability,
 ): NextResponse | null {
   return capabilities.has(capability) ? null : forbidden(`Missing permission: ${capability}`)
+}
+
+/** 403 to return-as-is, or null if allowed. Scope-based — the common route guard. */
+export function assertCapability(
+  scope: ViewerScope,
+  capability: Capability,
+): NextResponse | null {
+  return scope.capabilities.has(capability) ? null : forbidden(`Missing permission: ${capability}`)
+}
+
+/**
+ * Ensure a member has at least their default RBAC role assignment, so new
+ * members (created after the migration backfill) aren't locked out once
+ * enforcement is on. admin → Owner, everyone else → Recruiter. Idempotent.
+ * Call from every org_members creation path.
+ */
+export async function ensureDefaultMemberRole(
+  supabase: Supabase,
+  orgId: string,
+  userId: string,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+
+  const { data: existing } = await sb
+    .from('rbac_member_roles')
+    .select('role_id')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .limit(1)
+  if (((existing ?? []) as unknown[]).length > 0) return
+
+  const { data: member } = await sb
+    .from('org_members')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  const roleName = (member as { role?: string } | null)?.role === 'admin' ? 'Owner' : 'Recruiter'
+
+  const { data: role } = await sb
+    .from('rbac_roles')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('is_system', true)
+    .eq('name', roleName)
+    .maybeSingle()
+  const roleId = (role as { id?: string } | null)?.id
+  if (!roleId) return
+
+  await sb
+    .from('rbac_member_roles')
+    .upsert({ org_id: orgId, user_id: userId, role_id: roleId }, { onConflict: 'org_id,user_id,role_id', ignoreDuplicates: true })
 }

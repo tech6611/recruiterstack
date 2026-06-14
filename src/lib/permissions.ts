@@ -19,7 +19,7 @@ export const CAPABILITIES = [
   'okrs:view',        'okrs:edit',
   'documents:view',   'documents:edit',
   'hr_cases:view',    'hr_cases:edit',
-  'leave:view',       'leave:approve',
+  'leave:view',       'leave:edit',       'leave:approve',
   'payroll:view',     'payroll:edit',
   'analytics:view',
   'approvals:view',   'approvals:approve',
