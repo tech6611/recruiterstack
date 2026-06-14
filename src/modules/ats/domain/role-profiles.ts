@@ -180,3 +180,86 @@ export async function updateCandidateStatusesForRoleDecision(
     ),
   ])
 }
+
+export type RoleSummary = Pick<
+  Role,
+  | 'id'
+  | 'job_title'
+  | 'status'
+  | 'location'
+  | 'min_experience'
+  | 'required_skills'
+  | 'salary_min'
+  | 'salary_max'
+  | 'auto_advance_threshold'
+  | 'auto_reject_threshold'
+  | 'created_at'
+>
+
+export async function listRoleSummaries(
+  supabase: Supabase,
+  orgId: string,
+  opts: { status?: string | null },
+): Promise<RoleSummary[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q: any = supabase
+    .from('roles')
+    .select(
+      'id, job_title, status, location, min_experience, required_skills, salary_min, salary_max, auto_advance_threshold, auto_reject_threshold, created_at',
+    )
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+
+  if (opts.status) q = q.eq('status', opts.status)
+
+  const { data, error } = await q.limit(50)
+  if (error) throw error
+  return (data ?? []) as RoleSummary[]
+}
+
+export async function createRoleReturningSummary(
+  supabase: Supabase,
+  orgId: string,
+  input: RoleInsert,
+): Promise<Pick<Role, 'id' | 'job_title' | 'status'>> {
+  const { data, error } = await supabase
+    .from('roles')
+    .insert({ ...input, org_id: orgId } as never)
+    .select('id, job_title, status')
+    .single()
+
+  if (error) throw error
+  return data as Pick<Role, 'id' | 'job_title' | 'status'>
+}
+
+export async function getRoleTitleForOrg(
+  supabase: Supabase,
+  orgId: string,
+  roleId: string,
+): Promise<Pick<Role, 'id' | 'job_title'> | null> {
+  const { data, error } = await supabase
+    .from('roles')
+    .select('id, job_title')
+    .eq('id', roleId)
+    .eq('org_id', orgId)
+    .single()
+
+  if (error) return null
+  return (data ?? null) as Pick<Role, 'id' | 'job_title'> | null
+}
+
+export async function updateRoleFields(
+  supabase: Supabase,
+  orgId: string,
+  roleId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  updates: Record<string, any>,
+): Promise<void> {
+  const { error } = await supabase
+    .from('roles')
+    .update(updates as never)
+    .eq('id', roleId)
+    .eq('org_id', orgId)
+
+  if (error) throw error
+}

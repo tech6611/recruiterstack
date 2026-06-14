@@ -14,10 +14,65 @@ import {
   createLegacyIntakeRequest,
   createLegacyJobAndPipeline,
   findLegacyJobsForAgent,
+  getFirstLegacyPipelineStage,
   getLegacyJobById,
+  getLegacyPipelineStageById,
   listLegacyJobsForAgent,
+  listLegacyPipelineStagesForJob,
   updateLegacyJob,
 } from '@/modules/ats/domain/job-pipelines'
+import {
+  searchCandidatesForAgent,
+  countCandidatesByStatus,
+  getCandidateForAgentLookup,
+  searchCandidatePoolForAgent,
+  getCandidateNameAndStatus,
+  setCandidateStatus,
+  markCandidateOfferExtended,
+  markCandidateHired,
+} from '@/modules/ats/domain/candidates'
+import {
+  listActiveApplicationsByCandidatesWithJobTitle,
+  listActiveApplicationsForJobPipeline,
+  listActiveApplicationHiringRequestIds,
+  listActiveApplicationsForStaleCheck,
+  listApplicationsForCandidateWithJobAndStage,
+  getApplicationStageContext,
+  updateApplicationStage,
+  getApplicationCandidateAndJob,
+  listExistingApplicationCandidateIds,
+  insertPipelineApplication,
+  listUnscoredActiveApplicationsWithCandidate,
+  applyAiScoreToApplication,
+  getApplicationCandidateEmailAndJob,
+  getApplicationCandidateIdAndJob,
+  findApplicationIdInOrg,
+  updateApplicationStatusInOrg,
+  getApplicationStageNameInOrg,
+  updateApplicationStageById,
+  listActiveApplicationsBelowScore,
+  updateApplicationStatusById,
+  listStaleActiveApplicationsForInbox,
+  getApplicationCandidateFullNameAndJob,
+  getApplicationForEmailDraft,
+} from '@/modules/ats/domain/applications'
+import {
+  listRoleSummaries,
+  createRoleReturningSummary,
+  getRoleTitleForOrg,
+  updateRoleFields,
+} from '@/modules/ats/domain/role-profiles'
+import {
+  scheduleInterview as scheduleInterviewRow,
+  listInterviews,
+  updateInterviewStatus as updateInterviewStatusRow,
+  createSelfScheduleInterview,
+} from '@/modules/ats/domain/interviews'
+import {
+  createOfferRow,
+  updateOfferRow,
+  listOffers,
+} from '@/modules/ats/domain/offers'
 import { fetchLegacyAnalyticsInputs } from '@/modules/ats/domain/reporting'
 import {
   getEmployeeByPerson,
@@ -1252,43 +1307,13 @@ async function searchCandidates(
 ): Promise<string> {
   const { query, status } = input
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = supabase
-    .from('candidates')
-    .select('id, current_title, status, skills, experience_years, location, person:people(name, email)')
-    .eq('org_id', orgId)
-
-  if (query) {
-    // Name now lives on people; resolve matching person ids first and OR with
-    // the candidate-side title filter so the AI agent still gets relevant results.
-    const { data: people } = await supabase
-      .from('people')
-      .select('id')
-      .eq('org_id', orgId)
-      .ilike('name', `%${query}%`)
-      .limit(200)
-    const personIds = ((people ?? []) as Array<{ id: string }>).map(p => p.id)
-    const titleClause = `current_title.ilike.%${query}%`
-    if (personIds.length > 0) {
-      q = q.or(`${titleClause},person_id.in.(${personIds.join(',')})`)
-    } else {
-      q = q.or(titleClause)
-    }
-  }
-  if (status) q = q.eq('status', status)
-
-  const { data, error } = await q.order('created_at', { ascending: false }).limit(20)
+  const { data, error } = await searchCandidatesForAgent(supabase, orgId, { query, status })
   if (error) return `Error: ${error.message}`
   if (!data || data.length === 0) return `No candidates found matching "${query}"${status ? ` with status "${status}"` : ''}.`
 
   // Active applications per candidate
   const candidateIds = data.map((c: { id: string }) => c.id)
-  const { data: apps } = await supabase
-    .from('applications')
-    .select('candidate_id, hiring_request:hiring_requests(position_title)')
-    .in('candidate_id', candidateIds)
-    .eq('org_id', orgId)
-    .eq('status', 'active')
+  const apps = await listActiveApplicationsByCandidatesWithJobTitle(supabase, orgId, candidateIds)
 
   const appsByCandidate: Record<string, string[]> = {}
   for (const app of apps ?? []) {
@@ -1341,25 +1366,16 @@ async function getJobPipeline(
 
   const job = jobs[0]
 
-  const [stagesRes, appsRes] = await Promise.all([
-    supabase
-      .from('pipeline_stages')
-      .select('id, name, order_index')
-      .eq('hiring_request_id', job.id)
-      .eq('org_id', orgId)
-      .order('order_index'),
-    supabase
-      .from('applications')
-      .select('id, stage_id, ai_score, candidate:candidates(name)')
-      .eq('hiring_request_id', job.id)
-      .eq('org_id', orgId)
-      .eq('status', 'active'),
-  ])
-
-  if (stagesRes.error) return `Error fetching stages: ${stagesRes.error.message}`
-
-  const stages = stagesRes.data ?? []
-  const apps   = appsRes.data ?? []
+  let stages
+  let apps
+  try {
+    [stages, apps] = await Promise.all([
+      listLegacyPipelineStagesForJob(supabase, orgId, job.id),
+      listActiveApplicationsForJobPipeline(supabase, orgId, job.id),
+    ])
+  } catch (err) {
+    return `Error fetching stages: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
 
   // Group candidates by stage
   const stageMap: Record<string, { name: string; candidates: string[] }> = {}
@@ -1414,12 +1430,7 @@ async function listJobs(
   if (jobs.length === 0) return 'No jobs found.'
 
   const jobIds = jobs.map((j: { id: string }) => j.id)
-  const { data: appCounts } = await supabase
-    .from('applications')
-    .select('hiring_request_id')
-    .in('hiring_request_id', jobIds)
-    .eq('org_id', orgId)
-    .eq('status', 'active')
+  const appCounts = await listActiveApplicationHiringRequestIds(supabase, orgId, jobIds)
 
   const countByJob: Record<string, number> = {}
   for (const app of appCounts ?? []) {
@@ -1437,18 +1448,18 @@ async function listJobs(
 }
 
 async function getDashboardStats(orgId: string, supabase: SupabaseClient): Promise<string> {
-  const [totalJobs, activeRes, interviewingRes, hiredRes] = await Promise.all([
+  const [totalJobs, activeCount, interviewingCount, hiredCount] = await Promise.all([
     countLegacyJobs(supabase, orgId),
-    supabase.from('candidates').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'active'),
-    supabase.from('candidates').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'interviewing'),
-    supabase.from('candidates').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'hired'),
+    countCandidatesByStatus(supabase, orgId, 'active'),
+    countCandidatesByStatus(supabase, orgId, 'interviewing'),
+    countCandidatesByStatus(supabase, orgId, 'hired'),
   ])
 
   return `Recruiting overview:
 • Total jobs: ${totalJobs}
-• Active candidates: ${activeRes.count ?? 0}
-• Currently interviewing: ${interviewingRes.count ?? 0}
-• Total hired: ${hiredRes.count ?? 0}`
+• Active candidates: ${activeCount}
+• Currently interviewing: ${interviewingCount}
+• Total hired: ${hiredCount}`
 }
 
 async function findStaleApplications(
@@ -1460,11 +1471,7 @@ async function findStaleApplications(
   const days   = input.days ?? 7
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
-  const { data: apps, error: appsErr } = await supabase
-    .from('applications')
-    .select('id, applied_at, pipeline_stages(name), hiring_request:hiring_requests(position_title), candidate:candidates(name)')
-    .eq('org_id', orgId)
-    .eq('status', 'active')
+  const { data: apps, error: appsErr } = await listActiveApplicationsForStaleCheck(supabase, orgId)
 
   if (appsErr) return `Error: ${appsErr.message}`
   if (!apps || apps.length === 0) return 'No active applications found.'
@@ -1519,21 +1526,14 @@ async function getCandidate(
 ): Promise<string> {
   const { candidate_id, candidate_name_query } = input
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = supabase
-    .from('candidates')
-    .select('id, name, email, phone, current_title, skills, experience_years, location, status, linkedin_url')
-    .eq('org_id', orgId)
-
-  if (candidate_id) {
-    q = q.eq('id', candidate_id)
-  } else if (candidate_name_query) {
-    q = q.ilike('name', `%${candidate_name_query}%`)
-  } else {
+  if (!candidate_id && !candidate_name_query) {
     return 'Error: provide either candidate_id or candidate_name_query'
   }
 
-  const { data: candidates, error } = await q.limit(3)
+  const { data: candidates, error } = await getCandidateForAgentLookup(supabase, orgId, {
+    candidateId: candidate_id,
+    nameQuery: candidate_name_query,
+  })
   if (error) return `Error: ${error.message}`
   if (!candidates || candidates.length === 0) return `No candidate found matching "${candidate_name_query ?? candidate_id}".`
 
@@ -1542,14 +1542,10 @@ async function getCandidate(
     return `Multiple candidates found — be more specific:\n${candidates.map((c: any) => `• ${c.name} | ${c.current_title ?? 'No title'} | ${c.email} | ID: ${c.id}`).join('\n')}`
   }
 
-  const c = candidates[0]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const c = candidates[0] as any
 
-  const { data: apps } = await supabase
-    .from('applications')
-    .select('id, status, applied_at, ai_score, pipeline_stages(name), hiring_request:hiring_requests(position_title, status)')
-    .eq('candidate_id', c.id)
-    .eq('org_id', orgId)
-    .order('applied_at', { ascending: false })
+  const apps = await listApplicationsForCandidateWithJobAndStage(supabase, orgId, c.id)
 
   let result = `${c.name}\n`
   result += `Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}\n`
@@ -1584,30 +1580,16 @@ async function moveApplicationToStage(
   const { application_id, stage_id, note } = input
 
   // Verify application exists in this org
-  const { data: current, error: fetchErr } = await supabase
-    .from('applications')
-    .select('id, pipeline_stages(name), candidate:candidates(name), hiring_request:hiring_requests(position_title)')
-    .eq('id', application_id)
-    .eq('org_id', orgId)
-    .single()
+  const { data: current, error: fetchErr } = await getApplicationStageContext(supabase, orgId, application_id)
 
   if (fetchErr || !current) return `Application not found or not in your organization.`
 
   // Verify new stage exists in this org
-  const { data: newStage, error: stageErr } = await supabase
-    .from('pipeline_stages')
-    .select('id, name')
-    .eq('id', stage_id)
-    .eq('org_id', orgId)
-    .single()
+  const newStage = await getLegacyPipelineStageById(supabase, orgId, stage_id)
 
-  if (stageErr || !newStage) return `Stage not found in your organization.`
+  if (!newStage) return `Stage not found in your organization.`
 
-  const { error: updateErr } = await supabase
-    .from('applications')
-    .update({ stage_id } as never)
-    .eq('id', application_id)
-    .eq('org_id', orgId)
+  const { error: updateErr } = await updateApplicationStage(supabase, orgId, application_id, stage_id)
 
   if (updateErr) return `Error moving application: ${updateErr.message}`
 
@@ -1641,12 +1623,7 @@ async function addNoteToApplication(
 
   if (!note?.trim()) return 'Error: note cannot be empty'
 
-  const { data: app, error: fetchErr } = await supabase
-    .from('applications')
-    .select('id, candidate:candidates(name), hiring_request:hiring_requests(position_title)')
-    .eq('id', application_id)
-    .eq('org_id', orgId)
-    .single()
+  const { data: app, error: fetchErr } = await getApplicationCandidateAndJob(supabase, orgId, application_id)
 
   if (fetchErr || !app) return `Application not found or not in your organization.`
 
@@ -1711,19 +1688,13 @@ async function searchCandidatePool(
 ): Promise<string> {
   const { skills_keywords, location, min_experience, max_experience, limit = 50 } = input
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = supabase
-    .from('candidates')
-    .select('id, name, email, current_title, experience_years, location, skills, status')
-    .eq('org_id', orgId)
-    .neq('status', 'rejected')
-
-  if (location) q = q.ilike('location', `%${location}%`)
-  if (min_experience != null) q = q.gte('experience_years', min_experience)
-  if (max_experience != null) q = q.lte('experience_years', max_experience)
-
   // Fetch 3x limit to allow for client-side skill filtering
-  const { data, error } = await q.order('created_at', { ascending: false }).limit((limit as number) * 3)
+  const { data, error } = await searchCandidatePoolForAgent(supabase, orgId, {
+    location,
+    minExperience: min_experience,
+    maxExperience: max_experience,
+    fetchLimit: (limit as number) * 3,
+  })
   if (error) return `Error: ${error.message}`
   if (!data || data.length === 0) return 'No candidates found matching the criteria.'
 
@@ -1772,24 +1743,16 @@ async function bulkAddToPipeline(
   }
 
   // Get first pipeline stage for the job
-  const { data: stages, error: stageErr } = await supabase
-    .from('pipeline_stages')
-    .select('id, name')
-    .eq('hiring_request_id', job_id)
-    .eq('org_id', orgId)
-    .order('order_index')
-    .limit(1)
-
-  if (stageErr) return `Error fetching pipeline stages: ${stageErr.message}`
-  const firstStage = stages?.[0] ?? null
+  let stage
+  try {
+    stage = await getFirstLegacyPipelineStage(supabase, orgId, job_id)
+  } catch (err) {
+    return `Error fetching pipeline stages: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
+  const firstStage = stage
 
   // Check for existing applications (skip duplicates)
-  const { data: existing } = await supabase
-    .from('applications')
-    .select('candidate_id')
-    .eq('hiring_request_id', job_id)
-    .eq('org_id', orgId)
-    .in('candidate_id', candidate_ids)
+  const existing = await listExistingApplicationCandidateIds(supabase, orgId, job_id, candidate_ids)
 
   const existingIds = new Set((existing ?? []).map((e: { candidate_id: string }) => e.candidate_id))
   const toAdd = (candidate_ids as string[]).filter(id => !existingIds.has(id))
@@ -1800,19 +1763,12 @@ async function bulkAddToPipeline(
 
   let added = 0
   for (const candidate_id of toAdd) {
-    const { data: app, error: appErr } = await supabase
-      .from('applications')
-      .insert({
-        candidate_id,
-        hiring_request_id: job_id,
-        stage_id:          firstStage?.id ?? null,
-        status:            'active',
-        source,
-        org_id:            orgId,
-        applied_at:        new Date().toISOString(),
-      } as never)
-      .select('id')
-      .single()
+    const { data: app, error: appErr } = await insertPipelineApplication(supabase, orgId, {
+      candidateId: candidate_id,
+      hiringRequestId: job_id,
+      stageId: firstStage?.id ?? null,
+      source,
+    })
 
     if (appErr || !app) continue
 
@@ -1846,13 +1802,7 @@ async function bulkScoreApplications(
   if (!job) return 'Job not found.'
 
   // Fetch active, unscored applications with full candidate data
-  const { data: apps, error: appsErr } = await supabase
-    .from('applications')
-    .select('id, candidate:candidates(*)')
-    .eq('hiring_request_id', job_id)
-    .eq('org_id', orgId)
-    .eq('status', 'active')
-    .is('ai_scored_at', null)
+  const { data: apps, error: appsErr } = await listUnscoredActiveApplicationsWithCandidate(supabase, orgId, job_id)
 
   if (appsErr) return `Error fetching applications: ${appsErr.message}`
   if (!apps || apps.length === 0) return 'No unscored active applications found for this job.'
@@ -1868,16 +1818,7 @@ async function bulkScoreApplications(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await scoreApplicationForJob(candidate as any, job)
 
-      await supabase
-        .from('applications')
-        .update({
-          ai_score:          result.score,
-          ai_recommendation: result.recommendation,
-          ai_strengths:      result.strengths,
-          ai_gaps:           result.gaps,
-          ai_scored_at:      new Date().toISOString(),
-        } as never)
-        .eq('id', app.id as string)
+      await applyAiScoreToApplication(supabase, app.id as string, result)
 
       scored++
       totalScore += result.score
@@ -1908,12 +1849,7 @@ async function sendOutreachEmail(
   const { application_id, subject, body, recruiter_name = 'The Recruiting Team' } = input
 
   // Fetch application + candidate details
-  const { data: app, error: appErr } = await supabase
-    .from('applications')
-    .select('id, candidate:candidates(name, email), hiring_request:hiring_requests(position_title)')
-    .eq('id', application_id)
-    .eq('org_id', orgId)
-    .single()
+  const { data: app, error: appErr } = await getApplicationCandidateEmailAndJob(supabase, orgId, application_id)
 
   if (appErr || !app) return 'Application not found or not in your organization.'
 
@@ -1965,12 +1901,7 @@ async function sendWhatsAppMessageTool(
 ): Promise<string> {
   const { application_id, body, template_params } = input
 
-  const { data: app, error: appErr } = await supabase
-    .from('applications')
-    .select('id, candidate_id, hiring_request:hiring_requests(position_title)')
-    .eq('id', application_id)
-    .eq('org_id', orgId)
-    .single()
+  const { data: app, error: appErr } = await getApplicationCandidateIdAndJob(supabase, orgId, application_id)
 
   if (appErr || !app) return 'Application not found or not in your organization.'
 
@@ -2089,20 +2020,11 @@ async function updateCandidateStatus(
 ): Promise<string> {
   const { candidate_id, status, reason } = input
 
-  const { data: candidate, error: fetchErr } = await supabase
-    .from('candidates')
-    .select('name, status')
-    .eq('id', candidate_id)
-    .eq('org_id', orgId)
-    .single()
+  const candidate = await getCandidateNameAndStatus(supabase, orgId, candidate_id)
 
-  if (fetchErr || !candidate) return 'Candidate not found in your organization.'
+  if (!candidate) return 'Candidate not found in your organization.'
 
-  const { error: updateErr } = await supabase
-    .from('candidates')
-    .update({ status } as never)
-    .eq('id', candidate_id)
-    .eq('org_id', orgId)
+  const { error: updateErr } = await setCandidateStatus(supabase, orgId, candidate_id, status)
 
   if (updateErr) return `Error updating status: ${updateErr.message}`
   return `Updated ${candidate.name}'s status from "${candidate.status}" to "${status}".${reason ? ` Reason: ${reason}` : ''}`
@@ -2124,20 +2046,11 @@ async function updateApplicationStatus(
   let updated = 0
 
   for (const application_id of application_ids as string[]) {
-    const { data: app } = await supabase
-      .from('applications')
-      .select('id')
-      .eq('id', application_id)
-      .eq('org_id', orgId)
-      .single()
+    const app = await findApplicationIdInOrg(supabase, orgId, application_id)
 
     if (!app) continue
 
-    await supabase
-      .from('applications')
-      .update({ status } as never)
-      .eq('id', application_id)
-      .eq('org_id', orgId)
+    await updateApplicationStatusInOrg(supabase, orgId, application_id, status)
 
     await supabase.from('application_events').insert({
       application_id,
@@ -2166,30 +2079,17 @@ async function bulkMoveToStage(
     return 'Error: application_ids must be a non-empty array'
   }
 
-  const { data: stage, error: stageErr } = await supabase
-    .from('pipeline_stages')
-    .select('id, name')
-    .eq('id', stage_id)
-    .eq('org_id', orgId)
-    .single()
+  const stage = await getLegacyPipelineStageById(supabase, orgId, stage_id)
 
-  if (stageErr || !stage) return 'Stage not found in your organization.'
+  if (!stage) return 'Stage not found in your organization.'
 
   let moved = 0
   for (const application_id of application_ids as string[]) {
-    const { data: app } = await supabase
-      .from('applications')
-      .select('id, pipeline_stages(name)')
-      .eq('id', application_id)
-      .eq('org_id', orgId)
-      .single()
+    const app = await getApplicationStageNameInOrg(supabase, orgId, application_id)
 
     if (!app) continue
 
-    await supabase
-      .from('applications')
-      .update({ stage_id } as never)
-      .eq('id', application_id)
+    await updateApplicationStageById(supabase, application_id, stage_id)
 
     await supabase.from('application_events').insert({
       application_id,
@@ -2216,14 +2116,7 @@ async function bulkRejectBelowScore(
 ): Promise<string> {
   const { job_id, below_score, reason = 'Score below threshold' } = input
 
-  const { data: apps, error } = await supabase
-    .from('applications')
-    .select('id, ai_score, candidate:candidates(name)')
-    .eq('hiring_request_id', job_id)
-    .eq('org_id', orgId)
-    .eq('status', 'active')
-    .not('ai_score', 'is', null)
-    .lt('ai_score', below_score)
+  const { data: apps, error } = await listActiveApplicationsBelowScore(supabase, orgId, job_id, below_score)
 
   if (error) return `Error: ${error.message}`
   if (!apps || apps.length === 0) return `No active scored applications below ${below_score} found.`
@@ -2232,10 +2125,7 @@ async function bulkRejectBelowScore(
   for (const app of apps as Record<string, unknown>[]) {
     const appId = app.id as string
 
-    await supabase
-      .from('applications')
-      .update({ status: 'rejected' } as never)
-      .eq('id', appId)
+    await updateApplicationStatusById(supabase, appId, 'rejected')
 
     await supabase.from('application_events').insert({
       application_id: appId,
@@ -2259,12 +2149,7 @@ async function getApplicationEvents(
 ): Promise<string> {
   const { application_id } = input
 
-  const { data: app, error: appErr } = await supabase
-    .from('applications')
-    .select('id, candidate:candidates(name), hiring_request:hiring_requests(position_title)')
-    .eq('id', application_id)
-    .eq('org_id', orgId)
-    .single()
+  const { data: app, error: appErr } = await getApplicationCandidateAndJob(supabase, orgId, application_id)
 
   if (appErr || !app) return 'Application not found in your organization.'
 
@@ -2334,12 +2219,7 @@ async function getScorecard(
 ): Promise<string> {
   const { application_id } = input
 
-  const { data: app, error: appErr } = await supabase
-    .from('applications')
-    .select('id, candidate:candidates(name), hiring_request:hiring_requests(position_title)')
-    .eq('id', application_id)
-    .eq('org_id', orgId)
-    .single()
+  const { data: app, error: appErr } = await getApplicationCandidateAndJob(supabase, orgId, application_id)
 
   if (appErr || !app) return 'Application not found in your organization.'
 
@@ -2387,17 +2267,12 @@ async function listRoles(
 ): Promise<string> {
   const { status } = input
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = supabase
-    .from('roles')
-    .select('id, job_title, status, location, min_experience, required_skills, salary_min, salary_max, auto_advance_threshold, auto_reject_threshold, created_at')
-    .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
-
-  if (status) q = q.eq('status', status)
-
-  const { data, error } = await q.limit(50)
-  if (error) return `Error: ${error.message}`
+  let data
+  try {
+    data = await listRoleSummaries(supabase, orgId, { status })
+  } catch (error) {
+    return `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+  }
   if (!data || data.length === 0) return `No roles found${status ? ` with status "${status}"` : ''}.`
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2425,9 +2300,9 @@ async function createRole(
 
   if (!job_title?.trim()) return 'Error: job_title is required.'
 
-  const { data, error } = await supabase
-    .from('roles')
-    .insert({
+  let data
+  try {
+    data = await createRoleReturningSummary(supabase, orgId, {
       job_title:              job_title.trim(),
       required_skills:        required_skills ?? [],
       min_experience:         min_experience  ?? 0,
@@ -2437,12 +2312,10 @@ async function createRole(
       status:                 status          ?? 'active',
       auto_advance_threshold: auto_advance_threshold ?? null,
       auto_reject_threshold:  auto_reject_threshold  ?? null,
-      org_id:                 orgId,
     } as never)
-    .select('id, job_title, status')
-    .single()
-
-  if (error) return `Error creating role: ${error.message}`
+  } catch (error) {
+    return `Error creating role: ${error instanceof Error ? error.message : 'Unknown error'}`
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const r = data as any
@@ -2459,14 +2332,9 @@ async function updateRole(
   if (!role_id) return 'Error: role_id is required.'
 
   // Verify the role belongs to this org
-  const { data: existing, error: fetchErr } = await supabase
-    .from('roles')
-    .select('id, job_title')
-    .eq('id', role_id)
-    .eq('org_id', orgId)
-    .single()
+  const existing = await getRoleTitleForOrg(supabase, orgId, role_id)
 
-  if (fetchErr || !existing) return `Role not found: ${role_id}`
+  if (!existing) return `Role not found: ${role_id}`
 
   // Build update payload from provided fields only
   const allowed = ['job_title', 'required_skills', 'min_experience', 'location', 'salary_min', 'salary_max', 'status', 'auto_advance_threshold', 'auto_reject_threshold']
@@ -2478,13 +2346,11 @@ async function updateRole(
 
   if (Object.keys(updates).length === 0) return 'No fields provided to update.'
 
-  const { error } = await supabase
-    .from('roles')
-    .update(updates as never)
-    .eq('id', role_id)
-    .eq('org_id', orgId)
-
-  if (error) return `Error updating role: ${error.message}`
+  try {
+    await updateRoleFields(supabase, orgId, role_id, updates)
+  } catch (error) {
+    return `Error updating role: ${error instanceof Error ? error.message : 'Unknown error'}`
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const changes = Object.entries(updates).map(([k, v]) => `${k}: "${Array.isArray(v) ? v.join(', ') : v}"`).join(', ')
@@ -2560,7 +2426,7 @@ async function getInbox(
 ): Promise<string> {
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
-  const [eventsRes, staleRes] = await Promise.all([
+  const [eventsRes, stale] = await Promise.all([
     supabase
       .from('application_events')
       .select(`
@@ -2574,23 +2440,10 @@ async function getInbox(
       .eq('org_id', orgId)
       .order('created_at', { ascending: false })
       .limit(20),
-    supabase
-      .from('applications')
-      .select(`
-        id, status, applied_at, stage_id,
-        candidate:candidates(full_name),
-        job:hiring_requests(position_title),
-        stage:pipeline_stages(name)
-      `)
-      .eq('org_id', orgId)
-      .eq('status', 'active')
-      .lt('applied_at', fourteenDaysAgo)
-      .order('applied_at', { ascending: true })
-      .limit(20),
+    listStaleActiveApplicationsForInbox(supabase, orgId, fourteenDaysAgo),
   ])
 
   const events = eventsRes.data ?? []
-  const stale  = staleRes.data  ?? []
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const activityLines = (events as any[]).map(ev => {
@@ -2636,12 +2489,7 @@ async function createScorecard(
   }
 
   // Verify application belongs to org
-  const { data: app, error: appErr } = await supabase
-    .from('applications')
-    .select('id, candidate:candidates(full_name), job:hiring_requests(position_title)')
-    .eq('id', application_id)
-    .eq('org_id', orgId)
-    .single()
+  const { data: app, error: appErr } = await getApplicationCandidateFullNameAndJob(supabase, orgId, application_id)
 
   if (appErr || !app) return `Application not found: ${application_id}`
 
@@ -2690,17 +2538,7 @@ async function draftApplicationEmail(
   const templateKey = (template ?? 'interview_invite') as TemplateKey
   if (!TEMPLATE_DESC[templateKey]) return `Invalid template "${template}". Choose: interview_invite, rejection, offer, followup.`
 
-  const { data: app, error: appErr } = await supabase
-    .from('applications')
-    .select(`
-      id, status,
-      candidate:candidates(full_name, email),
-      job:hiring_requests(position_title, department),
-      stage:pipeline_stages(name)
-    `)
-    .eq('id', application_id)
-    .eq('org_id', orgId)
-    .single()
+  const { data: app, error: appErr } = await getApplicationForEmailDraft(supabase, orgId, application_id)
 
   if (appErr || !app) return `Application not found: ${application_id}`
 
@@ -2809,11 +2647,7 @@ async function scheduleInterview(
     org_id: orgId,
   }
 
-  const { data, error } = await supabase
-    .from('interviews')
-    .insert({ ...body, status: 'scheduled' } as never)
-    .select()
-    .single()
+  const { data, error } = await scheduleInterviewRow(supabase, orgId, body)
 
   if (error) return `Error: ${error.message}`
 
@@ -2842,17 +2676,11 @@ async function getInterviews(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = supabase
-    .from('interviews')
-    .select('*')
-    .eq('org_id', orgId)
-
-  if (input.application_id) q = q.eq('application_id', input.application_id)
-  if (input.candidate_id)   q = q.eq('candidate_id', input.candidate_id)
-  if (input.upcoming_only)  q = q.gte('scheduled_at', new Date().toISOString()).eq('status', 'scheduled')
-
-  const { data, error } = await q.order('scheduled_at', { ascending: true })
+  const { data, error } = await listInterviews(supabase, orgId, {
+    applicationId: input.application_id,
+    candidateId: input.candidate_id,
+    upcomingOnly: input.upcoming_only,
+  })
   if (error) return `Error: ${error.message}`
   if (!data || data.length === 0) return 'No interviews found.'
 
@@ -2871,13 +2699,7 @@ async function updateInterviewStatus(
 ): Promise<string> {
   const { interview_id, status, notes } = input
 
-  const { data, error } = await supabase
-    .from('interviews')
-    .update({ status, notes: notes ?? undefined, updated_at: new Date().toISOString() })
-    .eq('id', interview_id)
-    .eq('org_id', orgId)
-    .select()
-    .single()
+  const { data, error } = await updateInterviewStatusRow(supabase, orgId, interview_id, status, notes)
 
   if (error) return `Error: ${error.message}`
 
@@ -2910,25 +2732,24 @@ async function createOffer(
   const { application_id, candidate_id, hiring_request_id, position_title,
     base_salary, bonus, equity, start_date, expiry_date, notes, offer_letter_text } = input
 
-  const { data, error } = await supabase
-    .from('offers')
-    .insert({
-      org_id: orgId,
-      application_id, candidate_id, hiring_request_id,
-      position_title,
-      base_salary: base_salary ?? null,
-      bonus: bonus ?? null,
-      equity: equity ?? null,
-      start_date: start_date ?? null,
-      expiry_date: expiry_date ?? null,
-      notes: notes ?? null,
-      offer_letter_text: offer_letter_text ?? null,
-      status: 'draft',
-    } as never)
-    .select()
-    .single()
-
-  if (error) return `Error: ${error.message}`
+  let data
+  try {
+    data = await createOfferRow(supabase, orgId, {
+      applicationId: application_id,
+      candidateId: candidate_id,
+      hiringRequestId: hiring_request_id,
+      positionTitle: position_title,
+      baseSalary: base_salary,
+      bonus,
+      equity,
+      startDate: start_date,
+      expiryDate: expiry_date,
+      notes,
+      offerLetterText: offer_letter_text,
+    })
+  } catch (err) {
+    return `Error: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
 
   await supabase.from('application_events').insert({
     application_id,
@@ -2939,10 +2760,7 @@ async function createOffer(
     created_by: orgId,
   } as never)
 
-  await supabase
-    .from('candidates')
-    .update({ status: 'offer_extended', updated_at: new Date().toISOString() })
-    .eq('id', candidate_id).eq('org_id', orgId)
+  await markCandidateOfferExtended(supabase, orgId, candidate_id)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return `Offer created (ID: ${(data as any).id}, status: draft). Submit for approval with update_offer_status.`
@@ -2962,15 +2780,12 @@ async function updateOfferStatus(
   if (status === 'sent')                                 updatePayload.sent_at      = new Date().toISOString()
   if (status === 'accepted' || status === 'declined')    updatePayload.responded_at = new Date().toISOString()
 
-  const { data, error } = await supabase
-    .from('offers')
-    .update(updatePayload)
-    .eq('id', offer_id)
-    .eq('org_id', orgId)
-    .select()
-    .single()
-
-  if (error) return `Error: ${error.message}`
+  let data
+  try {
+    data = await updateOfferRow(supabase, orgId, offer_id, updatePayload)
+  } catch (err) {
+    return `Error: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const offer = data as any
@@ -2990,10 +2805,7 @@ async function updateOfferStatus(
     } as never)
 
     if (status === 'accepted') {
-      await supabase
-        .from('candidates')
-        .update({ status: 'hired', updated_at: new Date().toISOString() })
-        .eq('id', offer.candidate_id).eq('org_id', orgId)
+      await markCandidateHired(supabase, orgId, offer.candidate_id)
     }
   }
 
@@ -3006,18 +2818,16 @@ async function getOffers(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let q: any = supabase
-    .from('offers')
-    .select('*')
-    .eq('org_id', orgId)
-
-  if (input.application_id) q = q.eq('application_id', input.application_id)
-  if (input.candidate_id)   q = q.eq('candidate_id', input.candidate_id)
-  if (input.status)         q = q.eq('status', input.status)
-
-  const { data, error } = await q.order('created_at', { ascending: false })
-  if (error) return `Error: ${error.message}`
+  let data
+  try {
+    data = await listOffers(supabase, orgId, {
+      applicationId: input.application_id,
+      candidateId: input.candidate_id,
+      status: input.status,
+    })
+  } catch (err) {
+    return `Error: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
   if (!data || data.length === 0) return 'No offers found.'
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3065,21 +2875,16 @@ async function createSelfScheduleInvite(
   const placeholderDate = new Date()
   placeholderDate.setDate(placeholderDate.getDate() + 7)
 
-  const { data, error } = await supabase
-    .from('interviews')
-    .insert({
-      org_id: orgId,
-      application_id, candidate_id, hiring_request_id,
-      interviewer_name,
-      interview_type: interview_type ?? 'video',
-      scheduled_at: placeholderDate.toISOString(),
-      duration_minutes: duration_minutes ?? 60,
-      status: 'scheduled',
-      self_schedule_token: token,
-      self_schedule_expires_at: expires.toISOString(),
-    } as never)
-    .select()
-    .single()
+  const { data, error } = await createSelfScheduleInterview(supabase, orgId, {
+    application_id, candidate_id, hiring_request_id,
+    interviewer_name,
+    interview_type: interview_type ?? 'video',
+    scheduled_at: placeholderDate.toISOString(),
+    duration_minutes: duration_minutes ?? 60,
+    status: 'scheduled',
+    self_schedule_token: token,
+    self_schedule_expires_at: expires.toISOString(),
+  } as never)
 
   if (error) return `Error: ${error.message}`
 

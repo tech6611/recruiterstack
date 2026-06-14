@@ -497,6 +497,23 @@ export async function getLegacyJobById(
   return (data as HiringRequest) ?? null
 }
 
+/** Token-population fields for a legacy job, by hiring_request_id. Used by the
+ *  sequence-email handler. Matches the original inline read: looked up by id
+ *  only (no org filter in scope there), missing/error → null. */
+export async function getLegacyJobTokens(
+  supabase: Supabase,
+  hiringRequestId: string,
+): Promise<Pick<HiringRequest, 'position_title' | 'autopilot_company_name' | 'autopilot_recruiter_name'> | null> {
+  const { data } = await supabase
+    .from('hiring_requests')
+    .select('position_title, autopilot_company_name, autopilot_recruiter_name')
+    .eq('id', hiringRequestId)
+    .maybeSingle()
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any) ?? null
+}
+
 // Partial update for update_job.
 export async function updateLegacyJob(
   supabase: Supabase,
@@ -590,4 +607,46 @@ export async function createLegacyIntakeRequest(
 
   if (error) throw error
   return data as { id: string; intake_token: string; position_title: string }
+}
+
+// ── Pipeline-stage write/read facade (Slice 2) ───────────────────────────────
+
+// Ordered stages for one legacy job (get_job_pipeline agent tool).
+// Org-scoped; sorted by order_index. Caller does all string formatting.
+export async function listLegacyPipelineStagesForJob(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<Pick<PipelineStage, 'id' | 'name' | 'order_index'>[]> {
+  const { data, error } = await supabase
+    .from('pipeline_stages')
+    .select('id, name, order_index')
+    .eq('hiring_request_id', jobId)
+    .eq('org_id', orgId)
+    .order('order_index')
+
+  if (error) throw error
+  return (data ?? []) as Pick<PipelineStage, 'id' | 'name' | 'order_index'>[]
+}
+
+// Lookup a single pipeline stage by id within the org (move_application_to_stage
+// + bulk_move_to_stage agent tools). Returns null when the stage does not exist
+// in this org; callers emit their own not-found message.
+export async function getLegacyPipelineStageById(
+  supabase: Supabase,
+  orgId: string,
+  stageId: string,
+): Promise<Pick<PipelineStage, 'id' | 'name'> | null> {
+  const { data, error } = await supabase
+    .from('pipeline_stages')
+    .select('id, name')
+    .eq('id', stageId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw error
+  }
+  return (data as Pick<PipelineStage, 'id' | 'name'>) ?? null
 }

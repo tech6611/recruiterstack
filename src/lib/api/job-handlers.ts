@@ -14,6 +14,17 @@ import { logger } from '@/lib/logger'
 import Anthropic from '@anthropic-ai/sdk'
 import sgMail from '@sendgrid/mail'
 import type { Candidate, Role } from '@/lib/types/database'
+import {
+  getCandidateForSummary,
+  saveCandidateAiSummary,
+  setCandidateStatus,
+} from '@/modules/ats/domain/candidates'
+import {
+  listApplicationsForCandidateSummary,
+  getApplicationHiringRequestId,
+} from '@/modules/ats/domain/applications'
+import { getRoleMatchingInputs } from '@/modules/ats/domain/role-profiles'
+import { getLegacyJobTokens } from '@/modules/ats/domain/job-pipelines'
 
 // ── Autopilot ─────────────────────────────────────────────────────────────────
 
@@ -48,31 +59,11 @@ registerHandler('ai_summary', async (job: QueuedJob) => {
   const supabase = createAdminClient()
 
   // Fetch candidate + applications + events + scorecards
-  const [candRes, appsRes] = await Promise.all([
-    supabase
-      .from('candidates')
-      .select('*')
-      .eq('id', candidateId)
-      .eq('org_id', job.org_id)
-      .single(),
-    supabase
-      .from('applications')
-      .select(`
-        id, status, source, applied_at, ai_score, ai_recommendation,
-        ai_strengths, ai_gaps,
-        pipeline_stages(name),
-        hiring_requests(position_title, department, level)
-      `)
-      .eq('candidate_id', candidateId)
-      .eq('org_id', job.org_id)
-      .order('applied_at', { ascending: false }),
+  const [candidate, appsRes] = await Promise.all([
+    getCandidateForSummary(supabase, job.org_id, candidateId),
+    listApplicationsForCandidateSummary(supabase, job.org_id, candidateId),
   ])
 
-  if (candRes.error || !candRes.data) {
-    throw new Error('Candidate not found')
-  }
-
-  const candidate = candRes.data
   const apps = appsRes.data ?? []
 
   const appIds = apps.map((a: { id: string }) => a.id)
@@ -149,16 +140,7 @@ Be concise, direct, and useful for a recruiter who hasn't reviewed this profile 
 
   const summary = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
 
-  const { error: updateErr } = await supabase
-    .from('candidates')
-    .update({
-      ai_summary: summary,
-      ai_summary_generated_at: new Date().toISOString(),
-    })
-    .eq('id', candidateId)
-    .eq('org_id', job.org_id)
-
-  if (updateErr) throw new Error(`Failed to save summary: ${updateErr.message}`)
+  await saveCandidateAiSummary(supabase, job.org_id, candidateId, summary)
 
   logger.info('AI summary generated via queue', { jobId: job.id, candidateId })
 })
@@ -171,16 +153,11 @@ registerHandler('matching', async (job: QueuedJob) => {
 
   const supabase = createAdminClient()
 
-  const [roleRes, candsRes] = await Promise.all([
-    supabase.from('roles').select('*').eq('id', roleId).eq('org_id', job.org_id).single(),
-    supabase.from('candidates').select('*').eq('org_id', job.org_id),
-  ])
+  const inputs = await getRoleMatchingInputs(supabase, job.org_id, roleId)
+  if (!inputs) throw new Error('Role not found')
 
-  if (roleRes.error || !roleRes.data) throw new Error('Role not found')
-  if (candsRes.error) throw new Error(`Candidates query failed: ${candsRes.error.message}`)
-
-  const role = roleRes.data as Role
-  const candidates = (candsRes.data ?? []) as Candidate[]
+  const role = inputs.role as Role
+  const candidates = inputs.candidates as Candidate[]
 
   const results = await Promise.allSettled(
     candidates.map(async (candidate) => {
@@ -215,9 +192,9 @@ registerHandler('matching', async (job: QueuedJob) => {
 
     for (const m of matches ?? []) {
       if (role.auto_advance_threshold && m.score >= role.auto_advance_threshold) {
-        await supabase.from('candidates').update({ status: 'interviewing' }).eq('id', m.candidate_id).eq('org_id', job.org_id)
+        await setCandidateStatus(supabase, job.org_id, m.candidate_id, 'interviewing')
       } else if (role.auto_reject_threshold && m.score <= role.auto_reject_threshold) {
-        await supabase.from('candidates').update({ status: 'rejected' }).eq('id', m.candidate_id).eq('org_id', job.org_id)
+        await setCandidateStatus(supabase, job.org_id, m.candidate_id, 'rejected')
       }
     }
   }
@@ -317,14 +294,9 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
   let companyName = ''
   let recruiterName = ''
   if (enrollment.application_id) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: app } = await (supabase.from('applications') as any)
-      .select('hiring_request_id').eq('id', enrollment.application_id).single()
+    const app = await getApplicationHiringRequestId(supabase, enrollment.application_id)
     if (app?.hiring_request_id) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: hr } = await (supabase.from('hiring_requests') as any)
-        .select('position_title, autopilot_company_name, autopilot_recruiter_name')
-        .eq('id', app.hiring_request_id).single()
+      const hr = await getLegacyJobTokens(supabase, app.hiring_request_id)
       if (hr) {
         jobTitle = hr.position_title ?? ''
         companyName = hr.autopilot_company_name ?? ''

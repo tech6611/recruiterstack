@@ -12,6 +12,16 @@ entries on top.
 ## 2026-06-14
 
 ### Changed
+- **Canonical Slice 2 — copilot + job-queue storage access moved behind domain
+  facades.** `src/lib/copilot-tools.ts` and `src/lib/api/job-handlers.ts` no
+  longer touch `candidates` / `applications` / `pipeline_stages` / `roles` /
+  `interviews` / `offers` / `hiring_requests` directly. All raw `supabase.from(...)`
+  reads/writes on those tables now route through `@/modules/ats/domain/*` facades
+  (`candidates`, `applications`, `job-pipelines`, `role-profiles`, `interviews`,
+  `offers`). Behavior is byte-identical — every agent-facing return string, error
+  message, ordering, limit, and filter is preserved. One out-of-scope
+  `hiring_requests` token-population read remains in the sequence-email handler
+  (no facade specified for it yet).
 - **Sidebar IA — TA-professional-only restructure (Phase 1).** The product is the
   cockpit for a centralized TA team (recruiting + HR-ops, access-gated); employee
   self-service ships as a separate variant. So `Sidebar.tsx` `NAV_SECTIONS` now:
