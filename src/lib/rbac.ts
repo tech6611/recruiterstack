@@ -14,6 +14,11 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
+import {
+  type Capability,
+  type CapabilityOverride,
+  resolveCapabilities,
+} from '@/lib/permissions'
 
 type Supabase = SupabaseClient<Database>
 
@@ -102,4 +107,66 @@ export function assertCanViewSensitive(
   targetEmployeeId: string,
 ): NextResponse | null {
   return canViewSensitive(scope, targetEmployeeId) ? null : forbidden()
+}
+
+// ── Per-member RBAC (Slice 0) ───────────────────────────────────────────────
+// Capability resolution over the roles / overrides model (migration 065).
+// Standalone for now — NOT yet wired into getViewerScope or any route. Slice 1
+// turns these into enforcement. The casts on `.from(...)` are because the new
+// tables aren't in the generated Database type yet (formalize via gen:types).
+
+/**
+ * Effective capability set for a member: union of assigned-role capabilities,
+ * plus per-member allow/deny overrides; Owner roles grant everything.
+ * See `resolveCapabilities` in src/lib/permissions.ts for the precedence rules.
+ */
+export async function getPermissionSet(
+  supabase: Supabase,
+  orgId: string,
+  userId: string,
+): Promise<Set<Capability>> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+
+  const { data: assigned } = await sb
+    .from('rbac_member_roles')
+    .select('role_id')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+  const roleIds = ((assigned ?? []) as Array<{ role_id: string }>).map(r => r.role_id)
+
+  let isOwner = false
+  let roleCapabilities: string[] = []
+  if (roleIds.length > 0) {
+    const [{ data: roles }, { data: caps }] = await Promise.all([
+      sb.from('rbac_roles').select('is_owner').eq('org_id', orgId).in('id', roleIds),
+      sb.from('rbac_role_capabilities').select('capability').in('role_id', roleIds),
+    ])
+    isOwner = ((roles ?? []) as Array<{ is_owner: boolean }>).some(r => r.is_owner)
+    roleCapabilities = ((caps ?? []) as Array<{ capability: string }>).map(c => c.capability)
+  }
+
+  const { data: overrides } = await sb
+    .from('rbac_member_overrides')
+    .select('capability, effect')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+
+  return resolveCapabilities({
+    isOwner,
+    roleCapabilities,
+    overrides: (overrides ?? []) as CapabilityOverride[],
+  })
+}
+
+export function can(capabilities: Set<Capability>, capability: Capability): boolean {
+  return capabilities.has(capability)
+}
+
+/** Convenience: returns the 403 to return-as-is, or null if allowed. */
+export function assertCan(
+  capabilities: Set<Capability>,
+  capability: Capability,
+): NextResponse | null {
+  return capabilities.has(capability) ? null : forbidden(`Missing permission: ${capability}`)
 }

@@ -11,7 +11,21 @@ entries on top.
 
 ## 2026-06-14
 
+### Added
+- **Per-member RBAC — Slice 0 (model & resolver).** Hybrid model: named roles
+  (capability bundles) + per-member allow/deny overrides; capability =
+  `<module>:<action>`. New `src/lib/permissions.ts` (capability registry + pure
+  `resolveCapabilities`, precedence deny > allow > role, Owner → all). `rbac.ts`
+  gains `getPermissionSet`/`can`/`assertCan` — **standalone and dormant** (not
+  wired into `getViewerScope` or any route yet; Slice 1 turns on enforcement).
+  Plan in `docs/rbac-plan.md`. **No enforcement; behavior unchanged.**
+
 ### Schema
+- **Migration 065 — RBAC tables (Slice 0).** `rbac_roles`,
+  `rbac_role_capabilities`, `rbac_member_roles`, `rbac_member_overrides`
+  (prefixed `rbac_` to avoid the legacy ATS `roles` table). Seeds Owner +
+  Recruiter system roles per org and backfills assignments behavior-preservingly
+  (admins → Owner/all-caps, everyone else → Recruiter/recruiting+openings+analytics).
 - **Migration 064 — Canonical Slice 3: link applications to canonical jobs.**
   Adds nullable `applications.job_id` (→`jobs`) and `opening_id` (→`openings`)
   plus indexes. Forward-only dual-write: `createApplication` now accepts optional
