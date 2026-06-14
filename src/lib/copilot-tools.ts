@@ -8,6 +8,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import sgMail from '@sendgrid/mail'
 import { SupabaseClient } from '@supabase/supabase-js'
+import type { Capability } from '@/lib/permissions'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import {
   countLegacyJobs,
@@ -1201,13 +1202,77 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
 
 // ── Tool executor ─────────────────────────────────────────────────────────────
 
+/**
+ * RBAC: capability required to run each tool (RBAC Slice 3). Tools not listed
+ * need no capability (system/self/governance tools, e.g. escalate_to_recruiter,
+ * send_whatsapp_reply, request_approval). Enforced only when executeTool is given
+ * a capability set — user-facing copilot passes one; background jobs (WhatsApp
+ * responder, autopilot) omit it and run unrestricted.
+ */
+const TOOL_CAPABILITIES: Record<string, Capability> = {
+  // Recruiting — read
+  search_candidates: 'recruiting:view', search_candidate_pool: 'recruiting:view',
+  get_candidate: 'recruiting:view', get_job_pipeline: 'recruiting:view',
+  list_jobs: 'recruiting:view', get_dashboard_stats: 'recruiting:view',
+  find_stale_applications: 'recruiting:view', get_application_events: 'recruiting:view',
+  get_inbox: 'recruiting:view', get_scorecard: 'recruiting:view', get_offers: 'recruiting:view',
+  get_interviews: 'recruiting:view', get_sequence: 'recruiting:view',
+  list_sequences: 'recruiting:view', list_candidate_sequence_history: 'recruiting:view',
+  list_roles: 'recruiting:view',
+  // Recruiting — write
+  add_note_to_application: 'recruiting:edit', move_application_to_stage: 'recruiting:edit',
+  bulk_add_to_pipeline: 'recruiting:edit', bulk_move_to_stage: 'recruiting:edit',
+  bulk_reject_below_score: 'recruiting:edit', bulk_score_applications: 'recruiting:edit',
+  create_candidate: 'recruiting:edit', create_job_and_pipeline: 'recruiting:edit',
+  update_job: 'recruiting:edit', update_candidate_status: 'recruiting:edit',
+  update_application_status: 'recruiting:edit', create_offer: 'recruiting:edit',
+  update_offer_status: 'recruiting:edit', create_scorecard: 'recruiting:edit',
+  schedule_interview: 'recruiting:edit', update_interview_status: 'recruiting:edit',
+  create_self_schedule_invite: 'recruiting:edit', send_outreach_email: 'recruiting:edit',
+  send_whatsapp_message: 'recruiting:edit', send_assessment: 'recruiting:edit',
+  draft_application_email: 'recruiting:edit', create_role: 'recruiting:edit',
+  update_role: 'recruiting:edit', create_intake_request: 'recruiting:edit',
+  // Analytics
+  get_recruiting_analytics: 'analytics:view',
+  // People
+  list_employees: 'people:view', get_employee_history: 'people:view', get_direct_reports: 'people:view',
+  mark_employee_joined: 'people:edit', mark_employee_terminated: 'people:edit',
+  set_employee_manager: 'people:edit', record_employee_note: 'people:edit',
+  // Payroll
+  get_employee_compensation: 'payroll:view', get_employee_payslips: 'payroll:view',
+  get_payroll_run: 'payroll:view', list_payroll_runs: 'payroll:view',
+  record_employee_compensation: 'payroll:edit',
+  // Onboarding
+  get_employee_onboarding: 'onboarding:view', list_onboarding_plans: 'onboarding:view',
+  list_onboarding_templates: 'onboarding:view', start_onboarding: 'onboarding:edit',
+  complete_onboarding_task: 'onboarding:edit',
+  // OKRs
+  list_employee_okrs: 'okrs:view', get_okr: 'okrs:view', create_okr: 'okrs:edit',
+  add_okr_key_result: 'okrs:edit', update_kr_progress: 'okrs:edit', update_okr_status: 'okrs:edit',
+  // Documents
+  list_employee_documents: 'documents:view', list_org_documents: 'documents:view',
+  list_expiring_documents: 'documents:view',
+  // Leave
+  get_employee_leave_balance: 'leave:view', list_holidays: 'leave:view',
+  list_time_off: 'leave:view', request_time_off: 'leave:view', decide_time_off: 'leave:approve',
+}
+
 export async function executeTool(
   name: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   input: Record<string, any>,
   orgId: string,
   supabase: SupabaseClient,
+  /** When provided, the tool runs only if its required capability is held.
+   *  Omit (background jobs) to run unrestricted. */
+  capabilities?: Set<Capability> | null,
 ): Promise<string> {
+  if (capabilities) {
+    const required = TOOL_CAPABILITIES[name]
+    if (required && !capabilities.has(required)) {
+      return `Permission denied: this action requires the "${required}" capability, which you don't have. Ask an admin to grant it.`
+    }
+  }
   try {
     switch (name) {
       case 'search_candidates':     return await searchCandidates(input, orgId, supabase)

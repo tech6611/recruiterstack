@@ -11,6 +11,7 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { executeTool } from '@/lib/copilot-tools'
+import type { Capability } from '@/lib/permissions'
 
 const MAX_ITERATIONS = 8
 const MAX_TOKENS = 2048
@@ -24,6 +25,9 @@ export interface SubAgentOptions {
   task: string
   orgId: string
   supabase: SupabaseClient
+  /** Caller's RBAC capabilities. When set, tools are capability-gated; omit for
+   *  background/system contexts (WhatsApp responder, autopilot) to run unrestricted. */
+  capabilities?: Set<Capability> | null
   /** Override the tool-loop cap (default 8). */
   maxIterations?: number
 }
@@ -61,7 +65,7 @@ export async function runSubAgent(opts: SubAgentOptions): Promise<string> {
     const results: Anthropic.ToolResultBlockParam[] = []
     for (const tu of toolUses) {
       const input = (tu.input ?? {}) as Record<string, unknown>
-      const result = await executeTool(tu.name, input, opts.orgId, opts.supabase)
+      const result = await executeTool(tu.name, input, opts.orgId, opts.supabase, opts.capabilities)
       results.push({ type: 'tool_result', tool_use_id: tu.id, content: result })
     }
     conversation.push({ role: 'user', content: results })

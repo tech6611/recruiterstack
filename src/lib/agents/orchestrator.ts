@@ -11,6 +11,7 @@
 
 import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Capability } from '@/lib/permissions'
 import { ATS_SYSTEM_PROMPT, ATS_TOOLS } from '@/modules/ats/agent'
 import { HRIS_SYSTEM_PROMPT, HRIS_TOOLS } from '@/modules/hris/agent'
 import { CRM_SYSTEM_PROMPT, CRM_TOOLS } from '@/modules/crm/agent'
@@ -135,6 +136,8 @@ interface ExecutorContext {
   model:     string
   orgId:     string
   supabase:  SupabaseClient
+  /** Caller's RBAC capabilities, threaded to sub-agent tools (RBAC Slice 3). */
+  capabilities?: Set<Capability> | null
 }
 
 /**
@@ -160,6 +163,7 @@ export async function executeOrchestratorTool(
         task,
         orgId:        ctx.orgId,
         supabase:     ctx.supabase,
+        capabilities: ctx.capabilities,
       })
 
     case 'delegate_to_hris':
@@ -171,6 +175,7 @@ export async function executeOrchestratorTool(
         task,
         orgId:        ctx.orgId,
         supabase:     ctx.supabase,
+        capabilities: ctx.capabilities,
       })
 
     case 'delegate_to_crm':
@@ -182,6 +187,7 @@ export async function executeOrchestratorTool(
         task,
         orgId:        ctx.orgId,
         supabase:     ctx.supabase,
+        capabilities: ctx.capabilities,
       })
 
     case 'delegate_to_payroll':
@@ -193,6 +199,7 @@ export async function executeOrchestratorTool(
         task,
         orgId:        ctx.orgId,
         supabase:     ctx.supabase,
+        capabilities: ctx.capabilities,
       })
 
     default:

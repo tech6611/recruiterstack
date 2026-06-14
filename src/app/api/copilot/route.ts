@@ -17,7 +17,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { requireOrgAndUser } from '@/lib/auth'
+import { getPermissionSet } from '@/lib/rbac'
 import {
   ORCHESTRATOR_TOOLS,
   ORCHESTRATOR_SYSTEM_PROMPT,
@@ -54,9 +55,9 @@ function toolSummary(name: string, result: string): string {
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
 
   const rateLimited = await checkAuthRateLimit(orgId, { maxRequests: 20, window: '60 s' })
   if (rateLimited) return rateLimited
@@ -75,6 +76,8 @@ export async function POST(request: NextRequest) {
 
   const supabase = createAdminClient()
   const client   = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  // The copilot acts as the user — its tools are gated by the user's capabilities.
+  const capabilities = await getPermissionSet(supabase, orgId, userId)
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -187,7 +190,7 @@ export async function POST(request: NextRequest) {
             }
 
             const result = await executeOrchestratorTool(tc.name, parsedInput, {
-              client, model: MODEL, orgId, supabase,
+              client, model: MODEL, orgId, supabase, capabilities,
             })
             send({ type: 'tool_done', id: tc.id, name: tc.name, summary: toolSummary(tc.name, result) })
 
