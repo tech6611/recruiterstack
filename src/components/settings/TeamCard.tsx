@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Users, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -9,7 +10,9 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import type { OrgRole } from '@/lib/types/requisitions'
-import type { InviteRow } from '@/lib/validations/onboarding-invites'
+
+type RbacRole = { id: string; name: string; is_owner: boolean }
+type InviteRow = { email: string; roleId: string }
 
 interface MemberRow {
   id:          string
@@ -48,21 +51,6 @@ export function TeamCard() {
   }
 
   useEffect(() => { refresh() }, [])
-
-  async function changeRole(id: string, role: OrgRole) {
-    const res = await fetch(`/api/team/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role }),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      toast.error(err.error ?? 'Failed to change role')
-      return
-    }
-    toast.success('Role updated')
-    refresh()
-  }
 
   async function toggleActive(id: string, nextActive: boolean) {
     const res = await fetch(`/api/team/${id}`, {
@@ -109,16 +97,14 @@ export function TeamCard() {
                     <div className="text-xs text-slate-500 truncate">{m.users?.email}</div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Select
-                      value={m.role}
-                      onChange={e => changeRole(m.id, e.target.value as OrgRole)}
-                      className="w-36"
-                      disabled={!m.is_active}
+                    <span className="w-28 text-right text-xs text-slate-500">{ROLE_LABELS[m.role] ?? m.role}</span>
+                    <Link
+                      href="/admin/permissions"
+                      className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
+                      title="Manage this member's roles & permissions"
                     >
-                      {(Object.keys(ROLE_LABELS) as OrgRole[]).map(r => (
-                        <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                      ))}
-                    </Select>
+                      Manage access
+                    </Link>
                     {m.is_active ? (
                       <Button
                         variant="outline"
@@ -147,17 +133,35 @@ export function TeamCard() {
 }
 
 function InviteDialog({ onClose }: { onClose: () => void }) {
-  const [rows, setRows] = useState<InviteRow[]>([{ email: '', role: 'recruiter' }])
+  const [roles, setRoles] = useState<RbacRole[]>([])
+  const [rows, setRows] = useState<InviteRow[]>([{ email: '', roleId: '' }])
   const [submitting, setSubmitting] = useState(false)
+
+  // Load the org's RBAC roles for the invite picker. Default new rows to the
+  // first non-owner role (fallback: first role) so an invite isn't sent as Owner
+  // by accident.
+  useEffect(() => {
+    fetch('/api/admin/roles')
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => {
+        const list = (j?.data ?? []) as RbacRole[]
+        setRoles(list)
+        const def = list.find(r => !r.is_owner)?.id ?? list[0]?.id ?? ''
+        setRows([{ email: '', roleId: def }])
+      })
+      .catch(() => {})
+  }, [])
+
+  const defaultRoleId = roles.find(r => !r.is_owner)?.id ?? roles[0]?.id ?? ''
 
   function update(i: number, patch: Partial<InviteRow>) {
     setRows(prev => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)))
   }
-  function add()  { if (rows.length < MAX_INVITES) setRows(prev => [...prev, { email: '', role: 'recruiter' }]) }
+  function add()  { if (rows.length < MAX_INVITES) setRows(prev => [...prev, { email: '', roleId: defaultRoleId }]) }
   function drop(i: number) { setRows(prev => prev.filter((_, j) => j !== i)) }
 
   async function submit() {
-    const invites = rows.filter(r => r.email.trim())
+    const invites = rows.filter(r => r.email.trim() && r.roleId)
     if (invites.length === 0) return
     setSubmitting(true)
     const res = await fetch('/api/team/invite', {
@@ -196,11 +200,11 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
                 onChange={e => update(i, { email: e.target.value })}
                 className="flex-1"
               />
-              <Select value={row.role} onChange={e => update(i, { role: e.target.value as InviteRow['role'] })} className="w-40">
-                <option value="recruiter">Recruiter</option>
-                <option value="hiring_manager">Hiring manager</option>
-                <option value="interviewer">Interviewer</option>
-                <option value="admin">Admin</option>
+              <Select value={row.roleId} onChange={e => update(i, { roleId: e.target.value })} className="w-44">
+                {roles.length === 0 && <option value="">Loading roles…</option>}
+                {roles.map(r => (
+                  <option key={r.id} value={r.id}>{r.name}{r.is_owner ? ' (full access)' : ''}</option>
+                ))}
               </Select>
               <button type="button" onClick={() => drop(i)} disabled={rows.length === 1} className="text-slate-400 hover:text-slate-900 disabled:opacity-30" aria-label="Remove">
                 <Trash2 className="h-4 w-4" />

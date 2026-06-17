@@ -11,6 +11,19 @@ entries on top.
 
 ## 2026-06-14
 
+### Changed
+- **RBAC — invite flow wired to RBAC roles + remaining gates migrated.** The
+  Settings → "Invite teammate" dropdown now lists the org's **RBAC roles**
+  (including custom ones) instead of the legacy 4-role enum. New `teamInviteSchema`
+  (email + `roleId`); `/api/team/invite` resolves the role, maps Owner → Clerk
+  `org:admin` (else `org:member`), and stamps `rbac_role_id` on the invitation;
+  new `getInviteRbacRole` + `ensureDefaultMemberRole` **assign that exact role on
+  join** (org-verified). The team member row's legacy role dropdown is replaced by
+  a "Manage access" link to `/admin/permissions` (one source of truth). Also
+  migrated `/api/org-settings` PATCH admin-field gate and the `/settings` page's
+  client `is_admin` gating to the `settings:edit` capability. Onboarding bootstrap
+  + last-admin guard intentionally left on the legacy path.
+
 ### Added
 - **Per-member RBAC — Slice 5 (cleanup).** Remaining coarse admin gates
   (`requireAdmin()` on departments / locations / compensation-bands) migrated to

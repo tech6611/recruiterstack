@@ -19,6 +19,7 @@ import {
   type CapabilityOverride,
   resolveCapabilities,
 } from '@/lib/permissions'
+import { getInviteRbacRole } from '@/lib/clerk/invites'
 
 type Supabase = SupabaseClient<Database>
 
@@ -224,6 +225,29 @@ export async function ensureDefaultMemberRole(
     .eq('user_id', userId)
     .limit(1)
   if (((existing ?? []) as unknown[]).length > 0) return
+
+  // If the member was invited with a specific RBAC role (Settings → team invite
+  // stamps it on the Clerk invitation), honor that instead of the default.
+  // Verify the role belongs to this org before assigning (don't trust a bogus id).
+  const { data: u } = await sb.from('users').select('email').eq('id', userId).maybeSingle()
+  const email = (u as { email?: string } | null)?.email
+  if (email) {
+    const invited = await getInviteRbacRole(orgId, email)
+    if (invited) {
+      const { data: invitedRole } = await sb
+        .from('rbac_roles')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('id', invited.roleId)
+        .maybeSingle()
+      if ((invitedRole as { id?: string } | null)?.id) {
+        await sb
+          .from('rbac_member_roles')
+          .upsert({ org_id: orgId, user_id: userId, role_id: invited.roleId }, { onConflict: 'org_id,user_id,role_id', ignoreDuplicates: true })
+        return
+      }
+    }
+  }
 
   const { data: member } = await sb
     .from('org_members')

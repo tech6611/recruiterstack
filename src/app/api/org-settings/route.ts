@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger'
 import { cached, cacheKey, invalidate } from '@/lib/api/cache'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { orgSettingsUpdateSchema } from '@/lib/validations/org-settings'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 
 // GET /api/org-settings — returns connection status for the current user.
 // Google / Microsoft / Zoom are per-user (user_integrations).
@@ -82,18 +83,9 @@ export async function PATCH(request: NextRequest) {
     parsed.enabled_agents !== undefined
 
   if (adminFieldPresent) {
-    const { data: me } = await supabase
-      .from('org_members')
-      .select('role')
-      .eq('org_id', orgId)
-      .eq('user_id', userId)
-      .maybeSingle()
-    if ((me as { role: string } | null)?.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Only admins can change company info or enabled agents.' },
-        { status: 403 },
-      )
-    }
+    const scope = await getViewerScope(supabase, orgId, userId)
+    const denied = assertCapability(scope, 'settings:edit')
+    if (denied) return denied
   }
 
   const patch: Record<string, unknown> = {

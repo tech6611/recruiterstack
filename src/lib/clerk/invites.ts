@@ -63,5 +63,47 @@ const ROLES = new Set<OrgRole>(['admin', 'recruiter', 'hiring_manager', 'intervi
 interface ClerkInvitation {
   email_address?: string
   status?: 'pending' | 'accepted' | 'revoked' | 'expired'
-  public_metadata?: { preferred_role?: string }
+  public_metadata?: { preferred_role?: string; rbac_role_id?: string; rbac_role_name?: string }
+}
+
+/**
+ * The RBAC role the inviter chose for this invitee (Settings → team invite
+ * stamps `rbac_role_id`/`rbac_role_name` on the Clerk invitation). Mirrors
+ * getInvitePreferredRole. Returns null if the user wasn't invited with an RBAC
+ * role (e.g. they created the org, or came via the legacy onboarding invite).
+ */
+export async function getInviteRbacRole(
+  orgId: string,
+  email: string,
+): Promise<{ roleId: string; roleName: string } | null> {
+  const secret = process.env.CLERK_SECRET_KEY
+  if (!secret) return null
+
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return null
+
+  try {
+    const res = await fetch(
+      `https://api.clerk.com/v1/organizations/${orgId}/invitations?limit=100`,
+      { headers: { Authorization: `Bearer ${secret}` }, cache: 'no-store' },
+    )
+    if (!res.ok) return null
+
+    const payload = (await res.json()) as { data?: ClerkInvitation[] } | ClerkInvitation[]
+    const list = Array.isArray(payload) ? payload : payload.data ?? []
+
+    const match =
+      list.find(i => i.email_address?.toLowerCase() === normalized && i.status === 'accepted') ??
+      list.find(i => i.email_address?.toLowerCase() === normalized)
+
+    const roleId = match?.public_metadata?.rbac_role_id
+    if (roleId) return { roleId, roleName: match?.public_metadata?.rbac_role_name ?? '' }
+    return null
+  } catch (err) {
+    logger.warn('[invites] rbac_role lookup failed', {
+      orgId,
+      err: err instanceof Error ? err.message : String(err),
+    })
+    return null
+  }
 }

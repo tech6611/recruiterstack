@@ -56,8 +56,9 @@ export default function SettingsPage() {
   const [msErrorReason, setMsErrorReason] = useState<string | null>(null)
   const [msDisconnecting, setMsDisconnecting] = useState(false)
 
-  // Current user's role — gates admin-only sections (Slack, company info, team, agents)
-  const [isAdmin, setIsAdmin] = useState(false)
+  // Current user's capabilities — gate admin-only sections (Slack, company info,
+  // team, agents) on the `settings:edit` capability rather than a raw admin flag.
+  const [canManageSettings, setCanManageSettings] = useState(false)
 
   // Active tab in the settings sidebar
   const [activeTab, setActiveTab] = useState<TabId>('general')
@@ -78,7 +79,10 @@ export default function SettingsPage() {
   useEffect(() => {
     fetch('/api/me')
       .then(r => r.json())
-      .then(({ data }) => setIsAdmin(!!data?.is_admin))
+      .then(({ data }) => {
+        const caps = new Set<string>(Array.isArray(data?.capabilities) ? data.capabilities : [])
+        setCanManageSettings(caps.has('settings:edit'))
+      })
       .catch(() => {})
   }, [])
 
@@ -238,7 +242,7 @@ export default function SettingsPage() {
     })
 
     // Persist Company info (admin-only on the server).
-    const companyPromise = isAdmin
+    const companyPromise = canManageSettings
       ? fetch('/api/org-settings', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -402,7 +406,7 @@ export default function SettingsPage() {
       <div className="mt-6 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-6 md:gap-10">
         {/* Sidebar nav */}
         <nav className="space-y-1 md:sticky md:top-8 md:self-start">
-          {tabs.filter(t => !t.adminOnly || isAdmin).map(t => {
+          {tabs.filter(t => !t.adminOnly || canManageSettings).map(t => {
             const active = activeTab === t.id
             const Icon = t.icon
             return (
@@ -443,9 +447,9 @@ export default function SettingsPage() {
                       <input
                         value={form.company_name}
                         onChange={e => set('company_name', e.target.value)}
-                        readOnly={!isAdmin}
+                        readOnly={!canManageSettings}
                         placeholder="Acme Corp"
-                        className={!isAdmin ? `${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed` : inputCls}
+                        className={!canManageSettings ? `${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed` : inputCls}
                       />
                     </div>
                     <div>
@@ -453,12 +457,12 @@ export default function SettingsPage() {
                       <input
                         value={form.company_website}
                         onChange={e => set('company_website', e.target.value)}
-                        readOnly={!isAdmin}
+                        readOnly={!canManageSettings}
                         placeholder="https://acme.com"
-                        className={!isAdmin ? `${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed` : inputCls}
+                        className={!canManageSettings ? `${inputCls} bg-slate-50 text-slate-500 cursor-not-allowed` : inputCls}
                       />
                     </div>
-                    {!isAdmin && (
+                    {!canManageSettings && (
                       <p className="text-[10px] text-slate-400">Only admins can change company info. Ask an admin if these need updating.</p>
                     )}
                   </div>
@@ -610,7 +614,7 @@ export default function SettingsPage() {
           {activeTab === 'integrations' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Slack Notifications — channel webhook (admin-only) */}
-              {!isAdmin ? (
+              {!canManageSettings ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
                   <div className="flex items-center gap-2.5 mb-1">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
@@ -673,7 +677,7 @@ export default function SettingsPage() {
               )}
 
               {/* Slack App — OAuth DMs (admin-only install/disconnect) */}
-              {!isAdmin ? (
+              {!canManageSettings ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
                   <div className="flex items-center gap-2.5 mb-1">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
@@ -734,7 +738,7 @@ export default function SettingsPage() {
               )}
 
               {/* WhatsApp (Meta Cloud API) */}
-              <WhatsAppCard isAdmin={isAdmin} />
+              <WhatsAppCard isAdmin={canManageSettings} />
 
               {/* Google Calendar / Meet */}
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
@@ -875,7 +879,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeTab === 'workspace' && isAdmin && (
+          {activeTab === 'workspace' && canManageSettings && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <CompanyInfoCard />
               <DepartmentsCard />
@@ -886,7 +890,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeTab === 'team' && isAdmin && (
+          {activeTab === 'team' && canManageSettings && (
             <div className="space-y-6">
               <TeamCard />
               <AgentsCard />
