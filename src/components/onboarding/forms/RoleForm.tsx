@@ -17,6 +17,11 @@ interface RoleFormProps {
    * When set, the user can't pick a different role — the form is read-only.
    */
   lockedRole?: RoleInput['role']
+  /**
+   * Friendly RBAC role name from the invite (e.g. "Talent Acquisition"), shown
+   * in the locked message in place of the coarse legacy label when available.
+   */
+  lockedRoleLabel?: string
 }
 
 const OPTIONS: Array<{ value: RoleInput['role']; title: string; subtitle: string }> = [
@@ -26,7 +31,7 @@ const OPTIONS: Array<{ value: RoleInput['role']; title: string; subtitle: string
   { value: 'interviewer',     title: 'Interviewer',     subtitle: 'Just interview and submit scorecards.' },
 ]
 
-export function RoleForm({ forceAdmin, defaultRole, lockedRole }: RoleFormProps) {
+export function RoleForm({ forceAdmin, defaultRole, lockedRole, lockedRoleLabel }: RoleFormProps) {
   const router = useRouter()
   const initialRole = lockedRole ?? (forceAdmin ? 'admin' : (defaultRole ?? 'recruiter'))
   const { handleSubmit, watch, setValue, formState: { isSubmitting } } = useForm<RoleInput>({
@@ -34,7 +39,7 @@ export function RoleForm({ forceAdmin, defaultRole, lockedRole }: RoleFormProps)
     defaultValues: { role: initialRole },
   })
   const current = watch('role')
-  const lockedLabel = lockedRole && OPTIONS.find(o => o.value === lockedRole)?.title
+  const lockedLabel = lockedRoleLabel ?? (lockedRole && OPTIONS.find(o => o.value === lockedRole)?.title)
 
   async function onSubmit(values: RoleInput) {
     // Server is the source of truth — even if someone tampers with the

@@ -38,13 +38,17 @@ export async function getInvitePreferredRole(
     const list = Array.isArray(payload) ? payload : payload.data ?? []
 
     // Prefer accepted invitations (the one that produced this membership);
-    // fall back to pending if the user is mid-acceptance.
+    // fall back to pending if the user is mid-acceptance. Never match revoked
+    // or expired invitations — a revoked invite carries stale role metadata
+    // (e.g. a since-deleted role) that must not leak into the join.
     const match =
       list.find(
         i =>
           i.email_address?.toLowerCase() === normalized && i.status === 'accepted',
       ) ??
-      list.find(i => i.email_address?.toLowerCase() === normalized)
+      list.find(
+        i => i.email_address?.toLowerCase() === normalized && i.status === 'pending',
+      )
 
     const role = match?.public_metadata?.preferred_role
     if (role && ROLES.has(role as OrgRole)) return role as OrgRole
@@ -61,9 +65,67 @@ export async function getInvitePreferredRole(
 const ROLES = new Set<OrgRole>(['admin', 'recruiter', 'hiring_manager', 'interviewer'])
 
 interface ClerkInvitation {
+  id?: string
   email_address?: string
   status?: 'pending' | 'accepted' | 'revoked' | 'expired'
   public_metadata?: { preferred_role?: string; rbac_role_id?: string; rbac_role_name?: string }
+}
+
+/**
+ * Revoke every pending org invitation for an email. Called before sending a
+ * fresh invite so a re-invite (e.g. with a different role) can't leave a stale
+ * pending invitation behind — otherwise the join-time lookup could pick up the
+ * old role's metadata. Best-effort: failures are logged, not thrown, so a
+ * revoke hiccup doesn't block the new invite.
+ */
+export async function revokePendingInvitations(
+  orgId: string,
+  email: string,
+  requestingUserId: string,
+): Promise<void> {
+  const secret = process.env.CLERK_SECRET_KEY
+  if (!secret) return
+
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return
+
+  try {
+    const res = await fetch(
+      `https://api.clerk.com/v1/organizations/${orgId}/invitations?limit=100&status=pending`,
+      { headers: { Authorization: `Bearer ${secret}` }, cache: 'no-store' },
+    )
+    if (!res.ok) return
+
+    const payload = (await res.json()) as { data?: ClerkInvitation[] } | ClerkInvitation[]
+    const list = Array.isArray(payload) ? payload : payload.data ?? []
+    const stale = list.filter(
+      i => i.email_address?.toLowerCase() === normalized && i.id,
+    )
+
+    await Promise.all(
+      stale.map(i =>
+        fetch(
+          `https://api.clerk.com/v1/organizations/${orgId}/invitations/${i.id}/revoke`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requesting_user_id: requestingUserId }),
+          },
+        ).catch(err =>
+          logger.warn('[invites] revoke failed', {
+            orgId,
+            invitationId: i.id,
+            err: err instanceof Error ? err.message : String(err),
+          }),
+        ),
+      ),
+    )
+  } catch (err) {
+    logger.warn('[invites] revoke pending lookup failed', {
+      orgId,
+      err: err instanceof Error ? err.message : String(err),
+    })
+  }
 }
 
 /**
@@ -94,7 +156,7 @@ export async function getInviteRbacRole(
 
     const match =
       list.find(i => i.email_address?.toLowerCase() === normalized && i.status === 'accepted') ??
-      list.find(i => i.email_address?.toLowerCase() === normalized)
+      list.find(i => i.email_address?.toLowerCase() === normalized && i.status === 'pending')
 
     const roleId = match?.public_metadata?.rbac_role_id
     if (roleId) return { roleId, roleName: match?.public_metadata?.rbac_role_name ?? '' }

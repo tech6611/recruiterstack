@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getOrgId, resolveUserIdFromClerk } from '@/lib/auth'
 import { resolveEffectiveRole, stepsForRole } from '@/lib/onboarding/steps'
-import { getInvitePreferredRole } from '@/lib/clerk/invites'
+import { getInvitePreferredRole, getInviteRbacRole } from '@/lib/clerk/invites'
 import { OnboardingShell } from '@/components/onboarding/OnboardingShell'
 import { RoleForm } from '@/components/onboarding/forms/RoleForm'
 import type { OrgRole } from '@/lib/types/requisitions'
@@ -39,6 +39,10 @@ export default async function RoleStepPage() {
   // is on the invitation, the form is locked to it (server enforces too).
   // First org member can't be invited, so skip the lookup.
   let lockedRole: OrgRole | undefined
+  // The invite also carries the actual RBAC role name (e.g. "Talent
+  // Acquisition"); show that in the locked message instead of the coarse legacy
+  // label, which is always just admin/recruiter and misrepresents the grant.
+  let lockedRoleLabel: string | undefined
   if (!forceAdmin) {
     const { data: meUser } = await supabase
       .from('users')
@@ -48,6 +52,9 @@ export default async function RoleStepPage() {
     const email = (meUser as { email: string } | null)?.email
     if (email) {
       lockedRole = (await getInvitePreferredRole(orgId, email)) ?? undefined
+      if (lockedRole) {
+        lockedRoleLabel = (await getInviteRbacRole(orgId, email))?.roleName || undefined
+      }
     }
   }
 
@@ -58,7 +65,7 @@ export default async function RoleStepPage() {
       title="Your role"
       description="How do you plan to use RecruiterStack?"
     >
-      <RoleForm forceAdmin={forceAdmin} defaultRole={defaultRole} lockedRole={lockedRole} />
+      <RoleForm forceAdmin={forceAdmin} defaultRole={defaultRole} lockedRole={lockedRole} lockedRoleLabel={lockedRoleLabel} />
     </OnboardingShell>
   )
 }

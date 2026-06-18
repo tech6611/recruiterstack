@@ -514,9 +514,14 @@ function MemberRow({
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               {member.name}
-              <span className="text-[10px] uppercase font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
-                {member.org_role}
-              </span>
+              {/* Only surface the legacy base role when it's meaningful (admin).
+                  The generic recruiter/hiring_manager/interviewer base roles are
+                  superseded by the RBAC role chips below and just confuse here. */}
+              {member.org_role === 'admin' && (
+                <span className="text-[10px] uppercase font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
+                  {member.org_role}
+                </span>
+              )}
             </div>
             {member.email && <div className="text-xs text-slate-500 mt-0.5">{member.email}</div>}
 

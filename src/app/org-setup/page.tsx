@@ -16,7 +16,8 @@ export default function OrgSetupPage() {
 
       <h1 className="mb-2 text-2xl font-semibold text-slate-900">Set up your workspace</h1>
       <p className="mb-8 text-sm text-slate-600">
-        Create a new workspace for your company, or join an existing one.
+        Been invited to a team? Accept the invitation below. Otherwise, create a
+        new workspace for your company.
       </p>
 
       {/*

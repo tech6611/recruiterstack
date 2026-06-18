@@ -9,6 +9,28 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-18
+
+### Fixed
+- **Invite flow — stale-role leak on re-invite.** Re-inviting an email now revokes
+  any prior **pending** Clerk invitation first (`revokePendingInvitations`), so a
+  superseded invite can't win the join-time role lookup. The join-time lookups
+  (`getInvitePreferredRole` / `getInviteRbacRole`) now only fall back to **pending**
+  invitations — never `revoked`/`expired` — so a revoked invite's frozen metadata
+  (e.g. a since-deleted role) can no longer leak onto a new membership.
+- **Onboarding "Your role" step — showed coarse legacy label.** The locked-role
+  message now shows the actual invited **RBAC role name** (e.g. "Talent Acquisition")
+  instead of the back-compat legacy label (always just admin/recruiter).
+- **Team & Permissions — misleading base-role badge.** The per-member legacy
+  base-role chip is now only shown for `admin`; the generic
+  recruiter/hiring_manager/interviewer base roles (superseded by the RBAC role
+  chips) are suppressed.
+
+### Changed
+- **Org setup — clearer guidance for invitees.** Copy now points invited users to
+  the pending-invitation card (already rendered by Clerk's `OrganizationList`), so
+  an existing user who lands here after signing in has an unmistakable accept path.
+
 ## 2026-06-14
 
 ### Changed

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireCapability } from '@/lib/auth-admin'
 import { parseBody } from '@/lib/api/helpers'
 import { teamInviteSchema } from '@/lib/validations/team'
+import { revokePendingInvitations } from '@/lib/clerk/invites'
 import { logger } from '@/lib/logger'
 
 // POST /api/team/invite — requires settings:edit. Sends Clerk org invitations
@@ -42,6 +43,11 @@ export async function POST(req: NextRequest) {
         results.push({ email: invite.email, ok: false, error: 'Unknown role' })
         continue
       }
+
+      // Clear any prior pending invite for this email first, so re-inviting
+      // (often with a different role) doesn't leave a stale invitation whose
+      // metadata could win the join-time role lookup.
+      await revokePendingInvitations(orgId, invite.email, clerkUserId)
 
       const res = await fetch(`https://api.clerk.com/v1/organizations/${orgId}/invitations`, {
         method: 'POST',
