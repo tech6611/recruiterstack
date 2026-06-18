@@ -1,16 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
-import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { NextResponse } from 'next/server'
+import { withCapability, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { hiringRequestUpdateSchema } from '@/lib/validations/hiring-requests'
 
 // GET /api/hiring-requests/:id
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   const { data, error } = await supabase
     .from('hiring_requests')
     .select('*')
@@ -20,18 +13,12 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json({ data })
-}
+})
 
 // PATCH /api/hiring-requests/:id  — update status or other fields
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const PATCH = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
   const parsed = await parseBody(request, hiringRequestUpdateSchema)
   if (parsed instanceof NextResponse) return parsed
-
-  const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('hiring_requests')
@@ -43,4 +30,4 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   if (error) return handleSupabaseError(error)
   return NextResponse.json({ data })
-}
+})

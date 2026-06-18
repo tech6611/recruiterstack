@@ -1,8 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import sgMail from '@sendgrid/mail'
+import { withCapability } from '@/lib/api/helpers'
 
 // POST /api/email/send  { to, subject, body, from_name?, reply_to? }
-export async function POST(request: NextRequest) {
+// Gated: only members who can edit recruiting data may send mail from the org's
+// verified sender (prevents any authenticated user spoofing outbound email).
+export const POST = withCapability('recruiting:edit', async (request) => {
   const apiKey = process.env.SENDGRID_API_KEY
   const fromEmail = process.env.SENDGRID_FROM_EMAIL
 
@@ -50,4 +53,4 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ success: true })
-}
+})

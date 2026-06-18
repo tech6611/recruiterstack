@@ -11,6 +11,16 @@ entries on top.
 
 ## 2026-06-18
 
+### Security
+- **RBAC API guard gaps — closed.** Several recruiting endpoints enforced only
+  org-membership (or, for `/api/email/send`, nothing at all in the handler) and
+  ignored per-member capabilities. Added capability gates: `recruiting:view` on
+  `GET` of `/api/hiring-requests` (+`[id]`), `/api/email-templates`,
+  `/api/pipeline-stages`, `/api/roles` (+`[id]`), and `/api/export/{candidates,
+  applications,pipeline}`; `recruiting:edit` on their writes and on
+  `/api/email/send`; `analytics:view` on `/api/analytics`. A member without the
+  capability now gets a 403 instead of the nav merely being hidden.
+
 ### Fixed
 - **Invite flow — stale-role leak on re-invite.** Re-inviting an email now revokes
   any prior **pending** Clerk invitation first (`revokePendingInvitations`), so a

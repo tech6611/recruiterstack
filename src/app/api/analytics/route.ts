@@ -1,22 +1,23 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getOrgId } from '@/lib/auth'
+import { requireOrgAndUser } from '@/lib/auth'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { cached, cacheKey } from '@/lib/api/cache'
 import { fetchLegacyAnalyticsInputs } from '@/modules/ats/domain/reporting'
 import type { HiringRequest, PipelineStage, Candidate } from '@/lib/types/database'
 
 // GET /api/analytics — pipeline funnel, source breakdown, time-in-stage
 export async function GET() {
-  const orgId = await getOrgId()
-  if (!orgId) {
-    return NextResponse.json({
-      data: { stats: { active_candidates: 0, in_pipeline: 0, total_hired: 0, total_rejected: 0, interviewing: 0, total_applications: 0, active_jobs: 0 }, jobs_funnel: [], source_breakdown: [], avg_time_per_stage: [] },
-    })
-  }
+  const authResult = await requireOrgAndUser()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId, userId } = authResult
+
+  const supabase = createAdminClient()
+  const scope = await getViewerScope(supabase, orgId, userId)
+  const denied = assertCapability(scope, 'analytics:view')
+  if (denied) return denied
 
   const analyticsData = await cached(cacheKey(orgId, 'analytics'), 60, async () => {
-  const supabase = createAdminClient()
-
   const inputs = await fetchLegacyAnalyticsInputs(supabase, orgId)
 
   const jobs   = inputs.jobs as Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'status'>[]

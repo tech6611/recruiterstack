@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { requireOrg } from '@/lib/auth'
+import { requireOrgAndUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { toCsvResponse } from '@/lib/api/csv'
 import { fetchLegacyPipelineExportInputs } from '@/modules/ats/domain/reporting'
 
@@ -11,11 +12,14 @@ const CSV_HEADERS = [
 
 // GET /api/export/pipeline
 export async function GET() {
-  const authResult = await requireOrg()
+  const authResult = await requireOrgAndUser()
   if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+  const { orgId, userId } = authResult
 
   const supabase = createAdminClient()
+  const scope = await getViewerScope(supabase, orgId, userId)
+  const denied = assertCapability(scope, 'recruiting:view')
+  if (denied) return denied
 
   const inputs = await fetchLegacyPipelineExportInputs(supabase, orgId)
 

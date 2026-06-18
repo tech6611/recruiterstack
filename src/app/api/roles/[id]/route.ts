@@ -1,18 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
-import { parseBody } from '@/lib/api/helpers'
+import { NextResponse } from 'next/server'
+import { withCapability, parseBody } from '@/lib/api/helpers'
 import { roleUpdateSchema } from '@/lib/validations/roles'
 import { deleteRoleProfile, getRoleProfile, updateRoleProfile } from '@/modules/ats/domain/role-profiles'
 
 // GET /api/roles/:id
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   try {
     const data = await getRoleProfile(supabase, orgId, params.id)
     if (!data) return NextResponse.json({ error: 'Role not found' }, { status: 404 })
@@ -23,19 +15,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       { status: 500 },
     )
   }
-}
+})
 
 // PATCH /api/roles/:id
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const PATCH = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
   const parsed = await parseBody(request, roleUpdateSchema)
   if (parsed instanceof NextResponse) return parsed
 
@@ -54,19 +37,10 @@ export async function PATCH(
       { status: 500 },
     )
   }
-}
+})
 
 // DELETE /api/roles/:id
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: { id: string } },
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const DELETE = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }) => {
   try {
     await deleteRoleProfile(supabase, orgId, params.id)
     return new NextResponse(null, { status: 204 })
@@ -76,4 +50,4 @@ export async function DELETE(
       { status: 500 },
     )
   }
-}
+})

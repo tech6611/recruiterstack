@@ -1,15 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 import { auth } from '@clerk/nextjs/server'
 
 // GET  /api/email-templates  — list all saved templates for the org
-export async function GET() {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase) => {
   const { data, error } = await supabase
     .from('email_templates')
     .select('id, name, subject, body, created_at')
@@ -22,13 +16,10 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
   return NextResponse.json({ data })
-}
+})
 
 // POST /api/email-templates  — create a new saved template
-export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
+export const POST = withCapability('recruiting:edit', async (request, orgId, supabase) => {
   const { userId } = auth()
 
   let body: { name: string; subject: string; body: string }
@@ -40,7 +31,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'name, subject and body are required' }, { status: 400 })
   }
 
-  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('email_templates')
     .insert({
@@ -60,4 +50,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
   return NextResponse.json({ data }, { status: 201 })
-}
+})

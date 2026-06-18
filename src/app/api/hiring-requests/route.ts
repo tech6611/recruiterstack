@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import sgMail from '@sendgrid/mail'
-import { withOrg, parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { withCapability, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { hiringRequestInsertSchema } from '@/lib/validations/hiring-requests'
 import { logger } from '@/lib/logger'
 import type { HiringRequest, HiringRequestInsert } from '@/lib/types/database'
 
 // GET /api/hiring-requests
-export const GET = withOrg(async (_req, orgId, supabase) => {
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase) => {
   const { data, error } = await supabase
     .from('hiring_requests')
     .select('*')
@@ -20,7 +20,7 @@ export const GET = withOrg(async (_req, orgId, supabase) => {
 // POST /api/hiring-requests
 // Mode A (send_to_hm):  { position_title, department?, hiring_manager_name, hiring_manager_email, hiring_manager_slack? }
 // Mode B (fill_myself): above + filled_by_recruiter:true + all intake fields + generated_jd
-export const POST = withOrg(async (request, orgId, supabase) => {
+export const POST = withCapability('recruiting:edit', async (request, orgId, supabase) => {
   const body = await parseBody(request, hiringRequestInsertSchema)
   if (body instanceof NextResponse) return body
 

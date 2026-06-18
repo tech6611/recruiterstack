@@ -1,17 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withCapability } from '@/lib/api/helpers'
 import { buildSearchFilter } from '@/lib/api/search'
 import { createRoleProfile, listRoleProfiles } from '@/modules/ats/domain/role-profiles'
 import type { RoleInsert, RoleStatus } from '@/lib/types/database'
 
 // GET /api/roles?status=active&limit=50&offset=0&search=engineer
-export async function GET(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const GET = withCapability('recruiting:view', async (request, orgId, supabase) => {
   const { searchParams } = new URL(request.url)
 
   const status = searchParams.get('status') as RoleStatus | null
@@ -39,16 +33,10 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     )
   }
-}
+})
 
 // POST /api/roles
-export async function POST(request: NextRequest) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
-
+export const POST = withCapability('recruiting:edit', async (request, orgId, supabase) => {
   let body: RoleInsert
   try {
     body = await request.json()
@@ -69,4 +57,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     )
   }
-}
+})

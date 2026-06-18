@@ -1,18 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
-import { requireOrg } from '@/lib/auth'
-import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
+import { NextResponse } from 'next/server'
+import { withCapability, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { emailTemplateUpdateSchema } from '@/lib/validations/email-templates'
 
 // PATCH /api/email-templates/[id] — rename / update a saved template
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
+export const PATCH = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
   const parsed = await parseBody(request, emailTemplateUpdateSchema)
   if (parsed instanceof NextResponse) return parsed
 
@@ -25,7 +16,6 @@ export async function PATCH(
   if (Object.keys(updates).length === 0)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
-  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('email_templates')
     .update(updates)
@@ -36,18 +26,10 @@ export async function PATCH(
 
   if (error) return handleSupabaseError(error)
   return NextResponse.json({ data })
-}
+})
 
 // DELETE /api/email-templates/[id] — delete a saved template
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const authResult = await requireOrg()
-  if (authResult instanceof NextResponse) return authResult
-  const { orgId } = authResult
-
-  const supabase = createAdminClient()
+export const DELETE = withCapability('recruiting:edit', async (_request, orgId, supabase, { params }) => {
   const { error } = await supabase
     .from('email_templates')
     .delete()
@@ -56,4 +38,4 @@ export async function DELETE(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
-}
+})
