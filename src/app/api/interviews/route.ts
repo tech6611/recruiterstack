@@ -7,7 +7,7 @@ import { createTeamsMeeting } from '@/lib/microsoft/calendar'
 import { resolveHost, HostTokenUnavailableError, type ResolvableProvider } from '@/lib/integrations/host-resolver'
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
 import { logger } from '@/lib/logger'
-import { getLegacyCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
+import { getCanonicalCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
 import type { InterviewInsert, ApplicationEventInsert } from '@/lib/types/database'
 
 interface PanelMember { name?: string; email: string }
@@ -74,7 +74,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
 
   if (interview_type === 'video' || interview_type === 'panel' || interview_type === 'technical') {
     // Fetch candidate + hiring request info (needed for event summary)
-    const context = await getLegacyCandidateJobContext(supabase, orgId, candidate_id, hiring_request_id)
+    const context = await getCanonicalCandidateJobContext(supabase, orgId, application_id)
     const candidate = context?.candidate ?? null
     const hiringReq = context?.job ?? null
 
@@ -213,7 +213,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
   // Fetch recruiter + candidate info for notification copy
   ;(async () => {
     try {
-      const context = await getLegacyCandidateJobContext(supabase, orgId, candidate_id, hiring_request_id)
+      const context = await getCanonicalCandidateJobContext(supabase, orgId, application_id)
       const candData = context?.candidate ?? null
       const hrData = context?.job ?? null
 

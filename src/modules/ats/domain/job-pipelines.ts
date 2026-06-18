@@ -935,7 +935,9 @@ export async function getFirstJobStage(
 // Lookup a single pipeline stage by id within the org (move_application_to_stage
 // + bulk_move_to_stage agent tools). Returns null when the stage does not exist
 // in this org; callers emit their own not-found message.
-export async function getLegacyPipelineStageById(
+// Source-agnostic: pipeline_stages are looked up by id+org, so this resolves a
+// stage whether it belongs to a canonical job or a legacy hiring_request.
+export async function getPipelineStageById(
   supabase: Supabase,
   orgId: string,
   stageId: string,
@@ -1313,4 +1315,272 @@ export async function approveCanonicalIntakeJob(
   }
   if (!data) return null
   return { position_title: (data as { title: string }).title }
+}
+
+// ── Canonical job read/update for the update_job agent tool (Phase 3 / C5.6 — agent B) ──
+// Mirror getLegacyJobById / updateLegacyJob over canonical `jobs`. The copilot
+// update_job tool only reads `position_title` (for its confirmation string) and
+// writes a small set of fields; canonical jobs expose title/description/status,
+// so we surface title→position_title and accept those three updatable columns.
+// jobs columns are not yet in the generated Database types; cast the client as
+// elsewhere in this module.
+
+export interface CanonicalAgentJobRow {
+  id: string
+  org_id: string
+  position_title: string
+  status: string
+  description: string | null
+}
+
+/** Resolve a canonical job by id within the org for the update_job tool, mapping
+ *  title→position_title so the tool's confirmation string is unchanged. */
+export async function getCanonicalJobById(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<CanonicalAgentJobRow | null> {
+  // jobs columns are not yet in the generated types; cast as in rbac.ts.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('jobs')
+    .select('id, org_id, title, status, description')
+    .eq('id', jobId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return null
+
+  const row = data as {
+    id: string
+    org_id: string
+    title: string
+    status: string
+    description: string | null
+  }
+  return {
+    id: row.id,
+    org_id: row.org_id,
+    position_title: row.title,
+    status: row.status,
+    description: row.description,
+  }
+}
+
+/** Updatable canonical job columns for the update_job tool. */
+export interface CanonicalJobUpdate {
+  title?: string
+  description?: string
+  status?: string
+}
+
+/** Partial update of a canonical job for update_job. Mirrors updateLegacyJob. */
+export async function updateCanonicalJob(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+  updates: CanonicalJobUpdate,
+): Promise<void> {
+  // jobs columns are not yet in the generated types; cast as in rbac.ts.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('jobs')
+    .update(updates)
+    .eq('id', jobId)
+    .eq('org_id', orgId)
+
+  if (error) throw error
+}
+
+// ── Canonical scoring + candidate context (Phase 3 / C5.6) ───────────────────
+// Mirror the legacy scoring/interview readers (getLegacyJobScoringContext /
+// getLegacyCandidateJobContext) over the canonical spine so canonical-job
+// candidacies (applications.job_id, hiring_request_id null) are visible to the
+// bulk-scoring + interview-scheduling flows. The job is mapped into the legacy
+// HiringRequest-ish shape via canonicalJobToHiringRequest (so callers reading
+// job.position_title / scoring_criteria / auto_* are unchanged); stages come
+// from pipeline_stages WHERE job_id and applications from applications WHERE
+// job_id (migrations 066/068). Candidate identity lives on `people`, so we join
+// candidates(*, person:people(...)) and flatten name/email/phone/linkedin onto
+// the candidate, matching getCanonicalJobBoardDetail. job_id columns are not in
+// the generated Database types yet; cast the client as elsewhere in this module.
+
+/** Scoring context over a canonical `jobs` row (Phase 3 / C5.6). Mirrors
+ *  getLegacyJobScoringContext: the job mapped into the legacy HiringRequest-ish
+ *  shape, pipeline_stages WHERE job_id (ordered), and ACTIVE applications WHERE
+ *  job_id with their candidate (identity flattened from people). */
+export async function getCanonicalJobScoringContext(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<LegacyJobScoringContext | null> {
+  // job_id / people join columns not in generated types yet; cast as rbac.ts.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [jobRes, stagesRes, appsRes] = await Promise.all([
+    (supabase as any)
+      .from('jobs')
+      .select('id, org_id, title, status, created_at, department:departments(name)')
+      .eq('id', jobId)
+      .eq('org_id', orgId)
+      .maybeSingle(),
+    (supabase as any)
+      .from('pipeline_stages')
+      .select('*')
+      .eq('job_id', jobId)
+      .eq('org_id', orgId)
+      .order('order_index'),
+    (supabase as any)
+      .from('applications')
+      .select('*, candidate:candidates(*, person:people(name, email, phone, linkedin_url))')
+      .eq('job_id', jobId)
+      .eq('org_id', orgId)
+      .eq('status', 'active'),
+  ])
+
+  if (jobRes.error) throw jobRes.error
+  if (stagesRes.error) throw stagesRes.error
+  if (appsRes.error) throw appsRes.error
+  if (!jobRes.data) return null
+
+  // Flatten the people join onto each candidate so name/email/phone/linkedin are
+  // present at candidate.* (identity is owned by `people`), as in the board detail.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applications = ((appsRes.data ?? []) as any[]).map(app => {
+    const candidate = app.candidate
+    const person = candidate?.person ?? null
+    return {
+      ...app,
+      candidate: candidate
+        ? {
+            ...candidate,
+            name: person?.name ?? candidate.name ?? '',
+            email: person?.email ?? candidate.email ?? '',
+            phone: person?.phone ?? candidate.phone ?? null,
+            linkedin_url: person?.linkedin_url ?? candidate.linkedin_url ?? null,
+          }
+        : candidate,
+    }
+  }) as unknown as (Application & { candidate: Candidate })[]
+
+  return {
+    job: canonicalJobToHiringRequest(jobRes.data as CanonicalJobRow),
+    stages: (stagesRes.data ?? []) as PipelineStage[],
+    applications,
+  }
+}
+
+/** Candidate + job context for a canonical application (Phase 3 / C5.6). Mirrors
+ *  getLegacyCandidateJobContext, but resolves both sides from the application:
+ *  applications.job_id → the canonical job (title → position_title; canonical
+ *  jobs have no ticket_number, so it is null), and applications.candidate_id →
+ *  the candidate with identity flattened from people. Returns null when the
+ *  application (or its job/candidate) is not found in this org. */
+export async function getCanonicalCandidateJobContext(
+  supabase: Supabase,
+  orgId: string,
+  applicationId: string,
+): Promise<LegacyCandidateJobContext | null> {
+  // job_id / people join columns not in generated types yet; cast as rbac.ts.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('applications')
+    .select(
+      'job:jobs(title), candidate:candidates(current_title, location, person:people(name, email))',
+    )
+    .eq('id', applicationId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === 'PGRST116' || error.message === 'Not found') return null
+    throw error
+  }
+  if (!data) return null
+
+  const row = data as {
+    job: { title: string } | null
+    candidate: {
+      current_title: string | null
+      location: string | null
+      person: { name: string | null; email: string | null } | null
+    } | null
+  }
+  if (!row.job || !row.candidate) return null
+
+  const person = row.candidate.person
+  return {
+    candidate: {
+      name: person?.name ?? '',
+      email: person?.email ?? '',
+      current_title: row.candidate.current_title ?? null,
+      location: row.candidate.location ?? null,
+    },
+    job: {
+      position_title: row.job.title,
+      ticket_number: null,
+    },
+  }
+}
+
+// ── Canonical sequence-email token fields (Phase 3 / C5.6 — agent B) ─────────
+// Resolve the token-population fields for an application's job, covering BOTH
+// canonical (applications.job_id) and legacy (applications.hiring_request_id)
+// candidacies. Replaces the handler's two-step getApplicationHiringRequestId →
+// getLegacyJobTokens, which was blind to canonical-job applications. Canonical
+// `jobs` expose only `title` (→ position_title); there is no canonical
+// company/recruiter column, so those tokens come from the legacy job when the
+// application is legacy, and are empty for canonical jobs. Returns null when the
+// application has no resolvable job. job_id / canonical columns are not in the
+// generated Database types yet; cast the client as elsewhere in this module.
+
+export interface JobTokenFields {
+  position_title: string | null
+  autopilot_company_name: string | null
+  autopilot_recruiter_name: string | null
+}
+
+export async function getApplicationJobTokens(
+  supabase: Supabase,
+  applicationId: string,
+): Promise<JobTokenFields | null> {
+  // job_id not in generated types yet (migration 066); cast as in rbac.ts.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: app } = await (supabase as any)
+    .from('applications')
+    .select('job_id, hiring_request_id')
+    .eq('id', applicationId)
+    .maybeSingle()
+
+  if (!app) return null
+  const row = app as { job_id: string | null; hiring_request_id: string | null }
+
+  // Canonical candidacy: read title from `jobs` (no company/recruiter columns).
+  if (row.job_id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: job } = await (supabase as any)
+      .from('jobs')
+      .select('title')
+      .eq('id', row.job_id)
+      .maybeSingle()
+    if (!job) return null
+    return {
+      position_title: (job as { title: string }).title,
+      autopilot_company_name: null,
+      autopilot_recruiter_name: null,
+    }
+  }
+
+  // Legacy candidacy: fall back to the legacy hiring_requests token fields.
+  if (row.hiring_request_id) {
+    const legacy = await getLegacyJobTokens(supabase, row.hiring_request_id)
+    if (!legacy) return null
+    return {
+      position_title: legacy.position_title ?? null,
+      autopilot_company_name: legacy.autopilot_company_name ?? null,
+      autopilot_recruiter_name: legacy.autopilot_recruiter_name ?? null,
+    }
+  }
+
+  return null
 }

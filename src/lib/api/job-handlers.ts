@@ -21,10 +21,9 @@ import {
 } from '@/modules/ats/domain/candidates'
 import {
   listApplicationsForCandidateSummary,
-  getApplicationHiringRequestId,
 } from '@/modules/ats/domain/applications'
 import { getRoleMatchingInputs } from '@/modules/ats/domain/role-profiles'
-import { getLegacyJobTokens } from '@/modules/ats/domain/job-pipelines'
+import { getApplicationJobTokens } from '@/modules/ats/domain/job-pipelines'
 
 // ── Autopilot ─────────────────────────────────────────────────────────────────
 
@@ -294,14 +293,11 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
   let companyName = ''
   let recruiterName = ''
   if (enrollment.application_id) {
-    const app = await getApplicationHiringRequestId(supabase, enrollment.application_id)
-    if (app?.hiring_request_id) {
-      const hr = await getLegacyJobTokens(supabase, app.hiring_request_id)
-      if (hr) {
-        jobTitle = hr.position_title ?? ''
-        companyName = hr.autopilot_company_name ?? ''
-        recruiterName = hr.autopilot_recruiter_name ?? ''
-      }
+    const hr = await getApplicationJobTokens(supabase, enrollment.application_id)
+    if (hr) {
+      jobTitle = hr.position_title ?? ''
+      companyName = hr.autopilot_company_name ?? ''
+      recruiterName = hr.autopilot_recruiter_name ?? ''
     }
   }
 

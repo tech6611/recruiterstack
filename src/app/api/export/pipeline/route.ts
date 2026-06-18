@@ -3,7 +3,7 @@ import { requireOrgAndUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { toCsvResponse } from '@/lib/api/csv'
-import { fetchLegacyPipelineExportInputs } from '@/modules/ats/domain/reporting'
+import { fetchCanonicalPipelineExportInputs } from '@/modules/ats/domain/reporting'
 
 const CSV_HEADERS = [
   'Job Title', 'Department', 'Stage Name', 'Stage Order',
@@ -21,7 +21,7 @@ export async function GET() {
   const denied = assertCapability(scope, 'recruiting:view')
   if (denied) return denied
 
-  const inputs = await fetchLegacyPipelineExportInputs(supabase, orgId)
+  const inputs = await fetchCanonicalPipelineExportInputs(supabase, orgId)
 
   const jobs = inputs.jobs as { id: string; position_title: string; department: string | null }[]
   const stages = inputs.stages as { id: string; hiring_request_id: string; name: string; order_index: number }[]

@@ -16,12 +16,13 @@ import {
   createCanonicalJobForAgent,
   findCanonicalJobsForAgent,
   getCanonicalJobBoardDetail,
-  getFirstLegacyPipelineStage,
-  getLegacyJobById,
-  getLegacyPipelineStageById,
+  getCanonicalJobById,
+  getCanonicalJobScoringContext,
+  getFirstJobStage,
+  getPipelineStageById,
   listCanonicalJobBoardSummaries,
-  listLegacyPipelineStagesForJob,
-  updateLegacyJob,
+  updateCanonicalJob,
+  type CanonicalJobUpdate,
 } from '@/modules/ats/domain/job-pipelines'
 import {
   searchCandidatesForAgent,
@@ -140,7 +141,6 @@ import { findPersonByEmail } from '@/modules/core/domain/people'
 import type {
   EmployeeProfile,
   EmployeeStatus,
-  HiringRequestUpdate,
   TimeOffRequestType,
   TimeOffStatus,
 } from '@/lib/types/database'
@@ -1645,7 +1645,7 @@ async function moveApplicationToStage(
   if (fetchErr || !current) return `Application not found or not in your organization.`
 
   // Verify new stage exists in this org
-  const newStage = await getLegacyPipelineStageById(supabase, orgId, stage_id)
+  const newStage = await getPipelineStageById(supabase, orgId, stage_id)
 
   if (!newStage) return `Stage not found in your organization.`
 
@@ -1790,7 +1790,7 @@ async function bulkAddToPipeline(
   // Get first pipeline stage for the job
   let stage
   try {
-    stage = await getFirstLegacyPipelineStage(supabase, orgId, job_id)
+    stage = await getFirstJobStage(supabase, orgId, job_id)
   } catch (err) {
     return `Error fetching pipeline stages: ${err instanceof Error ? err.message : 'Unknown error'}`
   }
@@ -1842,9 +1842,10 @@ async function bulkScoreApplications(
 ): Promise<string> {
   const { job_id, min_score_threshold = 70 } = input
 
-  // Fetch the hiring request (used as job context for scoring)
-  const job = await getLegacyJobById(supabase, orgId, job_id)
-  if (!job) return 'Job not found.'
+  // Fetch the job (HiringRequest-shaped) used as scoring context.
+  const scoringCtx = await getCanonicalJobScoringContext(supabase, orgId, job_id)
+  if (!scoringCtx) return 'Job not found.'
+  const job = scoringCtx.job
 
   // Fetch active, unscored applications with full candidate data
   const { data: apps, error: appsErr } = await listUnscoredActiveApplicationsWithCandidate(supabase, orgId, job_id)
@@ -2124,7 +2125,7 @@ async function bulkMoveToStage(
     return 'Error: application_ids must be a non-empty array'
   }
 
-  const stage = await getLegacyPipelineStageById(supabase, orgId, stage_id)
+  const stage = await getPipelineStageById(supabase, orgId, stage_id)
 
   if (!stage) return 'Stage not found in your organization.'
 
@@ -2233,24 +2234,23 @@ async function updateJob(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { job_id, status, position_title, hiring_manager_name, key_requirements, location, headcount } = input
+  const { job_id, status, position_title, key_requirements } = input
 
-  const job = await getLegacyJobById(supabase, orgId, job_id)
+  const job = await getCanonicalJobById(supabase, orgId, job_id)
   if (!job) return 'Job not found in your organization.'
 
-  // Build update payload only from provided fields
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const updates: Record<string, any> = {}
-  if (status             != null) updates.status              = status
-  if (position_title     != null) updates.position_title      = position_title
-  if (hiring_manager_name != null) updates.hiring_manager_name = hiring_manager_name
-  if (key_requirements   != null) updates.key_requirements    = key_requirements
-  if (location           != null) updates.location            = location
-  if (headcount          != null) updates.headcount           = headcount
+  // Build update payload only from provided fields, mapped to canonical `jobs`
+  // columns (title, description, status). Legacy-only fields (hiring_manager_name,
+  // location, headcount) have no canonical column; key_requirements is folded into
+  // the job description.
+  const updates: CanonicalJobUpdate = {}
+  if (status         != null) updates.status      = status
+  if (position_title != null) updates.title       = position_title
+  if (key_requirements != null) updates.description = key_requirements
 
   if (Object.keys(updates).length === 0) return 'No fields provided to update.'
 
-  await updateLegacyJob(supabase, orgId, job_id, updates as HiringRequestUpdate)
+  await updateCanonicalJob(supabase, orgId, job_id, updates)
 
   const changes = Object.entries(updates).map(([k, v]) => `${k}: "${v}"`).join(', ')
   return `Updated "${job.position_title}": ${changes}.`

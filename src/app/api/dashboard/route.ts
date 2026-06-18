@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getOrgId } from '@/lib/auth'
 import { cached, cacheKey } from '@/lib/api/cache'
 import { checkAuthRateLimit } from '@/lib/api/rate-limit'
-import { fetchLegacyDashboardInputs } from '@/modules/ats/domain/reporting'
+import { fetchCanonicalDashboardInputs } from '@/modules/ats/domain/reporting'
 import type { CandidateStatus, StageColor } from '@/lib/types/database'
 
 const INTERVIEW_KEYWORDS = ['interview', 'screen', 'technical', 'phone', 'video', 'onsite', 'call']
@@ -39,7 +39,7 @@ export async function GET() {
   const dashboardData = await cached(cacheKey(orgId, 'dashboard'), 60, async () => {
   const supabase = createAdminClient()
 
-  const inputs = await fetchLegacyDashboardInputs(supabase, orgId)
+  const inputs = await fetchCanonicalDashboardInputs(supabase, orgId)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const jobs       = inputs.jobs as any[]

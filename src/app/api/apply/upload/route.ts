@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/api/rate-limit'
-import { getLegacyApplyJobByToken } from '@/modules/ats/domain/job-pipelines'
+import { getCanonicalApplyJobByToken } from '@/modules/ats/domain/job-pipelines'
 
 const BUCKET = 'resumes'
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   const supabase = createAdminClient()
 
   // Verify the apply link
-  const job = await getLegacyApplyJobByToken(supabase, applyToken)
+  const job = await getCanonicalApplyJobByToken(supabase, applyToken)
   if (!job) {
     return NextResponse.json({ error: 'Invalid apply token.' }, { status: 400 })
   }

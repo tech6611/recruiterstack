@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
-import { getLegacyJobScoringContext } from '@/modules/ats/domain/job-pipelines'
+import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
 import type { Candidate, HiringRequest } from '@/lib/types/database'
 
 // GET /api/debug-scores?job_id=xxx[&app_id=yyy&dry_run=1]
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
         .eq('id', appId)
         .single()
 
-      const context = await getLegacyJobScoringContext(supabase, orgId, jobId)
+      const context = await getCanonicalJobScoringContext(supabase, orgId, jobId)
 
       if (!appRow || !context) {
         dryRunError = 'Could not load app or job row'

@@ -14,7 +14,7 @@ import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import { createNotification } from '@/lib/api/notify'
-import { getLegacyJobScoringContext } from '@/modules/ats/domain/job-pipelines'
+import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
 import type { Candidate, HiringRequest, PipelineStage, Application, ApplicationUpdate, ApplicationEventInsert } from '@/lib/types/database'
 
 export const maxDuration = 300 // 5 min — needed for large pipelines on Vercel
@@ -36,7 +36,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
   // ── 1. Fetch job, stages, and active applications ──────────────────────────
   let context
   try {
-    context = await getLegacyJobScoringContext(supabase, orgId, jobId)
+    context = await getCanonicalJobScoringContext(supabase, orgId, jobId)
   } catch {
     return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   }

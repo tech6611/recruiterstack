@@ -28,7 +28,7 @@ import { getValidAccessToken, createMeetEvent, queryFreeBusy } from '@/lib/googl
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
-import { getLegacyCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
+import { getCanonicalCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
 
 interface ScheduleInterviewBody {
   // Required
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   const supabase = createAdminClient()
 
   // ── Fetch candidate + hiring request context ─────────────────────────────
-  const context = await getLegacyCandidateJobContext(supabase, orgId, candidate_id, hiring_request_id)
+  const context = await getCanonicalCandidateJobContext(supabase, orgId, application_id)
   if (!context) {
     return NextResponse.json({ error: 'Candidate or hiring request not found' }, { status: 404 })
   }
