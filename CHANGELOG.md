@@ -11,6 +11,14 @@ entries on top.
 
 ## 2026-06-19
 
+### Changed
+- **Nav — Openings folded into Jobs (single recruiting-pipeline entry).** Dropped
+  the standalone "Openings" sidebar item; the Recruiting bucket is now Jobs ·
+  Candidates · Sourcing · Sequences · Inbox. Openings (requisitions) stay fully
+  available via an "Openings" link in the Jobs page header. Completes the nav
+  roadmap's Phase-3 target (Greenhouse-style single Jobs object) now that jobs are
+  canonical and candidate-bearing.
+
 ### Removed
 - **Legacy `hiring_requests` cutover (Phase 3 / C6).** Deleted the legacy CRUD
   routes (`/api/hiring-requests`, `.../[id]`) and the legacy UI
