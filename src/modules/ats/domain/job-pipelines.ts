@@ -4,6 +4,7 @@ import type {
   Candidate,
   Database,
   HiringRequest,
+  HiringRequestStatus,
   HiringRequestUpdate,
   PipelineStage,
   StageColor,
@@ -207,6 +208,196 @@ export async function getCanonicalJobPipeline(
     source: 'legacy_hiring_request',
     departmentName: row.department,
     createdAt: row.created_at,
+  }
+}
+
+// ── Canonical board reads (Phase 3 / C4) ─────────────────────────────────────
+// Adapter reads that return the EXISTING legacy board shapes
+// (LegacyJobPipelineSummary / LegacyJobPipelineDetail) mapped from canonical
+// `jobs`, so the /jobs board UI + /api/jobs routes are unchanged. Canonical jobs
+// lack most legacy HiringRequest fields (ticket_number, hiring_manager_name,
+// budget, generated_jd, …); we map what exists (jobs.title → position_title,
+// department_id → departments.name, status, created_at) and fill the rest with
+// null / sensible defaults. Stages come from pipeline_stages WHERE job_id and
+// applications from applications WHERE job_id (migrations 066/068). The client is
+// cast to `any` for not-yet-typed canonical columns, as in rbac.ts.
+
+interface CanonicalJobRow {
+  id: string
+  org_id: string
+  title: string
+  status: string
+  created_at: string | null
+  department: { name: string } | null
+}
+
+/** Map a canonical `jobs` row into the legacy HiringRequest-ish shape the board
+ *  UI expects. Legacy-only fields are null / sensible defaults. */
+function canonicalJobToHiringRequest(row: CanonicalJobRow): HiringRequest {
+  return {
+    id: row.id,
+    org_id: row.org_id,
+    ticket_number: null,
+    position_title: row.title,
+    department: row.department?.name ?? null,
+    hiring_manager_name: '',
+    hiring_manager_email: null,
+    hiring_manager_slack: null,
+    intake_token: '',
+    apply_link_token: null,
+    status: row.status as HiringRequestStatus,
+    filled_by_recruiter: true,
+    team_context: null,
+    level: null,
+    headcount: 1,
+    location: null,
+    remote_ok: false,
+    key_requirements: null,
+    nice_to_haves: null,
+    target_companies: null,
+    budget_min: null,
+    budget_max: null,
+    target_start_date: null,
+    additional_notes: null,
+    generated_jd: null,
+    intake_sent_at: null,
+    intake_submitted_at: null,
+    jd_sent_at: null,
+    created_at: row.created_at ?? '',
+    updated_at: row.created_at ?? '',
+    auto_advance_score: null,
+    auto_reject_score: null,
+    auto_advance_stage_id: null,
+    auto_email_rejection: false,
+    autopilot_recruiter_name: null,
+    autopilot_company_name: null,
+    scoring_criteria: null,
+  }
+}
+
+/** Board summaries over canonical `jobs` (Phase 3 / C4). Mirrors
+ *  listLegacyJobPipelineSummaries: per job, total_candidates = count of
+ *  applications WHERE job_id, and stage_counts from pipeline_stages WHERE job_id
+ *  (active apps per stage). Returns the LegacyJobPipelineSummary shape. */
+export async function listCanonicalJobBoardSummaries(
+  supabase: Supabase,
+  orgId: string,
+): Promise<LegacyJobPipelineSummary[]> {
+  // job_id columns / apply_token are not yet in generated types (migrations
+  // 066/068); cast the client as in rbac.ts.
+  const [jobsRes, stagesRes, appsRes] = await Promise.all([
+    (supabase as any)
+      .from('jobs')
+      .select('id, org_id, title, status, created_at, department:departments(name)')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false }),
+    (supabase as any)
+      .from('pipeline_stages')
+      .select('id, job_id, name, color, order_index')
+      .eq('org_id', orgId)
+      .not('job_id', 'is', null),
+    (supabase as any)
+      .from('applications')
+      .select('id, job_id, stage_id, status')
+      .eq('org_id', orgId)
+      .not('job_id', 'is', null),
+  ])
+
+  if (jobsRes.error) throw jobsRes.error
+  if (stagesRes.error) throw stagesRes.error
+  if (appsRes.error) throw appsRes.error
+
+  const stages = (stagesRes.data ?? []) as Array<
+    Pick<PipelineStage, 'id' | 'job_id' | 'name' | 'color' | 'order_index'>
+  >
+  const apps = (appsRes.data ?? []) as Array<
+    Pick<Application, 'id' | 'job_id' | 'stage_id' | 'status'>
+  >
+
+  return ((jobsRes.data ?? []) as CanonicalJobRow[]).map(row => {
+    const jobStages = stages
+      .filter(s => s.job_id === row.id)
+      .sort((a, b) => a.order_index - b.order_index)
+    const jobApps = apps.filter(a => a.job_id === row.id)
+    const activeApps = jobApps.filter(a => a.status === 'active')
+
+    return {
+      ...canonicalJobToHiringRequest(row),
+      total_candidates: jobApps.length,
+      stage_counts: jobStages.map(s => ({
+        stage_id: s.id,
+        stage_name: s.name,
+        color: s.color,
+        count: activeApps.filter(a => a.stage_id === s.id).length,
+      })),
+    }
+  })
+}
+
+/** Board detail over a canonical `jobs` row (Phase 3 / C4). Mirrors
+ *  getLegacyJobPipelineDetail: the job mapped into the HiringRequest-ish shape,
+ *  pipeline_stages WHERE job_id (ordered), and applications WHERE job_id with
+ *  their candidate. Candidate identity lives on `people`, so we join
+ *  candidates(*, person:people(...)) and flatten name/email onto the candidate so
+ *  the returned shape matches the legacy detail (candidate.name / candidate.email). */
+export async function getCanonicalJobBoardDetail(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<LegacyJobPipelineDetail | null> {
+  // job_id columns are not yet in generated types (migration 066); cast as rbac.ts.
+  const [jobRes, stagesRes, appsRes] = await Promise.all([
+    (supabase as any)
+      .from('jobs')
+      .select('id, org_id, title, status, created_at, department:departments(name)')
+      .eq('id', jobId)
+      .eq('org_id', orgId)
+      .maybeSingle(),
+    (supabase as any)
+      .from('pipeline_stages')
+      .select('*')
+      .eq('job_id', jobId)
+      .eq('org_id', orgId)
+      .order('order_index'),
+    (supabase as any)
+      .from('applications')
+      .select(
+        '*, ai_score, ai_recommendation, ai_strengths, ai_gaps, ai_criterion_scores, ai_scored_at, candidate:candidates(*, person:people(name, email, phone, linkedin_url))',
+      )
+      .eq('job_id', jobId)
+      .eq('org_id', orgId)
+      .order('applied_at', { ascending: true }),
+  ])
+
+  if (jobRes.error) throw jobRes.error
+  if (stagesRes.error) throw stagesRes.error
+  if (appsRes.error) throw appsRes.error
+  if (!jobRes.data) return null
+
+  // Flatten the people join onto each candidate so name/email/phone/linkedin
+  // are present at candidate.* (identity is owned by `people`), matching the
+  // shape the legacy detail returns via candidates(*).
+  const applications = ((appsRes.data ?? []) as any[]).map(app => {
+    const candidate = app.candidate
+    const person = candidate?.person ?? null
+    return {
+      ...app,
+      candidate: candidate
+        ? {
+            ...candidate,
+            name: person?.name ?? candidate.name ?? '',
+            email: person?.email ?? candidate.email ?? '',
+            phone: person?.phone ?? candidate.phone ?? null,
+            linkedin_url: person?.linkedin_url ?? candidate.linkedin_url ?? null,
+          }
+        : candidate,
+    }
+  }) as unknown as (Application & { candidate: Candidate })[]
+
+  return {
+    ...canonicalJobToHiringRequest(jobRes.data as CanonicalJobRow),
+    pipeline_stages: (stagesRes.data ?? []) as PipelineStage[],
+    applications,
   }
 }
 

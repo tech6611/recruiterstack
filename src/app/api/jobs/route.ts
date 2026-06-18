@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
-import { listLegacyJobPipelineSummaries } from '@/modules/ats/domain/job-pipelines'
+import { listCanonicalJobBoardSummaries } from '@/modules/ats/domain/job-pipelines'
 
-// GET /api/jobs — list all hiring requests with candidate counts per stage
+// GET /api/jobs — list canonical jobs with candidate counts per stage (Phase 3 / C4)
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase) => {
   try {
-    const data = await listLegacyJobPipelineSummaries(supabase, orgId)
+    const data = await listCanonicalJobBoardSummaries(supabase, orgId)
     return NextResponse.json({ data })
   } catch (err) {
     return NextResponse.json(
