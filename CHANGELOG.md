@@ -21,6 +21,12 @@ entries on top.
 - **Onboarding "Your role" step — showed coarse legacy label.** The locked-role
   message now shows the actual invited **RBAC role name** (e.g. "Talent Acquisition")
   instead of the back-compat legacy label (always just admin/recruiter).
+- **Onboarding "Your role" step — wrong role highlighted in the picker.** When the
+  invite carries an RBAC role, the step now renders a single locked card with that
+  role's real **name + description** (read from `rbac_roles`) instead of the legacy
+  4-role radio list, which highlighted the coarse mapping (e.g. "Recruiter") and
+  contradicted the banner above it. Uninvited/legacy-only joins still get the
+  static 4-role list.
 - **Team & Permissions — misleading base-role badge.** The per-member legacy
   base-role chip is now only shown for `admin`; the generic
   recruiter/hiring_manager/interviewer base roles (superseded by the RBAC role

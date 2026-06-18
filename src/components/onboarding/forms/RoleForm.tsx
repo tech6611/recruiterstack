@@ -18,10 +18,12 @@ interface RoleFormProps {
    */
   lockedRole?: RoleInput['role']
   /**
-   * Friendly RBAC role name from the invite (e.g. "Talent Acquisition"), shown
-   * in the locked message in place of the coarse legacy label when available.
+   * The actual RBAC role from the invite (e.g. "Talent Acquisition"). When set,
+   * the form renders a single locked card with this role's real name +
+   * description instead of the coarse legacy radio list — the user can't change
+   * it anyway, so the list would only misrepresent the grant.
    */
-  lockedRoleLabel?: string
+  lockedRbacRole?: { name: string; description: string | null }
 }
 
 const OPTIONS: Array<{ value: RoleInput['role']; title: string; subtitle: string }> = [
@@ -31,7 +33,7 @@ const OPTIONS: Array<{ value: RoleInput['role']; title: string; subtitle: string
   { value: 'interviewer',     title: 'Interviewer',     subtitle: 'Just interview and submit scorecards.' },
 ]
 
-export function RoleForm({ forceAdmin, defaultRole, lockedRole, lockedRoleLabel }: RoleFormProps) {
+export function RoleForm({ forceAdmin, defaultRole, lockedRole, lockedRbacRole }: RoleFormProps) {
   const router = useRouter()
   const initialRole = lockedRole ?? (forceAdmin ? 'admin' : (defaultRole ?? 'recruiter'))
   const { handleSubmit, watch, setValue, formState: { isSubmitting } } = useForm<RoleInput>({
@@ -39,7 +41,7 @@ export function RoleForm({ forceAdmin, defaultRole, lockedRole, lockedRoleLabel 
     defaultValues: { role: initialRole },
   })
   const current = watch('role')
-  const lockedLabel = lockedRoleLabel ?? (lockedRole && OPTIONS.find(o => o.value === lockedRole)?.title)
+  const lockedLabel = lockedRbacRole?.name ?? (lockedRole && OPTIONS.find(o => o.value === lockedRole)?.title)
 
   async function onSubmit(values: RoleInput) {
     // Server is the source of truth — even if someone tampers with the
@@ -64,48 +66,64 @@ export function RoleForm({ forceAdmin, defaultRole, lockedRole, lockedRoleLabel 
           You&rsquo;re the first member here, so you&rsquo;ll be set up as admin. You can invite teammates and set their roles next.
         </div>
       ) : null}
-      <div className="space-y-2">
-        {OPTIONS.map(opt => {
-          const isLocked = !!lockedRole
-          const disabled =
-            isLocked
-              ? opt.value !== lockedRole
-              : forceAdmin && opt.value !== 'admin'
-          const selected = current === opt.value
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              disabled={disabled}
-              onClick={() => {
-                if (isLocked) return
-                setValue('role', opt.value, { shouldValidate: true })
-              }}
-              className={cn(
-                'w-full rounded-lg border p-3 text-left transition-colors',
-                selected ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white hover:bg-slate-50',
-                disabled && 'opacity-40 cursor-not-allowed hover:bg-white',
-                isLocked && selected && 'cursor-default',
+      {lockedRbacRole ? (
+        <div className="rounded-lg border border-emerald-500 bg-emerald-50 p-3 text-left">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-900">{lockedRbacRole.name}</div>
+              {lockedRbacRole.description && (
+                <div className="text-xs text-slate-500 mt-0.5">{lockedRbacRole.description}</div>
               )}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">{opt.title}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">{opt.subtitle}</div>
+            </div>
+            <span className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-emerald-600">
+              <span className="h-2 w-2 rounded-full bg-emerald-600" />
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {OPTIONS.map(opt => {
+            const isLocked = !!lockedRole
+            const disabled =
+              isLocked
+                ? opt.value !== lockedRole
+                : forceAdmin && opt.value !== 'admin'
+            const selected = current === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                  if (isLocked) return
+                  setValue('role', opt.value, { shouldValidate: true })
+                }}
+                className={cn(
+                  'w-full rounded-lg border p-3 text-left transition-colors',
+                  selected ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white hover:bg-slate-50',
+                  disabled && 'opacity-40 cursor-not-allowed hover:bg-white',
+                  isLocked && selected && 'cursor-default',
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">{opt.title}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{opt.subtitle}</div>
+                  </div>
+                  <span
+                    className={cn(
+                      'flex h-4 w-4 items-center justify-center rounded-full border-2',
+                      selected ? 'border-emerald-600' : 'border-slate-300',
+                    )}
+                  >
+                    {selected && <span className="h-2 w-2 rounded-full bg-emerald-600" />}
+                  </span>
                 </div>
-                <span
-                  className={cn(
-                    'flex h-4 w-4 items-center justify-center rounded-full border-2',
-                    selected ? 'border-emerald-600' : 'border-slate-300',
-                  )}
-                >
-                  {selected && <span className="h-2 w-2 rounded-full bg-emerald-600" />}
-                </span>
-              </div>
-            </button>
-          )
-        })}
-      </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
       <div className="flex justify-end">
         <Button type="submit" loading={isSubmitting}>Continue</Button>
       </div>

@@ -39,10 +39,10 @@ export default async function RoleStepPage() {
   // is on the invitation, the form is locked to it (server enforces too).
   // First org member can't be invited, so skip the lookup.
   let lockedRole: OrgRole | undefined
-  // The invite also carries the actual RBAC role name (e.g. "Talent
-  // Acquisition"); show that in the locked message instead of the coarse legacy
-  // label, which is always just admin/recruiter and misrepresents the grant.
-  let lockedRoleLabel: string | undefined
+  // The invite may also carry the actual RBAC role (e.g. "Talent Acquisition").
+  // When it does, we show that role's real name + description as a single locked
+  // card instead of the coarse legacy radio list, which misrepresents the grant.
+  let lockedRbacRole: { name: string; description: string | null } | undefined
   if (!forceAdmin) {
     const { data: meUser } = await supabase
       .from('users')
@@ -53,7 +53,20 @@ export default async function RoleStepPage() {
     if (email) {
       lockedRole = (await getInvitePreferredRole(orgId, email)) ?? undefined
       if (lockedRole) {
-        lockedRoleLabel = (await getInviteRbacRole(orgId, email))?.roleName || undefined
+        const invited = await getInviteRbacRole(orgId, email)
+        if (invited?.roleId) {
+          // rbac_* tables aren't in the generated Supabase types yet; cast to
+          // query them (same pattern as lib/rbac.ts).
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: roleRow } = await (supabase as any)
+            .from('rbac_roles')
+            .select('name, description')
+            .eq('org_id', orgId)
+            .eq('id', invited.roleId)
+            .maybeSingle()
+          const r = roleRow as { name: string; description: string | null } | null
+          if (r) lockedRbacRole = { name: r.name, description: r.description }
+        }
       }
     }
   }
@@ -65,7 +78,7 @@ export default async function RoleStepPage() {
       title="Your role"
       description="How do you plan to use RecruiterStack?"
     >
-      <RoleForm forceAdmin={forceAdmin} defaultRole={defaultRole} lockedRole={lockedRole} lockedRoleLabel={lockedRoleLabel} />
+      <RoleForm forceAdmin={forceAdmin} defaultRole={defaultRole} lockedRole={lockedRole} lockedRbacRole={lockedRbacRole} />
     </OnboardingShell>
   )
 }
