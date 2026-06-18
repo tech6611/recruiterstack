@@ -12,8 +12,8 @@ import type { Capability } from '@/lib/permissions'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import {
   countLegacyJobs,
+  createCanonicalJobForAgent,
   createLegacyIntakeRequest,
-  createLegacyJobAndPipeline,
   findLegacyJobsForAgent,
   getFirstLegacyPipelineStage,
   getLegacyJobById,
@@ -1718,31 +1718,16 @@ async function createJobAndPipeline(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const {
-    position_title,
-    hiring_manager_name,
-    location,
-    headcount = 1,
-    department,
-    level,
-    key_requirements,
-    nice_to_haves,
-    remote_ok = false,
-  } = input
+  const { position_title, key_requirements } = input
 
-  const job = await createLegacyJobAndPipeline(supabase, orgId, {
-    positionTitle:     position_title,
-    hiringManagerName: hiring_manager_name,
-    location,
-    headcount,
-    department,
-    level,
-    keyRequirements:   key_requirements,
-    niceToHaves:       nice_to_haves,
-    remoteOk:          remote_ok,
+  // `department` arrives as free text from the agent, not a department_id FK, so
+  // we omit it from the canonical insert; title + description carry over.
+  const job = await createCanonicalJobForAgent(supabase, orgId, {
+    title:       position_title,
+    description: key_requirements ?? null,
   })
 
-  return `Created job "${job.position_title}"${job.ticket_number ? ` (${job.ticket_number})` : ''} — ID: ${job.id}. Pipeline stages are being auto-created.`
+  return `Created job "${job.title}" — ID: ${job.id}. Pipeline stages are being auto-created.`
 }
 
 async function searchCandidatePool(

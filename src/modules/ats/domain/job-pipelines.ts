@@ -74,6 +74,23 @@ export interface LegacyApplyJobPreview {
   status: string
 }
 
+// ── Canonical apply (migration 068) — keyed on jobs.apply_token ──────────────
+
+export interface CanonicalApplyJob {
+  id: string
+  org_id: string
+  title: string
+  status: string
+}
+
+export interface CanonicalApplyJobPreview {
+  position_title: string
+  department: string | null
+  location: string | null
+  generated_jd: string | null
+  status: string
+}
+
 export async function listCanonicalJobPipelines(
   supabase: Supabase,
   orgId: string,
@@ -379,6 +396,63 @@ export async function getLegacyApplyJobByToken(
     throw error
   }
   return data as LegacyApplyJob | null
+}
+
+/** Public-safe preview for the canonical apply page, keyed on jobs.apply_token.
+ *  Mirrors getLegacyApplyJobPreview but reads canonical `jobs` (joining the
+ *  department name). A canonical job has no dedicated location/JD column yet,
+ *  so location is null and the description doubles as the public JD. */
+export async function getCanonicalApplyJobPreview(
+  supabase: Supabase,
+  token: string,
+): Promise<CanonicalApplyJobPreview | null> {
+  // apply_token is not in generated types yet (migration 068); cast as in rbac.ts.
+  const { data, error } = await (supabase as any)
+    .from('jobs')
+    .select('title, description, status, department:departments(name)')
+    .eq('apply_token', token)
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === 'PGRST116' || error.message === 'Not found') return null
+    throw error
+  }
+  if (!data) return null
+
+  const row = data as {
+    title: string
+    description: string | null
+    status: string
+    department: { name: string } | null
+  }
+  return {
+    position_title: row.title,
+    department: row.department?.name ?? null,
+    location: null,
+    generated_jd: row.description,
+    status: row.status,
+  }
+}
+
+/** Resolve a canonical job by its public apply_token, or null. Mirrors
+ *  getLegacyApplyJobByToken. A canonical job accepts applications when
+ *  status = 'open' (there is no 'posted'/'active', so no auto-transition). */
+export async function getCanonicalApplyJobByToken(
+  supabase: Supabase,
+  token: string,
+): Promise<CanonicalApplyJob | null> {
+  // apply_token is not in generated types yet (migration 068); cast as in rbac.ts.
+  const { data, error } = await (supabase as any)
+    .from('jobs')
+    .select('id, org_id, title, status')
+    .eq('apply_token', token)
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === 'PGRST116' || error.message === 'Not found') return null
+    throw error
+  }
+  return (data as CanonicalApplyJob) ?? null
 }
 
 export async function activateLegacyApplyJob(
@@ -687,4 +761,38 @@ export async function getLegacyPipelineStageById(
     throw error
   }
   return (data as Pick<PipelineStage, 'id' | 'name'>) ?? null
+}
+
+// ── Canonical job creation (Phase 3 / C3) ────────────────────────────────────
+
+export interface CreateCanonicalJobInput {
+  title: string
+  department_id?: string | null
+  description?: string | null
+}
+
+/** Net-new canonical job for create_job_and_pipeline. Inserts into `jobs` with
+ *  status 'open' so it can immediately accept applications; the migration-066
+ *  jobs-insert trigger seeds the 6 default pipeline_stages keyed on job_id. */
+export async function createCanonicalJobForAgent(
+  supabase: Supabase,
+  orgId: string,
+  input: CreateCanonicalJobInput,
+): Promise<{ id: string; title: string }> {
+  // cast: jobs columns are not yet in the generated Database types
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('jobs')
+    .insert({
+      title:         input.title,
+      department_id: input.department_id ?? null,
+      description:   input.description ?? null,
+      status:        'open',
+      org_id:        orgId,
+    })
+    .select('id, title')
+    .single()
+
+  if (error) throw error
+  return data as { id: string; title: string }
 }

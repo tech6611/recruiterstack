@@ -32,13 +32,12 @@ describe('/api/apply', () => {
   describe('GET', () => {
     it('returns job data for valid token', async () => {
       const job = {
-        position_title: 'Software Engineer',
-        department: 'Engineering',
-        location: 'Remote',
-        generated_jd: 'Some JD',
-        status: 'posted',
+        title: 'Software Engineer',
+        description: 'Some JD',
+        status: 'open',
+        department: { name: 'Engineering' },
       }
-      mockSupabase.results.set('hiring_requests', { data: job, error: null })
+      mockSupabase.results.set('jobs', { data: job, error: null })
 
       const req = createMockRequest('GET', 'http://localhost:3000/api/apply?token=valid-token')
       const res = await GET(req)
@@ -46,6 +45,7 @@ describe('/api/apply', () => {
 
       expect(res.status).toBe(200)
       expect(json.data.position_title).toBe('Software Engineer')
+      expect(json.data.department).toBe('Engineering')
     })
 
     it('returns 400 when token is missing', async () => {
@@ -58,7 +58,7 @@ describe('/api/apply', () => {
     })
 
     it('returns 404 for invalid token', async () => {
-      mockSupabase.results.set('hiring_requests', { data: null, error: { code: 'PGRST116', message: 'Not found' } })
+      mockSupabase.results.set('jobs', { data: null, error: { code: 'PGRST116', message: 'Not found' } })
 
       const req = createMockRequest('GET', 'http://localhost:3000/api/apply?token=bad-token')
       const res = await GET(req)
@@ -92,7 +92,7 @@ describe('/api/apply', () => {
     })
 
     it('returns 404 for invalid token', async () => {
-      mockSupabase.results.set('hiring_requests', { data: null, error: { code: 'PGRST116', message: 'Not found' } })
+      mockSupabase.results.set('jobs', { data: null, error: { code: 'PGRST116', message: 'Not found' } })
 
       const req = createMockRequest('POST', 'http://localhost:3000/api/apply', {
         token: 'bad-token',
@@ -107,8 +107,8 @@ describe('/api/apply', () => {
     })
 
     it('returns 409 for duplicate application', async () => {
-      mockSupabase.results.set('hiring_requests', {
-        data: { id: 'job-1', org_id: 'org-1', position_title: 'Engineer', status: 'posted', auto_advance_score: null, auto_reject_score: null },
+      mockSupabase.results.set('jobs', {
+        data: { id: 'job-1', org_id: 'org-1', title: 'Engineer', status: 'open' },
         error: null,
       })
       mockSupabase.results.set('candidates', { data: { id: 'cand-1' }, error: null })
@@ -128,8 +128,8 @@ describe('/api/apply', () => {
     })
 
     it('creates application successfully with valid input', async () => {
-      mockSupabase.results.set('hiring_requests', {
-        data: { id: 'job-1', org_id: 'org-1', position_title: 'Engineer', status: 'posted', auto_advance_score: null, auto_reject_score: null },
+      mockSupabase.results.set('jobs', {
+        data: { id: 'job-1', org_id: 'org-1', title: 'Engineer', status: 'open' },
         error: null,
       })
       mockSupabase.results.set('candidates', { data: { id: 'cand-1' }, error: null })
@@ -151,7 +151,7 @@ describe('/api/apply', () => {
       expect(json.data.message).toBe('Application submitted successfully.')
 
       // Verify correct tables were queried
-      expect(mockSupabase.client.from).toHaveBeenCalledWith('hiring_requests')
+      expect(mockSupabase.client.from).toHaveBeenCalledWith('jobs')
       expect(mockSupabase.client.from).toHaveBeenCalledWith('candidates')
       expect(mockSupabase.client.from).toHaveBeenCalledWith('pipeline_stages')
       expect(mockSupabase.client.from).toHaveBeenCalledWith('applications')

@@ -10,10 +10,9 @@ import { logger } from '@/lib/logger'
 import { findOrCreateCandidateProfile } from '@/modules/ats/domain/candidates'
 import { createApplication, recordApplicationEvent } from '@/modules/ats/domain/applications'
 import {
-  activateLegacyApplyJob,
-  getFirstLegacyPipelineStage,
-  getLegacyApplyJobByToken,
-  getLegacyApplyJobPreview,
+  getCanonicalApplyJobByToken,
+  getCanonicalApplyJobPreview,
+  getFirstJobStage,
 } from '@/modules/ats/domain/job-pipelines'
 import type { ApplicationEventInsert } from '@/lib/types/database'
 
@@ -26,7 +25,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'token required' }, { status: 400 })
   }
 
-  const data = await getLegacyApplyJobPreview(supabase, token)
+  const data = await getCanonicalApplyJobPreview(supabase, token)
   if (!data) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
@@ -49,19 +48,14 @@ export async function POST(request: NextRequest) {
   const { token, name, email, phone, linkedin_url, cover_letter, cv_url } = body
 
   // ── Verify token & get job ────────────────────────────────────────────────
-  const job = await getLegacyApplyJobByToken(supabase, token)
+  const job = await getCanonicalApplyJobByToken(supabase, token)
   if (!job) {
     return NextResponse.json({ error: 'Invalid or expired apply link' }, { status: 404 })
   }
 
-  // Only accept applications for posted or active jobs
-  if (job.status !== 'posted' && job.status !== 'active') {
+  // A canonical job accepts applications only while it is open.
+  if (job.status !== 'open') {
     return NextResponse.json({ error: 'This position is no longer accepting applications.' }, { status: 400 })
-  }
-
-  // Auto-transition posted → active on first application
-  if (job.status === 'posted') {
-    await activateLegacyApplyJob(supabase, job.org_id, job.id)
   }
 
   // ── Upsert candidate ──────────────────────────────────────────────────────
@@ -80,7 +74,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Get first pipeline stage ──────────────────────────────────────────────
-  const firstStage = await getFirstLegacyPipelineStage(supabase, job.org_id, job.id)
+  const firstStage = await getFirstJobStage(supabase, job.org_id, job.id)
 
   // ── Create application ────────────────────────────────────────────────────
   let appId: string
@@ -88,7 +82,7 @@ export async function POST(request: NextRequest) {
     const app = await createApplication(supabase, {
       orgId: job.org_id,
       candidateId,
-      hiringRequestId: job.id,
+      jobId: job.id,
       stageId: firstStage?.id ?? null,
       source: 'applied',
       resumeUrl: cv_url ?? null,
@@ -130,38 +124,35 @@ export async function POST(request: NextRequest) {
     orgId: job.org_id,
     type: 'candidate_applied',
     title: `New application: ${name}`,
-    body: `${name} applied for ${job.position_title}`,
-    slackText: `📥 New application: *${name}* applied for *${job.position_title}*`,
+    body: `${name} applied for ${job.title}`,
+    slackText: `📥 New application: *${name}* applied for *${job.title}*`,
     resourceType: 'application',
     resourceId: appId,
   })
 
-  // ── Autopilot: enqueue scoring if thresholds are configured ────────────────
-  const hasAutopilot =
-    job.auto_advance_score !== null ||
-    job.auto_reject_score  !== null
-
-  if (hasAutopilot) {
-    try {
-      await enqueue({
-        orgId: job.org_id,
-        jobType: 'autopilot',
-        payload: { applicationId: appId },
-      })
-    } catch {
-      // Queue unavailable — fall back to original fire-and-forget
-      logger.warn('Queue unavailable, falling back to direct autopilot', { applicationId: appId })
-      void runAutopilot(appId, job.org_id).catch((err) => {
-        logger.error('Autopilot failed', err, { applicationId: appId })
-      })
-    }
+  // ── Autopilot: enqueue scoring ─────────────────────────────────────────────
+  // Canonical jobs carry no auto-advance/reject thresholds (those are a legacy
+  // hiring_requests concern), so enqueue unconditionally; the scorer no-ops when
+  // no scoring config applies.
+  try {
+    await enqueue({
+      orgId: job.org_id,
+      jobType: 'autopilot',
+      payload: { applicationId: appId },
+    })
+  } catch {
+    // Queue unavailable — fall back to original fire-and-forget
+    logger.warn('Queue unavailable, falling back to direct autopilot', { applicationId: appId })
+    void runAutopilot(appId, job.org_id).catch((err) => {
+      logger.error('Autopilot failed', err, { applicationId: appId })
+    })
   }
 
   return NextResponse.json(
     {
       data: {
         application_id: appId,
-        job_title: job.position_title,
+        job_title: job.title,
         message: 'Application submitted successfully.',
       },
     },
