@@ -839,7 +839,9 @@ export type StageColor = 'slate' | 'blue' | 'violet' | 'amber' | 'emerald' | 'gr
 export interface PipelineStage {
   id: string
   org_id: string
-  hiring_request_id: string
+  // Exactly one parent (migration 066): legacy hiring_request OR canonical job.
+  hiring_request_id: string | null
+  job_id: string | null
   name: string
   order_index: number
   color: StageColor
@@ -1308,9 +1310,11 @@ export interface HiringRequestInsert extends Omit<HiringRequest, 'id' | 'created
 
 export interface HiringRequestUpdate extends Partial<HiringRequestInsert> {}
 
-export interface PipelineStageInsert extends Omit<PipelineStage, 'id' | 'created_at'> {
+export interface PipelineStageInsert extends Omit<PipelineStage, 'id' | 'created_at' | 'hiring_request_id' | 'job_id'> {
   id?: string
   created_at?: string
+  hiring_request_id?: string | null
+  job_id?: string | null
 }
 
 export interface PipelineStageUpdate extends Partial<PipelineStageInsert> {}

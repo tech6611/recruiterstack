@@ -629,6 +629,44 @@ export async function listLegacyPipelineStagesForJob(
   return (data ?? []) as Pick<PipelineStage, 'id' | 'name' | 'order_index'>[]
 }
 
+// ── Canonical job stages (migration 066) — keyed on jobs.id via pipeline_stages.job_id ──
+
+/** Ordered stages for a canonical job (Phase 3 / C1). */
+export async function listJobStages(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<Pick<PipelineStage, 'id' | 'name' | 'order_index'>[]> {
+  const { data, error } = await supabase
+    .from('pipeline_stages')
+    .select('id, name, order_index')
+    .eq('job_id', jobId)
+    .eq('org_id', orgId)
+    .order('order_index')
+
+  if (error) throw error
+  return (data ?? []) as Pick<PipelineStage, 'id' | 'name' | 'order_index'>[]
+}
+
+/** First stage ('Applied') of a canonical job — the entry stage for new applications. */
+export async function getFirstJobStage(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<Pick<PipelineStage, 'id' | 'name'> | null> {
+  const { data, error } = await supabase
+    .from('pipeline_stages')
+    .select('id, name')
+    .eq('job_id', jobId)
+    .eq('org_id', orgId)
+    .order('order_index')
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data as Pick<PipelineStage, 'id' | 'name'> | null
+}
+
 // Lookup a single pipeline stage by id within the org (move_application_to_stage
 // + bulk_move_to_stage agent tools). Returns null when the stage does not exist
 // in this org; callers emit their own not-found message.
