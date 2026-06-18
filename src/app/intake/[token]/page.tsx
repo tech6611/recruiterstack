@@ -286,7 +286,13 @@ export default function IntakePage() {
     </div>
   )
 
-  if (requestInfo?.status !== 'intake_pending') return (
+  // Intake is "pending" (form should show) while the role hasn't been submitted.
+  // Legacy hiring_requests use status 'intake_pending'; canonical intake jobs
+  // (Phase 3 / C5.5) use 'draft' until submit/approve flips them to 'open'.
+  const intakePending =
+    requestInfo?.status === 'intake_pending' || requestInfo?.status === 'draft'
+
+  if (!intakePending) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="text-center max-w-sm">
         <CheckCircle className="h-12 w-12 text-emerald-400 mx-auto mb-4" />

@@ -12,6 +12,26 @@ entries on top.
 ## 2026-06-19
 
 ### Changed
+- **HM intake flow → canonical jobs (Phase 3 / C5.5).** The hiring-manager intake
+  routes now operate on canonical `jobs` keyed by `jobs.intake_token` instead of
+  legacy `hiring_requests`: `GET/POST /api/intake/[token]`, `.../generate-jd`, and
+  `.../approve`. An intake is a canonical job — intake-pending = `draft`, the
+  AI-generated JD lands in `jobs.description`, structured intake fields + HM
+  name/email live in `jobs.custom_fields.intake`, and submit/approve flips the job
+  to `open` (apply-ready via the migration-068 apply_token). New domain helpers in
+  `src/modules/ats/domain/job-pipelines.ts`:
+  `getCanonicalIntakeJobByToken` / `getCanonicalIntakeJobFull` /
+  `submitCanonicalIntakeJob` / `setCanonicalIntakeJobJd` /
+  `approveCanonicalIntakeJob`. AI JD generation, validation, notifications, and
+  response shapes are preserved. Legacy intake code is untouched (cutover is C6).
+
+### Schema
+- **069_jobs_intake_token.sql.** Adds `jobs.intake_token TEXT UNIQUE` + a
+  `BEFORE INSERT` trigger `set_job_intake_token` (auto-generates when null) +
+  backfill, mirroring the migration-068 apply_token. Additive, idempotent,
+  reversible.
+
+### Changed
 - **Copilot job tools → canonical jobs (Phase 3 / C5).** The agent job tools in
   `src/lib/copilot-tools.ts` now read the canonical `jobs` spine instead of
   legacy `hiring_requests`: `list_jobs` uses `listCanonicalJobBoardSummaries`,

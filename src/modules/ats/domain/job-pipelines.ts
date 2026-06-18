@@ -1033,3 +1033,284 @@ export async function createCanonicalJobForAgent(
   if (error) throw error
   return data as { id: string; title: string }
 }
+
+// ── Canonical intake creation (Phase 3 / C5.5) ───────────────────────────────
+// Mirror of createLegacyIntakeRequest, but the intake IS a canonical `job`:
+// an intake-pending job = status 'draft' (becomes 'open' on intake submit /
+// approve). The migration-069 jobs-insert trigger auto-generates
+// jobs.intake_token (mirrors the migration-068 apply_token trigger); migration
+// 066 seeds the 6 default pipeline_stages keyed on job_id. The generated JD will
+// land in jobs.description; structured intake fields live in jobs.custom_fields.
+// Canonical jobs have no hiring-manager column, so HM name/email go into
+// custom_fields for now. jobs.intake_token / custom_fields are not yet in the
+// generated Database types; cast the client as elsewhere in this module.
+
+export interface CreateCanonicalIntakeInput {
+  title: string
+  hiringManagerName?: string | null
+  hiringManagerEmail?: string | null
+}
+
+export async function createCanonicalIntakeJob(
+  supabase: Supabase,
+  orgId: string,
+  input: CreateCanonicalIntakeInput,
+): Promise<{ id: string; intake_token: string; title: string }> {
+  // cast: jobs.intake_token / custom_fields are not yet in the generated types
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('jobs')
+    .insert({
+      title:         input.title,
+      status:        'draft',
+      org_id:        orgId,
+      custom_fields: {
+        intake: {
+          hiring_manager_name:  input.hiringManagerName ?? null,
+          hiring_manager_email: input.hiringManagerEmail ?? null,
+        },
+      },
+    })
+    .select('id, intake_token, title')
+    .single()
+
+  if (error) throw error
+  return data as { id: string; intake_token: string; title: string }
+}
+
+// ── Canonical intake reads/writes (Phase 3 / C5.5) ───────────────────────────
+//
+// Mirror the legacy hiring_requests intake reads/writes used by the three
+// /api/intake/[token] routes, but operate on canonical `jobs` keyed by
+// jobs.intake_token (migration 069). The HM-facing form data, the AI JD
+// (jobs.description), and the structured intake fields (jobs.custom_fields.intake)
+// all live on the job. An intake-pending job = status 'draft'; on submit/approve
+// it goes live (status 'open' → apply-ready via the apply_token from 068).
+// jobs.intake_token / custom_fields are not in the generated Database types yet;
+// cast the client as elsewhere in this module.
+
+/** Public-safe intake form data, keyed on jobs.intake_token. Mirrors the legacy
+ *  hiring_requests intake GET shape consumed by /intake/[token]. */
+export interface CanonicalIntakeJobForm {
+  id: string
+  position_title: string
+  department: string | null
+  hiring_manager_name: string | null
+  status: string
+  intake_submitted_at: string | null
+  jd_sent_at: string | null
+  created_at: string | null
+}
+
+/** Full canonical intake job row needed by the JD-generation + submit paths. */
+export interface CanonicalIntakeJob {
+  id: string
+  org_id: string
+  title: string
+  status: string
+  description: string | null
+  department: string | null
+  custom_fields: Record<string, unknown>
+}
+
+/** Structured intake fields the HM submits (stored in custom_fields.intake). */
+export interface CanonicalIntakeFields {
+  team_context?: string | null
+  level?: string | null
+  headcount?: number | null
+  location?: string | null
+  remote_ok?: boolean | null
+  key_requirements?: string | null
+  nice_to_haves?: string | null
+  target_companies?: string | null
+  budget_min?: number | null
+  budget_max?: number | null
+  target_start_date?: string | null
+  additional_notes?: string | null
+}
+
+function readIntakeBag(customFields: Record<string, unknown> | null): Record<string, unknown> {
+  const cf = customFields ?? {}
+  const intake = cf.intake
+  return intake && typeof intake === 'object' ? (intake as Record<string, unknown>) : {}
+}
+
+/** Resolve a canonical intake job's form data by its intake_token, or null.
+ *  Mirrors the legacy hiring_requests intake GET. The department name is read
+ *  from the joined departments row; HM name + timestamps from custom_fields.intake. */
+export async function getCanonicalIntakeJobByToken(
+  supabase: Supabase,
+  token: string,
+): Promise<CanonicalIntakeJobForm | null> {
+  // intake_token / custom_fields not in generated types yet (migration 069); cast.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('jobs')
+    .select('id, title, status, created_at, custom_fields, department:departments(name)')
+    .eq('intake_token', token)
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === 'PGRST116' || error.message === 'Not found') return null
+    throw error
+  }
+  if (!data) return null
+
+  const row = data as {
+    id: string
+    title: string
+    status: string
+    created_at: string | null
+    custom_fields: Record<string, unknown> | null
+    department: { name: string } | null
+  }
+  const bag = readIntakeBag(row.custom_fields)
+  return {
+    id: row.id,
+    position_title: row.title,
+    department: row.department?.name ?? null,
+    hiring_manager_name: (bag.hiring_manager_name as string | undefined) ?? null,
+    status: row.status,
+    intake_submitted_at: (bag.intake_submitted_at as string | undefined) ?? null,
+    jd_sent_at: (bag.jd_sent_at as string | undefined) ?? null,
+    created_at: row.created_at,
+  }
+}
+
+/** Resolve the full canonical intake job (incl. custom_fields) by intake_token,
+ *  for the JD-generation + submit paths. Returns null when not found. */
+export async function getCanonicalIntakeJobFull(
+  supabase: Supabase,
+  token: string,
+): Promise<CanonicalIntakeJob | null> {
+  // intake_token / custom_fields not in generated types yet (migration 069); cast.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('jobs')
+    .select('id, org_id, title, status, description, custom_fields, department:departments(name)')
+    .eq('intake_token', token)
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === 'PGRST116' || error.message === 'Not found') return null
+    throw error
+  }
+  if (!data) return null
+
+  const row = data as {
+    id: string
+    org_id: string
+    title: string
+    status: string
+    description: string | null
+    custom_fields: Record<string, unknown> | null
+    department: { name: string } | null
+  }
+  return {
+    id: row.id,
+    org_id: row.org_id,
+    title: row.title,
+    status: row.status,
+    description: row.description,
+    department: row.department?.name ?? null,
+    custom_fields: row.custom_fields ?? {},
+  }
+}
+
+/** Persist the HM intake submission on the canonical job: writes the final JD to
+ *  jobs.description, merges structured fields + timestamps into
+ *  custom_fields.intake, and flips the job live (status 'open'). Mirrors the
+ *  legacy hiring_requests submit, which set generated_jd + status 'jd_approved'.
+ *  The optional title lets the HM rename the role. */
+export async function submitCanonicalIntakeJob(
+  supabase: Supabase,
+  token: string,
+  args: {
+    positionTitle?: string | null
+    finalJd: string
+    fields: CanonicalIntakeFields
+    existingCustomFields: Record<string, unknown>
+  },
+): Promise<void> {
+  const now = new Date().toISOString()
+  const intakeBag: Record<string, unknown> = {
+    ...readIntakeBag(args.existingCustomFields),
+    team_context: args.fields.team_context ?? null,
+    level: args.fields.level ?? null,
+    headcount: args.fields.headcount ?? 1,
+    location: args.fields.location ?? null,
+    remote_ok: args.fields.remote_ok ?? false,
+    key_requirements: args.fields.key_requirements ?? null,
+    nice_to_haves: args.fields.nice_to_haves ?? null,
+    target_companies: args.fields.target_companies ?? null,
+    budget_min: args.fields.budget_min ?? null,
+    budget_max: args.fields.budget_max ?? null,
+    target_start_date: args.fields.target_start_date ?? null,
+    additional_notes: args.fields.additional_notes ?? null,
+    intake_submitted_at: now,
+    jd_sent_at: now,
+  }
+  const customFields: Record<string, unknown> = {
+    ...args.existingCustomFields,
+    intake: intakeBag,
+  }
+
+  const update: Record<string, unknown> = {
+    description: args.finalJd,
+    custom_fields: customFields,
+    status: 'open',
+  }
+  if (args.positionTitle?.trim()) update.title = args.positionTitle.trim()
+
+  // intake_token / custom_fields not in generated types yet (migration 069); cast.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('jobs')
+    .update(update)
+    .eq('intake_token', token)
+
+  if (error) throw error
+}
+
+/** Store the AI-generated JD on the canonical intake job's description without
+ *  changing status (used by the generate-jd preview/persist path). */
+export async function setCanonicalIntakeJobJd(
+  supabase: Supabase,
+  token: string,
+  jd: string,
+): Promise<void> {
+  // intake_token not in generated types yet (migration 069); cast.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('jobs')
+    .update({ description: jd })
+    .eq('intake_token', token)
+
+  if (error) throw error
+}
+
+/** Approve a canonical intake job (one-click email link): flips status to 'open'
+ *  when it is still pending. Mirrors the legacy approve route, which set
+ *  'jd_approved' from 'jd_sent'/'jd_generated'. Returns the job title, or null
+ *  when the link is invalid / already actioned. */
+export async function approveCanonicalIntakeJob(
+  supabase: Supabase,
+  token: string,
+): Promise<{ position_title: string } | null> {
+  // intake_token not in generated types yet (migration 069); cast.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('jobs')
+    .update({ status: 'open' })
+    .eq('intake_token', token)
+    .in('status', ['draft', 'pending_approval', 'approved'])
+    .select('title')
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === 'PGRST116' || error.message === 'Not found') return null
+    throw error
+  }
+  if (!data) return null
+  return { position_title: (data as { title: string }).title }
+}

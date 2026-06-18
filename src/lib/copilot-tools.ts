@@ -12,8 +12,8 @@ import type { Capability } from '@/lib/permissions'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import {
   countCanonicalJobs,
+  createCanonicalIntakeJob,
   createCanonicalJobForAgent,
-  createLegacyIntakeRequest,
   findCanonicalJobsForAgent,
   getCanonicalJobBoardDetail,
   getFirstLegacyPipelineStage,
@@ -2645,25 +2645,26 @@ async function createIntakeRequest(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { position_title, hiring_manager_name, hiring_manager_email, department, hiring_manager_slack } = input
+  const { position_title, hiring_manager_name, hiring_manager_email } = input
 
   if (!position_title?.trim() || !hiring_manager_name?.trim() || !hiring_manager_email?.trim()) {
     return 'Error: position_title, hiring_manager_name, and hiring_manager_email are required.'
   }
 
-  const r = await createLegacyIntakeRequest(supabase, orgId, {
-    positionTitle:      position_title.trim(),
+  // Phase 3 / C5.5: an intake is now a canonical `job` (status 'draft' until
+  // the HM submits / it's approved). jobs.intake_token (migration 069) keys the
+  // /intake/<token> URL, mirroring how apply_token keys /apply.
+  const r = await createCanonicalIntakeJob(supabase, orgId, {
+    title:              position_title.trim(),
     hiringManagerName:  hiring_manager_name.trim(),
     hiringManagerEmail: hiring_manager_email.trim(),
-    hiringManagerSlack: hiring_manager_slack,
-    department,
   })
   const appUrl    = process.env.NEXT_PUBLIC_APP_URL || 'https://app.recruiterstack.com'
   const intakeUrl = `${appUrl}/intake/${r.intake_token}`
 
   return [
-    `Intake request created for "${r.position_title}" (HM: ${hiring_manager_name}).`,
-    `Status: intake_pending | ID: ${r.id}`,
+    `Intake request created for "${r.title}" (HM: ${hiring_manager_name}).`,
+    `Status: draft (intake pending) | ID: ${r.id}`,
     ``,
     `Intake URL (share this with the hiring manager):`,
     intakeUrl,

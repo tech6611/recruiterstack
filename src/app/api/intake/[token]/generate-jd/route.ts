@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { generateJD } from '@/lib/ai/jd-generator'
+import {
+  getCanonicalIntakeJobFull,
+  setCanonicalIntakeJobJd,
+} from '@/modules/ats/domain/job-pipelines'
 
 // POST /api/intake/:token/generate-jd
-// Generates a JD preview from the form data WITHOUT saving to DB.
-// The HM can then review/edit before final submission.
+// Generates a JD from the form data for the canonical intake job and stores it
+// on jobs.description (the HM can still review/edit before final submission).
 export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
   const supabase = createAdminClient()
 
-  const { data: req, error } = await supabase
-    .from('hiring_requests')
-    .select('id, position_title, department, status')
-    .eq('intake_token', params.token)
-    .single()
-
-  if (error || !req) {
+  const job = await getCanonicalIntakeJobFull(supabase, params.token)
+  if (!job) {
     return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 })
   }
-  if (req.status !== 'intake_pending') {
+  // An intake-pending canonical job is still 'draft'.
+  if (job.status !== 'draft') {
     return NextResponse.json({ error: 'This intake form has already been submitted' }, { status: 409 })
   }
 
@@ -49,8 +49,8 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
   try {
     const jd = await generateJD({
-      position_title: req.position_title,
-      department: req.department,
+      position_title: job.title,
+      department: job.department,
       level: body.level || null,
       location: body.location || null,
       remote_ok: body.remote_ok || false,
@@ -63,6 +63,12 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       target_start_date: body.target_start_date || null,
       additional_notes: body.additional_notes || null,
     })
+    // Persist the latest draft JD on the canonical job (status unchanged).
+    try {
+      await setCanonicalIntakeJobJd(supabase, params.token, jd)
+    } catch (e) {
+      console.error('Failed to persist generated JD:', e)
+    }
     return NextResponse.json({ jd })
   } catch {
     return NextResponse.json({ error: 'Failed to generate JD. Please try again.' }, { status: 500 })
