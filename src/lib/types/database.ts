@@ -1322,10 +1322,11 @@ export interface PipelineStageUpdate extends Partial<PipelineStageInsert> {}
 // Application Row type (without optional joined relations)
 type ApplicationRow = Omit<Application, 'candidate' | 'stage' | 'hiring_request'>
 
-export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at' | 'resume_url' | 'cover_letter' | 'ai_score' | 'ai_recommendation' | 'ai_strengths' | 'ai_gaps' | 'ai_scored_at' | 'ai_criterion_scores' | 'source_detail' | 'credited_to' | 'stage_id' | 'review_status' | 'job_id' | 'opening_id'> {
+export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at' | 'resume_url' | 'cover_letter' | 'ai_score' | 'ai_recommendation' | 'ai_strengths' | 'ai_gaps' | 'ai_scored_at' | 'ai_criterion_scores' | 'source_detail' | 'credited_to' | 'stage_id' | 'review_status' | 'job_id' | 'opening_id' | 'hiring_request_id'> {
   id?: string
   created_at?: string
   applied_at?: string
+  hiring_request_id?: string | null
   job_id?: string | null
   opening_id?: string | null
   resume_url?: string | null

@@ -11,9 +11,11 @@ type Supabase = SupabaseClient<Database>
 export interface CreateApplicationInput {
   orgId: string
   candidateId: string
-  hiringRequestId: string
-  /** Canonical links (Slice 3). Optional; set when the application is created
-   *  against a canonical job pipeline. Legacy apply flow leaves them unset. */
+  /** Legacy anchor. Optional now (migration 067): a canonical candidacy sets
+   *  jobId instead and leaves this unset. Exactly one of hiringRequestId / jobId
+   *  should be provided. */
+  hiringRequestId?: string | null
+  /** Canonical links. jobId set for a candidacy against a canonical job pipeline. */
   jobId?: string | null
   openingId?: string | null
   stageId?: string | null
@@ -32,9 +34,9 @@ export async function createApplication(
   const row: ApplicationInsert = {
     org_id: input.orgId,
     candidate_id: input.candidateId,
-    hiring_request_id: input.hiringRequestId,
-    // Only reference the canonical link columns when set, so legacy inserts
-    // never touch them (deploy stays safe even if migration 064 lags).
+    // Exactly one anchor: legacy hiring_request OR canonical job. Only reference
+    // columns that are set, so neither side is touched when absent.
+    ...(input.hiringRequestId ? { hiring_request_id: input.hiringRequestId } : {}),
     ...(input.jobId ? { job_id: input.jobId } : {}),
     ...(input.openingId ? { opening_id: input.openingId } : {}),
     stage_id: input.stageId ?? null,
