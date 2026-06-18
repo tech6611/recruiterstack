@@ -954,6 +954,52 @@ export async function getLegacyPipelineStageById(
   return (data as Pick<PipelineStage, 'id' | 'name'>) ?? null
 }
 
+// ── Canonical agent lookups (Phase 3 / C5) ───────────────────────────────────
+// Mirror the legacy agent helpers (findLegacyJobsForAgent / countLegacyJobs) over
+// canonical `jobs`, so the copilot job tools resolve jobs from the canonical spine
+// instead of `hiring_requests`. job columns are not yet in the generated Database
+// types; cast the client as elsewhere in this module.
+
+export interface CanonicalAgentJob {
+  id: string
+  title: string
+  status: string
+}
+
+/** Lookup for get_job_pipeline over canonical `jobs`: by id, or fuzzy by title
+ *  for disambiguation. Mirrors findLegacyJobsForAgent. */
+export async function findCanonicalJobsForAgent(
+  supabase: Supabase,
+  orgId: string,
+  opts: { jobId?: string; titleQuery?: string; limit?: number },
+): Promise<CanonicalAgentJob[]> {
+  // jobs columns are not yet in the generated types; cast as in rbac.ts.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q = (supabase as any)
+    .from('jobs')
+    .select('id, title, status')
+    .eq('org_id', orgId)
+
+  if (opts.jobId) q = q.eq('id', opts.jobId)
+  else if (opts.titleQuery) q = q.ilike('title', `%${opts.titleQuery}%`)
+
+  const { data, error } = await q.limit(opts.limit ?? 5)
+  if (error) throw error
+  return (data ?? []) as CanonicalAgentJob[]
+}
+
+/** Total canonical job count for get_dashboard_stats. Mirrors countLegacyJobs. */
+export async function countCanonicalJobs(supabase: Supabase, orgId: string): Promise<number> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { count, error } = await (supabase as any)
+    .from('jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('org_id', orgId)
+
+  if (error) throw error
+  return count ?? 0
+}
+
 // ── Canonical job creation (Phase 3 / C3) ────────────────────────────────────
 
 export interface CreateCanonicalJobInput {

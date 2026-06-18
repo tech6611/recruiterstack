@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { cached, cacheKey } from '@/lib/api/cache'
-import { fetchLegacyAnalyticsInputs } from '@/modules/ats/domain/reporting'
+import { fetchCanonicalAnalyticsInputs } from '@/modules/ats/domain/reporting'
 import type { HiringRequest, PipelineStage, Candidate } from '@/lib/types/database'
 
 // GET /api/analytics — pipeline funnel, source breakdown, time-in-stage
@@ -18,7 +18,7 @@ export async function GET() {
   if (denied) return denied
 
   const analyticsData = await cached(cacheKey(orgId, 'analytics'), 60, async () => {
-  const inputs = await fetchLegacyAnalyticsInputs(supabase, orgId)
+  const inputs = await fetchCanonicalAnalyticsInputs(supabase, orgId)
 
   const jobs   = inputs.jobs as Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'status'>[]
   const apps   = inputs.apps as { id: string; status: string; source: string; stage_id: string | null; applied_at: string; hiring_request_id: string; candidate_id: string }[]
@@ -26,7 +26,10 @@ export async function GET() {
   const cands  = inputs.candidates as Pick<Candidate, 'id' | 'status'>[]
 
   // ── 1. Jobs funnel ────────────────────────────────────────────────────────
-  const ACTIVE_JOB_STATUSES = ['active', 'jd_approved', 'jd_sent', 'jd_generated', 'posted']
+  // Canonical `jobs` status enum (migration 035): draft | pending_approval |
+  // approved | open | closed | archived. The "active" funnel set is jobs that
+  // are live / accepting candidates.
+  const ACTIVE_JOB_STATUSES = ['open', 'approved']
   const activeJobs = jobs.filter(j => ACTIVE_JOB_STATUSES.includes(j.status))
 
   const jobsFunnel = activeJobs

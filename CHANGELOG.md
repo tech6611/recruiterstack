@@ -9,7 +9,34 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-19
+
+### Changed
+- **Copilot job tools → canonical jobs (Phase 3 / C5).** The agent job tools in
+  `src/lib/copilot-tools.ts` now read the canonical `jobs` spine instead of
+  legacy `hiring_requests`: `list_jobs` uses `listCanonicalJobBoardSummaries`,
+  `get_job_pipeline` resolves via the new `findCanonicalJobsForAgent` then reads
+  `getCanonicalJobBoardDetail`, and `get_dashboard_stats` job count uses the new
+  `countCanonicalJobs`. Agent-facing return-string formats are unchanged. New
+  canonical lookup helpers `findCanonicalJobsForAgent` / `countCanonicalJobs`
+  added to `job-pipelines.ts`; legacy reads left intact (cutover is C6).
+
 ## 2026-06-18
+
+### Added
+- **Public apply → canonical jobs (Phase 3 / C3).** The public `/api/apply`
+  route (GET preview + POST submit) now resolves the apply token against
+  canonical `jobs` via `jobs.apply_token`, gates on `status = 'open'`, seeds the
+  candidacy at the job's first canonical pipeline stage (`getFirstJobStage`), and
+  creates the application anchored on `job_id` (no `hiring_request_id`). New
+  domain helpers `getCanonicalApplyJobByToken` / `getCanonicalApplyJobPreview` in
+  `job-pipelines.ts`. Legacy paths left intact (cutover is C6).
+
+### Schema
+- **Migration 068 — `jobs.apply_token`.** Adds a unique public apply token to
+  canonical `jobs` with a `BEFORE INSERT` trigger that auto-generates it when
+  null (mirrors `hiring_requests.apply_link_token`); backfills existing rows.
+  Idempotent.
 
 ### Security
 - **RBAC API guard gaps — closed.** Several recruiting endpoints enforced only

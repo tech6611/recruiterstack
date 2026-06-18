@@ -11,14 +11,15 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import type { Capability } from '@/lib/permissions'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import {
-  countLegacyJobs,
+  countCanonicalJobs,
   createCanonicalJobForAgent,
   createLegacyIntakeRequest,
-  findLegacyJobsForAgent,
+  findCanonicalJobsForAgent,
+  getCanonicalJobBoardDetail,
   getFirstLegacyPipelineStage,
   getLegacyJobById,
   getLegacyPipelineStageById,
-  listLegacyJobsForAgent,
+  listCanonicalJobBoardSummaries,
   listLegacyPipelineStagesForJob,
   updateLegacyJob,
 } from '@/modules/ats/domain/job-pipelines'
@@ -34,8 +35,6 @@ import {
 } from '@/modules/ats/domain/candidates'
 import {
   listActiveApplicationsByCandidatesWithJobTitle,
-  listActiveApplicationsForJobPipeline,
-  listActiveApplicationHiringRequestIds,
   listActiveApplicationsForStaleCheck,
   listApplicationsForCandidateWithJobAndStage,
   getApplicationStageContext,
@@ -1418,7 +1417,7 @@ async function getJobPipeline(
     return 'Error: provide either job_id or job_title_query'
   }
 
-  const jobs = await findLegacyJobsForAgent(supabase, orgId, {
+  const jobs = await findCanonicalJobsForAgent(supabase, orgId, {
     jobId: job_id,
     titleQuery: job_title_query,
   })
@@ -1426,21 +1425,22 @@ async function getJobPipeline(
 
   if (jobs.length > 1 && !job_id) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return `Multiple jobs found — be more specific or use job_id:\n${jobs.map((j: any) => `• ${j.position_title} (${j.status}) — ID: ${j.id}`).join('\n')}`
+    return `Multiple jobs found — be more specific or use job_id:\n${jobs.map((j: any) => `• ${j.title} (${j.status}) — ID: ${j.id}`).join('\n')}`
   }
 
-  const job = jobs[0]
-
-  let stages
-  let apps
+  let detail
   try {
-    [stages, apps] = await Promise.all([
-      listLegacyPipelineStagesForJob(supabase, orgId, job.id),
-      listActiveApplicationsForJobPipeline(supabase, orgId, job.id),
-    ])
+    detail = await getCanonicalJobBoardDetail(supabase, orgId, jobs[0].id)
   } catch (err) {
     return `Error fetching stages: ${err instanceof Error ? err.message : 'Unknown error'}`
   }
+  if (!detail) return `No job found matching "${job_title_query ?? job_id}".`
+
+  const job = detail
+  const stages = detail.pipeline_stages
+  // Match prior behavior: only active applications appear in the pipeline view.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const apps = (detail.applications as any[]).filter(a => a.status === 'active')
 
   // Group candidates by stage
   const stageMap: Record<string, { name: string; candidates: string[] }> = {}
@@ -1491,21 +1491,16 @@ async function listJobs(
 ): Promise<string> {
   const { status_filter } = input
 
-  const jobs = await listLegacyJobsForAgent(supabase, orgId, status_filter)
+  const summaries = await listCanonicalJobBoardSummaries(supabase, orgId)
+  const jobs = status_filter
+    ? summaries.filter(j => j.status === status_filter)
+    : summaries
   if (jobs.length === 0) return 'No jobs found.'
 
-  const jobIds = jobs.map((j: { id: string }) => j.id)
-  const appCounts = await listActiveApplicationHiringRequestIds(supabase, orgId, jobIds)
-
-  const countByJob: Record<string, number> = {}
-  for (const app of appCounts ?? []) {
-    const id = (app as { hiring_request_id: string }).hiring_request_id
-    countByJob[id] = (countByJob[id] ?? 0) + 1
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lines = jobs.map((j: any) => {
-    const count = countByJob[j.id] ?? 0
+  const lines = jobs.map(j => {
+    // Active candidates per job (matches prior active-only count): sum the
+    // per-stage active counts the board summary computes.
+    const count = j.stage_counts.reduce((sum, s) => sum + s.count, 0)
     return `• ${j.position_title}${j.department ? ` (${j.department})` : ''} | ${j.status} | HM: ${j.hiring_manager_name} | ${count} candidates | ID: ${j.id}`
   })
 
@@ -1514,7 +1509,7 @@ async function listJobs(
 
 async function getDashboardStats(orgId: string, supabase: SupabaseClient): Promise<string> {
   const [totalJobs, activeCount, interviewingCount, hiredCount] = await Promise.all([
-    countLegacyJobs(supabase, orgId),
+    countCanonicalJobs(supabase, orgId),
     countCandidatesByStatus(supabase, orgId, 'active'),
     countCandidatesByStatus(supabase, orgId, 'interviewing'),
     countCandidatesByStatus(supabase, orgId, 'hired'),
