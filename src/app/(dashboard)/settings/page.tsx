@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Check, Building2, User, Sparkles, Database, Bell, Plug, LayoutList, Calendar, Video, Monitor, SlidersHorizontal, Briefcase, Users } from 'lucide-react'
 import { useSettings, KANBAN_CARD_FIELD_OPTIONS } from '@/lib/hooks/useSettings'
+import { useCapabilities } from '@/components/providers/CapabilitiesProvider'
 import { inputCls } from '@/lib/ui/styles'
 import type { AppSettings } from '@/lib/hooks/useSettings'
 import { CompanyInfoCard } from '@/components/settings/CompanyInfoCard'
@@ -58,7 +59,11 @@ export default function SettingsPage() {
 
   // Current user's capabilities — gate admin-only sections (Slack, company info,
   // team, agents) on the `settings:edit` capability rather than a raw admin flag.
-  const [canManageSettings, setCanManageSettings] = useState(false)
+  // Sourced from the shared provider (one /api/me for the dashboard); `capsLoading`
+  // covers the cold-load window so the nav renders a stable skeleton instead of
+  // popping the admin tabs in after a late fetch.
+  const { can, loading: capsLoading } = useCapabilities()
+  const canManageSettings = can('settings:edit')
 
   // Active tab in the settings sidebar
   const [activeTab, setActiveTab] = useState<TabId>('general')
@@ -75,16 +80,6 @@ export default function SettingsPage() {
   useEffect(() => {
     if (loaded) setForm(settings)
   }, [loaded]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    fetch('/api/me')
-      .then(r => r.json())
-      .then(({ data }) => {
-        const caps = new Set<string>(Array.isArray(data?.capabilities) ? data.capabilities : [])
-        setCanManageSettings(caps.has('settings:edit'))
-      })
-      .catch(() => {})
-  }, [])
 
   // Hydrate Company + Recruiter Profile cards from the DB.
   // Onboarding writes company info to org_settings and recruiter info to users;
@@ -404,9 +399,14 @@ export default function SettingsPage() {
       )}
 
       <div className="mt-6 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-6 md:gap-10">
-        {/* Sidebar nav */}
+        {/* Sidebar nav. While capabilities are still loading we render fixed-height
+            placeholders so the admin tabs don't pop in and shift the layout. */}
         <nav className="space-y-1 md:sticky md:top-8 md:self-start">
-          {tabs.filter(t => !t.adminOnly || canManageSettings).map(t => {
+          {capsLoading ? (
+            Array.from({ length: tabs.length }).map((_, i) => (
+              <div key={i} className="h-9 rounded-xl bg-slate-100 animate-pulse" />
+            ))
+          ) : tabs.filter(t => !t.adminOnly || canManageSettings).map(t => {
             const active = activeTab === t.id
             const Icon = t.icon
             return (

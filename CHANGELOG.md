@@ -30,6 +30,12 @@ entries on top.
 - **Org setup — clearer guidance for invitees.** Copy now points invited users to
   the pending-invitation card (already rendered by Clerk's `OrganizationList`), so
   an existing user who lands here after signing in has an unmistakable accept path.
+- **Settings/Sidebar — removed capability-gated nav flicker.** A new shared
+  `CapabilitiesProvider` fetches `/api/me` once for the whole dashboard; Sidebar and
+  Settings now read from it instead of each firing their own request. The Settings
+  nav renders a skeleton while capabilities load, so admin tabs ("Workspace",
+  "Teams & Agents") appear together with the rest instead of popping in ~100–300ms
+  later.
 
 ## 2026-06-14
 

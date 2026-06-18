@@ -31,6 +31,7 @@ import { UserButton, useOrganization } from '@clerk/nextjs'
 import { useEffect, useRef, useState } from 'react'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { flags } from '@/lib/flags'
+import { useCapabilities } from '@/components/providers/CapabilitiesProvider'
 import type { Capability } from '@/lib/permissions'
 
 type IconType = typeof LayoutDashboard
@@ -117,24 +118,14 @@ const CLOSE_DELAY_MS = 120
 export function Sidebar() {
   const pathname              = usePathname()
   const { organization }      = useOrganization()
-  const [caps, setCaps] = useState<Set<string> | null>(null)
+  // Capabilities come from the shared provider (one /api/me for the whole
+  // dashboard) so the sidebar doesn't flash chrome in after its own late fetch.
+  const { capabilities: caps } = useCapabilities()
   const [openSection, setOpenSection] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen]   = useState(false)
 
   const openTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Fetch the viewer's capabilities so the sidebar shows only accessible
-  // modules. Initial render assumes none, to avoid a flash of chrome the
-  // member can't access.
-  useEffect(() => {
-    let alive = true
-    fetch('/api/me')
-      .then(r => r.ok ? r.json() : null)
-      .then(j => { if (alive) setCaps(new Set<string>(j?.data?.capabilities ?? [])) })
-      .catch(() => { if (alive) setCaps(new Set<string>()) })
-    return () => { alive = false }
-  }, [])
 
   useEffect(() => () => {
     if (openTimer.current)  clearTimeout(openTimer.current)

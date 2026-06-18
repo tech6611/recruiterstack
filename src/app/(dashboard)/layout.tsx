@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { OrgGate } from '@/components/OrgGate'
 import { Copilot } from '@/components/Copilot'
 import { AnalyticsIdentify } from '@/components/AnalyticsIdentify'
+import { CapabilitiesProvider } from '@/components/providers/CapabilitiesProvider'
 import { getOrgId, resolveUserIdFromClerk } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/server'
 
@@ -35,12 +36,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <OrgGate />
-      <AnalyticsIdentify />
-      <Sidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
-      <Copilot />
-    </div>
+    <CapabilitiesProvider>
+      <div className="flex min-h-screen bg-slate-50">
+        <OrgGate />
+        <AnalyticsIdentify />
+        <Sidebar />
+        <main className="flex-1 overflow-auto">{children}</main>
+        <Copilot />
+      </div>
+    </CapabilitiesProvider>
   )
 }
