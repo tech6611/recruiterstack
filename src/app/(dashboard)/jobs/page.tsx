@@ -5,7 +5,7 @@ import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import {
   Briefcase, Plus, Search, Clock, X, Mail, FileText, Send,
-  CheckCircle, Copy, Check, Users, PenLine, Wand2, RefreshCw, Loader2, Sparkles, Paperclip,
+  CheckCircle, Check, Users, PenLine, Wand2, RefreshCw, Loader2, Sparkles, Paperclip,
   ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft, GripVertical, Archive,
   CalendarDays, SlidersHorizontal, Pencil,
 } from 'lucide-react'
@@ -147,6 +147,7 @@ function FileImportButton({ onExtract, field }: { onExtract: (text: string) => v
 // ─────────────────────────────────────────────────────────────────────────────
 
 function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const drawerRouter = useRouter()
   const [mode, setMode] = useState<NewJobMode>(null)
   const [positionTitle, setPositionTitle] = useState('')
   const [department, setDepartment] = useState('')
@@ -171,8 +172,6 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
   const [jdGenError, setJdGenError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<{ ticketNumber: string; intakeUrl?: string; positionTitle: string } | null>(null)
-  const [copied, setCopied] = useState(false)
 
   const append = (setter: React.Dispatch<React.SetStateAction<string>>) => (text: string) =>
     setter(prev => prev ? prev + '\n\n' + text : text)
@@ -208,94 +207,26 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!positionTitle.trim()) { setError('Position title is required.'); return }
     setLoading(true); setError(null)
-    const body: Record<string, unknown> = {
-      position_title: positionTitle,
-      department: department || undefined,
-      hiring_manager_name: hmName,
-    }
-    if (mode === 'send_to_hm') {
-      body.hiring_manager_email = hmEmail
-      body.hiring_manager_slack = hmSlack || undefined
-    } else {
-      body.filled_by_recruiter = true
-      body.hiring_manager_email = hmEmail || undefined
-      body.hiring_manager_slack = hmSlack || undefined
-      body.team_context = teamContext
-      body.level = level || undefined
-      body.headcount = headcount
-      body.location = location || undefined
-      body.remote_ok = remoteOk
-      body.key_requirements = keyReqs
-      body.nice_to_haves = niceToHave || undefined
-      body.target_companies = targetCompanies.join(', ') || undefined
-      body.budget_min = budgetMin ? Number(budgetMin) : undefined
-      body.budget_max = budgetMax ? Number(budgetMax) : undefined
-      body.target_start_date = startDate || undefined
-      body.additional_notes = notes || undefined
-      body.generated_jd = jd
-    }
-    const res = await fetch('/api/hiring-requests', {
+    // Canonical job-create: the legacy hiring_requests intake flow has been
+    // retired. Create a draft canonical job, then open it for full editing.
+    const res = await fetch('/api/req-jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ title: positionTitle.trim() }),
     })
     const json = await res.json()
     setLoading(false)
     if (!res.ok) { setError(json.error ?? 'Something went wrong'); return }
-    setSuccess({ ticketNumber: json.data?.ticket_number ?? '', intakeUrl: json.intake_url, positionTitle })
     trackEvent('job_created', { mode: mode ?? 'unknown', position_title: positionTitle })
     onCreated()
-  }
-
-  const copyIntakeUrl = () => {
-    if (!success?.intakeUrl) return
-    navigator.clipboard.writeText(success.intakeUrl)
-    setCopied(true); setTimeout(() => setCopied(false), 2000)
+    const newId = json.data?.id
+    if (newId) drawerRouter.push(`/req-jobs/${newId}`)
+    else onClose()
   }
 
   const innerContent = () => {
-    if (success) {
-      return (
-        <div className="p-6">
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center space-y-4">
-            <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto" />
-            <div>
-              <p className="text-xs font-mono text-emerald-600 font-semibold mb-1">{success.ticketNumber}</p>
-              <h2 className="text-xl font-bold text-emerald-900">{mode === 'send_to_hm' ? 'Intake sent!' : 'Job created!'}</h2>
-              <p className="text-sm text-emerald-700 mt-2">
-                {mode === 'send_to_hm'
-                  ? `An email and Slack message have been sent to ${hmName} with the intake form link.`
-                  : `The hiring request for ${success.positionTitle} has been created with the JD ready.`}
-              </p>
-            </div>
-            {success.intakeUrl && (
-              <div className="rounded-xl border border-emerald-200 bg-white p-3 text-left">
-                <p className="text-xs font-semibold text-slate-500 mb-1.5">Intake form link</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs text-slate-600 truncate flex-1 font-mono">{success.intakeUrl}</p>
-                  <button onClick={copyIntakeUrl} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 shrink-0">
-                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="flex gap-3 pt-2">
-              <button onClick={() => { setSuccess(null); setMode(null) }}
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-                New Job
-              </button>
-              <button onClick={onClose}
-                className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
     if (mode === null) {
       return (
         <div className="p-6 space-y-6">

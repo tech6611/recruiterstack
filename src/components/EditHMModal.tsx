@@ -23,13 +23,15 @@ export default function EditHMModal({ requestId, initial, onClose, onSaved }: Ed
     setSaving(true)
     setError('')
     try {
-      const res = await fetch(`/api/hiring-requests/${requestId}`, {
+      const res = await fetch(`/api/req-jobs/${requestId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          hiring_manager_name:  name.trim(),
-          hiring_manager_email: email.trim() || null,
-          hiring_manager_slack: slack.trim() || null,
+          custom_fields: {
+            hiring_manager_name:  name.trim(),
+            hiring_manager_email: email.trim() || null,
+            hiring_manager_slack: slack.trim() || null,
+          },
         }),
       })
       if (!res.ok) { setError('Failed to save. Please try again.'); setSaving(false); return }

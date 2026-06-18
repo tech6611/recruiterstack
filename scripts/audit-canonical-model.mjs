@@ -13,12 +13,10 @@ const CHECK_MODE = process.argv.includes('--check')
 // work must NOT add to this list — it must use canonical services / domain
 // facades. A new legacy/mixed file outside this set fails `--check`.
 const LEGACY_ALLOWLIST = new Set([
-  // Legacy intake → hiring_requests flow; frozen pending the requisition converter.
-  'src/app/api/hiring-requests/[id]/route.ts',
-  'src/app/api/hiring-requests/route.ts',
-  'src/app/api/intake/[token]/approve/route.ts',
-  'src/app/api/intake/[token]/generate-jd/route.ts',
-  'src/app/api/intake/[token]/route.ts',
+  // Phase 3 / C6: the legacy hiring_requests CRUD routes and the intake →
+  // hiring_requests flow have been retired. Intake now writes canonical `jobs`
+  // via domain facades, so no allowlisted compatibility bridges remain. Net-new
+  // core work must NOT add to this list — use canonical services / domain facades.
 ])
 const trackedTables = [
   'hiring_requests',

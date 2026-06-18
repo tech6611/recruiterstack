@@ -609,10 +609,10 @@ function TasksWidget({ tasks, onCandidateClick, onRefresh }: { tasks: DashboardD
   async function handleApprove(jobId: string) {
     setActioningId(jobId)
     try {
-      await fetch(`/api/hiring-requests/${jobId}`, {
+      await fetch(`/api/req-jobs/${jobId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'posted' }),
+        body: JSON.stringify({ status: 'open' }),
       })
       setActionResult({ id: jobId, msg: 'Approved & posted!' })
       setTimeout(() => { setActionResult(null); onRefresh?.() }, 1500)
@@ -1388,10 +1388,10 @@ function ActionQueueWidget({
     setActioningId(item.id)
     try {
       if (item.type === 'approve') {
-        await fetch(`/api/hiring-requests/${item.targetId}`, {
+        await fetch(`/api/req-jobs/${item.targetId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'posted' }),
+          body: JSON.stringify({ status: 'open' }),
         })
       } else if (item.type === 'score') {
         await fetch(`/api/jobs/${item.targetId}/score`, {

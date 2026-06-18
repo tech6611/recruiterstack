@@ -1,4 +1,13 @@
-# Canonical Jobs Collapse — Build Plan (nav roadmap Phase 3)
+# Canonical Jobs Collapse — Build Plan (nav roadmap Phase 3) — ✅ COMPLETE
+
+> **Status (2026-06-19): plan complete.** C1–C6 done. The legacy
+> `hiring_requests` CRUD routes (`/api/hiring-requests`) and UI
+> (`/hiring-requests`) are deleted, the legacy job-create path is retired (the
+> "new job" flow now POSTs canonical `/api/req-jobs` and opens `/req-jobs/:id`),
+> the dead legacy domain functions are removed, and the intake/hiring_requests
+> entries have left the drift-guard allowlist (now empty). Remaining cutover work
+> is operational, not code: the production legacy-data wipe (post-snapshot) and
+> the final Openings-fold nav decision.
 
 Make canonical `jobs` the single, candidate-bearing recruiting pipeline and
 retire the legacy `hiring_requests` board. See `nav-consolidation-roadmap.md`
@@ -29,7 +38,7 @@ in one cutover: wipe legacy data + flip the nav + delete the legacy surfaces.
 | **C3** | Create-side → canonical | code | Job creation (UI + `/api/req-jobs` already canonical; retire the legacy create path), public apply (`/api/apply` + posting tokens) and intake re-pointed to create canonical `jobs`/`openings` + `applications.job_id` (+ default stages). `createApplication` already dual-writes `job_id`. |
 | **C4** | Canonical pipeline board + reads | code | The Jobs board (kanban/detail) reads canonical `jobs` + applications-by-`job_id` + job stages. Repoint `job-pipelines` domain reads; confirm scoring/autopilot, scorecards, interviews, offers operate on canonical applications. |
 | **C5** | Agent + analytics → canonical | code | Repoint copilot job tools (`list_jobs`/`get_job_pipeline`/`create_job_and_pipeline`/…) and dashboard/analytics off the legacy facade onto canonical jobs. |
-| **C6** | Cutover | data + nav | Snapshot → wipe legacy data → flip the "Jobs" nav entry to canonical → delete `/jobs` + `/hiring-requests` → drop the intake/hiring_requests rows from the drift-guard allowlist → decide the Openings-fold. |
+| **C6** ✅ | Cutover | data + nav | **Done (code).** Deleted `/api/hiring-requests` + `/hiring-requests` UI; retired the legacy create path (the "new job" flow now creates a canonical `/api/req-jobs` job and opens `/req-jobs/:id`); removed dead legacy `job-pipelines`/`reporting`/`applications` domain functions; dropped the intake + hiring_requests rows from the drift-guard allowlist (now empty). Remaining: production legacy-data wipe (post-snapshot) + final Openings-fold nav decision. |
 
 ## Sequencing
 C1 + C2 (schema) first — additive/reversible. Then C3 → C4 → C5 (code, build

@@ -15,7 +15,15 @@ const jobBase = z.object({
 })
 
 export const jobCreateSchema = jobBase
-export const jobUpdateSchema = jobBase.partial()
+
+// Update accepts every base field plus `status` (board-level transitions such as
+// the HM approve action that flips a job to 'open'). status is constrained to the
+// canonical jobs status set (migration 035).
+export const jobUpdateSchema = jobBase
+  .extend({
+    status: z.enum(['draft', 'pending_approval', 'approved', 'open', 'closed', 'archived']),
+  })
+  .partial()
 
 export type JobCreateInput = z.infer<typeof jobCreateSchema>
 export type JobUpdateInput = z.infer<typeof jobUpdateSchema>

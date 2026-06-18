@@ -588,17 +588,3 @@ export async function listApplicationsForCandidateSummary(
   return { data: (data ?? null) as any }
 }
 
-/** hiring_request_id for one application, by id only (no org filter), matching
- *  the prior inline query in the sequence-email handler which had no org id in
- *  scope. Returns the row or null. */
-export async function getApplicationHiringRequestId(
-  supabase: Supabase,
-  applicationId: string,
-): Promise<{ hiring_request_id: string | null } | null> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabase.from('applications') as any)
-    .select('hiring_request_id').eq('id', applicationId).single()
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data ?? null) as any
-}

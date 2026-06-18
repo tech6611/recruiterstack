@@ -160,6 +160,12 @@ Slice 3 is the one that makes canonical `jobs` hold real candidates. It sits
 
 ### Phase 3 — Final nav collapse (after Slice 3 + backfill)
 
+> **Phase 3 complete (code, 2026-06-19):** the Canonical Jobs Collapse (C1–C6) is
+> done — `/hiring-requests` UI + `/api/hiring-requests` are deleted, the legacy
+> job-create path now creates canonical `/api/req-jobs` jobs, dead legacy domain
+> functions are removed, and the drift-guard allowlist is empty. Remaining is
+> operational only (production legacy-data wipe + final Openings-fold decision).
+
 - Flip the surviving "Jobs" entry to canonical `/req-jobs` (now populated).
 - Delete `/jobs` and `/hiring-requests` for real.
 - **Target IA (decided 2026-06-14):** collapse toward **one** "Jobs" entry with

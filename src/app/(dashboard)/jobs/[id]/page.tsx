@@ -1140,10 +1140,10 @@ function ScoringCriteriaModal({
     const valid = items.filter(c => c.name.trim())
     if (valid.length === 0) { setError('Add at least one criterion'); return }
     setSaving(true); setError('')
-    const res = await fetch(`/api/hiring-requests/${jobId}`, {
+    const res = await fetch(`/api/req-jobs/${jobId}`, {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ scoring_criteria: valid }),
+      body:    JSON.stringify({ custom_fields: { scoring_criteria: valid } }),
     })
     setSaving(false)
     if (!res.ok) { const j = await res.json(); setError(j.error ?? 'Save failed'); return }

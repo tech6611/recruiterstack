@@ -11,7 +11,33 @@ entries on top.
 
 ## 2026-06-19
 
+### Removed
+- **Legacy `hiring_requests` cutover (Phase 3 / C6).** Deleted the legacy CRUD
+  routes (`/api/hiring-requests`, `.../[id]`) and the legacy UI
+  (`/hiring-requests` list, `new`, `[id]`). Removed the now-dead legacy domain
+  functions from `src/modules/ats/domain/`: in `job-pipelines.ts` —
+  `createLegacyJobAndPipeline`, `createLegacyIntakeRequest`,
+  `listLegacyJobPipelineSummaries`, `getLegacyJobPipelineDetail`,
+  `getLegacyJobScoringContext`, `getLegacyCandidateJobContext`,
+  `getLegacyApplyJobByToken`, `getLegacyApplyJobPreview`, `activateLegacyApplyJob`,
+  `getLegacyJobById`, `updateLegacyJob`, `getFirstLegacyPipelineStage`,
+  `listLegacyJobsForAgent`, `findLegacyJobsForAgent`, `countLegacyJobs`,
+  `listLegacyPipelineStagesForJob`, the `listCanonicalJobPipelines` /
+  `getCanonicalJobPipeline` union helpers, and the now-unused Legacy* types; in
+  `reporting.ts` — `fetchLegacyDashboardInputs` / `fetchLegacyPipelineExportInputs`;
+  in `applications.ts` — `getApplicationHiringRequestId`. Kept `getLegacyJobTokens`
+  (still called by `getApplicationJobTokens`) and `fetchLegacyAnalyticsInputs`
+  (still called by the copilot analytics tool).
+
 ### Changed
+- **"New job" flow → canonical create (Phase 3 / C6).** The Jobs page "new job"
+  drawer now POSTs to canonical `/api/req-jobs` (`{ title }`) and navigates to
+  `/req-jobs/:id` on success, replacing the legacy `/api/hiring-requests` intake
+  POST and the dead ticket-number/intake-URL success UI. The intake submit
+  notification's "View in Dashboard" link now points to `/req-jobs`.
+- **Drift-guard allowlist emptied (Phase 3 / C6).** Removed the 2 hiring-requests
+  + 3 intake entries from `LEGACY_ALLOWLIST` in `scripts/audit-canonical-model.mjs`;
+  the audit now reports 0 legacy / 0 mixed / 0 adapter files.
 - **HM intake flow → canonical jobs (Phase 3 / C5.5).** The hiring-manager intake
   routes now operate on canonical `jobs` keyed by `jobs.intake_token` instead of
   legacy `hiring_requests`: `GET/POST /api/intake/[token]`, `.../generate-jd`, and
