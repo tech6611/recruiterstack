@@ -57,7 +57,7 @@ export default function ReqJobsListPage() {
           <h1 className="text-2xl font-semibold text-slate-900">Job pipelines</h1>
           <p className="text-sm text-slate-500 mt-1">Pipeline containers for approved openings.</p>
         </div>
-        <Link href="/req-jobs/new">
+        <Link href="/jobs?new">
           <Button><Plus className="h-4 w-4" /> New pipeline</Button>
         </Link>
       </div>
@@ -102,7 +102,7 @@ export default function ReqJobsListPage() {
                 <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
                   <div className="space-y-2">
                     <p>No pipelines yet.</p>
-                    <Link href="/req-jobs/new" className="text-emerald-600 font-medium">Create the first one →</Link>
+                    <Link href="/jobs?new" className="text-emerald-600 font-medium">Create the first one →</Link>
                   </div>
                 </td>
               </tr>

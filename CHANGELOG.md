@@ -32,6 +32,14 @@ entries on top.
   into the editable JD textarea instead of being stuck.
 
 ### Changed
+- **Single job-creation front door.** There were two divergent "new job" forms:
+  the rich drawer on `/jobs` and a bare-bones `/req-jobs/new` "New pipeline" form.
+  `/req-jobs/new` now redirects to `/jobs?new` (which auto-opens the rich
+  drawer), the `/req-jobs` list "New pipeline" links point there too, and the
+  unused `NewJobForm` component was removed.
+- **Archived jobs no longer linger on the board.** DELETE is a soft-archive
+  (`status='archived'`); the board list now filters those out, so a deleted job
+  disappears from `/jobs` instead of showing as a ghost row that 404s on click.
 - **Nav — Openings folded into Jobs (single recruiting-pipeline entry).** Dropped
   the standalone "Openings" sidebar item; the Recruiting bucket is now Jobs ·
   Candidates · Sourcing · Sequences · Inbox. Openings (requisitions) stay fully

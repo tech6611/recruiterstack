@@ -638,6 +638,15 @@ export default function JobsPage() {
   // ── UI ────────────────────────────────────────────────────────────────────
   const [showDrawer, setShowDrawer] = useState(false)
 
+  // Single front door: /req-jobs/new redirects here with ?new to open the rich
+  // New Job drawer. Strip the param so a refresh/back doesn't reopen it.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('new')) {
+      setShowDrawer(true)
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
+
   // ── Drag-and-drop: rows ───────────────────────────────────────────────────
   const [dragRowId,    setDragRowId]    = useState<string | null>(null)
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null)
