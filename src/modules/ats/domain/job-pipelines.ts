@@ -148,6 +148,8 @@ export async function listCanonicalJobBoardSummaries(
       .from('jobs')
       .select('id, org_id, title, status, created_at, custom_fields, department:departments(name)')
       .eq('org_id', orgId)
+      // DELETE is a soft-archive (status='archived'); keep deleted jobs off the board.
+      .neq('status', 'archived')
       .order('created_at', { ascending: false }),
     (supabase as any)
       .from('pipeline_stages')
