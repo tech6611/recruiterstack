@@ -11,6 +11,26 @@ entries on top.
 
 ## 2026-06-19
 
+### Added
+- **New Job form now persists everything — incl. multi-location openings.** The
+  "Fill Everything Myself" flow previously discarded every field except the title
+  on create. It now posts the full payload to `/api/req-jobs`: the JD
+  (`description`), department (find-or-create by name), comp range, and a
+  per-location **openings repeater** ("Add another location", seats per location).
+  The backend find-or-creates departments + locations by name, creates one opening
+  per seat, and links them to the job via `job_openings`. Remaining intake fields
+  (level, HM details, requirements, target companies) are stashed in the job's
+  `custom_fields.intake` so nothing typed is lost.
+
+### Fixed
+- **Apply link — "Copy apply link" silently did nothing.** After the canonical
+  cutover the board mapper hard-coded `apply_link_token: null`, so the copy button
+  bailed. The real `jobs.apply_token` is now threaded through the board SELECTs and
+  mapper.
+- **JD generation — manual fallback.** When AI JD generation fails (or after a
+  successful generate), a "Write manually instead" button now lets the user drop
+  into the editable JD textarea instead of being stuck.
+
 ### Changed
 - **Nav — Openings folded into Jobs (single recruiting-pipeline entry).** Dropped
   the standalone "Openings" sidebar item; the Recruiting bucket is now Jobs ·

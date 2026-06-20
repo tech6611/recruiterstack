@@ -16,6 +16,37 @@ const jobBase = z.object({
 
 export const jobCreateSchema = jobBase
 
+// ── Intake create ────────────────────────────────────────────────
+// The New Job form posts a richer payload than the bare canonical job row:
+// a department *name* (find-or-create), the generated/written JD, comp range,
+// and a list of openings (one row per location, each with a seat count). All
+// the softer intake fields (level, HM details, requirements, target companies)
+// ride along in `intake` and are stashed into the job's custom_fields so
+// nothing the user typed is discarded on create.
+const compNumOrNull = z.preprocess(
+  v => (v === '' || v === undefined || v === null ? null : Number(v)),
+  z.number().min(0).nullable(),
+)
+
+export const jobIntakeOpeningSchema = z.object({
+  location: z.string().trim().max(200).optional().default(''),
+  seats:    z.coerce.number().int().min(1).max(50).optional().default(1),
+})
+
+export const jobIntakeCreateSchema = z.object({
+  title:           z.string().trim().min(1).max(200),
+  department:      z.string().trim().max(200).optional().default(''),
+  description:     z.string().trim().max(20000).optional().default(''),
+  confidentiality: z.enum(['public', 'confidential']).optional().default('public'),
+  comp_min:        compNumOrNull.optional().default(null),
+  comp_max:        compNumOrNull.optional().default(null),
+  remote_ok:       z.boolean().optional().default(false),
+  openings:        z.array(jobIntakeOpeningSchema).max(20).optional().default([]),
+  intake:          z.record(z.string(), z.unknown()).optional().default({}),
+})
+
+export type JobIntakeCreateInput = z.infer<typeof jobIntakeCreateSchema>
+
 // Update accepts every base field plus `status` (board-level transitions such as
 // the HM approve action that flips a job to 'open'). status is constrained to the
 // canonical jobs status set (migration 035).

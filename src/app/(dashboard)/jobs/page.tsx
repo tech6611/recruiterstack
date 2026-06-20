@@ -155,9 +155,15 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
   const [hmEmail, setHmEmail] = useState('')
   const [hmSlack, setHmSlack] = useState('')
   const [level, setLevel] = useState('')
-  const [headcount, setHeadcount] = useState(1)
-  const [location, setLocation] = useState('')
+  const [openings, setOpenings] = useState<{ location: string; seats: number }[]>([{ location: '', seats: 1 }])
   const [remoteOk, setRemoteOk] = useState(false)
+
+  const totalSeats = openings.reduce((sum, o) => sum + (o.seats || 1), 0)
+  const primaryLocation = openings.find(o => o.location.trim())?.location ?? ''
+  const updateOpening = (idx: number, patch: Partial<{ location: string; seats: number }>) =>
+    setOpenings(prev => prev.map((o, i) => (i === idx ? { ...o, ...patch } : o)))
+  const addOpening = () => setOpenings(prev => [...prev, { location: '', seats: 1 }])
+  const removeOpening = (idx: number) => setOpenings(prev => prev.filter((_, i) => i !== idx))
   const [teamContext, setTeamContext] = useState('')
   const [keyReqs, setKeyReqs] = useState('')
   const [niceToHave, setNiceToHave] = useState('')
@@ -187,8 +193,8 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        position_title: positionTitle, department, level, location,
-        remote_ok: remoteOk, headcount,
+        position_title: positionTitle, department, level, location: primaryLocation,
+        remote_ok: remoteOk, headcount: totalSeats,
         team_context: teamContext, key_requirements: keyReqs,
         nice_to_haves: niceToHave,
         budget_min: budgetMin ? Number(budgetMin) : undefined,
@@ -210,11 +216,30 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
     if (!positionTitle.trim()) { setError('Position title is required.'); return }
     setLoading(true); setError(null)
     // Canonical job-create: the legacy hiring_requests intake flow has been
-    // retired. Create a draft canonical job, then open it for full editing.
+    // retired. Persist a draft job plus one opening per seat per location,
+    // then open it for full editing.
     const res = await fetch('/api/req-jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: positionTitle.trim() }),
+      body: JSON.stringify({
+        title:       positionTitle.trim(),
+        department,
+        description: jd,
+        comp_min:    budgetMin ? Number(budgetMin) : null,
+        comp_max:    budgetMax ? Number(budgetMax) : null,
+        remote_ok:   remoteOk,
+        openings: openings
+          .filter(o => o.location.trim() || o.seats > 0)
+          .map(o => ({ location: o.location.trim(), seats: o.seats || 1 })),
+        intake: {
+          level,
+          hm_name: hmName, hm_email: hmEmail, hm_slack: hmSlack,
+          team_context: teamContext, key_requirements: keyReqs, nice_to_have: niceToHave,
+          target_companies: targetCompanies,
+          budget_min: budgetMin, budget_max: budgetMax,
+          target_start_date: startDate, notes,
+        },
+      }),
     })
     const json = await res.json()
     setLoading(false)
@@ -319,21 +344,41 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
                       {LEVEL_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className={labelCls}>Openings</label>
-                    <input type="number" min={1} max={50} value={headcount}
-                      onChange={e => setHeadcount(Number(e.target.value))} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Location</label>
-                    <AutocompleteInput value={location} onChange={setLocation} options={CITIES} placeholder="New York, Remote, Hybrid…" />
-                  </div>
                   <div className="flex flex-col justify-end">
                     <label className="flex items-center gap-2 cursor-pointer py-2.5">
                       <input type="checkbox" checked={remoteOk} onChange={e => setRemoteOk(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
                       <span className="text-sm font-semibold text-slate-700">Remote OK</span>
                     </label>
                   </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className={labelCls + ' mb-0'}>Openings by location</label>
+                    <span className="text-xs text-slate-400">{totalSeats} {totalSeats === 1 ? 'seat' : 'seats'} total</span>
+                  </div>
+                  {openings.map((o, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <AutocompleteInput value={o.location} onChange={v => updateOpening(idx, { location: v })}
+                          options={CITIES} placeholder="New York, Remote, Hybrid…" />
+                      </div>
+                      <input type="number" min={1} max={50} value={o.seats}
+                        onChange={e => updateOpening(idx, { seats: Math.max(1, Number(e.target.value)) })}
+                        title="Seats at this location"
+                        className={inputCls + ' w-20 text-center'} />
+                      {openings.length > 1 && (
+                        <button type="button" onClick={() => removeOpening(idx)}
+                          className="h-[44px] w-10 flex items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 transition-colors">
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button type="button" onClick={addOpening}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
+                    <Plus className="h-3.5 w-3.5" />Add another location
+                  </button>
                 </div>
               </div>
 
@@ -417,8 +462,14 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
                     <button type="button" onClick={handleGenerateJD} disabled={generatingJD}
                       className="flex items-center gap-1.5 rounded-lg bg-violet-50 border border-violet-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 transition-colors">
                       {generatingJD ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                      {generatingJD ? 'Generating…' : 'Regenerate with AI'}
+                      {generatingJD ? 'Generating…' : jdMode === 'ai' ? 'Regenerate with AI' : 'Generate with AI'}
                     </button>
+                    {jdMode === 'ai' && !generatingJD && (
+                      <button type="button" onClick={() => { setJdMode('manual'); setJdGenError(null) }}
+                        className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors">
+                        <PenLine className="h-3.5 w-3.5" />Write manually instead
+                      </button>
+                    )}
                   </div>
                 )}
 

@@ -3,7 +3,60 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
-import { jobCreateSchema } from '@/lib/validations/jobs'
+import { jobIntakeCreateSchema } from '@/lib/validations/jobs'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/** Find an org-scoped department by name, creating it if absent. */
+async function findOrCreateDepartment(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
+  orgId: string,
+  name: string,
+): Promise<string | null> {
+  const trimmed = name.trim()
+  if (!trimmed) return null
+  const { data: existing } = await supabase
+    .from('departments')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('name', trimmed)
+    .maybeSingle()
+  if (existing) return (existing as { id: string }).id
+  const { data: created } = await supabase
+    .from('departments')
+    .insert({ org_id: orgId, name: trimmed })
+    .select('id')
+    .single()
+  return created ? (created as { id: string }).id : null
+}
+
+/** Find an org-scoped location by name, creating it if absent. */
+async function findOrCreateLocation(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
+  orgId: string,
+  name: string,
+): Promise<string | null> {
+  const trimmed = name.trim()
+  if (!trimmed) return null
+  const { data: existing } = await supabase
+    .from('locations')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('name', trimmed)
+    .maybeSingle()
+  if (existing) return (existing as { id: string }).id
+  const remoteType =
+    trimmed.toLowerCase() === 'remote' ? 'remote'
+    : trimmed.toLowerCase() === 'hybrid' ? 'hybrid'
+    : 'onsite'
+  const { data: created } = await supabase
+    .from('locations')
+    .insert({ org_id: orgId, name: trimmed, remote_type: remoteType })
+    .select('id')
+    .single()
+  return created ? (created as { id: string }).id : null
+}
 
 /**
  * GET /api/req-jobs — list with filters + pagination.
@@ -83,20 +136,22 @@ export async function POST(req: NextRequest) {
   const denied = assertCapability(await getViewerScope(createAdminClient(), orgId, userId), 'recruiting:edit')
   if (denied) return denied
 
-  const body = await parseBody(req, jobCreateSchema)
+  const body = await parseBody(req, jobIntakeCreateSchema)
   if (body instanceof NextResponse) return body
 
   const supabase = createAdminClient()
-  const { data, error } = await supabase
+
+  const departmentId = await findOrCreateDepartment(supabase, orgId, body.department)
+
+  const { data: job, error } = await supabase
     .from('jobs')
     .insert({
       org_id:          orgId,
       title:           body.title,
-      department_id:   body.department_id ?? null,
-      description:     body.description ?? null,
-      hiring_team_id:  body.hiring_team_id ?? null,
+      department_id:   departmentId,
+      description:     body.description || null,
       confidentiality: body.confidentiality,
-      custom_fields:   body.custom_fields ?? {},
+      custom_fields:   Object.keys(body.intake).length > 0 ? { intake: body.intake } : {},
       status:          'draft',
       created_by:      userId,
     })
@@ -104,5 +159,55 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return handleSupabaseError(error)
-  return NextResponse.json({ data }, { status: 201 })
+  const jobRow = job as { id: string }
+
+  // Create one opening per seat for each location row, then link them to the
+  // job via the job_openings M2M. A row with N seats expands to N openings —
+  // each opening is a single funded headcount seat (migration 035).
+  const openingRows = body.openings.filter(o => o.location.trim() || o.seats > 0)
+  if (openingRows.length > 0) {
+    const locationCache = new Map<string, string | null>()
+    const inserts: Array<Record<string, unknown>> = []
+    for (const row of openingRows) {
+      const key = row.location.trim()
+      if (!locationCache.has(key)) {
+        locationCache.set(key, await findOrCreateLocation(supabase, orgId, key))
+      }
+      const locationId = locationCache.get(key) ?? null
+      for (let i = 0; i < Math.max(1, row.seats); i++) {
+        inserts.push({
+          org_id:        orgId,
+          title:         body.title,
+          department_id: departmentId,
+          location_id:   locationId,
+          comp_min:      body.comp_min,
+          comp_max:      body.comp_max,
+          status:        'draft',
+          created_by:    userId,
+          recruiter_id:  userId,
+        })
+      }
+    }
+
+    if (inserts.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const db = supabase as any
+      const { data: createdOpenings, error: openErr } = await db
+        .from('openings')
+        .insert(inserts)
+        .select('id')
+      if (openErr) return handleSupabaseError(openErr)
+      const links = (createdOpenings ?? []).map((o: { id: string }) => ({
+        job_id:     jobRow.id,
+        opening_id: o.id,
+        linked_by:  userId,
+      }))
+      if (links.length > 0) {
+        const { error: linkErr } = await db.from('job_openings').insert(links)
+        if (linkErr) return handleSupabaseError(linkErr)
+      }
+    }
+  }
+
+  return NextResponse.json({ data: job }, { status: 201 })
 }
