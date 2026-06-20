@@ -16,7 +16,7 @@ const ALLOWED_TYPES = [
  * Public — no auth required, but the apply token must be valid.
  * Accepts multipart/form-data with:
  *   - file  : the CV / resume file
- *   - token : the hiring-request apply_link_token
+ *   - token : the canonical job's apply_token
  *
  * Uploads the file to the "resumes" Supabase Storage bucket and
  * returns the public URL.

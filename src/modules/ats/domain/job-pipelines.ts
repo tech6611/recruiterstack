@@ -79,6 +79,7 @@ interface CanonicalJobRow {
   title: string
   status: string
   created_at: string | null
+  apply_token?: string | null
   department: { name: string } | null
   // Board-only data not yet in dedicated columns lives in custom_fields:
   // scoring_criteria + hiring_manager_* (written via the repointed board writers).
@@ -101,7 +102,7 @@ function canonicalJobToHiringRequest(row: CanonicalJobRow): HiringRequest {
     hiring_manager_email: (cf.hiring_manager_email as string | undefined) ?? null,
     hiring_manager_slack: (cf.hiring_manager_slack as string | undefined) ?? null,
     intake_token: '',
-    apply_link_token: null,
+    apply_link_token: row.apply_token ?? null,
     status: row.status as HiringRequestStatus,
     filled_by_recruiter: true,
     team_context: null,
@@ -206,7 +207,7 @@ export async function getCanonicalJobBoardDetail(
   const [jobRes, stagesRes, appsRes] = await Promise.all([
     (supabase as any)
       .from('jobs')
-      .select('id, org_id, title, status, created_at, custom_fields, department:departments(name)')
+      .select('id, org_id, title, status, created_at, apply_token, custom_fields, department:departments(name)')
       .eq('id', jobId)
       .eq('org_id', orgId)
       .maybeSingle(),
