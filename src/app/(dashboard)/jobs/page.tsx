@@ -667,7 +667,7 @@ export default function JobsPage() {
   // ── Data fetch ────────────────────────────────────────────────────────────
   const fetchJobs = useCallback(() => {
     setLoading(true)
-    fetch('/api/jobs')
+    fetch('/api/jobs', { cache: 'no-store' })
       .then(r => r.json())
       .then(j => setJobs(j.data ?? []))
       .finally(() => setLoading(false))

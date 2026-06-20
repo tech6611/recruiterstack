@@ -12,6 +12,12 @@ entries on top.
 ## 2026-06-20
 
 ### Fixed
+- **Jobs board — a job deleted in the DB could linger on the board.** The list
+  response (`GET /api/jobs`) set no cache header, so a stale cached copy could
+  survive a refresh and keep showing a row that no longer exists in `jobs`
+  (clicking it then 404s, since the detail read is live). The list response now
+  sends `Cache-Control: no-store` and the board's client fetch uses
+  `cache: 'no-store'`, mirroring the detail route — every board load is fresh.
 - **Job detail — server errors no longer masquerade as "Job not found."**
   `GET /api/jobs/[id]` caught *every* failure from the board-detail read and
   returned a 404, so a real query error (e.g. a missing `jobs.apply_token` column
