@@ -9,6 +9,18 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-20
+
+### Fixed
+- **Job detail — server errors no longer masquerade as "Job not found."**
+  `GET /api/jobs/[id]` caught *every* failure from the board-detail read and
+  returned a 404, so a real query error (e.g. a missing `jobs.apply_token` column
+  when migration 068 hasn't been applied to the database) showed up as a deleted /
+  nonexistent job. Genuine query failures now surface as a 500 with the error
+  message; only an actually-missing row returns 404. This is why a job could show
+  on the board list (whose SELECT omits `apply_token`) yet 404 on its detail page
+  (whose SELECT includes it).
+
 ## 2026-06-19
 
 ### Added

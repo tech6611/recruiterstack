@@ -9,8 +9,13 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
   let data
   try {
     data = await getCanonicalJobBoardDetail(supabase, orgId, id)
-  } catch {
-    return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  } catch (err) {
+    // A query failure is a server error, not a missing job — surface it instead
+    // of disguising it as a 404 (which hid the real cause from the board page).
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to load job' },
+      { status: 500 },
+    )
   }
 
   if (!data) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
