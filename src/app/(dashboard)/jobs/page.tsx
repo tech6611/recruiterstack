@@ -534,7 +534,15 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   jd_approved:     { label: 'To be Published',        color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
   posted:          { label: 'Active',                 color: 'bg-green-50 text-green-700 border-green-200',       icon: <Send className="h-3 w-3" /> },
   closed:          { label: 'Closed',                 color: 'bg-slate-100 text-slate-500 border-slate-200',      icon: <Archive className="h-3 w-3" /> },
+  // Canonical job statuses (jobs table): draft → pending_approval → approved → open → closed/archived.
+  draft:            { label: 'Draft',                 color: 'bg-slate-50 text-slate-600 border-slate-200',       icon: <FileText className="h-3 w-3" /> },
+  pending_approval: { label: 'Pending Approval',      color: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <Clock className="h-3 w-3" /> },
+  approved:         { label: 'To be Published',       color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
+  open:             { label: 'Active',                color: 'bg-green-50 text-green-700 border-green-200',       icon: <Send className="h-3 w-3" /> },
+  archived:         { label: 'Archived',              color: 'bg-slate-100 text-slate-400 border-slate-200',      icon: <Archive className="h-3 w-3" /> },
 }
+
+const DEFAULT_STATUS_CONFIG = { label: 'Unknown', color: 'bg-slate-100 text-slate-500 border-slate-200', icon: <Clock className="h-3 w-3" /> }
 
 type SortKey = 'ticket_number' | 'position_title' | 'hiring_manager_name' | 'status' | 'created_at'
 type TimeFilter = '7d' | '30d' | '3m' | 'all' | 'custom'
@@ -773,13 +781,18 @@ export default function JobsPage() {
   }, [jobs])
 
   // ── Counts ────────────────────────────────────────────────────────────────
-  const counts = useMemo(() => ({
-    total:    jobs.length,
-    awaiting: jobs.filter(j => j.status === 'intake_pending').length,
-    ready:    jobs.filter(j => j.status === 'jd_approved').length,
-    active:   jobs.filter(j => j.status === 'posted').length,
-    closed:   jobs.filter(j => j.status === 'closed').length,
-  }), [jobs])
+  // Count both legacy and canonical statuses so the cards stay correct through the
+  // canonical cutover: draft≈awaiting, approved≈ready, open≈active.
+  const counts = useMemo(() => {
+    const is = (j: JobListItem, ...s: string[]) => s.includes(j.status as string)
+    return {
+      total:    jobs.length,
+      awaiting: jobs.filter(j => is(j, 'intake_pending', 'draft')).length,
+      ready:    jobs.filter(j => is(j, 'jd_approved', 'approved')).length,
+      active:   jobs.filter(j => is(j, 'posted', 'open')).length,
+      closed:   jobs.filter(j => is(j, 'closed')).length,
+    }
+  }, [jobs])
 
   // ── Filtered + sorted list ────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -925,7 +938,7 @@ export default function JobsPage() {
 
   // ─── Render a row cell ─────────────────────────────────────────────────────
   const renderCell = (job: JobListItem, colId: ColId) => {
-    const s = STATUS_CONFIG[job.status] ?? STATUS_CONFIG.closed
+    const s = STATUS_CONFIG[job.status] ?? DEFAULT_STATUS_CONFIG
     switch (colId) {
       case 'ticket':
         return <td key={colId} className="px-3 py-3.5"><span className="text-xs font-mono font-semibold text-slate-400">{job.ticket_number ?? '—'}</span></td>
