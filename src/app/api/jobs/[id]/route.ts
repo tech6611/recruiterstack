@@ -18,7 +18,32 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
     )
   }
 
-  if (!data) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  if (!data) {
+    // TEMP DIAGNOSTIC (read-only): the row isn't visible under the resolved org.
+    // Look it up ignoring the org filter so we can see what's actually going on —
+    // resolved org vs. the row's real org, or whether the id matches no row at all.
+    // Remove once the "Job not found" mystery is solved.
+    const probe = await (supabase as any)
+      .from('jobs')
+      .select('id, org_id, title, status')
+      .eq('id', id)
+      .maybeSingle()
+    return NextResponse.json(
+      {
+        error: 'Job not found',
+        _diagnostic: {
+          requestedId: id,
+          resolvedOrgId: orgId,
+          rowExistsIgnoringOrg: !!probe.data,
+          rowOrgId: probe.data?.org_id ?? null,
+          rowTitle: probe.data?.title ?? null,
+          rowStatus: probe.data?.status ?? null,
+          probeError: probe.error?.message ?? null,
+        },
+      },
+      { status: 404 },
+    )
+  }
 
   return NextResponse.json(
     { data },
