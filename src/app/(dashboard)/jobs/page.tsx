@@ -544,6 +544,18 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 
 const DEFAULT_STATUS_CONFIG = { label: 'Unknown', color: 'bg-slate-100 text-slate-500 border-slate-200', icon: <Clock className="h-3 w-3" /> }
 
+// Where a job row opens when clicked. The recruiting Kanban (/jobs/[id]) is the
+// candidate-pipeline view, so it's the right destination for any job that has (or
+// had) a pipeline: 'open' jobs and 'closed' jobs (to review their past
+// candidates), plus the legacy 'posted'/'closed' equivalents. A pre-open job
+// (draft / pending_approval / approved) has nothing to show there, so it opens
+// the requisition management view (/req-jobs/[id]) where you submit for approval,
+// link openings, and publish.
+const LIVE_PIPELINE_STATUSES = new Set(['open', 'posted', 'closed'])
+function jobDetailHref(status: string, id: string): string {
+  return LIVE_PIPELINE_STATUSES.has(status) ? `/jobs/${id}` : `/req-jobs/${id}`
+}
+
 type SortKey = 'ticket_number' | 'position_title' | 'hiring_manager_name' | 'status' | 'created_at'
 type TimeFilter = '7d' | '30d' | '3m' | 'all' | 'custom'
 type ColId = 'ticket' | 'position' | 'pipeline' | 'manager' | 'status' | 'created' | 'actions'
@@ -1267,7 +1279,7 @@ export default function JobsPage() {
                   onDragOver={e => { e.preventDefault(); setDragOverRowId(job.id) }}
                   onDrop={() => handleRowDrop(job.id)}
                   onDragEnd={() => { setDragRowId(null); setDragOverRowId(null) }}
-                  onClick={() => router.push(`/jobs/${job.id}`)}
+                  onClick={() => router.push(jobDetailHref(job.status as string, job.id))}
                   className={`border-b border-slate-100 last:border-0 cursor-pointer transition-colors select-none ${
                     dragRowId === job.id ? 'opacity-40 bg-slate-50'
                     : dragOverRowId === job.id ? 'bg-blue-50 border-blue-200'
