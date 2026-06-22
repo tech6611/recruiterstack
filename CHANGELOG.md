@@ -9,6 +9,28 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-22
+
+### Changed
+- **Renamed "Openings" to "Requisitions" across the UI.** The recruiting object
+  was labelled "Openings" in some places and conceptually overlapped with "Jobs"
+  in users' minds. All user-facing display text now reads "Requisitions" — the
+  Jobs-board header button, the requisitions list/new/detail pages
+  (`(dashboard)/openings/*`), the linked-requisitions panel and link dialog on
+  the pipeline detail (`req-jobs/JobDetail.tsx`, `req-jobs/LinkOpeningDialog.tsx`),
+  the job-pipelines list copy (`req-jobs/page.tsx`), the approval-chain target
+  label and builder (`admin/approvals/page.tsx`, `approvals/ChainBuilder.tsx`),
+  and the Settings cards (Locations, Comp bands, Departments, Custom fields).
+  URLs (`/openings`), routes, API endpoints, database tables, and code
+  identifiers are unchanged — this is a display-text-only rename. The public
+  hiring-manager intake form's "Number of Openings" field was intentionally left
+  as-is (it reads as plain-English headcount, not the product object).
+- **Pre-open jobs open in the management view, not the Kanban.** Clicking a job
+  on the board now routes draft / pending-approval / approved jobs to the
+  requisition management view (`/req-jobs/[id]`) and only sends open / posted /
+  closed jobs to the Kanban pipeline (`/jobs/[id]`), so you manage a job before
+  it goes live and work candidates once it's open.
+
 ## 2026-06-21
 
 ### Changed

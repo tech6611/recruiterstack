@@ -54,7 +54,7 @@ export function LocationsCard() {
         <CardTitle className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-emerald-600" /> Locations
         </CardTitle>
-        <CardDescription>Where your team operates. Used by openings and posting feeds.</CardDescription>
+        <CardDescription>Where your team operates. Used by requisitions and posting feeds.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex justify-end mb-3">

@@ -55,7 +55,7 @@ export default function ReqJobsListPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Job pipelines</h1>
-          <p className="text-sm text-slate-500 mt-1">Pipeline containers for approved openings.</p>
+          <p className="text-sm text-slate-500 mt-1">Pipeline containers for approved requisitions.</p>
         </div>
         <Link href="/jobs?new">
           <Button><Plus className="h-4 w-4" /> New pipeline</Button>
@@ -89,7 +89,7 @@ export default function ReqJobsListPage() {
               <th className="text-left px-4 py-3 font-medium">Title</th>
               <th className="text-left px-4 py-3 font-medium">Status</th>
               <th className="text-left px-4 py-3 font-medium">Department</th>
-              <th className="text-left px-4 py-3 font-medium">Linked openings</th>
+              <th className="text-left px-4 py-3 font-medium">Linked requisitions</th>
               <th className="text-left px-4 py-3 font-medium">Confidentiality</th>
             </tr>
           </thead>

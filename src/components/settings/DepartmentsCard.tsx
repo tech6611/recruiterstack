@@ -47,7 +47,7 @@ export function DepartmentsCard() {
         <CardTitle className="flex items-center gap-2">
           <Building2 className="h-4 w-4 text-emerald-600" /> Departments
         </CardTitle>
-        <CardDescription>Used by openings and jobs. Archived departments hide from dropdowns.</CardDescription>
+        <CardDescription>Used by requisitions and jobs. Archived departments hide from dropdowns.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex justify-end mb-3">

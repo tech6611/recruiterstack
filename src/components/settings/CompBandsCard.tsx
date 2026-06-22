@@ -64,7 +64,7 @@ export function CompBandsCard() {
         <CardTitle className="flex items-center gap-2">
           <DollarSign className="h-4 w-4 text-amber-600" /> Compensation bands
         </CardTitle>
-        <CardDescription>Salary ranges keyed by level + department + location. Auto-fills the opening form.</CardDescription>
+        <CardDescription>Salary ranges keyed by level + department + location. Auto-fills the requisition form.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex justify-end mb-3">

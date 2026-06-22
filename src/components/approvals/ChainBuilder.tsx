@@ -159,7 +159,7 @@ export function ChainBuilder({ mode, chainId, initial }: Props) {
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label>Name</Label>
-              <Input value={name} onChange={e => setName(e.target.value)} placeholder="Engineering Opening Approval" />
+              <Input value={name} onChange={e => setName(e.target.value)} placeholder="Engineering Requisition Approval" />
             </div>
             <div className="space-y-1.5">
               <Label>Description (optional)</Label>
@@ -169,7 +169,7 @@ export function ChainBuilder({ mode, chainId, initial }: Props) {
               <div className="space-y-1.5">
                 <Label>Target type</Label>
                 <Select disabled={mode === 'edit'} value={target} onChange={e => setTarget(e.target.value as TargetType)}>
-                  <option value="opening">Opening</option>
+                  <option value="opening">Requisition</option>
                   <option value="job">Job</option>
                   <option value="offer">Offer</option>
                 </Select>

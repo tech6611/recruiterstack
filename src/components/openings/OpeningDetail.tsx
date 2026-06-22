@@ -92,7 +92,7 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
   }
 
   async function archive() {
-    if (!confirm('Archive this opening? Status will change to archived.')) return
+    if (!confirm('Archive this requisition? Status will change to archived.')) return
     setArchiving(true)
     const res = await fetch(`/api/openings/${opening.id}`, { method: 'DELETE' })
     setArchiving(false)
@@ -100,7 +100,7 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
       toast.error('Archive failed')
       return
     }
-    toast.success('Opening archived')
+    toast.success('Requisition archived')
     router.push('/openings')
   }
 
@@ -119,7 +119,7 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
 
   async function cancelApproval() {
     if (!opening.approval_id) return
-    if (!confirm('Cancel this approval? The opening will return to draft.')) return
+    if (!confirm('Cancel this approval? The requisition will return to draft.')) return
     setCancelling(true)
     const res = await fetch(`/api/approvals/${opening.approval_id}/cancel`, { method: 'POST' })
     setCancelling(false)
@@ -141,7 +141,7 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
   return (
     <>
       <Link href="/openings" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 mb-4">
-        <ArrowLeft className="h-4 w-4" /> Back to openings
+        <ArrowLeft className="h-4 w-4" /> Back to requisitions
       </Link>
 
       <div className="flex items-start justify-between gap-4 mb-6">

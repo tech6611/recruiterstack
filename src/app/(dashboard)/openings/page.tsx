@@ -66,11 +66,11 @@ export default function OpeningsListPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Openings</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">Requisitions</h1>
           <p className="text-sm text-slate-500 mt-1">Approved headcount for your team.</p>
         </div>
         <Link href="/openings/new">
-          <Button><Plus className="h-4 w-4" /> New opening</Button>
+          <Button><Plus className="h-4 w-4" /> New requisition</Button>
         </Link>
       </div>
 
@@ -132,7 +132,7 @@ export default function OpeningsListPage() {
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
                   <div className="space-y-2">
-                    <p>No openings yet.</p>
+                    <p>No requisitions yet.</p>
                     <Link href="/openings/new" className="text-emerald-600 font-medium">Create the first one →</Link>
                   </div>
                 </td>

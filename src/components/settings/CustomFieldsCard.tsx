@@ -12,6 +12,12 @@ import { cn } from '@/lib/utils'
 import type { CustomFieldDefinition, CustomFieldObjectType, CustomFieldType } from '@/lib/types/requisitions'
 
 const OBJECT_TYPES: CustomFieldObjectType[] = ['opening', 'job', 'posting']
+// User-facing labels — the stored value stays `opening`, but we show "Requisition".
+const OBJECT_LABEL: Record<CustomFieldObjectType, string> = {
+  opening: 'Requisition',
+  job:     'Job',
+  posting: 'Posting',
+}
 const FIELD_TYPES: CustomFieldType[] = ['text', 'number', 'select', 'multi_select', 'date', 'boolean', 'user']
 
 export function CustomFieldsCard() {
@@ -46,12 +52,12 @@ export function CustomFieldsCard() {
         <CardTitle className="flex items-center gap-2">
           <ListPlus className="h-4 w-4 text-fuchsia-600" /> Custom fields
         </CardTitle>
-        <CardDescription>Extra fields beyond the built-ins. Render dynamically on the opening form.</CardDescription>
+        <CardDescription>Extra fields beyond the built-ins. Render dynamically on the requisition form.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-between mb-3 gap-3">
           <Select value={object} onChange={e => setObject(e.target.value as CustomFieldObjectType)} className="w-44">
-            {OBJECT_TYPES.map(o => <option key={o} value={o} className="capitalize">{o}</option>)}
+            {OBJECT_TYPES.map(o => <option key={o} value={o}>{OBJECT_LABEL[o]}</option>)}
           </Select>
           <Button size="sm" onClick={() => setOpen({ mode: 'add' })}><Plus className="h-4 w-4" /> Add</Button>
         </div>
@@ -59,7 +65,7 @@ export function CustomFieldsCard() {
         {!loaded ? (
           <p className="text-xs text-slate-400">Loading…</p>
         ) : items.length === 0 ? (
-          <p className="text-xs text-slate-500">No custom fields for {object} yet.</p>
+          <p className="text-xs text-slate-500">No custom fields for {OBJECT_LABEL[object].toLowerCase()} yet.</p>
         ) : (
           <div className="divide-y divide-slate-100">
             {items.map(d => (
@@ -158,7 +164,7 @@ function FieldDialog({ mode, row, defaultObjectType, onClose }: {
             <div className="space-y-1.5">
               <Label>Applies to</Label>
               <Select disabled={mode === 'edit'} value={form.object_type} onChange={e => setForm({ ...form, object_type: e.target.value as CustomFieldObjectType })}>
-                {OBJECT_TYPES.map(o => <option key={o} value={o} className="capitalize">{o}</option>)}
+                {OBJECT_TYPES.map(o => <option key={o} value={o}>{OBJECT_LABEL[o]}</option>)}
               </Select>
             </div>
             <div className="space-y-1.5">

@@ -25,7 +25,7 @@ interface Chain {
 }
 
 const TARGET_LABEL: Record<TargetType, string> = {
-  opening: 'Opening',
+  opening: 'Requisition',
   job:     'Pipeline',
   offer:   'Offer',
 }

@@ -83,7 +83,7 @@ export function JobDetail({ job, department, linkedOpenings }: Props) {
   }
 
   async function unlinkOpening(openingId: string) {
-    if (!confirm('Unlink this opening from the pipeline?')) return
+    if (!confirm('Unlink this requisition from the pipeline?')) return
     const res = await fetch(`/api/req-jobs/${job.id}/unlink-opening`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -182,17 +182,17 @@ export function JobDetail({ job, department, linkedOpenings }: Props) {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Linked openings</CardTitle>
+                    <CardTitle>Linked requisitions</CardTitle>
                     <CardDescription>Headcount seats this pipeline fills.</CardDescription>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => setLinkOpen(true)}>
-                    <Plus className="h-4 w-4" /> Link opening
+                    <Plus className="h-4 w-4" /> Link requisition
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 {linkedOpenings.length === 0 ? (
-                  <p className="text-xs text-slate-500">No openings linked yet.</p>
+                  <p className="text-xs text-slate-500">No requisitions linked yet.</p>
                 ) : (
                   <div className="divide-y divide-slate-100">
                     {linkedOpenings.map(o => (

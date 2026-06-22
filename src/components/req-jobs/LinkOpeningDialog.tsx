@@ -56,19 +56,19 @@ export function LinkOpeningDialog({ jobId, alreadyLinked, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => onClose(linkedAny)}>
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-semibold text-slate-900">Link opening</h3>
+          <h3 className="text-base font-semibold text-slate-900">Link requisition</h3>
           <button type="button" onClick={() => onClose(linkedAny)} aria-label="Close">
             <X className="h-4 w-4 text-slate-500" />
           </button>
         </div>
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input placeholder="Search openings…" value={q} onChange={e => setQ(e.target.value)} className="pl-9" />
+          <Input placeholder="Search requisitions…" value={q} onChange={e => setQ(e.target.value)} className="pl-9" />
         </div>
         {!loaded ? (
           <p className="text-xs text-slate-400">Loading…</p>
         ) : candidates.length === 0 ? (
-          <p className="text-xs text-slate-500 py-4">No openings available to link.</p>
+          <p className="text-xs text-slate-500 py-4">No requisitions available to link.</p>
         ) : (
           <div className="max-h-80 overflow-y-auto rounded-lg border border-slate-200">
             {candidates.map(o => (
