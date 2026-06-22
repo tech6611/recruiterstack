@@ -9,6 +9,25 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-21
+
+### Changed
+- **Public apply link now exists only when a job is open.** Previously every
+  canonical job got an `apply_token` at creation (migration 068), so a
+  draft/pending/approved job had a shareable apply URL that looked valid but
+  accepted no applicants (the apply POST already gated on `status = 'open'`).
+  Now the token is minted only when the job reaches `open`, the "Copy Apply
+  Link" button is hidden until then (`jobs/[id]/page.tsx`), the job-detail API
+  no longer returns the token for non-open jobs, and the public apply preview
+  treats any non-open job as "not found" instead of showing a fillable form
+  (`modules/ats/domain/job-pipelines.ts`).
+
+### Schema
+- **070_apply_token_only_when_open.sql** — `jobs.apply_token` trigger now mints
+  the token only when `status = 'open'` (fires on INSERT *and* UPDATE so it's
+  generated at the moment a job opens). Backfill nulls tokens for pre-open jobs
+  (draft/pending_approval/approved) and ensures open jobs have one.
+
 ## 2026-06-20
 
 ### Fixed

@@ -4325,8 +4325,9 @@ export default function JobPipelinePage() {
             )}
           </button>
 
-          {/* Job settings (Apply Link, etc.) — inline on xl+ */}
-          <div className="relative hidden xl:block">
+          {/* Job settings (Apply Link, etc.) — inline on xl+. Only when the job
+              is open: a pre-open job has no working public apply link. */}
+          <div className={`relative hidden ${(job.status as string) === 'open' ? 'xl:block' : 'xl:hidden'}`}>
             <button
               onClick={() => setShowJobMenu(m => !m)}
               title="Copy apply link & more"
@@ -4376,13 +4377,15 @@ export default function JobPipelinePage() {
                       <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500" />
                     )}
                   </button>
-                  <button
-                    onClick={() => { copyApplyLink(); setShowMoreMenu(false) }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    <Link2 className="h-4 w-4 text-slate-400" />
-                    {copied ? 'Copied!' : 'Copy Apply Link'}
-                  </button>
+                  {(job.status as string) === 'open' && (
+                    <button
+                      onClick={() => { copyApplyLink(); setShowMoreMenu(false) }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <Link2 className="h-4 w-4 text-slate-400" />
+                      {copied ? 'Copied!' : 'Copy Apply Link'}
+                    </button>
+                  )}
                 </div>
               </>
             )}

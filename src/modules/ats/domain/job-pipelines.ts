@@ -102,7 +102,9 @@ function canonicalJobToHiringRequest(row: CanonicalJobRow): HiringRequest {
     hiring_manager_email: (cf.hiring_manager_email as string | undefined) ?? null,
     hiring_manager_slack: (cf.hiring_manager_slack as string | undefined) ?? null,
     intake_token: '',
-    apply_link_token: row.apply_token ?? null,
+    // Only surface the public apply token once the job is open — pre-open jobs
+    // must not expose a shareable (but non-functional) apply link. (migration 070)
+    apply_link_token: row.status === 'open' ? (row.apply_token ?? null) : null,
     status: row.status as HiringRequestStatus,
     filled_by_recruiter: true,
     team_context: null,
@@ -288,6 +290,10 @@ export async function getCanonicalApplyJobPreview(
     status: string
     department: { name: string } | null
   }
+  // The public apply page only exists for open jobs. Treat any non-open job as
+  // not found so a stale/leaked link shows "not found" rather than a fillable
+  // form the POST would later reject. (migration 070)
+  if (row.status !== 'open') return null
   return {
     position_title: row.title,
     department: row.department?.name ?? null,
