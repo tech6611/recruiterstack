@@ -11,6 +11,18 @@ entries on top.
 
 ## 2026-06-23
 
+### Changed
+- **New Job drawer: Team & Requirements fields are now rich-text (Gmail-style).**
+  "What does this person do on the team?", "Key Requirements" and "Nice to Have"
+  were plain textareas; they now use the shared `RichTextEditor` (Tiptap) with a
+  bold/italic/underline/lists/headings/align/link toolbar
+  (`app/(dashboard)/jobs/page.tsx`). The HTML is stripped back to clean text
+  before it's sent to the AI JD generator and before it's stored in the job's
+  `custom_fields.intake`, so nothing downstream (the AI prompt, the hiring-manager
+  intake form) ever sees raw tags. "Import from PDF/TXT" now inserts the extracted
+  text into the live editor. The JD box and Additional notes stay plain text (the
+  JD is AI-generated markdown rendered as plain text on the job page).
+
 ### Fixed
 - **Target start date now carries from an approved requisition into Create JD.**
   The "Create job & write JD" handoff prefilled title/department/location/comp/HM

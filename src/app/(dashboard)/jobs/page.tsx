@@ -10,9 +10,21 @@ import {
   CalendarDays, SlidersHorizontal, Pencil,
 } from 'lucide-react'
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
+import type { Editor } from '@tiptap/react'
 import EditHMModal from '@/components/EditHMModal'
+import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
 import { inputCls, labelCls } from '@/lib/ui/styles'
 import { trackEvent } from '@/lib/analytics'
+
+// Convert plain text (e.g. extracted from an imported PDF/TXT) into simple HTML
+// so it can be inserted into a Tiptap rich-text editor with line breaks intact.
+function plainTextToHtml(text: string): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return text
+    .split(/\n{2,}/)
+    .map(block => `<p>${block.split('\n').map(esc).join('<br>')}</p>`)
+    .join('')
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -199,8 +211,18 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
   const append = (setter: React.Dispatch<React.SetStateAction<string>>) => (text: string) =>
     setter(prev => prev ? prev + '\n\n' + text : text)
 
+  // Rich-text editors hold HTML; Tiptap only reads `content` on init, so file
+  // imports must insert into the live editor instance (captured here) rather
+  // than mutating React state. We strip the HTML back to clean text for the AI
+  // prompt and for storage so nothing downstream ever sees raw tags.
+  const teamCtxEditor   = useRef<Editor | null>(null)
+  const keyReqsEditor   = useRef<Editor | null>(null)
+  const niceToHaveEditor = useRef<Editor | null>(null)
+  const insertIntoEditor = (ref: React.MutableRefObject<Editor | null>) => (text: string) =>
+    ref.current?.chain().focus().insertContent(plainTextToHtml(text)).run()
+
   const handleGenerateJD = async () => {
-    if (!teamContext.trim() || !keyReqs.trim()) {
+    if (isHtmlEmpty(teamContext) || isHtmlEmpty(keyReqs)) {
       setJdGenError('Please fill in Team Context and Key Requirements before generating.')
       return
     }
@@ -212,8 +234,8 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
       body: JSON.stringify({
         position_title: positionTitle, department, level, location: primaryLocation,
         remote_ok: remoteOk, headcount: totalSeats,
-        team_context: teamContext, key_requirements: keyReqs,
-        nice_to_haves: niceToHave,
+        team_context: stripHtml(teamContext), key_requirements: stripHtml(keyReqs),
+        nice_to_haves: stripHtml(niceToHave),
         budget_min: budgetMin ? Number(budgetMin) : undefined,
         budget_max: budgetMax ? Number(budgetMax) : undefined,
         target_start_date: startDate, additional_notes: notes,
@@ -231,6 +253,10 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!positionTitle.trim()) { setError('Position title is required.'); return }
+    if (mode === 'fill_myself' && (isHtmlEmpty(teamContext) || isHtmlEmpty(keyReqs))) {
+      setError('Please fill in Team Context and Key Requirements.')
+      return
+    }
     setLoading(true); setError(null)
     // Canonical job-create: the legacy hiring_requests intake flow has been
     // retired. Persist a draft job plus one opening per seat per location,
@@ -256,7 +282,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
         intake: {
           level,
           hm_name: hmName, hm_email: hmEmail, hm_slack: hmSlack,
-          team_context: teamContext, key_requirements: keyReqs, nice_to_have: niceToHave,
+          team_context: stripHtml(teamContext), key_requirements: stripHtml(keyReqs), nice_to_have: stripHtml(niceToHave),
           target_companies: targetCompanies,
           budget_min: budgetMin, budget_max: budgetMax,
           target_start_date: startDate, notes,
@@ -416,21 +442,27 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Team & Requirements</p>
                 <div>
                   <label className={labelCls}>What does this person do on the team? <span className="text-red-500">*</span></label>
-                  <textarea required rows={4} value={teamContext} onChange={e => setTeamContext(e.target.value)}
-                    placeholder="They'll own the checkout flow, work with design, lead 2 junior engineers…" className={inputCls + ' resize-none'} />
-                  <FileImportButton onExtract={append(setTeamContext)} field="team-context" />
+                  <RichTextEditor value={teamContext} onChange={setTeamContext}
+                    onEditorReady={ed => { teamCtxEditor.current = ed }}
+                    minHeight={110}
+                    placeholder="They'll own the checkout flow, work with design, lead 2 junior engineers…" />
+                  <FileImportButton onExtract={insertIntoEditor(teamCtxEditor)} field="team-context" />
                 </div>
                 <div>
                   <label className={labelCls}>Key Requirements <span className="text-red-500">*</span></label>
-                  <textarea required rows={4} value={keyReqs} onChange={e => setKeyReqs(e.target.value)}
-                    placeholder="5+ years React, Node.js, shipped production apps…" className={inputCls + ' resize-none'} />
-                  <FileImportButton onExtract={append(setKeyReqs)} field="key-reqs" />
+                  <RichTextEditor value={keyReqs} onChange={setKeyReqs}
+                    onEditorReady={ed => { keyReqsEditor.current = ed }}
+                    minHeight={110}
+                    placeholder="5+ years React, Node.js, shipped production apps…" />
+                  <FileImportButton onExtract={insertIntoEditor(keyReqsEditor)} field="key-reqs" />
                 </div>
                 <div>
                   <label className={labelCls}>Nice to Have</label>
-                  <textarea rows={3} value={niceToHave} onChange={e => setNiceToHave(e.target.value)}
-                    placeholder="Next.js, fintech background, startup experience…" className={inputCls + ' resize-none'} />
-                  <FileImportButton onExtract={append(setNiceToHave)} field="nice-to-have" />
+                  <RichTextEditor value={niceToHave} onChange={setNiceToHave}
+                    onEditorReady={ed => { niceToHaveEditor.current = ed }}
+                    minHeight={84}
+                    placeholder="Next.js, fintech background, startup experience…" />
+                  <FileImportButton onExtract={insertIntoEditor(niceToHaveEditor)} field="nice-to-have" />
                 </div>
               </div>
 
