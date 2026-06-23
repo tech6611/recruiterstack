@@ -11,6 +11,14 @@ entries on top.
 
 ## 2026-06-23
 
+### Added
+- **Target Start Date in the New Job drawer now has a calendar picker.** The
+  field stays free-text (so "ASAP" / "Q2 2026" still work), but a calendar icon
+  on the right opens the browser's native date picker for users who'd rather
+  click a date than type it; picking one fills the field with the date
+  (`app/(dashboard)/jobs/page.tsx`). Implemented as a transparent `input[type=date]`
+  overlaid on the icon — no new dependency.
+
 ### Changed
 - **New Job drawer: Team & Requirements fields are now rich-text (Gmail-style).**
   "What does this person do on the team?", "Key Requirements" and "Nice to Have"

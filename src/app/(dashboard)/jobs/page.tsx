@@ -485,7 +485,22 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
                   </div>
                   <div className="col-span-2">
                     <label className={labelCls}>Target Start Date</label>
-                    <input value={startDate} onChange={e => setStartDate(e.target.value)} placeholder="ASAP, Q2 2025, June…" className={inputCls} />
+                    <div className="relative">
+                      <input value={startDate} onChange={e => setStartDate(e.target.value)} placeholder="ASAP, Q2 2025, June…" className={`${inputCls} pr-10`} />
+                      {/* Calendar picker: a transparent native date input sits over the
+                          icon so clicking it opens the browser's date picker (anchored
+                          here). Typing free text like "ASAP" still works on the left. */}
+                      <div className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-400">
+                        <CalendarDays className="h-4 w-4 pointer-events-none" />
+                        <input
+                          type="date"
+                          aria-label="Pick a target start date"
+                          value={/^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : ''}
+                          onChange={e => setStartDate(e.target.value)}
+                          className="absolute inset-0 cursor-pointer opacity-0"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
