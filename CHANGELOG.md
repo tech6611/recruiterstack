@@ -11,6 +11,17 @@ entries on top.
 
 ## 2026-06-23
 
+### Fixed
+- **Target start date now carries from an approved requisition into Create JD.**
+  The "Create job & write JD" handoff prefilled title/department/location/comp/HM
+  but silently dropped the requisition's `target_start_date`, so the JD drawer's
+  start-date field (and the generated JD) always came up blank. The date is now
+  threaded end-to-end: added to the handoff URL in
+  `components/openings/OpeningDetail.tsx`, to the `FromOpening` type + URL parse +
+  `startDate` initial state in `app/(dashboard)/jobs/page.tsx`. The JD-generation
+  payload, API route, and generator already accepted it — only the client handoff
+  was missing.
+
 ### Added
 - **Push an approved requisition straight into JD creation.** An approved
   requisition (`/openings/[id]`) now shows a "Create job & write JD" button that

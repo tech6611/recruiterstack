@@ -142,6 +142,7 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
     if (loc?.name)  params.set('location', loc.name)
     if (opening.comp_min != null) params.set('comp_min', String(opening.comp_min))
     if (opening.comp_max != null) params.set('comp_max', String(opening.comp_max))
+    if (opening.target_start_date) params.set('target_start_date', opening.target_start_date)
     const hmName = hm?.full_name ?? hm?.email
     if (hmName) params.set('hm_name', hmName)
     router.push(`/jobs?${params.toString()}`)

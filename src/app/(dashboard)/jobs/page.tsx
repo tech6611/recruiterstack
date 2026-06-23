@@ -59,13 +59,14 @@ type NewJobMode = 'send_to_hm' | 'fill_myself' | null
 // Prefill payload when the New Job drawer is opened from an approved
 // requisition (see the "Create job & write JD" action on /openings/[id]).
 interface FromOpening {
-  id:         string
-  title:      string
-  department: string
-  location:   string
-  comp_min:   string
-  comp_max:   string
-  hm_name:    string
+  id:                string
+  title:             string
+  department:        string
+  location:          string
+  comp_min:          string
+  comp_max:          string
+  target_start_date: string
+  hm_name:           string
 }
 
 
@@ -186,7 +187,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
   const [targetCompanies, setTargetCompanies] = useState<string[]>([])
   const [budgetMin, setBudgetMin] = useState(fromOpening?.comp_min ?? '')
   const [budgetMax, setBudgetMax] = useState(fromOpening?.comp_max ?? '')
-  const [startDate, setStartDate] = useState('')
+  const [startDate, setStartDate] = useState(fromOpening?.target_start_date ?? '')
   const [notes, setNotes] = useState('')
   const [jd, setJd] = useState('')
   const [jdMode, setJdMode] = useState<'ai' | 'manual' | null>(null)
@@ -702,9 +703,10 @@ export default function JobsPage() {
           title:      params.get('title')      ?? '',
           department: params.get('department')  ?? '',
           location:   params.get('location')    ?? '',
-          comp_min:   params.get('comp_min')     ?? '',
-          comp_max:   params.get('comp_max')     ?? '',
-          hm_name:    params.get('hm_name')      ?? '',
+          comp_min:          params.get('comp_min')          ?? '',
+          comp_max:          params.get('comp_max')          ?? '',
+          target_start_date: params.get('target_start_date') ?? '',
+          hm_name:           params.get('hm_name')           ?? '',
         })
       }
       setShowDrawer(true)
