@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Building2, Plus, Trash2, X } from 'lucide-react'
+import { Building2, Plus, Trash2, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,9 @@ export function DepartmentsCard() {
   const [items, setItems]     = useState<Department[]>([])
   const [loaded, setLoaded]   = useState(false)
   const [open, setOpen]       = useState<{ mode: 'add' } | { mode: 'edit'; row: Department } | null>(null)
+  // The list can get long, so each group is collapsed into a clickable header.
+  const [showApproved, setShowApproved] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
 
   async function refresh() {
     const res = await fetch('/api/departments?include_inactive=1')
@@ -28,6 +31,26 @@ export function DepartmentsCard() {
     setLoaded(true)
   }
   useEffect(() => { refresh() }, [])
+
+  const activeItems   = items.filter(d => d.is_active)
+  const archivedItems = items.filter(d => !d.is_active)
+
+  const renderRow = (d: Department) => (
+    <div key={d.id} className={`flex items-center justify-between py-2.5 ${!d.is_active ? 'opacity-50' : ''}`}>
+      <div className="min-w-0 flex-1">
+        <button onClick={() => setOpen({ mode: 'edit', row: d })} className="text-sm font-medium text-slate-900 hover:text-emerald-700 text-left">
+          {d.name}
+        </button>
+        {d.slug && <span className="ml-2 text-xs text-slate-400">/{d.slug}</span>}
+        {!d.is_active && <span className="ml-2 text-[10px] uppercase font-semibold text-slate-400">archived</span>}
+      </div>
+      {d.is_active && (
+        <Button variant="ghost" size="sm" onClick={() => archive(d.id)} aria-label="Archive">
+          <Trash2 className="h-4 w-4 text-slate-400" />
+        </Button>
+      )}
+    </div>
+  )
 
   async function archive(id: string) {
     if (!confirm('Archive this department?')) return
@@ -60,28 +83,68 @@ export function DepartmentsCard() {
         ) : items.length === 0 ? (
           <p className="text-xs text-slate-500">No departments yet.</p>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {items.map(d => (
-              <div key={d.id} className={`flex items-center justify-between py-2.5 ${!d.is_active && 'opacity-50'}`}>
-                <div className="min-w-0 flex-1">
-                  <button onClick={() => setOpen({ mode: 'edit', row: d })} className="text-sm font-medium text-slate-900 hover:text-emerald-700 text-left">
-                    {d.name}
-                  </button>
-                  {d.slug && <span className="ml-2 text-xs text-slate-400">/{d.slug}</span>}
-                  {!d.is_active && <span className="ml-2 text-[10px] uppercase font-semibold text-slate-400">archived</span>}
-                </div>
-                {d.is_active && (
-                  <Button variant="ghost" size="sm" onClick={() => archive(d.id)} aria-label="Archive">
-                    <Trash2 className="h-4 w-4 text-slate-400" />
-                  </Button>
-                )}
-              </div>
-            ))}
+          <div className="space-y-2">
+            <DeptGroup
+              label="Active departments"
+              count={activeItems.length}
+              isOpen={showApproved}
+              onToggle={() => setShowApproved(v => !v)}
+            >
+              {activeItems.length === 0
+                ? <p className="py-2.5 text-xs text-slate-400">None yet.</p>
+                : activeItems.map(renderRow)}
+            </DeptGroup>
+
+            {archivedItems.length > 0 && (
+              <DeptGroup
+                label="Archived"
+                count={archivedItems.length}
+                isOpen={showArchived}
+                onToggle={() => setShowArchived(v => !v)}
+              >
+                {archivedItems.map(renderRow)}
+              </DeptGroup>
+            )}
           </div>
         )}
         {open && <DeptDialog mode={open.mode} row={open.mode === 'edit' ? open.row : undefined} onClose={() => { setOpen(null); refresh() }} />}
       </CardContent>
     </Card>
+  )
+}
+
+// A collapsible group: a clickable header (label + count + chevron) that folds
+// its rows away. Keeps the long department list tidy.
+function DeptGroup({
+  label,
+  count,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  label:    string
+  count:    number
+  isOpen:   boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left hover:bg-slate-50"
+      >
+        <span className="text-sm font-semibold text-slate-700">
+          {label} <span className="font-normal text-slate-400">({count})</span>
+        </span>
+        {isOpen
+          ? <ChevronDown className="h-4 w-4 text-slate-400" />
+          : <ChevronRight className="h-4 w-4 text-slate-400" />}
+      </button>
+      {isOpen && <div className="divide-y divide-slate-100 border-t border-slate-100 px-3">{children}</div>}
+    </div>
   )
 }
 

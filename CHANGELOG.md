@@ -11,6 +11,13 @@ entries on top.
 
 ## 2026-06-23
 
+### Changed
+- **Settings → Departments list is now collapsible.** The flat stack of every
+  department made the Workspace settings page long. Active departments are now
+  folded into a collapsible "Active departments (N)" group with a click-to-
+  expand header, and any archived departments sit in their own "Archived (M)"
+  group; both default to collapsed (`components/settings/DepartmentsCard.tsx`).
+
 ### Fixed
 - **Approval chains list now reads "Requisition", not "Opening."** A leftover
   from the 2026-06-22 rename: each chain row printed the raw `target_type`
