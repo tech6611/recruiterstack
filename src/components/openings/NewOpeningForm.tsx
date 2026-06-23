@@ -10,8 +10,8 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { CustomFieldsBlock } from '@/components/openings/CustomFieldsBlock'
+import { DepartmentCombobox } from '@/components/openings/DepartmentCombobox'
 import type {
-  Department,
   Location as LocationRow,
   CompensationBand,
   EmploymentType,
@@ -51,7 +51,6 @@ const EMPTY: FormState = {
 export function NewOpeningForm() {
   const router = useRouter()
   const [form, setForm]       = useState<FormState>(EMPTY)
-  const [depts, setDepts]     = useState<Department[]>([])
   const [locs,  setLocs]      = useState<LocationRow[]>([])
   const [bands, setBands]     = useState<CompensationBand[]>([])
   const [members, setMembers] = useState<TeamMemberLite[]>([])
@@ -60,7 +59,6 @@ export function NewOpeningForm() {
   const [saving, setSaving]   = useState(false)
 
   useEffect(() => {
-    fetch('/api/departments').then(r => r.json()).then(({ data }) => setDepts(data ?? []))
     fetch('/api/locations').then(r => r.json()).then(({ data }) => setLocs(data ?? []))
     fetch('/api/team').then(r => r.json()).then(({ data }) => setMembers(data ?? []))
     fetch('/api/admin/custom-fields?object_type=opening').then(r => r.json()).then(({ data }) => setDefs(data ?? []))
@@ -147,13 +145,10 @@ export function NewOpeningForm() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Department</Label>
-              <Select value={form.department_id} onChange={e => setForm(f => ({ ...f, department_id: e.target.value, comp_band_id: '' }))}>
-                <option value="">—</option>
-                {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </Select>
-              {depts.length === 0 && (
-                <p className="text-[11px] text-slate-400">No departments configured yet.</p>
-              )}
+              <DepartmentCombobox
+                value={form.department_id}
+                onChange={id => setForm(f => ({ ...f, department_id: id, comp_band_id: '' }))}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Location</Label>

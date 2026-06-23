@@ -59,8 +59,10 @@ const NAV_SECTIONS: NavSection[] = [
     section: 'Recruiting',
     icon:    Briefcase,
     items: [
-      // Openings (requisitions) folded into Jobs — reachable via the "Openings"
-      // link in the Jobs page header. Single recruiting-pipeline nav entry.
+      // Requisitions (the approved-headcount object) get their own nav home so
+      // they're discoverable, not buried behind a Jobs-header button. They sit
+      // right above Jobs because a requisition is upstream of a job pipeline.
+      { href: '/openings',   label: 'Requisitions', icon: ClipboardList, cap: 'recruiting:view' },
       { href: '/jobs',       label: 'Jobs',       icon: Briefcase,     cap: 'recruiting:view' },
       { href: '/candidates', label: 'Candidates', icon: Users,         cap: 'recruiting:view' },
       { href: '/sourcing',   label: 'Sourcing',   icon: Search,        cap: 'recruiting:view' },

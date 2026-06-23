@@ -11,12 +11,31 @@ entries on top.
 
 ## 2026-06-23
 
+### Added
+- **Requisitions has its own sidebar nav home + a status summary.** Requisitions
+  were only reachable via a button in the Jobs header, which made them feel
+  second-class and confused users about Jobs vs Requisitions. Added a
+  **Requisitions** item to the Recruiting nav flyout (above Jobs, since a
+  requisition is upstream of a job pipeline; `components/layout/Sidebar.tsx`).
+  The list page (`(dashboard)/openings/page.tsx`) now shows a clickable
+  status-count strip ("All · N", "open · 3", …) that doubles as the status
+  filter; status filtering moved client-side so the counts stay stable.
+
 ### Changed
 - **Settings → Departments list is now collapsible.** The flat stack of every
   department made the Workspace settings page long. Active departments are now
   folded into a collapsible "Active departments (N)" group with a click-to-
   expand header, and any archived departments sit in their own "Archived (M)"
   group; both default to collapsed (`components/settings/DepartmentsCard.tsx`).
+
+### Added
+- **Department field on the New Requisition form is now an autocomplete.**
+  Replaced the static department dropdown with a typeahead combobox
+  (`components/openings/DepartmentCombobox.tsx`): type to filter the org's
+  departments, and if the typed name doesn't exist an "Add '<name>'" row creates
+  it inline (`POST /api/departments`, admin-only) and selects it. Wired into
+  `NewOpeningForm.tsx` (the now-unused `depts` fetch/state removed). Supports
+  keyboard nav (↑/↓/Enter/Esc) and a clear button.
 
 ### Fixed
 - **Approval chains list now reads "Requisition", not "Opening."** A leftover

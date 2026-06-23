@@ -42,22 +42,33 @@ export default function OpeningsListPage() {
     fetch('/api/locations').then(r => r.json()).then(({ data }) => setLocs(data ?? []))
   }, [])
 
+  // Status is filtered client-side (via the summary chips) so the per-status
+  // counts always reflect the full set within the current dept/location scope.
   useEffect(() => {
     const params = new URLSearchParams()
-    if (filters.status)        params.set('status', filters.status)
     if (filters.department_id) params.set('department_id', filters.department_id)
     if (filters.location_id)   params.set('location_id', filters.location_id)
     fetch(`/api/openings?${params}`)
       .then(r => r.json())
       .then(({ data }) => { setItems(data ?? []); setLoaded(true) })
       .catch(() => setLoaded(true))
-  }, [filters.status, filters.department_id, filters.location_id])
+  }, [filters.department_id, filters.location_id])
+
+  // Counts per status within the current dept/location scope (ignores the q
+  // and status filters so the chips are stable as you click between them).
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {}
+    for (const o of items) c[o.status] = (c[o.status] ?? 0) + 1
+    return c
+  }, [items])
 
   const filtered = useMemo(() => {
     const q = filters.q.trim().toLowerCase()
-    if (!q) return items
-    return items.filter(o => o.title.toLowerCase().includes(q))
-  }, [items, filters.q])
+    return items.filter(o =>
+      (!filters.status || o.status === filters.status) &&
+      (!q || o.title.toLowerCase().includes(q)),
+    )
+  }, [items, filters.q, filters.status])
 
   const deptById = useMemo(() => new Map(depts.map(d => [d.id, d])), [depts])
   const locById  = useMemo(() => new Map(locs.map(l => [l.id, l])),  [locs])
@@ -74,6 +85,37 @@ export default function OpeningsListPage() {
         </Link>
       </div>
 
+      {/* Status summary — clickable chips that double as the status filter */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setFilters(f => ({ ...f, status: '' }))}
+          className={cn(
+            'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+            filters.status === '' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+          )}
+        >
+          All {items.length > 0 && <span className="opacity-70">· {items.length}</span>}
+        </button>
+        {STATUS_OPTIONS.filter(s => (counts[s] ?? 0) > 0).map(s => {
+          const selected = filters.status === s
+          return (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setFilters(f => ({ ...f, status: selected ? '' : s }))}
+              className={cn(
+                'rounded-full px-3 py-1 text-xs font-semibold capitalize transition-colors',
+                STATUS_BADGE[s],
+                selected ? 'ring-2 ring-offset-1 ring-slate-400' : 'hover:opacity-80',
+              )}
+            >
+              {s.replace('_', ' ')} <span className="opacity-70">· {counts[s]}</span>
+            </button>
+          )
+        })}
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-4">
         <div className="relative flex-1 min-w-[220px]">
@@ -85,14 +127,6 @@ export default function OpeningsListPage() {
             className="pl-9"
           />
         </div>
-        <Select
-          value={filters.status}
-          onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}
-          className="w-44"
-        >
-          <option value="">All statuses</option>
-          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-        </Select>
         <Select
           value={filters.department_id}
           onChange={e => setFilters(f => ({ ...f, department_id: e.target.value }))}
