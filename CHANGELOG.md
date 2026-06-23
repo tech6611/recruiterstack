@@ -9,6 +9,22 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-23
+
+### Fixed
+- **Approval chains list now reads "Requisition", not "Opening."** A leftover
+  from the 2026-06-22 rename: each chain row printed the raw `target_type`
+  (`opening`) instead of the display label, so the list still showed "Opening".
+  It now uses the `TARGET_LABEL` map like the rest of the page
+  (`admin/approvals/page.tsx`).
+
+### Added
+- **Visible "Edit" button on each approval-chain row.** The chain editor already
+  existed (`/admin/approvals/[id]`) and the whole card was a link to it, but with
+  no obvious affordance it looked un-editable. Added an explicit Edit button per
+  row; it bubbles the click up to the existing row link, so it opens the same
+  editor (`admin/approvals/page.tsx`).
+
 ## 2026-06-22
 
 ### Changed

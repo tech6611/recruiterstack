@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, AlertTriangle } from 'lucide-react'
+import { Plus, AlertTriangle, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -163,11 +163,18 @@ export default function ApprovalChainsListPage() {
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-slate-500 mt-0.5 capitalize">{c.target_type} · {c.description ?? 'no description'}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{TARGET_LABEL[c.target_type]} · {c.description ?? 'No description'}</div>
                     </div>
                     <span className="text-[10px] uppercase font-semibold text-slate-400 hidden sm:inline">
                       Updated {new Date(c.updated_at).toLocaleDateString()}
                     </span>
+                    {/* Explicit Edit affordance. The whole card is already a link
+                        to the editor; this button just makes that discoverable.
+                        It intentionally does NOT stop propagation, so the click
+                        bubbles up to the row's <Link> and opens the editor. */}
+                    <Button variant="outline" size="sm">
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </Button>
                     <ChainRowActions
                       chainId={c.id}
                       chainName={c.name}
