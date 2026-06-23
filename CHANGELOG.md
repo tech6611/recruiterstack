@@ -11,6 +11,17 @@ entries on top.
 
 ## 2026-06-23
 
+### Changed
+- **Requisitions list now matches the Jobs page visually.** The Requisitions
+  list (`(dashboard)/openings/page.tsx`) was restyled to be consistent with the
+  Jobs list: the status-count chip strip was replaced with the same five colored
+  stat-cards (Total / Awaiting Approval / Approved / Open / Closed) that filter
+  the table on click, status pills now use the Jobs-style icon + colored badge
+  via a shared `STATUS_CONFIG`, the header/"New requisition" button adopt the
+  Jobs styling, and the table gained matching row hover, a dashed empty state,
+  and a "Showing N of M" footer. Cards bucket all seven statuses so each stays
+  reachable; the seven-status filter is preserved.
+
 ### Added
 - **Requisitions has its own sidebar nav home + a status summary.** Requisitions
   were only reachable via a button in the Jobs header, which made them feel
