@@ -17,6 +17,7 @@ import {
   Info,
 } from 'lucide-react'
 import { timeAgo } from '@/lib/ui/date-utils'
+import { stepHref } from '@/lib/onboarding/checklist-steps'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ function resourceHref(type: string | null, id: string | null): string | null {
     case 'time_off_request':    return '/me/time-off'
     case 'employee':            return `/hris/employees/${id}`
     case 'compensation_record': return '/me' // overview shows current comp
+    case 'onboarding':          return stepHref(id) // first-run setup nudges
     default:                    return null
   }
 }

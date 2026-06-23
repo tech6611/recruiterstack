@@ -11,6 +11,25 @@ entries on top.
 
 ## 2026-06-23
 
+### Added
+- **First-run "Getting started" checklist on the dashboard.** A self-hiding
+  banner (`components/onboarding/GettingStartedBanner.tsx`) guides the
+  operational setup the signup wizard skips — and whose gaps stop a job from
+  going live: create departments, add locations, approval chains for
+  requisitions *and* jobs, first requisition, first published job, invite a
+  teammate (org-wide, admins only), and connect your calendar (personal). Steps
+  **auto-tick** from live data — no manual check-off — via a new
+  `GET /api/onboarding/checklist` that reads real signals (departments,
+  locations, `approval_chains` per target, `openings`, open `jobs`,
+  `org_members`, `user_integrations`). Each still-open step also raises one
+  notification nudge (`?sync=1`), routed to the right audience, deduped, and
+  auto-cleared once done; the bell links each nudge to the right setup screen.
+  Detection logic split into a client-safe `lib/onboarding/checklist-steps.ts`
+  (with unit tests) and a server-only `lib/onboarding/checklist.ts`. Settings now
+  honours `?tab=` so each step deep-links to the correct tab. (Note: "connect
+  email" was dropped — the app sends candidate email via SendGrid and only
+  connects calendars per user, so it could never tick.)
+
 ### Changed
 - **Requisitions list now matches the Jobs page visually.** The Requisitions
   list (`(dashboard)/openings/page.tsx`) was restyled to be consistent with the

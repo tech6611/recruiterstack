@@ -41,6 +41,7 @@ import {
 import type { StageColor } from '@/lib/types/database'
 import { timeAgo, fmtDate } from '@/lib/ui/date-utils'
 import { CandidateDrawer } from '@/components/dashboard/CandidateDrawer'
+import { GettingStartedBanner } from '@/components/onboarding/GettingStartedBanner'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -2291,6 +2292,9 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {/* First-run setup checklist — self-hides once complete */}
+        <GettingStartedBanner />
 
         {/* Widget area — fills remaining viewport height */}
         <div className="flex-1 overflow-hidden p-4 flex flex-col">

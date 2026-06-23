@@ -68,6 +68,14 @@ export default function SettingsPage() {
   // Active tab in the settings sidebar
   const [activeTab, setActiveTab] = useState<TabId>('general')
 
+  // Deep-link to a tab via ?tab= (used by the dashboard onboarding checklist).
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t === 'general' || t === 'integrations' || t === 'workspace' || t === 'team') {
+      setActiveTab(t)
+    }
+  }, [searchParams])
+
   // Auto-switch to Integrations tab when returning from any OAuth flow
   useEffect(() => {
     const oauthParams = ['slack', 'google', 'zoom', 'microsoft']
