@@ -15,6 +15,7 @@ import {
   DollarSign,
   GitBranch,
   Info,
+  ClipboardCheck,
 } from 'lucide-react'
 import { timeAgo } from '@/lib/ui/date-utils'
 import { stepHref } from '@/lib/onboarding/checklist-steps'
@@ -47,6 +48,10 @@ const TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string }> = 
   time_off_decided:     { icon: Check,        color: 'bg-emerald-500' },
   manager_changed:      { icon: GitBranch,    color: 'bg-blue-500' },
   comp_changed:         { icon: DollarSign,   color: 'bg-emerald-500' },
+  // Approvals:
+  approval_requested:   { icon: ClipboardCheck, color: 'bg-amber-500' },
+  approval_decided:     { icon: Check,          color: 'bg-emerald-500' },
+  approval_completed:   { icon: Check,          color: 'bg-green-500' },
 }
 
 function resourceHref(type: string | null, id: string | null): string | null {
@@ -55,6 +60,8 @@ function resourceHref(type: string | null, id: string | null): string | null {
     case 'candidate':           return `/candidates/${id}`
     case 'application':         return `/candidates/${id}`
     case 'job':                 return `/jobs/${id}`
+    case 'opening':             return `/openings/${id}` // requisition (display name)
+    case 'approval':            return '/approvals/inbox' // approver's pending-decision queue
     case 'role':                return `/roles/${id}`
     case 'time_off_request':    return '/me/time-off'
     case 'employee':            return `/hris/employees/${id}`

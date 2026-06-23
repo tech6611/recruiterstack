@@ -126,6 +126,26 @@ export function Sidebar() {
   const { capabilities: caps } = useCapabilities()
   const [openSection, setOpenSection] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen]   = useState(false)
+  // Count of approval decisions waiting on the current user, shown as a badge on
+  // the Approvals nav item. Mirrors the NotificationBell's polling cadence.
+  const [approvalsCount, setApprovalsCount] = useState(0)
+
+  const canViewApprovals = caps?.has('approvals:view') ?? false
+  useEffect(() => {
+    if (!canViewApprovals) { setApprovalsCount(0); return }
+    let cancelled = false
+    const fetchCount = () =>
+      fetch('/api/approvals/inbox')
+        .then(r => r.json())
+        .then(j => { if (!cancelled) setApprovalsCount((j.data ?? []).length) })
+        .catch(() => { /* non-critical */ })
+    fetchCount()
+    const id = setInterval(fetchCount, 60_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [canViewApprovals, pathname])
+
+  // Badge count for a given nav item (0 = no badge). Only Approvals carries one.
+  const itemBadge = (href: string) => (href === '/approvals/inbox' ? approvalsCount : 0)
 
   const openTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -179,9 +199,17 @@ export function Sidebar() {
         ? 'bg-emerald-50 text-emerald-700'
         : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
     }`
+    // A bucket shows a small red dot when one of its (collapsed) flyout items has
+    // a pending count, so the badge is noticeable without opening the flyout.
+    const bucketBadge = s.items.reduce((n, it) => n + itemBadge(it.href), 0)
     const inner = (
       <>
-        <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
+        <span className="relative shrink-0">
+          <Icon className={`h-[18px] w-[18px] ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
+          {bucketBadge > 0 && !isOpen && (
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+          )}
+        </span>
         <span className="truncate">{s.section}</span>
       </>
     )
@@ -215,6 +243,7 @@ export function Sidebar() {
             <div className="space-y-0.5 px-1">
               {s.items.map(({ href, label, icon: ItemIcon }) => {
                 const itemActive = isItemActive(href)
+                const badge      = itemBadge(href)
                 return (
                   <Link
                     key={href}
@@ -228,6 +257,11 @@ export function Sidebar() {
                   >
                     <ItemIcon className={`h-[18px] w-[18px] shrink-0 ${itemActive ? 'text-emerald-600' : 'text-slate-400'}`} />
                     <span className="truncate">{label}</span>
+                    {badge > 0 && (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                        {badge > 99 ? '99+' : badge}
+                      </span>
+                    )}
                   </Link>
                 )
               })}
@@ -255,6 +289,7 @@ export function Sidebar() {
                 : s.items
               ).map(({ href, label, icon: ItemIcon }) => {
                 const active = isItemActive(href)
+                const badge  = itemBadge(href)
                 return (
                   <Link
                     key={href}
@@ -267,6 +302,11 @@ export function Sidebar() {
                   >
                     <ItemIcon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
                     <span className="truncate">{label}</span>
+                    {badge > 0 && (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                        {badge > 99 ? '99+' : badge}
+                      </span>
+                    )}
                   </Link>
                 )
               })}

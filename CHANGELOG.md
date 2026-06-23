@@ -12,6 +12,19 @@ entries on top.
 ## 2026-06-23
 
 ### Added
+- **Approval requests now ring the in-app bell + show a sidebar count.** Approval
+  steps already emailed/Slacked the approver, but never created an in-app
+  notification, so a pending decision was easy to miss. `notifyStepActivated`
+  now also creates an `approval_requested` bell notification for each approver
+  (links to `/approvals/inbox`), and the requester gets `approval_decided` /
+  `approval_completed` notifications when steps are decided/finished
+  (`lib/approvals/notifications.ts`, new types in `lib/api/notify.ts`, icons +
+  routing in `components/notifications/NotificationBell.tsx`). The sidebar
+  **Approvals** item now shows a red count badge of decisions waiting on you
+  (polled from `/api/approvals/inbox` every 60s), plus a small dot on the Admin
+  bucket when the flyout is collapsed (`components/layout/Sidebar.tsx`).
+
+### Added
 - **First-run "Getting started" checklist on the dashboard.** A self-hiding
   banner (`components/onboarding/GettingStartedBanner.tsx`) guides the
   operational setup the signup wizard skips — and whose gaps stop a job from

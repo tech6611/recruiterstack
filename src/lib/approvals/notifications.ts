@@ -18,7 +18,16 @@ import {
   renderApprovalSlaBreach,
 } from '@/lib/email/templates'
 import { notifySlackDM } from '@/lib/notifications'
+import { createNotification } from '@/lib/api/notify'
 import type { ApprovalTargetType } from '@/lib/types/approvals'
+
+// Friendly noun for the in-app notification copy (matches the user-facing
+// rename: an 'opening' reads as "Requisition").
+const TARGET_NOUN: Record<ApprovalTargetType, string> = {
+  opening: 'requisition',
+  job:     'job',
+  offer:   'offer',
+}
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL ?? 'https://recruiterstack.in'
 
@@ -164,6 +173,17 @@ export async function notifyStepActivated(input: {
           targetTitle, input.stepName, requesterName,
         )
       }
+      // In-app (bell) notification — links to the Approvals inbox via
+      // resource_type 'approval' (see NotificationBell.resourceHref).
+      await createNotification({
+        orgId: input.orgId,
+        userId: a.id,
+        type: 'approval_requested',
+        title: `Approval requested: ${targetTitle}`,
+        body: `${requesterName} needs your decision on this ${TARGET_NOUN[input.targetType]} (step: ${input.stepName}).`,
+        resourceType: 'approval',
+        resourceId: input.approvalId,
+      })
     }
   } catch (err) {
     logger.error('[notify] step_activated failed', err)
@@ -200,6 +220,17 @@ export async function notifyStepDecided(input: {
       const msg = `${approver?.full_name ?? approver?.email ?? 'An approver'} ${verb} the *${input.stepName}* step on *${targetTitle}*.${input.comment ? `\n> ${input.comment}` : ''}`
       await notifySlackDM(input.orgId, requester.email, msg)
     }
+    // In-app (bell) notification to the requester — links to the target.
+    const approverName = approver?.full_name ?? approver?.email ?? 'An approver'
+    await createNotification({
+      orgId: input.orgId,
+      userId: requester.id,
+      type: 'approval_decided',
+      title: `${targetTitle}: step ${input.decision}`,
+      body: `${approverName} ${input.decision} the "${input.stepName}" step.${input.comment ? ` "${input.comment}"` : ''}`,
+      resourceType: input.targetType,
+      resourceId: input.targetId,
+    })
   } catch (err) {
     logger.error('[notify] step_decided failed', err)
   }
@@ -223,6 +254,16 @@ export async function notifyApprovalCompleted(input: {
     if (await hasSlackInstalled(input.orgId)) {
       await notifySlackDM(input.orgId, requester.email, `🎉 Your approval for *${targetTitle}* completed — all steps approved.`)
     }
+    // In-app (bell) notification to the requester — links to the target.
+    await createNotification({
+      orgId: input.orgId,
+      userId: requester.id,
+      type: 'approval_completed',
+      title: `Approved: ${targetTitle}`,
+      body: `Every approval step is complete — this ${TARGET_NOUN[input.targetType]} is fully approved.`,
+      resourceType: input.targetType,
+      resourceId: input.targetId,
+    })
   } catch (err) {
     logger.error('[notify] completed failed', err)
   }

@@ -14,6 +14,10 @@ export type NotificationType =
   | 'time_off_decided'      // sent to the requester when their request is approved/rejected/cancelled
   | 'manager_changed'       // sent to the new manager when someone starts reporting to them
   | 'comp_changed'          // sent to the affected employee when their compensation is updated
+  // Approval-chain notifications (wired from src/lib/approvals/notifications.ts):
+  | 'approval_requested'    // sent to each approver when an approval step activates and awaits their decision
+  | 'approval_decided'      // sent to the requester when an approver approves/rejects a step
+  | 'approval_completed'    // sent to the requester when every step is approved
 
 interface CreateNotificationParams {
   orgId: string
