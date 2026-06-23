@@ -12,6 +12,16 @@ entries on top.
 ## 2026-06-23
 
 ### Added
+- **Decide on an approval straight from the requisition/job detail page.**
+  Previously the only place to approve/reject was the Approvals inbox; the
+  detail page's Approval card just showed read-only progress. The card
+  (`components/approvals/ApprovalProgress.tsx`) now also checks the current
+  user's inbox and, when they're the pending approver for this approval, shows
+  an "Approve / Reject" button that opens the existing `DecisionModal`. On a
+  decision it refreshes the card and the page (status badge, Cancel button). Used
+  by both `OpeningDetail` and `JobDetail`, so it works for requisitions and jobs.
+
+### Added
 - **Approval requests now ring the in-app bell + show a sidebar count.** Approval
   steps already emailed/Slacked the approver, but never created an in-app
   notification, so a pending decision was easy to miss. `notifyStepActivated`

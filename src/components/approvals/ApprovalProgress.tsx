@@ -1,13 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Check, X, Clock, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { DecisionModal } from '@/components/approvals/DecisionModal'
 
 interface ApprovalRow {
   id:                 string
   status:             'pending' | 'approved' | 'rejected' | 'cancelled'
   current_step_index: number
+}
+
+// One pending decision in the current user's inbox (subset of the inbox API).
+interface MyPendingStep {
+  approval_id:  string
+  step_id:      string
+  target_title: string
 }
 
 interface StepRow {
@@ -25,6 +35,7 @@ interface ChainStepMeta { id: string; name: string }
 interface ApproverMeta  { id: string; full_name: string | null; email: string }
 
 export function ApprovalProgress({ approvalId }: { approvalId: string }) {
+  const router = useRouter()
   const [data, setData] = useState<{
     approval: ApprovalRow
     steps:    StepRow[]
@@ -32,13 +43,25 @@ export function ApprovalProgress({ approvalId }: { approvalId: string }) {
     approvers:   ApproverMeta[]
   } | null>(null)
   const [loaded, setLoaded] = useState(false)
+  // If the current user has a pending decision on THIS approval, the inbox
+  // returns it — we surface an Approve/Reject button right here so they can
+  // decide from the detail page instead of hunting in the Approvals inbox.
+  const [myStep, setMyStep] = useState<MyPendingStep | null>(null)
+  const [deciding, setDeciding] = useState(false)
 
-  useEffect(() => {
-    fetch(`/api/approvals/${approvalId}`)
-      .then(r => r.json())
-      .then(({ data }) => { setData(data ?? null); setLoaded(true) })
-      .catch(() => setLoaded(true))
+  const load = useCallback(() => {
+    Promise.all([
+      fetch(`/api/approvals/${approvalId}`).then(r => r.json()).catch(() => ({ data: null })),
+      fetch('/api/approvals/inbox').then(r => r.json()).catch(() => ({ data: [] })),
+    ]).then(([approvalRes, inboxRes]) => {
+      setData(approvalRes.data ?? null)
+      const mine = (inboxRes.data ?? []).find((i: MyPendingStep) => i.approval_id === approvalId) ?? null
+      setMyStep(mine)
+      setLoaded(true)
+    })
   }, [approvalId])
+
+  useEffect(() => { load() }, [load])
 
   if (!loaded) return <p className="text-xs text-slate-400">Loading approval…</p>
   if (!data)   return <p className="text-xs text-slate-400">No approval data.</p>
@@ -51,6 +74,7 @@ export function ApprovalProgress({ approvalId }: { approvalId: string }) {
   }
 
   return (
+    <>
     <ol className="space-y-3">
       {steps.map(s => {
         const isCurrent  = data.approval.status === 'pending' && s.status === 'pending' && s.activated_at != null
@@ -102,5 +126,28 @@ export function ApprovalProgress({ approvalId }: { approvalId: string }) {
         )
       })}
     </ol>
+
+    {/* This user can decide the active step → let them do it right here. */}
+    {myStep && (
+      <div className="mt-4 border-t border-slate-100 pt-3">
+        <p className="text-xs text-slate-500 mb-2">This approval is waiting on your decision.</p>
+        <Button size="sm" className="w-full" onClick={() => setDeciding(true)}>
+          Approve / Reject
+        </Button>
+      </div>
+    )}
+
+    {deciding && myStep && (
+      <DecisionModal
+        approvalId={myStep.approval_id}
+        stepId={myStep.step_id}
+        title={myStep.target_title}
+        onClose={(decided) => {
+          setDeciding(false)
+          if (decided) { load(); router.refresh() }  // refresh card + page status badge
+        }}
+      />
+    )}
+    </>
   )
 }
