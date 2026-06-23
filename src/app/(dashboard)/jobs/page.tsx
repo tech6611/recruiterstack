@@ -56,6 +56,18 @@ const CITIES = [
 
 type NewJobMode = 'send_to_hm' | 'fill_myself' | null
 
+// Prefill payload when the New Job drawer is opened from an approved
+// requisition (see the "Create job & write JD" action on /openings/[id]).
+interface FromOpening {
+  id:         string
+  title:      string
+  department: string
+  location:   string
+  comp_min:   string
+  comp_max:   string
+  hm_name:    string
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared sub-components (form helpers)
@@ -146,16 +158,20 @@ function FileImportButton({ onExtract, field }: { onExtract: (text: string) => v
 // New Job Drawer
 // ─────────────────────────────────────────────────────────────────────────────
 
-function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void; onCreated: () => void; fromOpening?: FromOpening | null }) {
   const drawerRouter = useRouter()
-  const [mode, setMode] = useState<NewJobMode>(null)
-  const [positionTitle, setPositionTitle] = useState('')
-  const [department, setDepartment] = useState('')
-  const [hmName, setHmName] = useState('')
+  // Created from an approved requisition → jump straight into the full form and
+  // link the existing requisition rather than collecting new seats.
+  const [mode, setMode] = useState<NewJobMode>(fromOpening ? 'fill_myself' : null)
+  const [positionTitle, setPositionTitle] = useState(fromOpening?.title ?? '')
+  const [department, setDepartment] = useState(fromOpening?.department ?? '')
+  const [hmName, setHmName] = useState(fromOpening?.hm_name ?? '')
   const [hmEmail, setHmEmail] = useState('')
   const [hmSlack, setHmSlack] = useState('')
   const [level, setLevel] = useState('')
-  const [openings, setOpenings] = useState<{ location: string; seats: number }[]>([{ location: '', seats: 1 }])
+  const [openings, setOpenings] = useState<{ location: string; seats: number }[]>([
+    { location: fromOpening?.location ?? '', seats: 1 },
+  ])
   const [remoteOk, setRemoteOk] = useState(false)
 
   const totalSeats = openings.reduce((sum, o) => sum + (o.seats || 1), 0)
@@ -168,8 +184,8 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
   const [keyReqs, setKeyReqs] = useState('')
   const [niceToHave, setNiceToHave] = useState('')
   const [targetCompanies, setTargetCompanies] = useState<string[]>([])
-  const [budgetMin, setBudgetMin] = useState('')
-  const [budgetMax, setBudgetMax] = useState('')
+  const [budgetMin, setBudgetMin] = useState(fromOpening?.comp_min ?? '')
+  const [budgetMax, setBudgetMax] = useState(fromOpening?.comp_max ?? '')
   const [startDate, setStartDate] = useState('')
   const [notes, setNotes] = useState('')
   const [jd, setJd] = useState('')
@@ -228,9 +244,14 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
         comp_min:    budgetMin ? Number(budgetMin) : null,
         comp_max:    budgetMax ? Number(budgetMax) : null,
         remote_ok:   remoteOk,
-        openings: openings
-          .filter(o => o.location.trim() || o.seats > 0)
-          .map(o => ({ location: o.location.trim(), seats: o.seats || 1 })),
+        // When linking an approved requisition, don't mint new seats — the
+        // existing opening is linked server-side via link_opening_id.
+        link_opening_id: fromOpening?.id ?? null,
+        openings: fromOpening
+          ? []
+          : openings
+              .filter(o => o.location.trim() || o.seats > 0)
+              .map(o => ({ location: o.location.trim(), seats: o.seats || 1 })),
         intake: {
           level,
           hm_name: hmName, hm_email: hmEmail, hm_slack: hmSlack,
@@ -352,6 +373,13 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
                   </div>
                 </div>
 
+                {fromOpening ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <p className="text-xs font-semibold text-emerald-800">Filling approved requisition</p>
+                    <p className="text-sm text-emerald-900 mt-0.5">{fromOpening.title}</p>
+                    <p className="text-xs text-emerald-700 mt-1">This job will be linked to the requisition you already approved — no new headcount is created.</p>
+                  </div>
+                ) : (
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
                     <label className={labelCls + ' mb-0'}>Requisitions by location</label>
@@ -380,6 +408,7 @@ function NewJobDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
                     <Plus className="h-3.5 w-3.5" />Add another location
                   </button>
                 </div>
+                )}
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
@@ -657,11 +686,27 @@ export default function JobsPage() {
 
   // ── UI ────────────────────────────────────────────────────────────────────
   const [showDrawer, setShowDrawer] = useState(false)
+  // When opened from an approved requisition, these prefill the drawer and tell
+  // it to link that existing opening instead of minting new seats.
+  const [drawerFromOpening, setDrawerFromOpening] = useState<FromOpening | null>(null)
 
   // Single front door: /req-jobs/new redirects here with ?new to open the rich
   // New Job drawer. Strip the param so a refresh/back doesn't reopen it.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has('new')) {
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('new')) {
+      const openingId = params.get('from_opening')
+      if (openingId) {
+        setDrawerFromOpening({
+          id:         openingId,
+          title:      params.get('title')      ?? '',
+          department: params.get('department')  ?? '',
+          location:   params.get('location')    ?? '',
+          comp_min:   params.get('comp_min')     ?? '',
+          comp_max:   params.get('comp_max')     ?? '',
+          hm_name:    params.get('hm_name')      ?? '',
+        })
+      }
       setShowDrawer(true)
       window.history.replaceState(null, '', window.location.pathname)
     }
@@ -1308,16 +1353,16 @@ export default function JobsPage() {
       {/* ── New Job Drawer ───────────────────────────────────────────────── */}
       {showDrawer && (
         <div className="fixed inset-0 z-50 flex">
-          <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={() => setShowDrawer(false)} />
+          <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={() => { setShowDrawer(false); setDrawerFromOpening(null) }} />
           <div className="w-full max-w-2xl bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
               <span className="text-sm font-semibold text-slate-500">New Job</span>
-              <button onClick={() => setShowDrawer(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+              <button onClick={() => { setShowDrawer(false); setDrawerFromOpening(null) }} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <NewJobDrawer onClose={() => setShowDrawer(false)} onCreated={fetchJobs} />
+              <NewJobDrawer onClose={() => { setShowDrawer(false); setDrawerFromOpening(null) }} onCreated={fetchJobs} fromOpening={drawerFromOpening} />
             </div>
           </div>
         </div>

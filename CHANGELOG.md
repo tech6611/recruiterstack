@@ -12,6 +12,19 @@ entries on top.
 ## 2026-06-23
 
 ### Added
+- **Push an approved requisition straight into JD creation.** An approved
+  requisition (`/openings/[id]`) now shows a "Create job & write JD" button that
+  opens the New Job drawer pre-filled from the requisition (title, department,
+  location, comp, hiring manager) in "fill everything myself" mode, so the user
+  lands directly on the JD-writing step. On save the new job is **linked to the
+  existing approved requisition** (via a new `link_opening_id` on
+  `POST /api/req-jobs`) instead of minting duplicate headcount — keeping seat
+  counts accurate. Touches `components/openings/OpeningDetail.tsx`,
+  `app/(dashboard)/jobs/page.tsx` (New Job drawer `fromOpening` prefill + linked
+  note in place of the seats editor), `lib/validations/jobs.ts`, and
+  `app/api/req-jobs/route.ts`.
+
+### Added
 - **Decide on an approval straight from the requisition/job detail page.**
   Previously the only place to approve/reject was the Approvals inbox; the
   detail page's Approval card just showed read-only progress. The card

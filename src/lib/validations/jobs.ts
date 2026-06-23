@@ -43,6 +43,9 @@ export const jobIntakeCreateSchema = z.object({
   remote_ok:       z.boolean().optional().default(false),
   openings:        z.array(jobIntakeOpeningSchema).max(20).optional().default([]),
   intake:          z.record(z.string(), z.unknown()).optional().default({}),
+  // When the job is created from an already-approved requisition, we link that
+  // existing opening instead of minting new ones (see /api/req-jobs POST).
+  link_opening_id: uuidOrNull.optional().default(null),
 })
 
 export type JobIntakeCreateInput = z.infer<typeof jobIntakeCreateSchema>

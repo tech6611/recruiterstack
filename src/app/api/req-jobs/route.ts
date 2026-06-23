@@ -161,6 +161,25 @@ export async function POST(req: NextRequest) {
   if (error) return handleSupabaseError(error)
   const jobRow = job as { id: string }
 
+  // When created from an already-approved requisition, link that existing
+  // opening to the new job instead of minting fresh seats. Verify org
+  // ownership first; ignore a duplicate link (composite PK) gracefully.
+  if (body.link_opening_id) {
+    const { data: existingOpening } = await supabase
+      .from('openings')
+      .select('id')
+      .eq('id', body.link_opening_id)
+      .eq('org_id', orgId)
+      .maybeSingle()
+    if (existingOpening) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: linkErr } = await (supabase as any)
+        .from('job_openings')
+        .insert({ job_id: jobRow.id, opening_id: body.link_opening_id, linked_by: userId })
+      if (linkErr && linkErr.code !== '23505') return handleSupabaseError(linkErr)
+    }
+  }
+
   // Create one opening per seat for each location row, then link them to the
   // job via the job_openings M2M. A row with N seats expands to N openings —
   // each opening is a single funded headcount seat (migration 035).

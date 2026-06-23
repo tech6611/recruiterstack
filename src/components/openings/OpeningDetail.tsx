@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Archive, Pencil, X, Send } from 'lucide-react'
+import { ArrowLeft, Archive, Pencil, X, Send, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -54,6 +54,8 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
   const canEdit   = opening.status === 'draft'
   const canSubmit = opening.status === 'draft' && (opening.justification?.trim().length ?? 0) >= 50
   const canCancel = opening.status === 'pending_approval' && opening.approval_id != null
+  // Approved requisition → next step is creating the job + writing its JD.
+  const canCreateJob = opening.status === 'approved'
 
   const userById = useMemo(() => new Map(users.map(u => [u.id, u])), [users])
   const deptById = useMemo(() => new Map(departments.map(d => [d.id, d])), [departments])
@@ -132,6 +134,19 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
     router.refresh()
   }
 
+  // Hand off to the New Job drawer pre-filled from this requisition. The drawer
+  // links this existing opening (via from_opening) instead of minting new seats.
+  function createJob() {
+    const params = new URLSearchParams({ new: '1', from_opening: opening.id, title: opening.title })
+    if (dept?.name) params.set('department', dept.name)
+    if (loc?.name)  params.set('location', loc.name)
+    if (opening.comp_min != null) params.set('comp_min', String(opening.comp_min))
+    if (opening.comp_max != null) params.set('comp_max', String(opening.comp_max))
+    const hmName = hm?.full_name ?? hm?.email
+    if (hmName) params.set('hm_name', hmName)
+    router.push(`/jobs?${params.toString()}`)
+  }
+
   const hm        = opening.hiring_manager_id ? userById.get(opening.hiring_manager_id) : null
   const recruiter = opening.recruiter_id      ? userById.get(opening.recruiter_id)      : null
   const dept      = opening.department_id     ? deptById.get(opening.department_id)     : null
@@ -158,6 +173,11 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
           <p className="text-xs text-slate-400 mt-1">Created {new Date(opening.created_at).toLocaleDateString()}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {canCreateJob && (
+            <Button size="sm" onClick={createJob}>
+              <FileText className="h-4 w-4" /> Create job &amp; write JD
+            </Button>
+          )}
           {canSubmit && (
             <Button size="sm" onClick={submitForApproval} loading={submitting}>
               <Send className="h-4 w-4" /> Submit for approval
