@@ -12,6 +12,14 @@ entries on top.
 ## 2026-06-23
 
 ### Added
+- **Edit a job after it's created (Draft only).** The job detail page
+  (`/req-jobs/[id]`) now has an **Edit** button next to Submit/Archive that shows
+  only while the job is a Draft. Clicking it flips the Overview card into an inline
+  edit form for Title, Department, Internal context, and Confidentiality; Save
+  PATCHes `/api/req-jobs/[id]` and refreshes. The draft-only lock matches the
+  backend, which rejects structural edits once a job leaves Draft
+  (`components/req-jobs/JobDetail.tsx`; the page now also fetches the full
+  department list for the picker in `app/(dashboard)/req-jobs/[id]/page.tsx`).
 - **Target Start Date in the New Job drawer now has a calendar picker.** The
   field stays free-text (so "ASAP" / "Q2 2026" still work), but a calendar icon
   on the right opens the browser's native date picker for users who'd rather

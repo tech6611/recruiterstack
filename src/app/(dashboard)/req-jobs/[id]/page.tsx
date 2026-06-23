@@ -21,10 +21,12 @@ export default async function JobDetailPage({ params }: { params: { id: string }
   const job = jobRow as Job | null
   if (!job) notFound()
 
-  const [{ data: deptRow }, { data: linkedRaw }] = await Promise.all([
+  const [{ data: deptRow }, { data: allDepts }, { data: linkedRaw }] = await Promise.all([
     job.department_id
       ? supabase.from('departments').select('id, name').eq('id', job.department_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Full department list powers the edit-form picker.
+    supabase.from('departments').select('id, name').eq('org_id', orgId).order('name'),
     supabase.from('job_openings').select('opening_id').eq('job_id', params.id),
   ])
 
@@ -38,6 +40,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
       <JobDetail
         job={job}
         department={deptRow as Pick<Department, 'id' | 'name'> | null}
+        departments={(allDepts ?? []) as Pick<Department, 'id' | 'name'>[]}
         linkedOpenings={(linkedOpeningsRaw ?? []) as Pick<Opening, 'id' | 'title' | 'status' | 'comp_min' | 'comp_max' | 'comp_currency' | 'target_start_date'>[]}
       />
     </div>

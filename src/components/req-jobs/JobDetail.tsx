@@ -3,10 +3,14 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Archive, Send, Globe, X, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Archive, Send, Globe, X, Plus, Trash2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { ApprovalProgress } from '@/components/approvals/ApprovalProgress'
 import { AuditLogTab } from '@/components/approvals/AuditLogTab'
 import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
@@ -36,21 +40,56 @@ const OPENING_BADGE: Record<OpeningStatus, string> = {
 interface Props {
   job:             Job
   department:      Pick<Department, 'id' | 'name'> | null
+  departments:     Pick<Department, 'id' | 'name'>[]
   linkedOpenings:  Pick<Opening, 'id' | 'title' | 'status' | 'comp_min' | 'comp_max' | 'comp_currency' | 'target_start_date'>[]
 }
 
 type Tab = 'overview' | 'postings' | 'audit'
 
-export function JobDetail({ job, department, linkedOpenings }: Props) {
+function initForm(job: Job) {
+  return {
+    title:           job.title ?? '',
+    department_id:   job.department_id ?? '',
+    description:     job.description ?? '',
+    confidentiality: job.confidentiality ?? 'public',
+  }
+}
+
+export function JobDetail({ job, department, departments, linkedOpenings }: Props) {
   const router = useRouter()
   const [tab, setTab]                 = useState<Tab>('overview')
   const [submitting, setSubmitting]   = useState(false)
   const [publishing, setPublishing]   = useState(false)
   const [archiving, setArchiving]     = useState(false)
   const [linkOpen, setLinkOpen]       = useState(false)
+  const [editing, setEditing]         = useState(false)
+  const [saving, setSaving]           = useState(false)
+  const [form, setForm]               = useState(initForm(job))
 
   const canSubmit  = job.status === 'draft'
+  const canEdit    = job.status === 'draft'
   const canPublish = job.status === 'approved' && linkedOpenings.some(o => ['approved', 'open', 'filled'].includes(o.status))
+
+  async function save() {
+    if (!form.title.trim()) { toast.error('Title is required'); return }
+    setSaving(true)
+    const res = await fetch(`/api/req-jobs/${job.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title:           form.title.trim(),
+        department_id:   form.department_id || null,
+        description:     form.description.trim() || null,
+        confidentiality: form.confidentiality,
+      }),
+    })
+    setSaving(false)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) { toast.error(body.error ?? 'Save failed'); return }
+    toast.success('Saved')
+    setEditing(false)
+    router.refresh()
+  }
 
   async function submitForApproval() {
     setSubmitting(true)
@@ -118,6 +157,11 @@ export function JobDetail({ job, department, linkedOpenings }: Props) {
           <p className="text-xs text-slate-400 mt-1">Created {new Date(job.created_at).toLocaleDateString()}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {canEdit && !editing && (
+            <Button variant="outline" size="sm" onClick={() => { setForm(initForm(job)); setEditing(true); setTab('overview') }}>
+              <Pencil className="h-4 w-4" /> Edit
+            </Button>
+          )}
           {canSubmit && (
             <Button size="sm" onClick={submitForApproval} loading={submitting}>
               <Send className="h-4 w-4" /> Submit for approval
@@ -159,21 +203,61 @@ export function JobDetail({ job, department, linkedOpenings }: Props) {
             <Card>
               <CardHeader><CardTitle>Overview</CardTitle></CardHeader>
               <CardContent>
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                  <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Department</dt>
-                    <dd className="text-slate-800 mt-0.5">{department?.name ?? '—'}</dd>
+                {editing ? (
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label>Title</Label>
+                      <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label>Department</Label>
+                        <Select value={form.department_id} onChange={e => setForm(f => ({ ...f, department_id: e.target.value }))}>
+                          <option value="">—</option>
+                          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Confidentiality</Label>
+                        <Select value={form.confidentiality} onChange={e => setForm(f => ({ ...f, confidentiality: e.target.value as Job['confidentiality'] }))}>
+                          <option value="public">Public</option>
+                          <option value="confidential">Confidential</option>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Internal context</Label>
+                      <Textarea
+                        rows={6}
+                        value={form.description}
+                        onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                        placeholder="Notes for the hiring team (not shown to candidates)."
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <Button size="sm" onClick={save} loading={saving}>Save changes</Button>
+                      <Button variant="outline" size="sm" onClick={() => { setEditing(false); setForm(initForm(job)) }}>Cancel</Button>
+                    </div>
                   </div>
-                  <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Confidentiality</dt>
-                    <dd className="text-slate-800 mt-0.5 capitalize">{job.confidentiality}</dd>
-                  </div>
-                </dl>
-                {job.description && (
-                  <div className="mt-5 pt-4 border-t border-slate-100">
-                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Internal context</dt>
-                    <p className="text-sm text-slate-700 whitespace-pre-line">{job.description}</p>
-                  </div>
+                ) : (
+                  <>
+                    <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                      <div>
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Department</dt>
+                        <dd className="text-slate-800 mt-0.5">{department?.name ?? '—'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Confidentiality</dt>
+                        <dd className="text-slate-800 mt-0.5 capitalize">{job.confidentiality}</dd>
+                      </div>
+                    </dl>
+                    {job.description && (
+                      <div className="mt-5 pt-4 border-t border-slate-100">
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Internal context</dt>
+                        <p className="text-sm text-slate-700 whitespace-pre-line">{job.description}</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
