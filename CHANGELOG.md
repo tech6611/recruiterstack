@@ -11,6 +11,19 @@ entries on top.
 
 ## 2026-06-24
 
+### Added
+- **Approvals page now has a Pending pane + a History pane.** The page previously
+  showed only your pending decisions and was empty once you'd cleared them. It now
+  has two stacked sections: a **collapsible "Pending decisions"** pane (your
+  personal to-dos, each with the Decide button — unchanged behaviour, just
+  foldable with a count) and a static **"History"** table below it listing every
+  approval **you've acted on**, newest first, with columns for Type, Title,
+  Status, Your decision, Requested by, and Decided date — plus **search + Status +
+  Type filters**. New endpoint `GET /api/approvals/history` returns the current
+  user's decided approvals (`app/(dashboard)/approvals/inbox/page.tsx`,
+  `app/api/approvals/history/route.ts`). An org-wide admin view of *all*
+  approvals is intentionally deferred.
+
 ### Changed
 - **Job Audit Log now includes the linked requisition's full history.** A job's
   audit log (`/req-jobs/[id]`) only showed events from after the requisition was
