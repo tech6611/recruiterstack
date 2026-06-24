@@ -1158,6 +1158,16 @@ export interface OrgSettings {
   industry: string | null
   website: string | null
   enabled_agents: AgentKey[]
+  // Careers page branding (migration 071)
+  careers_slug: string | null
+  careers_public: boolean
+  logo_url: string | null
+  hero_image_url: string | null
+  brand_color: string | null
+  accent_color: string | null
+  brand_font: string | null
+  tagline: string | null
+  about: string | null
   updated_at: string
 }
 

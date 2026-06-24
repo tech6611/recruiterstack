@@ -20,6 +20,7 @@ const isPublic = createRouteMatcher([
   // External-facing flows
   '/apply/(.*)',
   '/intake/(.*)',
+  '/careers/(.*)',
   // Public APIs
   '/api/leads',
   '/api/apply/(.*)',

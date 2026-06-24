@@ -54,6 +54,16 @@ export interface CanonicalApplyJob {
   status: string
 }
 
+/** Org branding shown on the apply page so the candidate journey stays on-brand
+ *  (Publish JD Phase 2c). Subset of the careers-page branding — no hero/about. */
+export interface ApplyBranding {
+  company_name: string | null
+  logo_url: string | null
+  brand_color: string | null
+  accent_color: string | null
+  brand_font: string | null
+}
+
 export interface CanonicalApplyJobPreview {
   position_title: string
   department: string | null
@@ -64,6 +74,9 @@ export interface CanonicalApplyJobPreview {
   responsibilities: string | null
   requirements: string | null
   nice_to_have: string | null
+  // The job's org branding (Publish JD Phase 2c). Null when the org hasn't set
+  // any branding up.
+  branding: ApplyBranding | null
   status: string
 }
 
@@ -279,7 +292,7 @@ export async function getCanonicalApplyJobPreview(
   // apply_token is not in generated types yet (migration 068); cast as in rbac.ts.
   const { data, error } = await (supabase as any)
     .from('jobs')
-    .select('title, description, status, custom_fields, department:departments(name)')
+    .select('org_id, title, description, status, custom_fields, department:departments(name)')
     .eq('apply_token', token)
     .maybeSingle()
 
@@ -290,6 +303,7 @@ export async function getCanonicalApplyJobPreview(
   if (!data) return null
 
   const row = data as {
+    org_id: string
     title: string
     description: string | null
     status: string
@@ -302,6 +316,25 @@ export async function getCanonicalApplyJobPreview(
   if (row.status !== 'open') return null
   const intake = (row.custom_fields?.intake ?? {}) as Record<string, unknown>
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null)
+
+  // Pull the org's branding so the apply page can render on-brand (Phase 2c).
+  // Independent of the careers_public toggle — that gates only the listing page.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: brandRow } = await (supabase as any)
+    .from('org_settings')
+    .select('company_name, logo_url, brand_color, accent_color, brand_font')
+    .eq('org_id', row.org_id)
+    .maybeSingle()
+  const branding: ApplyBranding | null = brandRow
+    ? {
+        company_name: brandRow.company_name ?? null,
+        logo_url: brandRow.logo_url ?? null,
+        brand_color: brandRow.brand_color ?? null,
+        accent_color: brandRow.accent_color ?? null,
+        brand_font: brandRow.brand_font ?? null,
+      }
+    : null
+
   return {
     position_title: row.title,
     department: row.department?.name ?? null,
@@ -310,7 +343,102 @@ export async function getCanonicalApplyJobPreview(
     responsibilities: text(intake.team_context),
     requirements: text(intake.key_requirements),
     nice_to_have: text(intake.nice_to_have),
+    branding,
     status: row.status,
+  }
+}
+
+// ── Public careers page (Publish JD — Phase 2b) ──────────────────────────────
+// Resolve an org's branded careers page + its open jobs by the public
+// careers_slug (migration 071). Public-safe: only orgs that have switched the
+// page on (careers_public = true) resolve, and only open jobs (which have a live
+// apply_token) are listed. org_settings.careers_* columns are not in the
+// generated Database types yet; cast the client as elsewhere in this module.
+
+export interface CareersPageBranding {
+  company_name: string | null
+  tagline: string | null
+  about: string | null
+  logo_url: string | null
+  hero_image_url: string | null
+  brand_color: string | null
+  accent_color: string | null
+  brand_font: string | null
+}
+
+export interface CareersPageJob {
+  title: string
+  department: string | null
+  location: string | null
+  apply_token: string
+}
+
+export interface CareersPage {
+  branding: CareersPageBranding
+  jobs: CareersPageJob[]
+}
+
+export async function getCareersPageBySlug(
+  supabase: Supabase,
+  slug: string,
+): Promise<CareersPage | null> {
+  // careers_* columns are not in the generated types yet (migration 071); cast.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: org, error: orgErr } = await (supabase as any)
+    .from('org_settings')
+    .select('org_id, careers_public, company_name, tagline, about, logo_url, hero_image_url, brand_color, accent_color, brand_font')
+    .ilike('careers_slug', slug)
+    .maybeSingle()
+
+  if (orgErr) {
+    if (orgErr.code === 'PGRST116' || orgErr.message === 'Not found') return null
+    throw orgErr
+  }
+  // No such slug, or the page is switched off — treat both as "not found" so a
+  // toggled-off page is hidden rather than showing an empty shell.
+  if (!org || !org.careers_public) return null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: jobRows, error: jobsErr } = await (supabase as any)
+    .from('jobs')
+    .select('title, apply_token, custom_fields, department:departments(name)')
+    .eq('org_id', org.org_id)
+    .eq('status', 'open')
+    .not('apply_token', 'is', null)
+    .order('created_at', { ascending: false })
+
+  if (jobsErr) throw jobsErr
+
+  const jobs: CareersPageJob[] = ((jobRows ?? []) as Array<{
+    title: string
+    apply_token: string | null
+    custom_fields: Record<string, unknown> | null
+    department: { name: string } | null
+  }>)
+    .filter(r => !!r.apply_token)
+    .map(r => {
+      const intake = (r.custom_fields?.intake ?? {}) as Record<string, unknown>
+      const loc = intake.location
+      return {
+        title: r.title,
+        department: r.department?.name ?? null,
+        location: typeof loc === 'string' && loc.trim() ? loc : null,
+        apply_token: r.apply_token as string,
+      }
+    })
+
+  return {
+    branding: {
+      company_name: org.company_name ?? null,
+      tagline: org.tagline ?? null,
+      about: org.about ?? null,
+      logo_url: org.logo_url ?? null,
+      hero_image_url: org.hero_image_url ?? null,
+      brand_color: org.brand_color ?? null,
+      accent_color: org.accent_color ?? null,
+      brand_font: org.brand_font ?? null,
+    },
+    jobs,
   }
 }
 

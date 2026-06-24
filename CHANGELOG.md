@@ -12,6 +12,37 @@ entries on top.
 ## 2026-06-24
 
 ### Added
+- **Publish JD — Phase 2c: the apply page now inherits the company's branding.**
+  The public application page (`/apply/[token]`) renders on-brand — the company's
+  logo and name in the header (falling back to the RecruiterStack mark when unset),
+  the brand color on the Submit button, and the chosen font across the page — so a
+  candidate arriving from the careers page stays in one consistent look. Branding
+  is independent of the careers-page public toggle (that gates only the listing
+  page). The apply preview API now returns a `branding` object alongside the job
+  (`getCanonicalApplyJobPreview` reads `org_settings`). (`app/apply/[token]/page.tsx`,
+  `modules/ats/domain/job-pipelines.ts`.)
+- **Publish JD — Phase 2b: the public branded careers page.** Each org with a
+  public careers page now has a live page at `recruiterstack.in/careers/<slug>`
+  that resolves the org by its slug, renders the saved branding (logo, hero image,
+  brand color, font, tagline, About) and lists every open job with department and
+  location, each linking straight to its existing apply page. Hidden unless the
+  admin has switched the page on (`careers_public = true`); a toggled-off or
+  unknown slug returns a 404. The route is public (added to the Clerk matchers in
+  `middleware.ts`) and reads through a new `getCareersPageBySlug` domain function.
+  (`app/careers/[slug]/page.tsx`, `modules/ats/domain/job-pipelines.ts`,
+  `middleware.ts`.)
+- **Publish JD — Phase 2a: "Careers page" branding settings.** Admins can now set
+  up a branded public careers page from **Settings → Workspace → Careers page**: a
+  unique page address (slug at `recruiterstack.in/careers/<slug>`, auto-suggested
+  from the company name, validated for format/reserved words/uniqueness), logo and
+  hero-image uploads, primary + accent colors, a font choice, a tagline, an About
+  blurb, and a public on/off toggle with a preview link. This is the admin/config
+  half — the public page itself and apply-page branding land in Phases 2b/2c.
+  Branding image uploads go through a new admin-only route
+  (`/api/org-settings/branding-upload`) into a public `company-assets` storage
+  bucket. (`components/settings/CareersPageCard.tsx`,
+  `app/api/org-settings/branding-upload/route.ts`, `app/api/org-settings/route.ts`,
+  `app/api/org-settings/company/route.ts`, `lib/validations/org-settings.ts`.)
 - **Cross-link the job's Kanban and detail views.** Once a job is published it
   routes to the Kanban (`/jobs/[id]`), which previously stranded the detail view
   (`/req-jobs/[id]`) — JD, approvals, audit log. The Kanban top bar now has a
@@ -240,6 +271,14 @@ entries on top.
   requisition management view (`/req-jobs/[id]`) and only sends open / posted /
   closed jobs to the Kanban pipeline (`/jobs/[id]`), so you manage a job before
   it goes live and work candidates once it's open.
+
+### Schema
+- **071_careers_branding.sql** — adds branded-careers-page columns to
+  `org_settings` (`careers_slug`, `careers_public`, `logo_url`, `hero_image_url`,
+  `brand_color`, `accent_color`, `brand_font`, `tagline`, `about`), a partial
+  unique index on `lower(careers_slug)` so slugs are unique and case-insensitive,
+  and a public `company-assets` storage bucket for logo/hero images. Additive,
+  idempotent, reversible.
 
 ## 2026-06-21
 

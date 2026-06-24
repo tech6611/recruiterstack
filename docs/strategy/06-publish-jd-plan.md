@@ -149,12 +149,30 @@ notes) stays **internal-only** — never rendered on the public apply page.
 makes the product look credible, with effectively zero schema risk because the
 data is already in the database.
 
-### Phase 2 — Branded company career page *(later session)*
+### Phase 2 — Branded company career page
 
-- Add `logo_url`, `brand_color`, and a `careers_slug` to company settings.
-- Build a public `/careers/[company-slug]` page that lists all of that
-  company's open jobs, plus themed per-job pages — replacing the bare token
-  link.
+Split into three slices: **2a** (config/admin half), **2b** (public page), **2c**
+(carry branding onto the apply page).
+
+- **2a — DONE (this session).** Full branding scope on `org_settings` (migration
+  071): `careers_slug` (unique, case-insensitive), `careers_public`, `logo_url`,
+  `hero_image_url`, `brand_color`, `accent_color`, `brand_font`, `tagline`,
+  `about`, plus a public `company-assets` storage bucket. Admin-only image upload
+  route (`/api/org-settings/branding-upload`), extended org-settings read/write +
+  Zod validation (slug format/reserved-word/uniqueness checks), and a new
+  **Settings → Workspace → "Careers page"** card (`CareersPageCard.tsx`) with
+  slug auto-suggest, logo/hero upload, color pickers, font picker, tagline, about,
+  public toggle, and a preview link.
+- **2b — DONE (this session).** Public `/careers/[slug]` server-component page
+  (`app/careers/[slug]/page.tsx`) that resolves the org by slug via
+  `getCareersPageBySlug`, gates on `careers_public = true` (else 404), renders the
+  saved branding (logo/hero/colors/font/tagline/about) and lists open jobs (with
+  department + location) linking to each job's apply page. Route added to the
+  Clerk public matchers in `middleware.ts`.
+- **2c — DONE (this session).** Apply page (`/apply/[token]`) inherits the org's
+  logo/name (header), brand color (Submit button) and font, so the candidate
+  journey stays on-brand. `getCanonicalApplyJobPreview` now returns a `branding`
+  object read from `org_settings` (independent of the careers_public toggle).
 - Optional follow-on: a JSON feed so customers can embed jobs in their own site.
 
 ### Phase 3 — Screening questions / application-form builder *(later session)*
@@ -179,4 +197,4 @@ No migrations. No change to what the apply form *collects* (Phase 3 territory).
 
 ---
 
-*End of Publish JD plan. Phase 1 ships this session; Phases 2–3 are queued.*
+*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions) is queued.*

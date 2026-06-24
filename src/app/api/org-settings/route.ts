@@ -75,17 +75,40 @@ export async function PATCH(request: NextRequest) {
 
   const supabase = createAdminClient()
 
+  const brandingFields = [
+    'careers_slug', 'careers_public', 'logo_url', 'hero_image_url',
+    'brand_color', 'accent_color', 'brand_font', 'tagline', 'about',
+  ] as const
+
   const adminFieldPresent =
     parsed.company_name !== undefined ||
     parsed.company_size !== undefined ||
     parsed.industry     !== undefined ||
     parsed.website      !== undefined ||
-    parsed.enabled_agents !== undefined
+    parsed.enabled_agents !== undefined ||
+    brandingFields.some((f) => parsed[f] !== undefined)
 
   if (adminFieldPresent) {
     const scope = await getViewerScope(supabase, orgId, userId)
     const denied = assertCapability(scope, 'settings:edit')
     if (denied) return denied
+  }
+
+  // Slug must be unique across all orgs (case-insensitive). Check before upsert
+  // so we can return a friendly message instead of a raw DB constraint error.
+  if (parsed.careers_slug) {
+    const { data: clash } = await supabase
+      .from('org_settings')
+      .select('org_id')
+      .ilike('careers_slug', parsed.careers_slug)
+      .neq('org_id', orgId)
+      .maybeSingle()
+    if (clash) {
+      return NextResponse.json(
+        { error: 'That careers page address is already taken — pick another.' },
+        { status: 409 }
+      )
+    }
   }
 
   const patch: Record<string, unknown> = {
@@ -98,6 +121,15 @@ export async function PATCH(request: NextRequest) {
   if (parsed.industry          !== undefined) patch.industry          = parsed.industry ?? null
   if (parsed.website           !== undefined) patch.website           = parsed.website ?? null
   if (parsed.enabled_agents    !== undefined) patch.enabled_agents    = parsed.enabled_agents
+  if (parsed.careers_slug      !== undefined) patch.careers_slug      = parsed.careers_slug ?? null
+  if (parsed.careers_public    !== undefined) patch.careers_public    = parsed.careers_public
+  if (parsed.logo_url          !== undefined) patch.logo_url          = parsed.logo_url ?? null
+  if (parsed.hero_image_url    !== undefined) patch.hero_image_url    = parsed.hero_image_url ?? null
+  if (parsed.brand_color       !== undefined) patch.brand_color       = parsed.brand_color ?? null
+  if (parsed.accent_color      !== undefined) patch.accent_color      = parsed.accent_color ?? null
+  if (parsed.brand_font        !== undefined) patch.brand_font        = parsed.brand_font ?? null
+  if (parsed.tagline           !== undefined) patch.tagline           = parsed.tagline ?? null
+  if (parsed.about             !== undefined) patch.about             = parsed.about ?? null
 
   const { data, error } = await supabase
     .from('org_settings')

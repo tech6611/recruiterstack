@@ -8,6 +8,7 @@ import { useCapabilities } from '@/components/providers/CapabilitiesProvider'
 import { inputCls } from '@/lib/ui/styles'
 import type { AppSettings } from '@/lib/hooks/useSettings'
 import { CompanyInfoCard } from '@/components/settings/CompanyInfoCard'
+import { CareersPageCard } from '@/components/settings/CareersPageCard'
 import { AgentsCard } from '@/components/settings/AgentsCard'
 import { TeamCard } from '@/components/settings/TeamCard'
 import { DepartmentsCard } from '@/components/settings/DepartmentsCard'
@@ -890,6 +891,7 @@ export default function SettingsPage() {
           {activeTab === 'workspace' && canManageSettings && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <CompanyInfoCard />
+              <CareersPageCard />
               <DepartmentsCard />
               <LocationsCard />
               <CompBandsCard />

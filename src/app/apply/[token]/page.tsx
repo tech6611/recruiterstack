@@ -8,6 +8,14 @@ import {
 } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
 
+interface Branding {
+  company_name: string | null
+  logo_url: string | null
+  brand_color: string | null
+  accent_color: string | null
+  brand_font: string | null
+}
+
 interface JobInfo {
   position_title: string
   department: string | null
@@ -16,6 +24,14 @@ interface JobInfo {
   responsibilities: string | null
   requirements: string | null
   nice_to_have: string | null
+  branding: Branding | null
+}
+
+const DEFAULT_BRAND = '#059669' // emerald-600 — the app's default accent
+
+// Build the Google Fonts stylesheet URL for the chosen family.
+function googleFontHref(family: string): string {
+  return `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
 }
 
 function JdSection({ title, body }: { title: string; body: string | null }) {
@@ -199,15 +215,43 @@ export default function ApplyPage() {
   }
 
   // ── Form ──────────────────────────────────────────────────────────────────
+  const branding = job.branding
+  const brand = branding?.brand_color || DEFAULT_BRAND
+  const font  = branding?.brand_font || null
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
+    <div
+      className="min-h-screen bg-slate-50"
+      style={font ? { fontFamily: `'${font}', system-ui, sans-serif` } : undefined}
+    >
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      {font && <link rel="stylesheet" href={googleFontHref(font)} />}
+
+      {/* Header — the company's logo + name when set, else RecruiterStack */}
       <header className="bg-white border-b border-slate-200 py-4 px-6">
         <div className="max-w-2xl mx-auto flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600">
-            <Zap className="h-3.5 w-3.5 text-white" />
-          </div>
-          <span className="text-sm font-bold text-slate-900">RecruiterStack</span>
+          {branding?.logo_url ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={branding.logo_url}
+                alt={`${branding.company_name ?? 'Company'} logo`}
+                className="h-7 w-auto max-w-[140px] rounded object-contain"
+              />
+              {branding.company_name && (
+                <span className="text-sm font-bold text-slate-900">{branding.company_name}</span>
+              )}
+            </>
+          ) : branding?.company_name ? (
+            <span className="text-sm font-bold text-slate-900">{branding.company_name}</span>
+          ) : (
+            <>
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600">
+                <Zap className="h-3.5 w-3.5 text-white" />
+              </div>
+              <span className="text-sm font-bold text-slate-900">RecruiterStack</span>
+            </>
+          )}
         </div>
       </header>
 
@@ -436,7 +480,8 @@ export default function ApplyPage() {
             <button
               type="submit"
               disabled={submitting || !name.trim() || !email.trim()}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3.5 text-sm font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60 shadow-sm"
+              style={{ backgroundColor: brand }}
+              className="w-full flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60 shadow-sm"
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {submitting ? 'Submitting…' : 'Submit Application'}
