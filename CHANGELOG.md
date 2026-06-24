@@ -11,6 +11,20 @@ entries on top.
 
 ## 2026-06-24
 
+### Changed
+- **Job Audit Log now includes the linked requisition's full history.** A job's
+  audit log (`/req-jobs/[id]`) only showed events from after the requisition was
+  approved (the job entity doesn't exist before that), hiding who requested and
+  approved the requisition. `GET /api/audit-log` now, for a job target, also
+  folds in its linked requisition(s)' `approval_audit_log` rows (found via
+  `job_openings`) and synthesizes the **"created"** events (creator/requester)
+  that aren't written to the audit table — for both the requisition and the job.
+  Rows are merged chronologically and tagged with their entity; `AuditLogTab.tsx`
+  shows a coloured **Requisition / Job** badge per row (only when the timeline
+  spans both) and now renders the decision on a step. So the log reads end-to-end:
+  requisition created → submitted → approved → job created → submitted → opened,
+  with requester and approver names throughout.
+
 ### Fixed
 - **Approvals inbox showed the bare word "job" instead of the job's name.** The
   inbox API (`/api/approvals/inbox`) only ever looked up titles for requisitions
