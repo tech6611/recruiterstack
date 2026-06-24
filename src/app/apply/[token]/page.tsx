@@ -13,6 +13,19 @@ interface JobInfo {
   department: string | null
   location: string | null
   generated_jd: string | null
+  responsibilities: string | null
+  requirements: string | null
+  nice_to_have: string | null
+}
+
+function JdSection({ title, body }: { title: string; body: string | null }) {
+  if (!body) return null
+  return (
+    <section>
+      <h2 className="text-sm font-bold text-slate-700 mb-2">{title}</h2>
+      <div className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{body}</div>
+    </section>
+  )
 }
 
 type CvMode = 'upload' | 'drive'
@@ -215,13 +228,13 @@ export default function ApplyPage() {
           </div>
         </div>
 
-        {/* JD */}
-        {job.generated_jd && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
-            <h2 className="text-sm font-bold text-slate-700 mb-3">About the role</h2>
-            <div className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
-              {job.generated_jd}
-            </div>
+        {/* JD — structured sections */}
+        {(job.generated_jd || job.responsibilities || job.requirements || job.nice_to_have) && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8 space-y-6">
+            <JdSection title="About the role" body={job.generated_jd} />
+            <JdSection title="What you'll do" body={job.responsibilities} />
+            <JdSection title="What we're looking for" body={job.requirements} />
+            <JdSection title="Nice to have" body={job.nice_to_have} />
           </div>
         )}
 

@@ -12,6 +12,20 @@ entries on top.
 ## 2026-06-24
 
 ### Added
+- **Publish JD — Phase 1: the JD details you fill in at job creation now actually
+  show up.** Fields like "What they'll do" (team context), "Key requirements" and
+  "Nice to have" were collected at creation but stashed in
+  `custom_fields.intake` and never rendered anywhere. They are now displayed as
+  proper sections on **both** surfaces: the public **apply page**
+  (`/apply/[token]` — About the role / What you'll do / What we're looking for /
+  Nice to have, with the old truncating scroll box removed) and the internal
+  **job detail Overview** (`/req-jobs/[id]` — same sections plus Level, Target
+  companies and Notes, which stay internal-only). Display-only; no schema change.
+  Sensitive intake (hiring-manager contact, budget) is never shown publicly.
+  (`modules/ats/domain/job-pipelines.ts`, `app/apply/[token]/page.tsx`,
+  `components/req-jobs/JobDetail.tsx`.) Plan + market research in
+  `docs/strategy/06-publish-jd-plan.md`; Phases 2 (branded career page) and 3
+  (screening questions) are scoped there for later sessions.
 - **Approvals page now has a Pending pane + a History pane.** The page previously
   showed only your pending decisions and was empty once you'd cleared them. It now
   has two stacked sections: a **collapsible "Pending decisions"** pane (your

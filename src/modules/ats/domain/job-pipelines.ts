@@ -59,6 +59,11 @@ export interface CanonicalApplyJobPreview {
   department: string | null
   location: string | null
   generated_jd: string | null
+  // Structured JD sections, read from custom_fields.intake (Publish JD Phase 1).
+  // Candidate-safe only — internal intake (HM contact, budget, notes) is excluded.
+  responsibilities: string | null
+  requirements: string | null
+  nice_to_have: string | null
   status: string
 }
 
@@ -274,7 +279,7 @@ export async function getCanonicalApplyJobPreview(
   // apply_token is not in generated types yet (migration 068); cast as in rbac.ts.
   const { data, error } = await (supabase as any)
     .from('jobs')
-    .select('title, description, status, department:departments(name)')
+    .select('title, description, status, custom_fields, department:departments(name)')
     .eq('apply_token', token)
     .maybeSingle()
 
@@ -288,17 +293,23 @@ export async function getCanonicalApplyJobPreview(
     title: string
     description: string | null
     status: string
+    custom_fields: Record<string, unknown> | null
     department: { name: string } | null
   }
   // The public apply page only exists for open jobs. Treat any non-open job as
   // not found so a stale/leaked link shows "not found" rather than a fillable
   // form the POST would later reject. (migration 070)
   if (row.status !== 'open') return null
+  const intake = (row.custom_fields?.intake ?? {}) as Record<string, unknown>
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null)
   return {
     position_title: row.title,
     department: row.department?.name ?? null,
     location: null,
     generated_jd: row.description,
+    responsibilities: text(intake.team_context),
+    requirements: text(intake.key_requirements),
+    nice_to_have: text(intake.nice_to_have),
     status: row.status,
   }
 }

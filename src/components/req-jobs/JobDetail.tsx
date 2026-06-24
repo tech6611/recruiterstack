@@ -55,6 +55,32 @@ function initForm(job: Job) {
   }
 }
 
+// Intake fields are collected at job creation and stashed in custom_fields.intake.
+function readIntake(job: Job) {
+  const i = (job.custom_fields?.intake ?? {}) as Record<string, unknown>
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null)
+  return {
+    team_context:     text(i.team_context),
+    key_requirements: text(i.key_requirements),
+    nice_to_have:     text(i.nice_to_have),
+    level:            text(i.level),
+    notes:            text(i.notes),
+    target_companies: Array.isArray(i.target_companies)
+      ? (i.target_companies as unknown[]).filter((t): t is string => typeof t === 'string' && t.trim() !== '')
+      : [],
+  }
+}
+
+function IntakeSection({ title, body }: { title: string; body: string | null }) {
+  if (!body) return null
+  return (
+    <div className="mt-5 pt-4 border-t border-slate-100">
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">{title}</dt>
+      <p className="text-sm text-slate-700 whitespace-pre-line">{body}</p>
+    </div>
+  )
+}
+
 export function JobDetail({ job, department, departments, linkedOpenings }: Props) {
   const router = useRouter()
   const [tab, setTab]                 = useState<Tab>('overview')
@@ -65,6 +91,8 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
   const [editing, setEditing]         = useState(false)
   const [saving, setSaving]           = useState(false)
   const [form, setForm]               = useState(initForm(job))
+
+  const intake = readIntake(job)
 
   const canSubmit  = job.status === 'draft'
   const canEdit    = job.status === 'draft'
@@ -257,6 +285,26 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
                         <p className="text-sm text-slate-700 whitespace-pre-line">{job.description}</p>
                       </div>
                     )}
+                    {intake.level && (
+                      <div className="mt-5 pt-4 border-t border-slate-100">
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Level</dt>
+                        <p className="text-sm text-slate-700 capitalize">{intake.level}</p>
+                      </div>
+                    )}
+                    <IntakeSection title="What they'll do" body={intake.team_context} />
+                    <IntakeSection title="Key requirements" body={intake.key_requirements} />
+                    <IntakeSection title="Nice to have" body={intake.nice_to_have} />
+                    {intake.target_companies.length > 0 && (
+                      <div className="mt-5 pt-4 border-t border-slate-100">
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Target companies</dt>
+                        <div className="flex flex-wrap gap-1.5">
+                          {intake.target_companies.map(c => (
+                            <span key={c} className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700">{c}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <IntakeSection title="Notes" body={intake.notes} />
                   </>
                 )}
               </CardContent>
