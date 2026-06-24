@@ -4262,6 +4262,16 @@ export default function JobPipelinePage() {
             <ArrowLeft className="h-3.5 w-3.5" />
             Jobs
           </button>
+          {/* Jump to the requisition/management view (JD, approvals, audit log) —
+              the published job still has all of it, just behind this Kanban. */}
+          <button
+            onClick={() => router.push(`/req-jobs/${job.id}`)}
+            title="Open details: JD, approvals & audit log"
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 transition-colors shadow-sm"
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            Details
+          </button>
           <div className="h-5 w-px bg-slate-200" />
           <div>
             <h1 className="text-xl font-bold text-slate-900 leading-tight">{job.position_title}</h1>

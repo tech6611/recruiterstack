@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Archive, Send, Globe, X, Plus, Trash2, Pencil } from 'lucide-react'
+import { ArrowLeft, Archive, Send, Globe, X, Plus, Trash2, Pencil, LayoutGrid } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -96,6 +96,9 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
 
   const canSubmit  = job.status === 'draft'
   const canEdit    = job.status === 'draft'
+  // Once live the job has a candidate pipeline; offer a jump to its Kanban so the
+  // detail view (JD / approvals / audit log) and the pipeline stay cross-linked.
+  const isLive     = ['open', 'posted', 'closed', 'filled'].includes(job.status)
   const canPublish = job.status === 'approved' && linkedOpenings.some(o => ['approved', 'open', 'filled'].includes(o.status))
 
   async function save() {
@@ -185,6 +188,13 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
           <p className="text-xs text-slate-400 mt-1">Created {new Date(job.created_at).toLocaleDateString()}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {isLive && (
+            <Link href={`/jobs/${job.id}`}>
+              <Button variant="outline" size="sm">
+                <LayoutGrid className="h-4 w-4" /> View pipeline
+              </Button>
+            </Link>
+          )}
           {canEdit && !editing && (
             <Button variant="outline" size="sm" onClick={() => { setForm(initForm(job)); setEditing(true); setTab('overview') }}>
               <Pencil className="h-4 w-4" /> Edit

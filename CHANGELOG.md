@@ -12,6 +12,14 @@ entries on top.
 ## 2026-06-24
 
 ### Added
+- **Cross-link the job's Kanban and detail views.** Once a job is published it
+  routes to the Kanban (`/jobs/[id]`), which previously stranded the detail view
+  (`/req-jobs/[id]`) — JD, approvals, audit log. The Kanban top bar now has a
+  **Details** button (next to "Jobs") that opens that view, and the detail view
+  shows a **View pipeline** button once the job is live, so you can move between
+  working candidates and the requisition record either way. Routing itself is
+  unchanged (`app/(dashboard)/jobs/[id]/page.tsx`, `components/req-jobs/JobDetail.tsx`).
+
 - **Publish JD — Phase 1: the JD details you fill in at job creation now actually
   show up.** Fields like "What they'll do" (team context), "Key requirements" and
   "Nice to have" were collected at creation but stashed in
