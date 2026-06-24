@@ -9,6 +9,20 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-24
+
+### Fixed
+- **Approvals inbox showed the bare word "job" instead of the job's name.** The
+  inbox API (`/api/approvals/inbox`) only ever looked up titles for requisitions
+  (`openings`); for a job target it fell back to printing the literal target type,
+  and the "title" link always pointed at `/openings/[id]` (a broken link for a
+  job). The inbox now hydrates **job** titles from the `jobs` table too, links each
+  card to the correct detail page (`/req-jobs/[id]` for jobs, `/openings/[id]` for
+  requisitions), and shows a type label ("Job posting" / "Requisition") plus
+  **who requested** the approval (`app/api/approvals/inbox/route.ts`,
+  `app/(dashboard)/approvals/inbox/page.tsx`). Email/Slack/bell notifications were
+  already detailed and are unchanged.
+
 ## 2026-06-23
 
 ### Added

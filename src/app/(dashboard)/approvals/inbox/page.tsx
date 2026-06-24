@@ -8,14 +8,25 @@ import { Button } from '@/components/ui/button'
 import { DecisionModal } from '@/components/approvals/DecisionModal'
 
 interface InboxItem {
-  approval_id:  string
-  step_id:      string
-  step_index:   number
-  target_type:  string
-  target_id:    string
-  target_title: string
-  activated_at: string
-  due_at:       string | null
+  approval_id:        string
+  step_id:            string
+  step_index:         number
+  target_type:        string
+  target_id:          string
+  target_title:       string
+  target_type_label:  string
+  requested_by_name:  string | null
+  activated_at:       string
+  due_at:             string | null
+}
+
+/** Detail-page route for a given approval target. */
+function targetHref(item: InboxItem): string {
+  switch (item.target_type) {
+    case 'opening': return `/openings/${item.target_id}`
+    case 'job':     return `/req-jobs/${item.target_id}`
+    default:        return '#'
+  }
 }
 
 export default function ApprovalInboxPage() {
@@ -56,10 +67,16 @@ export default function ApprovalInboxPage() {
                 <CardContent>
                   <div className="flex items-center justify-between gap-4 py-1">
                     <div className="min-w-0 flex-1">
-                      <Link href={`/openings/${item.target_id}`} className="text-sm font-semibold text-slate-900 hover:text-emerald-700">
-                        {item.target_title}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                          {item.target_type_label}
+                        </span>
+                        <Link href={targetHref(item)} className="truncate text-sm font-semibold text-slate-900 hover:text-emerald-700">
+                          {item.target_title}
+                        </Link>
+                      </div>
                       <div className="text-xs text-slate-500 mt-0.5">
+                        {item.requested_by_name && <>Requested by {item.requested_by_name} · </>}
                         Step {item.step_index + 1} · activated {new Date(item.activated_at).toLocaleString()}
                         {item.due_at && (
                           <span className={isOverdue ? 'text-red-600 font-medium ml-2' : 'text-amber-700 ml-2'}>
