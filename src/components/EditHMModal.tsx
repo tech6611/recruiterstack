@@ -121,7 +121,7 @@ export default function EditHMModal({ requestId, initial, onClose, onSaved }: Ed
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#221b14] text-white text-sm font-medium hover:bg-[#33271b] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Save changes

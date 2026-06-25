@@ -18,11 +18,11 @@ import { trackEvent } from '@/lib/analytics'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<CandidateStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  active:         { label: 'Active',         color: 'bg-blue-50 text-blue-700 border-blue-200',          icon: <UserCheck className="h-3 w-3" /> },
+  active:         { label: 'Active',         color: 'bg-slate-50 text-slate-700 border-slate-200',          icon: <UserCheck className="h-3 w-3" /> },
   on_hold:        { label: 'On Hold',        color: 'bg-orange-50 text-orange-700 border-orange-200',    icon: <Clock className="h-3 w-3" /> },
   inactive:       { label: 'Inactive',       color: 'bg-slate-100 text-slate-600 border-slate-200',      icon: <UserMinus className="h-3 w-3" /> },
   interviewing:   { label: 'Interviewing',   color: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <MessageSquare className="h-3 w-3" /> },
-  offer_extended: { label: 'Offer Extended', color: 'bg-violet-50 text-violet-700 border-violet-200',    icon: <FileCheck className="h-3 w-3" /> },
+  offer_extended: { label: 'Offer Extended', color: 'bg-slate-50 text-slate-700 border-slate-200',    icon: <FileCheck className="h-3 w-3" /> },
   hired:          { label: 'Hired',          color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
   rejected:       { label: 'Rejected',       color: 'bg-red-50 text-red-700 border-red-200',             icon: <XCircle className="h-3 w-3" /> },
 }
@@ -43,13 +43,13 @@ interface FunnelStageDef {
 
 const ALL_FUNNEL_DEFS: FunnelStageDef[] = [
   { id: 'sourced',        name: 'Sourced',          accent: { border: 'border-t-slate-400',   dot: 'bg-slate-400',   badge: 'bg-slate-100 text-slate-600' } },
-  { id: 'screened',       name: 'Screened',         accent: { border: 'border-t-blue-400',    dot: 'bg-blue-500',    badge: 'bg-blue-100 text-blue-700' } },
-  { id: 'engaged',        name: 'Engaged',          accent: { border: 'border-t-violet-400',  dot: 'bg-violet-500',  badge: 'bg-violet-100 text-violet-700' } },
+  { id: 'screened',       name: 'Screened',         accent: { border: 'border-t-slate-400',    dot: 'bg-slate-500',    badge: 'bg-slate-100 text-slate-700' } },
+  { id: 'engaged',        name: 'Engaged',          accent: { border: 'border-t-slate-400',  dot: 'bg-slate-500',  badge: 'bg-slate-100 text-slate-700' } },
   { id: 'interview',      name: 'Interview',        accent: { border: 'border-t-amber-400',   dot: 'bg-amber-500',   badge: 'bg-amber-100 text-amber-700' } },
-  { id: 'offer_accepted', name: 'Offer Accepted',   accent: { border: 'border-t-green-500',   dot: 'bg-green-500',   badge: 'bg-green-100 text-green-700' } },
+  { id: 'offer_accepted', name: 'Offer Accepted',   accent: { border: 'border-t-emerald-500',   dot: 'bg-emerald-500',   badge: 'bg-emerald-100 text-emerald-700' } },
   { id: 'offer_out',      name: 'Offer Rolled Out', accent: { border: 'border-t-emerald-500', dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' } },
-  { id: 'hired',          name: 'Hired',            accent: { border: 'border-t-teal-500',    dot: 'bg-teal-500',    badge: 'bg-teal-100 text-teal-700' } },
-  { id: 'onboarded',      name: 'Onboarded',        accent: { border: 'border-t-indigo-500',  dot: 'bg-indigo-500',  badge: 'bg-indigo-100 text-indigo-700' } },
+  { id: 'hired',          name: 'Hired',            accent: { border: 'border-t-emerald-500',    dot: 'bg-emerald-500',    badge: 'bg-emerald-100 text-emerald-700' } },
+  { id: 'onboarded',      name: 'Onboarded',        accent: { border: 'border-t-slate-500',  dot: 'bg-slate-500',  badge: 'bg-slate-100 text-slate-700' } },
 ]
 
 const LS_FUNNEL          = 'rs_candidates_funnel'
@@ -110,7 +110,7 @@ function FunnelCustomizer({
   function handleDragEnd() { setDraggingId(null); setDragOverId(null) }
 
   return (
-    <div className="border-b border-slate-100 bg-violet-50/40 px-4 py-4">
+    <div className="border-b border-slate-100 bg-slate-50/40 px-4 py-4">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <p className="text-xs font-semibold text-slate-800">Customise funnel</p>
@@ -123,7 +123,7 @@ function FunnelCustomizer({
           )}
           <button
             onClick={() => { if (hasChanges) setShowDiscard(true); else onClose() }}
-            className="rounded-lg bg-violet-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-violet-700 transition-colors">
+            className="rounded-lg bg-slate-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-slate-700 transition-colors">
             Done
           </button>
         </div>
@@ -145,7 +145,7 @@ function FunnelCustomizer({
               Discard
             </button>
             <button onClick={onClose}
-              className="flex-1 rounded-lg bg-violet-600 py-1 text-[11px] font-medium text-white hover:bg-violet-700 transition-colors">
+              className="flex-1 rounded-lg bg-slate-600 py-1 text-[11px] font-medium text-white hover:bg-slate-700 transition-colors">
               Save
             </button>
           </div>
@@ -170,8 +170,8 @@ function FunnelCustomizer({
                 onDrop={() => handleDrop(id)}
                 onDragEnd={handleDragEnd}
                 className={`flex items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1.5 cursor-grab active:cursor-grabbing select-none transition-all ${
-                  isDragging ? 'opacity-40 scale-95 border-violet-300' :
-                  isDragOver ? 'border-violet-400 shadow-sm ring-1 ring-violet-300 -translate-y-0.5' :
+                  isDragging ? 'opacity-40 scale-95 border-slate-300' :
+                  isDragOver ? 'border-slate-400 shadow-sm ring-1 ring-slate-300 -translate-y-0.5' :
                   'border-slate-200 hover:border-slate-300'
                 }`}
               >
@@ -201,7 +201,7 @@ function FunnelCustomizer({
               <button
                 key={def.id}
                 onClick={() => onChange([...activeIds, def.id])}
-                className="flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:border-violet-400 hover:bg-violet-50 hover:text-violet-600 transition-colors"
+                className="flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
               >
                 <Plus className="h-3 w-3" />
                 {def.name}
@@ -281,7 +281,7 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
           title="Customise funnel"
           className={`flex items-center justify-center rounded-lg border p-1.5 transition-colors ${
             customizing
-              ? 'border-violet-300 bg-violet-50 text-violet-600 cursor-default'
+              ? 'border-slate-300 bg-slate-50 text-slate-600 cursor-default'
               : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700'
           }`}
         >
@@ -322,7 +322,7 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
                     def.accent.border
                   } ${
                     isDragging  ? 'opacity-40 scale-95 shadow-none' :
-                    isDragOver  ? 'shadow-md ring-1 ring-violet-300 -translate-y-1' :
+                    isDragOver  ? 'shadow-md ring-1 ring-slate-300 -translate-y-1' :
                     'shadow-sm hover:shadow-md hover:-translate-y-0.5'
                   }`}
                 >
@@ -347,7 +347,7 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
           {activeDefs.length === 0 && (
             <div className="flex-1 py-8 text-center text-xs text-slate-400">
               No stages in the funnel.{' '}
-              <button onClick={openCustomizer} className="text-violet-500 hover:underline">Add some</button>
+              <button onClick={openCustomizer} className="text-slate-500 hover:underline">Add some</button>
             </div>
           )}
         </div>
@@ -415,8 +415,8 @@ export default function CandidatesPage() {
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 text-slate-300 ml-1" />
     return sortDir === 'asc'
-      ? <ChevronUp className="h-3 w-3 text-blue-500 ml-1" />
-      : <ChevronDown className="h-3 w-3 text-blue-500 ml-1" />
+      ? <ChevronUp className="h-3 w-3 text-slate-500 ml-1" />
+      : <ChevronDown className="h-3 w-3 text-slate-500 ml-1" />
   }
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -545,7 +545,7 @@ export default function CandidatesPage() {
           </button>
           <button
             onClick={() => setShowDrawer(true)}
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+            className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm"
           >
             <Plus className="h-4 w-4" />
             Add Candidate
@@ -567,7 +567,7 @@ export default function CandidatesPage() {
         <div className="grid grid-cols-4 gap-3">
           {([
             { label: 'Total',        value: counts.total,        color: 'bg-slate-50 border-slate-200 text-slate-700',       filter: 'all'          },
-            { label: 'Active',       value: counts.active,       color: 'bg-blue-50 border-blue-200 text-blue-700',          filter: 'active'       },
+            { label: 'Active',       value: counts.active,       color: 'bg-slate-50 border-slate-200 text-slate-700',          filter: 'active'       },
             { label: 'Interviewing', value: counts.interviewing, color: 'bg-amber-50 border-amber-200 text-amber-700',       filter: 'interviewing' },
             { label: 'Hired',        value: counts.hired,        color: 'bg-emerald-50 border-emerald-200 text-emerald-700', filter: 'hired'        },
           ] as const).map(stat => (
@@ -668,7 +668,7 @@ export default function CandidatesPage() {
           <p className="text-xs text-slate-400 mt-1 mb-4">Add your first candidate to start building your talent pool</p>
           <button
             onClick={() => setShowDrawer(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Candidate
@@ -891,7 +891,7 @@ export default function CandidatesPage() {
                 {/* Skills */}
                 <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Skills</p>
-                  <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 min-h-[44px] focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-emerald-100 transition">
+                  <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 min-h-[44px] focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-emerald-100 transition">
                     {form.skills.map(skill => (
                       <span key={skill} className="flex items-center gap-1 rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 shadow-sm">
                         {skill}
@@ -926,7 +926,7 @@ export default function CandidatesPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#221b14] px-4 py-3 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors shadow-sm"
                 >
                   {saving ? <><Loader2 className="h-4 w-4 animate-spin" />Saving…</> : 'Add Candidate'}
                 </button>

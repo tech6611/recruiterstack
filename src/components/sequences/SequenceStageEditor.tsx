@@ -331,7 +331,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                   onClick={() => setChannel(ch.value)}
                   className={`flex flex-col items-center gap-1 rounded-xl border-2 px-3 py-2.5 text-xs font-semibold transition-all ${
                     channel === ch.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      ? 'border-slate-500 bg-slate-50 text-slate-700'
                       : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
                   }`}
                 >
@@ -428,7 +428,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                     key={c.value}
                     className={`flex items-start gap-3 rounded-xl border-2 px-3.5 py-2.5 cursor-pointer transition-all ${
                       condition === c.value
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-slate-500 bg-slate-50'
                         : 'border-slate-200 bg-white hover:border-slate-300'
                     }`}
                   >
@@ -441,7 +441,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                       className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
                     />
                     <div>
-                      <p className={`text-xs font-semibold ${condition === c.value ? 'text-blue-700' : 'text-slate-700'}`}>
+                      <p className={`text-xs font-semibold ${condition === c.value ? 'text-slate-700' : 'text-slate-700'}`}>
                         {c.label}
                       </p>
                       <p className="text-[11px] text-slate-400">{c.description}</p>
@@ -488,13 +488,13 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                   disabled={generating}
                   className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium border transition-colors disabled:opacity-50 ${
                     aiOpen
-                      ? 'border-violet-400 bg-violet-50 text-violet-700'
+                      ? 'border-slate-400 bg-slate-50 text-slate-700'
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   {generating
                     ? <><Loader2 className="h-3 w-3 animate-spin" /> Generating...</>
-                    : <><Wand2 className="h-3 w-3 text-violet-500" /> AI Draft <ChevronDown className="h-3 w-3 opacity-60" /></>}
+                    : <><Wand2 className="h-3 w-3 text-slate-500" /> AI Draft <ChevronDown className="h-3 w-3 opacity-60" /></>}
                 </button>
 
                 {aiOpen && (
@@ -505,7 +505,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                         key={t.id}
                         type="button"
                         onClick={() => generateWithAI(t.id)}
-                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left hover:bg-violet-50 transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left hover:bg-slate-50 transition-colors"
                       >
                         <span className="text-sm shrink-0">{t.emoji}</span>
                         <p className="text-xs font-medium text-slate-700">{t.name}</p>
@@ -530,7 +530,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                   key={t.token}
                   type="button"
                   onClick={() => insertTokenInSubject(t.token)}
-                  className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 hover:bg-emerald-100 transition-colors"
+                  className="rounded-lg bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 hover:bg-emerald-100 transition-colors"
                 >
                   + {t.label}
                 </button>
@@ -555,7 +555,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                   key={t.token}
                   type="button"
                   onClick={() => insertTokenInBody(t.token)}
-                  className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 hover:bg-emerald-100 transition-colors"
+                  className="rounded-lg bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 hover:bg-emerald-100 transition-colors"
                 >
                   + {t.label}
                 </button>
@@ -595,7 +595,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+              className="flex items-center gap-2 rounded-xl bg-[#221b14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {isEdit ? 'Update Stage' : 'Add Stage'}

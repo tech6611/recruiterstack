@@ -94,7 +94,7 @@ export default function SequencesPage() {
         <button
           onClick={handleCreate}
           disabled={creating}
-          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+          className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors"
         >
           {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           New Sequence
@@ -104,8 +104,8 @@ export default function SequencesPage() {
       {/* Empty state */}
       {sequences.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 mb-4">
-            <Mail className="h-7 w-7 text-blue-500" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 mb-4">
+            <Mail className="h-7 w-7 text-slate-500" />
           </div>
           <h2 className="text-lg font-semibold text-slate-800 mb-1">No sequences yet</h2>
           <p className="text-sm text-slate-400 max-w-sm mb-6">
@@ -114,7 +114,7 @@ export default function SequencesPage() {
           <button
             onClick={handleCreate}
             disabled={creating}
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
+            className="flex items-center gap-2 rounded-xl bg-[#221b14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors"
           >
             <Plus className="h-4 w-4" /> Create Sequence
           </button>

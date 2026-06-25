@@ -158,8 +158,8 @@ const CATEGORY_LABELS: Record<WidgetCategory, string> = {
 // ── Widget card accent colours (top border per category) ──────────────────────
 
 const CATEGORY_ACCENT: Record<WidgetCategory, { border: string; icon: string; iconText: string; label: string }> = {
-  jobs:       { border: 'border-t-blue-400',   icon: 'bg-blue-100',   iconText: 'text-blue-600',   label: 'bg-blue-50 text-blue-700' },
-  candidates: { border: 'border-t-violet-400', icon: 'bg-violet-100', iconText: 'text-violet-600', label: 'bg-violet-50 text-violet-700' },
+  jobs:       { border: 'border-t-slate-400',   icon: 'bg-slate-100',   iconText: 'text-slate-600',   label: 'bg-slate-50 text-slate-700' },
+  candidates: { border: 'border-t-slate-400', icon: 'bg-slate-100', iconText: 'text-slate-600', label: 'bg-slate-50 text-slate-700' },
   activity:   { border: 'border-t-amber-400',  icon: 'bg-amber-100',  iconText: 'text-amber-600',  label: 'bg-amber-50 text-amber-700' },
 }
 
@@ -201,16 +201,16 @@ const DEFAULT_RIGHT_WIDGETS: WidgetId[] = ['tasks', 'recent_applications', 'jobs
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STAGE_COLORS: Record<StageColor, string> = {
-  slate: 'bg-slate-400', blue: 'bg-blue-500', violet: 'bg-violet-500',
-  amber: 'bg-amber-400', emerald: 'bg-emerald-500', green: 'bg-green-500',
-  red: 'bg-red-500', pink: 'bg-pink-500',
+  slate: 'bg-slate-400', blue: 'bg-slate-500', violet: 'bg-slate-500',
+  amber: 'bg-amber-400', emerald: 'bg-emerald-500', green: 'bg-emerald-500',
+  red: 'bg-red-500', pink: 'bg-slate-500',
 }
 
 const STATUS_COLORS: Record<string, { bg: string; label: string }> = {
-  active:         { bg: 'bg-blue-500',    label: 'Active' },
+  active:         { bg: 'bg-slate-500',    label: 'Active' },
   on_hold:        { bg: 'bg-orange-400',  label: 'On Hold' },
   interviewing:   { bg: 'bg-amber-400',   label: 'Interviewing' },
-  offer_extended: { bg: 'bg-violet-500',  label: 'Offer Extended' },
+  offer_extended: { bg: 'bg-slate-500',  label: 'Offer Extended' },
   hired:          { bg: 'bg-emerald-500', label: 'Hired' },
   inactive:       { bg: 'bg-slate-300',   label: 'Inactive' },
   rejected:       { bg: 'bg-red-400',     label: 'Rejected' },
@@ -261,8 +261,8 @@ function ViewsSidebar({
           return (
             <div key={v.id} className="group relative">
               {renamingId === v.id ? (
-                <div className="flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1.5">
-                  <Icon className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1.5">
+                  <Icon className="h-3.5 w-3.5 shrink-0 text-slate-500" />
                   <input
                     ref={renameRef}
                     value={renameVal}
@@ -272,17 +272,17 @@ function ViewsSidebar({
                       if (e.key === 'Escape') setRenamingId(null)
                     }}
                     onBlur={commitRename}
-                    className="min-w-0 flex-1 bg-transparent text-xs font-medium text-blue-700 outline-none"
+                    className="min-w-0 flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none"
                   />
                 </div>
               ) : (
                 <button
                   onClick={() => onSelect(v.id)}
                   className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
-                    isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    isActive ? 'bg-slate-50 text-slate-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
-                  <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-blue-500' : 'text-slate-400'}`} />
+                  <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-slate-500' : 'text-slate-400'}`} />
                   <span className="truncate text-xs font-medium">{v.name}</span>
                 </button>
               )}
@@ -369,7 +369,7 @@ function WidgetGrid({ widgets, widgetMode, data, onCandidateClick, onRefresh, on
           onDragLeave={() => setDragOverIdx(null)}
           onDrop={(e) => handleDrop(e, idx)}
           className={`rounded-xl border-2 ${
-            dragOverIdx === idx ? 'border-blue-400 bg-blue-50/30' : 'border-slate-200'
+            dragOverIdx === idx ? 'border-slate-400 bg-slate-50/30' : 'border-slate-200'
           } border-t-2 ${widgetAccent(wId).border} bg-white relative flex flex-col min-h-0 transition-colors ${
             widgetMode ? 'opacity-50 pointer-events-none' : ''
           }`}
@@ -448,7 +448,7 @@ function FilterPills({
           onClick={() => onSelect(active === o.value ? '' : o.value)}
           className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
             active === o.value
-              ? 'bg-blue-100 text-blue-700'
+              ? 'bg-slate-100 text-slate-700'
               : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
           }`}
         >
@@ -497,7 +497,7 @@ function WidgetHeader({
               onClick={onToggleSearch}
               title="Search"
               className={`flex items-center justify-center rounded p-0.5 transition-colors ${
-                showSearch ? 'text-blue-500' : 'text-slate-300 hover:text-slate-500'
+                showSearch ? 'text-slate-500' : 'text-slate-300 hover:text-slate-500'
               }`}
             >
               <Search className="h-3.5 w-3.5" />
@@ -511,7 +511,7 @@ function WidgetHeader({
         </div>
       </div>
       {showSearch && onQueryChange && (
-        <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 focus-within:border-blue-300 focus-within:ring-1 focus-within:ring-emerald-100 transition-all">
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 focus-within:border-slate-300 focus-within:ring-1 focus-within:ring-emerald-100 transition-all">
           <Search className="h-3 w-3 shrink-0 text-slate-400" />
           <input
             autoFocus
@@ -560,7 +560,7 @@ function InterviewsWidget({ interviews, onCandidateClick }: { interviews: Upcomi
       {interviews.length === 0 ? (
         <div className="py-6 text-center text-xs text-slate-400">
           No upcoming interviews.{' '}
-          <Link href="/candidates" className="text-blue-500 hover:underline">View candidates</Link>
+          <Link href="/candidates" className="text-slate-500 hover:underline">View candidates</Link>
         </div>
       ) : (
         <>
@@ -708,7 +708,7 @@ function TasksWidget({ tasks, onCandidateClick, onRefresh }: { tasks: DashboardD
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
               <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold leading-none ${
-                activeTab === tab.key ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
+                activeTab === tab.key ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-500'
               }`}>{tab.count}</span>
             )}
           </button>
@@ -736,7 +736,7 @@ function TasksWidget({ tasks, onCandidateClick, onRefresh }: { tasks: DashboardD
               <button
                 onClick={(e) => { e.stopPropagation(); handleApprove(item.id) }}
                 disabled={actioningId === item.id}
-                className="shrink-0 rounded bg-emerald-500 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+                className="shrink-0 rounded bg-[#221b14] px-2 py-0.5 text-[10px] font-medium text-white hover:bg-[#33271b] disabled:opacity-50 transition-colors"
               >
                 {actioningId === item.id ? '...' : 'Approve'}
               </button>
@@ -790,10 +790,10 @@ function TasksWidget({ tasks, onCandidateClick, onRefresh }: { tasks: DashboardD
 
 function OverviewStatsWidget({ stats }: { stats: DashboardData['stats'] }) {
   const CARDS = [
-    { label: 'Open Jobs',         value: stats.open_jobs,         icon: Briefcase,  color: 'bg-blue-50 text-blue-700 border-blue-100',    href: '/jobs' },
+    { label: 'Open Jobs',         value: stats.open_jobs,         icon: Briefcase,  color: 'bg-slate-50 text-slate-700 border-slate-100',    href: '/jobs' },
     { label: 'Active Candidates', value: stats.active_candidates, icon: Users,      color: 'bg-emerald-50 text-emerald-700 border-emerald-100', href: '/candidates' },
     { label: 'Interviewing',      value: stats.interviewing,      icon: Activity,   color: 'bg-amber-50 text-amber-700 border-amber-100',  href: '/candidates' },
-    { label: 'Total Hired',       value: stats.hired_total,       icon: UserCheck,  color: 'bg-violet-50 text-violet-700 border-violet-100', href: '/candidates' },
+    { label: 'Total Hired',       value: stats.hired_total,       icon: UserCheck,  color: 'bg-slate-50 text-slate-700 border-slate-100', href: '/candidates' },
   ]
   return (
     <div>
@@ -874,7 +874,7 @@ function JobsMiniWidget({ jobs }: { jobs: TopJob[] }) {
         />
       )}
       {jobs.length === 0 ? (
-        <p className="text-xs text-slate-400">No open jobs. <Link href="/jobs" className="text-blue-500 hover:underline">Create one</Link></p>
+        <p className="text-xs text-slate-400">No open jobs. <Link href="/jobs" className="text-slate-500 hover:underline">Create one</Link></p>
       ) : (
         <div className="space-y-1">
           {preview.map(job => (
@@ -923,12 +923,12 @@ const SOURCE_LABELS: Record<string, string> = {
   sourced: 'Sourced', referral: 'Referral',
 }
 const SOURCE_COLORS: Record<string, string> = {
-  manual: 'bg-slate-400', applied: 'bg-blue-500', imported: 'bg-violet-500',
+  manual: 'bg-slate-400', applied: 'bg-slate-500', imported: 'bg-slate-500',
   sourced: 'bg-emerald-500', referral: 'bg-amber-400',
 }
 const RECO_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   strong_yes: { label: 'Strong Yes', bg: 'bg-emerald-100', text: 'text-emerald-700' },
-  yes:        { label: 'Yes',        bg: 'bg-blue-100',    text: 'text-blue-700' },
+  yes:        { label: 'Yes',        bg: 'bg-slate-100',    text: 'text-slate-700' },
   maybe:      { label: 'Maybe',      bg: 'bg-amber-100',   text: 'text-amber-700' },
   no:         { label: 'No',         bg: 'bg-red-100',     text: 'text-red-600' },
 }
@@ -959,7 +959,7 @@ function JobsByDeptWidget({ departments }: { departments: JobByDept[] }) {
               </div>
               <div className="h-1.5 w-full rounded-full bg-slate-100">
                 <div
-                  className="h-full rounded-full bg-blue-500 transition-all"
+                  className="h-full rounded-full bg-slate-500 transition-all"
                   style={{ width: `${(d.candidate_count / max) * 100}%` }}
                 />
               </div>
@@ -1044,7 +1044,7 @@ function RecentApplicationsWidget({ applications, onCandidateClick }: { applicat
             <button key={a.id} onClick={() => onCandidateClick(a.candidate_id)}
               className="flex w-full items-center gap-3 rounded-lg border-b border-slate-50 px-1 py-2 hover:bg-slate-50 transition-colors text-left"
             >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-emerald-600">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-emerald-600">
                 {a.candidate_name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -1197,16 +1197,16 @@ function OfferTrackerWidget({ offers, onCandidateClick }: { offers: OfferTracker
         <div className="space-y-1.5">
           {preview.map(o => (
             <button key={o.candidate_id} onClick={() => onCandidateClick(o.candidate_id)}
-              className="flex w-full items-center gap-2.5 rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-2 hover:bg-violet-100 transition-colors text-left"
+              className="flex w-full items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 hover:bg-slate-100 transition-colors text-left"
             >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-200 text-[10px] font-bold text-violet-700">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700">
                 {o.candidate_name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="truncate text-xs font-medium text-slate-800">{o.candidate_name}</p>
                 <p className="truncate text-[10px] text-slate-500">{o.job_title}{o.current_title ? ` · ${o.current_title}` : ''}</p>
               </div>
-              <span className="shrink-0 rounded-full border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+              <span className="shrink-0 rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
                 Offer Out
               </span>
             </button>
@@ -1232,9 +1232,9 @@ const EVENT_TYPE_ICONS: Record<string, string> = {
   applied: '→', stage_moved: '↑', note_added: '✎', status_changed: '⟳', email_sent: '✉',
 }
 const EVENT_TYPE_COLORS: Record<string, string> = {
-  applied: 'bg-blue-100 text-emerald-600', stage_moved: 'bg-emerald-100 text-emerald-600',
+  applied: 'bg-slate-100 text-emerald-600', stage_moved: 'bg-emerald-100 text-emerald-600',
   note_added: 'bg-slate-100 text-slate-500', status_changed: 'bg-amber-100 text-amber-600',
-  email_sent: 'bg-violet-100 text-violet-600',
+  email_sent: 'bg-slate-100 text-slate-600',
 }
 
 function RecentActivityWidget({ activity, onCandidateClick }: { activity: RecentEvent[]; onCandidateClick?: (id: string) => void }) {
@@ -1377,7 +1377,7 @@ function ActionQueueWidget({
       title: t.candidate_name, sub: `Feedback needed · ${t.job_title}`,
       openSince: t.moved_at,
       candidateId: t.candidate_id,
-      actionLabel: 'Review', actionColor: 'bg-blue-500 hover:bg-emerald-600',
+      actionLabel: 'Review', actionColor: 'bg-slate-500 hover:bg-emerald-600',
       iconColor: 'bg-amber-100 text-amber-600',
       icon: <MessageSquare className="h-3 w-3" />,
     })
@@ -1579,7 +1579,7 @@ function RightPanelCustomizer({
   function handleDragEnd() { setDraggingId(null); setDragOverId(null) }
 
   return (
-    <div className="border-b border-slate-100 bg-blue-50/40 px-4 py-4">
+    <div className="border-b border-slate-100 bg-slate-50/40 px-4 py-4">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <p className="text-xs font-semibold text-slate-800">Customize panel</p>
@@ -1594,7 +1594,7 @@ function RightPanelCustomizer({
           )}
           <button
             onClick={handleDoneClick}
-            className="rounded-lg bg-emerald-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-emerald-700 transition-colors"
+            className="rounded-lg bg-[#221b14] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#33271b] transition-colors"
           >
             Done
           </button>
@@ -1615,7 +1615,7 @@ function RightPanelCustomizer({
               className="flex-1 rounded-lg border border-red-200 bg-white py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors"
             >Discard</button>
             <button onClick={onClose}
-              className="flex-1 rounded-lg bg-emerald-600 py-1 text-[11px] font-medium text-white hover:bg-emerald-700 transition-colors"
+              className="flex-1 rounded-lg bg-[#221b14] py-1 text-[11px] font-medium text-white hover:bg-[#33271b] transition-colors"
             >Save</button>
           </div>
         </div>
@@ -1639,8 +1639,8 @@ function RightPanelCustomizer({
               onDrop={() => handleDrop(wId)}
               onDragEnd={handleDragEnd}
               className={`flex items-center gap-2 rounded-lg border bg-white px-2.5 py-2 cursor-grab active:cursor-grabbing transition-all ${
-                isDragging ? 'opacity-40 scale-95 border-blue-300' :
-                isDragOver ? 'border-blue-400 shadow-sm ring-1 ring-emerald-300 -translate-y-0.5' :
+                isDragging ? 'opacity-40 scale-95 border-slate-300' :
+                isDragOver ? 'border-slate-400 shadow-sm ring-1 ring-emerald-300 -translate-y-0.5' :
                 'border-slate-200 hover:border-slate-300'
               }`}
             >
@@ -1736,7 +1736,7 @@ function ActivityPanel({
           title="Customise panel"
           className={`flex items-center justify-center rounded-lg border p-1.5 transition-colors ${
             rightPanelMode
-              ? 'border-blue-300 bg-blue-50 text-emerald-600 cursor-default'
+              ? 'border-slate-300 bg-slate-50 text-emerald-600 cursor-default'
               : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700'
           }`}
         >
@@ -1857,7 +1857,7 @@ function WidgetCustomizer({
   }
 
   return (
-    <div className="rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/40 p-5">
+    <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/40 p-5">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
@@ -1875,7 +1875,7 @@ function WidgetCustomizer({
           )}
           <button
             onClick={handleDoneClick}
-            className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition-colors"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-[#221b14] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#33271b] transition-colors"
           >
             Done
           </button>
@@ -1907,7 +1907,7 @@ function WidgetCustomizer({
               </button>
               <button
                 onClick={onClose}
-                className="rounded-lg border border-blue-200 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition-colors"
+                className="rounded-lg border border-slate-200 bg-[#221b14] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#33271b] transition-colors"
               >
                 Save
               </button>
@@ -1935,8 +1935,8 @@ function WidgetCustomizer({
               onDrop={() => handleDrop(wId)}
               onDragEnd={handleDragEnd}
               className={`flex items-center gap-3 rounded-lg border bg-white px-3 py-2.5 cursor-grab active:cursor-grabbing transition-all ${
-                isDragging  ? 'opacity-40 scale-95 border-blue-300' :
-                isDragOver  ? 'border-blue-400 shadow-md ring-1 ring-emerald-300 -translate-y-0.5' :
+                isDragging  ? 'opacity-40 scale-95 border-slate-300' :
+                isDragOver  ? 'border-slate-400 shadow-md ring-1 ring-emerald-300 -translate-y-0.5' :
                 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
               }`}
             >
@@ -2235,7 +2235,7 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center p-16 text-sm text-slate-400">
         Failed to load.{' '}
-        <button onClick={() => fetchData()} className="ml-2 text-blue-500 underline">Retry</button>
+        <button onClick={() => fetchData()} className="ml-2 text-slate-500 underline">Retry</button>
       </div>
     )
   }
@@ -2276,7 +2276,7 @@ export default function DashboardPage() {
               title="Customise view"
               className={`flex items-center justify-center rounded-lg border p-1.5 transition-colors ${
                 widgetMode
-                  ? 'border-blue-300 bg-blue-50 text-emerald-600 cursor-default'
+                  ? 'border-slate-300 bg-slate-50 text-emerald-600 cursor-default'
                   : 'border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-700'
               }`}
             >

@@ -79,7 +79,7 @@ export default function VoiceCallModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-xl bg-slate-50 flex items-center justify-center">
               <PhoneCall className="h-4.5 w-4.5 text-emerald-600" />
             </div>
             <div>
@@ -161,7 +161,7 @@ export default function VoiceCallModal({
                 <button
                   onClick={handleCall}
                   disabled={!phone.trim() || calling}
-                  className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {calling ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

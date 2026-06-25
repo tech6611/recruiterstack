@@ -28,14 +28,14 @@ interface VoiceCallDetail {
 
 const REC_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   strong_yes: { label: 'Strong Yes', color: 'text-emerald-700', bg: 'bg-emerald-100' },
-  yes:        { label: 'Yes',        color: 'text-blue-700',    bg: 'bg-blue-100'    },
+  yes:        { label: 'Yes',        color: 'text-slate-700',    bg: 'bg-slate-100'    },
   maybe:      { label: 'Maybe',      color: 'text-amber-700',   bg: 'bg-amber-100'   },
   no:         { label: 'No',         color: 'text-red-700',     bg: 'bg-red-100'     },
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   completed:   { label: 'Completed',   color: 'text-emerald-700', bg: 'bg-emerald-100' },
-  in_progress: { label: 'In Progress', color: 'text-blue-700',    bg: 'bg-blue-100'    },
+  in_progress: { label: 'In Progress', color: 'text-slate-700',    bg: 'bg-slate-100'    },
   ringing:     { label: 'Ringing',     color: 'text-amber-700',   bg: 'bg-amber-100'   },
   no_answer:   { label: 'No Answer',   color: 'text-slate-600',   bg: 'bg-slate-100'   },
   failed:      { label: 'Failed',      color: 'text-red-700',     bg: 'bg-red-100'     },
@@ -86,7 +86,7 @@ export default function VoiceCallDetailModal({ callId, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-xl bg-slate-50 flex items-center justify-center">
               <Phone className="h-4 w-4 text-emerald-600" />
             </div>
             <div>
@@ -169,10 +169,10 @@ export default function VoiceCallDetailModal({ callId, onClose }: Props) {
               {call.summary && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+                    <Sparkles className="h-3.5 w-3.5 text-slate-500" />
                     <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">AI Summary</p>
                   </div>
-                  <div className="rounded-xl bg-violet-50 border border-violet-100 px-4 py-3">
+                  <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
                     <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{call.summary}</p>
                   </div>
                 </div>
@@ -193,7 +193,7 @@ export default function VoiceCallDetailModal({ callId, onClose }: Props) {
                       return (
                         <div key={i} className={`flex gap-2.5 ${isAI ? '' : 'flex-row-reverse'}`}>
                           <div className={`h-6 w-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold mt-0.5
-                            ${isAI ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'}`}
+                            ${isAI ? 'bg-slate-100 text-slate-700' : 'bg-slate-200 text-slate-600'}`}
                           >
                             {isAI ? 'AI' : 'C'}
                           </div>
@@ -216,9 +216,9 @@ export default function VoiceCallDetailModal({ callId, onClose }: Props) {
 
               {/* Pending state */}
               {['ringing', 'in_progress', 'queued'].includes(call.status) && (
-                <div className="flex items-center gap-3 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-500 shrink-0" />
-                  <p className="text-sm text-blue-700">
+                <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+                  <Loader2 className="h-4 w-4 animate-spin text-slate-500 shrink-0" />
+                  <p className="text-sm text-slate-700">
                     {call.status === 'ringing' ? 'Ringing candidate…' :
                      call.status === 'in_progress' ? 'Call in progress — transcript will appear when it ends.' :
                      'Call queued…'}

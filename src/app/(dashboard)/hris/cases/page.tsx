@@ -11,7 +11,7 @@ type Row = HrCase & { requester: { name: string | null; email: string | null } |
 
 const STATUS_BADGE: Record<HrCaseStatus, string> = {
   open:         'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  in_progress:  'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+  in_progress:  'bg-slate-50 text-slate-700 ring-1 ring-slate-200',
   resolved:     'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
   closed:       'bg-slate-100 text-slate-500 ring-1 ring-slate-200',
 }
@@ -52,7 +52,7 @@ export default function HrCasesAdminPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">HR cases</h1>
           <p className="text-sm text-slate-500">
             Employee questions and issues. The AI takes a first pass on every new case &mdash; ones with
-            a <Sparkles className="inline h-3 w-3 text-violet-500" /> AI reply usually self-resolve.
+            a <Sparkles className="inline h-3 w-3 text-slate-500" /> AI reply usually self-resolve.
           </p>
         </div>
       </div>
@@ -115,7 +115,7 @@ export default function HrCasesAdminPage() {
                 <td className="px-4 py-3">
                   {c.ai_attempted_at && (
                     <span title="AI took a first pass" className="inline-flex">
-                      <Sparkles className="h-4 w-4 text-violet-500" />
+                      <Sparkles className="h-4 w-4 text-slate-500" />
                     </span>
                   )}
                 </td>

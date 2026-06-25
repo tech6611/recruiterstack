@@ -54,6 +54,36 @@ entries on top.
   `modules/ats/domain/job-pipelines.ts`, `modules/ats/domain/applications.ts`,
   `modules/ats/domain/screening.ts`, `lib/validations/applications.ts`.)
 
+### Changed
+- **Platform rebrand — "Warm Confident" (Direction D), Stage 1: foundations.** A
+  brand overhaul of the in-app platform (not the marketing site). Redefined the
+  Tailwind `emerald` scale as a pine green (brand accent → `#15604a`) and the
+  `slate` scale as a warm sand→bark neutral ramp, so the whole app re-skins from
+  `tailwind.config.ts` without per-file edits. Page background is now warm cream
+  (`#faf7f2`); headings use a new display font (Plus Jakarta Sans, loaded as
+  `--font-display` and applied to h1–h4); body stays Inter. The sidebar (desktop
+  rail + mobile drawer) is now espresso (`#221b14`) with light-on-dark nav. A
+  throwaway preview of all directions lives at `/brand-lab`.
+  (`tailwind.config.ts`, `globals.css`, `layout.tsx`,
+  `components/layout/Sidebar.tsx`.) Stage 2 (card consolidation) is next.
+- **Platform rebrand — Stage 1b: single-accent palette.** Followed the
+  foundations by collapsing the app's competing accent colors onto one brand
+  color. Stray non-token greens (`green-*`/`teal-*` + hardcoded `#10b981` etc.)
+  and cool grays (`gray-*`/`zinc-*`) were folded into pine/warm-slate; then the
+  whole "rainbow" of decorative accents (`blue` — 400+ uses — plus `indigo`,
+  `sky`, `violet`, `purple`, `cyan`, `pink`) was demoted to warm neutral across
+  64 in-platform files. Pine is now the sole accent (primary actions, active
+  states, positive statuses); only amber (warning) and red (danger) remain as
+  semantic colors. Avatars and the score scale keep their colors on purpose.
+  Public/marketing pages, emails, and `/brand-lab` were left out of scope.
+- **Platform rebrand — Stage 1c: espresso action buttons.** Recolored the solid
+  pine buttons to the sidebar's espresso brown (`#221b14`, hover `#33271b`) so
+  the platform reads as a two-tone system: espresso = primary action, pine =
+  accent / positive state. Only genuine buttons changed (filtered on the
+  interactive hover state), so checkmarks, step indicators, status dots, the
+  sidebar logo, and outline/text accents stay pine. Shared `Button` primary
+  variant + ~40 in-platform files; marketing pages left out of scope.
+
 ## 2026-06-24
 
 ### Added

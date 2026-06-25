@@ -225,7 +225,7 @@ export default function MeOverviewPage() {
           {reports.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-5">
               <div className="mb-3 flex items-center gap-2">
-                <Users className="h-4 w-4 text-blue-600" />
+                <Users className="h-4 w-4 text-slate-600" />
                 <h2 className="text-sm font-semibold text-slate-900">Your team ({reports.length})</h2>
               </div>
               <ul className="space-y-1.5 text-sm">
@@ -290,7 +290,7 @@ export default function MeOverviewPage() {
       <div className="mt-6 flex items-center justify-end gap-3">
         <Link
           href="/me/time-off"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#221b14] px-3 py-2 text-sm font-semibold text-white hover:bg-[#33271b]"
         >
           <Calendar className="h-4 w-4" />
           Request time off

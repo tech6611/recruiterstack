@@ -15,8 +15,8 @@ const STATUS_CONFIG: Record<Opening['status'], { label: string; color: string; i
   draft:            { label: 'Draft',            color: 'bg-slate-50 text-slate-600 border-slate-200',       icon: <FileText className="h-3 w-3" /> },
   pending_approval: { label: 'Pending Approval', color: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <Clock className="h-3 w-3" /> },
   approved:         { label: 'Approved',         color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
-  open:             { label: 'Open',             color: 'bg-green-50 text-green-700 border-green-200',       icon: <Send className="h-3 w-3" /> },
-  filled:           { label: 'Filled',           color: 'bg-violet-50 text-violet-700 border-violet-200',    icon: <CheckCircle className="h-3 w-3" /> },
+  open:             { label: 'Open',             color: 'bg-emerald-50 text-emerald-700 border-emerald-200',       icon: <Send className="h-3 w-3" /> },
+  filled:           { label: 'Filled',           color: 'bg-slate-50 text-slate-700 border-slate-200',    icon: <CheckCircle className="h-3 w-3" /> },
   closed:           { label: 'Closed',           color: 'bg-slate-100 text-slate-500 border-slate-200',      icon: <Archive className="h-3 w-3" /> },
   archived:         { label: 'Archived',         color: 'bg-slate-100 text-slate-400 border-slate-200',      icon: <Archive className="h-3 w-3" /> },
 }
@@ -33,7 +33,7 @@ const STAT_CARDS: ReadonlyArray<{
   { key: 'all',      label: 'Total',             color: 'bg-slate-50 border-slate-200 text-slate-700',       statuses: null },
   { key: 'pending',  label: 'Awaiting Approval', color: 'bg-amber-50 border-amber-200 text-amber-700',       statuses: ['draft', 'pending_approval'] },
   { key: 'approved', label: 'Approved',          color: 'bg-emerald-50 border-emerald-200 text-emerald-700', statuses: ['approved'] },
-  { key: 'open',     label: 'Open',              color: 'bg-green-50 border-green-200 text-green-700',        statuses: ['open'] },
+  { key: 'open',     label: 'Open',              color: 'bg-emerald-50 border-emerald-200 text-emerald-700',        statuses: ['open'] },
   { key: 'closed',   label: 'Closed',            color: 'bg-slate-100 border-slate-200 text-slate-500',      statuses: ['filled', 'closed', 'archived'] },
 ]
 
@@ -104,7 +104,7 @@ export default function OpeningsListPage() {
         </div>
         <Link
           href="/openings/new"
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm"
         >
           <Plus className="h-4 w-4" /> New requisition
         </Link>
@@ -200,7 +200,7 @@ export default function OpeningsListPage() {
               <p className="text-xs text-slate-400 mt-1 mb-4">Create your first requisition to get started</p>
               <Link
                 href="/openings/new"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" /> New requisition
               </Link>

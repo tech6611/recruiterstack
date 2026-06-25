@@ -20,7 +20,7 @@ const CATEGORIES: { value: HrCaseCategory; label: string }[] = [
 
 const STATUS_BADGE: Record<HrCaseStatus, string> = {
   open:         'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  in_progress:  'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+  in_progress:  'bg-slate-50 text-slate-700 ring-1 ring-slate-200',
   resolved:     'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
   closed:       'bg-slate-100 text-slate-500 ring-1 ring-slate-200',
 }
@@ -83,7 +83,7 @@ export default function MyCasesPage() {
         {!open && (
           <button
             onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#221b14] px-3 py-2 text-sm font-semibold text-white hover:bg-[#33271b]"
           >
             <Plus className="h-4 w-4" />
             Ask HR
@@ -127,7 +127,7 @@ export default function MyCasesPage() {
               <button
                 onClick={submit}
                 disabled={!subject.trim() || !body.trim() || submitting}
-                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                className="rounded-lg bg-[#221b14] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-50"
               >
                 {submitting ? 'Submitting…' : 'Submit'}
               </button>

@@ -183,7 +183,7 @@ export default function PayrollSettingsPage() {
         {/* Singapore-only info — engine settings are hard-coded so the form
             stays empty; explain what's active. */}
         {settings.country_code === 'SG' && (
-          <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
             <div className="font-semibold">Singapore engine (Jan 2026)</div>
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
               <li>CPF: employee 20% / employer 17% (up to age 55), Ordinary Wages capped at S$8,000/month.</li>

@@ -50,7 +50,7 @@ export function CustomFieldsCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <ListPlus className="h-4 w-4 text-fuchsia-600" /> Custom fields
+          <ListPlus className="h-4 w-4 text-slate-600" /> Custom fields
         </CardTitle>
         <CardDescription>Extra fields beyond the built-ins. Render dynamically on the requisition form.</CardDescription>
       </CardHeader>

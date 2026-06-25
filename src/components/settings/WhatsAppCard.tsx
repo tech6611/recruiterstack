@@ -134,8 +134,8 @@ export function WhatsAppCard({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
       <div className="flex items-center gap-2.5 mb-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50">
-          <MessageCircle className="h-4 w-4 text-green-600" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
+          <MessageCircle className="h-4 w-4 text-emerald-600" />
         </div>
         <h2 className="text-sm font-semibold text-slate-800">WhatsApp</h2>
       </div>
@@ -147,7 +147,7 @@ export function WhatsAppCard({ isAdmin }: { isAdmin: boolean }) {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
+              <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
               <p className="text-sm text-slate-700">
                 Connected{displayPhone ? <> as <span className="font-semibold">{displayPhone}</span></> : null}
                 <span className="text-slate-400"> · via {provider === 'vobiz' ? 'Vobiz' : 'Meta'}</span>
@@ -295,7 +295,7 @@ export function WhatsAppCard({ isAdmin }: { isAdmin: boolean }) {
                 !accessToken.trim() ||
                 (provider === 'meta' ? !wabaId.trim() : !authId.trim())
               }
-              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
+              className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors disabled:opacity-60"
             >
               {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? (
                 <><CheckCircle className="h-4 w-4" /> Saved!</>

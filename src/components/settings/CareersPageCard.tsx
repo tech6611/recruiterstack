@@ -58,7 +58,7 @@ interface FormState {
 
 const EMPTY: FormState = {
   careers_slug: '', careers_public: false, logo_url: null, hero_image_url: null,
-  brand_color: '#2563eb', accent_color: '#10b981', brand_font: 'Inter',
+  brand_color: '#2563eb', accent_color: '#1f7a5a', brand_font: 'Inter',
   tagline: '', about: '',
 }
 
@@ -86,7 +86,7 @@ export function CareersPageCard() {
           logo_url:       data?.logo_url ?? null,
           hero_image_url: data?.hero_image_url ?? null,
           brand_color:    data?.brand_color ?? '#2563eb',
-          accent_color:   data?.accent_color ?? '#10b981',
+          accent_color:   data?.accent_color ?? '#1f7a5a',
           brand_font:     data?.brand_font ?? 'Inter',
           tagline:        data?.tagline ?? '',
           about:          data?.about ?? '',

@@ -12,7 +12,7 @@ type EmpInfo = { id: string; status: EmployeeStatus; person: { name: string; ema
 
 const STATUS_BADGE: Record<OkrStatus, string> = {
   draft:     'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
-  active:    'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+  active:    'bg-slate-50 text-slate-700 ring-1 ring-slate-200',
   achieved:  'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
   missed:    'bg-rose-50 text-rose-700 ring-1 ring-rose-200',
   abandoned: 'bg-slate-100 text-slate-500 ring-1 ring-slate-200',

@@ -10,9 +10,9 @@ interface StatsCardProps {
 }
 
 const COLOR_MAP = {
-  blue:    { bg: 'bg-blue-50',    icon: 'text-emerald-600',   ring: 'ring-emerald-100' },
+  blue:    { bg: 'bg-slate-50',    icon: 'text-emerald-600',   ring: 'ring-emerald-100' },
   emerald: { bg: 'bg-emerald-50', icon: 'text-emerald-600', ring: 'ring-emerald-100' },
-  violet:  { bg: 'bg-violet-50',  icon: 'text-violet-600',  ring: 'ring-violet-100' },
+  violet:  { bg: 'bg-slate-50',  icon: 'text-slate-600',  ring: 'ring-slate-100' },
   amber:   { bg: 'bg-amber-50',   icon: 'text-amber-600',   ring: 'ring-amber-100' },
 }
 

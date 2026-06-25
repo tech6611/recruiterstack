@@ -49,7 +49,7 @@ export default function ReferralsTab({ candidateId, referrals, onReferralAdded }
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="Note (optional)" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm resize-none outline-none focus:border-emerald-400" />
           <div className="flex justify-end gap-2">
             <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700">Cancel</button>
-            <button onClick={submit} disabled={saving || !name.trim()} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+            <button onClick={submit} disabled={saving || !name.trim()} className="rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b] disabled:opacity-50">
               {saving ? 'Saving…' : 'Add Referral'}
             </button>
           </div>

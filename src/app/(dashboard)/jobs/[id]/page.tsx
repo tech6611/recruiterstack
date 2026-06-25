@@ -48,24 +48,24 @@ function RatingDots({ rating }: { rating: number }) {
 
 const STAGE_STYLES: Record<StageColor, { header: string; dot: string; border: string; bar: string; barTop: string; barBottom: string }> = {
   slate:   { header: 'bg-slate-100',   dot: 'bg-slate-400',   border: 'border-slate-300',   bar: 'border-y-4 border-slate-300',   barTop: 'border-t-4 border-slate-300',   barBottom: 'border-b-4 border-slate-300'   },
-  blue:    { header: 'bg-blue-50',     dot: 'bg-blue-500',    border: 'border-blue-300',    bar: 'border-y-4 border-blue-300',    barTop: 'border-t-4 border-blue-300',    barBottom: 'border-b-4 border-blue-300'    },
-  violet:  { header: 'bg-violet-50',   dot: 'bg-violet-500',  border: 'border-violet-300',  bar: 'border-y-4 border-violet-300',  barTop: 'border-t-4 border-violet-300',  barBottom: 'border-b-4 border-violet-300'  },
+  blue:    { header: 'bg-slate-50',     dot: 'bg-slate-500',    border: 'border-slate-300',    bar: 'border-y-4 border-slate-300',    barTop: 'border-t-4 border-slate-300',    barBottom: 'border-b-4 border-slate-300'    },
+  violet:  { header: 'bg-slate-50',   dot: 'bg-slate-500',  border: 'border-slate-300',  bar: 'border-y-4 border-slate-300',  barTop: 'border-t-4 border-slate-300',  barBottom: 'border-b-4 border-slate-300'  },
   amber:   { header: 'bg-amber-50',    dot: 'bg-amber-500',   border: 'border-amber-300',   bar: 'border-y-4 border-amber-300',   barTop: 'border-t-4 border-amber-300',   barBottom: 'border-b-4 border-amber-300'   },
   emerald: { header: 'bg-emerald-50',  dot: 'bg-emerald-500', border: 'border-emerald-300', bar: 'border-y-4 border-emerald-300', barTop: 'border-t-4 border-emerald-300', barBottom: 'border-b-4 border-emerald-300' },
-  green:   { header: 'bg-green-50',    dot: 'bg-green-500',   border: 'border-green-300',   bar: 'border-y-4 border-green-300',   barTop: 'border-t-4 border-green-300',   barBottom: 'border-b-4 border-green-300'   },
+  green:   { header: 'bg-emerald-50',    dot: 'bg-emerald-500',   border: 'border-emerald-300',   bar: 'border-y-4 border-emerald-300',   barTop: 'border-t-4 border-emerald-300',   barBottom: 'border-b-4 border-emerald-300'   },
   red:     { header: 'bg-red-50',      dot: 'bg-red-500',     border: 'border-red-300',     bar: 'border-y-4 border-red-300',     barTop: 'border-t-4 border-red-300',     barBottom: 'border-b-4 border-red-300'     },
-  pink:    { header: 'bg-pink-50',     dot: 'bg-pink-500',    border: 'border-pink-300',    bar: 'border-y-4 border-pink-300',    barTop: 'border-t-4 border-pink-300',    barBottom: 'border-b-4 border-pink-300'    },
+  pink:    { header: 'bg-slate-50',     dot: 'bg-slate-500',    border: 'border-slate-300',    bar: 'border-y-4 border-slate-300',    barTop: 'border-t-4 border-slate-300',    barBottom: 'border-b-4 border-slate-300'    },
 }
 
 const COLOR_OPTIONS: { value: StageColor; label: string; dot: string }[] = [
   { value: 'slate',   label: 'Grey',    dot: 'bg-slate-400'   },
-  { value: 'blue',    label: 'Blue',    dot: 'bg-blue-500'    },
-  { value: 'violet',  label: 'Purple',  dot: 'bg-violet-500'  },
+  { value: 'blue',    label: 'Blue',    dot: 'bg-slate-500'    },
+  { value: 'violet',  label: 'Purple',  dot: 'bg-slate-500'  },
   { value: 'amber',   label: 'Amber',   dot: 'bg-amber-500'   },
   { value: 'emerald', label: 'Teal',    dot: 'bg-emerald-500' },
-  { value: 'green',   label: 'Green',   dot: 'bg-green-500'   },
+  { value: 'green',   label: 'Green',   dot: 'bg-emerald-500'   },
   { value: 'red',     label: 'Red',     dot: 'bg-red-500'     },
-  { value: 'pink',    label: 'Pink',    dot: 'bg-pink-500'    },
+  { value: 'pink',    label: 'Pink',    dot: 'bg-slate-500'    },
 ]
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -75,8 +75,8 @@ const SOURCE_LABELS: Record<string, string> = {
 
 const SOURCE_COLORS: Record<string, string> = {
   manual: 'bg-slate-100 text-slate-600',
-  applied: 'bg-blue-50 text-blue-700',
-  imported: 'bg-violet-50 text-violet-700',
+  applied: 'bg-slate-50 text-slate-700',
+  imported: 'bg-slate-50 text-slate-700',
   sourced: 'bg-amber-50 text-amber-700',
   referral: 'bg-emerald-50 text-emerald-700',
 }
@@ -114,7 +114,7 @@ function ScorePill({ score }: { score: number | null }) {
 
 const AI_REC_CONFIG: Record<AiRecommendation, { label: string; cls: string }> = {
   strong_yes: { label: 'Strong Yes', cls: 'bg-emerald-100 text-emerald-700' },
-  yes:        { label: 'Yes',        cls: 'bg-blue-100 text-blue-700'       },
+  yes:        { label: 'Yes',        cls: 'bg-slate-100 text-slate-700'       },
   maybe:      { label: 'Maybe',      cls: 'bg-amber-100 text-amber-700'     },
   no:         { label: 'No',         cls: 'bg-red-100 text-red-700'         },
 }
@@ -122,11 +122,11 @@ const AI_REC_CONFIG: Record<AiRecommendation, { label: string; cls: string }> = 
 // ── Candidate card ────────────────────────────────────────────────────────────
 
 const SIGNAL_ACCENT: Record<string, string> = {
-  strong_yes: '#10b981', yes: '#3b82f6', maybe: '#f59e0b', no: '#ef4444',
+  strong_yes: '#1f7a5a', yes: '#3b82f6', maybe: '#f59e0b', no: '#ef4444',
 }
 const SIGNAL_BADGE: Record<string, { label: string; cls: string }> = {
   strong_yes: { label: 'Strong Yes', cls: 'bg-emerald-100 text-emerald-700' },
-  yes:        { label: 'Yes',        cls: 'bg-blue-100 text-blue-700'       },
+  yes:        { label: 'Yes',        cls: 'bg-slate-100 text-slate-700'       },
   maybe:      { label: 'Maybe',      cls: 'bg-amber-100 text-amber-700'     },
   no:         { label: 'No',         cls: 'bg-red-100 text-red-700'         },
 }
@@ -178,7 +178,7 @@ function CandidateCard({
       onClick={() => onClick(app)}
       style={accentColor ? { borderLeftColor: accentColor, borderLeftWidth: '3px' } : undefined}
       className={`cursor-pointer rounded-xl border bg-white px-3 py-2 shadow-sm hover:shadow-md transition-all select-none ${
-        isSelected ? 'border-blue-400 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-emerald-200'
+        isSelected ? 'border-slate-400 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-emerald-200'
       }`}
     >
       <div className="flex items-center gap-1.5 min-w-0">
@@ -186,7 +186,7 @@ function CandidateCard({
         <div
           onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
           className={`h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
-            isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-emerald-400 bg-white'
+            isSelected ? 'bg-slate-500 border-slate-500' : 'border-slate-300 hover:border-emerald-400 bg-white'
           }`}
         >
           {isSelected && <Check className="h-2 w-2 text-white" />}
@@ -231,7 +231,7 @@ function CandidateCard({
           score:  'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
           reject: 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100',
           final:  'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-          move:   'border-blue-200 bg-blue-50 text-blue-700 hover:bg-emerald-100',
+          move:   'border-slate-200 bg-slate-50 text-slate-700 hover:bg-emerald-100',
         }[suggestedAction.variant]
         return (
           <button
@@ -422,14 +422,14 @@ function StageColumn({
               title={allInStageSelected ? 'Deselect all in this stage' : 'Select all in this stage'}
               className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-all ${
                 allInStageSelected
-                  ? 'bg-blue-500 border-blue-500'
+                  ? 'bg-slate-500 border-slate-500'
                   : someInStageSelected
-                    ? 'bg-blue-100 border-blue-400'
+                    ? 'bg-slate-100 border-slate-400'
                     : 'border-slate-300 bg-white/70 hover:border-emerald-400'
               }`}
             >
               {allInStageSelected  && <Check className="h-2.5 w-2.5 text-white" />}
-              {someInStageSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
+              {someInStageSelected && <div className="h-0.5 w-2 bg-slate-500 rounded-full" />}
             </button>
           )}
           <button
@@ -793,7 +793,7 @@ function AddCandidateModal({
               onClick={() => setTab(t.key as 'new' | 'search')}
               className={`flex-1 py-3 text-sm font-medium transition-colors ${
                 tab === t.key
-                  ? 'text-blue-700 border-b-2 border-emerald-600'
+                  ? 'text-slate-700 border-b-2 border-emerald-600'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -835,7 +835,7 @@ function AddCandidateModal({
                     onClick={() => { setShowLinkedIn(v => !v); setShowDriveUrl(false) }}
                     disabled={importLoading}
                     className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 ${
-                      showLinkedIn ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      showLinkedIn ? 'border-slate-300 bg-slate-50 text-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     <Link2 className="h-3.5 w-3.5" />
@@ -846,7 +846,7 @@ function AddCandidateModal({
                     onClick={() => { setShowDriveUrl(v => !v); setShowLinkedIn(false) }}
                     disabled={importLoading}
                     className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-50 ${
-                      showDriveUrl ? 'border-green-300 bg-green-50 text-green-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      showDriveUrl ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -875,7 +875,7 @@ function AddCandidateModal({
                       type="button"
                       onClick={handleLinkedInImport}
                       disabled={importLoading || !linkedInText.trim()}
-                      className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-lg bg-[#221b14] px-3 py-2 text-xs font-semibold text-white hover:bg-[#33271b] transition-colors disabled:opacity-50"
                     >
                       {importLoading && showLinkedIn && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                       Extract Details
@@ -891,13 +891,13 @@ function AddCandidateModal({
                       value={driveUrl}
                       onChange={e => setDriveUrl(e.target.value)}
                       placeholder="https://drive.google.com/file/d/…/view"
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                     <button
                       type="button"
                       onClick={handleDriveImport}
                       disabled={importLoading || !driveUrl.trim()}
-                      className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-lg bg-[#221b14] px-3 py-2 text-xs font-semibold text-white hover:bg-[#33271b] transition-colors disabled:opacity-50"
                     >
                       {importLoading && showDriveUrl && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                       Import from Drive
@@ -959,7 +959,7 @@ function AddCandidateModal({
                 >
                   <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showImportedFields ? 'rotate-0' : '-rotate-90'}`} />
                   Additional Details
-                  {showImportedFields && <span className="ml-1 text-[10px] font-medium text-emerald-600 bg-blue-50 rounded px-1.5 py-0.5">auto-filled</span>}
+                  {showImportedFields && <span className="ml-1 text-[10px] font-medium text-emerald-600 bg-slate-50 rounded px-1.5 py-0.5">auto-filled</span>}
                 </button>
 
                 {showImportedFields && (
@@ -1083,7 +1083,7 @@ function AddCandidateModal({
             <button
               onClick={addNew}
               disabled={saving}
-              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
+              className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors disabled:opacity-60"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               Add to Pipeline
@@ -1210,7 +1210,7 @@ function ScoringCriteriaModal({
                         const v = Math.max(0, Math.min(100, parseInt(e.target.value) || 0))
                         setItems(prev => prev.map((x, j) => j === i ? { ...x, weight: v } : x))
                       }}
-                      className={`w-9 text-xs font-semibold text-center rounded border bg-transparent focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-300 border-transparent hover:border-slate-200 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${total === 100 ? 'text-slate-700' : 'text-amber-600'}`}
+                      className={`w-9 text-xs font-semibold text-center rounded border bg-transparent focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 border-transparent hover:border-slate-200 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${total === 100 ? 'text-slate-700' : 'text-amber-600'}`}
                     />
                     <span className={`text-xs font-semibold ${total === 100 ? 'text-slate-700' : 'text-amber-600'}`}>%</span>
                   </div>
@@ -1261,7 +1261,7 @@ function ScoringCriteriaModal({
 
             const RATING_LABEL: Record<number, string> = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Excellent' }
             const RATING_COLOR: Record<number, string> = {
-              1: 'text-red-500', 2: 'text-amber-500', 3: 'text-blue-500', 4: 'text-emerald-500',
+              1: 'text-red-500', 2: 'text-amber-500', 3: 'text-slate-500', 4: 'text-emerald-500',
             }
 
             const weightedTotal = items.reduce((sum, c) => {
@@ -1269,15 +1269,15 @@ function ScoringCriteriaModal({
               return sum + (r ? r.pts : 0)
             }, 0)
 
-            const headerCls  = hasManual ? 'bg-slate-100'   : hasScore ? 'bg-blue-50'   : 'bg-slate-100'
-            const thCls      = hasManual ? 'text-slate-500' : hasScore ? 'text-blue-500' : 'text-slate-500'
-            const dividerCls = hasManual ? 'divide-slate-100' : hasScore ? 'divide-blue-50' : 'divide-slate-100'
-            const footerCls  = hasManual ? 'bg-slate-100 border-slate-200' : hasScore ? 'bg-blue-50 border-blue-100' : 'bg-slate-100 border-slate-200'
-            const borderCls  = hasManual ? 'border-slate-200' : hasScore ? 'border-blue-100' : 'border-slate-200'
+            const headerCls  = hasManual ? 'bg-slate-100'   : hasScore ? 'bg-slate-50'   : 'bg-slate-100'
+            const thCls      = hasManual ? 'text-slate-500' : hasScore ? 'text-slate-500' : 'text-slate-500'
+            const dividerCls = hasManual ? 'divide-slate-100' : hasScore ? 'divide-slate-50' : 'divide-slate-100'
+            const footerCls  = hasManual ? 'bg-slate-100 border-slate-200' : hasScore ? 'bg-slate-50 border-slate-100' : 'bg-slate-100 border-slate-200'
+            const borderCls  = hasManual ? 'border-slate-200' : hasScore ? 'border-slate-100' : 'border-slate-200'
             const wrapCls    = hasManual
               ? 'rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2'
               : hasScore
-                ? 'rounded-xl bg-blue-50/50 border border-blue-100 p-3 space-y-2'
+                ? 'rounded-xl bg-slate-50/50 border border-slate-100 p-3 space-y-2'
                 : 'rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2'
 
             return (
@@ -1329,7 +1329,7 @@ function ScoringCriteriaModal({
                     <tfoot>
                       <tr className={`border-t-2 ${footerCls}`}>
                         <td colSpan={3} className="px-2 py-1.5 font-bold text-slate-600">Total</td>
-                        <td className={`px-2 py-1.5 text-center font-bold ${(hasManual || hasAI) ? 'text-violet-600' : (total === 100 ? 'text-emerald-600' : 'text-amber-600')}`}>
+                        <td className={`px-2 py-1.5 text-center font-bold ${(hasManual || hasAI) ? 'text-slate-600' : (total === 100 ? 'text-emerald-600' : 'text-amber-600')}`}>
                           {(hasManual || hasAI) ? `${weightedTotal.toFixed(1)} / 100` : `${total}`}
                         </td>
                       </tr>
@@ -1340,7 +1340,7 @@ function ScoringCriteriaModal({
                 {/* Footer note */}
                 {hasManual || hasAI ? (
                   <div className="flex items-center justify-between gap-2">
-                    <p className={`text-[9px] ${hasManual ? 'text-slate-400' : 'text-blue-400'}`}>
+                    <p className={`text-[9px] ${hasManual ? 'text-slate-400' : 'text-slate-400'}`}>
                       Wtg × Rating = (Rating ÷ 4) × Weightage. Updates live as you adjust weights.
                     </p>
                     {/* Re-score button — passes current (possibly unsaved) items */}
@@ -1348,7 +1348,7 @@ function ScoringCriteriaModal({
                       <button
                         onClick={() => onRescore(items)}
                         disabled={rescoring}
-                        className="shrink-0 text-[9px] font-semibold text-blue-500 hover:text-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                        className="shrink-0 text-[9px] font-semibold text-slate-500 hover:text-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                       >
                         <Loader2 className={`h-2.5 w-2.5 ${rescoring ? 'animate-spin' : ''}`} />
                         {rescoring ? 'Rescoring…' : 'Re-score'}
@@ -1357,7 +1357,7 @@ function ScoringCriteriaModal({
                   </div>
                 ) : hasScore && onRescore ? (
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[9px] text-blue-400">
+                    <p className="text-[9px] text-slate-400">
                       {rescoring
                         ? `Rescoring ${candidateName ?? 'candidate'}…`
                         : `No per-criterion breakdown yet for ${candidateName ?? 'this candidate'}.`}
@@ -1365,7 +1365,7 @@ function ScoringCriteriaModal({
                     <button
                       onClick={() => onRescore(items)}
                       disabled={rescoring}
-                      className="shrink-0 text-[9px] font-semibold text-white bg-blue-500 hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors rounded-md px-2 py-1 flex items-center gap-1"
+                      className="shrink-0 text-[9px] font-semibold text-white bg-[#221b14] hover:bg-[#33271b] disabled:opacity-60 disabled:cursor-not-allowed transition-colors rounded-md px-2 py-1 flex items-center gap-1"
                     >
                       <Loader2 className={`h-2.5 w-2.5 ${rescoring ? 'animate-spin' : ''}`} />
                       {rescoring ? 'Rescoring…' : 'Re-score now'}
@@ -1403,7 +1403,7 @@ function ScoringCriteriaModal({
             <button
               onClick={handleSave}
               disabled={saving || total !== 100}
-              className="flex-1 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 rounded-xl bg-slate-600 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >{saving ? 'Saving…' : 'Save'}</button>
           </div>
         </div>
@@ -1603,13 +1603,13 @@ function CandidateSlideOver({
               onClick={() => setTab(t.key as 'details' | 'scorecards')}
               className={`flex items-center gap-1.5 flex-1 py-3 text-sm font-medium transition-colors ${
                 tab === t.key
-                  ? 'text-blue-700 border-b-2 border-emerald-600'
+                  ? 'text-slate-700 border-b-2 border-emerald-600'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               {t.label}
               {t.count != null && t.count > 0 && (
-                <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-xs font-bold text-violet-700">
+                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-700">
                   {t.count}
                 </span>
               )}
@@ -1697,7 +1697,7 @@ function CandidateSlideOver({
                 <button
                   onClick={() => setEditCriteriaOpen(true)}
                   title="Edit scoring criteria"
-                  className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-violet-600 transition-colors ml-2 shrink-0"
+                  className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-600 transition-colors ml-2 shrink-0"
                 >
                   <Pencil className="h-2.5 w-2.5" />
                   Edit
@@ -1706,19 +1706,19 @@ function CandidateSlideOver({
 
               {/* ── AI Analysis (stored, no extra API call) ── */}
               {(app.ai_score !== null || rescoring) && (
-                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-2.5">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 space-y-2.5">
                   {/* Rescoring banner */}
                   {rescoring && (
-                    <div className="flex items-center gap-2 text-xs text-emerald-600 bg-blue-100 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 text-xs text-emerald-600 bg-slate-100 rounded-lg px-3 py-2">
                       <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
                       <span>Rescoring with new criteria…</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-blue-700">🤖 AI Analysis</span>
+                      <span className="text-xs font-bold text-slate-700">🤖 AI Analysis</span>
                       {app.ai_scored_at && !rescoring && (
-                        <span className="text-[10px] text-blue-400">{fmtRelative(app.ai_scored_at)}</span>
+                        <span className="text-[10px] text-slate-400">{fmtRelative(app.ai_scored_at)}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -1762,11 +1762,11 @@ function CandidateSlideOver({
 
                   {/* Scored-on basis */}
                   {localCriteria && localCriteria.length > 0 && (
-                    <div className="pt-2 border-t border-blue-100">
-                      <p className="text-[9px] font-semibold text-blue-400 uppercase tracking-wide mb-1.5">📊 Scored on</p>
+                    <div className="pt-2 border-t border-slate-100">
+                      <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">📊 Scored on</p>
                       <div className="flex flex-wrap gap-1">
                         {localCriteria.map(c => (
-                          <span key={c.id} className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-emerald-600 font-medium">
+                          <span key={c.id} className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-emerald-600 font-medium">
                             {c.name} {c.weight}%
                           </span>
                         ))}
@@ -1780,7 +1780,7 @@ function CandidateSlideOver({
               {!showAddForm && (
                 <button
                   onClick={() => setShowAddForm(true)}
-                  className="flex items-center gap-2 w-full rounded-xl border-2 border-dashed border-violet-200 px-4 py-3 text-sm font-medium text-violet-600 hover:bg-violet-50 hover:border-violet-300 transition-colors"
+                  className="flex items-center gap-2 w-full rounded-xl border-2 border-dashed border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Add Scorecard
@@ -1789,7 +1789,7 @@ function CandidateSlideOver({
 
               {/* Inline scorecard form */}
               {showAddForm && (
-                <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 space-y-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-bold text-slate-800">New Scorecard</p>
                     <button onClick={() => { setShowAddForm(false); setScError('') }} className="p-1 text-slate-400 hover:text-slate-700">
@@ -1804,7 +1804,7 @@ function CandidateSlideOver({
                         value={scInterviewer}
                         onChange={e => setScInterviewer(e.target.value)}
                         placeholder="Jane Smith"
-                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400"
                       />
                     </div>
                     <div>
@@ -1813,7 +1813,7 @@ function CandidateSlideOver({
                         value={scRound}
                         onChange={e => setScRound(e.target.value)}
                         placeholder="Phone Screen"
-                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400"
                       />
                     </div>
                   </div>
@@ -1826,7 +1826,7 @@ function CandidateSlideOver({
                         type="button"
                         onClick={() => setEditCriteriaOpen(true)}
                         title="Edit scoring criteria"
-                        className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-violet-600 transition-colors"
+                        className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
                       >
                         <Pencil className="h-2.5 w-2.5" /> Edit criteria
                       </button>
@@ -1888,7 +1888,7 @@ function CandidateSlideOver({
                     onChange={e => setScNotes(e.target.value)}
                     rows={2}
                     placeholder="Overall notes (optional)…"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none"
                   />
 
                   {scError && (
@@ -1901,7 +1901,7 @@ function CandidateSlideOver({
                   <button
                     onClick={submitScorecard}
                     disabled={scSaving}
-                    className="flex items-center justify-center gap-2 w-full rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-60"
+                    className="flex items-center justify-center gap-2 w-full rounded-xl bg-slate-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition-colors disabled:opacity-60"
                   >
                     {scSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
                     Submit Scorecard
@@ -1916,7 +1916,7 @@ function CandidateSlideOver({
                 </div>
               ) : scorecards.length === 0 && !showAddForm ? (
                 <div className="flex flex-col items-center py-10 text-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-300 mb-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50 text-slate-300 mb-3">
                     <Star className="h-6 w-6" />
                   </div>
                   <p className="text-sm font-medium text-slate-500">No scorecards yet</p>
@@ -2152,8 +2152,8 @@ function RankedView({
           {children}
           {active
             ? sortDir === 'asc'
-              ? <ArrowUp className="h-3 w-3 text-blue-500 shrink-0" />
-              : <ArrowDown className="h-3 w-3 text-blue-500 shrink-0" />
+              ? <ArrowUp className="h-3 w-3 text-slate-500 shrink-0" />
+              : <ArrowDown className="h-3 w-3 text-slate-500 shrink-0" />
             : <ArrowDownUp className="h-3 w-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           }
         </div>
@@ -2178,13 +2178,13 @@ function RankedView({
                   onClick={() => onBulkSelect(allSelected || someSelected ? [] : sortedApps.map(a => a.id))}
                   title={allSelected || someSelected ? 'Deselect all' : 'Select all visible candidates'}
                   className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
-                    allSelected  ? 'bg-blue-500 border-blue-500' :
-                    someSelected ? 'bg-blue-100 border-blue-400' :
+                    allSelected  ? 'bg-slate-500 border-slate-500' :
+                    someSelected ? 'bg-slate-100 border-slate-400' :
                     'border-slate-300 hover:border-emerald-400 bg-white'
                   }`}
                 >
                   {allSelected  && <Check className="h-2.5 w-2.5 text-white" />}
-                  {someSelected && <div className="h-0.5 w-2 bg-blue-500 rounded-full" />}
+                  {someSelected && <div className="h-0.5 w-2 bg-slate-500 rounded-full" />}
                 </div>
               </th>
               <SortTh col="score" className="w-10">#</SortTh>
@@ -2218,14 +2218,14 @@ function RankedView({
                   key={app.id}
                   onClick={() => onCardClick(app)}
                   className={`border-b border-slate-50 cursor-pointer transition-colors last:border-0 ${
-                    isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'
+                    isSelected ? 'bg-slate-50' : 'hover:bg-slate-50'
                   }`}
                 >
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <div
                       onClick={e => { e.stopPropagation(); onToggleSelect(app.id) }}
                       className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 hover:border-emerald-400 bg-white'
+                        isSelected ? 'bg-slate-500 border-slate-500' : 'border-slate-300 hover:border-emerald-400 bg-white'
                       }`}
                     >
                       {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
@@ -2280,7 +2280,7 @@ function RankedView({
                       /* No score yet → prompt to score */
                       <button
                         onClick={() => onScoreApp(app)}
-                        className="flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors whitespace-nowrap"
+                        className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors whitespace-nowrap"
                       >
                         ⚡ Score candidate
                       </button>
@@ -2302,7 +2302,7 @@ function RankedView({
                         onClick={() => onMoveToStage(app.id, nextStage.id)}
                         className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
                           app.ai_recommendation === 'strong_yes' || app.ai_recommendation === 'yes'
-                            ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-emerald-100'
+                            ? 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-emerald-100'
                             : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
                       >
@@ -2483,10 +2483,10 @@ function AutopilotDrawer({
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
           {/* Auto-runs banner */}
-          <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+          <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
             <span className="text-base leading-none mt-0.5">⚡</span>
             <div>
-              <p className="text-xs font-semibold text-blue-800">Runs automatically on every new application</p>
+              <p className="text-xs font-semibold text-slate-800">Runs automatically on every new application</p>
               <p className="text-xs text-emerald-600 mt-0.5">
                 Sifter scores candidates the moment they apply — no manual trigger needed.
               </p>
@@ -2880,7 +2880,7 @@ function ScheduleInterviewModal({
   const MEETING_INTEGRATIONS = [
     { id: 'gmeet',  label: 'Google Meet', color: 'hover:bg-emerald-50 hover:border-emerald-300',     url: 'https://meet.google.com/new',               placeholder: 'https://meet.google.com/xxx-yyy-zzz' },
     { id: 'zoom',   label: 'Zoom',        color: 'hover:bg-emerald-50 hover:border-emerald-300',     url: 'https://zoom.us/start/videomeeting',        placeholder: 'https://zoom.us/j/...' },
-    { id: 'teams',  label: 'MS Teams',    color: 'hover:bg-violet-50 hover:border-violet-300', url: 'https://teams.microsoft.com/l/meeting/new', placeholder: 'https://teams.microsoft.com/l/...' },
+    { id: 'teams',  label: 'MS Teams',    color: 'hover:bg-slate-50 hover:border-slate-300', url: 'https://teams.microsoft.com/l/meeting/new', placeholder: 'https://teams.microsoft.com/l/...' },
   ] as const
 
   const [activePlatform, setActivePlatform] = useState<string | null>(null)
@@ -2999,19 +2999,19 @@ function ScheduleInterviewModal({
             )}
             {/* Auto-created Meet link banner */}
             {autoMeetLink && (
-              <div className="flex items-center justify-between gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-green-500">✓</span>
+                  <span className="text-emerald-500">✓</span>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-green-700">Google Meet created</p>
-                    <p className="text-[11px] text-green-600 truncate">{autoMeetLink}</p>
+                    <p className="text-xs font-semibold text-emerald-700">Google Meet created</p>
+                    <p className="text-[11px] text-emerald-600 truncate">{autoMeetLink}</p>
                   </div>
                 </div>
                 <a
                   href={autoMeetLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="shrink-0 text-xs font-medium text-green-700 underline hover:text-green-900"
+                  className="shrink-0 text-xs font-medium text-emerald-700 underline hover:text-emerald-900"
                 >
                   Join
                 </a>
@@ -3030,7 +3030,7 @@ function ScheduleInterviewModal({
                 href={location}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 hover:bg-emerald-100 transition-colors"
+                className="flex items-center justify-center gap-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-100 transition-colors"
               >
                 <ExternalLink className="h-4 w-4" /> Open meeting link
               </a>
@@ -3117,7 +3117,7 @@ function ScheduleInterviewModal({
                     disabled={!member.email}
                     className={`text-[10px] font-medium rounded-full px-2 py-0.5 border transition-colors ${
                       interviewer === member.name && interviewerEmail === member.email
-                        ? 'bg-blue-50 text-emerald-600 border-blue-200'
+                        ? 'bg-slate-50 text-emerald-600 border-slate-200'
                         : member.email
                         ? 'text-slate-400 border-slate-200 hover:border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50 bg-white'
                         : 'text-slate-300 border-slate-100 bg-white cursor-not-allowed'
@@ -3183,7 +3183,7 @@ function ScheduleInterviewModal({
                     setAddingMember(false)
                   }}
                   disabled={!newMemberName.trim()}
-                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-[#221b14] text-white text-xs font-medium hover:bg-[#33271b] disabled:opacity-40 transition-colors"
                 >
                   Add
                 </button>
@@ -3207,7 +3207,7 @@ function ScheduleInterviewModal({
                   onClick={() => setInterviewType(t.value)}
                   className={`px-2.5 py-2 rounded-xl border text-xs font-medium transition-colors text-left ${
                     interviewType === t.value
-                      ? 'border-blue-400 bg-blue-50 text-blue-700'
+                      ? 'border-slate-400 bg-slate-50 text-slate-700'
                       : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
@@ -3227,7 +3227,7 @@ function ScheduleInterviewModal({
                   onClick={() => setDuration(d.value)}
                   className={`flex-1 px-2 py-2 rounded-xl border text-xs font-medium transition-colors ${
                     duration === d.value
-                      ? 'border-blue-400 bg-blue-50 text-blue-700'
+                      ? 'border-slate-400 bg-slate-50 text-slate-700'
                       : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
@@ -3392,7 +3392,7 @@ function ScheduleInterviewModal({
                                       : isSelected
                                       ? 'bg-emerald-600'
                                       : isInBlock
-                                      ? 'bg-blue-200 hover:bg-emerald-300 cursor-pointer'
+                                      ? 'bg-slate-200 hover:bg-emerald-300 cursor-pointer'
                                       : isWeekend
                                       ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                       : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
@@ -3410,7 +3410,7 @@ function ScheduleInterviewModal({
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-100 border border-emerald-200" /> Free</span>
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-red-100" /> Busy</span>
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-600" /> Start</span>
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-blue-200" /> Duration block</span>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-slate-200" /> Duration block</span>
                   </div>
                 </div>
               )}
@@ -3428,7 +3428,7 @@ function ScheduleInterviewModal({
                     onClick={() => openIntegration(p)}
                     className={`flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
                       activePlatform === p.id
-                        ? 'border-blue-400 bg-blue-50 text-blue-700'
+                        ? 'border-slate-400 bg-slate-50 text-slate-700'
                         : `border-slate-200 text-slate-600 ${p.color}`
                     }`}
                   >
@@ -3444,11 +3444,11 @@ function ScheduleInterviewModal({
               </div>
               {/* Google Meet + Calendar connected → auto-create banner */}
               {activePlatform === 'gmeet' && googleConnected ? (
-                <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
-                  <span className="text-green-500 text-base">✓</span>
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+                  <span className="text-emerald-500 text-base">✓</span>
                   <div>
-                    <p className="text-xs font-semibold text-green-700">Google Meet link will be auto-created</p>
-                    <p className="text-[11px] text-green-600">Calendar invites sent to candidate &amp; interviewer on schedule</p>
+                    <p className="text-xs font-semibold text-emerald-700">Google Meet link will be auto-created</p>
+                    <p className="text-[11px] text-emerald-600">Calendar invites sent to candidate &amp; interviewer on schedule</p>
                   </div>
                 </div>
               ) : (
@@ -3521,7 +3521,7 @@ function ScheduleInterviewModal({
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#221b14] hover:bg-[#33271b] text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
           >
             {saving ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</>
@@ -3668,7 +3668,7 @@ function ScheduleInterviewModal({
                                   : isSelected
                                   ? 'bg-emerald-600'
                                   : isInBlock
-                                  ? 'bg-blue-200 hover:bg-emerald-300 cursor-pointer'
+                                  ? 'bg-slate-200 hover:bg-emerald-300 cursor-pointer'
                                   : isWeekend
                                   ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                   : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
@@ -3697,7 +3697,7 @@ function ScheduleInterviewModal({
               <span className="inline-block h-3 w-5 rounded bg-emerald-600" /> Start
             </span>
             <span className="flex items-center gap-1.5 text-xs text-slate-400">
-              <span className="inline-block h-3 w-5 rounded bg-blue-200" /> Duration block
+              <span className="inline-block h-3 w-5 rounded bg-slate-200" /> Duration block
             </span>
             <span className="ml-auto text-xs text-slate-400">Esc to close</span>
           </div>
@@ -4253,7 +4253,7 @@ export default function JobPipelinePage() {
   return (
     <div className="flex flex-col min-h-full">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-8 py-4 border-b border-violet-100 bg-gradient-to-r from-violet-50 via-slate-50 to-white sticky top-0 z-30">
+      <div className="flex items-center justify-between px-8 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-slate-50 to-white sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push('/jobs')}
@@ -4283,11 +4283,11 @@ export default function JobPipelinePage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1.5 rounded-full bg-white border border-slate-200 shadow-sm px-3 py-1 text-xs font-semibold text-slate-600">
-              <Users className="h-3.5 w-3.5 text-violet-500" />
+              <Users className="h-3.5 w-3.5 text-slate-500" />
               {activeApps.length} in pipeline
             </span>
             {job.ticket_number && (
-              <span className="font-mono text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-1">
+              <span className="font-mono text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
                 {job.ticket_number}
               </span>
             )}
@@ -4403,7 +4403,7 @@ export default function JobPipelinePage() {
 
           <button
             onClick={() => setShowAdd(true)}
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+            className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm"
           >
             <UserPlus className="h-4 w-4" />
             Add Candidate
@@ -4418,16 +4418,16 @@ export default function JobPipelinePage() {
           scoreResult && scoreResult.errors > 0 && scoreResult.scored === 0 ? 'bg-red-50 border-red-200 text-red-700' :
           scoreResult && scoreResult.errors > 0              ? 'bg-amber-50 border-amber-200 text-amber-800'   :
           scoreResult                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-                                                               'bg-violet-50 border-violet-200 text-violet-700'
+                                                               'bg-slate-50 border-slate-200 text-slate-700'
         }`}>
           {scoring && (
             <>
               <Loader2 className="h-4 w-4 animate-spin shrink-0" />
               <div className="flex-1">
                 <p className="font-medium">Scoring {scoreProgress.done} of {scoreProgress.total} candidates…</p>
-                <div className="mt-1.5 h-1.5 rounded-full bg-violet-200 overflow-hidden">
+                <div className="mt-1.5 h-1.5 rounded-full bg-slate-200 overflow-hidden">
                   <div
-                    className="h-full bg-violet-500 rounded-full transition-all duration-300"
+                    className="h-full bg-slate-500 rounded-full transition-all duration-300"
                     style={{ width: scoreProgress.total > 0 ? `${(scoreProgress.done / scoreProgress.total) * 100}%` : '0%' }}
                   />
                 </div>
@@ -4488,14 +4488,14 @@ export default function JobPipelinePage() {
             onClick={() => setFilterPanelOpen(v => !v)}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
               activeFilterCount > 0
-                ? 'border-violet-300 bg-violet-50 text-violet-700 font-medium'
+                ? 'border-slate-300 bg-slate-50 text-slate-700 font-medium'
                 : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
             }`}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white">
+              <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-slate-600 text-[10px] font-bold text-white">
                 {activeFilterCount}
               </span>
             )}
@@ -4588,7 +4588,7 @@ export default function JobPipelinePage() {
                     setFilterSignal('all'); setFilterAction('all')
                     setFilterPanelOpen(false)
                   }}
-                  className="w-full text-xs text-violet-600 hover:text-violet-800 font-medium py-1.5 border border-violet-200 rounded-lg hover:bg-violet-50 transition-colors"
+                  className="w-full text-xs text-slate-600 hover:text-slate-800 font-medium py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   Clear all filters
                 </button>
@@ -4601,7 +4601,7 @@ export default function JobPipelinePage() {
         {selectedApps.size > 0 && (
           <button
             onClick={() => setSelectedApps(new Set())}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-emerald-100 transition-colors font-medium"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-700 hover:bg-emerald-100 transition-colors font-medium"
           >
             {selectedApps.size} selected
             <X className="h-3 w-3" />
@@ -4614,7 +4614,7 @@ export default function JobPipelinePage() {
               setFilterSearch(''); setFilterSource('all'); setFilterStage('all')
               setFilterScore('all'); setFilterSignal('all'); setFilterAction('all')
             }}
-            className="text-xs text-violet-600 hover:text-violet-800 underline underline-offset-2 font-medium"
+            className="text-xs text-slate-600 hover:text-slate-800 underline underline-offset-2 font-medium"
           >
             Clear filters
           </button>
@@ -4666,7 +4666,7 @@ export default function JobPipelinePage() {
         ref={activeAreaRef}
         style={splitHeight !== null ? { height: splitHeight, flexShrink: 0 } : { minHeight: '55vh', flexShrink: 0 }}
         className={`flex items-stretch shrink-0 divide-x transition-colors ${
-          editMode ? 'divide-violet-100 bg-violet-50/20' : 'divide-slate-300 bg-transparent'
+          editMode ? 'divide-slate-100 bg-slate-50/20' : 'divide-slate-300 bg-transparent'
         }`}
       >
         {/* Status column — sticky, not tied to stages */}
@@ -4674,15 +4674,15 @@ export default function JobPipelinePage() {
           className="sticky left-0 z-10 shrink-0 flex flex-col border-t-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
           style={{ width: statusColWidth }}
         >
-          <div className="rounded-xl bg-violet-50 border-2 border-violet-300 px-2.5 py-2.5 flex items-center gap-1.5 mb-1 min-w-0">
-            <div className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
-            <span className="text-xs font-bold text-violet-700 flex-1 min-w-0 truncate">Active</span>
-            <span className="text-xs font-bold text-violet-600 bg-white rounded-full px-1.5 border border-violet-200 shrink-0">{activeApps.length}</span>
+          <div className="rounded-xl bg-slate-50 border-2 border-slate-300 px-2.5 py-2.5 flex items-center gap-1.5 mb-1 min-w-0">
+            <div className="h-2 w-2 rounded-full bg-slate-500 shrink-0" />
+            <span className="text-xs font-bold text-slate-700 flex-1 min-w-0 truncate">Active</span>
+            <span className="text-xs font-bold text-slate-600 bg-white rounded-full px-1.5 border border-slate-200 shrink-0">{activeApps.length}</span>
           </div>
           <p className="text-[10px] text-slate-400 px-0.5 mt-1 leading-tight truncate">Status from HM intake form</p>
           {/* Resize handle — right edge */}
           <div
-            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-violet-300 active:bg-violet-400 transition-colors z-20"
+            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-slate-300 active:bg-slate-400 transition-colors z-20"
             onMouseDown={handleStatusColMouseDown}
             title="Drag to resize"
           />
@@ -4830,20 +4830,20 @@ export default function JobPipelinePage() {
         {/* Add-stage panel — always visible in edit mode */}
         {editMode && (
           <div className="flex-1 min-w-[160px] max-w-[220px] px-3 flex flex-col">
-            <div className="rounded-2xl border-2 border-dashed border-violet-200 bg-white p-3 flex flex-col gap-2">
-              <p className="text-xs font-semibold text-violet-500">New stage</p>
+            <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-3 flex flex-col gap-2">
+              <p className="text-xs font-semibold text-slate-500">New stage</p>
               <input
                 autoFocus
                 value={newStageName}
                 onChange={e => setNewStageName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleAddStage() }}
                 placeholder="Stage name…"
-                className="w-full rounded-xl border border-violet-200 bg-violet-50/50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300"
               />
               <button
                 onClick={handleAddStage}
                 disabled={addingStage || !newStageName.trim()}
-                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-500 transition-colors disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-600 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-500 transition-colors disabled:opacity-50"
               >
                 {addingStage ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                 Add Stage
@@ -4881,7 +4881,7 @@ export default function JobPipelinePage() {
 
       {/* Draggable fill-line divider — same visual language as column bar borders */}
       <div
-        className="shrink-0 h-[4px] bg-slate-300 hover:bg-violet-400 cursor-row-resize transition-colors select-none"
+        className="shrink-0 h-[4px] bg-slate-300 hover:bg-slate-400 cursor-row-resize transition-colors select-none"
         onMouseDown={handleSplitMouseDown}
         title="Drag to resize"
       />
@@ -4935,13 +4935,13 @@ export default function JobPipelinePage() {
 
       {/* Edit Pipeline toggle — outside scroll, spans full height of Active + Rejected */}
       <div className={`shrink-0 flex flex-col gap-1.5 items-stretch px-3 pt-5 border-t-4 ${
-        editMode ? 'border-violet-200 bg-violet-50/20' : 'border-slate-200 bg-transparent'
+        editMode ? 'border-slate-200 bg-slate-50/20' : 'border-slate-200 bg-transparent'
       }`}>
         <button
           onClick={() => setEditMode(e => !e)}
           className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${
             editMode
-              ? 'border-violet-300 bg-violet-600 text-white hover:bg-violet-500 shadow-sm'
+              ? 'border-slate-300 bg-slate-600 text-white hover:bg-slate-500 shadow-sm'
               : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 bg-white'
           }`}
         >

@@ -10,7 +10,7 @@ export const OFFER_STATUS_CONFIG: Record<OfferStatus, { label: string; badge: st
   draft:            { label: 'Draft',            badge: 'bg-slate-100 text-slate-600' },
   pending_approval: { label: 'Pending Approval', badge: 'bg-amber-100 text-amber-700' },
   approved:         { label: 'Approved',         badge: 'bg-emerald-100 text-emerald-700' },
-  sent:             { label: 'Sent',             badge: 'bg-blue-100 text-blue-700' },
+  sent:             { label: 'Sent',             badge: 'bg-slate-100 text-slate-700' },
   accepted:         { label: 'Accepted ✓',       badge: 'bg-emerald-100 text-emerald-700' },
   declined:         { label: 'Declined',         badge: 'bg-red-100 text-red-700' },
   withdrawn:        { label: 'Withdrawn',        badge: 'bg-slate-100 text-slate-600' },
@@ -220,7 +220,7 @@ export default function CreateOfferDrawer({
           <button
             onClick={submit}
             disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
+            className="flex items-center gap-2 rounded-xl bg-[#221b14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors disabled:opacity-60"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
             Create Offer

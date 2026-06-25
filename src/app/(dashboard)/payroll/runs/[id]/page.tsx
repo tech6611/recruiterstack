@@ -178,7 +178,7 @@ export default function PayrollRunDetailPage({ params }: { params: Promise<{ id:
           ) : (
             <button
               onClick={finalize}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#221b14] px-3.5 py-2 text-sm font-medium text-white hover:bg-[#33271b] disabled:opacity-50"
               disabled={run.payslips.length === 0}
             >
               <CheckCircle2 className="h-4 w-4" /> Finalize run

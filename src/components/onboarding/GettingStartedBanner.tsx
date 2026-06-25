@@ -98,7 +98,7 @@ export function GettingStartedBanner() {
                 {!step.done && (
                   <Link
                     href={step.href}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#221b14] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b] transition-colors"
                   >
                     Set up <ArrowRight className="h-3 w-3" />
                   </Link>

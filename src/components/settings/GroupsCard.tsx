@@ -52,7 +52,7 @@ export function GroupsCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <UsersRound className="h-4 w-4 text-indigo-600" /> Approval groups
+          <UsersRound className="h-4 w-4 text-slate-600" /> Approval groups
         </CardTitle>
         <CardDescription>Reusable sets of approvers. Use them as the &ldquo;group&rdquo; approver type in chain steps.</CardDescription>
       </CardHeader>

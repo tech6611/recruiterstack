@@ -12,7 +12,7 @@ type BalanceByType = Record<TimeOffRequestType, { granted: number; used: number;
 const TYPE_TONE: Record<TimeOffRequestType, string> = {
   vacation: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
   sick:     'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  personal: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+  personal: 'bg-slate-50 text-slate-700 ring-1 ring-slate-200',
   unpaid:   'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
 }
 
@@ -157,7 +157,7 @@ export default function MyTimeOffPage() {
               <button
                 onClick={submit}
                 disabled={!start || !end || submitting}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#221b14] px-3 py-2 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-50"
               >
                 <Calendar className="h-4 w-4" />
                 {submitting ? 'Submitting…' : 'Submit request'}

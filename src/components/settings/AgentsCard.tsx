@@ -64,7 +64,7 @@ export function AgentsCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-violet-600" /> AI agents
+          <Sparkles className="h-4 w-4 text-slate-600" /> AI agents
         </CardTitle>
         <CardDescription>Turn on the agents your team will use.</CardDescription>
       </CardHeader>

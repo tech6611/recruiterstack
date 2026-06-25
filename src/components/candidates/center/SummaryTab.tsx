@@ -18,7 +18,7 @@ interface VoiceCallSummary {
 
 const CALL_STATUS: Record<string, { label: string; color: string }> = {
   completed:   { label: 'Completed',   color: 'text-emerald-600' },
-  in_progress: { label: 'In Progress', color: 'text-blue-600'    },
+  in_progress: { label: 'In Progress', color: 'text-slate-600'    },
   ringing:     { label: 'Ringing',     color: 'text-amber-600'   },
   no_answer:   { label: 'No Answer',   color: 'text-slate-500'   },
   failed:      { label: 'Failed',      color: 'text-red-600'     },
@@ -27,7 +27,7 @@ const CALL_STATUS: Record<string, { label: string; color: string }> = {
 
 const CALL_REC: Record<string, { label: string; color: string; bg: string }> = {
   strong_yes: { label: 'Strong Yes', color: 'text-emerald-700', bg: 'bg-emerald-100' },
-  yes:        { label: 'Yes',        color: 'text-blue-700',    bg: 'bg-blue-100'    },
+  yes:        { label: 'Yes',        color: 'text-slate-700',    bg: 'bg-slate-100'    },
   maybe:      { label: 'Maybe',      color: 'text-amber-700',   bg: 'bg-amber-100'   },
   no:         { label: 'No',         color: 'text-red-700',     bg: 'bg-red-100'     },
 }
@@ -42,7 +42,7 @@ interface SummaryTabProps {
 
 const REC_CONFIG: Record<AiRecommendation, { label: string; color: string; bg: string }> = {
   strong_yes: { label: 'Strong Yes',  color: 'text-emerald-700', bg: 'bg-emerald-100' },
-  yes:        { label: 'Yes',         color: 'text-blue-700',    bg: 'bg-blue-100'    },
+  yes:        { label: 'Yes',         color: 'text-slate-700',    bg: 'bg-slate-100'    },
   maybe:      { label: 'Maybe',       color: 'text-amber-700',   bg: 'bg-amber-100'   },
   no:         { label: 'No',          color: 'text-red-700',     bg: 'bg-red-100'     },
 }
@@ -171,7 +171,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
           <div key={app.id} className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-violet-500" />
+                <TrendingUp className="h-4 w-4 text-slate-500" />
                 <h3 className="text-sm font-semibold text-slate-800">AI Score</h3>
                 {applications.length > 1 && (
                   <span className="text-[10px] text-slate-400">
@@ -206,7 +206,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
                         <p className="text-[10px] text-slate-500 w-28 shrink-0 truncate">{c.name}</p>
                         <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-violet-500"
+                            className="h-full rounded-full bg-slate-500"
                             style={{ width: `${(c.rating / 4) * 100}%` }}
                           />
                         </div>
@@ -253,13 +253,13 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <Wand2 className="h-4 w-4 text-violet-500" />
+            <Wand2 className="h-4 w-4 text-slate-500" />
             <h3 className="text-sm font-semibold text-slate-800">AI Summary</h3>
           </div>
           <button
             onClick={generate}
             disabled={generating}
-            className="flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors"
+            className="flex items-center gap-1.5 rounded-lg bg-slate-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60 transition-colors"
           >
             {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : summary ? <RefreshCw className="h-3 w-3" /> : <Wand2 className="h-3 w-3" />}
             {generating ? 'Generating…' : summary ? 'Regenerate' : 'Generate Summary'}
@@ -278,7 +278,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
       {/* ── Phone Screens ─────────────────────────────────────────────────── */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
-          <Phone className="h-4 w-4 text-blue-500" />
+          <Phone className="h-4 w-4 text-slate-500" />
           <h3 className="text-sm font-semibold text-slate-800">Phone Screens</h3>
           {!callsLoading && (
             <span className="ml-auto text-xs text-slate-400">{calls.length} call{calls.length !== 1 ? 's' : ''}</span>
@@ -308,7 +308,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
                   onClick={() => setSelectedCallId(call.id)}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
                 >
-                  <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                  <div className="h-8 w-8 rounded-full bg-slate-50 flex items-center justify-center shrink-0">
                     <Phone className="h-3.5 w-3.5 text-emerald-600" />
                   </div>
                   <div className="flex-1 min-w-0">

@@ -134,7 +134,7 @@ function DropZone({ onFile }: { onFile: (text: string, name: string) => void }) 
       }}
       onClick={() => inputRef.current?.click()}
       className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors select-none ${
-        dragging ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-emerald-300 hover:bg-slate-50'
+        dragging ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-emerald-300 hover:bg-slate-50'
       }`}
     >
       <input
@@ -144,7 +144,7 @@ function DropZone({ onFile }: { onFile: (text: string, name: string) => void }) 
         className="hidden"
         onChange={e => { const f = e.target.files?.[0]; if (f) readFile(f) }}
       />
-      <Upload className={`w-9 h-9 mx-auto mb-3 transition-colors ${dragging ? 'text-blue-400' : 'text-slate-300'}`} />
+      <Upload className={`w-9 h-9 mx-auto mb-3 transition-colors ${dragging ? 'text-slate-400' : 'text-slate-300'}`} />
       <p className="text-sm font-semibold text-slate-600">Drop your CSV here, or click to browse</p>
       <p className="text-xs text-slate-400 mt-1.5 max-w-xs mx-auto">
         Works with LinkedIn exports, Indeed downloads, Greenhouse/Lever exports, or any spreadsheet saved as CSV
@@ -175,7 +175,7 @@ function PdfDropZone({ onFiles }: { onFiles: (files: File[]) => void }) {
       }}
       onClick={() => inputRef.current?.click()}
       className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-colors select-none ${
-        dragging ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-emerald-300 hover:bg-slate-50'
+        dragging ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-emerald-300 hover:bg-slate-50'
       }`}
     >
       <input
@@ -186,7 +186,7 @@ function PdfDropZone({ onFiles }: { onFiles: (files: File[]) => void }) {
         className="hidden"
         onChange={e => { if (e.target.files) handleFileList(e.target.files) }}
       />
-      <FileUp className={`w-9 h-9 mx-auto mb-3 transition-colors ${dragging ? 'text-blue-400' : 'text-slate-300'}`} />
+      <FileUp className={`w-9 h-9 mx-auto mb-3 transition-colors ${dragging ? 'text-slate-400' : 'text-slate-300'}`} />
       <p className="text-sm font-semibold text-slate-600">Drop PDF CVs here, or click to browse</p>
       <p className="text-xs text-slate-400 mt-1.5 max-w-xs mx-auto">
         Upload multiple PDFs at once — up to 20 files, 10 MB each
@@ -234,11 +234,11 @@ function ConnectorCard({
   const badgeClass =
     connector.badgeColor === 'green'  ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
     connector.badgeColor === 'orange' ? 'bg-orange-50 text-orange-700 border-orange-100'   :
-                                        'bg-blue-50 text-blue-700 border-blue-100'
+                                        'bg-slate-50 text-slate-700 border-slate-100'
 
   return (
     <div className={`border rounded-2xl transition-all ${
-      isOpen ? 'border-blue-200 bg-blue-50/30' : 'border-slate-200 bg-white hover:border-slate-300'
+      isOpen ? 'border-slate-200 bg-slate-50/30' : 'border-slate-200 bg-white hover:border-slate-300'
     }`}>
       <button onClick={onToggle} className="w-full text-left p-5">
         <div className="flex items-start justify-between">
@@ -260,7 +260,7 @@ function ConnectorCard({
           <ol className="space-y-2.5">
             {connector.steps.map((step, i) => (
               <li key={i} className="flex gap-3 text-sm text-slate-600">
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-bold flex items-center justify-center mt-0.5">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-bold flex items-center justify-center mt-0.5">
                   {i + 1}
                 </span>
                 {step}
@@ -327,7 +327,7 @@ function CandidateTable({
           <button
             onClick={onAction}
             disabled={actionDisabled}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#221b14] text-white text-sm font-semibold rounded-xl hover:bg-[#33271b] disabled:opacity-40 transition-colors"
           >
             {actionLoading
               ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -345,7 +345,7 @@ function CandidateTable({
                   type="checkbox"
                   checked={allSelected}
                   onChange={onToggleAll}
-                  className="rounded accent-blue-600"
+                  className="rounded accent-slate-600"
                 />
               </th>
               {['Name', 'Email', 'Title', 'Location', 'Exp', 'Skills'].map(h => (
@@ -372,7 +372,7 @@ function CandidateTable({
                       checked={isSelected}
                       onChange={() => onToggleRow(idx)}
                       onClick={e => e.stopPropagation()}
-                      className="rounded accent-blue-600"
+                      className="rounded accent-slate-600"
                     />
                   </td>
                   <td className="px-3 py-3 font-medium text-slate-800 whitespace-nowrap">
@@ -747,12 +747,12 @@ export default function SourcingPage() {
           {!importRes && parsed.length === 0 && (
             <>
               {fileName && !showPaste && (
-                <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-                  <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                  <span className="text-sm text-blue-700 font-medium flex-1">{fileName}</span>
+                <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                  <FileText className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                  <span className="text-sm text-slate-700 font-medium flex-1">{fileName}</span>
                   <button
                     onClick={() => { setCsvText(''); setFileName('') }}
-                    className="text-blue-400 hover:text-emerald-600"
+                    className="text-slate-400 hover:text-emerald-600"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -783,7 +783,7 @@ export default function SourcingPage() {
                 <button
                   onClick={handleParse}
                   disabled={!csvText.trim() || parsing}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#221b14] text-white text-sm font-semibold rounded-xl hover:bg-[#33271b] disabled:opacity-40 transition-colors"
                 >
                   {parsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                   {parsing ? 'Parsing with AI…' : 'Parse candidates'}
@@ -866,7 +866,7 @@ export default function SourcingPage() {
                             <span className="text-xs text-slate-400">Ready</span>
                           )}
                           {r.status === 'parsing' && (
-                            <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                            <Loader2 className="w-4 h-4 text-slate-500 animate-spin" />
                           )}
                           {r.status === 'done' && (
                             <span className="text-xs text-emerald-600 font-medium">
@@ -888,7 +888,7 @@ export default function SourcingPage() {
                 <button
                   onClick={handleCvParse}
                   disabled={cvParsing}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#221b14] text-white text-sm font-semibold rounded-xl hover:bg-[#33271b] disabled:opacity-40 transition-colors"
                 >
                   {cvParsing
                     ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -1005,7 +1005,7 @@ export default function SourcingPage() {
                   <p className="text-xs text-slate-400 font-medium mb-2">Skills</p>
                   <div className="flex flex-wrap gap-1.5">
                     {(extracted.skills ?? []).map(s => (
-                      <span key={s} className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full border border-blue-100">
+                      <span key={s} className="text-xs bg-slate-50 text-slate-700 px-2.5 py-1 rounded-full border border-slate-100">
                         {s}
                       </span>
                     ))}
@@ -1023,7 +1023,7 @@ export default function SourcingPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#221b14] text-white text-sm font-semibold rounded-xl hover:bg-[#33271b] disabled:opacity-40 transition-colors"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
                   Save to candidates
@@ -1062,7 +1062,7 @@ export default function SourcingPage() {
               <button
                 onClick={handleExtract}
                 disabled={!profileText.trim() || extracting}
-                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#221b14] text-white text-sm font-semibold rounded-xl hover:bg-[#33271b] disabled:opacity-40 transition-colors"
               >
                 {extracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
                 {extracting ? 'Extracting with AI…' : 'Extract candidate →'}

@@ -154,7 +154,7 @@ function PipelineFlowSection({ events, applications }: {
       {flows.map(({ app, steps }) => (
         <div key={app.id}>
           {app.hiring_requests && flows.length > 1 && (
-            <p className="text-[10px] font-semibold text-violet-500 uppercase tracking-wide mb-2">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2">
               {app.hiring_requests.position_title}
             </p>
           )}
@@ -165,17 +165,17 @@ function PipelineFlowSection({ events, applications }: {
               // Color scheme: Applied = indigo, current/last stage = violet, past = white/slate
               const blockCls = step.type === 'applied'
                 ? isLast
-                  ? 'bg-indigo-600 border-indigo-600'
-                  : 'bg-indigo-50 border-indigo-200'
+                  ? 'bg-slate-600 border-slate-600'
+                  : 'bg-slate-50 border-slate-200'
                 : isLast
-                  ? 'bg-violet-600 border-violet-600'
+                  ? 'bg-slate-600 border-slate-600'
                   : 'bg-white border-slate-200'
               const labelCls = step.type === 'applied'
-                ? isLast ? 'text-white' : 'text-indigo-700'
+                ? isLast ? 'text-white' : 'text-slate-700'
                 : isLast ? 'text-white' : 'text-slate-800'
               const dateCls = step.type === 'applied'
-                ? isLast ? 'text-indigo-200' : 'text-indigo-400'
-                : isLast ? 'text-violet-200' : 'text-slate-400'
+                ? isLast ? 'text-slate-200' : 'text-slate-400'
+                : isLast ? 'text-slate-200' : 'text-slate-400'
               return (
                 <div key={`${step.stage}-${idx}`} className="flex items-center gap-1 shrink-0">
                   <div className={`rounded-xl px-3 py-2.5 text-center min-w-[80px] border transition-colors ${blockCls}`}>

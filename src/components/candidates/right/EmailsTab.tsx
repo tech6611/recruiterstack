@@ -84,7 +84,7 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
               </p>
             )}
             {scheduled && (
-              <span className="inline-flex items-center gap-0.5 mt-0.5 rounded-full bg-violet-50 border border-violet-200 px-1.5 py-0.5 text-[9px] font-semibold text-violet-600">
+              <span className="inline-flex items-center gap-0.5 mt-0.5 rounded-full bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
                 🕐 Scheduled · {new Date(scheduled).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
@@ -129,7 +129,7 @@ export default function EmailsTab({ applications, emailEvents, onDraftEmail }: E
             onClick={() => onDraftEmail(activeApps[0].id)}
             className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <Wand2 className="h-3 w-3 text-violet-500" /> Draft Email
+            <Wand2 className="h-3 w-3 text-slate-500" /> Draft Email
           </button>
         )}
       </div>

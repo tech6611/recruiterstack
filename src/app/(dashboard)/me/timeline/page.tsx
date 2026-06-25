@@ -16,11 +16,11 @@ type MeEvent = {
 const META: Record<EmploymentEventType, { icon: typeof BadgeCheck; tone: string; ring: string; title: string }> = {
   hired:              { icon: Briefcase,  tone: 'text-amber-600',   ring: 'ring-amber-200',   title: 'Hired (pre-hire)' },
   joined:             { icon: BadgeCheck, tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Joined the org' },
-  manager_changed:    { icon: GitBranch,  tone: 'text-blue-600',    ring: 'ring-blue-200',    title: 'Manager changed' },
+  manager_changed:    { icon: GitBranch,  tone: 'text-slate-600',    ring: 'ring-slate-200',    title: 'Manager changed' },
   comp_changed:       { icon: DollarSign, tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Compensation changed' },
   terminated:         { icon: LogOut,     tone: 'text-slate-500',   ring: 'ring-slate-200',   title: 'Terminated' },
   note:               { icon: StickyNote, tone: 'text-slate-600',   ring: 'ring-slate-200',   title: 'Note' },
-  time_off_requested: { icon: Calendar,   tone: 'text-blue-600',    ring: 'ring-blue-200',    title: 'Time-off requested' },
+  time_off_requested: { icon: Calendar,   tone: 'text-slate-600',    ring: 'ring-slate-200',    title: 'Time-off requested' },
   time_off_approved:  { icon: Check,      tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Time-off approved' },
   time_off_rejected:  { icon: X,          tone: 'text-rose-600',    ring: 'ring-rose-200',    title: 'Time-off rejected' },
   time_off_cancelled: { icon: X,          tone: 'text-slate-500',   ring: 'ring-slate-200',   title: 'Time-off cancelled' },

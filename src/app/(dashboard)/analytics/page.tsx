@@ -35,32 +35,32 @@ interface AnalyticsData {
 
 const STAGE_BAR: Record<StageColor, string> = {
   slate:   'bg-slate-400',
-  blue:    'bg-blue-500',
-  violet:  'bg-violet-500',
+  blue:    'bg-slate-500',
+  violet:  'bg-slate-500',
   amber:   'bg-amber-500',
   emerald: 'bg-emerald-500',
-  green:   'bg-green-500',
+  green:   'bg-emerald-500',
   red:     'bg-red-500',
-  pink:    'bg-pink-500',
+  pink:    'bg-slate-500',
 }
 
 const STAGE_TEXT: Record<StageColor, string> = {
   slate:   'text-slate-600',
   blue:    'text-emerald-600',
-  violet:  'text-violet-600',
+  violet:  'text-slate-600',
   amber:   'text-amber-600',
   emerald: 'text-emerald-600',
-  green:   'text-green-600',
+  green:   'text-emerald-600',
   red:     'text-red-600',
-  pink:    'text-pink-600',
+  pink:    'text-slate-600',
 }
 
 const SOURCE_COLORS: Record<string, string> = {
   manual:   'bg-slate-500',
-  applied:  'bg-blue-500',
+  applied:  'bg-slate-500',
   sourced:  'bg-amber-500',
   referral: 'bg-emerald-500',
-  imported: 'bg-violet-500',
+  imported: 'bg-slate-500',
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -231,8 +231,8 @@ export default function AnalyticsPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="Active Candidates"  value={stats.active_candidates}  icon={Users}       color="bg-blue-500"    sub={`${stats.in_pipeline} in pipeline`} />
-        <StatCard label="Active Jobs"        value={stats.active_jobs}        icon={Briefcase}   color="bg-violet-500"  />
+        <StatCard label="Active Candidates"  value={stats.active_candidates}  icon={Users}       color="bg-slate-500"    sub={`${stats.in_pipeline} in pipeline`} />
+        <StatCard label="Active Jobs"        value={stats.active_jobs}        icon={Briefcase}   color="bg-slate-500"  />
         <StatCard label="In Interviews"      value={stats.interviewing}       icon={Clock}       color="bg-amber-500"   />
         <StatCard label="Total Applications" value={stats.total_applications} icon={TrendingUp}  color="bg-slate-500"   />
         <StatCard label="Hired"              value={stats.total_hired}        icon={CheckCircle} color="bg-emerald-500" />
@@ -331,7 +331,7 @@ export default function AnalyticsPage() {
                   <span className="w-28 shrink-0 text-right text-xs font-medium text-slate-600">{name}</span>
                   <div className="flex-1 h-6 bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-indigo-400 transition-all"
+                      className="h-full rounded-full bg-slate-400 transition-all"
                       style={{ width: `${pct(avgDays, maxAvgDays)}%`, minWidth: avgDays > 0 ? '2rem' : '0' }}
                     />
                   </div>
@@ -356,7 +356,7 @@ export default function AnalyticsPage() {
           <div className="flex items-center gap-0">
             {[
               { label: 'Applied',    value: stats.total_applications, color: 'bg-slate-200 text-slate-700' },
-              { label: 'In Pipeline', value: stats.in_pipeline,      color: 'bg-blue-100 text-blue-700'   },
+              { label: 'In Pipeline', value: stats.in_pipeline,      color: 'bg-slate-100 text-slate-700'   },
               { label: 'Hired',      value: stats.total_hired,        color: 'bg-emerald-100 text-emerald-700' },
             ].map((step, i) => (
               <div key={step.label} className="flex items-center gap-0 flex-1 min-w-0">

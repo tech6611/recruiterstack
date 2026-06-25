@@ -4,21 +4,29 @@
 
 @layer base {
   :root {
-    --background: #f8fafc;
-    --foreground: #020617;
+    --background: #faf7f2; /* warm cream paper */
+    --foreground: #2a2118; /* bark */
   }
-  
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+
   body {
     @apply bg-[var(--background)] text-[var(--foreground)];
-    background-image: 
-      radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.04) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(225, 151, 23, 0.04) 0px, transparent 50%);
+    background-image:
+      radial-gradient(at 0% 0%, rgba(21, 96, 74, 0.035) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(180, 97, 47, 0.035) 0px, transparent 50%);
     background-attachment: fixed;
+  }
+
+  /* Headings carry the brand's display font (Plus Jakarta Sans). Body copy
+     stays Inter via <body>. This gives every page title personality without
+     touching each heading individually. */
+  h1, h2, h3, h4 {
+    font-family: var(--font-display), 'Inter', ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.01em;
   }
 }
 

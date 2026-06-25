@@ -126,7 +126,7 @@ export default function HrDocumentsAdminPage() {
           </div>
         </div>
         {!open && (
-          <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+          <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-[#221b14] px-3 py-2 text-sm font-semibold text-white hover:bg-[#33271b]">
             <Plus className="h-4 w-4" />
             Add document
           </button>
@@ -179,7 +179,7 @@ export default function HrDocumentsAdminPage() {
           {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
           <div className="mt-3 flex justify-end gap-2">
             <button onClick={() => setOpen(false)} disabled={submitting} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
-            <button onClick={submit} disabled={!title.trim() || !url.trim() || submitting} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+            <button onClick={submit} disabled={!title.trim() || !url.trim() || submitting} className="rounded-lg bg-[#221b14] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-50">
               {submitting ? 'Saving…' : 'Save'}
             </button>
           </div>

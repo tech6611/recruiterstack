@@ -14,13 +14,13 @@ import { useCandidateProfile } from './CandidateProfileContext'
 
 const STAGE_COLOR_MAP: Record<string, string> = {
   slate:   'bg-slate-100 text-slate-700',
-  blue:    'bg-blue-50 text-blue-700',
-  violet:  'bg-violet-50 text-violet-700',
+  blue:    'bg-slate-50 text-slate-700',
+  violet:  'bg-slate-50 text-slate-700',
   amber:   'bg-amber-50 text-amber-700',
   emerald: 'bg-emerald-50 text-emerald-700',
-  green:   'bg-green-50 text-green-700',
+  green:   'bg-emerald-50 text-emerald-700',
   red:     'bg-red-50 text-red-700',
-  pink:    'bg-pink-50 text-pink-700',
+  pink:    'bg-slate-50 text-slate-700',
 }
 
 type ApplicationWithJobInfo = Application & {
@@ -171,7 +171,7 @@ export default React.memo(function LeftPanel({
                     if (e.key === 'Escape') setEditLinkedin(false)
                   }}
                   placeholder="linkedin.com/in/…"
-                  className="flex-1 min-w-0 rounded-lg border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs focus:outline-none focus:border-emerald-400"
+                  className="flex-1 min-w-0 rounded-lg border border-slate-300 bg-slate-50 px-2 py-0.5 text-xs focus:outline-none focus:border-emerald-400"
                 />
                 <button onClick={saveLinkedin} aria-label="Save" className="text-emerald-600 hover:text-emerald-800 shrink-0">
                   <Check className="h-3.5 w-3.5" />

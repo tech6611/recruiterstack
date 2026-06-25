@@ -12,14 +12,14 @@ type CaseRow = HrCase & { requester: { name: string | null; email: string | null
 
 const STATUS_BADGE: Record<HrCaseStatus, string> = {
   open:         'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  in_progress:  'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+  in_progress:  'bg-slate-50 text-slate-700 ring-1 ring-slate-200',
   resolved:     'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
   closed:       'bg-slate-100 text-slate-500 ring-1 ring-slate-200',
 }
 
 function authorLabel(role: HrCaseAuthorRole): { icon: React.ElementType; label: string; tone: string } {
   switch (role) {
-    case 'agent':    return { icon: Sparkles,   label: 'AI assistant',  tone: 'text-violet-600' }
+    case 'agent':    return { icon: Sparkles,   label: 'AI assistant',  tone: 'text-slate-600' }
     case 'hr':       return { icon: Users,      label: 'You (HR)',      tone: 'text-emerald-600' }
     case 'employee': return { icon: UserCircle, label: 'Employee',      tone: 'text-slate-700' }
     case 'system':   return { icon: Sparkles,   label: 'System',        tone: 'text-slate-400' }
@@ -97,7 +97,7 @@ export default function HrCaseAdminDetailPage() {
                   {' · '}created {new Date(hrCase.created_at).toLocaleString()}
                 </p>
                 {hrCase.ai_attempted_at && (
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-violet-700">
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-700">
                     <Sparkles className="h-3.5 w-3.5" />
                     AI took a first pass at {new Date(hrCase.ai_attempted_at).toLocaleString()}
                   </p>
@@ -128,7 +128,7 @@ export default function HrCaseAdminDetailPage() {
               const { icon: Icon, label, tone } = authorLabel(m.author_role)
               const isAgent = m.author_role === 'agent'
               return (
-                <div key={m.id} className={`rounded-xl border p-4 ${isAgent ? 'border-violet-200 bg-violet-50/40' : 'border-slate-200 bg-white'}`}>
+                <div key={m.id} className={`rounded-xl border p-4 ${isAgent ? 'border-slate-200 bg-slate-50/40' : 'border-slate-200 bg-white'}`}>
                   <div className="mb-2 flex items-center gap-2 text-xs">
                     <Icon className={`h-4 w-4 ${tone}`} />
                     <span className={`font-semibold ${tone}`}>{label}</span>
@@ -154,7 +154,7 @@ export default function HrCaseAdminDetailPage() {
                 <button
                   onClick={sendReply}
                   disabled={!reply.trim() || submitting}
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  className="rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b] disabled:opacity-50"
                 >
                   {submitting ? 'Sending…' : 'Send reply'}
                 </button>

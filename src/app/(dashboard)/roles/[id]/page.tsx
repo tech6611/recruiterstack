@@ -277,7 +277,7 @@ export default function RoleDetailPage() {
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Required Skills</p>
             <div className="flex flex-wrap gap-1.5">
               {role.required_skills.map(skill => (
-                <span key={skill} className="inline-block rounded-md bg-blue-50 px-2.5 py-0.5 text-xs text-blue-700 font-medium">
+                <span key={skill} className="inline-block rounded-md bg-slate-50 px-2.5 py-0.5 text-xs text-slate-700 font-medium">
                   {skill}
                 </span>
               ))}
@@ -317,14 +317,14 @@ export default function RoleDetailPage() {
           <button
             onClick={runMatching}
             disabled={matching}
-            className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors shadow-sm"
+            className="flex items-center gap-2 rounded-xl bg-slate-600 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60 transition-colors shadow-sm"
           >
             {matching ? <><Loader2 className="h-4 w-4 animate-spin" />Running…</> : <><Sparkles className="h-4 w-4" />Run AI Match</>}
           </button>
         </div>
 
         {matchMsg && (
-          <div className={`rounded-xl border px-4 py-2.5 text-sm ${matchMsgType === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-violet-50 border-violet-200 text-violet-700'}`}>
+          <div className={`rounded-xl border px-4 py-2.5 text-sm ${matchMsgType === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
             {matchMsg}
           </div>
         )}
@@ -358,7 +358,7 @@ export default function RoleDetailPage() {
       >
         {emailLoading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
-            <Loader2 className="h-7 w-7 animate-spin text-blue-400" />
+            <Loader2 className="h-7 w-7 animate-spin text-slate-400" />
             <p className="text-sm">Drafting personalized email…</p>
           </div>
         ) : (
@@ -421,7 +421,7 @@ export default function RoleDetailPage() {
                 <button
                   onClick={handleSendEmail}
                   disabled={emailSending || !emailCandidateEmail || !emailSubject}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-50 transition-colors"
                 >
                   {emailSending ? <><Loader2 className="h-4 w-4 animate-spin" />Sending…</> : <><Send className="h-4 w-4" />Send Email</>}
                 </button>

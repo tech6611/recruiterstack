@@ -223,7 +223,7 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
                     <li key={q.id} className="flex items-center justify-between gap-3">
                       <span className="text-sm text-slate-700 truncate">
                         {q.label}
-                        {q.is_eeo && <span className="ml-2 text-[10px] uppercase text-violet-600">EEO</span>}
+                        {q.is_eeo && <span className="ml-2 text-[10px] uppercase text-slate-600">EEO</span>}
                       </span>
                       <Button variant="ghost" size="sm" onClick={() => addFromLibrary(q)}>
                         <Plus className="h-4 w-4" /> Add

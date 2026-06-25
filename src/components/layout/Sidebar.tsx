@@ -196,8 +196,8 @@ export function Sidebar() {
     const isOpen    = openSection === s.section
     const cls = `flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-colors ${
       active
-        ? 'bg-emerald-50 text-emerald-700'
-        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+        ? 'bg-white/10 text-[#f6efe3]'
+        : 'text-[#a99c87] hover:bg-white/5 hover:text-[#f6efe3]'
     }`
     // A bucket shows a small red dot when one of its (collapsed) flyout items has
     // a pending count, so the badge is noticeable without opening the flyout.
@@ -205,9 +205,9 @@ export function Sidebar() {
     const inner = (
       <>
         <span className="relative shrink-0">
-          <Icon className={`h-[18px] w-[18px] ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
+          <Icon className={`h-[18px] w-[18px] ${active ? 'text-[#f6efe3]' : 'text-[#7d7160]'}`} />
           {bucketBadge > 0 && !isOpen && (
-            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#221b14]" />
           )}
         </span>
         <span className="truncate">{s.section}</span>
@@ -279,7 +279,7 @@ export function Sidebar() {
         {sections.map(s => (
           <div key={s.section}>
             {s.section !== 'Dashboard' && (
-              <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8a7d68]">
                 {s.section}
               </p>
             )}
@@ -296,11 +296,11 @@ export function Sidebar() {
                     href={href}
                     className={`flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-colors ${
                       active
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        ? 'bg-white/10 text-[#f6efe3]'
+                        : 'text-[#a99c87] hover:bg-white/5 hover:text-[#f6efe3]'
                     }`}
                   >
-                    <ItemIcon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <ItemIcon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-[#f6efe3]' : 'text-[#7d7160]'}`} />
                     <span className="truncate">{label}</span>
                     {badge > 0 && (
                       <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
@@ -320,13 +320,13 @@ export function Sidebar() {
   return (
     <>
       {/* ── Desktop rail (md+) ─────────────────────────────────────────── */}
-      <aside className="relative hidden h-screen w-[140px] shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+      <aside className="relative hidden h-screen w-[140px] shrink-0 flex-col border-r border-[#34291e] bg-[#221b14] md:flex">
         {/* Logo */}
-        <div className="flex h-14 items-center gap-2 border-b border-slate-100 px-3">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-600">
+        <div className="flex h-14 items-center gap-2 border-b border-white/10 px-3">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500">
             <Zap className="h-3.5 w-3.5 text-white" />
           </div>
-          <span className="truncate text-sm font-bold tracking-tight text-slate-900">
+          <span className="truncate font-display text-sm font-bold tracking-tight text-[#f6efe3]">
             RecruiterStack
           </span>
         </div>
@@ -339,11 +339,11 @@ export function Sidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-slate-100 px-3 py-3">
+        <div className="border-t border-white/10 px-3 py-3">
           <div className="flex items-center gap-2">
             <UserButton afterSignOutUrl="/sign-in" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-slate-700">
+              <p className="truncate text-xs font-semibold text-[#cdbfa8]">
                 {organization?.name ?? 'RecruiterStack'}
               </p>
             </div>
@@ -369,31 +369,31 @@ export function Sidebar() {
             className="absolute inset-0 bg-slate-900/40"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-slate-200 bg-white shadow-xl">
-            <div className="flex h-14 items-center justify-between border-b border-slate-100 px-3">
+          <aside className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-[#34291e] bg-[#221b14] shadow-xl">
+            <div className="flex h-14 items-center justify-between border-b border-white/10 px-3">
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-600">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500">
                   <Zap className="h-3.5 w-3.5 text-white" />
                 </div>
-                <span className="truncate text-sm font-bold tracking-tight text-slate-900">
+                <span className="truncate font-display text-sm font-bold tracking-tight text-[#f6efe3]">
                   RecruiterStack
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#a99c87] hover:bg-white/10 hover:text-[#f6efe3]"
                 aria-label="Close navigation"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
             <MobileDrawerBody />
-            <div className="border-t border-slate-100 px-4 py-3">
+            <div className="border-t border-white/10 px-4 py-3">
               <div className="flex items-center gap-3">
                 <UserButton afterSignOutUrl="/sign-in" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-slate-700">
+                  <p className="truncate text-xs font-semibold text-[#cdbfa8]">
                     {organization?.name ?? 'RecruiterStack'}
                   </p>
                 </div>

@@ -526,7 +526,7 @@ function SourceRetentionCard({ wrapped, loading }: { wrapped: Wrapped<SourceRete
     <div className="space-y-3">
       <div className="text-xs text-slate-500">
         Two bars per source — <span className="font-semibold text-emerald-700">hire rate</span> (apps → hired)
-        and <span className="font-semibold text-sky-700">retention rate</span> (hired → still active).
+        and <span className="font-semibold text-slate-700">retention rate</span> (hired → still active).
         Sources with few apps have noisy rates; the n column grounds it.
       </div>
       <div className="overflow-hidden rounded-lg border border-slate-200">
@@ -552,7 +552,7 @@ function SourceRetentionCard({ wrapped, loading }: { wrapped: Wrapped<SourceRete
                 </td>
                 <td className="px-4 py-2 text-right text-slate-700">{r.active_now}</td>
                 <td className="px-4 py-2">
-                  <RateBar rate={r.retention_rate} color="bg-sky-500" />
+                  <RateBar rate={r.retention_rate} color="bg-slate-500" />
                 </td>
               </tr>
             ))}
@@ -607,7 +607,7 @@ function TrendsCard({ wrapped, loading }: { wrapped: Wrapped<MonthlyTrends> | un
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           <Line type="monotone" dataKey="apps"   name="Applications" stroke="#94a3b8" strokeWidth={2} dot={{ r: 2 }} />
-          <Line type="monotone" dataKey="hired"  name="Hired"        stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} />
+          <Line type="monotone" dataKey="hired"  name="Hired"        stroke="#1f7a5a" strokeWidth={2} dot={{ r: 2 }} />
           <Line type="monotone" dataKey="joined" name="Joined"       stroke="#0ea5e9" strokeWidth={2} dot={{ r: 2 }} />
         </LineChart>
       </ResponsiveContainer>

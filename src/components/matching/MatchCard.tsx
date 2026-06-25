@@ -6,14 +6,14 @@ const REC_CONFIG: Record<
   { label: string; color: string; bg: string; icon: typeof CheckCircle }
 > = {
   strong_yes: { label: 'Strong Yes', color: 'text-emerald-700', bg: 'bg-emerald-100', icon: CheckCircle },
-  yes:        { label: 'Yes',        color: 'text-blue-700',    bg: 'bg-blue-100',    icon: TrendingUp },
+  yes:        { label: 'Yes',        color: 'text-slate-700',    bg: 'bg-slate-100',    icon: TrendingUp },
   maybe:      { label: 'Maybe',      color: 'text-amber-700',   bg: 'bg-amber-100',   icon: AlertCircle },
   no:         { label: 'No',         color: 'text-red-700',     bg: 'bg-red-100',     icon: XCircle },
 }
 
 function ScoreBar({ score }: { score: number }) {
   const color =
-    score >= 80 ? 'bg-emerald-500' : score >= 60 ? 'bg-blue-500' : score >= 40 ? 'bg-amber-500' : 'bg-red-500'
+    score >= 80 ? 'bg-emerald-500' : score >= 60 ? 'bg-slate-500' : score >= 40 ? 'bg-amber-500' : 'bg-red-500'
 
   return (
     <div className="flex items-center gap-3">

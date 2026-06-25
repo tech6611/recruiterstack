@@ -43,9 +43,9 @@ export default function SequenceAnalytics({ sequenceId }: Props) {
       {/* Overview cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Enrolled', value: total_enrollments, color: 'text-blue-600' },
+          { label: 'Enrolled', value: total_enrollments, color: 'text-slate-600' },
           { label: 'Emails Sent', value: overall.total_sent, color: 'text-slate-700' },
-          { label: 'Opened', value: `${overall.total_opened} (${pct(overall.total_opened, overall.total_sent)})`, color: 'text-violet-600' },
+          { label: 'Opened', value: `${overall.total_opened} (${pct(overall.total_opened, overall.total_sent)})`, color: 'text-slate-600' },
           { label: 'Replied', value: `${overall.total_replied} (${pct(overall.total_replied, total_enrollments)})`, color: 'text-emerald-600' },
         ].map(card => (
           <div key={card.label} className="rounded-xl border border-slate-200 bg-white p-3.5">
@@ -72,7 +72,7 @@ export default function SequenceAnalytics({ sequenceId }: Props) {
       {/* Per-stage table */}
       <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
-          <TrendingUp className="h-4 w-4 text-blue-500" />
+          <TrendingUp className="h-4 w-4 text-slate-500" />
           <p className="text-sm font-semibold text-slate-700">Per-Stage Performance</p>
         </div>
         <div className="overflow-x-auto">
@@ -92,7 +92,7 @@ export default function SequenceAnalytics({ sequenceId }: Props) {
               {stages.map(s => (
                 <tr key={s.stage_id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-2.5">
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-emerald-600">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-emerald-600">
                       {s.order_index}
                     </span>
                     <span className="ml-2 text-xs text-slate-400">Day {s.delay_days}</span>
@@ -100,7 +100,7 @@ export default function SequenceAnalytics({ sequenceId }: Props) {
                   <td className="px-4 py-2.5 text-slate-700 truncate max-w-[200px]">{s.subject}</td>
                   <td className="px-4 py-2.5 text-right font-medium text-slate-700">{s.sent}</td>
                   <td className="px-4 py-2.5 text-right">
-                    <span className="font-medium text-violet-600">{s.opened}</span>
+                    <span className="font-medium text-slate-600">{s.opened}</span>
                     <span className="text-slate-400 ml-1 text-xs">{pct(s.opened, s.sent)}</span>
                   </td>
                   <td className="px-4 py-2.5 text-right">

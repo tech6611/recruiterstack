@@ -119,7 +119,7 @@ function WorkflowStepList({
               <span
                 className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5 ${
                   isDone    ? 'bg-emerald-100 text-emerald-600' :
-                  isRunning ? 'bg-violet-100 text-violet-600' :
+                  isRunning ? 'bg-slate-100 text-slate-600' :
                               'bg-slate-100 text-slate-400'
                 }`}
               >
@@ -133,9 +133,9 @@ function WorkflowStepList({
                 </p>
                 {isRunning && (
                   <span className="flex items-center gap-1 mt-1">
-                    <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </span>
                 )}
               </div>
@@ -263,15 +263,15 @@ function PlanCard({
   }
 
   return (
-    <div className="bg-violet-50 border border-violet-200 rounded-2xl overflow-hidden">
+    <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden">
       {/* Header */}
-      <div className="px-3.5 py-2.5 border-b border-violet-100 bg-white">
-        <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest">Plan</p>
+      <div className="px-3.5 py-2.5 border-b border-slate-100 bg-white">
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Plan</p>
         <p className="text-sm font-semibold text-slate-800 mt-0.5">{plan.summary}</p>
       </div>
 
       {/* Steps */}
-      <div className="divide-y divide-violet-100">
+      <div className="divide-y divide-slate-100">
         {plan.steps.map(step => {
           const isQueued  = step.status === 'queued'
           const isEditing = editingStep === step.number
@@ -302,9 +302,9 @@ function PlanCard({
                       onChange={e => setEditText(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingStep(null) }}
                       autoFocus
-                      className="flex-1 text-xs border border-violet-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-400"
+                      className="flex-1 text-xs border border-slate-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-slate-400"
                     />
-                    <button onClick={saveEdit} className="text-xs text-violet-600 font-medium hover:text-violet-800">Save</button>
+                    <button onClick={saveEdit} className="text-xs text-slate-600 font-medium hover:text-slate-800">Save</button>
                   </div>
                 ) : (
                   <p className="text-xs leading-snug text-slate-700">
@@ -321,7 +321,7 @@ function PlanCard({
                 <div className="flex-shrink-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => startEdit(step)}
-                    className="p-1 text-slate-400 hover:text-violet-600 rounded"
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded"
                     title="Edit step"
                   >
                     <Pencil className="w-3 h-3" />
@@ -341,7 +341,7 @@ function PlanCard({
       </div>
 
       {/* Add step */}
-      <div className="px-3.5 py-2 border-t border-violet-100">
+      <div className="px-3.5 py-2 border-t border-slate-100">
         {addingStep ? (
           <div className="flex gap-1.5">
             <input
@@ -351,15 +351,15 @@ function PlanCard({
               onKeyDown={e => { if (e.key === 'Enter') addStep(); if (e.key === 'Escape') { setAddingStep(false); setNewStepText('') } }}
               placeholder="Describe the new step…"
               autoFocus
-              className="flex-1 text-xs border border-violet-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-400 placeholder:text-slate-400"
+              className="flex-1 text-xs border border-slate-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-slate-400 placeholder:text-slate-400"
             />
-            <button onClick={addStep} className="text-xs text-violet-600 font-medium hover:text-violet-800">Add</button>
+            <button onClick={addStep} className="text-xs text-slate-600 font-medium hover:text-slate-800">Add</button>
             <button onClick={() => { setAddingStep(false); setNewStepText('') }} className="text-xs text-slate-400 hover:text-slate-600">Cancel</button>
           </div>
         ) : (
           <button
             onClick={() => setAddingStep(true)}
-            className="flex items-center gap-1 text-xs text-violet-500 hover:text-violet-700 font-medium"
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 font-medium"
           >
             <Plus className="w-3 h-3" /> Add Step
           </button>
@@ -367,16 +367,16 @@ function PlanCard({
       </div>
 
       {/* Actions */}
-      <div className="px-3.5 py-2.5 border-t border-violet-100 bg-white flex items-center gap-2">
+      <div className="px-3.5 py-2.5 border-t border-slate-100 bg-white flex items-center gap-2">
         <button
           onClick={() => onExecute(plan)}
-          className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 text-white rounded-lg px-3 py-2 transition-colors active:scale-95"
+          className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold bg-slate-600 hover:bg-slate-700 text-white rounded-lg px-3 py-2 transition-colors active:scale-95"
         >
           <Play className="w-3 h-3" /> Execute Plan
         </button>
         <button
           onClick={onModifyViaChat}
-          className="text-xs text-violet-500 hover:text-violet-700 font-medium underline underline-offset-2"
+          className="text-xs text-slate-500 hover:text-slate-700 font-medium underline underline-offset-2"
         >
           Modify via Chat
         </button>
@@ -627,7 +627,7 @@ export function Copilot() {
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           style={{ left: fabPos.x, top: fabPos.y }}
-          className="fixed z-50 w-14 h-14 rounded-full bg-violet-600 text-white shadow-lg hover:bg-violet-700 transition-colors flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
+          className="fixed z-50 w-14 h-14 rounded-full bg-slate-600 text-white shadow-lg hover:bg-slate-700 transition-colors flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
           title="Open AI Copilot (drag to reposition)"
         >
           <Bot className="w-6 h-6 pointer-events-none" />
@@ -646,14 +646,14 @@ export function Copilot() {
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
-              <Bot className="w-4 h-4 text-violet-600" />
+            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+              <Bot className="w-4 h-4 text-slate-600" />
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-800 leading-none">AI Copilot</p>
               <p className="text-xs text-slate-400 mt-0.5">
                 {streaming ? (
-                  <span className="text-violet-500">Working…</span>
+                  <span className="text-slate-500">Working…</span>
                 ) : (
                   'Your autonomous recruiting agent'
                 )}
@@ -687,8 +687,8 @@ export function Copilot() {
           {messages.length === 0 ? (
             /* Empty state */
             <div className="flex flex-col items-center justify-center h-full text-center pb-8">
-              <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
-                <Bot className="w-7 h-7 text-violet-400" />
+              <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mb-4">
+                <Bot className="w-7 h-7 text-slate-400" />
               </div>
               <p className="text-sm font-semibold text-slate-700 mb-1">What should we work on?</p>
               <p className="text-xs text-slate-400 mb-5 max-w-[220px]">
@@ -699,7 +699,7 @@ export function Copilot() {
                   <button
                     key={s}
                     onClick={() => submit(s)}
-                    className="text-xs text-left bg-slate-50 hover:bg-violet-50 hover:text-violet-700 text-slate-600 border border-slate-200 hover:border-violet-200 rounded-xl px-3.5 py-2.5 transition-colors"
+                    className="text-xs text-left bg-slate-50 hover:bg-slate-50 hover:text-slate-700 text-slate-600 border border-slate-200 hover:border-slate-200 rounded-xl px-3.5 py-2.5 transition-colors"
                   >
                     {s}
                   </button>
@@ -719,7 +719,7 @@ export function Copilot() {
                 >
                   {msg.role === 'user' ? (
                     /* User bubble */
-                    <div className="max-w-[82%] bg-violet-600 text-white rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm leading-relaxed">
+                    <div className="max-w-[82%] bg-slate-600 text-white rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm leading-relaxed">
                       {msg.content}
                     </div>
                   ) : (
@@ -743,11 +743,11 @@ export function Copilot() {
                               className={`inline-flex items-center text-xs font-medium rounded-full px-2.5 py-0.5 transition-colors ${
                                 te.summary
                                   ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-violet-50 text-violet-600'
+                                  : 'bg-slate-50 text-slate-600'
                               }`}
                             >
                               {!te.summary && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping mr-1.5 flex-shrink-0" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-ping mr-1.5 flex-shrink-0" />
                               )}
                               {te.summary ? `✓ ${te.summary}` : te.label}
                             </span>
@@ -839,13 +839,13 @@ export function Copilot() {
               placeholder="Give me a goal or ask a question…"
               rows={1}
               disabled={streaming}
-              className="flex-1 resize-none rounded-xl border border-slate-200 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 outline-none text-sm px-3 py-2 text-slate-700 placeholder:text-slate-400 disabled:bg-slate-50 disabled:cursor-not-allowed transition-colors leading-relaxed"
+              className="flex-1 resize-none rounded-xl border border-slate-200 focus:border-slate-300 focus:ring-2 focus:ring-slate-100 outline-none text-sm px-3 py-2 text-slate-700 placeholder:text-slate-400 disabled:bg-slate-50 disabled:cursor-not-allowed transition-colors leading-relaxed"
               style={{ maxHeight: '120px', overflowY: 'auto' }}
             />
             <button
               onClick={() => submit(input)}
               disabled={streaming || !input.trim()}
-              className="flex-shrink-0 w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center hover:bg-violet-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-shrink-0 w-9 h-9 rounded-xl bg-slate-600 text-white flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Send className="w-4 h-4" />
             </button>

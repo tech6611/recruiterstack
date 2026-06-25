@@ -22,7 +22,7 @@ const TASK_TYPES = [
 // ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_OPTIONS: { value: TaskStatus; label: string; dot: string; badge: string }[] = [
   { value: 'to_do',       label: 'To Do',       dot: 'bg-slate-400',   badge: 'bg-slate-100 text-slate-600' },
-  { value: 'in_progress', label: 'In Progress',  dot: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700' },
+  { value: 'in_progress', label: 'In Progress',  dot: 'bg-slate-500',    badge: 'bg-slate-50 text-slate-700' },
   { value: 'done',        label: 'Done',         dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700' },
   { value: 'blocked',     label: 'Blocked',      dot: 'bg-red-500',     badge: 'bg-red-50 text-red-700' },
 ]
@@ -151,7 +151,7 @@ export default function TaskScheduler({ candidateId, tasks, onTaskAdded, onTaskU
       </div>
 
       {showForm && (
-        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-2">
+        <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 space-y-2">
           {/* Task type dropdown */}
           <select
             autoFocus
@@ -213,7 +213,7 @@ export default function TaskScheduler({ candidateId, tasks, onTaskAdded, onTaskU
             <button
               onClick={submit}
               disabled={saving || (taskType === 'Other' && !customTitle.trim())}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              className="rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b] disabled:opacity-50 transition-colors"
             >
               {saving ? 'Adding…' : 'Add Task'}
             </button>

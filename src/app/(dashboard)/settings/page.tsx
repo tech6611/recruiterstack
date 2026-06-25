@@ -363,7 +363,7 @@ export default function SettingsPage() {
           {oauthToast && (
             <div className={`rounded-xl px-4 py-3 text-sm font-medium ${
               oauthToast === 'connected'
-                ? 'bg-green-50 text-green-700 border border-green-200'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : 'bg-red-50 text-red-700 border border-red-200'
             }`}>
               {oauthToast === 'connected'
@@ -374,7 +374,7 @@ export default function SettingsPage() {
           {googleToast && (
             <div className={`rounded-xl px-4 py-3 text-sm font-medium ${
               googleToast === 'connected'
-                ? 'bg-green-50 text-green-700 border border-green-200'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : 'bg-red-50 text-red-700 border border-red-200'
             }`}>
               {googleToast === 'connected'
@@ -385,7 +385,7 @@ export default function SettingsPage() {
           {zoomToast && (
             <div className={`rounded-xl px-4 py-3 text-sm font-medium ${
               zoomToast === 'connected'
-                ? 'bg-green-50 text-green-700 border border-green-200'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : 'bg-red-50 text-red-700 border border-red-200'
             }`}>
               {zoomToast === 'connected'
@@ -396,7 +396,7 @@ export default function SettingsPage() {
           {msToast && (
             <div className={`rounded-xl px-4 py-3 text-sm font-medium ${
               msToast === 'connected'
-                ? 'bg-green-50 text-green-700 border border-green-200'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : 'bg-red-50 text-red-700 border border-red-200'
             }`}>
               {msToast === 'connected'
@@ -425,7 +425,7 @@ export default function SettingsPage() {
                 onClick={() => setActiveTab(t.id)}
                 className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
                   active
-                    ? 'bg-blue-50 text-blue-700'
+                    ? 'bg-slate-50 text-slate-700'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
@@ -444,7 +444,7 @@ export default function SettingsPage() {
                 {/* Company */}
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                   <div className="flex items-center gap-2.5 mb-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50">
                       <Building2 className="h-4 w-4 text-emerald-600" />
                     </div>
                     <h2 className="text-sm font-semibold text-slate-800">Company</h2>
@@ -480,8 +480,8 @@ export default function SettingsPage() {
                 {/* Recruiter Profile */}
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                   <div className="flex items-center gap-2.5 mb-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50">
-                      <User className="h-4 w-4 text-violet-600" />
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50">
+                      <User className="h-4 w-4 text-slate-600" />
                     </div>
                     <h2 className="text-sm font-semibold text-slate-800">Recruiter Profile</h2>
                   </div>
@@ -524,8 +524,8 @@ export default function SettingsPage() {
               {/* Kanban Card Fields — full width */}
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50">
-                    <LayoutList className="h-4 w-4 text-indigo-600" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50">
+                    <LayoutList className="h-4 w-4 text-slate-600" />
                   </div>
                   <div>
                     <h2 className="text-sm font-semibold text-slate-800">Kanban Card Fields</h2>
@@ -555,17 +555,17 @@ export default function SettingsPage() {
                         onClick={() => toggleCardField(field.id)}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
                           active
-                            ? 'bg-indigo-50 border-indigo-200'
+                            ? 'bg-slate-50 border-slate-200'
                             : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50'
                         }`}
                       >
                         <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-all ${
-                          active ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300 bg-white'
+                          active ? 'bg-slate-500 border-slate-500' : 'border-slate-300 bg-white'
                         }`}>
                           {active && <Check className="h-2.5 w-2.5 text-white" />}
                         </div>
                         <div className="min-w-0">
-                          <p className={`text-xs font-semibold ${active ? 'text-indigo-700' : 'text-slate-700'}`}>
+                          <p className={`text-xs font-semibold ${active ? 'text-slate-700' : 'text-slate-700'}`}>
                             {field.label}
                           </p>
                           <p className="text-[10px] text-slate-400">{field.description}</p>
@@ -579,7 +579,7 @@ export default function SettingsPage() {
               {/* Save button */}
               <button
                 type="submit"
-                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                className="flex items-center gap-2 rounded-xl bg-[#221b14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm"
               >
                 {saved ? (
                   <>
@@ -595,7 +595,7 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-2">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-violet-500" />
+                    <Sparkles className="h-4 w-4 text-slate-500" />
                     <p className="text-xs font-semibold text-slate-600">AI Model</p>
                   </div>
                   <p className="text-sm font-medium text-slate-800">Claude Sonnet 4.6</p>
@@ -636,8 +636,8 @@ export default function SettingsPage() {
               ) : (
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50">
-                    <Bell className="h-4 w-4 text-green-600" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
+                    <Bell className="h-4 w-4 text-emerald-600" />
                   </div>
                   <h2 className="text-sm font-semibold text-slate-800">Slack Channel Alerts</h2>
                 </div>
@@ -661,7 +661,7 @@ export default function SettingsPage() {
                     type="button"
                     onClick={saveSlack}
                     disabled={slackStatus === 'saving'}
-                    className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                    className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors disabled:opacity-60"
                   >
                     {slackStatus === 'saving' ? 'Saving…' : slackStatus === 'saved' ? (
                       <><CheckCircle className="h-4 w-4" /> Saved!</>
@@ -703,8 +703,8 @@ export default function SettingsPage() {
               ) : (
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50">
-                    <Plug className="h-4 w-4 text-purple-600" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50">
+                    <Plug className="h-4 w-4 text-slate-600" />
                   </div>
                   <h2 className="text-sm font-semibold text-slate-800">Slack App</h2>
                 </div>
@@ -713,7 +713,7 @@ export default function SettingsPage() {
                 {slackConnected ? (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
+                      <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                       <p className="text-sm text-slate-700">
                         Connected to <span className="font-semibold">{slackTeamName ?? 'your workspace'}</span>
                       </p>
@@ -752,7 +752,7 @@ export default function SettingsPage() {
               {/* Google Calendar / Meet */}
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50">
                     <Calendar className="h-4 w-4 text-emerald-600" />
                   </div>
                   <h2 className="text-sm font-semibold text-slate-800">Google Calendar &amp; Meet</h2>
@@ -762,7 +762,7 @@ export default function SettingsPage() {
                 {googleConnected ? (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
+                      <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                       <p className="text-sm text-slate-700">
                         Connected as <span className="font-semibold">{googleEmail ?? 'your Google account'}</span>
                       </p>
@@ -801,7 +801,7 @@ export default function SettingsPage() {
               {/* Zoom */}
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50">
                     <Video className="h-4 w-4 text-emerald-600" />
                   </div>
                   <h2 className="text-sm font-semibold text-slate-800">Zoom</h2>
@@ -811,7 +811,7 @@ export default function SettingsPage() {
                 {zoomConnected ? (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
+                      <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                       <p className="text-sm text-slate-700">
                         Connected as <span className="font-semibold">{zoomEmail ?? 'your Zoom account'}</span>
                       </p>
@@ -845,8 +845,8 @@ export default function SettingsPage() {
               {/* Microsoft Teams */}
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50">
-                    <Monitor className="h-4 w-4 text-violet-600" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50">
+                    <Monitor className="h-4 w-4 text-slate-600" />
                   </div>
                   <h2 className="text-sm font-semibold text-slate-800">Microsoft Teams</h2>
                 </div>
@@ -855,7 +855,7 @@ export default function SettingsPage() {
                 {msConnected ? (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
+                      <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                       <p className="text-sm text-slate-700">
                         Connected as <span className="font-semibold">{msEmail ?? 'your Microsoft account'}</span>
                       </p>
@@ -879,7 +879,7 @@ export default function SettingsPage() {
                       href="/api/microsoft/connect"
                       className="inline-flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
                     >
-                      <Monitor className="h-4 w-4 text-violet-600" />
+                      <Monitor className="h-4 w-4 text-slate-600" />
                       Connect Microsoft
                     </a>
                   </div>

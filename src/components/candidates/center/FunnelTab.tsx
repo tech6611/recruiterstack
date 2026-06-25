@@ -36,25 +36,25 @@ interface TimelineEvent {
 }
 
 const EVENT_ICON: Record<string, { icon: React.ReactNode; bg: string; title: (e: ApplicationEvent) => string }> = {
-  applied:              { icon: <Send className="h-3.5 w-3.5" />,         bg: 'bg-blue-500',    title: e => `Applied — entered ${e.to_stage ?? 'pipeline'}` },
-  stage_moved:          { icon: <ChevronRight className="h-3.5 w-3.5" />, bg: 'bg-violet-500',  title: e => `Moved to ${e.to_stage ?? '?'}${e.from_stage ? ` from ${e.from_stage}` : ''}` },
+  applied:              { icon: <Send className="h-3.5 w-3.5" />,         bg: 'bg-slate-500',    title: e => `Applied — entered ${e.to_stage ?? 'pipeline'}` },
+  stage_moved:          { icon: <ChevronRight className="h-3.5 w-3.5" />, bg: 'bg-slate-500',  title: e => `Moved to ${e.to_stage ?? '?'}${e.from_stage ? ` from ${e.from_stage}` : ''}` },
   note_added:           { icon: <FileText className="h-3.5 w-3.5" />,     bg: 'bg-amber-500',   title: () => 'Note added' },
   status_changed:       { icon: <AlertCircle className="h-3.5 w-3.5" />,  bg: 'bg-slate-500',   title: e => `Status changed → ${e.to_stage ?? '?'}` },
-  email_sent:           { icon: <Mail className="h-3.5 w-3.5" />,         bg: 'bg-blue-500',    title: e => `Email sent${(e.metadata as { subject?: string })?.subject ? ` · ${(e.metadata as { subject?: string }).subject}` : ''}` },
+  email_sent:           { icon: <Mail className="h-3.5 w-3.5" />,         bg: 'bg-slate-500',    title: e => `Email sent${(e.metadata as { subject?: string })?.subject ? ` · ${(e.metadata as { subject?: string }).subject}` : ''}` },
   interview_scheduled:  { icon: <Calendar className="h-3.5 w-3.5" />,     bg: 'bg-amber-500',   title: () => 'Interview scheduled' },
   interview_completed:  { icon: <BadgeCheck className="h-3.5 w-3.5" />,   bg: 'bg-emerald-500', title: () => 'Interview completed' },
   interview_cancelled:  { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-400',     title: () => 'Interview cancelled' },
-  offer_created:        { icon: <Gift className="h-3.5 w-3.5" />,         bg: 'bg-violet-500',  title: () => 'Offer created' },
+  offer_created:        { icon: <Gift className="h-3.5 w-3.5" />,         bg: 'bg-slate-500',  title: () => 'Offer created' },
   offer_approved:       { icon: <BadgeCheck className="h-3.5 w-3.5" />,   bg: 'bg-emerald-500', title: () => 'Offer approved' },
-  offer_sent:           { icon: <Send className="h-3.5 w-3.5" />,         bg: 'bg-blue-500',    title: () => 'Offer sent to candidate' },
+  offer_sent:           { icon: <Send className="h-3.5 w-3.5" />,         bg: 'bg-slate-500',    title: () => 'Offer sent to candidate' },
   offer_accepted:       { icon: <BadgeCheck className="h-3.5 w-3.5" />,   bg: 'bg-emerald-600', title: () => 'Offer accepted 🎉' },
   offer_declined:       { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-500',     title: () => 'Offer declined' },
   assessment_sent:      { icon: <ClipboardList className="h-3.5 w-3.5" />,bg: 'bg-amber-500',   title: () => 'Assessment sent' },
   rejected:             { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-500',     title: () => 'Application rejected' },
-  scorecard_added:      { icon: <ClipboardList className="h-3.5 w-3.5" />,bg: 'bg-violet-500',  title: () => 'Scorecard submitted' },
-  referral_added:       { icon: <Users className="h-3.5 w-3.5" />,        bg: 'bg-pink-500',    title: () => 'Referral added' },
-  whatsapp_sent:        { icon: <MessageCircle className="h-3.5 w-3.5" />,bg: 'bg-green-500',   title: () => 'WhatsApp message sent' },
-  whatsapp_received:    { icon: <MessageCircle className="h-3.5 w-3.5" />,bg: 'bg-green-600',   title: () => 'WhatsApp reply received' },
+  scorecard_added:      { icon: <ClipboardList className="h-3.5 w-3.5" />,bg: 'bg-slate-500',  title: () => 'Scorecard submitted' },
+  referral_added:       { icon: <Users className="h-3.5 w-3.5" />,        bg: 'bg-slate-500',    title: () => 'Referral added' },
+  whatsapp_sent:        { icon: <MessageCircle className="h-3.5 w-3.5" />,bg: 'bg-emerald-500',   title: () => 'WhatsApp message sent' },
+  whatsapp_received:    { icon: <MessageCircle className="h-3.5 w-3.5" />,bg: 'bg-emerald-600',   title: () => 'WhatsApp reply received' },
   whatsapp_opt_out:     { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-400',     title: () => 'Opted out of WhatsApp' },
 }
 
@@ -98,8 +98,8 @@ export default function FunnelTab({ events, applications }: FunnelTabProps) {
   if (events.length === 0) {
     return (
       <div className="flex flex-col items-center py-16 text-center px-6">
-        <div className="h-12 w-12 rounded-xl bg-violet-50 flex items-center justify-center mb-3">
-          <GitBranch className="h-6 w-6 text-violet-400" />
+        <div className="h-12 w-12 rounded-xl bg-slate-50 flex items-center justify-center mb-3">
+          <GitBranch className="h-6 w-6 text-slate-400" />
         </div>
         <p className="text-sm font-medium text-slate-600">No pipeline activity yet</p>
         <p className="text-xs text-slate-400 mt-1">Events will appear here as the candidate moves through the process</p>
@@ -169,7 +169,7 @@ export default function FunnelTab({ events, applications }: FunnelTabProps) {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-slate-800">{item.title}</p>
                             {item.jobTitle && (
-                              <p className="text-[10px] text-violet-500 font-medium mt-0.5">{item.jobTitle}</p>
+                              <p className="text-[10px] text-slate-500 font-medium mt-0.5">{item.jobTitle}</p>
                             )}
                             {item.note && (
                               <p className="text-xs text-slate-500 mt-1.5 leading-relaxed bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">

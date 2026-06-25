@@ -41,14 +41,14 @@ export default function FeedbackTab({
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Scorecards</span>
           {totalScorecards > 0 && (
-            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-700">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
               {totalScorecards}
             </span>
           )}
         </div>
         <button
           onClick={() => onAddScorecard(activeApps[0].id)}
-          className="flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-violet-700 transition-colors"
+          className="flex items-center gap-1 rounded-lg bg-slate-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-slate-700 transition-colors"
         >
           <Plus className="h-3 w-3" /> Add Scorecard
         </button>
@@ -61,7 +61,7 @@ export default function FeedbackTab({
           </div>
         ) : totalScorecards === 0 ? (
           <div className="flex flex-col items-center py-10 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50 text-violet-400 mb-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50 text-slate-400 mb-3">
               <Star className="h-6 w-6" />
             </div>
             <p className="text-sm font-medium text-slate-600">No scorecards yet</p>

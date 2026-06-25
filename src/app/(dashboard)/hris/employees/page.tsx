@@ -165,7 +165,7 @@ export default function EmployeesPage() {
                       <button
                         onClick={() => markJoined(emp.id)}
                         disabled={busyId === emp.id}
-                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                        className="rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#33271b] disabled:opacity-50"
                       >
                         {busyId === emp.id ? 'Saving…' : 'Mark joined'}
                       </button>

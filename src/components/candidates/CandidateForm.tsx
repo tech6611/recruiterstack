@@ -160,7 +160,7 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
           </button>
         ) : parseState === 'parsing' ? (
           <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <Loader2 className="h-5 w-5 text-blue-500 animate-spin shrink-0" />
+            <Loader2 className="h-5 w-5 text-slate-500 animate-spin shrink-0" />
             <div>
               <p className="text-sm font-medium text-slate-700">Parsing resume…</p>
               <p className="text-xs text-slate-400">{parsedFileName}</p>
@@ -315,7 +315,7 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         <button
           type="submit"
           disabled={loading || parseState === 'parsing'}
-          className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+          className="flex-1 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors"
         >
           {loading ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Candidate'}
         </button>

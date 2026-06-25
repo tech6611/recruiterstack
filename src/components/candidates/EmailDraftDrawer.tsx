@@ -148,7 +148,7 @@ function EmailTagsInput({
 
   return (
     <div
-      className="flex flex-wrap gap-1 px-2 py-1.5 min-h-[34px] rounded-lg border border-slate-200 bg-white focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 cursor-text"
+      className="flex flex-wrap gap-1 px-2 py-1.5 min-h-[34px] rounded-lg border border-slate-200 bg-white focus-within:ring-2 focus-within:ring-slate-300 focus-within:border-slate-400 cursor-text"
       onClick={() => inputRef.current?.focus()}
     >
       {emails.map(email => (
@@ -531,14 +531,14 @@ export default function EmailDraftDrawer({
           {/* Drag handle — grab left edge to resize */}
           <div
             onMouseDown={onDragHandleMouseDown}
-            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-violet-400/40 active:bg-violet-400/60 transition-colors z-20"
+            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-slate-400/40 active:bg-slate-400/60 transition-colors z-20"
             title="Drag to resize"
           />
 
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 shrink-0">
           <div className="flex items-center gap-2">
-            <Wand2 className="h-4 w-4 text-violet-500" />
+            <Wand2 className="h-4 w-4 text-slate-500" />
             <h2 id="email-draft-title" className="text-sm font-bold text-slate-900">
               {step === 'sent' ? 'Email Sent' : 'Draft Email'}
             </h2>
@@ -551,7 +551,7 @@ export default function EmailDraftDrawer({
                 onClick={() => setShowDraftsPanel(p => !p)}
                 className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold transition-colors ${
                   showDraftsPanel
-                    ? 'bg-violet-100 text-violet-700'
+                    ? 'bg-slate-100 text-slate-700'
                     : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                 }`}
               >
@@ -582,7 +582,7 @@ export default function EmailDraftDrawer({
                       setSubject(''); setBody(''); setEditorKey(k => k + 1)
                       setShowDraftsPanel(false)
                     }}
-                    className="flex items-center gap-0.5 text-[10px] font-semibold text-violet-600 hover:text-violet-800 transition-colors"
+                    className="flex items-center gap-0.5 text-[10px] font-semibold text-slate-600 hover:text-slate-800 transition-colors"
                   >
                     <Plus className="h-2.5 w-2.5" /> New Draft
                   </button>
@@ -610,7 +610,7 @@ export default function EmailDraftDrawer({
                             {new Date(d.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
-                        {isActive && <Check className="h-3 w-3 text-violet-500 shrink-0" />}
+                        {isActive && <Check className="h-3 w-3 text-slate-500 shrink-0" />}
                       </button>
                     )
                   })}
@@ -627,8 +627,8 @@ export default function EmailDraftDrawer({
                   <EmailTagsInput emails={toEmails} onChange={setToEmails} placeholder="Add recipient…" />
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0 pt-1">
-                  {!showCc  && <button onClick={() => setShowCc(true)}  className="text-[10px] font-medium text-slate-400 hover:text-violet-600 transition-colors">Cc</button>}
-                  {!showBcc && <button onClick={() => setShowBcc(true)} className="text-[10px] font-medium text-slate-400 hover:text-violet-600 transition-colors">Bcc</button>}
+                  {!showCc  && <button onClick={() => setShowCc(true)}  className="text-[10px] font-medium text-slate-400 hover:text-slate-600 transition-colors">Cc</button>}
+                  {!showBcc && <button onClick={() => setShowBcc(true)} className="text-[10px] font-medium text-slate-400 hover:text-slate-600 transition-colors">Bcc</button>}
                 </div>
               </div>
 
@@ -641,7 +641,7 @@ export default function EmailDraftDrawer({
                     onClick={() => { setBuiltInOpen(o => !o); setMyTplOpen(false); setAiOpen(false) }}
                     className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors ${
                       builtInOpen
-                        ? 'border-violet-400 bg-violet-50 text-violet-700'
+                        ? 'border-slate-400 bg-slate-50 text-slate-700'
                         : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                     }`}
                   >
@@ -657,7 +657,7 @@ export default function EmailDraftDrawer({
                             applyTemplate({ kind: 'builtin', id: m.id, name: m.name, emoji: m.emoji, subject: BUILT_IN_SUBJECTS[m.id], body: BUILT_IN_BODIES[m.id] })
                             setBuiltInOpen(false)
                           }}
-                          className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-violet-50 transition-colors"
+                          className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors"
                         >
                           <span className="text-base shrink-0">{m.emoji}</span>
                           <div className="min-w-0">
@@ -676,7 +676,7 @@ export default function EmailDraftDrawer({
                     onClick={() => { setMyTplOpen(o => !o); setBuiltInOpen(false); setAiOpen(false) }}
                     className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors ${
                       myTplOpen
-                        ? 'border-violet-400 bg-violet-50 text-violet-700'
+                        ? 'border-slate-400 bg-slate-50 text-slate-700'
                         : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                     }`}
                   >
@@ -686,7 +686,7 @@ export default function EmailDraftDrawer({
                   {/* (+) saves current compose as a new template */}
                   <button
                     onClick={() => { setAddingTpl(true); setMyTplOpen(true); setBuiltInOpen(false); setAiOpen(false) }}
-                    className="flex items-center justify-center w-6 h-6 rounded-lg border border-slate-200 text-slate-500 hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+                    className="flex items-center justify-center w-6 h-6 rounded-lg border border-slate-200 text-slate-500 hover:border-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
                     title="Save current email as a template"
                   >
                     <Plus className="h-3 w-3" />
@@ -697,8 +697,8 @@ export default function EmailDraftDrawer({
 
                       {/* Inline "save current email as template" form */}
                       {addingTpl && (
-                        <div className="px-3 py-2.5 bg-violet-50/60 border-b border-violet-100">
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600 mb-1.5">Save as template</p>
+                        <div className="px-3 py-2.5 bg-slate-50/60 border-b border-slate-100">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 mb-1.5">Save as template</p>
                           <div className="flex gap-1.5">
                             <input
                               autoFocus
@@ -709,13 +709,13 @@ export default function EmailDraftDrawer({
                                 if (e.key === 'Escape') { setAddingTpl(false); setNewTplName(''); setTplError('') }
                               }}
                               placeholder="Template name…"
-                              className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-400 bg-white"
+                              className="flex-1 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-400 bg-white"
                             />
                             <button
                               onClick={addTemplate}
                               disabled={tplSaving || !newTplName.trim()}
                               aria-label="Save template"
-                              className="flex items-center justify-center w-8 shrink-0 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                              className="flex items-center justify-center w-8 shrink-0 rounded-lg bg-slate-600 text-white hover:bg-slate-700 disabled:opacity-40 transition-colors"
                             >
                               {tplSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                             </button>
@@ -750,7 +750,7 @@ export default function EmailDraftDrawer({
                                       if (e.key === 'Escape') setRenamingId(null)
                                     }}
                                     onBlur={() => renameTemplate(t.id, renamingName)}
-                                    className="flex-1 text-xs border border-violet-300 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-violet-300 bg-white"
+                                    className="flex-1 text-xs border border-slate-300 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-slate-300 bg-white"
                                   />
                                   <button
                                     onClick={() => setRenamingId(null)}
@@ -808,13 +808,13 @@ export default function EmailDraftDrawer({
                     disabled={generating}
                     className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors disabled:opacity-50 ${
                       aiOpen
-                        ? 'border-violet-400 bg-violet-50 text-violet-700'
+                        ? 'border-slate-400 bg-slate-50 text-slate-700'
                         : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                     }`}
                   >
                     {generating
                       ? <><Loader2 className="h-3 w-3 animate-spin" /> Generating…</>
-                      : <><Wand2 className="h-3 w-3 text-violet-500" /> AI Draft <ChevronDown className="h-3 w-3 opacity-60" /></>}
+                      : <><Wand2 className="h-3 w-3 text-slate-500" /> AI Draft <ChevronDown className="h-3 w-3 opacity-60" /></>}
                   </button>
 
                   {aiOpen && (
@@ -824,7 +824,7 @@ export default function EmailDraftDrawer({
                         <button
                           key={m.id}
                           onClick={() => generateWithAI(m.id)}
-                          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left hover:bg-violet-50 transition-colors"
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left hover:bg-slate-50 transition-colors"
                         >
                           <span className="text-sm shrink-0">{m.emoji}</span>
                           <p className="text-xs font-medium text-slate-700">{m.name}</p>
@@ -897,7 +897,7 @@ export default function EmailDraftDrawer({
                   onClick={() => setScheduled(s => !s)}
                   className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium border transition-colors ${
                     scheduled
-                      ? 'border-violet-400 bg-violet-50 text-violet-700'
+                      ? 'border-slate-400 bg-slate-50 text-slate-700'
                       : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
@@ -905,22 +905,22 @@ export default function EmailDraftDrawer({
                 </button>
 
                 {scheduled && (
-                  <div className="flex items-center gap-2 p-3 rounded-xl bg-violet-50 border border-violet-200">
-                    <Calendar className="h-4 w-4 text-violet-500 shrink-0" />
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <Calendar className="h-4 w-4 text-slate-500 shrink-0" />
                     <input
                       type="date"
                       value={schedDate}
                       min={minDate}
                       onChange={e => setSchedDate(e.target.value)}
-                      className="text-xs text-slate-700 border border-slate-200 rounded-lg px-2 py-1 bg-white outline-none focus:ring-2 focus:ring-violet-300"
+                      className="text-xs text-slate-700 border border-slate-200 rounded-lg px-2 py-1 bg-white outline-none focus:ring-2 focus:ring-slate-300"
                     />
                     <input
                       type="time"
                       value={schedTime}
                       onChange={e => setSchedTime(e.target.value)}
-                      className="text-xs text-slate-700 border border-slate-200 rounded-lg px-2 py-1 bg-white outline-none focus:ring-2 focus:ring-violet-300"
+                      className="text-xs text-slate-700 border border-slate-200 rounded-lg px-2 py-1 bg-white outline-none focus:ring-2 focus:ring-slate-300"
                     />
-                    <p className="text-[10px] text-violet-600 ml-auto">Email will send at this time</p>
+                    <p className="text-[10px] text-slate-600 ml-auto">Email will send at this time</p>
                   </div>
                 )}
 
@@ -934,7 +934,7 @@ export default function EmailDraftDrawer({
               <button
                 onClick={send}
                 disabled={sending || toEmails.length === 0 || !subject.trim() || isHtmlEmpty(body)}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#221b14] hover:bg-[#33271b] text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60"
               >
                 {sending
                   ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>

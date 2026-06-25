@@ -23,7 +23,7 @@ const STATUS_BADGE: Record<JobStatus, string> = {
   draft:            'bg-slate-100 text-slate-700',
   pending_approval: 'bg-amber-100 text-amber-800',
   approved:         'bg-emerald-100 text-emerald-800',
-  open:             'bg-blue-100 text-blue-800',
+  open:             'bg-slate-100 text-slate-800',
   closed:           'bg-slate-200 text-slate-600',
   archived:         'bg-slate-100 text-slate-400',
 }
@@ -32,8 +32,8 @@ const OPENING_BADGE: Record<OpeningStatus, string> = {
   draft:            'bg-slate-100 text-slate-700',
   pending_approval: 'bg-amber-100 text-amber-800',
   approved:         'bg-emerald-100 text-emerald-800',
-  open:             'bg-blue-100 text-blue-800',
-  filled:           'bg-violet-100 text-violet-800',
+  open:             'bg-slate-100 text-slate-800',
+  filled:           'bg-slate-100 text-slate-800',
   closed:           'bg-slate-200 text-slate-600',
   archived:         'bg-slate-100 text-slate-400',
 }

@@ -80,7 +80,7 @@ export default function ChangeStatusDropdown() {
                 >
                   <span className={`h-2 w-2 rounded-full shrink-0 bg-${s.color}-400`} />
                   <span className="text-xs font-medium text-slate-700 flex-1">{s.name}</span>
-                  {isCurrent && <Check className="h-3 w-3 text-violet-500 shrink-0" />}
+                  {isCurrent && <Check className="h-3 w-3 text-slate-500 shrink-0" />}
                 </button>
               )
             })

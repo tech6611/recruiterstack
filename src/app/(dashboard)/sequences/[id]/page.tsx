@@ -20,7 +20,7 @@ const STATUS_BADGE: Record<SequenceStatus, { label: string; cls: string }> = {
 }
 
 const ENROLL_STATUS_CLS: Record<string, string> = {
-  active:    'bg-blue-50 text-blue-700',
+  active:    'bg-slate-50 text-slate-700',
   completed: 'bg-slate-100 text-slate-600',
   replied:   'bg-emerald-50 text-emerald-700',
   bounced:   'bg-red-50 text-red-600',
@@ -204,7 +204,7 @@ export default function SequenceDetailPage() {
                 onChange={e => setNameInput(e.target.value)}
                 onBlur={saveName}
                 onKeyDown={e => e.key === 'Enter' && saveName()}
-                className="text-xl font-bold text-slate-900 border-b-2 border-blue-400 outline-none bg-transparent"
+                className="text-xl font-bold text-slate-900 border-b-2 border-slate-400 outline-none bg-transparent"
               />
             </div>
           ) : (
@@ -224,7 +224,7 @@ export default function SequenceDetailPage() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setShowAddCandidates(true)}
-            className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-emerald-100 transition-colors"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-emerald-100 transition-colors"
           >
             <Users className="h-4 w-4" /> Add Candidates
           </button>
@@ -233,7 +233,7 @@ export default function SequenceDetailPage() {
             className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
               seq.status === 'active'
                 ? 'border border-amber-200 text-amber-700 hover:bg-amber-50'
-                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                : 'bg-[#221b14] text-white hover:bg-[#33271b]'
             }`}
           >
             {seq.status === 'active'
@@ -262,7 +262,7 @@ export default function SequenceDetailPage() {
             {t.label}
             {t.count !== undefined && (
               <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
-                tab === t.id ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-500'
+                tab === t.id ? 'bg-slate-100 text-slate-700' : 'bg-slate-200 text-slate-500'
               }`}>{t.count}</span>
             )}
           </button>
@@ -280,16 +280,16 @@ export default function SequenceDetailPage() {
                 <div className="group rounded-2xl border border-slate-200 bg-white p-5 hover:border-slate-300 transition-all">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-emerald-600 mt-0.5">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-emerald-600 mt-0.5">
                         {stage.order_index}
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                            stage.channel === 'email' ? 'bg-blue-100 text-blue-700' :
-                            stage.channel === 'whatsapp' ? 'bg-green-100 text-green-700' :
-                            stage.channel === 'sms' ? 'bg-violet-100 text-violet-700' :
-                            'bg-sky-100 text-sky-700'
+                            stage.channel === 'email' ? 'bg-slate-100 text-slate-700' :
+                            stage.channel === 'whatsapp' ? 'bg-emerald-100 text-emerald-700' :
+                            stage.channel === 'sms' ? 'bg-slate-100 text-slate-700' :
+                            'bg-slate-100 text-slate-700'
                           }`}>
                             {stage.channel ?? 'email'}
                           </span>
@@ -442,7 +442,7 @@ export default function SequenceDetailPage() {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
               <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-500" />
+                <Users className="h-5 w-5 text-slate-500" />
                 <h2 className="text-base font-bold text-slate-900">Add Candidates to Sequence</h2>
               </div>
               <button onClick={() => setShowAddCandidates(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
@@ -452,9 +452,9 @@ export default function SequenceDetailPage() {
 
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
               {/* Sequence info */}
-              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <p className="text-xs font-semibold text-emerald-600">{seq.name}</p>
-                <p className="text-[11px] text-blue-500">{stages.length} stages · {seq.status}</p>
+                <p className="text-[11px] text-slate-500">{stages.length} stages · {seq.status}</p>
               </div>
 
               {seq.status !== 'active' && (
@@ -494,12 +494,12 @@ export default function SequenceDetailPage() {
                         onClick={() => toggleCandidate(c)}
                         className={`w-full flex items-center gap-3 rounded-xl border-2 px-3.5 py-2.5 text-left transition-all ${
                           isSelected
-                            ? 'border-blue-500 bg-blue-50'
+                            ? 'border-slate-500 bg-slate-50'
                             : 'border-slate-200 bg-white hover:border-slate-300'
                         }`}
                       >
                         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          isSelected ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'
+                          isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'
                         }`}>
                           {c.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
@@ -544,7 +544,7 @@ export default function SequenceDetailPage() {
               <button
                 onClick={enrollSelected}
                 disabled={enrollingDirect || selectedCandidates.length === 0 || seq.status !== 'active'}
-                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+                className="flex items-center gap-2 rounded-xl bg-[#221b14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors"
               >
                 {enrollingDirect && <Loader2 className="h-4 w-4 animate-spin" />}
                 Enroll {selectedCandidates.length > 0 ? `(${selectedCandidates.length})` : ''}

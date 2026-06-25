@@ -8,21 +8,43 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        // Headings use Plus Jakarta Sans (loaded in layout.tsx as --font-display);
+        // body inherits Inter from <body>. `font-display` opts an element in.
+        display: ['var(--font-display)', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        // ── Brand: "emerald" is redefined as pine green (Direction D). Every
+        //    existing `emerald-*` class across the app now reads as pine. ──────
         emerald: {
-          50: '#ecfdf5',
-          100: '#d1fae5',
-          200: '#a7f3d0',
-          300: '#6ee7b7',
-          400: '#34d399',
-          500: '#10b981',
-          600: '#059669',
-          700: '#047857',
-          800: '#065f46',
-          900: '#064e3b',
-          950: '#022c22',
+          50:  '#ecf3ef',
+          100: '#d9e8e0',
+          200: '#b7d3c4',
+          300: '#8bbaa3',
+          400: '#4f9a7b',
+          500: '#1f7a5a',
+          600: '#15604a', // primary action / accent
+          700: '#11503d', // hover
+          800: '#0e4232',
+          900: '#0c362a',
+          950: '#062019',
+        },
+        // ── Neutral: "slate" is redefined as a warm sand→bark ramp. Every
+        //    existing `slate-*` class now reads warm instead of cool gray. ─────
+        slate: {
+          50:  '#faf7f2', // page background (cream)
+          100: '#f4efe7', // subtle fills / hover
+          200: '#ece4d6', // hairline borders (sand)
+          300: '#ddd2bf',
+          400: '#b3a791', // muted icons / placeholder
+          500: '#8a7f6f', // secondary text
+          600: '#6b6256',
+          700: '#4f483d',
+          800: '#36302a',
+          900: '#2a2118', // headings (bark)
+          950: '#1c1610',
         },
         gold: {
           50: '#fdf8ec',
@@ -42,8 +64,8 @@ const config: Config = {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
       },
       boxShadow: {
-        'glass': '0 8px 32px 0 rgba(16, 185, 129, 0.05)',
-        'glass-hover': '0 8px 32px 0 rgba(16, 185, 129, 0.15)',
+        'glass': '0 8px 32px 0 rgba(21, 96, 74, 0.05)',
+        'glass-hover': '0 8px 32px 0 rgba(21, 96, 74, 0.12)',
       }
     },
   },

@@ -77,7 +77,7 @@ export default function MyApprovalsPage() {
                     <button
                       onClick={() => decide(r.id, 'approve')}
                       disabled={busyId === r.id}
-                      className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      className="rounded-md bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b] disabled:opacity-50"
                     >
                       Approve
                     </button>

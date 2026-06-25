@@ -95,14 +95,14 @@ export default React.memo(function CenterPanel({
         <button
           onClick={onPhoneScreen}
           disabled={!hasActiveApps}
-          className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <PhoneCall className="h-3.5 w-3.5" />
           Phone Screen
         </button>
         <button
           onClick={onAddToSequence}
-          className="flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors"
+          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
         >
           <Mail className="h-3.5 w-3.5" />
           Add to Sequence
@@ -112,7 +112,7 @@ export default React.memo(function CenterPanel({
           disabled={!hasActiveApps}
           className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <Wand2 className="h-3.5 w-3.5 text-violet-500" />
+          <Wand2 className="h-3.5 w-3.5 text-slate-500" />
           Draft Email
         </button>
         <button
@@ -126,7 +126,7 @@ export default React.memo(function CenterPanel({
         <button
           onClick={onAddScorecard}
           disabled={!hasActiveApps}
-          className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 rounded-xl bg-slate-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ClipboardList className="h-3.5 w-3.5" />
           Add Scorecard
@@ -146,7 +146,7 @@ export default React.memo(function CenterPanel({
                 onClick={() => handleAppSelect(app.id)}
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium shrink-0 transition-colors border ${
                   isSel
-                    ? 'bg-violet-600 border-violet-600 text-white'
+                    ? 'bg-slate-600 border-slate-600 text-white'
                     : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >

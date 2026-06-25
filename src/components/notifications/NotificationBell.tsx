@@ -36,22 +36,22 @@ interface Notification {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string }> = {
-  candidate_applied:    { icon: UserPlus,     color: 'bg-blue-500' },
+  candidate_applied:    { icon: UserPlus,     color: 'bg-slate-500' },
   interview_scheduled:  { icon: Calendar,     color: 'bg-amber-500' },
-  score_complete:       { icon: Sparkles,     color: 'bg-violet-500' },
+  score_complete:       { icon: Sparkles,     color: 'bg-slate-500' },
   stage_moved:          { icon: ArrowRight,   color: 'bg-emerald-500' },
-  offer_extended:       { icon: Check,        color: 'bg-green-500' },
+  offer_extended:       { icon: Check,        color: 'bg-emerald-500' },
   task_due:             { icon: Clock,        color: 'bg-red-500' },
   system:               { icon: Info,         color: 'bg-slate-500' },
   // HRIS:
   time_off_requested:   { icon: Calendar,     color: 'bg-amber-500' },
   time_off_decided:     { icon: Check,        color: 'bg-emerald-500' },
-  manager_changed:      { icon: GitBranch,    color: 'bg-blue-500' },
+  manager_changed:      { icon: GitBranch,    color: 'bg-slate-500' },
   comp_changed:         { icon: DollarSign,   color: 'bg-emerald-500' },
   // Approvals:
   approval_requested:   { icon: ClipboardCheck, color: 'bg-amber-500' },
   approval_decided:     { icon: Check,          color: 'bg-emerald-500' },
-  approval_completed:   { icon: Check,          color: 'bg-green-500' },
+  approval_completed:   { icon: Check,          color: 'bg-emerald-500' },
 }
 
 function resourceHref(type: string | null, id: string | null): string | null {
@@ -241,7 +241,7 @@ export function NotificationBell({ collapsed }: { collapsed?: boolean }) {
                     className={`w-full text-left flex items-start gap-3 px-4 py-3 transition-colors ${
                       n.read
                         ? 'bg-white hover:bg-slate-50'
-                        : 'bg-blue-50/50 hover:bg-emerald-50'
+                        : 'bg-slate-50/50 hover:bg-emerald-50'
                     } ${href ? 'cursor-pointer' : 'cursor-default'}`}
                   >
                     {/* Type icon */}
@@ -264,7 +264,7 @@ export function NotificationBell({ collapsed }: { collapsed?: boolean }) {
 
                     {/* Unread dot */}
                     {!n.read && (
-                      <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                      <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-500" />
                     )}
                   </button>
                 )

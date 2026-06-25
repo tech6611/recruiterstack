@@ -54,7 +54,7 @@ export function RoleForm({ forceAdmin, defaultRole, lockedRole, lockedRbacRole }
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       {lockedRole ? (
-        <div className="flex items-start gap-2.5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+        <div className="flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900">
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
           <div>
             Your role was set to <span className="font-semibold">{lockedLabel}</span> by the teammate

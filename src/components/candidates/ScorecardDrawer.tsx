@@ -72,7 +72,7 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
               <ClipboardList className="h-4 w-4" />
             </div>
             <div>
@@ -95,7 +95,7 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
                 id="scorecard-application"
                 value={appId}
                 onChange={e => setAppId(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500"
               >
                 {activeApps.map(app => (
                   <option key={app.id} value={app.id}>
@@ -117,7 +117,7 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
                 value={interviewer}
                 onChange={e => setInterviewer(e.target.value)}
                 placeholder="Jane Smith"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
             <div>
@@ -129,7 +129,7 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
                 value={round}
                 onChange={e => setRound(e.target.value)}
                 placeholder="e.g. Phone Screen, Onsite"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500"
               />
             </div>
           </div>
@@ -195,7 +195,7 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
               onChange={e => setNotes(e.target.value)}
               rows={3}
               placeholder="Overall impression, key observations…"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-500 resize-none"
             />
           </div>
 
@@ -218,7 +218,7 @@ export default function ScorecardDrawer({ activeApps, defaultAppId, onClose, onS
           <button
             onClick={submit}
             disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-60"
+            className="flex items-center gap-2 rounded-xl bg-slate-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 transition-colors disabled:opacity-60"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
             Submit Scorecard

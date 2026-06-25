@@ -121,7 +121,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
     setInput('')
   }
   return (
-    <div className="flex flex-wrap gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 min-h-[44px] focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-emerald-100 transition">
+    <div className="flex flex-wrap gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 min-h-[44px] focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-emerald-100 transition">
       {tags.map(t => (
         <span key={t} className="flex items-center gap-1 bg-white border border-slate-200 text-slate-700 text-xs rounded-full px-2.5 py-1 shadow-sm">
           {t}
@@ -310,7 +310,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button onClick={() => setMode('send_to_hm')}
               className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-emerald-400 hover:shadow-sm transition-all">
-              <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
+              <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
                 <Send className="h-5 w-5 text-emerald-600" />
               </div>
               <h3 className="font-bold text-slate-900 text-sm mb-1">Send to Hiring Manager</h3>
@@ -318,13 +318,13 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
               <p className="text-xs text-emerald-600 font-medium mt-3">→ Sends intake link to HM</p>
             </button>
             <button onClick={() => setMode('fill_myself')}
-              className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-violet-400 hover:shadow-sm transition-all">
-              <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center mb-4 group-hover:bg-violet-100 transition-colors">
-                <Users className="h-5 w-5 text-violet-600" />
+              className="group text-left rounded-2xl border-2 border-slate-200 bg-white p-6 hover:border-slate-400 hover:shadow-sm transition-all">
+              <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center mb-4 group-hover:bg-slate-100 transition-colors">
+                <Users className="h-5 w-5 text-slate-600" />
               </div>
               <h3 className="font-bold text-slate-900 text-sm mb-1">Fill Everything Myself</h3>
               <p className="text-xs text-slate-500 leading-relaxed">You have all the details ready. Fill requirements and generate or write the JD right now.</p>
-              <p className="text-xs text-violet-600 font-medium mt-3">→ No HM email sent</p>
+              <p className="text-xs text-slate-600 font-medium mt-3">→ No HM email sent</p>
             </button>
           </div>
         </div>
@@ -512,7 +512,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
                 <FileImportButton onExtract={append(setNotes)} field="notes" />
               </div>
 
-              <div className="rounded-xl border-2 border-violet-200 bg-white p-5 space-y-4">
+              <div className="rounded-xl border-2 border-slate-200 bg-white p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Job Description <span className="text-red-500">*</span></p>
@@ -526,7 +526,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
                 {jdMode === null ? (
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button type="button" onClick={handleGenerateJD}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 transition-colors">
+                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-600 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 transition-colors">
                       <Wand2 className="h-4 w-4" />Generate with AI
                     </button>
                     <button type="button" onClick={() => setJdMode('manual')}
@@ -537,7 +537,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
                 ) : (
                   <div className="flex gap-2">
                     <button type="button" onClick={handleGenerateJD} disabled={generatingJD}
-                      className="flex items-center gap-1.5 rounded-lg bg-violet-50 border border-violet-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 transition-colors">
+                      className="flex items-center gap-1.5 rounded-lg bg-slate-50 border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-colors">
                       {generatingJD ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                       {generatingJD ? 'Generating…' : jdMode === 'ai' ? 'Regenerate with AI' : 'Generate with AI'}
                     </button>
@@ -552,7 +552,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
 
                 {jdMode !== null && (
                   generatingJD ? (
-                    <div className="flex items-center justify-center gap-3 rounded-xl border border-violet-100 bg-violet-50 py-10 text-sm text-violet-600">
+                    <div className="flex items-center justify-center gap-3 rounded-xl border border-slate-100 bg-slate-50 py-10 text-sm text-slate-600">
                       <Loader2 className="h-5 w-5 animate-spin" />Claude is writing the JD…
                     </div>
                   ) : (
@@ -569,7 +569,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
           )}
 
           {mode === 'send_to_hm' && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-700 space-y-1">
+            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-700 space-y-1">
               <p className="font-semibold">What happens next:</p>
               <p>1. {hmName || 'The hiring manager'} gets an email + Slack with their personal intake link</p>
               <p>2. They fill in role details and requirements</p>
@@ -581,7 +581,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
           <button
             type="submit"
             disabled={loading || (mode === 'fill_myself' && !jd.trim())}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm"
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#221b14] px-4 py-3 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors shadow-sm"
           >
             {loading ? (
               <><Loader2 className="h-4 w-4 animate-spin" />Creating request…</>
@@ -605,17 +605,17 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   intake_pending:   { label: "Awaiting HM's Input",  color: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <Clock className="h-3 w-3" /> },
-  intake_submitted: { label: 'Intake Received',       color: 'bg-blue-50 text-blue-700 border-blue-200',          icon: <FileText className="h-3 w-3" /> },
-  jd_generated:    { label: 'JD Generated',           color: 'bg-violet-50 text-violet-700 border-violet-200',    icon: <FileText className="h-3 w-3" /> },
-  jd_sent:         { label: 'JD Sent',                color: 'bg-indigo-50 text-indigo-700 border-indigo-200',    icon: <Mail className="h-3 w-3" /> },
+  intake_submitted: { label: 'Intake Received',       color: 'bg-slate-50 text-slate-700 border-slate-200',          icon: <FileText className="h-3 w-3" /> },
+  jd_generated:    { label: 'JD Generated',           color: 'bg-slate-50 text-slate-700 border-slate-200',    icon: <FileText className="h-3 w-3" /> },
+  jd_sent:         { label: 'JD Sent',                color: 'bg-slate-50 text-slate-700 border-slate-200',    icon: <Mail className="h-3 w-3" /> },
   jd_approved:     { label: 'To be Published',        color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
-  posted:          { label: 'Active',                 color: 'bg-green-50 text-green-700 border-green-200',       icon: <Send className="h-3 w-3" /> },
+  posted:          { label: 'Active',                 color: 'bg-emerald-50 text-emerald-700 border-emerald-200',       icon: <Send className="h-3 w-3" /> },
   closed:          { label: 'Closed',                 color: 'bg-slate-100 text-slate-500 border-slate-200',      icon: <Archive className="h-3 w-3" /> },
   // Canonical job statuses (jobs table): draft → pending_approval → approved → open → closed/archived.
   draft:            { label: 'Draft',                 color: 'bg-slate-50 text-slate-600 border-slate-200',       icon: <FileText className="h-3 w-3" /> },
   pending_approval: { label: 'Pending Approval',      color: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <Clock className="h-3 w-3" /> },
   approved:         { label: 'To be Published',       color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
-  open:             { label: 'Active',                color: 'bg-green-50 text-green-700 border-green-200',       icon: <Send className="h-3 w-3" /> },
+  open:             { label: 'Active',                color: 'bg-emerald-50 text-emerald-700 border-emerald-200',       icon: <Send className="h-3 w-3" /> },
   archived:         { label: 'Archived',              color: 'bg-slate-100 text-slate-400 border-slate-200',      icon: <Archive className="h-3 w-3" /> },
 }
 
@@ -674,9 +674,9 @@ const TIME_OPTS: { value: TimeFilter; label: string }[] = [
 ]
 
 const STAGE_DOT: Record<StageColor, string> = {
-  slate: 'bg-slate-400', blue: 'bg-blue-500', violet: 'bg-violet-500',
-  amber: 'bg-amber-500', emerald: 'bg-emerald-500', green: 'bg-green-500',
-  red: 'bg-red-500', pink: 'bg-pink-500',
+  slate: 'bg-slate-400', blue: 'bg-slate-500', violet: 'bg-slate-500',
+  amber: 'bg-amber-500', emerald: 'bg-emerald-500', green: 'bg-emerald-500',
+  red: 'bg-red-500', pink: 'bg-slate-500',
 }
 
 function PipelineBar({ stages }: { stages: JobListItem['stage_counts'] }) {
@@ -813,8 +813,8 @@ export default function JobsPage() {
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 text-slate-300 ml-1 shrink-0" />
     return sortDir === 'asc'
-      ? <ChevronUp   className="h-3 w-3 text-blue-500 ml-1 shrink-0" />
-      : <ChevronDown className="h-3 w-3 text-blue-500 ml-1 shrink-0" />
+      ? <ChevronUp   className="h-3 w-3 text-slate-500 ml-1 shrink-0" />
+      : <ChevronDown className="h-3 w-3 text-slate-500 ml-1 shrink-0" />
   }
 
   // ── Column visibility helpers ─────────────────────────────────────────────
@@ -997,7 +997,7 @@ export default function JobsPage() {
         onDrop={() => handleColDrop(col.id)}
         onDragEnd={() => { setDragColId(null); setDragOverColId(null) }}
         className={`${thBase} transition-colors ${
-          dragColId === col.id ? 'opacity-40' : dragOverColId === col.id ? 'bg-blue-50' : ''
+          dragColId === col.id ? 'opacity-40' : dragOverColId === col.id ? 'bg-slate-50' : ''
         }`}
       >
         <div className="flex items-center gap-1">
@@ -1026,7 +1026,7 @@ export default function JobsPage() {
               }}
               className={`flex items-center gap-0.5 rounded px-1 py-0.5 transition-colors shrink-0 ${
                 activeFilter
-                  ? 'bg-blue-50 text-emerald-600 ring-1 ring-emerald-200'
+                  ? 'bg-slate-50 text-emerald-600 ring-1 ring-emerald-200'
                   : colDropdown?.colId === col.id
                   ? 'bg-slate-100 text-slate-600'
                   : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
@@ -1139,7 +1139,7 @@ export default function JobsPage() {
               placeholder="Search jobs…"
               className={`h-9 w-52 rounded-xl border pl-8 pr-8 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
                 jobSearch
-                  ? 'border-blue-300 bg-blue-50 text-slate-800'
+                  ? 'border-slate-300 bg-slate-50 text-slate-800'
                   : 'border-slate-200 bg-white text-slate-700 placeholder-slate-400'
               }`}
             />
@@ -1159,7 +1159,7 @@ export default function JobsPage() {
               onClick={() => setShowTimePicker(p => !p)}
               className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
                 timeFilter !== 'all'
-                  ? 'border-blue-300 bg-blue-50 text-blue-700'
+                  ? 'border-slate-300 bg-slate-50 text-slate-700'
                   : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
               }`}
               title="Time filter"
@@ -1179,7 +1179,7 @@ export default function JobsPage() {
                         if (opt.value !== 'custom') setShowTimePicker(false)
                       }}
                       className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                        timeFilter === opt.value ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                        timeFilter === opt.value ? 'bg-slate-50 text-slate-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       {opt.label}
@@ -1199,7 +1199,7 @@ export default function JobsPage() {
                           className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
                       </div>
                       <button onClick={() => setShowTimePicker(false)}
-                        className="w-full text-xs bg-emerald-600 text-white rounded-lg py-1.5 hover:bg-emerald-700 transition-colors font-semibold">
+                        className="w-full text-xs bg-[#221b14] text-white rounded-lg py-1.5 hover:bg-[#33271b] transition-colors font-semibold">
                         Apply
                       </button>
                     </div>
@@ -1225,7 +1225,7 @@ export default function JobsPage() {
 
           <button
             onClick={() => setShowDrawer(true)}
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+            className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm"
           >
             <Plus className="h-4 w-4" />
             New Job
@@ -1248,7 +1248,7 @@ export default function JobsPage() {
             { label: 'Total',           value: counts.total,    color: 'bg-slate-50 border-slate-200 text-slate-700',      filter: 'all'            },
             { label: "Awaiting Input",  value: counts.awaiting, color: 'bg-amber-50 border-amber-200 text-amber-700',      filter: 'intake_pending' },
             { label: 'To be Published', value: counts.ready,    color: 'bg-emerald-50 border-emerald-200 text-emerald-700', filter: 'jd_approved'  },
-            { label: 'Active',          value: counts.active,   color: 'bg-green-50 border-green-200 text-green-700',      filter: 'posted'         },
+            { label: 'Active',          value: counts.active,   color: 'bg-emerald-50 border-emerald-200 text-emerald-700',      filter: 'posted'         },
             { label: 'Closed',          value: counts.closed,   color: 'bg-slate-100 border-slate-200 text-slate-500',     filter: 'closed'         },
           ] as const).map(stat => (
             <button
@@ -1275,8 +1275,8 @@ export default function JobsPage() {
             const singleLabel = colId === 'status' ? (STATUS_CONFIG[values[0]]?.label ?? values[0]) : values[0]
             const displayLabel = values.length === 1 ? singleLabel : `${values.length} selected`
             return (
-              <span key={colId} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700 font-medium">
-                <span className="text-blue-400">{colDef?.label}:</span> {displayLabel}
+              <span key={colId} className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-xs text-slate-700 font-medium">
+                <span className="text-slate-400">{colDef?.label}:</span> {displayLabel}
                 <button onClick={() => clearColFilter(colId)} className="ml-0.5 hover:text-emerald-900">
                   <X className="h-3 w-3" />
                 </button>
@@ -1284,7 +1284,7 @@ export default function JobsPage() {
             )
           })}
           {timeFilter !== 'all' && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs text-blue-700 font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-xs text-slate-700 font-medium">
               <CalendarDays className="h-3 w-3" /> {timeLabel}
               <button onClick={() => setTimeFilter('all')} className="ml-0.5 hover:text-emerald-900">
                 <X className="h-3 w-3" />
@@ -1300,7 +1300,7 @@ export default function JobsPage() {
             </button>
           )}
           {manualOrder && (
-            <button onClick={() => setManualOrder(null)} className="text-xs text-blue-500 hover:text-emerald-700 transition-colors">
+            <button onClick={() => setManualOrder(null)} className="text-xs text-slate-500 hover:text-emerald-700 transition-colors">
               Reset row order
             </button>
           )}
@@ -1340,7 +1340,7 @@ export default function JobsPage() {
           <p className="text-sm font-medium text-slate-500">No jobs yet</p>
           <p className="text-xs text-slate-400 mt-1 mb-4">Create your first job to get started</p>
           <button onClick={() => setShowDrawer(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors">
             <Plus className="h-3.5 w-3.5" />New Job
           </button>
         </div>
@@ -1376,7 +1376,7 @@ export default function JobsPage() {
                   onClick={() => router.push(jobDetailHref(job.status as string, job.id))}
                   className={`border-b border-slate-100 last:border-0 cursor-pointer transition-colors select-none ${
                     dragRowId === job.id ? 'opacity-40 bg-slate-50'
-                    : dragOverRowId === job.id ? 'bg-blue-50 border-blue-200'
+                    : dragOverRowId === job.id ? 'bg-slate-50 border-slate-200'
                     : 'hover:bg-slate-50'
                   }`}
                 >
@@ -1393,7 +1393,7 @@ export default function JobsPage() {
           {displayedJobs.length > 0 && (
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
               <p className="text-xs text-slate-400">Showing {displayedJobs.length} of {jobs.length} job{jobs.length !== 1 ? 's' : ''}</p>
-              {manualOrder && <p className="text-xs text-blue-500">Custom row order active</p>}
+              {manualOrder && <p className="text-xs text-slate-500">Custom row order active</p>}
             </div>
           )}
         </div>
@@ -1555,7 +1555,7 @@ export default function JobsPage() {
                 <span className="text-sm text-slate-700">{col.label}</span>
                 {col.required && <span className="text-xs text-slate-300 ml-auto">required</span>}
                 {!col.defaultVisible && !visibleCols.includes(col.id) && (
-                  <span className="text-xs text-blue-400 ml-auto">+ add</span>
+                  <span className="text-xs text-slate-400 ml-auto">+ add</span>
                 )}
               </label>
             ))}

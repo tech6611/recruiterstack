@@ -103,7 +103,7 @@ export default function EnrollCandidateDrawer({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
           <div className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-blue-500" />
+            <UserPlus className="h-5 w-5 text-slate-500" />
             <h2 id="enroll-candidate-title" className="text-base font-bold text-slate-900">Enroll in Sequence</h2>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
@@ -113,12 +113,12 @@ export default function EnrollCandidateDrawer({
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {/* Candidate preview */}
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold text-emerald-600 mb-1">
               {candidateIds.length} candidate{candidateIds.length > 1 ? 's' : ''}
             </p>
             {candidateNames && candidateNames.length > 0 && (
-              <p className="text-xs text-blue-500 truncate">
+              <p className="text-xs text-slate-500 truncate">
                 {candidateNames.slice(0, 5).join(', ')}
                 {candidateNames.length > 5 && ` +${candidateNames.length - 5} more`}
               </p>
@@ -144,7 +144,7 @@ export default function EnrollCandidateDrawer({
               <button
                 onClick={handleCreateSequence}
                 disabled={creating}
-                className="flex items-center justify-center gap-2 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+                className="flex items-center justify-center gap-2 w-full rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors"
               >
                 {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 {creating ? 'Creating...' : 'Create & Configure Sequence'}
@@ -189,7 +189,7 @@ export default function EnrollCandidateDrawer({
               <p className="text-xs font-semibold text-slate-500">Stages Preview</p>
               {selectedSeq.stages.map((stage, i) => (
                 <div key={stage.id} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-emerald-600 mt-0.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-emerald-600 mt-0.5">
                     {i + 1}
                   </span>
                   <div className="min-w-0">
@@ -230,7 +230,7 @@ export default function EnrollCandidateDrawer({
             <button
               onClick={handleEnroll}
               disabled={enrolling}
-              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+              className="flex items-center gap-2 rounded-xl bg-[#221b14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors"
             >
               {enrolling && <Loader2 className="h-4 w-4 animate-spin" />}
               Enroll

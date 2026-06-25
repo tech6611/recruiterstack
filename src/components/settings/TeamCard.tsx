@@ -71,7 +71,7 @@ export function TeamCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-sky-600" /> Team
+          <Users className="h-4 w-4 text-slate-600" /> Team
         </CardTitle>
         <CardDescription>Manage roles and invite teammates. You can&rsquo;t demote the last admin.</CardDescription>
       </CardHeader>

@@ -129,7 +129,7 @@ export default function MyDocumentsPage() {
         {!open && (
           <button
             onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#221b14] px-3 py-2 text-sm font-semibold text-white hover:bg-[#33271b]"
           >
             <Plus className="h-4 w-4" />
             Add document
@@ -170,7 +170,7 @@ export default function MyDocumentsPage() {
           {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
           <div className="mt-3 flex justify-end gap-2">
             <button onClick={() => setOpen(false)} disabled={submitting} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
-            <button onClick={submit} disabled={!title.trim() || !url.trim() || submitting} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+            <button onClick={submit} disabled={!title.trim() || !url.trim() || submitting} className="rounded-lg bg-[#221b14] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-50">
               {submitting ? 'Saving…' : 'Save'}
             </button>
           </div>
@@ -192,7 +192,7 @@ export default function MyDocumentsPage() {
         {/* Org docs */}
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="mb-3 flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-blue-600" />
+            <Building2 className="h-4 w-4 text-slate-600" />
             <h2 className="text-sm font-semibold text-slate-900">Org-wide ({orgLevel.length})</h2>
           </div>
           {loading ? <p className="py-2 text-sm text-slate-400">Loading…</p>

@@ -17,8 +17,8 @@ type Column = {
 }
 
 const COLUMNS: Column[] = [
-  { status: 'active',         label: 'Active',        color: 'border-blue-300',   bg: 'bg-blue-50',    dot: 'bg-blue-500'   },
-  { status: 'interviewing',   label: 'Interviewing',  color: 'border-violet-300', bg: 'bg-violet-50',  dot: 'bg-violet-500' },
+  { status: 'active',         label: 'Active',        color: 'border-slate-300',   bg: 'bg-slate-50',    dot: 'bg-slate-500'   },
+  { status: 'interviewing',   label: 'Interviewing',  color: 'border-slate-300', bg: 'bg-slate-50',  dot: 'bg-slate-500' },
   { status: 'offer_extended', label: 'Offer Extended',color: 'border-amber-300',  bg: 'bg-amber-50',   dot: 'bg-amber-500'  },
   { status: 'hired',          label: 'Hired',         color: 'border-emerald-300',bg: 'bg-emerald-50', dot: 'bg-emerald-500'},
   { status: 'rejected',       label: 'Rejected',      color: 'border-red-300',    bg: 'bg-red-50',     dot: 'bg-red-400'    },

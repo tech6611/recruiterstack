@@ -80,17 +80,17 @@ interface CandidateDrawerProps {
 const STATUS_STYLES: Record<string, string> = {
   active:       'bg-emerald-100 text-emerald-700',
   on_hold:      'bg-orange-100 text-orange-700',
-  hired:        'bg-green-100 text-green-700',
+  hired:        'bg-emerald-100 text-emerald-700',
   rejected:     'bg-red-100 text-red-700',
   withdrawn:    'bg-slate-100 text-slate-600',
   interviewing: 'bg-amber-100 text-amber-700',
-  offer_extended: 'bg-violet-100 text-violet-700',
+  offer_extended: 'bg-slate-100 text-slate-700',
   inactive:     'bg-slate-100 text-slate-500',
 }
 
 const RECO_STYLES: Record<string, { label: string; cls: string }> = {
   strong_yes: { label: 'Strong Yes', cls: 'bg-emerald-100 text-emerald-700' },
-  yes:        { label: 'Yes',        cls: 'bg-green-100 text-green-700' },
+  yes:        { label: 'Yes',        cls: 'bg-emerald-100 text-emerald-700' },
   maybe:      { label: 'Maybe',      cls: 'bg-amber-100 text-amber-700' },
   no:         { label: 'No',         cls: 'bg-red-100 text-red-700' },
 }
@@ -130,7 +130,7 @@ function AddNoteAction({ applicationId, onDone }: { applicationId: string; onDon
       <button
         onClick={handleSubmit}
         disabled={!note.trim() || saving}
-        className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+        className="rounded-lg bg-[#221b14] px-2.5 py-1.5 text-xs font-medium text-white hover:bg-[#33271b] disabled:opacity-50 transition-colors"
       >
         {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
       </button>
@@ -174,7 +174,7 @@ function MoveStageAction({
             disabled={isCurrent || saving}
             className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
               isCurrent
-                ? 'bg-blue-100 text-blue-700 ring-1 ring-emerald-300'
+                ? 'bg-slate-100 text-slate-700 ring-1 ring-emerald-300'
                 : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600'
             } disabled:cursor-default`}
           >
@@ -258,7 +258,7 @@ function QuickEmailAction({
         <button
           onClick={handleSend}
           disabled={!subject.trim() || !body.trim() || sending}
-          className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#33271b] disabled:opacity-50 transition-colors"
         >
           {sending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
           Send
@@ -631,7 +631,7 @@ export function CandidateDrawer({ candidateId, onClose, onActionComplete }: Cand
           {error && (
             <div className="px-5 py-10 text-center">
               <p className="text-sm text-red-500">{error}</p>
-              <button onClick={() => fetchCandidate(candidateId)} className="mt-2 text-xs text-blue-500 hover:underline">Retry</button>
+              <button onClick={() => fetchCandidate(candidateId)} className="mt-2 text-xs text-slate-500 hover:underline">Retry</button>
             </div>
           )}
 
@@ -640,7 +640,7 @@ export function CandidateDrawer({ candidateId, onClose, onActionComplete }: Cand
               {/* Profile header */}
               <div className="px-5 py-4 border-b border-slate-100">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-emerald-600">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-emerald-600">
                     {data.candidate.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -682,7 +682,7 @@ export function CandidateDrawer({ candidateId, onClose, onActionComplete }: Cand
                   )}
                   {data.candidate.linkedin_url && (
                     <a href={data.candidate.linkedin_url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-xs text-blue-500 hover:underline">
+                      className="flex items-center gap-2 text-xs text-slate-500 hover:underline">
                       <Linkedin className="h-3 w-3" />
                       <span>LinkedIn Profile</span>
                     </a>

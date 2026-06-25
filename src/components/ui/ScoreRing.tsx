@@ -7,7 +7,7 @@ export function ScoreRing({ score, size = 72 }: { score: number; size?: number }
   const radius = (size / 2) - 8
   const circ   = 2 * Math.PI * radius
   const offset = circ - (score / 100) * circ
-  const color  = score >= 70 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444'
+  const color  = score >= 70 ? '#1f7a5a' : score >= 50 ? '#f59e0b' : '#ef4444'
   return (
     <svg width={size} height={size} className="shrink-0">
       <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e2e8f0" strokeWidth="6" />

@@ -50,13 +50,13 @@ interface InboxData {
 
 const STAGE_BADGE: Record<StageColor, string> = {
   slate:   'bg-slate-100 text-slate-600',
-  blue:    'bg-blue-100 text-blue-700',
-  violet:  'bg-violet-100 text-violet-700',
+  blue:    'bg-slate-100 text-slate-700',
+  violet:  'bg-slate-100 text-slate-700',
   amber:   'bg-amber-100 text-amber-700',
   emerald: 'bg-emerald-100 text-emerald-700',
-  green:   'bg-green-100 text-green-700',
+  green:   'bg-emerald-100 text-emerald-700',
   red:     'bg-red-100 text-red-700',
-  pink:    'bg-pink-100 text-pink-700',
+  pink:    'bg-slate-100 text-slate-700',
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ function eventLabel(e: ActivityEvent): { icon: React.ElementType; text: string; 
         text:  e.from_stage && e.to_stage
                  ? `Moved from ${e.from_stage} → ${e.to_stage}`
                  : e.to_stage ? `Moved to ${e.to_stage}` : 'Stage updated',
-        color: 'text-blue-600',
+        color: 'text-slate-600',
       }
     case 'note_added':
       return { icon: MessageSquare, text: e.note ?? 'Note added', color: 'text-slate-600' }
@@ -171,7 +171,7 @@ export default function InboxPage() {
             {t.label}
             <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
               tab === t.id
-                ? t.id === 'attention' && t.count > 0 ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                ? t.id === 'attention' && t.count > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
                 : 'bg-slate-200 text-slate-500'
             }`}>
               {t.count}

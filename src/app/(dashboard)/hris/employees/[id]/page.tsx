@@ -77,11 +77,11 @@ const STATUS_LABEL: Record<EmployeeStatus, string> = {
 const EVENT_META: Record<EmploymentEventType, { icon: typeof BadgeCheck; tone: string; ring: string; title: string }> = {
   hired:               { icon: Briefcase,  tone: 'text-amber-600',   ring: 'ring-amber-200',   title: 'Hired (pre-hire)' },
   joined:              { icon: BadgeCheck, tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Joined the org' },
-  manager_changed:     { icon: GitBranch,  tone: 'text-blue-600',    ring: 'ring-blue-200',    title: 'Manager changed' },
+  manager_changed:     { icon: GitBranch,  tone: 'text-slate-600',    ring: 'ring-slate-200',    title: 'Manager changed' },
   comp_changed:        { icon: DollarSign, tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Compensation changed' },
   terminated:          { icon: LogOut,     tone: 'text-slate-500',   ring: 'ring-slate-200',   title: 'Terminated' },
   note:                { icon: StickyNote, tone: 'text-slate-600',   ring: 'ring-slate-200',   title: 'Note' },
-  time_off_requested:  { icon: Calendar,   tone: 'text-blue-600',    ring: 'ring-blue-200',    title: 'Time-off requested' },
+  time_off_requested:  { icon: Calendar,   tone: 'text-slate-600',    ring: 'ring-slate-200',    title: 'Time-off requested' },
   time_off_approved:   { icon: Check,      tone: 'text-emerald-600', ring: 'ring-emerald-200', title: 'Time-off approved' },
   time_off_rejected:   { icon: X,          tone: 'text-rose-600',    ring: 'ring-rose-200',    title: 'Time-off rejected' },
   time_off_cancelled:  { icon: X,          tone: 'text-slate-500',   ring: 'ring-slate-200',   title: 'Time-off cancelled' },
@@ -339,7 +339,7 @@ export default function EmployeeDetailPage() {
                   <button
                     onClick={() => transition('join')}
                     disabled={busy}
-                    className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                    className="rounded-lg bg-[#221b14] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#33271b] disabled:opacity-50"
                   >
                     {busy ? 'Saving…' : 'Mark joined'}
                   </button>
@@ -453,7 +453,7 @@ export default function EmployeeDetailPage() {
                 ) : !showOnboardingForm ? (
                   <button
                     onClick={openOnboardingForm}
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                    className="rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b]"
                   >
                     Start onboarding
                   </button>
@@ -495,7 +495,7 @@ export default function EmployeeDetailPage() {
                   <button
                     onClick={startOnboarding}
                     disabled={!obTemplateId || submittingOB}
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    className="rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b] disabled:opacity-50"
                   >
                     {submittingOB ? 'Starting…' : 'Start plan'}
                   </button>
@@ -516,7 +516,7 @@ export default function EmployeeDetailPage() {
               {!showTimeOffForm && (
                 <button
                   onClick={() => setShowTimeOffForm(true)}
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                  className="rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#33271b]"
                 >
                   Request time off
                 </button>
@@ -559,7 +559,7 @@ export default function EmployeeDetailPage() {
                   <button
                     onClick={submitTimeOff}
                     disabled={!toStart || !toEnd || submittingTO}
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                    className="rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#33271b] disabled:opacity-50"
                   >
                     {submittingTO ? 'Submitting…' : 'Submit request'}
                   </button>
@@ -587,7 +587,7 @@ export default function EmployeeDetailPage() {
                       <span className="flex shrink-0 gap-1">
                         <button
                           onClick={() => decideTimeOff(r.id, 'approve')}
-                          className="rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                          className="rounded-md bg-[#221b14] px-2 py-1 text-xs font-semibold text-white hover:bg-[#33271b]"
                         >Approve</button>
                         <button
                           onClick={() => decideTimeOff(r.id, 'reject')}

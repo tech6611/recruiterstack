@@ -434,16 +434,16 @@ export default function ScheduleInterviewModal({
               </div>
             )}
             {autoMeetLink && (
-              <div className="flex items-center justify-between gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-green-500">✓</span>
+                  <span className="text-emerald-500">✓</span>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-green-700">Google Meet created</p>
-                    <p className="text-[11px] text-green-600 truncate">{autoMeetLink}</p>
+                    <p className="text-xs font-semibold text-emerald-700">Google Meet created</p>
+                    <p className="text-[11px] text-emerald-600 truncate">{autoMeetLink}</p>
                   </div>
                 </div>
                 <a href={autoMeetLink} target="_blank" rel="noopener noreferrer"
-                  className="shrink-0 text-xs font-medium text-green-700 underline hover:text-green-900">
+                  className="shrink-0 text-xs font-medium text-emerald-700 underline hover:text-emerald-900">
                   Join
                 </a>
               </div>
@@ -458,7 +458,7 @@ export default function ScheduleInterviewModal({
             </a>
             {location && !autoMeetLink && (
               <a href={location} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 hover:bg-emerald-100 transition-colors">
+                className="flex items-center justify-center gap-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-100 transition-colors">
                 <ExternalLink className="h-4 w-4" /> Open meeting link
               </a>
             )}
@@ -542,7 +542,7 @@ export default function ScheduleInterviewModal({
                     disabled={!member.email}
                     className={`text-[10px] font-medium rounded-full px-2 py-0.5 border transition-colors ${
                       interviewer === member.name && interviewerEmail === member.email
-                        ? 'bg-blue-50 text-emerald-600 border-blue-200'
+                        ? 'bg-slate-50 text-emerald-600 border-slate-200'
                         : member.email
                         ? 'text-slate-400 border-slate-200 hover:border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50 bg-white'
                         : 'text-slate-300 border-slate-100 bg-white cursor-not-allowed'
@@ -603,7 +603,7 @@ export default function ScheduleInterviewModal({
                     setAddingMember(false)
                   }}
                   disabled={!newMemberName.trim()}
-                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-40 transition-colors"
+                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-[#221b14] text-white text-xs font-medium hover:bg-[#33271b] disabled:opacity-40 transition-colors"
                 >
                   Add
                 </button>
@@ -649,7 +649,7 @@ export default function ScheduleInterviewModal({
                   onClick={() => setInterviewType(t.value)}
                   className={`px-2.5 py-2 rounded-xl border text-xs font-medium transition-colors text-left ${
                     interviewType === t.value
-                      ? 'border-blue-400 bg-blue-50 text-blue-700'
+                      ? 'border-slate-400 bg-slate-50 text-slate-700'
                       : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
@@ -669,7 +669,7 @@ export default function ScheduleInterviewModal({
                   onClick={() => setDuration(d.value)}
                   className={`flex-1 px-2 py-2 rounded-xl border text-xs font-medium transition-colors ${
                     duration === d.value
-                      ? 'border-blue-400 bg-blue-50 text-blue-700'
+                      ? 'border-slate-400 bg-slate-50 text-slate-700'
                       : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
@@ -826,7 +826,7 @@ export default function ScheduleInterviewModal({
                                     busy
                                       ? (isSelected || isInBlock) ? 'bg-red-300 ring-1 ring-emerald-400 cursor-not-allowed' : 'bg-red-100 cursor-not-allowed'
                                       : isSelected ? 'bg-emerald-600'
-                                      : isInBlock  ? 'bg-blue-200 hover:bg-emerald-300 cursor-pointer'
+                                      : isInBlock  ? 'bg-slate-200 hover:bg-emerald-300 cursor-pointer'
                                       : isWeekend  ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                       : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                                   }`}
@@ -843,7 +843,7 @@ export default function ScheduleInterviewModal({
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-100 border border-emerald-200" /> Free</span>
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-red-100" /> Busy</span>
                     <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-emerald-600" /> Start</span>
-                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-blue-200" /> Duration block</span>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block h-2.5 w-4 rounded bg-slate-200" /> Duration block</span>
                   </div>
                 </div>
               )}
@@ -865,13 +865,13 @@ export default function ScheduleInterviewModal({
                 />
               ) : connectedPlatforms.length === 1 ? (
                 /* Exactly one connected — auto-selected, no selector needed */
-                <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
-                  <span className="text-green-500 text-base">✓</span>
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+                  <span className="text-emerald-500 text-base">✓</span>
                   <div>
-                    <p className="text-xs font-semibold text-green-700">
+                    <p className="text-xs font-semibold text-emerald-700">
                       {connectedPlatforms[0].icon} {connectedPlatforms[0].label} meeting will be auto-created
                     </p>
-                    <p className="text-[11px] text-green-600">Calendar invites sent to candidate &amp; all panel members on schedule</p>
+                    <p className="text-[11px] text-emerald-600">Calendar invites sent to candidate &amp; all panel members on schedule</p>
                   </div>
                 </div>
               ) : (
@@ -882,18 +882,18 @@ export default function ScheduleInterviewModal({
                       <button key={p.id} onClick={() => setActivePlatform(p.id)}
                         className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-colors ${
                           activePlatform === p.id
-                            ? 'border-blue-400 bg-blue-50 text-blue-700'
+                            ? 'border-slate-400 bg-slate-50 text-slate-700'
                             : 'border-slate-200 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50'
                         }`}>
                         <span>{p.icon}</span> {p.label}
-                        <span className="text-[9px] text-green-600 font-normal">Connected</span>
+                        <span className="text-[9px] text-emerald-600 font-normal">Connected</span>
                       </button>
                     ))}
                   </div>
                   {activePlatform && (
-                    <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
-                      <span className="text-green-500">✓</span>
-                      <p className="text-xs font-semibold text-green-700">
+                    <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+                      <span className="text-emerald-500">✓</span>
+                      <p className="text-xs font-semibold text-emerald-700">
                         {connectedPlatforms.find(p => p.id === activePlatform)?.label} meeting will be auto-created
                       </p>
                     </div>
@@ -928,17 +928,17 @@ export default function ScheduleInterviewModal({
 
           {/* Self-schedule link result */}
           {selfScheduleLink && (
-            <div className="rounded-xl bg-blue-50 border border-blue-200 px-3 py-3">
-              <p className="text-xs font-semibold text-blue-700 mb-1.5">📅 Scheduling link generated</p>
+            <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-3">
+              <p className="text-xs font-semibold text-slate-700 mb-1.5">📅 Scheduling link generated</p>
               <div className="flex items-center gap-2">
                 <input
                   readOnly
                   value={selfScheduleLink}
-                  className="flex-1 min-w-0 rounded-lg border border-blue-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none"
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none"
                 />
                 <button
                   onClick={() => { navigator.clipboard.writeText(selfScheduleLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000) }}
-                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors"
+                  className="shrink-0 px-2.5 py-1.5 rounded-lg bg-[#221b14] text-white text-xs font-medium hover:bg-[#33271b] transition-colors"
                 >
                   {linkCopied ? '✓ Copied' : 'Copy'}
                 </button>
@@ -963,12 +963,12 @@ export default function ScheduleInterviewModal({
           </button>
           {(googleConnected || msConnected || zoomConnected) && !selfScheduleLink && (
             <button onClick={handleSendLink} disabled={sendingLink || saving}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-emerald-100 text-blue-700 px-3 py-2.5 text-xs font-semibold transition-colors disabled:opacity-60 whitespace-nowrap">
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-100 text-slate-700 px-3 py-2.5 text-xs font-semibold transition-colors disabled:opacity-60 whitespace-nowrap">
               {sendingLink ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…</> : '🔗 Send scheduling link'}
             </button>
           )}
           <button onClick={handleSubmit} disabled={saving || sendingLink}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60">
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#221b14] hover:bg-[#33271b] text-white px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60">
             {saving ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</>
             ) : (
@@ -1081,7 +1081,7 @@ export default function ScheduleInterviewModal({
                                 busy
                                   ? (isSelected || isInBlock) ? 'bg-red-300 ring-1 ring-emerald-400 cursor-not-allowed' : 'bg-red-100 cursor-not-allowed'
                                   : isSelected ? 'bg-emerald-600'
-                                  : isInBlock  ? 'bg-blue-200 hover:bg-emerald-300 cursor-pointer'
+                                  : isInBlock  ? 'bg-slate-200 hover:bg-emerald-300 cursor-pointer'
                                   : isWeekend  ? 'bg-slate-100 hover:bg-slate-200 cursor-pointer'
                                   : 'bg-emerald-50 hover:bg-emerald-200 cursor-pointer'
                               }`}
@@ -1101,7 +1101,7 @@ export default function ScheduleInterviewModal({
             <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="inline-block h-3 w-5 rounded bg-emerald-100 border border-emerald-200" /> Free</span>
             <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="inline-block h-3 w-5 rounded bg-red-100" /> Busy</span>
             <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="inline-block h-3 w-5 rounded bg-emerald-600" /> Start</span>
-            <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="inline-block h-3 w-5 rounded bg-blue-200" /> Duration block</span>
+            <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="inline-block h-3 w-5 rounded bg-slate-200" /> Duration block</span>
             <span className="ml-auto text-xs text-slate-400">Esc to close</span>
           </div>
         </div>

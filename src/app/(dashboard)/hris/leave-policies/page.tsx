@@ -128,7 +128,7 @@ export default function LeavePoliciesPage() {
                     {editingDays[p.id] !== p.annual_days && (
                       <button
                         onClick={() => savePolicy(p)}
-                        className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                        className="rounded-lg bg-[#221b14] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#33271b]"
                       >
                         Save
                       </button>
@@ -163,7 +163,7 @@ export default function LeavePoliciesPage() {
             <button
               onClick={addHoliday}
               disabled={!hDate || !hName.trim() || addingHoliday}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b] disabled:opacity-50"
             >
               <Plus className="h-3.5 w-3.5" />
               {addingHoliday ? 'Adding…' : 'Add holiday'}

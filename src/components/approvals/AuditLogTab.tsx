@@ -38,7 +38,7 @@ const ACTION_LABEL: Record<string, string> = {
 // Per-entity badge colours so a job's timeline visibly separates its
 // requisition phase from its job phase.
 const ENTITY_BADGE: Record<string, string> = {
-  Requisition: 'bg-violet-100 text-violet-700',
+  Requisition: 'bg-slate-100 text-slate-700',
   Job:         'bg-emerald-100 text-emerald-700',
   Offer:       'bg-amber-100 text-amber-700',
 }
@@ -78,7 +78,7 @@ export function AuditLogTab({ targetType, targetId }: Props) {
                 : null
               return (
                 <li key={e.id} className="flex gap-3 text-sm">
-                  <div className={`mt-1 h-2 w-2 shrink-0 rounded-full ${e.entity === 'opening' ? 'bg-violet-500' : 'bg-emerald-500'}`} />
+                  <div className={`mt-1 h-2 w-2 shrink-0 rounded-full ${e.entity === 'opening' ? 'bg-slate-500' : 'bg-emerald-500'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="text-slate-900">
                       {badge && (

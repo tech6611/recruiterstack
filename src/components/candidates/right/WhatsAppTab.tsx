@@ -19,7 +19,7 @@ interface ThreadData {
 
 function StatusTicks({ status }: { status: WhatsAppMessage['status'] }) {
   if (status === 'failed') return <AlertCircle className="h-3 w-3 text-red-500" />
-  if (status === 'read') return <CheckCheck className="h-3 w-3 text-sky-500" />
+  if (status === 'read') return <CheckCheck className="h-3 w-3 text-slate-500" />
   if (status === 'delivered') return <CheckCheck className="h-3 w-3 text-slate-400" />
   if (status === 'sent') return <Check className="h-3 w-3 text-slate-400" />
   return null
@@ -122,7 +122,7 @@ export default function WhatsAppTab({ candidateId }: { candidateId: string }) {
                 <div
                   className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${
                     outbound
-                      ? 'bg-green-50 text-slate-800 border border-green-100'
+                      ? 'bg-emerald-50 text-slate-800 border border-emerald-100'
                       : 'bg-slate-50 text-slate-800 border border-slate-100'
                   }`}
                 >
@@ -202,7 +202,7 @@ export default function WhatsAppTab({ candidateId }: { candidateId: string }) {
                 type="button"
                 onClick={send}
                 disabled={sending || !draft.trim()}
-                className="shrink-0 rounded-xl bg-emerald-600 p-2.5 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                className="shrink-0 rounded-xl bg-[#221b14] p-2.5 text-white hover:bg-[#33271b] transition-colors disabled:opacity-50"
                 aria-label="Send WhatsApp message"
               >
                 <Send className="h-4 w-4" />
