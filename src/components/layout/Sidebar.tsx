@@ -18,7 +18,6 @@ import {
   Receipt,
   Settings,
   ShieldCheck,
-  Zap,
   BarChart2,
   Inbox,
   Search,
@@ -32,6 +31,7 @@ import { useEffect, useRef, useState } from 'react'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { flags } from '@/lib/flags'
 import { useCapabilities } from '@/components/providers/CapabilitiesProvider'
+import { BrandMark } from '@/components/layout/BrandMark'
 import type { Capability } from '@/lib/permissions'
 
 type IconType = typeof LayoutDashboard
@@ -323,11 +323,9 @@ export function Sidebar() {
       <aside className="relative hidden h-screen w-[140px] shrink-0 flex-col border-r border-[#34291e] bg-[#221b14] md:flex">
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 border-b border-white/10 px-3">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500">
-            <Zap className="h-3.5 w-3.5 text-white" />
-          </div>
+          <BrandMark />
           <span className="truncate font-display text-sm font-bold tracking-tight text-[#f6efe3]">
-            RecruiterStack
+            Recruiter<span className="font-extrabold">Stack</span>
           </span>
         </div>
 
@@ -372,11 +370,9 @@ export function Sidebar() {
           <aside className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-[#34291e] bg-[#221b14] shadow-xl">
             <div className="flex h-14 items-center justify-between border-b border-white/10 px-3">
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500">
-                  <Zap className="h-3.5 w-3.5 text-white" />
-                </div>
+                <BrandMark />
                 <span className="truncate font-display text-sm font-bold tracking-tight text-[#f6efe3]">
-                  RecruiterStack
+                  Recruiter<span className="font-extrabold">Stack</span>
                 </span>
               </div>
               <button

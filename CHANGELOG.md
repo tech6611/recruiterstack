@@ -12,6 +12,15 @@ entries on top.
 ## 2026-06-25
 
 ### Changed
+- **Rebrand polish — new logo mark + on-brand onboarding banner.** New
+  RecruiterStack mark (`BrandMark`): a layered "stack" glyph in a warm cream tile,
+  replacing the green lightning bolt in the sidebar (desktop + mobile); wordmark
+  now emphasises "Stack". The "Finish setting up RecruiterStack" banner is
+  re-skinned off green — espresso rocket tile + progress bar, a purpose-built icon
+  per setup task (departments → building, locations → pin, approvals → shield/
+  branch, requisition → clipboard, job → briefcase, teammate → person, calendar),
+  and an espresso "done" tick instead of the green checkbox. Removed the throwaway
+  `/brand-lab` and `/logo-lab` preview routes.
 - **Platform rebrand — Stage 2: card consolidation.** Unified every "card"
   surface onto one shared system to remove the scattered, inconsistent-card look.
   The `Card` component gained variants (flat default / elevated / interactive /
@@ -25,6 +34,10 @@ entries on top.
   overview cards were neutralized to a calm, uniform look. Surface-only — inner
   content, colors, and behavior unchanged.
 ### Fixed
+- **Dashboard "Active Jobs" widget counted archived/closed jobs.** The
+  `top_jobs` list in `/api/dashboard` sliced the first 6 jobs with no status
+  filter, so archived and closed roles still showed as active. Now excludes
+  `archived` and `closed` before building the list.
 - **Stop stranding members on "Set up your workspace."** When a signed-in user's
   Clerk session had no *active* organization selected (e.g. after a token
   refresh, a new device, or a transient Clerk blip), `OrgGate` redirected them to
