@@ -13,10 +13,19 @@ async function lookupOrgId(userId: string): Promise<string | null> {
       `https://api.clerk.com/v1/users/${userId}/organization_memberships?limit=1`,
       { headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` } },
     )
-    if (!res.ok) return null
+    if (!res.ok) {
+      // A failed call is NOT the same as "no membership" — log it so a transient
+      // Clerk outage doesn't silently look like the user has no workspace.
+      console.error(
+        `[auth] Clerk org-membership lookup for user ${userId} failed: ` +
+        `${res.status} ${await res.text().catch(() => '')}`,
+      )
+      return null
+    }
     const { data } = await res.json()
     return (data?.[0]?.organization?.id as string) ?? null
-  } catch {
+  } catch (err) {
+    console.error(`[auth] Clerk org-membership lookup for user ${userId} threw:`, err)
     return null
   }
 }

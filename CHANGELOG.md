@@ -11,6 +11,18 @@ entries on top.
 
 ## 2026-06-25
 
+### Fixed
+- **Stop stranding members on "Set up your workspace."** When a signed-in user's
+  Clerk session had no *active* organization selected (e.g. after a token
+  refresh, a new device, or a transient Clerk blip), `OrgGate` redirected them to
+  `/org-setup` even though they were a member of an org with all their data
+  intact. It now checks the user's memberships first and silently re-activates
+  their workspace (`setActive`), only redirecting when they genuinely belong to
+  zero orgs. Also, the server fallback `lookupOrgId` (`lib/auth.ts`) no longer
+  treats a *failed* Clerk API call as "no membership" — it logs the failure so a
+  transient outage is diagnosable rather than silently looking like an absence.
+  (`components/OrgGate.tsx`, `lib/auth.ts`.)
+
 ### Added
 - **Publish JD — Phase 3e: EEO / voluntary compliance reporting.** A new
   **EEO report** page (`/analytics/eeo`) shows anonymous, aggregate counts of the
