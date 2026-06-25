@@ -1120,15 +1120,6 @@ export default function JobsPage() {
           <p className="text-sm text-slate-500 mt-0.5">Manage open roles and candidate pipelines</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Openings (requisitions) — folded under Jobs; no longer a top-level nav item */}
-          <button
-            type="button"
-            onClick={() => router.push('/openings')}
-            className="inline-flex items-center gap-1.5 h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
-            title="Requisitions"
-          >
-            <FileText className="h-3.5 w-3.5 text-slate-400" /> Requisitions
-          </button>
           {/* Global search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
