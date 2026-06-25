@@ -204,9 +204,17 @@ smallest-value-first:
   `recruiting:view`/`recruiting:edit`. Per-job form persists to
   `jobs.custom_fields.screening`. The knockout RULE is stored here; it's
   EVALUATED on apply in 3c.
-- **3c — candidate apply + knockout.** Render the per-job form on
-  `/apply/[token]`, validate + store answers, run `evaluateKnockout` on submit
-  (auto-flag/reject silently), split EEO answers into the hidden bucket.
+- **3c — candidate apply + knockout (DONE, this session).** The public apply page
+  (`/apply/[token]`) now renders the job's custom questions under an "Additional
+  questions" heading, with an input per field type (text, paragraph, yes-no,
+  single/multi choice, number, date, URL; file = paste-a-link for now) and a
+  "voluntary" tag on EEO questions. Required questions are enforced client- and
+  server-side. On submit the API re-loads the form server-side, attaches labels,
+  evaluates the knockout rules (`evaluateKnockout`) and — on a disqualifying
+  answer — silently saves the application as `rejected` (candidate still sees the
+  success screen) and skips autopilot scoring. EEO answers are split into the
+  hidden `eeo_answers` bucket (`partitionAnswers`); knockout/conditional rules are
+  never sent to the candidate (the preview returns a public-safe field shape).
 - **3d — conditional logic.** Show/hide a field based on an earlier answer
   (`visible_when` rules, already in the field shape).
 - **3e — EEO bucket.** Dedicated voluntary compliance section, hidden from the
@@ -230,4 +238,4 @@ No migrations. No change to what the apply form *collects* (Phase 3 territory).
 
 ---
 
-*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions, Ashby parity) in progress — 3a foundations + 3b recruiter builder done, 3c–3e queued.*
+*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions, Ashby parity) in progress — 3a foundations + 3b recruiter builder + 3c candidate apply/knockout done, 3d (conditional logic) + 3e (EEO reporting) queued.*

@@ -6,10 +6,26 @@ import type {
   HiringRequest,
   HiringRequestStatus,
   PipelineStage,
+  ScreeningField,
+  ScreeningFieldType,
   StageColor,
 } from '@/lib/types/database'
+import { getOrgScreeningTemplate } from '@/modules/ats/domain/screening'
 
 type Supabase = SupabaseClient<Database>
+
+// Public-safe view of a screening field for the apply page: rendering metadata
+// only. Knockout rules and conditional logic are deliberately NOT exposed to the
+// candidate — they're evaluated server-side on submit.
+export interface PublicScreeningField {
+  id: string
+  label: string
+  help_text: string | null
+  field_type: ScreeningFieldType
+  options: string[]
+  required: boolean
+  is_eeo: boolean
+}
 
 export interface LegacyJobPipelineSummary extends HiringRequest {
   total_candidates: number
@@ -77,6 +93,9 @@ export interface CanonicalApplyJobPreview {
   // The job's org branding (Publish JD Phase 2c). Null when the org hasn't set
   // any branding up.
   branding: ApplyBranding | null
+  // Custom screening questions for this job (Publish JD Phase 3c). Empty when the
+  // job (and the org default) define no questions.
+  screening: { fields: PublicScreeningField[] }
   status: string
 }
 
@@ -335,6 +354,24 @@ export async function getCanonicalApplyJobPreview(
       }
     : null
 
+  // Resolve this job's screening form: the per-job override on
+  // custom_fields.screening, else the org default template (inherit-then-override,
+  // Phase 3c). Strip to a public-safe shape — no knockout/conditional rules.
+  const jobScreening = (row.custom_fields?.screening ?? null) as { fields?: ScreeningField[] } | null
+  const screeningFields: ScreeningField[] =
+    jobScreening && Array.isArray(jobScreening.fields)
+      ? jobScreening.fields
+      : (await getOrgScreeningTemplate(supabase, row.org_id)).fields
+  const publicScreening: PublicScreeningField[] = screeningFields.map(f => ({
+    id: f.id,
+    label: f.label,
+    help_text: f.help_text,
+    field_type: f.field_type,
+    options: f.options,
+    required: f.required,
+    is_eeo: f.is_eeo,
+  }))
+
   return {
     position_title: row.title,
     department: row.department?.name ?? null,
@@ -344,6 +381,7 @@ export async function getCanonicalApplyJobPreview(
     requirements: text(intake.key_requirements),
     nice_to_have: text(intake.nice_to_have),
     branding,
+    screening: { fields: publicScreening },
     status: row.status,
   }
 }

@@ -9,6 +9,25 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-25
+
+### Added
+- **Publish JD — Phase 3c: candidates can answer screening questions, and
+  knockout rules fire.** The public apply page (`/apply/[token]`) now renders a
+  job's custom questions under an **"Additional questions"** section, with the
+  right input for each field type (short/long text, yes-no, single/multiple
+  choice, number, date, URL; file-type asks for a link for now) and a
+  **"voluntary"** tag on EEO questions. Required questions are enforced before
+  submit. When a candidate gives a **disqualifying answer**, the application is
+  silently saved as **rejected** and skipped by AI scoring — the candidate still
+  sees the normal success screen. **EEO answers** are stored in a separate hidden
+  bucket, and knockout/conditional rules are never exposed to the candidate (the
+  apply preview returns a public-safe field shape). The apply API re-loads the
+  form server-side to attach labels, evaluate knockouts, and split EEO answers.
+  (`app/apply/[token]/page.tsx`, `app/api/apply/route.ts`,
+  `modules/ats/domain/job-pipelines.ts`, `modules/ats/domain/applications.ts`,
+  `modules/ats/domain/screening.ts`, `lib/validations/applications.ts`.)
+
 ## 2026-06-24
 
 ### Added

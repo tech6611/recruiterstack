@@ -4,6 +4,7 @@ import type {
   ApplicationInsert,
   Application,
   Database,
+  ScreeningAnswer,
 } from '@/lib/types/database'
 
 type Supabase = SupabaseClient<Database>
@@ -25,6 +26,10 @@ export interface CreateApplicationInput {
   resumeUrl?: string | null
   coverLetter?: string | null
   creditedTo?: string | null
+  /** Screening-question answers (Publish JD Phase 3c). */
+  screeningAnswers?: ScreeningAnswer[]
+  eeoAnswers?: ScreeningAnswer[]
+  knockoutFailed?: boolean
 }
 
 export async function createApplication(
@@ -52,6 +57,9 @@ export async function createApplication(
     ai_scored_at: null,
     ai_criterion_scores: null,
     credited_to: input.creditedTo ?? null,
+    screening_answers: input.screeningAnswers ?? [],
+    eeo_answers: input.eeoAnswers ?? [],
+    knockout_failed: input.knockoutFailed ?? false,
   }
 
   const { data, error } = await supabase

@@ -35,6 +35,13 @@ export const publicApplySchema = z.object({
   linkedin_url: z.string().url().optional(),
   cover_letter: z.string().optional(),
   cv_url: z.string().url().optional(),
+  // Custom screening-question answers (Publish JD Phase 3c). The label is
+  // resolved server-side from the job's form, so the client only sends the
+  // field id + the candidate's value.
+  screening_answers: z.array(z.object({
+    field_id: z.string().min(1),
+    value: z.union([z.string(), z.array(z.string()), z.null()]),
+  })).max(100).optional(),
 })
 
 export type ApplicationInsertInput = z.infer<typeof applicationInsertSchema>

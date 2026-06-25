@@ -16,6 +16,22 @@ interface Branding {
   brand_font: string | null
 }
 
+type ScreeningFieldType =
+  | 'short_text' | 'long_text' | 'yes_no' | 'single_select'
+  | 'multi_select' | 'number' | 'date' | 'file' | 'url'
+
+interface ScreeningField {
+  id: string
+  label: string
+  help_text: string | null
+  field_type: ScreeningFieldType
+  options: string[]
+  required: boolean
+  is_eeo: boolean
+}
+
+type AnswerValue = string | string[]
+
 interface JobInfo {
   position_title: string
   department: string | null
@@ -25,6 +41,7 @@ interface JobInfo {
   requirements: string | null
   nice_to_have: string | null
   branding: Branding | null
+  screening: { fields: ScreeningField[] }
 }
 
 const DEFAULT_BRAND = '#059669' // emerald-600 — the app's default accent
@@ -41,6 +58,78 @@ function JdSection({ title, body }: { title: string; body: string | null }) {
       <h2 className="text-sm font-bold text-slate-700 mb-2">{title}</h2>
       <div className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{body}</div>
     </section>
+  )
+}
+
+const FIELD_INPUT_CLASS =
+  'w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent'
+
+function ScreeningQuestion({
+  field, value, onChange,
+}: { field: ScreeningField; value: AnswerValue | undefined; onChange: (v: AnswerValue) => void }) {
+  const str = typeof value === 'string' ? value : ''
+  const arr = Array.isArray(value) ? value : []
+
+  function renderInput() {
+    switch (field.field_type) {
+      case 'long_text':
+        return <textarea rows={4} value={str} onChange={e => onChange(e.target.value)} className={`${FIELD_INPUT_CLASS} resize-none`} />
+      case 'number':
+        return <input type="number" value={str} onChange={e => onChange(e.target.value)} className={FIELD_INPUT_CLASS} />
+      case 'date':
+        return <input type="date" value={str} onChange={e => onChange(e.target.value)} className={FIELD_INPUT_CLASS} />
+      case 'url':
+        return <input type="url" value={str} onChange={e => onChange(e.target.value)} placeholder="https://…" className={FIELD_INPUT_CLASS} />
+      case 'file':
+        return <input type="url" value={str} onChange={e => onChange(e.target.value)} placeholder="Paste a link to your file (Drive, Dropbox…)" className={FIELD_INPUT_CLASS} />
+      case 'yes_no':
+        return (
+          <div className="flex gap-5">
+            {['yes', 'no'].map(opt => (
+              <label key={opt} className="inline-flex items-center gap-1.5 text-sm capitalize text-slate-700">
+                <input type="radio" name={field.id} checked={str === opt} onChange={() => onChange(opt)} />
+                {opt}
+              </label>
+            ))}
+          </div>
+        )
+      case 'single_select':
+        return (
+          <select value={str} onChange={e => onChange(e.target.value)} className={FIELD_INPUT_CLASS}>
+            <option value="">Select…</option>
+            {field.options.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        )
+      case 'multi_select':
+        return (
+          <div className="space-y-1.5">
+            {field.options.map(o => (
+              <label key={o} className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={arr.includes(o)}
+                  onChange={e => onChange(e.target.checked ? [...arr, o] : arr.filter(x => x !== o))}
+                />
+                {o}
+              </label>
+            ))}
+          </div>
+        )
+      default: // short_text
+        return <input type="text" value={str} onChange={e => onChange(e.target.value)} className={FIELD_INPUT_CLASS} />
+    }
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+        {field.label}
+        {field.required && <span className="text-red-500"> *</span>}
+        {field.is_eeo && <span className="ml-2 text-xs font-normal text-slate-400">(voluntary)</span>}
+      </label>
+      {field.help_text && <p className="text-xs text-slate-400 mb-1.5">{field.help_text}</p>}
+      {renderInput()}
+    </div>
   )
 }
 
@@ -66,6 +155,10 @@ export default function ApplyPage() {
   const [phone, setPhone]             = useState('')
   const [linkedin, setLinkedin]       = useState('')
   const [coverLetter, setCoverLetter] = useState('')
+
+  // Custom screening-question answers, keyed by field id (Phase 3c).
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
+  const setAnswer = (id: string, value: AnswerValue) => setAnswers(prev => ({ ...prev, [id]: value }))
 
   // CV / resume state
   const [cvMode, setCvMode]       = useState<CvMode>('upload')
@@ -121,6 +214,16 @@ export default function ApplyPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || !email.trim()) return
+
+    // Required screening questions must be answered.
+    const screeningFields = job?.screening?.fields ?? []
+    for (const f of screeningFields) {
+      if (!f.required) continue
+      const v = answers[f.id]
+      const empty = v == null || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.length === 0)
+      if (empty) { setError(`Please answer: ${f.label}`); return }
+    }
+
     setSubmitting(true)
     setError('')
 
@@ -160,6 +263,10 @@ export default function ApplyPage() {
         linkedin_url: linkedin.trim() || undefined,
         cover_letter: coverLetter.trim() || undefined,
         cv_url:       finalCvUrl,
+        screening_answers: screeningFields.map(f => {
+          const v = answers[f.id]
+          return { field_id: f.id, value: v === undefined || v === '' ? null : v }
+        }),
       }),
     })
     const json = await res.json()
@@ -468,6 +575,16 @@ export default function ApplyPage() {
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
               />
             </div>
+
+            {/* Custom screening questions (Phase 3c) */}
+            {job.screening.fields.length > 0 && (
+              <div className="space-y-5 pt-2 border-t border-slate-100">
+                <h3 className="text-sm font-bold text-slate-900">Additional questions</h3>
+                {job.screening.fields.map(f => (
+                  <ScreeningQuestion key={f.id} field={f} value={answers[f.id]} onChange={v => setAnswer(f.id, v)} />
+                ))}
+              </div>
+            )}
 
             {/* Submission error */}
             {error && (

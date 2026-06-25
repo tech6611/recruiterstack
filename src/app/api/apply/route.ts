@@ -14,7 +14,12 @@ import {
   getCanonicalApplyJobPreview,
   getFirstJobStage,
 } from '@/modules/ats/domain/job-pipelines'
-import type { ApplicationEventInsert } from '@/lib/types/database'
+import {
+  getJobScreeningForm,
+  evaluateKnockout,
+  partitionAnswers,
+} from '@/modules/ats/domain/screening'
+import type { ApplicationEventInsert, ScreeningAnswer } from '@/lib/types/database'
 
 // GET /api/apply?token=xxx — fetch job info for the public apply page
 export async function GET(request: NextRequest) {
@@ -45,7 +50,7 @@ export async function POST(request: NextRequest) {
   const body = await parseBody(request, publicApplySchema)
   if (body instanceof NextResponse) return body
 
-  const { token, name, email, phone, linkedin_url, cover_letter, cv_url } = body
+  const { token, name, email, phone, linkedin_url, cover_letter, cv_url, screening_answers } = body
 
   // ── Verify token & get job ────────────────────────────────────────────────
   const job = await getCanonicalApplyJobByToken(supabase, token)
@@ -57,6 +62,32 @@ export async function POST(request: NextRequest) {
   if (job.status !== 'open') {
     return NextResponse.json({ error: 'This position is no longer accepting applications.' }, { status: 400 })
   }
+
+  // ── Screening answers (Phase 3c) ──────────────────────────────────────────
+  // Re-load the job's form server-side (the client only sends field id + value),
+  // attach each field's label, enforce required answers, then evaluate the
+  // knockout rules and split EEO answers into their hidden bucket.
+  const form = await getJobScreeningForm(supabase, job.org_id, job.id)
+  const fieldById = new Map(form.fields.map(f => [f.id, f]))
+  const answers: ScreeningAnswer[] = []
+  for (const submitted of screening_answers ?? []) {
+    const field = fieldById.get(submitted.field_id)
+    if (!field) continue // ignore answers to fields not on this form
+    answers.push({ field_id: field.id, label: field.label, value: submitted.value })
+  }
+
+  const answerById = new Map(answers.map(a => [a.field_id, a.value]))
+  for (const field of form.fields) {
+    if (!field.required) continue
+    const v = answerById.get(field.id)
+    const empty = v == null || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.length === 0)
+    if (empty) {
+      return NextResponse.json({ error: `Please answer: ${field.label}` }, { status: 400 })
+    }
+  }
+
+  const knockoutFailed = evaluateKnockout(form, answers)
+  const { screening: screeningAnswers, eeo: eeoAnswers } = partitionAnswers(form, answers)
 
   // ── Upsert candidate ──────────────────────────────────────────────────────
   let candidateId: string
@@ -84,9 +115,15 @@ export async function POST(request: NextRequest) {
       candidateId,
       jobId: job.id,
       stageId: firstStage?.id ?? null,
+      // A failed knockout auto-rejects silently — the candidate still sees the
+      // success screen, but the application lands as rejected for the team.
+      status: knockoutFailed ? 'rejected' : 'active',
       source: 'applied',
       resumeUrl: cv_url ?? null,
       coverLetter: cover_letter ?? null,
+      screeningAnswers,
+      eeoAnswers,
+      knockoutFailed,
     })
     appId = app.id
   } catch (err) {
@@ -104,6 +141,7 @@ export async function POST(request: NextRequest) {
   const noteParts: string[] = []
   if (linkedin_url) noteParts.push(`LinkedIn: ${linkedin_url}`)
   if (cv_url) noteParts.push(`CV: ${cv_url}`)
+  if (knockoutFailed) noteParts.push('Auto-screened out (disqualifying answer)')
 
   await recordApplicationEvent(
     supabase,
@@ -133,19 +171,22 @@ export async function POST(request: NextRequest) {
   // ── Autopilot: enqueue scoring ─────────────────────────────────────────────
   // Canonical jobs carry no auto-advance/reject thresholds (those are a legacy
   // hiring_requests concern), so enqueue unconditionally; the scorer no-ops when
-  // no scoring config applies.
-  try {
-    await enqueue({
-      orgId: job.org_id,
-      jobType: 'autopilot',
-      payload: { applicationId: appId },
-    })
-  } catch {
-    // Queue unavailable — fall back to original fire-and-forget
-    logger.warn('Queue unavailable, falling back to direct autopilot', { applicationId: appId })
-    void runAutopilot(appId, job.org_id).catch((err) => {
-      logger.error('Autopilot failed', err, { applicationId: appId })
-    })
+  // no scoring config applies. Skip entirely for knocked-out applications —
+  // they're already rejected, so there's nothing to score.
+  if (!knockoutFailed) {
+    try {
+      await enqueue({
+        orgId: job.org_id,
+        jobType: 'autopilot',
+        payload: { applicationId: appId },
+      })
+    } catch {
+      // Queue unavailable — fall back to original fire-and-forget
+      logger.warn('Queue unavailable, falling back to direct autopilot', { applicationId: appId })
+      void runAutopilot(appId, job.org_id).catch((err) => {
+        logger.error('Autopilot failed', err, { applicationId: appId })
+      })
+    }
   }
 
   return NextResponse.json(
