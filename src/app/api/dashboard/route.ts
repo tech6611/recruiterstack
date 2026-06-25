@@ -318,8 +318,12 @@ export async function GET() {
     .slice(0, 6)
 
   // ── Top jobs ──────────────────────────────────────────────────────────────────
+  // Exclude archived/closed jobs — the "Active Jobs" widget should only show live roles.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const top_jobs = jobs.slice(0, 6).map((job: any) => {
+  const top_jobs = jobs
+    .filter((job: any) => job.status !== 'archived' && job.status !== 'closed')
+    .slice(0, 6)
+    .map((job: any) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const jobStages  = stages.filter((s: any) => s.hiring_request_id === job.id)
     const activeApps = apps.filter((a: { hiring_request_id: string; status: string }) => a.hiring_request_id === job.id && a.status === 'active')
