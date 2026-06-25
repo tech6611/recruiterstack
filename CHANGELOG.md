@@ -12,6 +12,19 @@ entries on top.
 ## 2026-06-24
 
 ### Added
+- **Publish JD — Phase 3b: recruiter application-form builder.** Job detail pages
+  now have an **"Application form"** tab where recruiters build the questions a
+  candidate answers when applying. Add, reorder, and delete questions; choose a
+  field type (short/long text, yes-no, single/multi choice, number, date, file,
+  URL); edit choices; mark a question required or EEO/voluntary (hidden from the
+  hiring team); and set a knockout rule that will auto-disqualify on a given
+  answer. "Add from library" reuses saved questions and the bookmark icon saves a
+  question back to the org's library for reuse. New API routes
+  (`/api/screening/questions`, `/api/screening/questions/[id]`,
+  `/api/jobs/[id]/screening`) guarded by `recruiting:view`/`recruiting:edit`; the
+  per-job form is stored on `jobs.custom_fields.screening`. Candidates don't see
+  the form yet — rendering + knockout evaluation on the apply page land in 3c.
+  (`components/req-jobs/ScreeningTab.tsx`, `components/req-jobs/JobDetail.tsx`.)
 - **Publish JD — Phase 3a: screening-questions foundations (Ashby parity).**
   Backend groundwork for a real application-form builder: a reusable, org-scoped
   question library, an org default form template that new jobs inherit (with

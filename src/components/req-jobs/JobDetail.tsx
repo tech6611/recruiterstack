@@ -15,6 +15,7 @@ import { ApprovalProgress } from '@/components/approvals/ApprovalProgress'
 import { AuditLogTab } from '@/components/approvals/AuditLogTab'
 import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
+import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { cn } from '@/lib/utils'
 import type { Job, Department, Opening, JobStatus, OpeningStatus } from '@/lib/types/requisitions'
 
@@ -44,7 +45,14 @@ interface Props {
   linkedOpenings:  Pick<Opening, 'id' | 'title' | 'status' | 'comp_min' | 'comp_max' | 'comp_currency' | 'target_start_date'>[]
 }
 
-type Tab = 'overview' | 'postings' | 'audit'
+type Tab = 'overview' | 'postings' | 'screening' | 'audit'
+
+const TAB_LABELS: Record<Tab, string> = {
+  overview:  'Overview',
+  postings:  'Postings',
+  screening: 'Application form',
+  audit:     'Audit log',
+}
 
 function initForm(job: Job) {
   return {
@@ -220,16 +228,16 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
 
       <div className="border-b border-slate-200 mb-4">
         <nav className="flex gap-4">
-          {(['overview', 'postings', 'audit'] as Tab[]).map(t => (
+          {(['overview', 'postings', 'screening', 'audit'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={cn(
-                'border-b-2 px-1 pb-2 text-sm font-medium capitalize transition-colors',
+                'border-b-2 px-1 pb-2 text-sm font-medium transition-colors',
                 tab === t ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900',
               )}
             >
-              {t === 'audit' ? 'Audit log' : t}
+              {TAB_LABELS[t]}
             </button>
           ))}
         </nav>
@@ -385,6 +393,8 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
       {tab === 'postings' && (
         <PostingsTab jobId={job.id} jobStatus={job.status} />
       )}
+
+      {tab === 'screening' && <ScreeningTab jobId={job.id} />}
 
       {tab === 'audit' && <AuditLogTab targetType="job" targetId={job.id} />}
 

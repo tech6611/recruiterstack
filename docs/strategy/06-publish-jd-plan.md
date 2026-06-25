@@ -193,10 +193,17 @@ smallest-value-first:
   (`modules/ats/domain/screening.ts`: library CRUD, template + per-job
   get/save with inherit-then-override, `evaluateKnockout`, `partitionAnswers`).
   No live wiring yet — backend only.
-- **3b — recruiter form builder (next).** Library management UI + per-job form
-  editor in job detail: add/reorder fields, field types (short/long text,
-  yes-no, single/multi-select, number, date, file, URL), required toggle, help
-  text, knockout answers.
+- **3b — recruiter form builder (DONE, this session).** New **"Application form"**
+  tab on the job detail view (`ScreeningTab.tsx`): add/reorder/delete questions,
+  pick field type (short/long text, yes-no, single/multi-select, number, date,
+  file, URL), edit choices, set required, mark a question EEO/voluntary, and
+  configure a knockout rule (is / is not → answer). "Add from library" pulls
+  reusable questions; the bookmark icon saves a question back to the library.
+  Backed by new API routes (`/api/screening/questions`,
+  `/api/screening/questions/[id]`, `/api/jobs/[id]/screening`) all guarded by
+  `recruiting:view`/`recruiting:edit`. Per-job form persists to
+  `jobs.custom_fields.screening`. The knockout RULE is stored here; it's
+  EVALUATED on apply in 3c.
 - **3c — candidate apply + knockout.** Render the per-job form on
   `/apply/[token]`, validate + store answers, run `evaluateKnockout` on submit
   (auto-flag/reject silently), split EEO answers into the hidden bucket.
@@ -223,4 +230,4 @@ No migrations. No change to what the apply form *collects* (Phase 3 territory).
 
 ---
 
-*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions, Ashby parity) in progress — 3a foundations done, 3b–3e queued.*
+*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions, Ashby parity) in progress — 3a foundations + 3b recruiter builder done, 3c–3e queued.*
