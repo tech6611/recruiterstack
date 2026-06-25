@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import { fmtRelative, fmtDateTime } from '@/lib/ui/date-utils'
+import { Card } from '@/components/ui/card'
 
 type ApplicationWithJob = Application & {
   pipeline_stages: { name: string; color: string } | null
@@ -142,7 +143,7 @@ export default function HistoryTab({ events, applications }: FunnelTabProps) {
 
                     {/* Content */}
                     <div className={`flex-1 min-w-0 ${idx < group.items.length - 1 ? 'pb-4' : ''}`}>
-                      <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 hover:border-slate-300 transition-colors">
+                      <Card className="px-4 py-3 hover:border-slate-300 transition-colors">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-slate-800">{item.title}</p>
@@ -160,7 +161,7 @@ export default function HistoryTab({ events, applications }: FunnelTabProps) {
                             <p className="text-[9px] text-slate-300 mt-0.5 whitespace-nowrap">{fmtDateTime(item.date)}</p>
                           </div>
                         </div>
-                      </div>
+                      </Card>
                     </div>
                   </div>
                 ))}

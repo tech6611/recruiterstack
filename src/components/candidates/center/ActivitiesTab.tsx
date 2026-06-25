@@ -6,6 +6,7 @@ import type { CandidateTask, ApplicationEvent, Application, HiringRequest } from
 import { fmtShort } from '@/lib/ui/date-utils'
 import TaskScheduler from '../TaskScheduler'
 import InterviewProgressTable from '../InterviewProgressTable'
+import { Card } from '@/components/ui/card'
 
 type ApplicationWithAttribution = Application & {
   hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number'> | null
@@ -44,7 +45,7 @@ function AttributionCard({ app, onCreditedToChanged }: {
   }
 
   return (
-    <div className="rounded-xl border border-slate-100 bg-white px-4 py-3 space-y-2">
+    <Card className="px-4 py-3 space-y-2">
       {app.hiring_requests && (
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
           {app.hiring_requests.position_title}
@@ -85,7 +86,7 @@ function AttributionCard({ app, onCreditedToChanged }: {
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -132,7 +133,7 @@ function PipelineFlowSection({ events, applications }: {
   if (events.length === 0) return null
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+    <Card className="p-4 space-y-4">
       <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pipeline Activity</h4>
 
       {/* Stats bar */}
@@ -195,7 +196,7 @@ function PipelineFlowSection({ events, applications }: {
           </div>
         </div>
       ))}
-    </div>
+    </Card>
   )
 }
 
@@ -226,7 +227,7 @@ export default function ActivitiesTab({
   return (
     <div className="p-5 space-y-6">
       {/* Tasks */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <Card className="p-4">
         <TaskScheduler
           candidateId={candidateId}
           tasks={tasks}
@@ -234,16 +235,16 @@ export default function ActivitiesTab({
           onTaskUpdated={onTaskUpdated}
           onTaskDeleted={onTaskDeleted}
         />
-      </div>
+      </Card>
 
       {/* Pipeline flow + stats */}
       <PipelineFlowSection events={events} applications={appsWithLocalCredit} />
 
       {/* Interview Progress */}
       {events.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <Card className="p-4">
           <InterviewProgressTable events={events} />
-        </div>
+        </Card>
       )}
 
       {/* Attribution */}

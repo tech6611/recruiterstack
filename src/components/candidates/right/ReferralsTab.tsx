@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Plus, Users } from 'lucide-react'
 import type { CandidateReferral } from '@/lib/types/database'
+import { Card } from '@/components/ui/card'
 
 interface ReferralsTabProps {
   candidateId: string
@@ -64,12 +65,12 @@ export default function ReferralsTab({ candidateId, referrals, onReferralAdded }
       ) : (
         <div className="space-y-2">
           {referrals.map(r => (
-            <div key={r.id} className="rounded-xl border border-slate-100 bg-white px-4 py-3">
+            <Card key={r.id} className="px-4 py-3">
               <p className="text-sm font-medium text-slate-800">{r.referrer_name}</p>
               {r.referrer_email && <p className="text-xs text-slate-500 mt-0.5">{r.referrer_email}</p>}
               {r.note && <p className="text-xs text-slate-500 mt-1 italic">{r.note}</p>}
               <p className="text-[10px] text-slate-400 mt-1">{new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-            </div>
+            </Card>
           ))}
         </div>
       )}

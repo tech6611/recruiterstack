@@ -4,6 +4,7 @@ import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, Trending
 import type { Candidate, Application, AiRecommendation, HiringRequest } from '@/lib/types/database'
 import VoiceCallDetailModal from '../VoiceCallDetailModal'
 import { ScoreRing } from '@/components/ui/ScoreRing'
+import { Panel } from '@/components/ui/card'
 
 interface VoiceCallSummary {
   id: string
@@ -162,82 +163,65 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
 
   return (
     <>
-    <div className="p-5 space-y-5">
+    <div className="space-y-4 p-5">
 
-      {/* ── AI Scorecard (if any application has been scored) ─────────────── */}
+      {/* ── AI Scorecard (one per scored application) ─────────────────────── */}
       {scoredApps.map(app => {
         const rec = app.ai_recommendation ? REC_CONFIG[app.ai_recommendation] : null
         return (
-          <div key={app.id} className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-slate-500" />
-                <h3 className="text-sm font-semibold text-slate-800">AI Score</h3>
-                {applications.length > 1 && (
-                  <span className="text-[10px] text-slate-400">
-                    · {app.hiring_requests?.position_title ?? 'Role'}
-                  </span>
-                )}
-              </div>
-              {app.ai_scored_at && (
-                <span className="text-[10px] text-slate-400">
-                  Scored {new Date(app.ai_scored_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </span>
-              )}
-            </div>
-
-            <div className="px-4 py-4 flex items-start gap-5">
-              {/* Score ring */}
+          <Panel
+            key={app.id}
+            icon={TrendingUp}
+            title="AI Score"
+            meta={applications.length > 1 ? `· ${app.hiring_requests?.position_title ?? 'Role'}` : undefined}
+            action={app.ai_scored_at ? (
+              <span className="text-[10px] text-slate-400">
+                Scored {new Date(app.ai_scored_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            ) : undefined}
+          >
+            <div className="flex items-start gap-5 px-5 py-4">
               <ScoreRing score={app.ai_score!} />
-
-              {/* Recommendation + criteria */}
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 {rec && (
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold mb-3 ${rec.bg} ${rec.color}`}>
+                  <span className={`mb-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${rec.bg} ${rec.color}`}>
                     {rec.label}
                   </span>
                 )}
-
-                {/* Criteria bars */}
                 {app.ai_criterion_scores && app.ai_criterion_scores.length > 0 && (
-                  <div className="space-y-1.5 mb-3">
+                  <div className="mb-3 space-y-1.5">
                     {app.ai_criterion_scores.map((c, i) => (
                       <div key={i} className="flex items-center gap-2">
-                        <p className="text-[10px] text-slate-500 w-28 shrink-0 truncate">{c.name}</p>
-                        <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-slate-500"
-                            style={{ width: `${(c.rating / 4) * 100}%` }}
-                          />
+                        <p className="w-28 shrink-0 truncate text-[10px] text-slate-500">{c.name}</p>
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-slate-500" style={{ width: `${(c.rating / 4) * 100}%` }} />
                         </div>
-                        <span className="text-[10px] text-slate-400 w-8 text-right">{c.rating}/4</span>
+                        <span className="w-8 text-right text-[10px] text-slate-400">{c.rating}/4</span>
                       </div>
                     ))}
                   </div>
                 )}
-
-                {/* Strengths & Gaps */}
                 <div className="grid grid-cols-2 gap-3">
                   {app.ai_strengths?.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1 mb-1">
+                      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
                         <TrendingUp className="h-2.5 w-2.5" /> Strengths
                       </p>
                       <ul className="space-y-0.5">
                         {app.ai_strengths.slice(0, 3).map((s, i) => (
-                          <li key={i} className="text-[10px] text-slate-600 leading-relaxed">• {s}</li>
+                          <li key={i} className="text-[10px] leading-relaxed text-slate-600">• {s}</li>
                         ))}
                       </ul>
                     </div>
                   )}
                   {app.ai_gaps?.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-semibold text-amber-600 flex items-center gap-1 mb-1">
+                      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-amber-600">
                         <TrendingDown className="h-2.5 w-2.5" /> Gaps
                       </p>
                       <ul className="space-y-0.5">
                         {app.ai_gaps.slice(0, 3).map((g, i) => (
-                          <li key={i} className="text-[10px] text-slate-600 leading-relaxed">• {g}</li>
+                          <li key={i} className="text-[10px] leading-relaxed text-slate-600">• {g}</li>
                         ))}
                       </ul>
                     </div>
@@ -245,17 +229,15 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
                 </div>
               </div>
             </div>
-          </div>
+          </Panel>
         )
       })}
 
       {/* ── AI Summary ────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <Wand2 className="h-4 w-4 text-slate-500" />
-            <h3 className="text-sm font-semibold text-slate-800">AI Summary</h3>
-          </div>
+      <Panel
+        icon={Wand2}
+        title="AI Summary"
+        action={
           <button
             onClick={generate}
             disabled={generating}
@@ -264,36 +246,36 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
             {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : summary ? <RefreshCw className="h-3 w-3" /> : <Wand2 className="h-3 w-3" />}
             {generating ? 'Generating…' : summary ? 'Regenerate' : 'Generate Summary'}
           </button>
-        </div>
-        <div className="px-4 py-4">
+        }
+      >
+        <div className="px-5 py-4">
           {genError && <p className="text-sm text-red-600">{genError}</p>}
           {summary ? (
-            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{summary}</p>
+            <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{summary}</p>
           ) : !generating && (
-            <p className="text-sm text-slate-400 italic">Click &quot;Generate Summary&quot; to get an AI overview of this candidate.</p>
+            <p className="text-sm italic text-slate-400">Click &quot;Generate Summary&quot; to get an AI overview of this candidate.</p>
           )}
         </div>
-      </div>
+      </Panel>
 
       {/* ── Phone Screens ─────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
-          <Phone className="h-4 w-4 text-slate-500" />
-          <h3 className="text-sm font-semibold text-slate-800">Phone Screens</h3>
-          {!callsLoading && (
-            <span className="ml-auto text-xs text-slate-400">{calls.length} call{calls.length !== 1 ? 's' : ''}</span>
-          )}
-        </div>
+      <Panel
+        icon={Phone}
+        title="Phone Screens"
+        action={!callsLoading ? (
+          <span className="text-xs text-slate-400">{calls.length} call{calls.length !== 1 ? 's' : ''}</span>
+        ) : undefined}
+      >
         <div className="divide-y divide-slate-100">
           {callsLoading ? (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
             </div>
           ) : calls.length === 0 ? (
-            <div className="flex flex-col items-center py-8 text-center px-4">
-              <Phone className="h-7 w-7 text-slate-200 mb-2" />
+            <div className="flex flex-col items-center px-4 py-8 text-center">
+              <Phone className="mb-2 h-7 w-7 text-slate-200" />
               <p className="text-sm text-slate-400">No phone screens yet</p>
-              <p className="text-xs text-slate-300 mt-1">Use the &quot;Phone Screen&quot; button above to start one</p>
+              <p className="mt-1 text-xs text-slate-300">Use the &quot;Phone Screen&quot; button above to start one</p>
             </div>
           ) : calls.map(call => {
               const statusCfg = CALL_STATUS[call.status] ?? { label: call.status, color: 'text-slate-500' }
@@ -306,13 +288,13 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
                 <button
                   key={call.id}
                   onClick={() => setSelectedCallId(call.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                  className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-slate-50"
                 >
-                  <div className="h-8 w-8 rounded-full bg-slate-50 flex items-center justify-center shrink-0">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-50">
                     <Phone className="h-3.5 w-3.5 text-emerald-600" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className={`text-xs font-semibold ${statusCfg.color}`}>{statusCfg.label}</span>
                       {recCfg && (
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${recCfg.bg} ${recCfg.color}`}>
@@ -323,47 +305,44 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
                         <span className="text-[10px] text-slate-400">Score: {call.ai_score}/100</span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
+                    <p className="mt-0.5 text-[11px] text-slate-400">
                       {dateStr}{duration ? ` · ${duration}` : ''}
                       {call.metadata?.position_title ? ` · ${call.metadata.position_title}` : ''}
                     </p>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-slate-300 shrink-0" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
                 </button>
               )
             })}
-          </div>
         </div>
+      </Panel>
 
       {/* ── Resume / CV ───────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-slate-500" />
-            <h3 className="text-sm font-semibold text-slate-800">Resume / CV</h3>
-          </div>
-          {candidate.resume_url && (
-            <a href={candidate.resume_url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800">
-              <ExternalLink className="h-3 w-3" /> Download
-            </a>
-          )}
-        </div>
+      <Panel
+        icon={FileText}
+        title="Resume / CV"
+        action={candidate.resume_url ? (
+          <a href={candidate.resume_url} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800">
+            <ExternalLink className="h-3 w-3" /> Download
+          </a>
+        ) : undefined}
+      >
         <div className="p-2">
           {candidate.resume_url ? (
             <iframe
               src={candidate.resume_url}
-              className="w-full h-[500px] rounded-xl border border-slate-100"
+              className="h-[500px] w-full rounded-xl border border-slate-100"
               title="Resume"
             />
           ) : (
             <div className="flex flex-col items-center py-10 text-center">
-              <FileText className="h-8 w-8 text-slate-200 mb-2" />
+              <FileText className="mb-2 h-8 w-8 text-slate-200" />
               <p className="text-sm text-slate-400">No resume uploaded</p>
             </div>
           )}
         </div>
-      </div>
+      </Panel>
     </div>
 
     {selectedCallId && (

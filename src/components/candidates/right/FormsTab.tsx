@@ -2,6 +2,7 @@
 
 import { ExternalLink, FileText } from 'lucide-react'
 import type { Application, HiringRequest } from '@/lib/types/database'
+import { Card } from '@/components/ui/card'
 
 type ApplicationWithJobInfo = Application & {
   hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number' | 'key_requirements' | 'nice_to_haves' | 'team_context'> | null
@@ -27,7 +28,7 @@ export default function FormsTab({ applications }: FormsTabProps) {
         const job = app.hiring_requests
         if (!job) return null
         return (
-          <div key={app.id} className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+          <Card key={app.id} className="overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
               <div>
                 <p className="text-sm font-semibold text-slate-800">{job.position_title}</p>
@@ -65,7 +66,7 @@ export default function FormsTab({ applications }: FormsTabProps) {
                 <p className="text-sm text-slate-400 italic">No intake form details available</p>
               )}
             </div>
-          </div>
+          </Card>
         )
       })}
     </div>

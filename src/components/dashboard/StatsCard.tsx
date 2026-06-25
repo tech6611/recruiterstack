@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 interface StatsCardProps {
   title: string
@@ -28,7 +29,7 @@ export function StatsCard({
   const isPositive = (trend?.value ?? 0) >= 0
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+    <Card className="p-6">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-slate-500">{title}</p>
         <div className={`rounded-xl p-2.5 ring-4 ${colors.bg} ${colors.ring}`}>
@@ -55,6 +56,6 @@ export function StatsCard({
           <span className="text-xs text-slate-400">{trend.label}</span>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

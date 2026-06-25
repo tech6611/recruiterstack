@@ -1236,21 +1236,23 @@ export default function JobsPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {([
-            { label: 'Total',           value: counts.total,    color: 'bg-slate-50 border-slate-200 text-slate-700',      filter: 'all'            },
-            { label: "Awaiting Input",  value: counts.awaiting, color: 'bg-amber-50 border-amber-200 text-amber-700',      filter: 'intake_pending' },
-            { label: 'To be Published', value: counts.ready,    color: 'bg-emerald-50 border-emerald-200 text-emerald-700', filter: 'jd_approved'  },
-            { label: 'Active',          value: counts.active,   color: 'bg-emerald-50 border-emerald-200 text-emerald-700',      filter: 'posted'         },
-            { label: 'Closed',          value: counts.closed,   color: 'bg-slate-100 border-slate-200 text-slate-500',     filter: 'closed'         },
+            { label: 'Total',           value: counts.total,    filter: 'all'            },
+            { label: "Awaiting Input",  value: counts.awaiting, filter: 'intake_pending' },
+            { label: 'To be Published', value: counts.ready,    filter: 'jd_approved'  },
+            { label: 'Active',          value: counts.active,   filter: 'posted'         },
+            { label: 'Closed',          value: counts.closed,   filter: 'closed'         },
           ] as const).map(stat => (
             <button
               key={stat.label}
               onClick={() => handleStatCard(stat.filter)}
-              className={`rounded-xl border p-3.5 text-left transition-all hover:shadow-sm ${stat.color} ${
-                isStatActive(stat.filter) ? 'ring-2 ring-offset-1 ring-emerald-400' : ''
+              className={`rounded-xl border bg-white p-3.5 text-left transition-all ${
+                isStatActive(stat.filter)
+                  ? 'border-emerald-500 ring-1 ring-emerald-500'
+                  : 'border-slate-200 hover:border-slate-300'
               }`}
             >
-              <p className="text-2xl font-bold">{stat.value}</p>
-              <p className="text-xs font-medium mt-0.5 opacity-70">{stat.label}</p>
+              <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">{stat.label}</p>
             </button>
           ))}
         </div>
@@ -1336,7 +1338,7 @@ export default function JobsPage() {
           </button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm" style={{ overflow: 'clip' }}>
+        <div className="rounded-2xl border border-slate-200 bg-white" style={{ overflow: 'clip' }}>
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">

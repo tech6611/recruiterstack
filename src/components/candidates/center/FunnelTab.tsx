@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import { fmtRelative, fmtDateTime } from '@/lib/ui/date-utils'
+import { Card } from '@/components/ui/card'
 
 type ApplicationWithJob = Application & {
   pipeline_stages: { name: string; color: string } | null
@@ -131,10 +132,10 @@ export default function FunnelTab({ events, applications }: FunnelTabProps) {
           { label: 'Emails sent',        value: emailsSent },
           { label: 'Interviews done',    value: interviewsDone },
         ].map(stat => (
-          <div key={stat.label} className="rounded-xl bg-white border border-slate-200 px-3 py-3 text-center">
+          <Card key={stat.label} className="px-3 py-3 text-center">
             <p className="text-xl font-bold text-slate-900">{stat.value}</p>
             <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{stat.label}</p>
-          </div>
+          </Card>
         ))}
       </div>
 
@@ -164,7 +165,7 @@ export default function FunnelTab({ events, applications }: FunnelTabProps) {
 
                     {/* Content */}
                     <div className={`flex-1 min-w-0 ${idx < group.items.length - 1 ? 'pb-4' : ''}`}>
-                      <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 hover:border-slate-300 transition-colors">
+                      <Card className="px-4 py-3 hover:border-slate-300 transition-colors">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-slate-800">{item.title}</p>
@@ -182,7 +183,7 @@ export default function FunnelTab({ events, applications }: FunnelTabProps) {
                             <p className="text-[9px] text-slate-300 mt-0.5 whitespace-nowrap">{fmtDateTime(item.date)}</p>
                           </div>
                         </div>
-                      </div>
+                      </Card>
                     </div>
                   </div>
                 ))}

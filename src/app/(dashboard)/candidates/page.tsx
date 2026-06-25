@@ -271,7 +271,7 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
     .filter((d): d is FunnelStageDef => !!d)
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
 
       {/* Header row */}
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
@@ -566,20 +566,22 @@ export default function CandidatesPage() {
       ) : (
         <div className="grid grid-cols-4 gap-3">
           {([
-            { label: 'Total',        value: counts.total,        color: 'bg-slate-50 border-slate-200 text-slate-700',       filter: 'all'          },
-            { label: 'Active',       value: counts.active,       color: 'bg-slate-50 border-slate-200 text-slate-700',          filter: 'active'       },
-            { label: 'Interviewing', value: counts.interviewing, color: 'bg-amber-50 border-amber-200 text-amber-700',       filter: 'interviewing' },
-            { label: 'Hired',        value: counts.hired,        color: 'bg-emerald-50 border-emerald-200 text-emerald-700', filter: 'hired'        },
+            { label: 'Total',        value: counts.total,        filter: 'all'          },
+            { label: 'Active',       value: counts.active,       filter: 'active'       },
+            { label: 'Interviewing', value: counts.interviewing, filter: 'interviewing' },
+            { label: 'Hired',        value: counts.hired,        filter: 'hired'        },
           ] as const).map(stat => (
             <button
               key={stat.label}
               onClick={() => { setFilterStatus(filterStatus === stat.filter ? 'all' : stat.filter); setPage(1) }}
-              className={`rounded-xl border p-3.5 text-left transition-all hover:shadow-sm ${stat.color} ${
-                filterStatus === stat.filter ? 'ring-2 ring-offset-1 ring-emerald-400' : ''
+              className={`rounded-xl border bg-white p-3.5 text-left transition-all ${
+                filterStatus === stat.filter
+                  ? 'border-emerald-500 ring-1 ring-emerald-500'
+                  : 'border-slate-200 hover:border-slate-300'
               }`}
             >
-              <p className="text-2xl font-bold">{stat.value}</p>
-              <p className="text-xs font-medium mt-0.5 opacity-70">{stat.label}</p>
+              <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">{stat.label}</p>
             </button>
           ))}
         </div>

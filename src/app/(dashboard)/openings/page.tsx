@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Plus, Search, Clock, CheckCircle, Send, Archive, FileText, Briefcase } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import type { Opening, Department, Location as LocationRow } from '@/lib/types/requisitions'
 
@@ -27,14 +28,13 @@ const STATUS_CONFIG: Record<Opening['status'], { label: string; color: string; i
 const STAT_CARDS: ReadonlyArray<{
   key:      string
   label:    string
-  color:    string
   statuses: Opening['status'][] | null     // null = all (the Total card)
 }> = [
-  { key: 'all',      label: 'Total',             color: 'bg-slate-50 border-slate-200 text-slate-700',       statuses: null },
-  { key: 'pending',  label: 'Awaiting Approval', color: 'bg-amber-50 border-amber-200 text-amber-700',       statuses: ['draft', 'pending_approval'] },
-  { key: 'approved', label: 'Approved',          color: 'bg-emerald-50 border-emerald-200 text-emerald-700', statuses: ['approved'] },
-  { key: 'open',     label: 'Open',              color: 'bg-emerald-50 border-emerald-200 text-emerald-700',        statuses: ['open'] },
-  { key: 'closed',   label: 'Closed',            color: 'bg-slate-100 border-slate-200 text-slate-500',      statuses: ['filled', 'closed', 'archived'] },
+  { key: 'all',      label: 'Total',             statuses: null },
+  { key: 'pending',  label: 'Awaiting Approval', statuses: ['draft', 'pending_approval'] },
+  { key: 'approved', label: 'Approved',          statuses: ['approved'] },
+  { key: 'open',     label: 'Open',              statuses: ['open'] },
+  { key: 'closed',   label: 'Closed',            statuses: ['filled', 'closed', 'archived'] },
 ]
 
 interface Filters {
@@ -126,13 +126,14 @@ export default function OpeningsListPage() {
               key={stat.key}
               onClick={() => setFilters(f => ({ ...f, bucket: stat.key }))}
               className={cn(
-                'rounded-xl border p-3.5 text-left transition-all hover:shadow-sm',
-                stat.color,
-                filters.bucket === stat.key ? 'ring-2 ring-offset-1 ring-emerald-400' : '',
+                'rounded-xl border bg-white p-3.5 text-left transition-all',
+                filters.bucket === stat.key
+                  ? 'border-emerald-500 ring-1 ring-emerald-500'
+                  : 'border-slate-200 hover:border-slate-300',
               )}
             >
-              <p className="text-2xl font-bold">{cardValue(stat.statuses)}</p>
-              <p className="text-xs font-medium mt-0.5 opacity-70">{stat.label}</p>
+              <p className="text-2xl font-bold text-slate-900">{cardValue(stat.statuses)}</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">{stat.label}</p>
             </button>
           ))}
         </div>
@@ -169,7 +170,7 @@ export default function OpeningsListPage() {
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
       {!loaded ? (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm" style={{ overflow: 'clip' }}>
+        <Card className="overflow-clip">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -188,7 +189,7 @@ export default function OpeningsListPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Card>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-16 text-center">
           <Briefcase className="h-10 w-10 text-slate-200 mx-auto mb-3" />
@@ -208,7 +209,7 @@ export default function OpeningsListPage() {
           )}
         </div>
       ) : (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm" style={{ overflow: 'clip' }}>
+        <Card className="overflow-clip">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-slate-500">
@@ -256,7 +257,7 @@ export default function OpeningsListPage() {
               Showing {filtered.length} of {items.length} requisition{items.length !== 1 ? 's' : ''}
             </p>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   )

@@ -11,6 +11,19 @@ entries on top.
 
 ## 2026-06-25
 
+### Changed
+- **Platform rebrand — Stage 2: card consolidation.** Unified every "card"
+  surface onto one shared system to remove the scattered, inconsistent-card look.
+  The `Card` component gained variants (flat default / elevated / interactive /
+  ghost) plus `Panel` (boxed surface + header bar) and `Section` (headed region,
+  no box). Reusable `StatsCard` and `MatchCard` now route through it; the list
+  pages (Requisitions, Jobs, Candidates) got uniform flat stat tiles (pine ring
+  for the active filter) and flattened table surfaces; candidate detail tabs
+  (Activities, History, Funnel, Emails, Forms, Referrals) and `WhatsAppCard`
+  moved off inline `rounded-* border bg-white` wrappers onto `<Card>`/`<Panel>`
+  (shadows dropped for a flat look); and the dashboard's category accents and
+  overview cards were neutralized to a calm, uniform look. Surface-only — inner
+  content, colors, and behavior unchanged.
 ### Fixed
 - **Stop stranding members on "Set up your workspace."** When a signed-in user's
   Clerk session had no *active* organization selected (e.g. after a token

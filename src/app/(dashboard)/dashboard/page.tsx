@@ -160,7 +160,7 @@ const CATEGORY_LABELS: Record<WidgetCategory, string> = {
 const CATEGORY_ACCENT: Record<WidgetCategory, { border: string; icon: string; iconText: string; label: string }> = {
   jobs:       { border: 'border-t-slate-400',   icon: 'bg-slate-100',   iconText: 'text-slate-600',   label: 'bg-slate-50 text-slate-700' },
   candidates: { border: 'border-t-slate-400', icon: 'bg-slate-100', iconText: 'text-slate-600', label: 'bg-slate-50 text-slate-700' },
-  activity:   { border: 'border-t-amber-400',  icon: 'bg-amber-100',  iconText: 'text-amber-600',  label: 'bg-amber-50 text-amber-700' },
+  activity:   { border: 'border-t-slate-400',  icon: 'bg-slate-100',  iconText: 'text-slate-600',  label: 'bg-slate-50 text-slate-700' },
 }
 
 function widgetAccent(wId: WidgetId) {
@@ -791,8 +791,8 @@ function TasksWidget({ tasks, onCandidateClick, onRefresh }: { tasks: DashboardD
 function OverviewStatsWidget({ stats }: { stats: DashboardData['stats'] }) {
   const CARDS = [
     { label: 'Open Jobs',         value: stats.open_jobs,         icon: Briefcase,  color: 'bg-slate-50 text-slate-700 border-slate-100',    href: '/jobs' },
-    { label: 'Active Candidates', value: stats.active_candidates, icon: Users,      color: 'bg-emerald-50 text-emerald-700 border-emerald-100', href: '/candidates' },
-    { label: 'Interviewing',      value: stats.interviewing,      icon: Activity,   color: 'bg-amber-50 text-amber-700 border-amber-100',  href: '/candidates' },
+    { label: 'Active Candidates', value: stats.active_candidates, icon: Users,      color: 'bg-slate-50 text-slate-700 border-slate-100', href: '/candidates' },
+    { label: 'Interviewing',      value: stats.interviewing,      icon: Activity,   color: 'bg-slate-50 text-slate-700 border-slate-100',  href: '/candidates' },
     { label: 'Total Hired',       value: stats.hired_total,       icon: UserCheck,  color: 'bg-slate-50 text-slate-700 border-slate-100', href: '/candidates' },
   ]
   return (

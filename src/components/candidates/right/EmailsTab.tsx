@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Wand2, Mail, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import { fmtDateTime } from '@/lib/ui/date-utils'
+import { Card } from '@/components/ui/card'
 
 type ApplicationWithHiringRequest = Application & {
   hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number'> | null
@@ -45,7 +46,7 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
   const scheduled = meta.scheduled  || null
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+    <Card className="overflow-hidden">
       {/* Email header row */}
       <button
         className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
@@ -112,7 +113,7 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
           )}
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 

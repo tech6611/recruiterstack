@@ -1,5 +1,6 @@
 import type { MatchWithRelations, MatchRecommendation } from '@/lib/types/database'
 import { CheckCircle, XCircle, AlertCircle, TrendingUp, Mail } from 'lucide-react'
+import { Card } from '@/components/ui/card'
 
 const REC_CONFIG: Record<
   MatchRecommendation,
@@ -40,7 +41,7 @@ export function MatchCard({ match, showCandidate = true, showRole = false, onDra
   const Icon = rec.icon
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 hover:shadow-md transition-shadow">
+    <Card variant="interactive" className="p-5 space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -114,6 +115,6 @@ export function MatchCard({ match, showCandidate = true, showRole = false, onDra
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

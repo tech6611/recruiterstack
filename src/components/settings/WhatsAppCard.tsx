@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { CheckCircle, MessageCircle } from 'lucide-react'
+import { Card, Panel } from '@/components/ui/card'
 
 type Provider = 'meta' | 'vobiz'
 
@@ -116,7 +117,7 @@ export function WhatsAppCard({ isAdmin }: { isAdmin: boolean }) {
 
   if (!isAdmin) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+      <Card className="bg-slate-50 p-6">
         <div className="flex items-center gap-2.5 mb-1">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
             <MessageCircle className="h-4 w-4 text-slate-400" />
@@ -124,7 +125,7 @@ export function WhatsAppCard({ isAdmin }: { isAdmin: boolean }) {
           <h2 className="text-sm font-semibold text-slate-500">WhatsApp</h2>
         </div>
         <p className="text-xs text-slate-500 ml-11">Only admins can manage the WhatsApp connection.</p>
-      </div>
+      </Card>
     )
   }
 
@@ -132,13 +133,8 @@ export function WhatsAppCard({ isAdmin }: { isAdmin: boolean }) {
     'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition'
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
-      <div className="flex items-center gap-2.5 mb-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
-          <MessageCircle className="h-4 w-4 text-emerald-600" />
-        </div>
-        <h2 className="text-sm font-semibold text-slate-800">WhatsApp</h2>
-      </div>
+    <Panel icon={MessageCircle} title="WhatsApp">
+    <div className="p-6 space-y-4">
       <p className="text-xs text-slate-400 -mt-2">Agents message candidates on WhatsApp; replies are answered by AI</p>
 
       {!loaded ? (
@@ -314,5 +310,6 @@ export function WhatsAppCard({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
     </div>
+    </Panel>
   )
 }
