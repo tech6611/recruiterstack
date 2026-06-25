@@ -227,8 +227,19 @@ smallest-value-first:
   `visible_when` is now part of the public field shape (`PublicScreeningField`) —
   it must reach the candidate to drive show/hide — while knockout rules stay
   server-only.
-- **3e — EEO bucket.** Dedicated voluntary compliance section, hidden from the
-  hiring team, surfaced only in aggregate reporting.
+- **3e — EEO bucket / reporting (DONE, this session).** A dedicated, anonymous
+  compliance report over the hidden `applications.eeo_answers` bucket. New
+  `compliance:view` capability (added to the RBAC vocabulary in
+  `lib/permissions.ts`; renders automatically as a "Compliance · View" cell in
+  the data-driven role grid, and owners hold it by default). Facade
+  `getEeoReport` (`modules/ats/domain/reporting.ts`) aggregates EEO answers into
+  org-wide **counts only** — per-question response counts + per-option tallies,
+  with **no candidate / application / job linkage** so demographic data can never
+  be tied back to a person or influence a decision. API route
+  `GET /api/analytics/eeo` is gated behind `compliance:view`. A dedicated page
+  (`/analytics/eeo`) renders the response rate + per-question bars behind the same
+  capability (access-denied state otherwise), reached via a capability-gated
+  "EEO report" link on the main Analytics page.
 
 Note: `job_postings.application_form_id` (migration 035) is a dead-end hook from
 the old requisitions module — the live apply flow keys off `jobs.apply_token`,
@@ -248,4 +259,4 @@ No migrations. No change to what the apply form *collects* (Phase 3 territory).
 
 ---
 
-*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions, Ashby parity) in progress — 3a foundations + 3b recruiter builder + 3c candidate apply/knockout + 3d conditional logic done, 3e (EEO reporting) queued.*
+*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions, Ashby parity) COMPLETE — 3a foundations + 3b recruiter builder + 3c candidate apply/knockout + 3d conditional logic + 3e EEO reporting all done.*

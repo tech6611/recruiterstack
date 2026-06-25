@@ -22,6 +22,7 @@ export const CAPABILITIES = [
   'leave:view',       'leave:edit',       'leave:approve',
   'payroll:view',     'payroll:edit',
   'analytics:view',
+  'compliance:view',
   'approvals:view',   'approvals:approve',
   'settings:view',    'settings:edit',
 ] as const

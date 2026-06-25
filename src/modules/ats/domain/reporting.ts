@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/lib/types/database'
+import type { Database, ScreeningAnswer } from '@/lib/types/database'
 
 type Supabase = SupabaseClient<Database>
 
@@ -356,4 +356,82 @@ export async function fetchCanonicalPipelineExportInputs(
   }))
 
   return { jobs, stages, apps }
+}
+
+// ── EEO / voluntary compliance reporting (Publish JD Phase 3e) ───────────────
+// Aggregates the hidden `applications.eeo_answers` bucket into anonymous,
+// org-wide counts. EEO answers are voluntary demographic data that must stay
+// hidden from the hiring team and may never influence a hiring decision — so
+// this report is COUNTS ONLY, with no candidate, application, or job linkage,
+// and the route is gated behind the dedicated `compliance:view` capability.
+
+export interface EeoOptionCount {
+  value: string
+  count: number
+}
+
+export interface EeoQuestionReport {
+  field_id: string
+  label: string
+  responses: number // distinct applications that answered this question
+  options: EeoOptionCount[]
+}
+
+export interface EeoReport {
+  total_applications: number // every application in the org
+  responded: number          // applications that gave at least one EEO answer
+  questions: EeoQuestionReport[]
+}
+
+export async function getEeoReport(supabase: Supabase, orgId: string): Promise<EeoReport> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('applications')
+    .select('eeo_answers')
+    .eq('org_id', orgId)
+
+  if (error) throw error
+
+  const rows = (data ?? []) as { eeo_answers: ScreeningAnswer[] | null }[]
+  let responded = 0
+  const byField = new Map<string, { label: string; responders: number; counts: Map<string, number> }>()
+
+  for (const row of rows) {
+    const answers = Array.isArray(row.eeo_answers) ? row.eeo_answers : []
+    const fieldsSeenInRow = new Set<string>()
+    let rowAnswered = false
+
+    for (const a of answers) {
+      const values = Array.isArray(a.value)
+        ? a.value
+        : a.value == null || a.value === '' ? [] : [a.value]
+      if (values.length === 0) continue
+      rowAnswered = true
+
+      let entry = byField.get(a.field_id)
+      if (!entry) {
+        entry = { label: a.label, responders: 0, counts: new Map() }
+        byField.set(a.field_id, entry)
+      }
+      if (a.label) entry.label = a.label
+      if (!fieldsSeenInRow.has(a.field_id)) {
+        entry.responders += 1
+        fieldsSeenInRow.add(a.field_id)
+      }
+      for (const v of values) entry.counts.set(v, (entry.counts.get(v) ?? 0) + 1)
+    }
+
+    if (rowAnswered) responded += 1
+  }
+
+  const questions: EeoQuestionReport[] = Array.from(byField.entries()).map(([field_id, e]) => ({
+    field_id,
+    label: e.label,
+    responses: e.responders,
+    options: Array.from(e.counts.entries())
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count),
+  }))
+
+  return { total_applications: rows.length, responded, questions }
 }

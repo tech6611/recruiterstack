@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@clerk/nextjs'
-import { RefreshCw, TrendingUp, Users, CheckCircle, XCircle, Briefcase, Clock, Download, ChevronDown } from 'lucide-react'
+import { RefreshCw, TrendingUp, Users, CheckCircle, XCircle, Briefcase, Clock, Download, ChevronDown, ShieldCheck } from 'lucide-react'
 import type { StageColor } from '@/lib/types/database'
 import { timeAgo } from '@/lib/ui/date-utils'
+import { useCapabilities } from '@/components/providers/CapabilitiesProvider'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -102,6 +104,7 @@ function StatCard({
 
 export default function AnalyticsPage() {
   const { orgId } = useAuth()
+  const { can } = useCapabilities()
   const [data, setData]           = useState<AnalyticsData | null>(null)
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState('')
@@ -179,6 +182,15 @@ export default function AnalyticsPage() {
         <div className="flex items-center gap-3">
           {updatedAt && (
             <span className="text-xs text-slate-400">Updated {timeAgo(updatedAt)}</span>
+          )}
+          {can('compliance:view') && (
+            <Link
+              href="/analytics/eeo"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              EEO report
+            </Link>
           )}
           <div ref={exportRef} className="relative">
             <button

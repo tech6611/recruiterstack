@@ -12,6 +12,19 @@ entries on top.
 ## 2026-06-25
 
 ### Added
+- **Publish JD — Phase 3e: EEO / voluntary compliance reporting.** A new
+  **EEO report** page (`/analytics/eeo`) shows anonymous, aggregate counts of the
+  voluntary disclosures candidates give on the apply form — response rate plus a
+  bar breakdown per question. The figures are **counts only, with no link to any
+  candidate, application, or job**, so demographic data can never be tied back to
+  a person or sway a hiring decision. It sits behind a brand-new **Compliance ·
+  View** permission (`compliance:view`) — separate from the recruiting and
+  analytics permissions, so the hiring team can't see it; workspace owners get it
+  by default, and it shows up automatically as a new row in the Team & Permissions
+  grid. Reached via a permission-gated "EEO report" link on the Analytics page.
+  (`lib/permissions.ts`, `modules/ats/domain/reporting.ts`,
+  `app/api/analytics/eeo/route.ts`, `app/(dashboard)/analytics/eeo/page.tsx`,
+  `app/(dashboard)/analytics/page.tsx`.)
 - **Publish JD — Phase 3d: conditional questions (show/hide based on an earlier
   answer).** In the **Application form** builder, any question can now be set to
   appear only when an earlier yes-no / choice question was answered a certain way
