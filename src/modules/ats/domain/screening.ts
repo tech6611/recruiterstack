@@ -173,11 +173,26 @@ function valueMatches(answer: ScreeningAnswer['value'], rule: { operator: string
   }
 }
 
-// Returns true if any answer triggers a disqualifying (knockout) rule.
+// ── Conditional visibility (Phase 3d) ──────────────────────────────────────
+
+// Whether a field should be shown given the current answers. A field with no
+// `visible_when` rule is always visible; otherwise it shows only when the
+// controlling field's answer matches the rule. Used to skip required-answer
+// enforcement and knockout evaluation for fields the candidate never saw.
+export function isFieldVisible(field: ScreeningField, answers: ScreeningAnswer[]): boolean {
+  if (!field.visible_when) return true
+  const controller = answers.find(a => a.field_id === field.visible_when!.field_id)
+  return valueMatches(controller?.value ?? null, field.visible_when)
+}
+
+// Returns true if any answer triggers a disqualifying (knockout) rule. Fields
+// hidden by conditional logic are skipped — a candidate can't be knocked out by
+// a question they never saw.
 export function evaluateKnockout(form: ScreeningForm, answers: ScreeningAnswer[]): boolean {
   const byField = new Map(answers.map(a => [a.field_id, a.value]))
   return form.fields.some(field => {
     if (!field.knockout) return false
+    if (!isFieldVisible(field, answers)) return false
     const answer = byField.get(field.id) ?? null
     return valueMatches(answer, field.knockout)
   })

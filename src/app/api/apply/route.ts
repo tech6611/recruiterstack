@@ -18,6 +18,7 @@ import {
   getJobScreeningForm,
   evaluateKnockout,
   partitionAnswers,
+  isFieldVisible,
 } from '@/modules/ats/domain/screening'
 import type { ApplicationEventInsert, ScreeningAnswer } from '@/lib/types/database'
 
@@ -79,6 +80,8 @@ export async function POST(request: NextRequest) {
   const answerById = new Map(answers.map(a => [a.field_id, a.value]))
   for (const field of form.fields) {
     if (!field.required) continue
+    // A required field hidden by conditional logic isn't really required.
+    if (!isFieldVisible(field, answers)) continue
     const v = answerById.get(field.id)
     const empty = v == null || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.length === 0)
     if (empty) {

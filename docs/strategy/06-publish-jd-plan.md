@@ -215,8 +215,18 @@ smallest-value-first:
   success screen) and skips autopilot scoring. EEO answers are split into the
   hidden `eeo_answers` bucket (`partitionAnswers`); knockout/conditional rules are
   never sent to the candidate (the preview returns a public-safe field shape).
-- **3d — conditional logic.** Show/hide a field based on an earlier answer
-  (`visible_when` rules, already in the field shape).
+- **3d — conditional logic (DONE, this session).** A field can show/hide based on
+  an earlier answer (`visible_when` rules). The builder (`ScreeningTab.tsx`) adds a
+  `VisibilityEditor` per field: "Only show this question based on an earlier answer"
+  → pick a *prior* choice-type question (yes-no / single / multi-select) → *is /
+  is not* (`in` / `not_in`) → value. The public apply page evaluates the rule live
+  (mirrors `isFieldVisible`), hiding conditional questions until their controller
+  matches; hidden fields are skipped for required + knockout checks **both
+  client-side and re-checked server-side** (`isFieldVisible` in the screening
+  facade, applied inside `evaluateKnockout` and the apply route's required loop).
+  `visible_when` is now part of the public field shape (`PublicScreeningField`) —
+  it must reach the candidate to drive show/hide — while knockout rules stay
+  server-only.
 - **3e — EEO bucket.** Dedicated voluntary compliance section, hidden from the
   hiring team, surfaced only in aggregate reporting.
 
@@ -238,4 +248,4 @@ No migrations. No change to what the apply form *collects* (Phase 3 territory).
 
 ---
 
-*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions, Ashby parity) in progress — 3a foundations + 3b recruiter builder + 3c candidate apply/knockout done, 3d (conditional logic) + 3e (EEO reporting) queued.*
+*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions, Ashby parity) in progress — 3a foundations + 3b recruiter builder + 3c candidate apply/knockout + 3d conditional logic done, 3e (EEO reporting) queued.*

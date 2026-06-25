@@ -20,6 +20,14 @@ type ScreeningFieldType =
   | 'short_text' | 'long_text' | 'yes_no' | 'single_select'
   | 'multi_select' | 'number' | 'date' | 'file' | 'url'
 
+type ScreeningOperator = 'eq' | 'neq' | 'in' | 'not_in'
+
+interface ScreeningVisibility {
+  field_id: string
+  operator: ScreeningOperator
+  value: string | string[]
+}
+
 interface ScreeningField {
   id: string
   label: string
@@ -28,9 +36,29 @@ interface ScreeningField {
   options: string[]
   required: boolean
   is_eeo: boolean
+  visible_when: ScreeningVisibility | null
 }
 
 type AnswerValue = string | string[]
+
+// Mirror of the server-side rule check (modules/ats/domain/screening.ts) so the
+// page can show/hide conditional questions as the candidate answers.
+function answerMatches(answer: AnswerValue | undefined, rule: ScreeningVisibility): boolean {
+  const answerSet = Array.isArray(answer) ? answer : answer == null || answer === '' ? [] : [answer]
+  const ruleSet = Array.isArray(rule.value) ? rule.value : [rule.value]
+  switch (rule.operator) {
+    case 'eq':     return answerSet.length === 1 && answerSet[0] === ruleSet[0]
+    case 'neq':    return !(answerSet.length === 1 && answerSet[0] === ruleSet[0])
+    case 'in':     return answerSet.some(a => ruleSet.includes(a))
+    case 'not_in': return !answerSet.some(a => ruleSet.includes(a))
+    default:       return false
+  }
+}
+
+function isFieldVisible(field: ScreeningField, answers: Record<string, AnswerValue>): boolean {
+  if (!field.visible_when) return true
+  return answerMatches(answers[field.visible_when.field_id], field.visible_when)
+}
 
 interface JobInfo {
   position_title: string
@@ -215,8 +243,10 @@ export default function ApplyPage() {
     e.preventDefault()
     if (!name.trim() || !email.trim()) return
 
+    // Only the questions currently shown (conditional logic) are submitted.
+    const screeningFields = (job?.screening?.fields ?? []).filter(f => isFieldVisible(f, answers))
+
     // Required screening questions must be answered.
-    const screeningFields = job?.screening?.fields ?? []
     for (const f of screeningFields) {
       if (!f.required) continue
       const v = answers[f.id]
@@ -325,6 +355,10 @@ export default function ApplyPage() {
   const branding = job.branding
   const brand = branding?.brand_color || DEFAULT_BRAND
   const font  = branding?.brand_font || null
+
+  // Questions shown right now — conditional questions appear only once their
+  // controlling answer matches.
+  const visibleScreening = job.screening.fields.filter(f => isFieldVisible(f, answers))
 
   return (
     <div
@@ -576,11 +610,11 @@ export default function ApplyPage() {
               />
             </div>
 
-            {/* Custom screening questions (Phase 3c) */}
-            {job.screening.fields.length > 0 && (
+            {/* Custom screening questions (Phase 3c) — conditional ones (3d) appear only when shown */}
+            {visibleScreening.length > 0 && (
               <div className="space-y-5 pt-2 border-t border-slate-100">
                 <h3 className="text-sm font-bold text-slate-900">Additional questions</h3>
-                {job.screening.fields.map(f => (
+                {visibleScreening.map(f => (
                   <ScreeningQuestion key={f.id} field={f} value={answers[f.id]} onChange={v => setAnswer(f.id, v)} />
                 ))}
               </div>

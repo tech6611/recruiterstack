@@ -12,6 +12,19 @@ entries on top.
 ## 2026-06-25
 
 ### Added
+- **Publish JD — Phase 3d: conditional questions (show/hide based on an earlier
+  answer).** In the **Application form** builder, any question can now be set to
+  appear only when an earlier yes-no / choice question was answered a certain way
+  (a new "Only show this question based on an earlier answer" rule:
+  controlling question → *is / is not* → value). On the public apply page,
+  conditional questions stay hidden until their controlling answer matches, and
+  hidden questions are skipped for required-answer and knockout checks — both in
+  the browser and re-checked server-side, so a candidate can't be blocked or
+  knocked out by a question they never saw. The apply preview now returns each
+  field's visibility rule (knockout rules still stay server-only).
+  (`components/req-jobs/ScreeningTab.tsx`, `app/apply/[token]/page.tsx`,
+  `app/api/apply/route.ts`, `modules/ats/domain/screening.ts`,
+  `modules/ats/domain/job-pipelines.ts`.)
 - **Publish JD — Phase 3c: candidates can answer screening questions, and
   knockout rules fire.** The public apply page (`/apply/[token]`) now renders a
   job's custom questions under an **"Additional questions"** section, with the

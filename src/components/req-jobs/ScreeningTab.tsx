@@ -191,6 +191,8 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
                   field={field}
                   index={i}
                   total={fields.length}
+                  // A field can only be controlled by an earlier choice-type question.
+                  priorChoiceFields={fields.slice(0, i).filter(f => f.label.trim() && knockoutChoices(f).length > 0)}
                   onChange={patch => update(field.id, patch)}
                   onMove={dir => move(i, dir)}
                   onRemove={() => remove(field.id)}
@@ -239,16 +241,17 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
 }
 
 interface FieldEditorProps {
-  field:           ScreeningField
-  index:           number
-  total:           number
-  onChange:        (patch: Partial<ScreeningField>) => void
-  onMove:          (dir: -1 | 1) => void
-  onRemove:        () => void
-  onSaveToLibrary: () => void
+  field:             ScreeningField
+  index:             number
+  total:             number
+  priorChoiceFields: ScreeningField[]
+  onChange:          (patch: Partial<ScreeningField>) => void
+  onMove:            (dir: -1 | 1) => void
+  onRemove:          () => void
+  onSaveToLibrary:   () => void
 }
 
-function FieldEditor({ field, index, total, onChange, onMove, onRemove, onSaveToLibrary }: FieldEditorProps) {
+function FieldEditor({ field, index, total, priorChoiceFields, onChange, onMove, onRemove, onSaveToLibrary }: FieldEditorProps) {
   const choices = knockoutChoices(field)
 
   function setType(t: ScreeningFieldType) {
@@ -312,6 +315,8 @@ function FieldEditor({ field, index, total, onChange, onMove, onRemove, onSaveTo
               EEO / voluntary <span className="text-slate-400">(hidden from hiring team)</span>
             </label>
           </div>
+
+          <VisibilityEditor field={field} priorChoiceFields={priorChoiceFields} onChange={onChange} />
 
           {choices.length > 0 && (
             <KnockoutEditor field={field} choices={choices} onChange={onChange} />
@@ -392,6 +397,79 @@ function KnockoutEditor({ field, choices, onChange }: { field: ScreeningField; c
             {choices.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <span>the candidate is knocked out.</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Conditional visibility (Phase 3d): show this question only when an earlier
+// choice-type question was answered a certain way. `in` / `not_in` so the rule
+// works the same for yes-no, single- and multi-select controllers.
+function VisibilityEditor({
+  field, priorChoiceFields, onChange,
+}: { field: ScreeningField; priorChoiceFields: ScreeningField[]; onChange: (patch: Partial<ScreeningField>) => void }) {
+  const rule = field.visible_when
+
+  if (priorChoiceFields.length === 0) {
+    if (!rule) return null
+    // The controlling question was moved below or removed — let the recruiter clear the now-orphaned rule.
+    return (
+      <div className="rounded-md bg-slate-50 border border-slate-200 p-2.5 text-sm text-slate-600">
+        This question’s show/hide rule points at a question that no longer comes before it.{' '}
+        <button onClick={() => onChange({ visible_when: null })} className="text-emerald-700 underline">
+          Clear rule
+        </button>
+      </div>
+    )
+  }
+
+  const controller = priorChoiceFields.find(f => f.id === rule?.field_id) ?? null
+  const controllerChoices = controller ? knockoutChoices(controller) : []
+  const selectedValue = Array.isArray(rule?.value) ? rule?.value[0] ?? '' : rule?.value ?? ''
+
+  function enable(on: boolean) {
+    if (!on) { onChange({ visible_when: null }); return }
+    const first = priorChoiceFields[0]
+    onChange({ visible_when: { field_id: first.id, operator: 'in', value: knockoutChoices(first)[0] ?? '' } })
+  }
+
+  function setController(id: string) {
+    const f = priorChoiceFields.find(c => c.id === id)
+    onChange({ visible_when: { field_id: id, operator: rule!.operator, value: f ? knockoutChoices(f)[0] ?? '' : '' } })
+  }
+
+  return (
+    <div className="rounded-md bg-sky-50 border border-sky-100 p-2.5 space-y-2">
+      <label className="inline-flex items-center gap-1.5 text-sm text-sky-900">
+        <input type="checkbox" checked={rule != null} onChange={e => enable(e.target.checked)} />
+        Only show this question based on an earlier answer
+      </label>
+      {rule && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-sky-900">
+          <span>Show if</span>
+          <select
+            value={controller?.id ?? ''}
+            onChange={e => setController(e.target.value)}
+            className="h-8 max-w-[180px] truncate rounded-md border border-sky-200 bg-white px-2 text-sm"
+          >
+            {priorChoiceFields.map(f => <option key={f.id} value={f.id}>{f.label || '(untitled)'}</option>)}
+          </select>
+          <select
+            value={rule.operator}
+            onChange={e => onChange({ visible_when: { ...rule, operator: e.target.value as 'in' | 'not_in' } })}
+            className="h-8 rounded-md border border-sky-200 bg-white px-2 text-sm"
+          >
+            <option value="in">is</option>
+            <option value="not_in">is not</option>
+          </select>
+          <select
+            value={selectedValue}
+            onChange={e => onChange({ visible_when: { ...rule, value: e.target.value } })}
+            className="h-8 rounded-md border border-sky-200 bg-white px-2 text-sm"
+          >
+            {controllerChoices.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
       )}
     </div>

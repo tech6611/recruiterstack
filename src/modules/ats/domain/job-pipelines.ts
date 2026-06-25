@@ -8,6 +8,7 @@ import type {
   PipelineStage,
   ScreeningField,
   ScreeningFieldType,
+  ScreeningVisibility,
   StageColor,
 } from '@/lib/types/database'
 import { getOrgScreeningTemplate } from '@/modules/ats/domain/screening'
@@ -15,8 +16,9 @@ import { getOrgScreeningTemplate } from '@/modules/ats/domain/screening'
 type Supabase = SupabaseClient<Database>
 
 // Public-safe view of a screening field for the apply page: rendering metadata
-// only. Knockout rules and conditional logic are deliberately NOT exposed to the
-// candidate — they're evaluated server-side on submit.
+// plus the conditional-visibility rule (the page needs it to show/hide fields).
+// Knockout rules stay server-side — they're evaluated on submit and never sent
+// to the candidate.
 export interface PublicScreeningField {
   id: string
   label: string
@@ -25,6 +27,7 @@ export interface PublicScreeningField {
   options: string[]
   required: boolean
   is_eeo: boolean
+  visible_when: ScreeningVisibility | null
 }
 
 export interface LegacyJobPipelineSummary extends HiringRequest {
@@ -370,6 +373,7 @@ export async function getCanonicalApplyJobPreview(
     options: f.options,
     required: f.required,
     is_eeo: f.is_eeo,
+    visible_when: f.visible_when,
   }))
 
   return {
