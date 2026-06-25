@@ -55,7 +55,7 @@ export type JobIntakeCreateInput = z.infer<typeof jobIntakeCreateSchema>
 // canonical jobs status set (migration 035).
 export const jobUpdateSchema = jobBase
   .extend({
-    status: z.enum(['draft', 'pending_approval', 'approved', 'open', 'closed', 'archived']),
+    status: z.enum(['draft', 'pending_approval', 'approved', 'open', 'withdrawn', 'closed', 'archived']),
   })
   .partial()
 

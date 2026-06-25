@@ -11,6 +11,23 @@ entries on top.
 
 ## 2026-06-25
 
+### Added
+- **Withdraw a posted job.** A live (Open) job can now be **Withdrawn** from its
+  detail page — a new paused-but-revivable stage distinct from the terminal
+  **Archive**. Withdrawing immediately makes every corresponding public
+  application link defunct (the apply route and apply preview gate on
+  `status = 'open'`) and switches off any live job-board postings. A withdrawn
+  job can be **Re-published** (withdrawn → open), which reuses the original
+  apply token so previously-shared links revive. Withdrawn jobs show under the
+  **Past** block on the Jobs list. New endpoint `POST /api/req-jobs/[id]/withdraw`;
+  publish endpoint now accepts re-publish from `withdrawn`. Emits a new
+  `job.withdrawn` webhook.
+
+### Schema
+- **Migration 073** widens the `jobs.status` CHECK constraint to include
+  `'withdrawn'`. Additive/idempotent; ladder is now
+  draft → pending_approval → approved → open → (withdrawn ⇄ open) → closed/archived.
+
 ### Changed
 - **Requisitions and Jobs pages now split into "Active" and "Past" blocks.** Each
   page previously had a single table filtered by clickable stat cards. Both now

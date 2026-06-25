@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Briefcase, Plus, Search, Clock, X, Mail, FileText, Send,
   CheckCircle, Check, Users, PenLine, Wand2, RefreshCw, Loader2, Sparkles, Paperclip,
-  ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft, GripVertical, Archive,
+  ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft, GripVertical, Archive, Ban,
   CalendarDays, SlidersHorizontal, Pencil,
 } from 'lucide-react'
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
@@ -616,6 +616,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   pending_approval: { label: 'Pending Approval',      color: 'bg-amber-50 text-amber-700 border-amber-200',       icon: <Clock className="h-3 w-3" /> },
   approved:         { label: 'To be Published',       color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
   open:             { label: 'Active',                color: 'bg-emerald-50 text-emerald-700 border-emerald-200',       icon: <Send className="h-3 w-3" /> },
+  withdrawn:        { label: 'Withdrawn',             color: 'bg-orange-50 text-orange-700 border-orange-200',     icon: <Ban className="h-3 w-3" /> },
   archived:         { label: 'Archived',              color: 'bg-slate-100 text-slate-400 border-slate-200',      icon: <Archive className="h-3 w-3" /> },
 }
 
@@ -633,8 +634,9 @@ function jobDetailHref(status: string, id: string): string {
   return LIVE_PIPELINE_STATUSES.has(status) ? `/jobs/${id}` : `/req-jobs/${id}`
 }
 
-// "Past" = terminal jobs (closed/archived). Everything else is "Active" work.
-const PAST_JOB_STATUSES = new Set(['closed', 'archived'])
+// "Past" = jobs no longer live: terminal (closed/archived) plus withdrawn
+// (paused, off the market). Everything else is "Active" work.
+const PAST_JOB_STATUSES = new Set(['closed', 'archived', 'withdrawn'])
 const isPastJobStatus = (s: string) => PAST_JOB_STATUSES.has(s)
 
 /**

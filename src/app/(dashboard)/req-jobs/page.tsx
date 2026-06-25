@@ -11,13 +11,14 @@ import type { Job, JobStatus, Department } from '@/lib/types/requisitions'
 
 type ListItem = Job & { opening_count: number }
 
-const STATUS_OPTIONS: JobStatus[] = ['draft', 'pending_approval', 'approved', 'open', 'closed', 'archived']
+const STATUS_OPTIONS: JobStatus[] = ['draft', 'pending_approval', 'approved', 'open', 'withdrawn', 'closed', 'archived']
 
 const STATUS_BADGE: Record<JobStatus, string> = {
   draft:            'bg-slate-100 text-slate-700',
   pending_approval: 'bg-amber-100 text-amber-800',
   approved:         'bg-emerald-100 text-emerald-800',
   open:             'bg-slate-100 text-slate-800',
+  withdrawn:        'bg-orange-100 text-orange-800',
   closed:           'bg-slate-200 text-slate-600',
   archived:         'bg-slate-100 text-slate-400',
 }

@@ -218,6 +218,7 @@ export type JobStatus =
   | 'pending_approval'
   | 'approved'
   | 'open'
+  | 'withdrawn'
   | 'closed'
   | 'archived'
 

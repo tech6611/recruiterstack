@@ -6,11 +6,14 @@ import { emitWebhook } from '@/lib/webhooks/emit'
 import { logger } from '@/lib/logger'
 
 /**
- * POST /api/req-jobs/:id/publish — flip status from 'approved' to 'open'.
+ * POST /api/req-jobs/:id/publish — flip status to 'open'.
  *
  * Guards (per the prompt's spec):
- *   - Job must be 'approved'
+ *   - Job must be 'approved' (first publish) or 'withdrawn' (re-publish)
  *   - At least one linked Opening must be 'approved'
+ *
+ * Re-publishing a 'withdrawn' job reuses its original apply_token (migration
+ * 070 keeps the token across transitions), so previously-shared links revive.
  *
  * Postings can only go live after the Job is open — that gate lives in the
  * postings publish endpoint.
@@ -34,9 +37,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const j = job as { id: string; status: string }
 
   if (j.status === 'open')      return NextResponse.json({ ok: true, status: 'open' })
-  if (j.status !== 'approved') {
+  if (j.status !== 'approved' && j.status !== 'withdrawn') {
     return NextResponse.json(
-      { error: `Job must be 'approved' before publishing. Current status: '${j.status}'.` },
+      { error: `Job must be 'approved' or 'withdrawn' before publishing. Current status: '${j.status}'.` },
       { status: 409 },
     )
   }

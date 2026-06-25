@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Archive, Send, Globe, X, Plus, Trash2, Pencil, LayoutGrid } from 'lucide-react'
+import { ArrowLeft, Archive, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,7 @@ const STATUS_BADGE: Record<JobStatus, string> = {
   pending_approval: 'bg-amber-100 text-amber-800',
   approved:         'bg-emerald-100 text-emerald-800',
   open:             'bg-slate-100 text-slate-800',
+  withdrawn:        'bg-orange-100 text-orange-800',
   closed:           'bg-slate-200 text-slate-600',
   archived:         'bg-slate-100 text-slate-400',
 }
@@ -94,6 +95,7 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
   const [tab, setTab]                 = useState<Tab>('overview')
   const [submitting, setSubmitting]   = useState(false)
   const [publishing, setPublishing]   = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
   const [archiving, setArchiving]     = useState(false)
   const [linkOpen, setLinkOpen]       = useState(false)
   const [editing, setEditing]         = useState(false)
@@ -106,8 +108,11 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
   const canEdit    = job.status === 'draft'
   // Once live the job has a candidate pipeline; offer a jump to its Kanban so the
   // detail view (JD / approvals / audit log) and the pipeline stay cross-linked.
-  const isLive     = ['open', 'posted', 'closed', 'filled'].includes(job.status)
-  const canPublish = job.status === 'approved' && linkedOpenings.some(o => ['approved', 'open', 'filled'].includes(o.status))
+  const isLive     = ['open', 'withdrawn', 'posted', 'closed', 'filled'].includes(job.status)
+  // 'approved' = first publish; 'withdrawn' = re-publish a paused job.
+  const canPublish = (job.status === 'approved' || job.status === 'withdrawn') &&
+    linkedOpenings.some(o => ['approved', 'open', 'filled'].includes(o.status))
+  const canWithdraw = job.status === 'open'
 
   async function save() {
     if (!form.title.trim()) { toast.error('Title is required'); return }
@@ -147,6 +152,17 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
     const body = await res.json().catch(() => ({}))
     if (!res.ok) { toast.error(body.error ?? 'Publish failed'); return }
     toast.success('Pipeline is now open.')
+    router.refresh()
+  }
+
+  async function withdraw() {
+    if (!confirm('Withdraw this job? All public application links will stop working until you re-publish.')) return
+    setWithdrawing(true)
+    const res = await fetch(`/api/req-jobs/${job.id}/withdraw`, { method: 'POST' })
+    setWithdrawing(false)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) { toast.error(body.error ?? 'Withdraw failed'); return }
+    toast.success('Job withdrawn. Application links are now closed.')
     router.refresh()
   }
 
@@ -215,7 +231,12 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
           )}
           {canPublish && (
             <Button size="sm" onClick={publish} loading={publishing}>
-              <Globe className="h-4 w-4" /> Publish
+              <Globe className="h-4 w-4" /> {job.status === 'withdrawn' ? 'Re-publish' : 'Publish'}
+            </Button>
+          )}
+          {canWithdraw && (
+            <Button variant="outline" size="sm" onClick={withdraw} loading={withdrawing}>
+              <Ban className="h-4 w-4" /> Withdraw
             </Button>
           )}
           {job.status !== 'archived' && (
