@@ -884,10 +884,83 @@ export interface Application {
   ai_criterion_scores:    { name: string; rating: number; weight: number }[] | null
   // Attribution (migration 019)
   credited_to:            string | null
+  // Screening answers (migration 072). screening_answers is visible to the
+  // hiring team; eeo_answers is the separate hidden compliance bucket.
+  screening_answers: ScreeningAnswer[]
+  eeo_answers:       ScreeningAnswer[]
+  knockout_failed:   boolean
   // Joined
   candidate?: Candidate
   stage?: PipelineStage
   hiring_request?: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number'>
+}
+
+// ── Screening questions / application-form builder (migration 072) ────────
+
+export type ScreeningFieldType =
+  | 'short_text'
+  | 'long_text'
+  | 'yes_no'
+  | 'single_select'
+  | 'multi_select'
+  | 'number'
+  | 'date'
+  | 'file'
+  | 'url'
+
+export type ScreeningOperator = 'eq' | 'neq' | 'in' | 'not_in'
+
+// A reusable question in the org-level library (screening_questions table).
+export interface ScreeningQuestion {
+  id:         string
+  org_id:     string
+  label:      string
+  help_text:  string | null
+  field_type: ScreeningFieldType
+  options:    string[]
+  is_eeo:     boolean
+  archived:   boolean
+  created_at: string
+  updated_at: string
+}
+
+// A disqualifying-answer rule: if the answer matches, the candidate is knocked out.
+export interface ScreeningKnockout {
+  operator: ScreeningOperator
+  value:    string | string[]
+}
+
+// A conditional-visibility rule: show this field only when an earlier field matches.
+export interface ScreeningVisibility {
+  field_id: string
+  operator: ScreeningOperator
+  value:    string | string[]
+}
+
+// One field within a form (org template, or per-job at jobs.custom_fields.screening).
+export interface ScreeningField {
+  id:           string
+  question_id:  string | null
+  label:        string
+  help_text:    string | null
+  field_type:   ScreeningFieldType
+  options:      string[]
+  required:     boolean
+  is_eeo:       boolean
+  knockout:     ScreeningKnockout | null
+  visible_when: ScreeningVisibility | null
+}
+
+// The org default form (screening_form_templates table) and the per-job shape.
+export interface ScreeningForm {
+  fields: ScreeningField[]
+}
+
+// A candidate's answer to one field, stored on applications.screening_answers / eeo_answers.
+export interface ScreeningAnswer {
+  field_id: string
+  label:    string
+  value:    string | string[] | null
 }
 
 // ── Application Events ────────────────────────────────────────────────────
@@ -1332,7 +1405,7 @@ export interface PipelineStageUpdate extends Partial<PipelineStageInsert> {}
 // Application Row type (without optional joined relations)
 type ApplicationRow = Omit<Application, 'candidate' | 'stage' | 'hiring_request'>
 
-export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at' | 'resume_url' | 'cover_letter' | 'ai_score' | 'ai_recommendation' | 'ai_strengths' | 'ai_gaps' | 'ai_scored_at' | 'ai_criterion_scores' | 'source_detail' | 'credited_to' | 'stage_id' | 'review_status' | 'job_id' | 'opening_id' | 'hiring_request_id'> {
+export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at' | 'resume_url' | 'cover_letter' | 'ai_score' | 'ai_recommendation' | 'ai_strengths' | 'ai_gaps' | 'ai_scored_at' | 'ai_criterion_scores' | 'source_detail' | 'credited_to' | 'stage_id' | 'review_status' | 'job_id' | 'opening_id' | 'hiring_request_id' | 'screening_answers' | 'eeo_answers' | 'knockout_failed'> {
   id?: string
   created_at?: string
   applied_at?: string
@@ -1351,6 +1424,9 @@ export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_
   credited_to?: string | null
   stage_id?: string | null
   review_status?: ApplicationReviewStatus
+  screening_answers?: ScreeningAnswer[]
+  eeo_answers?: ScreeningAnswer[]
+  knockout_failed?: boolean
 }
 
 export interface ApplicationUpdate extends Partial<ApplicationInsert> {}

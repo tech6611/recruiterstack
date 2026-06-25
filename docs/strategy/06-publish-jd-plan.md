@@ -175,13 +175,39 @@ Split into three slices: **2a** (config/admin half), **2b** (public page), **2c*
   object read from `org_settings` (independent of the careers_public toggle).
 - Optional follow-on: a JSON feed so customers can embed jobs in their own site.
 
-### Phase 3 — Screening questions / application-form builder *(later session)*
+### Phase 3 — Screening questions / application-form builder *(in progress)*
 
-- New tables: `application_forms`, `form_fields` (question library),
-  `application_answers`.
-- Wire the existing `job_postings.application_form_id` to a real form.
-- Add knockout logic on apply-submit (auto-reject on a disqualifying answer);
-  keep EEO questions in a separate, hidden bucket.
+Built to **Ashby parity** (founder directive), not a trimmed MVP. Sliced
+smallest-value-first:
+
+- **3a — foundations (DONE, this session).** Migration 072 adds two tables —
+  `screening_questions` (org-scoped **reusable question library**: field type,
+  choices, `is_eeo` flag, archive) and `screening_form_templates` (one row per
+  org = the **default form** every new job inherits) — plus three additive
+  columns on `applications`: `screening_answers` (visible to hiring team),
+  `eeo_answers` (separate hidden compliance bucket), `knockout_failed`. Per-JOB
+  forms live on `jobs.custom_fields.screening` (the JSONB-on-job pattern intake
+  already uses), so a recruiter can override the org default per job. Types
+  (`ScreeningQuestion/Field/Form/Answer/...` in `database.ts`), Zod schemas
+  (`lib/validations/screening.ts`), and a domain facade
+  (`modules/ats/domain/screening.ts`: library CRUD, template + per-job
+  get/save with inherit-then-override, `evaluateKnockout`, `partitionAnswers`).
+  No live wiring yet — backend only.
+- **3b — recruiter form builder (next).** Library management UI + per-job form
+  editor in job detail: add/reorder fields, field types (short/long text,
+  yes-no, single/multi-select, number, date, file, URL), required toggle, help
+  text, knockout answers.
+- **3c — candidate apply + knockout.** Render the per-job form on
+  `/apply/[token]`, validate + store answers, run `evaluateKnockout` on submit
+  (auto-flag/reject silently), split EEO answers into the hidden bucket.
+- **3d — conditional logic.** Show/hide a field based on an earlier answer
+  (`visible_when` rules, already in the field shape).
+- **3e — EEO bucket.** Dedicated voluntary compliance section, hidden from the
+  hiring team, surfaced only in aggregate reporting.
+
+Note: `job_postings.application_form_id` (migration 035) is a dead-end hook from
+the old requisitions module — the live apply flow keys off `jobs.apply_token`,
+so Phase 3 builds on the canonical `jobs` spine, not that placeholder.
 
 ---
 
@@ -197,4 +223,4 @@ No migrations. No change to what the apply form *collects* (Phase 3 territory).
 
 ---
 
-*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions) is queued.*
+*End of Publish JD plan. Phase 1 + Phase 2 (2a/2b/2c) shipped; Phase 3 (screening questions, Ashby parity) in progress — 3a foundations done, 3b–3e queued.*

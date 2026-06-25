@@ -12,6 +12,16 @@ entries on top.
 ## 2026-06-24
 
 ### Added
+- **Publish JD — Phase 3a: screening-questions foundations (Ashby parity).**
+  Backend groundwork for a real application-form builder: a reusable, org-scoped
+  question library, an org default form template that new jobs inherit (with
+  per-job overrides stored on `jobs.custom_fields.screening`), and answer storage
+  on `applications`. Includes shared types (`database.ts`), Zod schemas
+  (`lib/validations/screening.ts`), and a domain facade
+  (`modules/ats/domain/screening.ts`) with library CRUD, template/per-job
+  get-save (inherit-then-override), knockout evaluation, and EEO-answer
+  partitioning. No UI wired yet — recruiter builder and candidate apply land in
+  3b/3c.
 - **Publish JD — Phase 2c: the apply page now inherits the company's branding.**
   The public application page (`/apply/[token]`) renders on-brand — the company's
   logo and name in the header (falling back to the RecruiterStack mark when unset),
@@ -273,6 +283,13 @@ entries on top.
   it goes live and work candidates once it's open.
 
 ### Schema
+- **072_screening_questions.sql** — screening / application-form builder
+  foundations. Adds `screening_questions` (org-scoped reusable question library:
+  field type, choices, `is_eeo`, archive) and `screening_form_templates` (one row
+  per org — the default form new jobs inherit), plus three additive columns on
+  `applications`: `screening_answers`, `eeo_answers` (hidden compliance bucket),
+  and `knockout_failed`. Per-job forms live on `jobs.custom_fields.screening`. RLS
+  on with the service-role policy; additive, idempotent, reversible.
 - **071_careers_branding.sql** — adds branded-careers-page columns to
   `org_settings` (`careers_slug`, `careers_public`, `logo_url`, `hero_image_url`,
   `brand_color`, `accent_color`, `brand_font`, `tagline`, `about`), a partial
