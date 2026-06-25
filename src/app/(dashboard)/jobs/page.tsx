@@ -633,6 +633,109 @@ function jobDetailHref(status: string, id: string): string {
   return LIVE_PIPELINE_STATUSES.has(status) ? `/jobs/${id}` : `/req-jobs/${id}`
 }
 
+// "Past" = terminal jobs (closed/archived). Everything else is "Active" work.
+const PAST_JOB_STATUSES = new Set(['closed', 'archived'])
+const isPastJobStatus = (s: string) => PAST_JOB_STATUSES.has(s)
+
+/**
+ * The "Past" block: a self-contained, simple list of closed/archived jobs with
+ * its own search bar. Mirrors the Requisitions Past block. The Active block keeps
+ * the full-featured table (drag, column config, filters) above it.
+ */
+function PastJobsBlock({ jobs }: { jobs: JobListItem[] }) {
+  const router = useRouter()
+  const [q, setQ] = useState('')
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    if (!needle) return jobs
+    return jobs.filter(j =>
+      j.position_title.toLowerCase().includes(needle) ||
+      (j.department ?? '').toLowerCase().includes(needle) ||
+      (j.hiring_manager_name ?? '').toLowerCase().includes(needle) ||
+      (j.location ?? '').toLowerCase().includes(needle),
+    )
+  }, [jobs, q])
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Past</h2>
+        <span className="inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{jobs.length}</span>
+      </div>
+
+      <div className="rounded-2xl border border-slate-300 bg-white shadow-sm" style={{ overflow: 'clip' }}>
+        {/* Own search bar */}
+        <div className="flex flex-wrap gap-2 p-3 border-b border-slate-100 bg-slate-50/60">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search past jobs…"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="py-12 text-center">
+            <Briefcase className="h-9 w-9 text-slate-200 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-500">
+              {jobs.length === 0 ? 'No past jobs yet' : 'No past jobs match your search'}
+            </p>
+          </div>
+        ) : (
+          <>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-slate-500">
+                  <th className="text-left px-4 py-3 font-medium">Position</th>
+                  <th className="text-left px-4 py-3 font-medium">Status</th>
+                  <th className="text-left px-4 py-3 font-medium">Hiring manager</th>
+                  <th className="text-left px-4 py-3 font-medium">Location</th>
+                  <th className="text-left px-4 py-3 font-medium">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(j => {
+                  const sc = STATUS_CONFIG[j.status as string] ?? DEFAULT_STATUS_CONFIG
+                  return (
+                    <tr
+                      key={j.id}
+                      onClick={() => router.push(jobDetailHref(j.status as string, j.id))}
+                      className="border-b border-slate-100 last:border-0 cursor-pointer hover:bg-slate-50 transition-colors"
+                    >
+                      <td className="px-4 py-3.5">
+                        <span className="font-medium text-slate-900">{j.position_title}</span>
+                        {j.department && <div className="text-xs text-slate-400">{j.department}</div>}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${sc.color}`}>
+                          {sc.icon} {sc.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-600">{j.hiring_manager_name || '—'}</td>
+                      <td className="px-4 py-3.5 text-slate-600">{j.location || '—'}</td>
+                      <td className="px-4 py-3.5 text-slate-600">{new Date(j.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50">
+              <p className="text-xs text-slate-400">
+                Showing {filtered.length} of {jobs.length} job{jobs.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}
+
 type SortKey = 'ticket_number' | 'position_title' | 'hiring_manager_name' | 'status' | 'created_at'
 type TimeFilter = '7d' | '30d' | '3m' | 'all' | 'custom'
 type ColId = 'ticket' | 'position' | 'pipeline' | 'manager' | 'status' | 'created' | 'actions'
@@ -855,23 +958,6 @@ export default function JobsPage() {
     setDragRowId(null); setDragOverRowId(null)
   }
 
-  // ── Stat card filter helpers ──────────────────────────────────────────────
-  const handleStatCard = (filter: HiringRequestStatus | 'all') => {
-    if (filter === 'all') {
-      setColFilters(p => { const cp = { ...p }; delete cp.status; return cp })
-    } else {
-      setColFilters(p => {
-        const current = p.status ?? []
-        if (current.length === 1 && current[0] === filter) {
-          const cp = { ...p }; delete cp.status; return cp
-        }
-        return { ...p, status: [filter] }
-      })
-    }
-  }
-  const isStatActive = (filter: HiringRequestStatus | 'all') =>
-    filter === 'all' ? !(colFilters.status?.length) : colFilters.status?.length === 1 && colFilters.status[0] === filter
-
   // ── Column filter options (unique values from data) ───────────────────────
   const colFilterOptions = useMemo<Partial<Record<ColId, { value: string; label: string }[]>>>(() => {
     const uniq = <T,>(arr: T[]): T[] => Array.from(new Set(arr))
@@ -900,9 +986,15 @@ export default function JobsPage() {
     }
   }, [jobs])
 
+  // ── Active / Past split ─────────────────────────────────────────────────
+  // The rich table below operates on Active jobs only; closed/archived jobs go
+  // to the separate Past block. Stat-card counts still span everything.
+  const activeJobs = useMemo(() => jobs.filter(j => !isPastJobStatus(j.status as string)), [jobs])
+  const pastJobs   = useMemo(() => jobs.filter(j =>  isPastJobStatus(j.status as string)), [jobs])
+
   // ── Filtered + sorted list ────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    let result = [...jobs]
+    let result = [...activeJobs]
 
     // Global text search
     if (jobSearch.trim()) {
@@ -943,7 +1035,7 @@ export default function JobsPage() {
       return (sortDir === 'asc' ? 1 : -1) * vA.localeCompare(vB, undefined, { numeric: true })
     })
     return result
-  }, [jobs, jobSearch, timeFilter, customFrom, customTo, colFilters, sortKey, sortDir])
+  }, [activeJobs, jobSearch, timeFilter, customFrom, customTo, colFilters, sortKey, sortDir])
 
   useEffect(() => { setManualOrder(null) }, [colFilters, jobSearch, timeFilter, customFrom, customTo, sortKey, sortDir])
 
@@ -1242,18 +1334,13 @@ export default function JobsPage() {
             { label: 'Active',          value: counts.active,   filter: 'posted'         },
             { label: 'Closed',          value: counts.closed,   filter: 'closed'         },
           ] as const).map(stat => (
-            <button
+            <div
               key={stat.label}
-              onClick={() => handleStatCard(stat.filter)}
-              className={`rounded-xl border bg-white p-3.5 text-left transition-all ${
-                isStatActive(stat.filter)
-                  ? 'border-emerald-500 ring-1 ring-emerald-500'
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}
+              className="rounded-xl border border-slate-200 bg-white p-3.5"
             >
               <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
               <p className="mt-0.5 text-xs font-medium text-slate-500">{stat.label}</p>
-            </button>
+            </div>
           ))}
         </div>
       )}
@@ -1338,7 +1425,14 @@ export default function JobsPage() {
           </button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-slate-200 bg-white" style={{ overflow: 'clip' }}>
+        <div className="space-y-6">
+        {/* ── Active block (the full-featured table) ──────────────────────── */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Active</h2>
+            <span className="inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{activeJobs.length}</span>
+          </div>
+        <div className="rounded-2xl border border-slate-300 bg-white shadow-sm" style={{ overflow: 'clip' }}>
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -1385,10 +1479,15 @@ export default function JobsPage() {
 
           {displayedJobs.length > 0 && (
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-              <p className="text-xs text-slate-400">Showing {displayedJobs.length} of {jobs.length} job{jobs.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-slate-400">Showing {displayedJobs.length} of {activeJobs.length} job{activeJobs.length !== 1 ? 's' : ''}</p>
               {manualOrder && <p className="text-xs text-slate-500">Custom row order active</p>}
             </div>
           )}
+        </div>
+        </section>
+
+        {/* ── Past block (closed/archived jobs, simple self-contained list) ── */}
+        <PastJobsBlock jobs={pastJobs} />
         </div>
       )}
 

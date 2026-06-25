@@ -12,6 +12,18 @@ entries on top.
 ## 2026-06-25
 
 ### Changed
+- **Requisitions and Jobs pages now split into "Active" and "Past" blocks.** Each
+  page previously had a single table filtered by clickable stat cards. Both now
+  show two clearly separated, self-contained blocks — each with **its own search
+  bar** — an **Active** block (in-flight work) on top and a **Past** block
+  (terminal records) below, with accentuated borders. On Requisitions, Active =
+  Draft/Pending/Approved/Open and Past = Filled/Closed/Archived; both blocks share
+  the same simple table. On Jobs, Active keeps the full-featured table
+  (drag-reorder, customizable columns, time + per-column filters, search) while
+  Past is a simple closed/archived list with its own search. Stat cards on both
+  pages are now a static at-a-glance overview (no longer click-to-filter); in-table
+  status filtering on Jobs remains via the column-header filter.
+  (`app/(dashboard)/openings/page.tsx`, `app/(dashboard)/jobs/page.tsx`.)
 - **Rebrand polish — new logo mark + on-brand onboarding banner.** New
   RecruiterStack mark (`BrandMark`): a layered "stack" glyph in a warm cream tile,
   replacing the green lightning bolt in the sidebar (desktop + mobile); wordmark
