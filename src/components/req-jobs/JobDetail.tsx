@@ -17,6 +17,7 @@ import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { cn } from '@/lib/utils'
+import { RichText } from '@/components/RichText'
 import type { Job, Department, Opening, JobStatus, OpeningStatus } from '@/lib/types/requisitions'
 
 const STATUS_BADGE: Record<JobStatus, string> = {
@@ -85,7 +86,7 @@ function IntakeSection({ title, body }: { title: string; body: string | null }) 
   return (
     <div className="mt-5 pt-4 border-t border-slate-100">
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">{title}</dt>
-      <p className="text-sm text-slate-700 whitespace-pre-line">{body}</p>
+      <RichText html={body} />
     </div>
   )
 }

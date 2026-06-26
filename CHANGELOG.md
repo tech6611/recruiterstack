@@ -9,6 +9,30 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-26
+
+### Fixed
+- **Dashboard "Add widget" silently did nothing on a custom view.** Views and the
+  "last active view" are stored under separate preference keys and could drift
+  apart (e.g. an orphaned active-view id left over after a data wipe). The render
+  layer tolerated the mismatch by falling back to the first view, but the
+  add/remove/reorder handlers looked up the raw `activeViewId`, found nothing, and
+  no-op'd — so the customizer looked editable but clicks did nothing. Handlers now
+  target the resolved on-screen view, and a stale `activeViewId` is snapped back to
+  the first view after hydration.
+
+### Added
+- **Job descriptions keep their formatting (bullets, bold) end-to-end.** The
+  Team context / Key requirements / Nice-to-have fields were being flattened to
+  plain text on save (via `stripHtml`), so pasted bullet lists rendered as
+  spaced-out paragraphs and stray `&nbsp;` leaked through. They now store the
+  editor's rich HTML and render it as formatted text — with real bullet markers
+  — on both the internal job detail page and the public application page. New
+  reusable `RichText` renderer sanitizes the HTML with DOMPurify before display
+  (the apply page is public), and falls back to plain-text rendering for older
+  records. The AI JD preview still receives stripped plain text, and the scorer
+  is unaffected (it reads these fields as null for canonical jobs).
+
 ## 2026-06-25
 
 ### Added

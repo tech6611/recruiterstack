@@ -7,6 +7,7 @@ import {
   Upload, Link2, FileText, X, CloudUpload,
 } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
+import { RichText } from '@/components/RichText'
 
 interface Branding {
   company_name: string | null
@@ -84,7 +85,7 @@ function JdSection({ title, body }: { title: string; body: string | null }) {
   return (
     <section>
       <h2 className="text-sm font-bold text-slate-700 mb-2">{title}</h2>
-      <div className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{body}</div>
+      <RichText html={body} className="text-slate-600" />
     </section>
   )
 }

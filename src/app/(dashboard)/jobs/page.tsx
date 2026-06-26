@@ -282,7 +282,13 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
         intake: {
           level,
           hm_name: hmName, hm_email: hmEmail, hm_slack: hmSlack,
-          team_context: stripHtml(teamContext), key_requirements: stripHtml(keyReqs), nice_to_have: stripHtml(niceToHave),
+          // Store the editor's rich HTML so bullets/bold survive into the
+          // detail view and the public apply page. (The AI JD preview above
+          // still gets the stripped plain-text version.) Empty editors persist
+          // as '' rather than Tiptap's "<p></p>" placeholder.
+          team_context:     isHtmlEmpty(teamContext) ? '' : teamContext,
+          key_requirements: isHtmlEmpty(keyReqs)      ? '' : keyReqs,
+          nice_to_have:     isHtmlEmpty(niceToHave)   ? '' : niceToHave,
           target_companies: targetCompanies,
           budget_min: budgetMin, budget_max: budgetMax,
           target_start_date: startDate, notes,
