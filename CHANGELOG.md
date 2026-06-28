@@ -16,9 +16,15 @@ entries on top.
   Candidates, and Requisitions moved from flat white tiles to soft, on-brand
   tints matched to each status (sand/neutral · amber waiting · pine ready · gold
   live/milestone), via a shared `lib/ui/stat-tones` helper. The selected filter
-  (Candidates) keeps an espresso ring.
+  (Candidates) keeps an espresso ring. Tints tuned ("Medium" strength) for clear
+  contrast against the cream page background.
 
 ### Fixed
+- **Stat-card tints weren't rendering (Tailwind wasn't scanning `src/lib`).** The
+  Tailwind `content` globs listed `src/pages`, `src/components`, and `src/app` but
+  not `src/lib`, so arbitrary color classes defined in `lib/ui/stat-tones` were
+  never generated — leaving most cards uncolored. Broadened the glob to
+  `./src/**/*` so helper-defined classes are picked up.
 - **Req-job status badge updates without a page refresh.** On the job detail page the
   status pill next to the title (and the status-driven action buttons) now re-read the
   job from the server right after an approval/submit/publish/withdraw, and again when
