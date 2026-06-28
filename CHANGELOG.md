@@ -50,6 +50,15 @@ entries on top.
   updated to match.
 
 ### Changed
+- **Candidates hiring funnel now shows real data.** The funnel's stages were
+  decorative labels (Sourced, Screened, Engaged, Offer Accepted, Offer Rolled
+  Out, Onboarded) that mostly mapped to nothing, so most cards were stuck at 0.
+  Re-pointed the stages at the real `CandidateStatus` values — default funnel is
+  the forward journey **Active → Interviewing → Offer Extended → Hired**, with
+  On Hold / Inactive / Rejected available to add via "Customise funnel". Each
+  card now tallies straight from `candidate.status`, matching the Pipeline
+  (Kanban) view. The per-browser funnel preference key was bumped (`_v2`) so any
+  stale, now-invalid saved layout resets cleanly to the new default.
 - **"Withdraw" is now terminal (a job killed for good), not a reversible pause.**
   Previously Withdraw took a job off the market but could be re-published — that
   reversible behaviour now lives in **Pause/Resume**. Withdraw now clears the job's
@@ -94,6 +103,10 @@ entries on top.
   contrast against the cream page background.
 
 ### Fixed
+- **Customise-funnel "Save changes?" buttons stretched full-width.** The confirm
+  dialog's three buttons used `flex-1` inside a full-width card, elongating them
+  across the whole row. Capped the dialog width and let the buttons size to their
+  text so it reads as a compact prompt.
 - **Couldn't save JD edits on non-draft jobs ("Cannot edit a job with status
   '…'").** The job update validation schema (`jobUpdateSchema`) inherited
   `.default()` values from the create schema, so a PATCH that only sent

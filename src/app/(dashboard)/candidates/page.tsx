@@ -52,36 +52,36 @@ interface FunnelStageDef {
   }
 }
 
+// Funnel stages map 1:1 to the real CandidateStatus values (database.ts), so every
+// card shows a true count drawn straight from candidate.status — the same vocabulary
+// the Pipeline (Kanban) page uses, keeping the two views in agreement. Each stage's
+// `id` IS the status value, which makes counting a direct tally (no fuzzy mapping).
 const ALL_FUNNEL_DEFS: FunnelStageDef[] = [
-  { id: 'sourced',        name: 'Sourced',          accent: { border: 'border-t-slate-400',   dot: 'bg-slate-400',   badge: 'bg-slate-100 text-slate-600' } },
-  { id: 'screened',       name: 'Screened',         accent: { border: 'border-t-slate-400',    dot: 'bg-slate-500',    badge: 'bg-slate-100 text-slate-700' } },
-  { id: 'engaged',        name: 'Engaged',          accent: { border: 'border-t-slate-400',  dot: 'bg-slate-500',  badge: 'bg-slate-100 text-slate-700' } },
-  { id: 'interview',      name: 'Interview',        accent: { border: 'border-t-amber-400',   dot: 'bg-amber-500',   badge: 'bg-amber-100 text-amber-700' } },
-  { id: 'offer_accepted', name: 'Offer Accepted',   accent: { border: 'border-t-emerald-500',   dot: 'bg-emerald-500',   badge: 'bg-emerald-100 text-emerald-700' } },
-  { id: 'offer_out',      name: 'Offer Rolled Out', accent: { border: 'border-t-emerald-500', dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' } },
-  { id: 'hired',          name: 'Hired',            accent: { border: 'border-t-emerald-500',    dot: 'bg-emerald-500',    badge: 'bg-emerald-100 text-emerald-700' } },
-  { id: 'onboarded',      name: 'Onboarded',        accent: { border: 'border-t-slate-500',  dot: 'bg-slate-500',  badge: 'bg-slate-100 text-slate-700' } },
+  { id: 'active',         name: 'Active',         accent: { border: 'border-t-slate-400',   dot: 'bg-slate-500',   badge: 'bg-slate-100 text-slate-700' } },
+  { id: 'interviewing',   name: 'Interviewing',   accent: { border: 'border-t-amber-400',   dot: 'bg-amber-500',   badge: 'bg-amber-100 text-amber-700' } },
+  { id: 'offer_extended', name: 'Offer Extended', accent: { border: 'border-t-emerald-400', dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' } },
+  { id: 'hired',          name: 'Hired',          accent: { border: 'border-t-emerald-600', dot: 'bg-emerald-600', badge: 'bg-emerald-100 text-emerald-800' } },
+  // Optional, off by default — real statuses, but side-states rather than forward progress.
+  { id: 'on_hold',        name: 'On Hold',        accent: { border: 'border-t-orange-400',  dot: 'bg-orange-500',  badge: 'bg-orange-100 text-orange-700' } },
+  { id: 'inactive',       name: 'Inactive',       accent: { border: 'border-t-slate-300',   dot: 'bg-slate-400',   badge: 'bg-slate-100 text-slate-600' } },
+  { id: 'rejected',       name: 'Rejected',       accent: { border: 'border-t-red-300',     dot: 'bg-red-400',     badge: 'bg-red-100 text-red-700' } },
 ]
 
-const LS_FUNNEL          = 'rs_candidates_funnel'
-const DEFAULT_FUNNEL_IDS = ALL_FUNNEL_DEFS.map(d => d.id)
+// Bumped to v2 when the stages were re-pointed at real CandidateStatus values — the
+// old key held now-invalid stage ids (sourced/screened/…), so a fresh key cleanly
+// resets everyone to the sensible new default instead of a broken leftover funnel.
+const LS_FUNNEL          = 'rs_candidates_funnel_v2'
+// Default funnel = the forward journey only. The side-states above can be added via
+// "Customise funnel".
+const DEFAULT_FUNNEL_IDS = ['active', 'interviewing', 'offer_extended', 'hired']
 
-// Map CandidateStatus → funnel stage IDs
+// Count candidates per funnel stage. Stage ids equal CandidateStatus values, so this
+// is a direct tally of candidate.status.
 function computeFunnelCounts(candidates: CandidateListItem[]): Map<string, number> {
   const counts = new Map<string, number>()
   ALL_FUNNEL_DEFS.forEach(d => counts.set(d.id, 0))
   for (const c of candidates) {
-    switch (c.status) {
-      case 'active':
-      case 'inactive':
-        counts.set('sourced', (counts.get('sourced') ?? 0) + 1); break
-      case 'interviewing':
-        counts.set('interview', (counts.get('interview') ?? 0) + 1); break
-      case 'offer_extended':
-        counts.set('offer_out', (counts.get('offer_out') ?? 0) + 1); break
-      case 'hired':
-        counts.set('hired', (counts.get('hired') ?? 0) + 1); break
-    }
+    if (counts.has(c.status)) counts.set(c.status, (counts.get(c.status) ?? 0) + 1)
   }
   return counts
 }
@@ -142,21 +142,21 @@ function FunnelCustomizer({
 
       <p className="mb-3 text-[10px] text-slate-400">Drag to reorder · click × to remove</p>
 
-      {/* Discard dialog */}
+      {/* Discard dialog — compact, width capped so the buttons don't stretch across the card */}
       {showDiscard && (
-        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+        <div className="mb-3 max-w-md rounded-lg border border-amber-200 bg-amber-50 p-3">
           <p className="text-xs font-semibold text-slate-800">Save changes?</p>
-          <div className="mt-2 flex gap-1.5">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             <button onClick={() => setShowDiscard(false)}
-              className="flex-1 rounded-lg border border-slate-200 bg-white py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
               Keep editing
             </button>
             <button onClick={onDiscard}
-              className="flex-1 rounded-lg border border-red-200 bg-white py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors">
+              className="rounded-lg border border-red-200 bg-white px-3 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors">
               Discard
             </button>
             <button onClick={onClose}
-              className="flex-1 rounded-lg bg-slate-600 py-1 text-[11px] font-medium text-white hover:bg-slate-700 transition-colors">
+              className="rounded-lg bg-slate-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-slate-700 transition-colors">
               Save
             </button>
           </div>
