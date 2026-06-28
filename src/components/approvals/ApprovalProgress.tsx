@@ -34,7 +34,7 @@ interface StepRow {
 interface ChainStepMeta { id: string; name: string }
 interface ApproverMeta  { id: string; full_name: string | null; email: string }
 
-export function ApprovalProgress({ approvalId }: { approvalId: string }) {
+export function ApprovalProgress({ approvalId, onDecided }: { approvalId: string; onDecided?: () => void }) {
   const router = useRouter()
   const [data, setData] = useState<{
     approval: ApprovalRow
@@ -144,7 +144,10 @@ export function ApprovalProgress({ approvalId }: { approvalId: string }) {
         title={myStep.target_title}
         onClose={(decided) => {
           setDeciding(false)
-          if (decided) { load(); router.refresh() }  // refresh card + page status badge
+          // load() refreshes this approval card; onDecided() re-reads the parent job so
+          // the title status badge + action buttons update live; router.refresh() syncs
+          // the rest of the server-rendered page (audit log, openings).
+          if (decided) { load(); onDecided?.(); router.refresh() }
         }}
       />
     )}

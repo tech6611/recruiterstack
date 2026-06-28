@@ -11,7 +11,25 @@ entries on top.
 
 ## 2026-06-28
 
+### Fixed
+- **Req-job status badge updates without a page refresh.** On the job detail page the
+  status pill next to the title (and the status-driven action buttons) now re-read the
+  job from the server right after an approval/submit/publish/withdraw, and again when
+  you return to the tab — so it no longer lags behind the audit log showing the same
+  change. The job is held in local state and refreshed via `GET /api/req-jobs/[id]`
+  instead of relying on `router.refresh()` alone (which could leave the badge stale).
+
 ### Added
+- **Copy an application form from another job.** The Application form tab now has a
+  **"Copy from another job"** button (next to Add question / Add from library) that
+  lists your other jobs and drops the chosen job's custom questions onto this form.
+  Field ids are regenerated and conditional show/hide rules (`visible_when`) are
+  re-pointed at the new ids so copied logic keeps working. Review and Save as usual.
+- **Soft nudge before publishing a bare form.** Publishing a job whose application
+  form has no custom questions now shows a confirmation — **"Add screening
+  questions"** (jumps to the form tab) or **"Publish anyway"**. It guides without
+  blocking; built-in fields (name, email, phone, LinkedIn, résumé, cover letter)
+  are always collected regardless.
 - **Set scoring criteria at the job level.** The weighted rubric the AI uses to
   judge candidates was only reachable inside a candidate's Scorecards tab — so on
   a job with no candidates yet there was no way to see or edit it. Added a

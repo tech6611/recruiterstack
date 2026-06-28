@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { ArrowUp, ArrowDown, Trash2, Plus, BookPlus, Library, Save } from 'lucide-react'
+import { ArrowUp, ArrowDown, Trash2, Plus, BookPlus, Library, Save, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -60,6 +60,11 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
   const [saving, setSaving]   = useState(false)
   const [dirty, setDirty]     = useState(false)
   const [showLibrary, setShowLibrary] = useState(false)
+  // "Copy from another job" — lazily loaded list of the org's other jobs.
+  const [showCopy, setShowCopy]       = useState(false)
+  const [jobs, setJobs]               = useState<{ id: string; title: string; status: string }[]>([])
+  const [jobsLoading, setJobsLoading] = useState(false)
+  const [copyingId, setCopyingId]     = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -117,6 +122,51 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
     ])
     setDirty(true)
     setShowLibrary(false)
+  }
+
+  // Toggle the "Copy from another job" picker, fetching the org's jobs the first
+  // time it opens (cheap list endpoint; we filter out the current job).
+  function toggleCopy() {
+    const next = !showCopy
+    setShowCopy(next)
+    if (next && jobs.length === 0) {
+      setJobsLoading(true)
+      fetch('/api/req-jobs?limit=200')
+        .then(r => r.json())
+        .then(j => setJobs(((j.data ?? []) as { id: string; title: string; status: string }[]).filter(x => x.id !== jobId)))
+        .catch(() => toast.error('Could not load your jobs'))
+        .finally(() => setJobsLoading(false))
+    }
+  }
+
+  // Pull another job's custom questions onto this form. We mint fresh field ids
+  // (so they don't collide) and re-point any conditional show/hide rules
+  // (`visible_when.field_id`) at the new ids so the copied logic still works.
+  async function copyFromJob(srcId: string, srcTitle: string) {
+    setCopyingId(srcId)
+    try {
+      const r = await fetch(`/api/jobs/${srcId}/screening`)
+      const j = await r.json()
+      const src = (j.data?.fields ?? []) as ScreeningField[]
+      if (src.length === 0) { toast.error(`"${srcTitle}" has no custom questions to copy`); return }
+      const idMap = new Map<string, string>()
+      src.forEach(f => idMap.set(f.id, crypto.randomUUID()))
+      const copied: ScreeningField[] = src.map(f => ({
+        ...f,
+        id: idMap.get(f.id)!,
+        visible_when: f.visible_when
+          ? { ...f.visible_when, field_id: idMap.get(f.visible_when.field_id) ?? f.visible_when.field_id }
+          : null,
+      }))
+      setFields(prev => [...prev, ...copied])
+      setDirty(true)
+      setShowCopy(false)
+      toast.success(`Added ${copied.length} question${copied.length > 1 ? 's' : ''} from "${srcTitle}"`)
+    } catch {
+      toast.error('Could not copy that form')
+    } finally {
+      setCopyingId(null)
+    }
   }
 
   async function saveToLibrary(field: ScreeningField) {
@@ -181,7 +231,7 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
         <CardContent>
           {fields.length === 0 ? (
             <p className="text-sm text-slate-500 py-4">
-              No custom questions yet. Add one below, or pull from your library.
+              No custom questions yet. Add one below, pull from your library, or copy an existing job&apos;s form.
             </p>
           ) : (
             <div className="space-y-3">
@@ -202,14 +252,41 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
             </div>
           )}
 
-          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100">
+          <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
             <Button variant="outline" size="sm" onClick={addBlank}>
               <Plus className="h-4 w-4" /> Add question
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowLibrary(v => !v)}>
               <Library className="h-4 w-4" /> Add from library
             </Button>
+            <Button variant="outline" size="sm" onClick={toggleCopy}>
+              <Copy className="h-4 w-4" /> Copy from another job
+            </Button>
           </div>
+
+          {showCopy && (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              {jobsLoading ? (
+                <p className="text-xs text-slate-500">Loading your jobs…</p>
+              ) : jobs.length === 0 ? (
+                <p className="text-xs text-slate-500">No other jobs to copy from yet.</p>
+              ) : (
+                <ul className="space-y-1 max-h-64 overflow-y-auto">
+                  {jobs.map(jb => (
+                    <li key={jb.id} className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-slate-700 truncate">
+                        {jb.title}
+                        <span className="ml-2 text-[10px] uppercase tracking-wide text-slate-400">{jb.status.replace('_', ' ')}</span>
+                      </span>
+                      <Button variant="ghost" size="sm" loading={copyingId === jb.id} onClick={() => copyFromJob(jb.id, jb.title)}>
+                        <Copy className="h-4 w-4" /> Copy
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {showLibrary && (
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Archive, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid } from 'lucide-react'
@@ -108,8 +108,14 @@ function IntakeSection({ title, body }: { title: string; body: string | null }) 
   )
 }
 
-export function JobDetail({ job, department, departments, linkedOpenings }: Props) {
+export function JobDetail({ job: initialJob, department, departments, linkedOpenings }: Props) {
   const router = useRouter()
+  // The job lives in local state so status-driven UI (the title badge and the
+  // action buttons) can update live without a full page refresh. The server prop
+  // only seeds the initial value; after mount, `refreshJob()` is the source of
+  // truth. We don't lean on router.refresh() alone because the server read can lag
+  // a just-committed status change (e.g. an approval that just landed).
+  const [job, setJob]                 = useState<Job>(initialJob)
   const [tab, setTab]                 = useState<Tab>('overview')
   const [submitting, setSubmitting]   = useState(false)
   const [publishing, setPublishing]   = useState(false)
@@ -119,8 +125,31 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
   const [editing, setEditing]         = useState(false)
   const [saving, setSaving]           = useState(false)
   const [form, setForm]               = useState(initForm(job))
+  // Soft nudge shown when publishing a job whose application form has no custom
+  // questions — guides toward adding screening questions without blocking.
+  const [publishNudge, setPublishNudge] = useState(false)
 
   const intake = readIntake(job)
+
+  // Re-read the job from the server and update local state. Called after any action
+  // that changes status (approve, submit, publish, withdraw) so the badge + buttons
+  // reflect reality immediately, and on window focus to catch changes made elsewhere
+  // (e.g. another approver acting) — the same "fetch fresh on view" model the audit
+  // log already uses.
+  const refreshJob = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/req-jobs/${initialJob.id}`)
+      if (!res.ok) return
+      const { data } = await res.json()
+      if (data) setJob(data as Job)
+    } catch { /* keep last-known status on a transient failure */ }
+  }, [initialJob.id])
+
+  useEffect(() => {
+    const onFocus = () => { refreshJob() }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [refreshJob])
 
   const canSubmit  = job.status === 'draft'
   // Editing is available while the job is active. In Draft everything is editable;
@@ -177,6 +206,7 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
     if (!res.ok) { toast.error(body.error ?? 'Save failed'); return }
     toast.success('Saved')
     setEditing(false)
+    refreshJob()
     router.refresh()
   }
 
@@ -187,16 +217,37 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
     const body = await res.json().catch(() => ({}))
     if (!res.ok) { toast.error(body.error ?? 'Submit failed'); return }
     toast.success(body.status === 'approved' ? 'Auto-approved.' : 'Submitted for approval.')
+    refreshJob()
     router.refresh()
   }
 
+  // Publish gate: if the job's application form has no custom questions, surface a
+  // soft nudge first; otherwise publish straight away. A failed check never blocks
+  // publishing — we just proceed.
   async function publish() {
+    setPublishing(true)
+    try {
+      const r = await fetch(`/api/jobs/${job.id}/screening`)
+      const j = await r.json()
+      if ((j.data?.fields ?? []).length === 0) {
+        setPublishing(false)
+        setPublishNudge(true)
+        return
+      }
+    } catch { /* check failed — fall through and publish */ }
+    setPublishing(false)
+    doPublish()
+  }
+
+  async function doPublish() {
+    setPublishNudge(false)
     setPublishing(true)
     const res = await fetch(`/api/req-jobs/${job.id}/publish`, { method: 'POST' })
     setPublishing(false)
     const body = await res.json().catch(() => ({}))
     if (!res.ok) { toast.error(body.error ?? 'Publish failed'); return }
     toast.success('Pipeline is now open.')
+    refreshJob()
     router.refresh()
   }
 
@@ -208,6 +259,7 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
     const body = await res.json().catch(() => ({}))
     if (!res.ok) { toast.error(body.error ?? 'Withdraw failed'); return }
     toast.success('Job withdrawn. Application links are now closed.')
+    refreshJob()
     router.refresh()
   }
 
@@ -515,7 +567,7 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
               <CardHeader><CardTitle className="text-sm">Approval</CardTitle></CardHeader>
               <CardContent>
                 {job.approval_id
-                  ? <ApprovalProgress approvalId={job.approval_id} />
+                  ? <ApprovalProgress approvalId={job.approval_id} onDecided={refreshJob} />
                   : canSubmit
                     ? <p className="text-xs text-slate-400">Click &ldquo;Submit for approval&rdquo; when ready.</p>
                     : <p className="text-xs text-slate-400">Not submitted yet.</p>
@@ -540,6 +592,28 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
           alreadyLinked={new Set(linkedOpenings.map(o => o.id))}
           onClose={(linked) => { setLinkOpen(false); if (linked) router.refresh() }}
         />
+      )}
+
+      {publishNudge && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setPublishNudge(false)} />
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-base font-semibold text-slate-900">Publish with just the basics?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              This job&apos;s application form has no custom screening questions yet. Candidates will
+              still be asked for the built-in fields (name, email, phone, LinkedIn, résumé, cover
+              letter) — but you won&apos;t collect anything role-specific.
+            </p>
+            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setPublishNudge(false); setTab('screening') }}>
+                Add screening questions
+              </Button>
+              <Button size="sm" onClick={doPublish} loading={publishing}>
+                Publish anyway
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )
