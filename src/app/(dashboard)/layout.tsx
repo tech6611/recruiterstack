@@ -37,7 +37,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <CapabilitiesProvider>
-      <div className="flex min-h-screen bg-slate-50">
+      {/* App-shell: the outer frame is fixed to one screen and clips its own
+          overflow, so the sidebar stays a full-height fixed panel and ONLY the
+          <main> content pane scrolls (overflow-auto keeps both axes — e.g. the
+          Kanban board's horizontal scroll). This is the Gmail/Linear/Notion
+          pattern and prevents the sidebar from "cutting off" on long pages. */}
+      <div className="flex h-screen overflow-hidden bg-slate-50">
         <OrgGate />
         <AnalyticsIdentify />
         <Sidebar />

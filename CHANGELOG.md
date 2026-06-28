@@ -39,6 +39,15 @@ entries on top.
 - Renamed the detail page's "Internal context" field to "Job description" (it was
   always the candidate-facing JD body, not internal notes).
 
+### Fixed
+- **Sidebar no longer "cuts off" on long pages.** The dashboard now uses an
+  app-shell layout (Gmail/Linear/Notion pattern): the outer frame is fixed to one
+  screen, the brown sidebar is a full-height fixed panel, and only the `<main>`
+  content pane scrolls. Previously the sidebar was `h-screen` inside a
+  `min-h-screen` flow, so on tall pages it ended after one viewport and showed bare
+  background below. Changed the shell to `h-screen overflow-hidden` with the
+  sidebar at `h-full`.
+
 ## 2026-06-26
 
 ### Fixed
