@@ -1,0 +1,23 @@
+-- ============================================================
+-- 075: Capture an "approved substance snapshot" on canonical jobs.
+--
+-- When a job's approval completes, we record the content the approval was
+-- granted against — the JD plus the key intake fields (key requirements,
+-- nice-to-haves, what-they'll-do, level), normalized to plain words. Later, if
+-- someone edits the live job, we compare the new content against this snapshot:
+-- a pure formatting change is allowed silently, but a real WORDING change sends
+-- the job back through approval (and notifies the approver).
+--
+-- Shape (jsonb):
+--   { "substance": { "description": "...", "key_requirements": "...",
+--                    "nice_to_have": "...", "team_context": "...", "level": "..." },
+--     "captured_at": "<iso8601>" }
+--
+-- Nullable: jobs approved before this migration simply have no baseline (the
+-- app treats "no snapshot" as "nothing to compare", so edits pass through until
+-- the next approval captures one).
+--
+-- Additive & idempotent: re-runnable.
+-- ============================================================
+
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS approved_snapshot jsonb;

@@ -218,7 +218,8 @@ export type JobStatus =
   | 'pending_approval'
   | 'approved'
   | 'open'
-  | 'withdrawn'
+  | 'paused'        // reversible: a live job temporarily frozen (resume → open)
+  | 'withdrawn'     // terminal: requisition abandoned, apply link killed for good
   | 'closed'
   | 'archived'
 
@@ -235,6 +236,10 @@ export interface Job {
   status: JobStatus
   approval_id: string | null
   custom_fields: Record<string, unknown>
+  // Content the most recent approval was granted against (JD + key intake
+  // fields, normalized). Set when approval completes; used to detect material
+  // edits that require re-approval. Null for jobs approved before migration 075.
+  approved_snapshot: import('@/lib/jobs/substance').ApprovedSnapshot | null
   created_by: string
   created_at: string
   updated_at: string
@@ -243,7 +248,7 @@ export interface Job {
 export interface JobInsert extends Omit<Job,
   'id' | 'created_at' | 'updated_at' | 'department_id' | 'description' | 'hiring_team_id' |
   'interview_plan_id' | 'scorecard_id' | 'confidentiality' | 'status' | 'approval_id' |
-  'custom_fields'> {
+  'custom_fields' | 'approved_snapshot'> {
   id?: string
   department_id?: string | null
   description?: string | null

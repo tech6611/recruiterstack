@@ -12,6 +12,7 @@ import type {
   StageColor,
 } from '@/lib/types/database'
 import { getOrgScreeningTemplate } from '@/modules/ats/domain/screening'
+import { captureApprovedSubstance } from '@/lib/jobs/substance'
 
 type Supabase = SupabaseClient<Database>
 
@@ -934,7 +935,7 @@ export async function approveCanonicalIntakeJob(
     .update({ status: 'open' })
     .eq('intake_token', token)
     .in('status', ['draft', 'pending_approval', 'approved'])
-    .select('title')
+    .select('id, title')
     .maybeSingle()
 
   if (error) {
@@ -942,6 +943,9 @@ export async function approveCanonicalIntakeJob(
     throw error
   }
   if (!data) return null
+  // This one-click path IS the approval for an intake job, so baseline the
+  // approved snapshot here too (the engine path captures it in applyApprovedToTarget).
+  await captureApprovedSubstance(supabase, (data as { id: string }).id)
   return { position_title: (data as { title: string }).title }
 }
 

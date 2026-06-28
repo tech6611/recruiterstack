@@ -10,6 +10,7 @@ import { selectChain } from './chain-selector'
 import { resolveApprovers } from './approver-resolver'
 import { evaluateCondition } from './condition'
 import { writeAudit } from './audit'
+import { captureApprovedSubstance } from '@/lib/jobs/substance'
 import { notifyStepActivated, notifyStepDecided, notifyApprovalCompleted } from './notifications'
 import { enqueue } from '@/lib/api/job-queue'
 import { emitWebhook } from '@/lib/webhooks/emit'
@@ -505,6 +506,9 @@ async function applyApprovedToTarget(targetType: ApprovalTargetType, targetId: s
     await supabase.from('openings').update({ status: 'approved' }).eq('id', targetId)
   } else if (targetType === 'job') {
     await supabase.from('jobs').update({ status: 'approved' }).eq('id', targetId)
+    // Re-baseline the approved snapshot to the content that was just signed off,
+    // so later edits are diffed against this (formatting-blind) baseline.
+    await captureApprovedSubstance(supabase, targetId)
   }
 }
 async function fetchRequester(approvalId: string): Promise<string> {

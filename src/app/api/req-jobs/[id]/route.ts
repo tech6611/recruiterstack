@@ -5,6 +5,7 @@ import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { jobUpdateSchema } from '@/lib/validations/jobs'
 import { updateCanonicalJob } from '@/modules/ats/domain/job-pipelines'
+import { maybeTriggerReapproval } from '@/lib/jobs/reapproval'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
@@ -56,6 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: `Cannot edit a job with status '${row.status}'.` }, { status: 409 })
   }
 
+  // ── Apply the write ──────────────────────────────────────────────────────
   // custom_fields must MERGE into the existing JSONB, so route the write through
   // the domain facade (read-then-write merge) rather than overwriting the column.
   // The board writers only send status + custom_fields (never the structural
@@ -73,21 +75,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     } catch (e) {
       return handleSupabaseError(e as { code: string; message: string })
     }
-    const { data, error } = await supabase
-      .from('jobs').select().eq('id', params.id).eq('org_id', orgId).single()
+  } else {
+    const { error } = await supabase
+      .from('jobs').update(body).eq('id', params.id).eq('org_id', orgId)
     if (error) return handleSupabaseError(error)
-    return NextResponse.json({ data })
   }
 
-  const { data, error } = await supabase
-    .from('jobs')
-    .update(body)
-    .eq('id', params.id)
-    .eq('org_id', orgId)
-    .select()
-    .single()
-  if (error) return handleSupabaseError(error)
-  return NextResponse.json({ data })
+  // ── Re-approval gate ─────────────────────────────────────────────────────
+  // If this edit changed the WORDING of the approved substance (JD / key
+  // requirements / nice-to-haves / level / what-they'll-do) on an approved or
+  // live job, re-run the approval workflow. Formatting-only edits pass through.
+  const { data: updated, error: readErr } = await supabase
+    .from('jobs').select('*').eq('id', params.id).eq('org_id', orgId).single()
+  if (readErr) return handleSupabaseError(readErr)
+
+  const reapproval = await maybeTriggerReapproval(supabase, orgId, userId, updated, row.status)
+
+  // The gate may have changed status/approval_id — re-read for an accurate row.
+  if (reapproval.reapproval || reapproval.reapproval_skipped) {
+    const { data: finalData, error: finalErr } = await supabase
+      .from('jobs').select().eq('id', params.id).eq('org_id', orgId).single()
+    if (finalErr) return handleSupabaseError(finalErr)
+    return NextResponse.json({ data: finalData, reapproval })
+  }
+  return NextResponse.json({ data: updated, reapproval })
 }
 
 /** DELETE — soft-archive (status='archived'). */

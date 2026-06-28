@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Archive, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid } from 'lucide-react'
+import { ArrowLeft, Archive, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid, PauseCircle, PlayCircle, Copy, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,7 +26,8 @@ const STATUS_BADGE: Record<JobStatus, string> = {
   pending_approval: 'bg-amber-100 text-amber-800',
   approved:         'bg-emerald-100 text-emerald-800',
   open:             'bg-slate-100 text-slate-800',
-  withdrawn:        'bg-orange-100 text-orange-800',
+  paused:           'bg-sky-100 text-sky-800',
+  withdrawn:        'bg-rose-100 text-rose-800',
   closed:           'bg-slate-200 text-slate-600',
   archived:         'bg-slate-100 text-slate-400',
 }
@@ -137,7 +138,10 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   const [tab, setTab]                 = useState<Tab>('overview')
   const [submitting, setSubmitting]   = useState(false)
   const [publishing, setPublishing]   = useState(false)
+  const [pausing, setPausing]         = useState(false)
+  const [resuming, setResuming]       = useState(false)
   const [withdrawing, setWithdrawing] = useState(false)
+  const [cloning, setCloning]         = useState(false)
   const [archiving, setArchiving]     = useState(false)
   const [linkOpen, setLinkOpen]       = useState(false)
   const [editing, setEditing]         = useState(false)
@@ -174,15 +178,25 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   // once it leaves Draft the *identity* fields (title/department/confidentiality,
   // plus hiring manager & location) lock, but the JD body and the requirements /
   // nice-to-have / level content stay editable so recruiters can keep refining.
-  const canEdit       = ['draft', 'approved', 'open', 'withdrawn'].includes(job.status)
+  // (Phase 2 will lock the approved substance on open/paused jobs.) Withdrawn is
+  // terminal/dead — no longer editable.
+  const canEdit       = ['draft', 'approved', 'open', 'paused'].includes(job.status)
   const lockIdentity  = job.status !== 'draft'
   // Once live the job has a candidate pipeline; offer a jump to its Kanban so the
   // detail view (JD / approvals / audit log) and the pipeline stay cross-linked.
-  const isLive     = ['open', 'withdrawn', 'posted', 'closed', 'filled'].includes(job.status)
-  // 'approved' = first publish; 'withdrawn' = re-publish a paused job.
-  const canPublish = (job.status === 'approved' || job.status === 'withdrawn') &&
+  const isLive     = ['open', 'paused', 'withdrawn', 'posted', 'closed', 'filled'].includes(job.status)
+  // First publish only ('approved'). A frozen live job comes back via Resume, not
+  // Publish; a withdrawn job is terminal and cannot be re-published.
+  const canPublish = job.status === 'approved' &&
     linkedOpenings.some(o => ['approved', 'open', 'filled'].includes(o.status))
-  const canWithdraw = job.status === 'open'
+  const canPause    = job.status === 'open'    // reversible freeze
+  const canResume   = job.status === 'paused'  // un-freeze, same link
+  const canWithdraw = job.status === 'open' || job.status === 'paused'  // terminal kill
+  // Post-approval states carry a signed-off baseline: wording edits to the JD /
+  // requirements re-trigger approval (formatting is free). Surfaced as a banner.
+  const lockedSubstance = ['approved', 'open', 'paused'].includes(job.status)
+  // Materially different role → spin off a fresh draft rather than rewrite this one.
+  const canNewVersion = ['approved', 'open', 'paused', 'withdrawn'].includes(job.status)
 
   async function save() {
     if (!form.title.trim()) { toast.error('Title is required'); return }
@@ -222,10 +236,36 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
     setSaving(false)
     const body = await res.json().catch(() => ({}))
     if (!res.ok) { toast.error(body.error ?? 'Save failed'); return }
-    toast.success('Saved')
+    // The server reports whether this edit changed the approved substance and
+    // had to re-run approval. Reflect that back so the user isn't surprised that
+    // a "save" quietly pulled the live job off the market.
+    const r = body.reapproval
+    const fields = (r?.changed_fields ?? []).join(', ')
+    if (r?.reapproval && r.auto_approved) {
+      toast.success(`Saved. Changes to ${fields} were re-approved automatically.`)
+    } else if (r?.reapproval) {
+      toast.warning(`Saved & sent for re-approval — ${fields} differ from what was approved. The job is paused from new applications until your approver signs off.`)
+    } else if (r?.reapproval_skipped) {
+      toast.warning(`Saved. ${fields} changed, but no approval chain is configured — applied without re-approval.`)
+    } else {
+      toast.success('Saved')
+    }
     setEditing(false)
     refreshJob()
     router.refresh()
+  }
+
+  async function newVersion() {
+    if (!confirm(
+      'Create a new draft version of this job?\n\nIt copies the JD and intake content into a fresh draft you can change freely, then re-submit for approval. The current job is left exactly as it is.'
+    )) return
+    setCloning(true)
+    const res = await fetch(`/api/req-jobs/${job.id}/clone`, { method: 'POST' })
+    setCloning(false)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) { toast.error(body.error ?? 'Could not create new version'); return }
+    toast.success('New draft version created.')
+    router.push(`/req-jobs/${body.data.id}`)
   }
 
   async function submitForApproval() {
@@ -269,14 +309,39 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
     router.refresh()
   }
 
+  async function pause() {
+    setPausing(true)
+    const res = await fetch(`/api/req-jobs/${job.id}/pause`, { method: 'POST' })
+    setPausing(false)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) { toast.error(body.error ?? 'Pause failed'); return }
+    toast.success('Job paused. The application link is frozen — resume any time.')
+    refreshJob()
+    router.refresh()
+  }
+
+  async function resume() {
+    setResuming(true)
+    const res = await fetch(`/api/req-jobs/${job.id}/resume`, { method: 'POST' })
+    setResuming(false)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) { toast.error(body.error ?? 'Resume failed'); return }
+    toast.success('Job resumed. The original application link is live again.')
+    refreshJob()
+    router.refresh()
+  }
+
   async function withdraw() {
-    if (!confirm('Withdraw this job? All public application links will stop working until you re-publish.')) return
+    if (!confirm(
+      'Withdraw this job for good?\n\nThis permanently kills the public application link — it cannot be revived. ' +
+      'To only temporarily stop applications, use Pause instead.'
+    )) return
     setWithdrawing(true)
     const res = await fetch(`/api/req-jobs/${job.id}/withdraw`, { method: 'POST' })
     setWithdrawing(false)
     const body = await res.json().catch(() => ({}))
     if (!res.ok) { toast.error(body.error ?? 'Withdraw failed'); return }
-    toast.success('Job withdrawn. Application links are now closed.')
+    toast.success('Job withdrawn. The application link is permanently closed.')
     refreshJob()
     router.refresh()
   }
@@ -354,12 +419,27 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           )}
           {canPublish && (
             <Button size="sm" onClick={publish} loading={publishing}>
-              <Globe className="h-4 w-4" /> {job.status === 'withdrawn' ? 'Re-publish' : 'Publish'}
+              <Globe className="h-4 w-4" /> Publish
+            </Button>
+          )}
+          {canPause && (
+            <Button variant="outline" size="sm" onClick={pause} loading={pausing}>
+              <PauseCircle className="h-4 w-4" /> Pause
+            </Button>
+          )}
+          {canResume && (
+            <Button size="sm" onClick={resume} loading={resuming}>
+              <PlayCircle className="h-4 w-4" /> Resume
             </Button>
           )}
           {canWithdraw && (
             <Button variant="outline" size="sm" onClick={withdraw} loading={withdrawing}>
               <Ban className="h-4 w-4" /> Withdraw
+            </Button>
+          )}
+          {canNewVersion && !editing && (
+            <Button variant="outline" size="sm" onClick={newVersion} loading={cloning}>
+              <Copy className="h-4 w-4" /> New version
             </Button>
           )}
           {job.status !== 'archived' && (
@@ -369,6 +449,18 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           )}
         </div>
       </div>
+
+      {editing && lockedSubstance && (
+        <div className="mb-5 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+          <div>
+            <span className="font-medium">This job is already approved.</span>{' '}
+            Re-formatting (bold, lists, etc.) is fine, but changing the <span className="font-medium">wording</span> of the
+            description, key requirements or nice-to-haves will send it back for re-approval — and pause new applications
+            until your approver signs off. For a materially different role, use <span className="font-medium">New version</span> instead.
+          </div>
+        </div>
+      )}
 
       <div className="border-b border-slate-200 mb-4">
         <nav className="flex gap-4">

@@ -70,7 +70,7 @@ export const jobUpdateSchema = z
     hiring_team_id:  uuidOrNull,
     confidentiality: z.enum(['public', 'confidential']),
     custom_fields:   z.record(z.string(), z.unknown()),
-    status:          z.enum(['draft', 'pending_approval', 'approved', 'open', 'withdrawn', 'closed', 'archived']),
+    status:          z.enum(['draft', 'pending_approval', 'approved', 'open', 'paused', 'withdrawn', 'closed', 'archived']),
   })
   .partial()
 

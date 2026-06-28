@@ -23,6 +23,8 @@ export type WebhookEvent =
   | 'job.submitted'
   | 'job.approved'
   | 'job.published'
+  | 'job.paused'
+  | 'job.resumed'
   | 'job.withdrawn'
   | 'approval.step.pending'
   | 'approval.step.decided'

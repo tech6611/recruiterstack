@@ -23,8 +23,27 @@ entries on top.
   flips it back to `open` and revives the *same* apply link. New routes
   `POST /api/req-jobs/[id]/pause` and `/resume`; new `job.paused` / `job.resumed`
   webhook events. Pause/Resume buttons on the job detail page.
+- **Edits to an approved job now re-trigger approval (formatting stays free).**
+  When a job is approved/live/paused, changing the *wording* of the JD, key
+  requirements, nice-to-haves, "what they'll do", or level no longer silently
+  ships — it's diffed (formatting-blind) against the content the approval was
+  granted on, and re-runs the approval workflow. Sole-approver orgs re-approve
+  instantly and the job stays live; where a real approver exists, the job drops
+  to `pending_approval` (off the market) until they sign off — and the engine
+  notifies them. Pure formatting changes (bold/italic/bullets) pass through. The
+  edit form shows an amber heads-up, and the save toast says what happened.
+  (`lib/jobs/substance.ts`, `lib/jobs/reapproval.ts`.)
+- **"New version" button (clone).** On an approved/live/paused/withdrawn job,
+  **New version** spins off a fresh `draft` copy of the JD + intake content for a
+  materially different role — re-approved separately, with its own apply link —
+  instead of rewriting the approved spec in place. New route
+  `POST /api/req-jobs/[id]/clone`.
 
 ### Schema
+- **Migration 075** adds an `approved_snapshot` jsonb column to `jobs` — the
+  formatting-normalized content (JD + key intake fields) the most recent approval
+  was granted against. Captured on approval completion / intake approve; compared
+  on edit to decide whether a change needs re-approval.
 - **Migration 074** adds `paused` to the `jobs` status CHECK constraint and
   documents the new ladder: `open ⇄ paused` (reversible) vs. `open|paused →
   withdrawn` (terminal, link killed). `JobStatus` type + `jobUpdateSchema` enum
@@ -38,10 +57,9 @@ entries on top.
   revived, and it can be triggered from `open` *or* `paused`. The publish route no
   longer accepts `withdrawn → open` (only `approved → open`); the withdraw confirm
   dialog and status badge (now red) reflect the terminal meaning.
-- This is **Phase 1** of the job-lifecycle redesign (state model). Phases still to
-  come: locking the approved substance — JD/key requirements/nice-to-haves — on
-  live jobs, a JD word-change diff that re-triggers approval, and a "create new
-  version" clone flow for materially different roles.
+- Completes the **job-lifecycle redesign** (Phases 1–4): the Pause/Withdraw state
+  model, locking the approved substance on live jobs, the formatting-blind
+  word-change diff that re-triggers approval, and the "New version" clone flow.
 - **List & data pages now fill the full page width.** Candidates, Settings, the
   approvals inbox & approval chains, permissions, the sequences list, sourcing,
   and the req-jobs list dropped their `max-w-*` width caps so they stretch across
