@@ -671,7 +671,7 @@ export default function SourcingPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
+    <div className="p-6 space-y-8">
 
       {/* Header */}
       <div>

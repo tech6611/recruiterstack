@@ -522,7 +522,7 @@ export default function CandidatesPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-8 max-w-6xl space-y-5">
+    <div className="p-6 space-y-6">
 
       {/* Header */}
       <div className="flex items-center justify-between">

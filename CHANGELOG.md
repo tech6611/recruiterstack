@@ -12,6 +12,13 @@ entries on top.
 ## 2026-06-28
 
 ### Changed
+- **List & data pages now fill the full page width.** Candidates, Settings, the
+  approvals inbox & approval chains, permissions, the sequences list, sourcing,
+  and the req-jobs list dropped their `max-w-*` width caps so they stretch across
+  the whole content pane like Jobs & Requisitions. Previously several (candidates
+  especially) were pinned to a narrow left column with wasted space on the right
+  and a horizontal scroll. Forms, single-record detail, and document pages keep
+  their readable capped width on purpose.
 - **Lighter, distinct summary-card colours on the list pages.** The Jobs /
   Candidates / Requisitions summary tiles used "medium" warm tints that read
   heavy, and two hues repeated (sand on Total + Closed, near-identical

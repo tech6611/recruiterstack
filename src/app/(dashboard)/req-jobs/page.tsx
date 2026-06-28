@@ -52,7 +52,7 @@ export default function ReqJobsListPage() {
   const deptById = useMemo(() => new Map(depts.map(d => [d.id, d])), [depts])
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Job pipelines</h1>

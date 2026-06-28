@@ -91,7 +91,7 @@ export default function ApprovalInboxPage() {
   })
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6">
       <div className="flex items-center gap-2 mb-6">
         <CheckSquare className="h-6 w-6 text-emerald-600" />
         <h1 className="text-2xl font-semibold text-slate-900">Approvals</h1>
