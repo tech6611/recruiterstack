@@ -2160,6 +2160,17 @@ export default function DashboardPage() {
     savePref('right_panel_widgets', rightWidgets)
   }, [rightWidgets, hydrated, savePref])
 
+  // Keep activeViewId valid. Views and the "last active view" are persisted under
+  // separate keys, so they can drift apart (e.g. an orphaned id after a data wipe).
+  // If the active id points at a view that no longer exists, snap back to the first
+  // view — otherwise add/remove/reorder silently target a missing view.
+  useEffect(() => {
+    if (!hydrated) return
+    if (views.length > 0 && !views.some(v => v.id === activeViewId)) {
+      setActiveViewId(views[0].id)
+    }
+  }, [hydrated, views, activeViewId])
+
   // Fetch
   const fetchData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -2193,17 +2204,21 @@ export default function DashboardPage() {
     })
   }
 
-  // Widget management for the current view
+  // Widget management for the current view.
+  // Always target the *resolved* view (the one actually on screen) rather than the
+  // raw activeViewId — otherwise a stale/orphaned activeViewId (e.g. left over after
+  // a data wipe) makes these silently no-op while the UI still looks editable.
   function updateWidgets(widgets: WidgetId[]) {
-    setViews(prev => prev.map(v => v.id === activeViewId ? { ...v, widgets } : v))
+    const targetId = activeView?.id ?? activeViewId
+    setViews(prev => prev.map(v => v.id === targetId ? { ...v, widgets } : v))
   }
   function handleRemoveWidget(id: WidgetId) {
-    const view = views.find(v => v.id === activeViewId)
+    const view = activeView
     if (!view) return
     updateWidgets((view.widgets ?? []).filter(w => w !== id))
   }
   function handleAddWidget(id: WidgetId) {
-    const view = views.find(v => v.id === activeViewId)
+    const view = activeView
     if (!view) return
     updateWidgets([...(view.widgets ?? []), id])
   }
