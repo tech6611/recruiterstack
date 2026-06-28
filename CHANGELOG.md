@@ -12,6 +12,13 @@ entries on top.
 ## 2026-06-28
 
 ### Changed
+- **Job description is now a rich-text field.** On the job detail edit form, "Job
+  description" uses the same formatting editor (bold, lists, headings, links) as
+  What they'll do / Key requirements / Nice to have, instead of a plain text box.
+  Existing plain-text descriptions are converted to paragraphs on first edit so
+  their structure is preserved, and the read view renders the formatting via
+  `RichText`. The candidate apply page already rendered it richly, so formatting
+  now flows end-to-end.
 - **Summary stat cards now use a warm tinted treatment.** The cards atop Jobs,
   Candidates, and Requisitions moved from flat white tiles to soft, on-brand
   tints matched to each status (sand/neutral · amber waiting · pine ready · gold

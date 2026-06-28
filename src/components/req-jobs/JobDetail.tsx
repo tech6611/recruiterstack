@@ -62,7 +62,7 @@ function initForm(job: Job) {
   return {
     title:             job.title ?? '',
     department_id:     job.department_id ?? '',
-    description:       job.description ?? '',
+    description:       descriptionToEditorHtml(job.description),
     confidentiality:   job.confidentiality ?? 'public',
     // Full JD / intake fields — rich HTML so bullets & formatting survive.
     level:             intake.level ?? '',
@@ -96,6 +96,24 @@ function readIntake(job: Job) {
       ? (i.target_companies as unknown[]).filter((t): t is string => typeof t === 'string' && t.trim() !== '')
       : [],
   }
+}
+
+// Legacy job descriptions were stored as plain text (newlines, no markup). The
+// rich editor treats its seed value as HTML, so feeding raw plain text would
+// collapse the line breaks. Detect plain text and convert blank-line-separated
+// blocks into <p> paragraphs (single newlines → <br>) so existing JDs load with
+// their structure intact. Anything that already contains HTML is passed through.
+const HTML_TAG = /<\/?[a-z][\s\S]*>/i
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+function descriptionToEditorHtml(value: string | null | undefined): string {
+  if (!value) return ''
+  if (HTML_TAG.test(value)) return value
+  return value
+    .split(/\n{2,}/)
+    .map(block => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`)
+    .join('')
 }
 
 function IntakeSection({ title, body }: { title: string; body: string | null }) {
@@ -175,8 +193,8 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
     // Editor fields store rich HTML; empty editors collapse to '' (not "<p></p>").
     const existingIntake = (job.custom_fields?.intake ?? {}) as Record<string, unknown>
     const payload: Record<string, unknown> = {
-      // JD body is editable at any status (server allows it).
-      description: form.description.trim() || null,
+      // JD body is editable at any status (server allows it). Stored as rich HTML.
+      description: isHtmlEmpty(form.description) ? null : form.description,
       custom_fields: {
         intake: {
           ...existingIntake,
@@ -428,12 +446,9 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                     {/* ── JD body + requirements (editable any status) ─────── */}
                     <div className="space-y-1.5">
                       <Label>Job description</Label>
-                      <Textarea
-                        rows={6}
-                        value={form.description}
-                        onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                        placeholder="The main job description shown to candidates."
-                      />
+                      <RichTextEditor value={form.description} minHeight={160}
+                        onChange={v => setForm(f => ({ ...f, description: v }))}
+                        placeholder="The main job description shown to candidates." />
                     </div>
                     <div className="space-y-1.5">
                       <Label>What they&apos;ll do</Label>
@@ -488,7 +503,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                     {job.description && (
                       <div className="mt-5 pt-4 border-t border-slate-100">
                         <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Job description</dt>
-                        <p className="text-sm text-slate-700 whitespace-pre-line">{job.description}</p>
+                        <RichText html={job.description} />
                       </div>
                     )}
                     {intake.level && (
