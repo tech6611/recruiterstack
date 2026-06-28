@@ -39,6 +39,15 @@ entries on top.
   contrast against the cream page background.
 
 ### Fixed
+- **Couldn't save JD edits on non-draft jobs ("Cannot edit a job with status
+  '…'").** The job update validation schema (`jobUpdateSchema`) inherited
+  `.default()` values from the create schema, so a PATCH that only sent
+  `description` + `custom_fields` was silently re-injected with
+  `department_id`/`confidentiality`/`hiring_team_id`. The route then saw those as
+  edits to locked identity fields and rejected the whole save with a 409 — on
+  approved, open, *and* withdrawn jobs. Rebuilt `jobUpdateSchema` as a plain
+  partial with no defaults so omitted fields stay absent. Also stops draft edits
+  from clobbering `hiring_team_id` to null.
 - **Stat-card tints weren't rendering (Tailwind wasn't scanning `src/lib`).** The
   Tailwind `content` globs listed `src/pages`, `src/components`, and `src/app` but
   not `src/lib`, so arbitrary color classes defined in `lib/ui/stat-tones` were

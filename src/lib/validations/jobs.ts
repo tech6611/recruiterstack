@@ -53,9 +53,24 @@ export type JobIntakeCreateInput = z.infer<typeof jobIntakeCreateSchema>
 // Update accepts every base field plus `status` (board-level transitions such as
 // the HM approve action that flips a job to 'open'). status is constrained to the
 // canonical jobs status set (migration 035).
-export const jobUpdateSchema = jobBase
-  .extend({
-    status: z.enum(['draft', 'pending_approval', 'approved', 'open', 'withdrawn', 'closed', 'archived']),
+//
+// IMPORTANT: this schema is intentionally defined WITHOUT the `.default()` values
+// that `jobBase` carries for create. A PATCH is a partial/merge: a field the
+// client omits must stay genuinely ABSENT after parsing. If defaults were applied,
+// omitted fields like `department_id`/`confidentiality`/`hiring_team_id` would be
+// silently injected — making the route think the caller is editing locked identity
+// fields and rejecting JD-only edits on non-draft jobs with a 409 (and clobbering
+// `hiring_team_id` to null on draft edits). So we rebuild the shape with plain
+// optionals, no defaults.
+export const jobUpdateSchema = z
+  .object({
+    title:           z.string().trim().min(1).max(200),
+    department_id:   uuidOrNull,
+    description:     z.string().trim().max(20000).nullable(),
+    hiring_team_id:  uuidOrNull,
+    confidentiality: z.enum(['public', 'confidential']),
+    custom_fields:   z.record(z.string(), z.unknown()),
+    status:          z.enum(['draft', 'pending_approval', 'approved', 'open', 'withdrawn', 'closed', 'archived']),
   })
   .partial()
 
