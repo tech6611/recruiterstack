@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { CandidateStatus, CandidateListItem } from '@/lib/types/database'
 import { inputCls, labelCls } from '@/lib/ui/styles'
+import { STAT_TONE, statTileClass } from '@/lib/ui/stat-tones'
 import { trackEvent } from '@/lib/analytics'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -566,22 +567,18 @@ export default function CandidatesPage() {
       ) : (
         <div className="grid grid-cols-4 gap-3">
           {([
-            { label: 'Total',        value: counts.total,        filter: 'all'          },
-            { label: 'Active',       value: counts.active,       filter: 'active'       },
-            { label: 'Interviewing', value: counts.interviewing, filter: 'interviewing' },
-            { label: 'Hired',        value: counts.hired,        filter: 'hired'        },
+            { label: 'Total',        value: counts.total,        tone: 'slate', filter: 'all'          },
+            { label: 'Active',       value: counts.active,       tone: 'pine',  filter: 'active'       },
+            { label: 'Interviewing', value: counts.interviewing, tone: 'amber', filter: 'interviewing' },
+            { label: 'Hired',        value: counts.hired,        tone: 'gold',  filter: 'hired'        },
           ] as const).map(stat => (
             <button
               key={stat.label}
               onClick={() => { setFilterStatus(filterStatus === stat.filter ? 'all' : stat.filter); setPage(1) }}
-              className={`rounded-xl border bg-white p-3.5 text-left transition-all ${
-                filterStatus === stat.filter
-                  ? 'border-emerald-500 ring-1 ring-emerald-500'
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}
+              className={statTileClass(stat.tone, filterStatus === stat.filter)}
             >
-              <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">{stat.label}</p>
+              <p className={`text-2xl font-bold ${STAT_TONE[stat.tone].ink}`}>{stat.value}</p>
+              <p className={`mt-0.5 text-xs font-medium ${STAT_TONE[stat.tone].sub}`}>{stat.label}</p>
             </button>
           ))}
         </div>

@@ -6,6 +6,7 @@ import { Plus, Search, Clock, CheckCircle, Send, Archive, FileText, Briefcase } 
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
+import { STAT_TONE, statTileClass, type StatTone } from '@/lib/ui/stat-tones'
 import { cn } from '@/lib/utils'
 import type { Opening, Department, Location as LocationRow } from '@/lib/types/requisitions'
 
@@ -33,13 +34,14 @@ const PAST_STATUSES:   Opening['status'][] = ['filled', 'closed', 'archived']
 const STAT_CARDS: ReadonlyArray<{
   key:      string
   label:    string
+  tone:     StatTone
   statuses: Opening['status'][] | null     // null = all (the Total card)
 }> = [
-  { key: 'all',      label: 'Total',             statuses: null },
-  { key: 'pending',  label: 'Awaiting Approval', statuses: ['draft', 'pending_approval'] },
-  { key: 'approved', label: 'Approved',          statuses: ['approved'] },
-  { key: 'open',     label: 'Open',              statuses: ['open'] },
-  { key: 'closed',   label: 'Closed',            statuses: ['filled', 'closed', 'archived'] },
+  { key: 'all',      label: 'Total',             tone: 'slate', statuses: null },
+  { key: 'pending',  label: 'Awaiting Approval', tone: 'amber', statuses: ['draft', 'pending_approval'] },
+  { key: 'approved', label: 'Approved',          tone: 'pine',  statuses: ['approved'] },
+  { key: 'open',     label: 'Open',              tone: 'gold',  statuses: ['open'] },
+  { key: 'closed',   label: 'Closed',            tone: 'slate', statuses: ['filled', 'closed', 'archived'] },
 ]
 
 /**
@@ -227,9 +229,9 @@ export default function OpeningsListPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {STAT_CARDS.map(stat => (
-            <div key={stat.key} className="rounded-xl border border-slate-200 bg-white p-3.5">
-              <p className="text-2xl font-bold text-slate-900">{cardValue(stat.statuses)}</p>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">{stat.label}</p>
+            <div key={stat.key} className={statTileClass(stat.tone, false)}>
+              <p className={`text-2xl font-bold ${STAT_TONE[stat.tone].ink}`}>{cardValue(stat.statuses)}</p>
+              <p className={`mt-0.5 text-xs font-medium ${STAT_TONE[stat.tone].sub}`}>{stat.label}</p>
             </div>
           ))}
         </div>

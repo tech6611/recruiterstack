@@ -11,6 +11,13 @@ entries on top.
 
 ## 2026-06-28
 
+### Changed
+- **Summary stat cards now use a warm tinted treatment.** The cards atop Jobs,
+  Candidates, and Requisitions moved from flat white tiles to soft, on-brand
+  tints matched to each status (sand/neutral · amber waiting · pine ready · gold
+  live/milestone), via a shared `lib/ui/stat-tones` helper. The selected filter
+  (Candidates) keeps an espresso ring.
+
 ### Fixed
 - **Req-job status badge updates without a page refresh.** On the job detail page the
   status pill next to the title (and the status-driven action buttons) now re-read the

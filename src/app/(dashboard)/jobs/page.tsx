@@ -14,6 +14,7 @@ import type { Editor } from '@tiptap/react'
 import EditHMModal from '@/components/EditHMModal'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
 import { inputCls, labelCls } from '@/lib/ui/styles'
+import { STAT_TONE, statTileClass } from '@/lib/ui/stat-tones'
 import { trackEvent } from '@/lib/analytics'
 
 // Convert plain text (e.g. extracted from an imported PDF/TXT) into simple HTML
@@ -1336,18 +1337,18 @@ export default function JobsPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {([
-            { label: 'Total',           value: counts.total,    filter: 'all'            },
-            { label: "Awaiting Input",  value: counts.awaiting, filter: 'intake_pending' },
-            { label: 'To be Published', value: counts.ready,    filter: 'jd_approved'  },
-            { label: 'Active',          value: counts.active,   filter: 'posted'         },
-            { label: 'Closed',          value: counts.closed,   filter: 'closed'         },
+            { label: 'Total',           value: counts.total,    tone: 'slate', filter: 'all'            },
+            { label: "Awaiting Input",  value: counts.awaiting, tone: 'amber', filter: 'intake_pending' },
+            { label: 'To be Published', value: counts.ready,    tone: 'pine',  filter: 'jd_approved'  },
+            { label: 'Active',          value: counts.active,   tone: 'gold',  filter: 'posted'         },
+            { label: 'Closed',          value: counts.closed,   tone: 'slate', filter: 'closed'         },
           ] as const).map(stat => (
             <div
               key={stat.label}
-              className="rounded-xl border border-slate-200 bg-white p-3.5"
+              className={statTileClass(stat.tone, false)}
             >
-              <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">{stat.label}</p>
+              <p className={`text-2xl font-bold ${STAT_TONE[stat.tone].ink}`}>{stat.value}</p>
+              <p className={`mt-0.5 text-xs font-medium ${STAT_TONE[stat.tone].sub}`}>{stat.label}</p>
             </div>
           ))}
         </div>
