@@ -12,6 +12,11 @@ entries on top.
 ## 2026-06-28
 
 ### Changed
+- **Discard is now reachable without scrolling when editing a job.** While the
+  job edit form is open, "Save changes" and a "Discard" button appear in the top
+  action bar (where "Edit" was), so you can back out instantly instead of
+  scrolling to the bottom of the long form. The bottom Save/Discard buttons
+  remain too.
 - **Job description is now a rich-text field.** On the job detail edit form, "Job
   description" uses the same formatting editor (bold, lists, headings, links) as
   What they'll do / Key requirements / Nice to have, instead of a plain text box.

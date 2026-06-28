@@ -339,6 +339,14 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
               <Pencil className="h-4 w-4" /> Edit
             </Button>
           )}
+          {editing && (
+            <>
+              <Button size="sm" onClick={save} loading={saving}>Save changes</Button>
+              <Button variant="outline" size="sm" onClick={() => { setEditing(false); setForm(initForm(job)) }}>
+                <X className="h-4 w-4" /> Discard
+              </Button>
+            </>
+          )}
           {canSubmit && (
             <Button size="sm" onClick={submitForApproval} loading={submitting}>
               <Send className="h-4 w-4" /> Submit for approval
@@ -485,7 +493,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
 
                     <div className="flex items-center gap-2 pt-1">
                       <Button size="sm" onClick={save} loading={saving}>Save changes</Button>
-                      <Button variant="outline" size="sm" onClick={() => { setEditing(false); setForm(initForm(job)) }}>Cancel</Button>
+                      <Button variant="outline" size="sm" onClick={() => { setEditing(false); setForm(initForm(job)) }}>Discard</Button>
                     </div>
                   </div>
                 ) : (
