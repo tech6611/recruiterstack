@@ -9,6 +9,28 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-28
+
+### Added
+- **Edit the full job description from the job detail page.** The Overview edit
+  form previously only exposed Title / Department / Confidentiality / a single
+  "Internal context" box. It now lets you edit the complete JD — Level, Job
+  description, "What they'll do", Key requirements, Nice to have (rich-text with
+  bullets/bold), plus Target start date and Notes. Requirements/nice-to-have/JD
+  are editable at any status, so the old jobs that lost their bullets can be fixed
+  by re-pasting.
+
+### Changed
+- **Identity fields lock once a requisition is approved.** Title, Department,
+  Confidentiality, Hiring manager and Location become read-only after a job leaves
+  Draft (shown but not editable); the JD body and requirements/nice-to-have/level
+  content stay editable. Editing is now available in `approved`/`open`/`withdrawn`
+  states, not just `draft`. The `PATCH /api/req-jobs/[id]` route now treats the JD
+  body (`description`) as editable at any status while keeping the other structural
+  identity fields draft-only.
+- Renamed the detail page's "Internal context" field to "Job description" (it was
+  always the candidate-facing JD body, not internal notes).
+
 ## 2026-06-26
 
 ### Fixed

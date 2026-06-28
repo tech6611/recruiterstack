@@ -18,6 +18,7 @@ import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { cn } from '@/lib/utils'
 import { RichText } from '@/components/RichText'
+import { RichTextEditor, isHtmlEmpty } from '@/components/RichTextEditor'
 import type { Job, Department, Opening, JobStatus, OpeningStatus } from '@/lib/types/requisitions'
 
 const STATUS_BADGE: Record<JobStatus, string> = {
@@ -57,24 +58,40 @@ const TAB_LABELS: Record<Tab, string> = {
 }
 
 function initForm(job: Job) {
+  const intake = readIntake(job)
   return {
-    title:           job.title ?? '',
-    department_id:   job.department_id ?? '',
-    description:     job.description ?? '',
-    confidentiality: job.confidentiality ?? 'public',
+    title:             job.title ?? '',
+    department_id:     job.department_id ?? '',
+    description:       job.description ?? '',
+    confidentiality:   job.confidentiality ?? 'public',
+    // Full JD / intake fields — rich HTML so bullets & formatting survive.
+    level:             intake.level ?? '',
+    team_context:      intake.team_context ?? '',
+    key_requirements:  intake.key_requirements ?? '',
+    nice_to_have:      intake.nice_to_have ?? '',
+    notes:             intake.notes ?? '',
+    target_start_date: intake.target_start_date ?? '',
   }
 }
+
+// Levels mirror the New Job create form (jobs/page.tsx) so the edit dropdown
+// offers the same choices.
+const LEVEL_OPTIONS = ['Intern', 'Junior', 'Mid-level', 'Senior', 'Lead', 'Staff', 'Principal', 'Director', 'VP']
 
 // Intake fields are collected at job creation and stashed in custom_fields.intake.
 function readIntake(job: Job) {
   const i = (job.custom_fields?.intake ?? {}) as Record<string, unknown>
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null)
   return {
-    team_context:     text(i.team_context),
-    key_requirements: text(i.key_requirements),
-    nice_to_have:     text(i.nice_to_have),
-    level:            text(i.level),
-    notes:            text(i.notes),
+    team_context:      text(i.team_context),
+    key_requirements:  text(i.key_requirements),
+    nice_to_have:      text(i.nice_to_have),
+    level:             text(i.level),
+    notes:             text(i.notes),
+    target_start_date: text(i.target_start_date),
+    hm_name:           text(i.hm_name),
+    hm_email:          text(i.hm_email),
+    hm_slack:          text(i.hm_slack),
     target_companies: Array.isArray(i.target_companies)
       ? (i.target_companies as unknown[]).filter((t): t is string => typeof t === 'string' && t.trim() !== '')
       : [],
@@ -106,7 +123,12 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
   const intake = readIntake(job)
 
   const canSubmit  = job.status === 'draft'
-  const canEdit    = job.status === 'draft'
+  // Editing is available while the job is active. In Draft everything is editable;
+  // once it leaves Draft the *identity* fields (title/department/confidentiality,
+  // plus hiring manager & location) lock, but the JD body and the requirements /
+  // nice-to-have / level content stay editable so recruiters can keep refining.
+  const canEdit       = ['draft', 'approved', 'open', 'withdrawn'].includes(job.status)
+  const lockIdentity  = job.status !== 'draft'
   // Once live the job has a candidate pipeline; offer a jump to its Kanban so the
   // detail view (JD / approvals / audit log) and the pipeline stay cross-linked.
   const isLive     = ['open', 'withdrawn', 'posted', 'closed', 'filled'].includes(job.status)
@@ -118,15 +140,37 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
   async function save() {
     if (!form.title.trim()) { toast.error('Title is required'); return }
     setSaving(true)
+    // custom_fields merges SHALLOW at the top level, so the whole `intake` bag is
+    // replaced — spread the existing intake first to keep target_companies / hiring
+    // manager (and anything else) intact, then override just the editable fields.
+    // Editor fields store rich HTML; empty editors collapse to '' (not "<p></p>").
+    const existingIntake = (job.custom_fields?.intake ?? {}) as Record<string, unknown>
+    const payload: Record<string, unknown> = {
+      // JD body is editable at any status (server allows it).
+      description: form.description.trim() || null,
+      custom_fields: {
+        intake: {
+          ...existingIntake,
+          level:             form.level.trim(),
+          team_context:      isHtmlEmpty(form.team_context)     ? '' : form.team_context,
+          key_requirements:  isHtmlEmpty(form.key_requirements) ? '' : form.key_requirements,
+          nice_to_have:      isHtmlEmpty(form.nice_to_have)     ? '' : form.nice_to_have,
+          notes:             form.notes.trim(),
+          target_start_date: form.target_start_date.trim(),
+        },
+      },
+    }
+    // Identity fields are only sent while the job is still a Draft; once approved
+    // the server rejects them (409) so we don't even include them.
+    if (!lockIdentity) {
+      payload.title           = form.title.trim()
+      payload.department_id   = form.department_id || null
+      payload.confidentiality = form.confidentiality
+    }
     const res = await fetch(`/api/req-jobs/${job.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title:           form.title.trim(),
-        department_id:   form.department_id || null,
-        description:     form.description.trim() || null,
-        confidentiality: form.confidentiality,
-      }),
+      body: JSON.stringify(payload),
     })
     setSaving(false)
     const body = await res.json().catch(() => ({}))
@@ -273,35 +317,105 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
               <CardContent>
                 {editing ? (
                   <div className="space-y-4">
+                    {lockIdentity && (
+                      <p className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-xs text-slate-500">
+                        Title, department, confidentiality, hiring manager &amp; location are locked once a
+                        requisition is approved. You can still update the job description and requirements below.
+                      </p>
+                    )}
+
+                    {/* ── Identity (locked after approval) ─────────────────── */}
                     <div className="space-y-1.5">
                       <Label>Title</Label>
-                      <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+                      {lockIdentity
+                        ? <p className="text-sm text-slate-800">{job.title}</p>
+                        : <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <Label>Department</Label>
-                        <Select value={form.department_id} onChange={e => setForm(f => ({ ...f, department_id: e.target.value }))}>
-                          <option value="">—</option>
-                          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                        </Select>
+                        {lockIdentity
+                          ? <p className="text-sm text-slate-800">{department?.name ?? '—'}</p>
+                          : (
+                            <Select value={form.department_id} onChange={e => setForm(f => ({ ...f, department_id: e.target.value }))}>
+                              <option value="">—</option>
+                              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </Select>
+                          )}
                       </div>
                       <div className="space-y-1.5">
                         <Label>Confidentiality</Label>
-                        <Select value={form.confidentiality} onChange={e => setForm(f => ({ ...f, confidentiality: e.target.value as Job['confidentiality'] }))}>
-                          <option value="public">Public</option>
-                          <option value="confidential">Confidential</option>
-                        </Select>
+                        {lockIdentity
+                          ? <p className="text-sm text-slate-800 capitalize">{job.confidentiality}</p>
+                          : (
+                            <Select value={form.confidentiality} onChange={e => setForm(f => ({ ...f, confidentiality: e.target.value as Job['confidentiality'] }))}>
+                              <option value="public">Public</option>
+                              <option value="confidential">Confidential</option>
+                            </Select>
+                          )}
                       </div>
                     </div>
+                    {(intake.hm_name || intake.hm_email) && (
+                      <div className="space-y-1.5">
+                        <Label>Hiring manager</Label>
+                        <p className="text-sm text-slate-800">
+                          {intake.hm_name ?? '—'}{intake.hm_email ? ` · ${intake.hm_email}` : ''}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* ── Level (editable) ─────────────────────────────────── */}
                     <div className="space-y-1.5">
-                      <Label>Internal context</Label>
+                      <Label>Level</Label>
+                      <Select value={form.level} onChange={e => setForm(f => ({ ...f, level: e.target.value }))}>
+                        <option value="">—</option>
+                        {LEVEL_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                      </Select>
+                    </div>
+
+                    {/* ── JD body + requirements (editable any status) ─────── */}
+                    <div className="space-y-1.5">
+                      <Label>Job description</Label>
                       <Textarea
                         rows={6}
                         value={form.description}
                         onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                        placeholder="Notes for the hiring team (not shown to candidates)."
+                        placeholder="The main job description shown to candidates."
                       />
                     </div>
+                    <div className="space-y-1.5">
+                      <Label>What they&apos;ll do</Label>
+                      <RichTextEditor value={form.team_context} minHeight={110}
+                        onChange={v => setForm(f => ({ ...f, team_context: v }))}
+                        placeholder="They'll own the checkout flow, work with design, lead 2 junior engineers…" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Key requirements</Label>
+                      <RichTextEditor value={form.key_requirements} minHeight={110}
+                        onChange={v => setForm(f => ({ ...f, key_requirements: v }))}
+                        placeholder="5+ years React, Node.js, shipped production apps…" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Nice to have</Label>
+                      <RichTextEditor value={form.nice_to_have} minHeight={84}
+                        onChange={v => setForm(f => ({ ...f, nice_to_have: v }))}
+                        placeholder="Next.js, fintech background, startup experience…" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label>Target start date</Label>
+                        <Input value={form.target_start_date}
+                          onChange={e => setForm(f => ({ ...f, target_start_date: e.target.value }))}
+                          placeholder="ASAP, Q2 2025, June…" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Notes</Label>
+                      <Textarea rows={3} value={form.notes}
+                        onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                        placeholder="Anything else the hiring team should know." />
+                    </div>
+
                     <div className="flex items-center gap-2 pt-1">
                       <Button size="sm" onClick={save} loading={saving}>Save changes</Button>
                       <Button variant="outline" size="sm" onClick={() => { setEditing(false); setForm(initForm(job)) }}>Cancel</Button>
@@ -321,7 +435,7 @@ export function JobDetail({ job, department, departments, linkedOpenings }: Prop
                     </dl>
                     {job.description && (
                       <div className="mt-5 pt-4 border-t border-slate-100">
-                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Internal context</dt>
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Job description</dt>
                         <p className="text-sm text-slate-700 whitespace-pre-line">{job.description}</p>
                       </div>
                     )}

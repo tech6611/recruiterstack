@@ -45,9 +45,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   // Board-level edits (status transitions like the HM approve action, and
   // custom_fields writes like scoring_criteria / hiring_manager_*) are allowed on
-  // any status. The strict draft-only gate only protects the structural edit-form
-  // fields (title/description/department/team/confidentiality).
-  const { status, custom_fields, ...structural } = body
+  // any status. The strict draft-only gate protects the *identity* fields that an
+  // org wants frozen once a requisition is approved (title/department/team/
+  // confidentiality). The JD body (`description`) is deliberately editable at any
+  // status — recruiters keep refining the posting after approval — so it's pulled
+  // out of the structural set and written on the always-allowed path below.
+  const { status, custom_fields, description, ...structural } = body
   const editsStructuralFields = Object.keys(structural).length > 0
   if (editsStructuralFields && row.status !== 'draft') {
     return NextResponse.json({ error: `Cannot edit a job with status '${row.status}'.` }, { status: 409 })
@@ -58,9 +61,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // The board writers only send status + custom_fields (never the structural
   // edit-form fields), so any structural fields are written by the regular path.
   if (custom_fields !== undefined) {
-    if (Object.keys(structural).length > 0) {
+    const directWrite: Record<string, unknown> = { ...structural }
+    if (description !== undefined) directWrite.description = description
+    if (Object.keys(directWrite).length > 0) {
       const { error } = await supabase
-        .from('jobs').update(structural).eq('id', params.id).eq('org_id', orgId)
+        .from('jobs').update(directWrite).eq('id', params.id).eq('org_id', orgId)
       if (error) return handleSupabaseError(error)
     }
     try {
