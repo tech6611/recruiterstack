@@ -1341,7 +1341,7 @@ export default function JobsPage() {
             { label: "Awaiting Input",  value: counts.awaiting, tone: 'amber', filter: 'intake_pending' },
             { label: 'To be Published', value: counts.ready,    tone: 'pine',  filter: 'jd_approved'  },
             { label: 'Active',          value: counts.active,   tone: 'gold',  filter: 'posted'         },
-            { label: 'Closed',          value: counts.closed,   tone: 'slate', filter: 'closed'         },
+            { label: 'Closed',          value: counts.closed,   tone: 'stone', filter: 'closed'         },
           ] as const).map(stat => (
             <div
               key={stat.label}

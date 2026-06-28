@@ -3,18 +3,22 @@
  * (Jobs, Candidates, Requisitions). Each card gets a soft, on-brand tint matched
  * to its meaning; the selected filter carries an espresso ring.
  *
- * Tones: slate (neutral/total) · amber (waiting) · pine (ready/positive) ·
- * gold (live/milestone).
+ * Tones: slate (sand — neutral/total) · amber (honey — waiting) · pine (sage —
+ * ready/positive) · gold (clay — live/milestone) · stone (muted — closed/inactive).
  */
-export type StatTone = 'slate' | 'amber' | 'pine' | 'gold'
+export type StatTone = 'slate' | 'amber' | 'pine' | 'gold' | 'stone'
 
-// "Medium" warm tints (Variant B) — saturated enough to read against the cream
-// page (#faf7f2); the neutral tone is a warm sand, NOT the page color.
+// "Lighter + distinct" warm tints (Variant C) — one notch lighter than the old
+// "medium" set, and every tone is a separate hue so no two cards repeat. Still
+// saturated enough to read against the cream page (#faf7f2). The neutral tone is
+// a warm sand (NOT the page color); 'stone' is a cooler muted neutral for
+// closed/inactive so it reads as distinct from 'slate'.
 export const STAT_TONE: Record<StatTone, { fill: string; border: string; ink: string; sub: string }> = {
-  slate: { fill: 'bg-[#f0e7d7]', border: 'border-[#e0d4bd]', ink: 'text-[#2a2118]', sub: 'text-[#7a6f5d]' },
-  amber: { fill: 'bg-[#fbdfa4]', border: 'border-[#eecb82]', ink: 'text-[#6f450f]', sub: 'text-[#8a5a14]' },
-  pine:  { fill: 'bg-[#c8e2d3]', border: 'border-[#a9d0bd]', ink: 'text-[#0c4634]', sub: 'text-[#15604a]' },
-  gold:  { fill: 'bg-[#f0da9d]', border: 'border-[#e2c87f]', ink: 'text-[#5c4413]', sub: 'text-[#7a5c18]' },
+  slate: { fill: 'bg-[#f4eee1]', border: 'border-[#e7dcc6]', ink: 'text-[#2a2118]', sub: 'text-[#7a6f5d]' }, // sand
+  amber: { fill: 'bg-[#fbe7bc]', border: 'border-[#f1d595]', ink: 'text-[#6f450f]', sub: 'text-[#8a5a14]' }, // honey
+  pine:  { fill: 'bg-[#d9ece1]', border: 'border-[#bedccd]', ink: 'text-[#0c4634]', sub: 'text-[#15604a]' }, // sage
+  gold:  { fill: 'bg-[#f7ddc6]', border: 'border-[#eec4a4]', ink: 'text-[#6b3d17]', sub: 'text-[#8a4f18]' }, // clay
+  stone: { fill: 'bg-[#eae6dd]', border: 'border-[#d8d2c4]', ink: 'text-[#4f483d]', sub: 'text-[#8a7f6f]' }, // stone
 }
 
 /** Full wrapper className for a tinted stat/filter card button. */

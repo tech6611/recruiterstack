@@ -12,6 +12,13 @@ entries on top.
 ## 2026-06-28
 
 ### Changed
+- **Lighter, distinct summary-card colours on the list pages.** The Jobs /
+  Candidates / Requisitions summary tiles used "medium" warm tints that read
+  heavy, and two hues repeated (sand on Total + Closed, near-identical
+  amber/gold on Awaiting + Active). Softened every tint one notch and gave each
+  card its own hue — sand · honey · sage · clay · stone — by lightening the four
+  existing tones in `src/lib/ui/stat-tones.ts` and adding a new `stone` tone for
+  the Closed card (Jobs + Openings now use it). No layout changes.
 - **Discard is now reachable without scrolling when editing a job.** While the
   job edit form is open, "Save changes" and a "Discard" button appear in the top
   action bar (where "Edit" was), so you can back out instantly instead of

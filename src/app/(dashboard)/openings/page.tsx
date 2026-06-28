@@ -41,7 +41,7 @@ const STAT_CARDS: ReadonlyArray<{
   { key: 'pending',  label: 'Awaiting Approval', tone: 'amber', statuses: ['draft', 'pending_approval'] },
   { key: 'approved', label: 'Approved',          tone: 'pine',  statuses: ['approved'] },
   { key: 'open',     label: 'Open',              tone: 'gold',  statuses: ['open'] },
-  { key: 'closed',   label: 'Closed',            tone: 'slate', statuses: ['filled', 'closed', 'archived'] },
+  { key: 'closed',   label: 'Closed',            tone: 'stone', statuses: ['filled', 'closed', 'archived'] },
 ]
 
 /**
