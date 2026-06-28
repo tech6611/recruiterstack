@@ -582,7 +582,20 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
         <PostingsTab jobId={job.id} jobStatus={job.status} />
       )}
 
-      {tab === 'screening' && <ScreeningTab jobId={job.id} />}
+      {tab === 'screening' && (
+        <ScreeningTab
+          jobId={job.id}
+          jobInfo={{
+            position_title:   job.title ?? '',
+            department:       department?.name ?? null,
+            location:         null,
+            generated_jd:     job.description ?? null,
+            responsibilities: intake.team_context,
+            requirements:     intake.key_requirements,
+            nice_to_have:     intake.nice_to_have,
+          }}
+        />
+      )}
 
       {tab === 'audit' && <AuditLogTab targetType="job" targetId={job.id} />}
 

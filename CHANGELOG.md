@@ -27,6 +27,14 @@ entries on top.
   instead of relying on `router.refresh()` alone (which could leave the badge stale).
 
 ### Added
+- **Preview the candidate application form.** The Application form tab has a new
+  **Preview** button (next to Save form) that opens a full, on-brand preview of the
+  apply page exactly as a candidate sees it — your company logo/colour/font, the JD
+  sections, the always-collected built-in fields, and your custom questions. It uses
+  your current unsaved edits and runs the conditional show/hide logic live (answer a
+  controlling question and dependent questions appear). Nothing is submitted. The
+  question renderer is now shared with the live apply page (`components/apply/
+  screening-fields.tsx`) so the preview can never drift from the real form.
 - **Copy an application form from another job.** The Application form tab now has a
   **"Copy from another job"** button (next to Add question / Add from library) that
   lists your other jobs and drops the chosen job's custom questions onto this form.

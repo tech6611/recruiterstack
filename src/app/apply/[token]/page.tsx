@@ -8,6 +8,11 @@ import {
 } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
 import { RichText } from '@/components/RichText'
+import {
+  ScreeningQuestion, isFieldVisible,
+  type PublicScreeningField as ScreeningField,
+  type AnswerValue,
+} from '@/components/apply/screening-fields'
 
 interface Branding {
   company_name: string | null
@@ -15,50 +20,6 @@ interface Branding {
   brand_color: string | null
   accent_color: string | null
   brand_font: string | null
-}
-
-type ScreeningFieldType =
-  | 'short_text' | 'long_text' | 'yes_no' | 'single_select'
-  | 'multi_select' | 'number' | 'date' | 'file' | 'url'
-
-type ScreeningOperator = 'eq' | 'neq' | 'in' | 'not_in'
-
-interface ScreeningVisibility {
-  field_id: string
-  operator: ScreeningOperator
-  value: string | string[]
-}
-
-interface ScreeningField {
-  id: string
-  label: string
-  help_text: string | null
-  field_type: ScreeningFieldType
-  options: string[]
-  required: boolean
-  is_eeo: boolean
-  visible_when: ScreeningVisibility | null
-}
-
-type AnswerValue = string | string[]
-
-// Mirror of the server-side rule check (modules/ats/domain/screening.ts) so the
-// page can show/hide conditional questions as the candidate answers.
-function answerMatches(answer: AnswerValue | undefined, rule: ScreeningVisibility): boolean {
-  const answerSet = Array.isArray(answer) ? answer : answer == null || answer === '' ? [] : [answer]
-  const ruleSet = Array.isArray(rule.value) ? rule.value : [rule.value]
-  switch (rule.operator) {
-    case 'eq':     return answerSet.length === 1 && answerSet[0] === ruleSet[0]
-    case 'neq':    return !(answerSet.length === 1 && answerSet[0] === ruleSet[0])
-    case 'in':     return answerSet.some(a => ruleSet.includes(a))
-    case 'not_in': return !answerSet.some(a => ruleSet.includes(a))
-    default:       return false
-  }
-}
-
-function isFieldVisible(field: ScreeningField, answers: Record<string, AnswerValue>): boolean {
-  if (!field.visible_when) return true
-  return answerMatches(answers[field.visible_when.field_id], field.visible_when)
 }
 
 interface JobInfo {
@@ -87,78 +48,6 @@ function JdSection({ title, body }: { title: string; body: string | null }) {
       <h2 className="text-sm font-bold text-slate-700 mb-2">{title}</h2>
       <RichText html={body} className="text-slate-600" />
     </section>
-  )
-}
-
-const FIELD_INPUT_CLASS =
-  'w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent'
-
-function ScreeningQuestion({
-  field, value, onChange,
-}: { field: ScreeningField; value: AnswerValue | undefined; onChange: (v: AnswerValue) => void }) {
-  const str = typeof value === 'string' ? value : ''
-  const arr = Array.isArray(value) ? value : []
-
-  function renderInput() {
-    switch (field.field_type) {
-      case 'long_text':
-        return <textarea rows={4} value={str} onChange={e => onChange(e.target.value)} className={`${FIELD_INPUT_CLASS} resize-none`} />
-      case 'number':
-        return <input type="number" value={str} onChange={e => onChange(e.target.value)} className={FIELD_INPUT_CLASS} />
-      case 'date':
-        return <input type="date" value={str} onChange={e => onChange(e.target.value)} className={FIELD_INPUT_CLASS} />
-      case 'url':
-        return <input type="url" value={str} onChange={e => onChange(e.target.value)} placeholder="https://…" className={FIELD_INPUT_CLASS} />
-      case 'file':
-        return <input type="url" value={str} onChange={e => onChange(e.target.value)} placeholder="Paste a link to your file (Drive, Dropbox…)" className={FIELD_INPUT_CLASS} />
-      case 'yes_no':
-        return (
-          <div className="flex gap-5">
-            {['yes', 'no'].map(opt => (
-              <label key={opt} className="inline-flex items-center gap-1.5 text-sm capitalize text-slate-700">
-                <input type="radio" name={field.id} checked={str === opt} onChange={() => onChange(opt)} />
-                {opt}
-              </label>
-            ))}
-          </div>
-        )
-      case 'single_select':
-        return (
-          <select value={str} onChange={e => onChange(e.target.value)} className={FIELD_INPUT_CLASS}>
-            <option value="">Select…</option>
-            {field.options.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
-        )
-      case 'multi_select':
-        return (
-          <div className="space-y-1.5">
-            {field.options.map(o => (
-              <label key={o} className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={arr.includes(o)}
-                  onChange={e => onChange(e.target.checked ? [...arr, o] : arr.filter(x => x !== o))}
-                />
-                {o}
-              </label>
-            ))}
-          </div>
-        )
-      default: // short_text
-        return <input type="text" value={str} onChange={e => onChange(e.target.value)} className={FIELD_INPUT_CLASS} />
-    }
-  }
-
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-        {field.label}
-        {field.required && <span className="text-red-500"> *</span>}
-        {field.is_eeo && <span className="ml-2 text-xs font-normal text-slate-400">(voluntary)</span>}
-      </label>
-      {field.help_text && <p className="text-xs text-slate-400 mb-1.5">{field.help_text}</p>}
-      {renderInput()}
-    </div>
   )
 }
 

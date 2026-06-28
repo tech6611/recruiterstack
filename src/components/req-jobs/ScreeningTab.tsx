@@ -1,13 +1,18 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { ArrowUp, ArrowDown, Trash2, Plus, BookPlus, Library, Save, Copy } from 'lucide-react'
+import { ArrowUp, ArrowDown, Trash2, Plus, BookPlus, Library, Save, Copy, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
+import {
+  BrandedApplyPreview,
+  type PreviewBranding,
+  type PreviewJobInfo,
+} from '@/components/apply/BrandedApplyPreview'
 import type {
   ScreeningField,
   ScreeningFieldType,
@@ -53,7 +58,7 @@ function knockoutChoices(field: ScreeningField): string[] {
   return []
 }
 
-export function ScreeningTab({ jobId }: { jobId: string }) {
+export function ScreeningTab({ jobId, jobInfo }: { jobId: string; jobInfo: PreviewJobInfo }) {
   const [fields, setFields]   = useState<ScreeningField[]>([])
   const [library, setLibrary] = useState<ScreeningQuestion[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,6 +70,11 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
   const [jobs, setJobs]               = useState<{ id: string; title: string; status: string }[]>([])
   const [jobsLoading, setJobsLoading] = useState(false)
   const [copyingId, setCopyingId]     = useState<string | null>(null)
+  // Candidate preview — lazily fetches the org's branding the first time it opens.
+  const [showPreview, setShowPreview]     = useState(false)
+  const [branding, setBranding]           = useState<PreviewBranding | null>(null)
+  const [brandingLoaded, setBrandingLoaded] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -169,6 +179,30 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
     }
   }
 
+  // Open the candidate preview. Branding is fetched once and reused; a failed
+  // fetch still opens the preview (it just falls back to default branding).
+  async function openPreview() {
+    if (brandingLoaded) { setShowPreview(true); return }
+    setPreviewLoading(true)
+    try {
+      const r = await fetch('/api/org-settings/company')
+      const j = await r.json()
+      const b = j.data
+      if (b) {
+        setBranding({
+          company_name: b.company_name ?? null,
+          logo_url:     b.logo_url ?? null,
+          brand_color:  b.brand_color ?? null,
+          accent_color: b.accent_color ?? null,
+          brand_font:   b.brand_font ?? null,
+        })
+      }
+    } catch { /* fall back to default branding */ }
+    setBrandingLoaded(true)
+    setPreviewLoading(false)
+    setShowPreview(true)
+  }
+
   async function saveToLibrary(field: ScreeningField) {
     if (!field.label.trim()) { toast.error('Give the question a label first'); return }
     const res = await fetch('/api/screening/questions', {
@@ -223,9 +257,14 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
                 phone, LinkedIn, résumé, cover letter) are always collected — add your own below.
               </CardDescription>
             </div>
-            <Button size="sm" onClick={save} loading={saving} disabled={!dirty}>
-              <Save className="h-4 w-4" /> Save form
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={openPreview} loading={previewLoading}>
+                <Eye className="h-4 w-4" /> Preview
+              </Button>
+              <Button size="sm" onClick={save} loading={saving} disabled={!dirty}>
+                <Save className="h-4 w-4" /> Save form
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -313,6 +352,15 @@ export function ScreeningTab({ jobId }: { jobId: string }) {
           )}
         </CardContent>
       </Card>
+
+      {showPreview && (
+        <BrandedApplyPreview
+          job={jobInfo}
+          branding={branding}
+          fields={fields}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   )
 }
