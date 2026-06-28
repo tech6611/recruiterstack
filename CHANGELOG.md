@@ -11,7 +11,37 @@ entries on top.
 
 ## 2026-06-28
 
+### Added
+- **Candidates page: time filter + full-width search + responsive funnel.** Added
+  a time filter (All time / 7d / 30d / 3m / custom range, by candidate
+  created_at) mirroring the Jobs page; the search bar now stretches full-width;
+  and the hiring-funnel stage cards flex to fill the available width (no more
+  fixed-width cards with horizontal scroll). (`app/(dashboard)/candidates/page.tsx`.)
+- **Pause / Resume for live jobs (reversible).** A live (`open`) job can now be
+  **Paused** — it stops accepting new applicants (the public apply link freezes)
+  and any live job-board postings go dark, but everything is preserved. **Resume**
+  flips it back to `open` and revives the *same* apply link. New routes
+  `POST /api/req-jobs/[id]/pause` and `/resume`; new `job.paused` / `job.resumed`
+  webhook events. Pause/Resume buttons on the job detail page.
+
+### Schema
+- **Migration 074** adds `paused` to the `jobs` status CHECK constraint and
+  documents the new ladder: `open ⇄ paused` (reversible) vs. `open|paused →
+  withdrawn` (terminal, link killed). `JobStatus` type + `jobUpdateSchema` enum
+  updated to match.
+
 ### Changed
+- **"Withdraw" is now terminal (a job killed for good), not a reversible pause.**
+  Previously Withdraw took a job off the market but could be re-published — that
+  reversible behaviour now lives in **Pause/Resume**. Withdraw now clears the job's
+  `apply_token`, so the public application link dies permanently and cannot be
+  revived, and it can be triggered from `open` *or* `paused`. The publish route no
+  longer accepts `withdrawn → open` (only `approved → open`); the withdraw confirm
+  dialog and status badge (now red) reflect the terminal meaning.
+- This is **Phase 1** of the job-lifecycle redesign (state model). Phases still to
+  come: locking the approved substance — JD/key requirements/nice-to-haves — on
+  live jobs, a JD word-change diff that re-triggers approval, and a "create new
+  version" clone flow for materially different roles.
 - **List & data pages now fill the full page width.** Candidates, Settings, the
   approvals inbox & approval chains, permissions, the sequences list, sourcing,
   and the req-jobs list dropped their `max-w-*` width caps so they stretch across
