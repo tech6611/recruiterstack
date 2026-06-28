@@ -7,7 +7,7 @@ import {
   Plus, Search, X, Users, Loader2, Download, Clock,
   UserCheck, UserMinus, MessageSquare, FileCheck, CheckCircle, XCircle,
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight,
-  GripVertical, Pencil,
+  GripVertical, Pencil, CalendarDays, Check,
 } from 'lucide-react'
 import type { CandidateStatus, CandidateListItem } from '@/lib/types/database'
 import { inputCls, labelCls } from '@/lib/ui/styles'
@@ -27,6 +27,16 @@ const STATUS_CONFIG: Record<CandidateStatus, { label: string; color: string; ico
   hired:          { label: 'Hired',          color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
   rejected:       { label: 'Rejected',       color: 'bg-red-50 text-red-700 border-red-200',             icon: <XCircle className="h-3 w-3" /> },
 }
+
+// Time filter (mirrors the Jobs page) — filters the list by candidate created_at.
+type TimeFilter = '7d' | '30d' | '3m' | 'all' | 'custom'
+const TIME_OPTS: { value: TimeFilter; label: string }[] = [
+  { value: 'all',    label: 'All time' },
+  { value: '7d',     label: 'Last 7 days' },
+  { value: '30d',    label: 'Last 30 days' },
+  { value: '3m',     label: 'Last 3 months' },
+  { value: 'custom', label: 'Custom range' },
+]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pipeline Funnel — stage definitions + count aggregation (by candidate status)
@@ -303,7 +313,7 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
 
       {/* Funnel cards */}
       {!customizing && (
-        <div className="flex items-stretch overflow-x-auto px-4 py-4 gap-0">
+        <div className="flex items-stretch px-4 py-4 gap-0">
           {activeDefs.map((def, idx) => {
             const count      = counts.get(def.id) ?? 0
             const isLast     = idx === activeDefs.length - 1
@@ -311,7 +321,7 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
             const isDragOver = dragOverId === def.id && draggingId !== def.id
 
             return (
-              <div key={def.id} className="flex items-center shrink-0">
+              <div key={def.id} className="flex flex-1 min-w-0 items-center">
                 {/* Stage card */}
                 <div
                   draggable
@@ -319,7 +329,7 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
                   onDragOver={e => handleDragOver(e, def.id)}
                   onDrop={() => handleDrop(def.id)}
                   onDragEnd={handleDragEnd}
-                  className={`flex flex-col rounded-xl border border-t-2 bg-white px-4 py-3 min-w-[130px] select-none cursor-grab active:cursor-grabbing transition-all ${
+                  className={`flex flex-1 min-w-0 flex-col rounded-xl border border-t-2 bg-white px-4 py-3 select-none cursor-grab active:cursor-grabbing transition-all ${
                     def.accent.border
                   } ${
                     isDragging  ? 'opacity-40 scale-95 shadow-none' :
@@ -385,6 +395,10 @@ export default function CandidatesPage() {
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(1)
+  const [timeFilter, setTimeFilter]       = useState<TimeFilter>('all')
+  const [showTimePicker, setShowTimePicker] = useState(false)
+  const [customFrom, setCustomFrom]       = useState('')
+  const [customTo, setCustomTo]           = useState('')
 
   // ── Drawer state ───────────────────────────────────────────────────────────
   const [showDrawer, setShowDrawer] = useState(false)
@@ -440,6 +454,16 @@ export default function CandidatesPage() {
         (c.location ?? '').toLowerCase().includes(q)
       )
     }
+    if (timeFilter !== 'all') {
+      if (timeFilter === 'custom') {
+        if (customFrom) result = result.filter(c => new Date(c.created_at) >= new Date(customFrom))
+        if (customTo)   result = result.filter(c => new Date(c.created_at) <= new Date(customTo + 'T23:59:59'))
+      } else {
+        const now = Date.now()
+        const ms  = timeFilter === '7d' ? 7 * 86_400_000 : timeFilter === '30d' ? 30 * 86_400_000 : 91 * 86_400_000
+        result = result.filter(c => now - new Date(c.created_at).getTime() <= ms)
+      }
+    }
     result.sort((a, b) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vA = String((a as any)[sortKey] ?? '')
@@ -449,7 +473,10 @@ export default function CandidatesPage() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return result
-  }, [candidates, filterStatus, search, sortKey, sortDir])
+  }, [candidates, filterStatus, search, timeFilter, customFrom, customTo, sortKey, sortDir])
+
+  const timeLabel = timeFilter === '7d' ? 'Last 7 days' : timeFilter === '30d' ? 'Last 30 days'
+    : timeFilter === '3m' ? 'Last 3 months' : timeFilter === 'custom' ? 'Custom range' : 'All time'
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = useMemo(() => {
@@ -589,7 +616,7 @@ export default function CandidatesPage() {
 
       {/* Filters */}
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <input
             value={search}
@@ -613,17 +640,71 @@ export default function CandidatesPage() {
             setFilterStatus(val); setPage(1)
             if (val !== 'all') trackEvent('candidates_filtered', { filter_type: val })
           }}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
+          className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
         >
           <option value="all">All statuses</option>
           {(Object.keys(STATUS_CONFIG) as CandidateStatus[]).map(s => (
             <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
           ))}
         </select>
-        {(filterStatus !== 'all' || search) && (
+
+        {/* Time filter (mirrors the Jobs page) */}
+        <div className="relative shrink-0">
           <button
-            onClick={() => { setFilterStatus('all'); setSearch(''); setPage(1) }}
-            className="text-xs text-slate-500 hover:text-slate-800 transition-colors"
+            onClick={() => setShowTimePicker(p => !p)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+              timeFilter !== 'all'
+                ? 'border-slate-300 bg-slate-50 text-slate-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
+            }`}
+            title="Time filter"
+          >
+            <CalendarDays className="h-4 w-4" />
+            {timeFilter !== 'all' && <span className="text-xs">{timeLabel}</span>}
+          </button>
+          {showTimePicker && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
+              <div className="absolute right-0 top-full mt-1 z-50 w-52 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                {TIME_OPTS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => { setTimeFilter(opt.value); setPage(1); if (opt.value !== 'custom') setShowTimePicker(false) }}
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                      timeFilter === opt.value ? 'bg-slate-50 font-semibold text-slate-700' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {opt.label}
+                    {timeFilter === opt.value && <Check className="ml-auto h-3 w-3 shrink-0" />}
+                  </button>
+                ))}
+                {timeFilter === 'custom' && (
+                  <div className="mt-1 space-y-2 border-t border-slate-100 px-2 pb-1 pt-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500">From</label>
+                      <input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setPage(1) }}
+                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none transition focus:border-emerald-400" />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500">To</label>
+                      <input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setPage(1) }}
+                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none transition focus:border-emerald-400" />
+                    </div>
+                    <button onClick={() => setShowTimePicker(false)}
+                      className="w-full rounded-lg bg-[#221b14] py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#33271b]">
+                      Apply
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {(filterStatus !== 'all' || search || timeFilter !== 'all') && (
+          <button
+            onClick={() => { setFilterStatus('all'); setSearch(''); setTimeFilter('all'); setCustomFrom(''); setCustomTo(''); setPage(1) }}
+            className="shrink-0 whitespace-nowrap text-xs text-slate-500 hover:text-slate-800 transition-colors"
           >
             Clear filters
           </button>
