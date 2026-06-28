@@ -12,6 +12,14 @@ entries on top.
 ## 2026-06-28
 
 ### Added
+- **Set scoring criteria at the job level.** The weighted rubric the AI uses to
+  judge candidates was only reachable inside a candidate's Scorecards tab — so on
+  a job with no candidates yet there was no way to see or edit it. Added a
+  **"Scoring criteria"** button in the job detail header next to **Autopilot**
+  (and in the ⋯ More menu on narrow screens) that opens the same editor in a
+  no-candidate mode, with a green dot when custom criteria are set. Saves through
+  the existing `PATCH /api/req-jobs/[id]` (`custom_fields.scoring_criteria`); no
+  backend change.
 - **Edit the full job description from the job detail page.** The Overview edit
   form previously only exposed Title / Department / Confidentiality / a single
   "Internal context" box. It now lets you edit the complete JD — Level, Job

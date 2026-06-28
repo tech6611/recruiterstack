@@ -3786,6 +3786,8 @@ export default function JobPipelinePage() {
 
   // Autopilot drawer
   const [showAutopilot, setShowAutopilot] = useState(false)
+  // Job-level scoring criteria modal (rubric used to judge candidates on this job)
+  const [showJobCriteria, setShowJobCriteria] = useState(false)
 
   // Kanban filter / sort state
   const [filterSearch,  setFilterSearch]  = useState('')
@@ -4335,6 +4337,23 @@ export default function JobPipelinePage() {
             )}
           </button>
 
+          {/* Scoring criteria — inline on xl+. The weighted rubric the AI uses to
+              judge every candidate on this job. */}
+          <button
+            onClick={() => setShowJobCriteria(true)}
+            className={`hidden xl:flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors border ${
+              job.scoring_criteria && job.scoring_criteria.length > 0
+                ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Scoring criteria
+            {job.scoring_criteria && job.scoring_criteria.length > 0 && (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            )}
+          </button>
+
           {/* Job settings (Apply Link, etc.) — inline on xl+. Only when the job
               is open: a pre-open job has no working public apply link. */}
           <div className={`relative hidden ${(job.status as string) === 'open' ? 'xl:block' : 'xl:hidden'}`}>
@@ -4384,6 +4403,16 @@ export default function JobPipelinePage() {
                     <Settings2 className="h-4 w-4 text-slate-400" />
                     Autopilot
                     {(job.auto_advance_score !== null || job.auto_reject_score !== null) && (
+                      <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => { setShowJobCriteria(true); setShowMoreMenu(false) }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <SlidersHorizontal className="h-4 w-4 text-slate-400" />
+                    Scoring criteria
+                    {job.scoring_criteria && job.scoring_criteria.length > 0 && (
                       <span className="ml-auto h-2 w-2 rounded-full bg-emerald-500" />
                     )}
                   </button>
@@ -4997,6 +5026,20 @@ export default function JobPipelinePage() {
           stages={job.pipeline_stages}
           onClose={() => setShowAutopilot(false)}
           onSaved={load}
+        />
+      )}
+
+      {/* Job-level scoring criteria — same editor used per-candidate, opened
+          straight from the header so the rubric can be set without a candidate. */}
+      {showJobCriteria && (
+        <ScoringCriteriaModal
+          criteria={job.scoring_criteria}
+          jobId={job.id}
+          onClose={() => setShowJobCriteria(false)}
+          onSaved={newCriteria => {
+            setJob(j => j ? { ...j, scoring_criteria: newCriteria } : j)
+            setShowJobCriteria(false)
+          }}
         />
       )}
 
