@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import type { CandidateStatus, CandidateListItem } from '@/lib/types/database'
 import { inputCls, labelCls } from '@/lib/ui/styles'
-import { STAT_TONE, statTileClass } from '@/lib/ui/stat-tones'
 import { trackEvent } from '@/lib/analytics'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,10 +44,15 @@ const TIME_OPTS: { value: TimeFilter; label: string }[] = [
 interface FunnelStageDef {
   id:     string
   name:   string
+  // Each stage owns a distinct, fixed tint (fill + matching border/ink/dot) tied to
+  // its MEANING — so any subset shown, in any order, is automatically all-different
+  // and a stage keeps its colour wherever it's dragged (Hired stays green, etc.).
   accent: {
-    border: string   // border-t-* colour class
-    dot:    string   // bg-* for dot
-    badge:  string   // bg + text for count chip
+    fill:   string   // bg-* card fill
+    border: string   // border-* card border
+    ink:    string   // text-* for the count + stage name
+    sub:    string   // text-* for the muted "candidates" sublabel
+    dot:    string   // bg-* for the status dot
   }
 }
 
@@ -57,14 +61,14 @@ interface FunnelStageDef {
 // the Pipeline (Kanban) page uses, keeping the two views in agreement. Each stage's
 // `id` IS the status value, which makes counting a direct tally (no fuzzy mapping).
 const ALL_FUNNEL_DEFS: FunnelStageDef[] = [
-  { id: 'active',         name: 'Active',         accent: { border: 'border-t-slate-400',   dot: 'bg-slate-500',   badge: 'bg-slate-100 text-slate-700' } },
-  { id: 'interviewing',   name: 'Interviewing',   accent: { border: 'border-t-amber-400',   dot: 'bg-amber-500',   badge: 'bg-amber-100 text-amber-700' } },
-  { id: 'offer_extended', name: 'Offer Extended', accent: { border: 'border-t-emerald-400', dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' } },
-  { id: 'hired',          name: 'Hired',          accent: { border: 'border-t-emerald-600', dot: 'bg-emerald-600', badge: 'bg-emerald-100 text-emerald-800' } },
+  { id: 'active',         name: 'Active',         accent: { fill: 'bg-[#f4eee1]', border: 'border-[#e7dcc6]', ink: 'text-[#2a2118]', sub: 'text-[#7a6f5d]', dot: 'bg-[#b29a73]' } }, // sand
+  { id: 'interviewing',   name: 'Interviewing',   accent: { fill: 'bg-[#fbe7bc]', border: 'border-[#f1d595]', ink: 'text-[#6f450f]', sub: 'text-[#8a5a14]', dot: 'bg-[#d99a2b]' } }, // honey
+  { id: 'offer_extended', name: 'Offer Extended', accent: { fill: 'bg-[#f7ddc6]', border: 'border-[#eec4a4]', ink: 'text-[#6b3d17]', sub: 'text-[#8a4f18]', dot: 'bg-[#d98a4e]' } }, // clay
+  { id: 'hired',          name: 'Hired',          accent: { fill: 'bg-[#d9ece1]', border: 'border-[#bedccd]', ink: 'text-[#0c4634]', sub: 'text-[#15604a]', dot: 'bg-[#2f9c72]' } }, // sage
   // Optional, off by default — real statuses, but side-states rather than forward progress.
-  { id: 'on_hold',        name: 'On Hold',        accent: { border: 'border-t-orange-400',  dot: 'bg-orange-500',  badge: 'bg-orange-100 text-orange-700' } },
-  { id: 'inactive',       name: 'Inactive',       accent: { border: 'border-t-slate-300',   dot: 'bg-slate-400',   badge: 'bg-slate-100 text-slate-600' } },
-  { id: 'rejected',       name: 'Rejected',       accent: { border: 'border-t-red-300',     dot: 'bg-red-400',     badge: 'bg-red-100 text-red-700' } },
+  { id: 'on_hold',        name: 'On Hold',        accent: { fill: 'bg-[#e3e7f0]', border: 'border-[#ccd4e4]', ink: 'text-[#2f3a4d]', sub: 'text-[#56627a]', dot: 'bg-[#6577a0]' } }, // blue-grey
+  { id: 'inactive',       name: 'Inactive',       accent: { fill: 'bg-[#eae6dd]', border: 'border-[#d8d2c4]', ink: 'text-[#4f483d]', sub: 'text-[#8a7f6f]', dot: 'bg-[#9a8f7d]' } }, // stone
+  { id: 'rejected',       name: 'Rejected',       accent: { fill: 'bg-[#f6dcd6]', border: 'border-[#ecc0b6]', ink: 'text-[#7a2e22]', sub: 'text-[#9a5345]', dot: 'bg-[#cf6952]' } }, // rose
 ]
 
 // Bumped to v2 when the stages were re-pointed at real CandidateStatus values — the
@@ -329,7 +333,9 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
                   onDragOver={e => handleDragOver(e, def.id)}
                   onDrop={() => handleDrop(def.id)}
                   onDragEnd={handleDragEnd}
-                  className={`flex flex-1 min-w-0 flex-col rounded-xl border border-t-2 bg-white px-4 py-3 select-none cursor-grab active:cursor-grabbing transition-all ${
+                  className={`flex flex-1 min-w-0 flex-col rounded-xl border px-4 py-3 select-none cursor-grab active:cursor-grabbing transition-all ${
+                    def.accent.fill
+                  } ${
                     def.accent.border
                   } ${
                     isDragging  ? 'opacity-40 scale-95 shadow-none' :
@@ -339,10 +345,10 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
                 >
                   <div className="flex items-center gap-1.5 mb-2">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${def.accent.dot}`} />
-                    <span className="text-[11px] font-semibold text-slate-600 truncate leading-tight">{def.name}</span>
+                    <span className={`text-[11px] font-semibold ${def.accent.ink} truncate leading-tight`}>{def.name}</span>
                   </div>
-                  <p className="text-2xl font-bold text-slate-800 leading-none">{count}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">candidates</p>
+                  <p className={`text-2xl font-bold ${def.accent.ink} leading-none`}>{count}</p>
+                  <p className={`text-[10px] ${def.accent.sub} mt-1`}>candidates</p>
                 </div>
 
                 {/* Arrow connector */}
@@ -435,15 +441,23 @@ export default function CandidatesPage() {
   }
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const counts = useMemo(() => ({
-    total:        candidates.length,
-    active:       candidates.filter(c => c.status === 'active').length,
-    interviewing: candidates.filter(c => c.status === 'interviewing').length,
-    hired:        candidates.filter(c => c.status === 'hired').length,
-  }), [candidates])
+  // Time filter is the page-level scope: it narrows the candidate set that BOTH the
+  // hiring funnel and the list below draw from (search + status only refine the list).
+  const timeScoped = useMemo(() => {
+    if (timeFilter === 'all') return candidates
+    if (timeFilter === 'custom') {
+      let result = candidates
+      if (customFrom) result = result.filter(c => new Date(c.created_at) >= new Date(customFrom))
+      if (customTo)   result = result.filter(c => new Date(c.created_at) <= new Date(customTo + 'T23:59:59'))
+      return result
+    }
+    const now = Date.now()
+    const ms  = timeFilter === '7d' ? 7 * 86_400_000 : timeFilter === '30d' ? 30 * 86_400_000 : 91 * 86_400_000
+    return candidates.filter(c => now - new Date(c.created_at).getTime() <= ms)
+  }, [candidates, timeFilter, customFrom, customTo])
 
   const filtered = useMemo(() => {
-    let result = [...candidates]
+    let result = [...timeScoped]
     if (filterStatus !== 'all') result = result.filter(c => c.status === filterStatus)
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -454,16 +468,6 @@ export default function CandidatesPage() {
         (c.location ?? '').toLowerCase().includes(q)
       )
     }
-    if (timeFilter !== 'all') {
-      if (timeFilter === 'custom') {
-        if (customFrom) result = result.filter(c => new Date(c.created_at) >= new Date(customFrom))
-        if (customTo)   result = result.filter(c => new Date(c.created_at) <= new Date(customTo + 'T23:59:59'))
-      } else {
-        const now = Date.now()
-        const ms  = timeFilter === '7d' ? 7 * 86_400_000 : timeFilter === '30d' ? 30 * 86_400_000 : 91 * 86_400_000
-        result = result.filter(c => now - new Date(c.created_at).getTime() <= ms)
-      }
-    }
     result.sort((a, b) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vA = String((a as any)[sortKey] ?? '')
@@ -473,7 +477,7 @@ export default function CandidatesPage() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return result
-  }, [candidates, filterStatus, search, timeFilter, customFrom, customTo, sortKey, sortDir])
+  }, [timeScoped, filterStatus, search, sortKey, sortDir])
 
   const timeLabel = timeFilter === '7d' ? 'Last 7 days' : timeFilter === '30d' ? 'Last 30 days'
     : timeFilter === '3m' ? 'Last 3 months' : timeFilter === 'custom' ? 'Custom range' : 'All time'
@@ -558,6 +562,61 @@ export default function CandidatesPage() {
           <p className="text-sm text-slate-500 mt-0.5">Your talent pool across all roles</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Time filter — scopes the whole page (funnel + list) */}
+          <div className="relative">
+            <button
+              onClick={() => setShowTimePicker(p => !p)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
+                timeFilter !== 'all'
+                  ? 'border-slate-300 bg-slate-50 text-slate-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
+              }`}
+              title="Time filter"
+            >
+              <CalendarDays className="h-4 w-4" />
+              <span className="text-xs">{timeFilter !== 'all' ? timeLabel : 'All time'}</span>
+            </button>
+            {showTimePicker && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 w-52">
+                  {TIME_OPTS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setTimeFilter(opt.value); setPage(1)
+                        if (opt.value !== 'custom') setShowTimePicker(false)
+                      }}
+                      className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                        timeFilter === opt.value ? 'bg-slate-50 text-slate-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {opt.label}
+                      {timeFilter === opt.value && <Check className="h-3 w-3 ml-auto shrink-0" />}
+                    </button>
+                  ))}
+                  {timeFilter === 'custom' && (
+                    <div className="px-2 pt-2 pb-1 border-t border-slate-100 mt-1 space-y-2">
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
+                        <input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setPage(1) }}
+                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
+                        <input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setPage(1) }}
+                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
+                      </div>
+                      <button onClick={() => setShowTimePicker(false)}
+                        className="w-full text-xs bg-[#221b14] text-white rounded-lg py-1.5 hover:bg-[#33271b] transition-colors font-semibold">
+                        Apply
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
           <button
             onClick={() => {
               const params = new URLSearchParams()
@@ -581,38 +640,8 @@ export default function CandidatesPage() {
         </div>
       </div>
 
-      {/* Stat cards */}
-      {loading ? (
-        <div className="grid grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-slate-200 bg-white p-3.5 animate-pulse">
-              <div className="h-7 w-10 rounded bg-slate-200 mb-2" />
-              <div className="h-3 w-16 rounded bg-slate-100" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-4 gap-3">
-          {([
-            { label: 'Total',        value: counts.total,        tone: 'slate', filter: 'all'          },
-            { label: 'Active',       value: counts.active,       tone: 'pine',  filter: 'active'       },
-            { label: 'Interviewing', value: counts.interviewing, tone: 'amber', filter: 'interviewing' },
-            { label: 'Hired',        value: counts.hired,        tone: 'gold',  filter: 'hired'        },
-          ] as const).map(stat => (
-            <button
-              key={stat.label}
-              onClick={() => { setFilterStatus(filterStatus === stat.filter ? 'all' : stat.filter); setPage(1) }}
-              className={statTileClass(stat.tone, filterStatus === stat.filter)}
-            >
-              <p className={`text-2xl font-bold ${STAT_TONE[stat.tone].ink}`}>{stat.value}</p>
-              <p className={`mt-0.5 text-xs font-medium ${STAT_TONE[stat.tone].sub}`}>{stat.label}</p>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Hiring Funnel */}
-      <PipelineFunnel candidates={candidates} />
+      {/* Hiring Funnel — scoped to the selected time range (header time filter) */}
+      <PipelineFunnel candidates={timeScoped} />
 
       {/* Filters */}
       <div className="flex items-center gap-3">
@@ -647,59 +676,6 @@ export default function CandidatesPage() {
             <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
           ))}
         </select>
-
-        {/* Time filter (mirrors the Jobs page) */}
-        <div className="relative shrink-0">
-          <button
-            onClick={() => setShowTimePicker(p => !p)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
-              timeFilter !== 'all'
-                ? 'border-slate-300 bg-slate-50 text-slate-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
-            }`}
-            title="Time filter"
-          >
-            <CalendarDays className="h-4 w-4" />
-            {timeFilter !== 'all' && <span className="text-xs">{timeLabel}</span>}
-          </button>
-          {showTimePicker && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
-              <div className="absolute right-0 top-full mt-1 z-50 w-52 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
-                {TIME_OPTS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => { setTimeFilter(opt.value); setPage(1); if (opt.value !== 'custom') setShowTimePicker(false) }}
-                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                      timeFilter === opt.value ? 'bg-slate-50 font-semibold text-slate-700' : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {opt.label}
-                    {timeFilter === opt.value && <Check className="ml-auto h-3 w-3 shrink-0" />}
-                  </button>
-                ))}
-                {timeFilter === 'custom' && (
-                  <div className="mt-1 space-y-2 border-t border-slate-100 px-2 pb-1 pt-2">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-500">From</label>
-                      <input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setPage(1) }}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none transition focus:border-emerald-400" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-500">To</label>
-                      <input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setPage(1) }}
-                        className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none transition focus:border-emerald-400" />
-                    </div>
-                    <button onClick={() => setShowTimePicker(false)}
-                      className="w-full rounded-lg bg-[#221b14] py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#33271b]">
-                      Apply
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
 
         {(filterStatus !== 'all' || search || timeFilter !== 'all') && (
           <button

@@ -50,6 +50,16 @@ entries on top.
   updated to match.
 
 ### Changed
+- **Candidates page: one set of cards, tinted by meaning; time filter moved to
+  the header and now scopes the whole page.** Removed the top row of 4 summary
+  stat cards (Total / Active / Interviewing / Hired) that duplicated the hiring
+  funnel below it. The funnel cards now carry the warm tinted fill (one fixed,
+  distinct colour per stage — sand / honey / clay / sage / blue-grey / stone /
+  rose — so any subset you assemble via "Customise funnel" is always all-distinct
+  and colour = meaning). The time filter was promoted from the filter row to the
+  top-right of the page header and now scopes **both** the funnel and the list
+  (via a shared `timeScoped` derivation), so the whole page reflects the chosen
+  date range. (`app/(dashboard)/candidates/page.tsx`.)
 - **Candidates hiring funnel now shows real data.** The funnel's stages were
   decorative labels (Sourced, Screened, Engaged, Offer Accepted, Offer Rolled
   Out, Onboarded) that mostly mapped to nothing, so most cards were stuck at 0.
