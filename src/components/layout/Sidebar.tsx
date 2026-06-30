@@ -196,8 +196,8 @@ export function Sidebar() {
     const isOpen    = openSection === s.section
     const cls = `flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-colors ${
       active
-        ? 'bg-white/10 text-[#f6efe3]'
-        : 'text-[#a99c87] hover:bg-white/5 hover:text-[#f6efe3]'
+        ? 'bg-white/10 text-[#fdfbf7]'
+        : 'text-[#c8beac] hover:bg-white/5 hover:text-[#fdfbf7]'
     }`
     // A bucket shows a small red dot when one of its (collapsed) flyout items has
     // a pending count, so the badge is noticeable without opening the flyout.
@@ -205,7 +205,7 @@ export function Sidebar() {
     const inner = (
       <>
         <span className="relative shrink-0">
-          <Icon className={`h-[18px] w-[18px] ${active ? 'text-[#f6efe3]' : 'text-[#7d7160]'}`} />
+          <Icon className={`h-[18px] w-[18px] ${active ? 'text-[#fdfbf7]' : 'text-[#9a8f7b]'}`} />
           {bucketBadge > 0 && !isOpen && (
             <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#221b14]" />
           )}
@@ -279,7 +279,7 @@ export function Sidebar() {
         {sections.map(s => (
           <div key={s.section}>
             {s.section !== 'Dashboard' && (
-              <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8a7d68]">
+              <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#aa9e87]">
                 {s.section}
               </p>
             )}
@@ -296,11 +296,11 @@ export function Sidebar() {
                     href={href}
                     className={`flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-colors ${
                       active
-                        ? 'bg-white/10 text-[#f6efe3]'
-                        : 'text-[#a99c87] hover:bg-white/5 hover:text-[#f6efe3]'
+                        ? 'bg-white/10 text-[#fdfbf7]'
+                        : 'text-[#c8beac] hover:bg-white/5 hover:text-[#fdfbf7]'
                     }`}
                   >
-                    <ItemIcon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-[#f6efe3]' : 'text-[#7d7160]'}`} />
+                    <ItemIcon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-[#fdfbf7]' : 'text-[#9a8f7b]'}`} />
                     <span className="truncate">{label}</span>
                     {badge > 0 && (
                       <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
@@ -324,7 +324,7 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 border-b border-white/10 px-3">
           <BrandMark />
-          <span className="truncate font-display text-sm font-bold tracking-tight text-[#f6efe3]">
+          <span className="truncate font-display text-sm font-bold tracking-tight text-[#fdfbf7]">
             Recruiter<span className="font-extrabold">Stack</span>
           </span>
         </div>
@@ -341,7 +341,7 @@ export function Sidebar() {
           <div className="flex items-center gap-2">
             <UserButton afterSignOutUrl="/sign-in" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-[#cdbfa8]">
+              <p className="truncate text-xs font-semibold text-[#dcd2bf]">
                 {organization?.name ?? 'RecruiterStack'}
               </p>
             </div>
@@ -371,14 +371,14 @@ export function Sidebar() {
             <div className="flex h-14 items-center justify-between border-b border-white/10 px-3">
               <div className="flex items-center gap-2">
                 <BrandMark />
-                <span className="truncate font-display text-sm font-bold tracking-tight text-[#f6efe3]">
+                <span className="truncate font-display text-sm font-bold tracking-tight text-[#fdfbf7]">
                   Recruiter<span className="font-extrabold">Stack</span>
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#a99c87] hover:bg-white/10 hover:text-[#f6efe3]"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#c8beac] hover:bg-white/10 hover:text-[#fdfbf7]"
                 aria-label="Close navigation"
               >
                 <X className="h-4 w-4" />
@@ -389,7 +389,7 @@ export function Sidebar() {
               <div className="flex items-center gap-3">
                 <UserButton afterSignOutUrl="/sign-in" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-[#cdbfa8]">
+                  <p className="truncate text-xs font-semibold text-[#dcd2bf]">
                     {organization?.name ?? 'RecruiterStack'}
                   </p>
                 </div>

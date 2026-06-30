@@ -12,6 +12,13 @@ entries on top.
 ## 2026-06-30
 
 ### Changed
+- **Sharper text contrast — brighter sidebar, darker body type.** Brightened the
+  espresso sidebar's nav text and icons (inactive items + active/brand text toward
+  near-white) so they stand out on the dark strip; darkened the platform's
+  warm-neutral text ramp (headings → near-black #181310, body text darker) for
+  crisper reading on the cream background; and amplified the dashboard
+  view-selector labels (Home / Recruiter Dashboard / …) to a larger, semibold,
+  darker style.
 - **Approval chains page now groups chains by target type into foldable sections.**
   The `/admin/approvals` list was a flat mix of Requisition, Pipeline, and Offer
   chains; it now stacks three collapsible cards in a fixed order — Requisitions,

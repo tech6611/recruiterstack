@@ -40,10 +40,10 @@ const config: Config = {
           300: '#ddd2bf',
           400: '#b3a791', // muted icons / placeholder
           500: '#8a7f6f', // secondary text
-          600: '#6b6256',
-          700: '#4f483d',
-          800: '#36302a',
-          900: '#2a2118', // headings (bark)
+          600: '#544c42',
+          700: '#363029',
+          800: '#262019',
+          900: '#181310', // headings (bark)
           950: '#1c1610',
         },
         gold: {

@@ -279,11 +279,11 @@ function ViewsSidebar({
                 <button
                   onClick={() => onSelect(v.id)}
                   className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
-                    isActive ? 'bg-slate-50 text-slate-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    isActive ? 'bg-slate-100 text-slate-900' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
-                  <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-slate-500' : 'text-slate-400'}`} />
-                  <span className="truncate text-xs font-medium">{v.name}</span>
+                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-slate-700' : 'text-slate-500'}`} />
+                  <span className="truncate text-sm font-semibold">{v.name}</span>
                 </button>
               )}
               {editMode && renamingId !== v.id && (
