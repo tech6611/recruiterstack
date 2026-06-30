@@ -11,6 +11,15 @@ entries on top.
 
 ## 2026-06-30
 
+### Changed
+- **Candidates hiring funnel now matches the Jobs/Requisitions card style.** Flipped
+  the funnel cards so the count sits on top and the stage label below (like the
+  Jobs and Requisitions summary cards), and re-tinted them by *position* instead
+  of by meaning so the first five cards run the same warm sequence those pages use
+  (sand → honey → sage → clay → stone); extra stages continue with blue-grey, then
+  rose. Trade-off: Hired/Rejected no longer read green/red — colour now follows the
+  card's slot for a consistent look. (`src/app/(dashboard)/candidates/page.tsx`.)
+
 ### Removed
 - **Retired the duplicate "Job pipelines" page (`/req-jobs`).** It listed the same
   `jobs` table as the main Jobs board (`/jobs`), so it was redundant. The

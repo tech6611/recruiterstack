@@ -42,33 +42,48 @@ const TIME_OPTS: { value: TimeFilter; label: string }[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface FunnelStageDef {
-  id:     string
-  name:   string
-  // Each stage owns a distinct, fixed tint (fill + matching border/ink/dot) tied to
-  // its MEANING — so any subset shown, in any order, is automatically all-different
-  // and a stage keeps its colour wherever it's dragged (Hired stays green, etc.).
-  accent: {
-    fill:   string   // bg-* card fill
-    border: string   // border-* card border
-    ink:    string   // text-* for the count + stage name
-    sub:    string   // text-* for the muted "candidates" sublabel
-    dot:    string   // bg-* for the status dot
-  }
+  id:   string
+  name: string
 }
+
+interface FunnelAccent {
+  fill:   string   // bg-* card fill
+  border: string   // border-* card border
+  ink:    string   // text-* for the count + stage name
+  sub:    string   // text-* for the muted sublabel
+  dot:    string   // bg-* for the status dot
+}
+
+// Card tints are assigned by POSITION (not by stage meaning) so the funnel reads
+// like the Jobs and Requisitions summary cards: the first five slots always run
+// sand → honey → sage → clay → stone, the exact warm sequence those pages use.
+// Extra stages beyond five continue the same palette (blue-grey, rose) and then
+// cycle. Reordering a stage adopts its new slot's colour, so every visible card
+// stays a distinct hue.
+const FUNNEL_PALETTE: FunnelAccent[] = [
+  { fill: 'bg-[#f4eee1]', border: 'border-[#e7dcc6]', ink: 'text-[#2a2118]', sub: 'text-[#7a6f5d]', dot: 'bg-[#b29a73]' }, // sand
+  { fill: 'bg-[#fbe7bc]', border: 'border-[#f1d595]', ink: 'text-[#6f450f]', sub: 'text-[#8a5a14]', dot: 'bg-[#d99a2b]' }, // honey
+  { fill: 'bg-[#d9ece1]', border: 'border-[#bedccd]', ink: 'text-[#0c4634]', sub: 'text-[#15604a]', dot: 'bg-[#2f9c72]' }, // sage
+  { fill: 'bg-[#f7ddc6]', border: 'border-[#eec4a4]', ink: 'text-[#6b3d17]', sub: 'text-[#8a4f18]', dot: 'bg-[#d98a4e]' }, // clay
+  { fill: 'bg-[#eae6dd]', border: 'border-[#d8d2c4]', ink: 'text-[#4f483d]', sub: 'text-[#8a7f6f]', dot: 'bg-[#9a8f7d]' }, // stone
+  { fill: 'bg-[#e3e7f0]', border: 'border-[#ccd4e4]', ink: 'text-[#2f3a4d]', sub: 'text-[#56627a]', dot: 'bg-[#6577a0]' }, // blue-grey
+  { fill: 'bg-[#f6dcd6]', border: 'border-[#ecc0b6]', ink: 'text-[#7a2e22]', sub: 'text-[#9a5345]', dot: 'bg-[#cf6952]' }, // rose
+]
+const funnelAccent = (idx: number): FunnelAccent => FUNNEL_PALETTE[idx % FUNNEL_PALETTE.length]
 
 // Funnel stages map 1:1 to the real CandidateStatus values (database.ts), so every
 // card shows a true count drawn straight from candidate.status — the same vocabulary
-// the Pipeline (Kanban) page uses, keeping the two views in agreement. Each stage's
-// `id` IS the status value, which makes counting a direct tally (no fuzzy mapping).
+// the Pipeline (Kanban) page uses. Each stage's `id` IS the status value, which makes
+// counting a direct tally (no fuzzy mapping). Colour is positional (see FUNNEL_PALETTE).
 const ALL_FUNNEL_DEFS: FunnelStageDef[] = [
-  { id: 'active',         name: 'Active',         accent: { fill: 'bg-[#f4eee1]', border: 'border-[#e7dcc6]', ink: 'text-[#2a2118]', sub: 'text-[#7a6f5d]', dot: 'bg-[#b29a73]' } }, // sand
-  { id: 'interviewing',   name: 'Interviewing',   accent: { fill: 'bg-[#fbe7bc]', border: 'border-[#f1d595]', ink: 'text-[#6f450f]', sub: 'text-[#8a5a14]', dot: 'bg-[#d99a2b]' } }, // honey
-  { id: 'offer_extended', name: 'Offer Extended', accent: { fill: 'bg-[#f7ddc6]', border: 'border-[#eec4a4]', ink: 'text-[#6b3d17]', sub: 'text-[#8a4f18]', dot: 'bg-[#d98a4e]' } }, // clay
-  { id: 'hired',          name: 'Hired',          accent: { fill: 'bg-[#d9ece1]', border: 'border-[#bedccd]', ink: 'text-[#0c4634]', sub: 'text-[#15604a]', dot: 'bg-[#2f9c72]' } }, // sage
+  { id: 'active',         name: 'Active'         },
+  { id: 'interviewing',   name: 'Interviewing'   },
+  { id: 'offer_extended', name: 'Offer Extended' },
+  { id: 'hired',          name: 'Hired'          },
   // Optional, off by default — real statuses, but side-states rather than forward progress.
-  { id: 'on_hold',        name: 'On Hold',        accent: { fill: 'bg-[#e3e7f0]', border: 'border-[#ccd4e4]', ink: 'text-[#2f3a4d]', sub: 'text-[#56627a]', dot: 'bg-[#6577a0]' } }, // blue-grey
-  { id: 'inactive',       name: 'Inactive',       accent: { fill: 'bg-[#eae6dd]', border: 'border-[#d8d2c4]', ink: 'text-[#4f483d]', sub: 'text-[#8a7f6f]', dot: 'bg-[#9a8f7d]' } }, // stone
-  { id: 'rejected',       name: 'Rejected',       accent: { fill: 'bg-[#f6dcd6]', border: 'border-[#ecc0b6]', ink: 'text-[#7a2e22]', sub: 'text-[#9a5345]', dot: 'bg-[#cf6952]' } }, // rose
+  { id: 'on_hold',        name: 'On Hold'        },
+  { id: 'inactive',       name: 'Inactive'       },
+  { id: 'rejected',       name: 'Rejected'       },
 ]
 
 // Bumped to v2 when the stages were re-pointed at real CandidateStatus values — the
@@ -171,9 +186,10 @@ function FunnelCustomizer({
       <div className="mb-4">
         <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Active stages</p>
         <div className="flex flex-wrap gap-1.5">
-          {activeIds.map(id => {
+          {activeIds.map((id, idx) => {
             const def = ALL_FUNNEL_DEFS.find(d => d.id === id)
             if (!def) return null
+            const accent = funnelAccent(idx)
             const isDragging = draggingId === id
             const isDragOver = dragOverId === id && draggingId !== id
             return (
@@ -191,7 +207,7 @@ function FunnelCustomizer({
                 }`}
               >
                 <GripVertical className="h-3 w-3 text-slate-300" />
-                <span className={`h-2 w-2 shrink-0 rounded-full ${def.accent.dot}`} />
+                <span className={`h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
                 <span className="text-xs font-medium text-slate-700">{def.name}</span>
                 <button
                   onClick={() => onChange(activeIds.filter(x => x !== id))}
@@ -320,6 +336,7 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
         <div className="flex items-stretch px-4 py-4 gap-0">
           {activeDefs.map((def, idx) => {
             const count      = counts.get(def.id) ?? 0
+            const accent     = funnelAccent(idx)
             const isLast     = idx === activeDefs.length - 1
             const isDragging = draggingId === def.id
             const isDragOver = dragOverId === def.id && draggingId !== def.id
@@ -334,20 +351,20 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
                   onDrop={() => handleDrop(def.id)}
                   onDragEnd={handleDragEnd}
                   className={`flex flex-1 min-w-0 flex-col rounded-xl border px-4 py-3 select-none cursor-grab active:cursor-grabbing transition-all ${
-                    def.accent.fill
+                    accent.fill
                   } ${
-                    def.accent.border
+                    accent.border
                   } ${
                     isDragging  ? 'opacity-40 scale-95 shadow-none' :
                     isDragOver  ? 'shadow-md ring-1 ring-slate-300 -translate-y-1' :
                     'shadow-sm hover:shadow-md hover:-translate-y-0.5'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${def.accent.dot}`} />
-                    <span className={`text-[11px] font-semibold ${def.accent.ink} truncate leading-tight`}>{def.name}</span>
+                  <p className={`text-2xl font-bold ${accent.ink} leading-none`}>{count}</p>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
+                    <span className={`text-[11px] font-semibold ${accent.ink} truncate leading-tight`}>{def.name}</span>
                   </div>
-                  <p className={`text-2xl font-bold ${def.accent.ink} leading-none`}>{count}</p>
                 </div>
 
                 {/* Arrow connector */}
