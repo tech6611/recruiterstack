@@ -23,7 +23,6 @@ vi.mock('../send', () => ({ sendWhatsApp: mocks.sendWhatsApp }))
 vi.mock('@/lib/notifications', () => ({ notify: mocks.notify }))
 vi.mock('@/lib/agents/sub-agent', () => ({ runSubAgent: mocks.runSubAgent }))
 vi.mock('@/lib/copilot-tools', () => ({ COPILOT_TOOLS: [] }))
-vi.mock('@anthropic-ai/sdk', () => ({ default: class MockAnthropic {} }))
 vi.mock('@/lib/supabase/server', () => ({
   createAdminClient: () => ({ from: () => ({ insert: mocks.insert }) }),
 }))
@@ -76,7 +75,7 @@ function conversation(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.stubEnv('ANTHROPIC_API_KEY', 'test-key')
+  vi.stubEnv('GEMINI_API_KEY', 'test-key')
   mocks.getConversationHistory.mockResolvedValue([])
 })
 

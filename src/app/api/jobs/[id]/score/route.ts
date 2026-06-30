@@ -57,7 +57,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
   }
 
   // Skip already-scored apps unless a specific applicationId was given (manual re-score)
-  // This prevents duplicate Claude API calls when "Score this stage" is clicked again
+  // This prevents duplicate AI API calls when "Score this stage" is clicked again
   if (!applicationId) {
     apps = apps.filter(a => !a.ai_scored_at)
     if (apps.length === 0) {

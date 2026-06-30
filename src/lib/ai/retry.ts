@@ -25,7 +25,7 @@ export async function withRetry<T>(
     } catch (err: unknown) {
       const isLast = attempt === maxRetries
 
-      // Check if error has a status code (Anthropic SDK errors)
+      // Check if error has a status code (AI SDK / HTTP errors)
       const status = (err as { status?: number })?.status
       const isRetryable = status ? RETRYABLE_STATUSES.has(status) : isNetworkError(err)
 

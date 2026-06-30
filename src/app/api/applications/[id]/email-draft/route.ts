@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { withCapability } from '@/lib/api/helpers'
 import { parseAiJson } from '@/lib/ai/parse-ai-response'
 import { emailDraftResponseSchema } from '@/lib/ai/schemas'
 import { trackUsage } from '@/lib/ai/track-usage'
+import { generateText } from '@/lib/ai/llm'
 
 type TemplateKey = 'interview_invite' | 'rejection' | 'offer' | 'followup'
 
@@ -16,10 +16,10 @@ const TEMPLATE_DESC: Record<TemplateKey, string> = {
 
 // POST /api/applications/[id]/email-draft
 export const POST = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY is not configured. Add it to .env.local to enable AI email drafts.' },
+      { error: 'GEMINI_API_KEY is not configured. Add it to .env.local to enable AI email drafts.' },
       { status: 503 }
     )
   }
@@ -64,9 +64,7 @@ export const POST = withCapability('recruiting:edit', async (request, orgId, sup
   const department  = job?.department
   const stageName   = stage?.name ?? 'Applied'
 
-  // ── Call Claude ────────────────────────────────────────────────────────────
-  const client = new Anthropic({ apiKey })
-
+  // ── Call the LLM ───────────────────────────────────────────────────────────
   const prompt = `Write ${TEMPLATE_DESC[template]} email from a recruiter to a job candidate.
 
 <candidate_context>
@@ -91,16 +89,14 @@ Respond with ONLY a valid JSON object in this exact format, nothing else:
 
   try {
     const MODEL = 'claude-haiku-4-5-20251001'
-    const message = await client.messages.create({
-      model:      MODEL,
-      max_tokens: 600,
-      messages:   [{ role: 'user', content: prompt }],
+    const { text, usage, model } = await generateText(prompt, {
+      model:     MODEL,
+      maxTokens: 600,
     })
 
-    trackUsage('email-draft', MODEL, message.usage)
+    trackUsage('email-draft', model, usage)
 
-    const raw  = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-    const draft = parseAiJson(raw, emailDraftResponseSchema, 'Email Draft')
+    const draft = parseAiJson(text.trim(), emailDraftResponseSchema, 'Email Draft')
 
     return NextResponse.json({ data: draft })
   } catch {

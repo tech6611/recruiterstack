@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Database,
@@ -12,6 +11,7 @@ import type {
 } from '@/lib/types/database'
 import { COPILOT_TOOLS } from '@/lib/copilot-tools'
 import { runSubAgent } from '@/lib/agents/sub-agent'
+import type { ClaudeTool } from '@/lib/ai/llm'
 import { createNotification } from '@/lib/api/notify'
 
 type Supabase = SupabaseClient<Database>
@@ -43,7 +43,7 @@ const HRIS_READ_TOOL_NAMES = new Set([
   'list_employee_okrs',
   'get_okr',
 ])
-const HRIS_READ_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
+const HRIS_READ_TOOLS: ClaudeTool[] = COPILOT_TOOLS.filter(t =>
   HRIS_READ_TOOL_NAMES.has(t.name),
 )
 
@@ -279,9 +279,7 @@ Look up whatever data is needed and write a helpful reply.`
 
   let answer = ''
   try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     answer = await runSubAgent({
-      client,
       model: MODEL,
       tools: HRIS_READ_TOOLS,
       systemPrompt,

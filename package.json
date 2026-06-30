@@ -19,6 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@clerk/nextjs": "^5.7.5",
+    "@google/genai": "^2.10.0",
     "@hookform/resolvers": "^5.2.2",
     "@sendgrid/mail": "^8.1.6",
     "@sentry/nextjs": "^10.45.0",

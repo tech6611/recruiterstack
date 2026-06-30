@@ -25,7 +25,7 @@ const SECTIONS = [
   },
   {
     title: '6. Third-Party Services',
-    body:  'We use Clerk for authentication, Supabase for data storage, Vercel for hosting, and Anthropic\'s Claude API for AI features. Each of these services has their own privacy policy governing how they handle data.',
+    body:  'We use Clerk for authentication, Supabase for data storage, Vercel for hosting, and Google\'s Gemini API for AI features. Each of these services has their own privacy policy governing how they handle data.',
   },
   {
     title: '7. Your Rights',

@@ -9,12 +9,12 @@
  * (0–4 scale, matching the manual scorecard scale) stored as ai_criterion_scores.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
 import type { Candidate, HiringRequest } from '@/lib/types/database'
 import { parseAiJson } from '@/lib/ai/parse-ai-response'
 import { jobScoreResponseSchema, type JobScoreResponse } from '@/lib/ai/schemas'
 import { trackUsage } from '@/lib/ai/track-usage'
 import { withRetry } from '@/lib/ai/retry'
+import { generateText } from '@/lib/ai/llm'
 
 export interface CriterionScore {
   name:   string  // matches criterion name from scoring_criteria
@@ -127,18 +127,12 @@ export async function scoreApplicationForJob(
   candidate: Candidate,
   job: HiringRequest,
 ): Promise<JobScoreResponse> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-  const message = await withRetry(() => client.messages.create({
-    model:      MODEL,
-    max_tokens: 600,
-    messages:   [{ role: 'user', content: buildPrompt(candidate, job) }],
+  const { text, usage, model } = await withRetry(() => generateText(buildPrompt(candidate, job), {
+    model:     MODEL,
+    maxTokens: 600,
   }), { label: 'Job Scorer' })
 
-  trackUsage('job-scorer', MODEL, message.usage)
+  trackUsage('job-scorer', model, usage)
 
-  const content = message.content[0]
-  if (content.type !== 'text') throw new Error('Unexpected Claude response type')
-
-  return parseAiJson(content.text, jobScoreResponseSchema, 'Job Scorer')
+  return parseAiJson(text, jobScoreResponseSchema, 'Job Scorer')
 }

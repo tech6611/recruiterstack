@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import type { Content } from '@google/genai'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getPermissionSet } from '@/lib/rbac'
@@ -26,6 +26,12 @@ import {
 } from '@/lib/agents/orchestrator'
 import { checkAuthRateLimit } from '@/lib/api/rate-limit'
 import { trackUsage } from '@/lib/ai/track-usage'
+import {
+  CopilotTurn,
+  copilotConfig,
+  functionResultsContent,
+  messagesToContents,
+} from '@/lib/ai/llm'
 
 const MODEL = 'claude-opus-4-6'
 
@@ -75,7 +81,6 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createAdminClient()
-  const client   = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   // The copilot acts as the user — its tools are gated by the user's capabilities.
   const capabilities = await getPermissionSet(supabase, orgId, userId)
 
@@ -86,70 +91,31 @@ export async function POST(request: NextRequest) {
         controller.enqueue(enc.encode(`data: ${JSON.stringify(payload)}\n\n`))
 
       try {
-        // Server-side conversation accumulates tool use/result blocks
-        // Client only holds user/assistant text turns
-        const conversationMessages: Anthropic.MessageParam[] = messages.map(m => ({
-          role:    m.role,
-          content: m.content,
-        }))
+        // Server-side conversation accumulates model turns + tool results.
+        // The client only holds user/assistant text turns.
+        const config = copilotConfig({
+          system:   ORCHESTRATOR_SYSTEM_PROMPT,
+          tools:    ORCHESTRATOR_TOOLS,
+          maxTokens: 4096,
+        })
+        const contents: Content[] = messagesToContents(messages)
 
-        // Agentic loop — max 6 iterations to prevent runaway
+        // Agentic loop — capped to prevent runaway.
         for (let iteration = 0; iteration < 15; iteration++) {
-          const claudeStream = client.messages.stream({
-            model:    MODEL,
-            max_tokens: 4096,
-            thinking: { type: 'adaptive' },
-            system:   ORCHESTRATOR_SYSTEM_PROMPT,
-            tools:    ORCHESTRATOR_TOOLS,
-            messages: conversationMessages,
-          })
-
-          const toolCalls: { id: string; name: string; inputJson: string }[] = []
-          let currentToolCall: { id: string; name: string; inputJson: string } | null = null
-          let stopReason = ''
+          const turn = new CopilotTurn(contents, config, MODEL)
           let textBuffer = ''
 
-          for await (const event of claudeStream) {
-            // ── Block starts ──────────────────────────────────────────────────
-            if (event.type === 'content_block_start') {
-              if (event.content_block.type === 'tool_use') {
-                currentToolCall = {
-                  id:        event.content_block.id,
-                  name:      event.content_block.name,
-                  inputJson: '',
-                }
-                send({ type: 'tool_start', id: currentToolCall.id, name: currentToolCall.name, label: toolLabel(currentToolCall.name) })
-              }
-            }
-
-            // ── Deltas ────────────────────────────────────────────────────────
-            if (event.type === 'content_block_delta') {
-              if (event.delta.type === 'text_delta') {
-                send({ type: 'text', delta: event.delta.text })
-                textBuffer += event.delta.text
-              }
-              // thinking_delta is intentionally skipped — don't send to client
-              if (event.delta.type === 'input_json_delta' && currentToolCall) {
-                currentToolCall.inputJson += event.delta.partial_json
-              }
-            }
-
-            // ── Block ends ────────────────────────────────────────────────────
-            if (event.type === 'content_block_stop' && currentToolCall) {
-              toolCalls.push(currentToolCall)
-              currentToolCall = null
-            }
-
-            // ── Stop reason ───────────────────────────────────────────────────
-            if (event.type === 'message_delta') {
-              stopReason = event.delta.stop_reason ?? ''
+          for await (const ev of turn.stream()) {
+            if (ev.type === 'text' && ev.delta) {
+              send({ type: 'text', delta: ev.delta })
+              textBuffer += ev.delta
+            } else if (ev.type === 'call' && ev.name) {
+              send({ type: 'tool_start', id: ev.id, name: ev.name, label: toolLabel(ev.name) })
             }
           }
 
-          // Get the full message (includes thinking blocks for next iteration)
-          const finalMsg = await claudeStream.finalMessage()
-          trackUsage('copilot', MODEL, finalMsg.usage)
-          conversationMessages.push({ role: 'assistant', content: finalMsg.content })
+          trackUsage('copilot', turn.model, turn.usage)
+          contents.push(turn.modelContent)
 
           // ── Plan detection — look for <!-- PLAN: {...} --> in text output ──
           const planMatch = textBuffer.match(/<!-- PLAN: ([\s\S]*?) -->/)
@@ -160,48 +126,35 @@ export async function POST(request: NextRequest) {
             } catch { /* ignore malformed plan JSON */ }
           }
 
-          // If Claude didn't request tools, we're done
-          if (stopReason !== 'tool_use' || toolCalls.length === 0) break
+          // If the model didn't request tools, we're done.
+          if (turn.calls.length === 0) break
 
           // ── Checkpoint detection — pause before request_approval ──────────
-          const checkpointCall = toolCalls.find(tc => tc.name === 'request_approval')
+          const checkpointCall = turn.calls.find(c => c.name === 'request_approval')
           if (checkpointCall) {
-            let cpInput: Record<string, string> = {}
-            try { cpInput = JSON.parse(checkpointCall.inputJson || '{}') } catch { /* noop */ }
+            const a = checkpointCall.args
             send({
               type:           'checkpoint',
-              action_summary: cpInput.action_summary ?? 'Awaiting approval',
-              details:        cpInput.details         ?? '',
-              impact:         cpInput.impact          ?? '',
+              action_summary: typeof a.action_summary === 'string' ? a.action_summary : 'Awaiting approval',
+              details:        typeof a.details         === 'string' ? a.details         : '',
+              impact:         typeof a.impact          === 'string' ? a.impact          : '',
             })
             // Do NOT execute any tools — user must approve first
             break
           }
 
           // ── Execute all tools and collect results ─────────────────────────
-          const toolResults: Anthropic.ToolResultBlockParam[] = []
+          const toolResults: { name: string; result: string }[] = []
 
-          for (const tc of toolCalls) {
-            let parsedInput: Record<string, unknown> = {}
-            try {
-              parsedInput = JSON.parse(tc.inputJson || '{}')
-            } catch {
-              parsedInput = {}
-            }
-
-            const result = await executeOrchestratorTool(tc.name, parsedInput, {
-              client, model: MODEL, orgId, supabase, capabilities,
+          for (const call of turn.calls) {
+            const result = await executeOrchestratorTool(call.name, call.args, {
+              model: MODEL, orgId, supabase, capabilities,
             })
-            send({ type: 'tool_done', id: tc.id, name: tc.name, summary: toolSummary(tc.name, result) })
-
-            toolResults.push({
-              type:        'tool_result',
-              tool_use_id: tc.id,
-              content:     result,
-            })
+            send({ type: 'tool_done', id: call.id, name: call.name, summary: toolSummary(call.name, result) })
+            toolResults.push({ name: call.name, result })
           }
 
-          conversationMessages.push({ role: 'user', content: toolResults })
+          contents.push(functionResultsContent(toolResults))
         }
 
         send({ type: 'done' })

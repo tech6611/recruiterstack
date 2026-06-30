@@ -1,13 +1,12 @@
-import Anthropic from '@anthropic-ai/sdk'
 import type { Candidate, Role } from '@/lib/types/database'
 import { parseAiJson } from '@/lib/ai/parse-ai-response'
 import { matchResponseSchema, type MatchResponse } from '@/lib/ai/schemas'
 import { trackUsage } from '@/lib/ai/track-usage'
 import { withRetry } from '@/lib/ai/retry'
+import { generateText } from '@/lib/ai/llm'
 
 export type MatchResult = MatchResponse
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const MODEL = 'claude-sonnet-4-6'
 
 export async function matchCandidateToRole(
@@ -48,16 +47,12 @@ Respond with ONLY valid JSON — no markdown, no extra text:
   "recommendation": "<strong_yes | yes | maybe | no>"
 }`
 
-  const message = await withRetry(() => client.messages.create({
+  const { text, usage, model } = await withRetry(() => generateText(prompt, {
     model: MODEL,
-    max_tokens: 512,
-    messages: [{ role: 'user', content: prompt }],
+    maxTokens: 512,
   }), { label: 'Matcher' })
 
-  trackUsage('matcher', MODEL, message.usage)
+  trackUsage('matcher', model, usage)
 
-  const content = message.content[0]
-  if (content.type !== 'text') throw new Error('Unexpected response type from Claude')
-
-  return parseAiJson(content.text, matchResponseSchema, 'Matcher')
+  return parseAiJson(text, matchResponseSchema, 'Matcher')
 }

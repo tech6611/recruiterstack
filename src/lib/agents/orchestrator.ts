@@ -9,8 +9,8 @@
  * approval only. The sub-agents do the actual domain work.
  */
 
-import type Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ClaudeTool } from '@/lib/ai/llm'
 import type { Capability } from '@/lib/permissions'
 import { ATS_SYSTEM_PROMPT, ATS_TOOLS } from '@/modules/ats/agent'
 import { HRIS_SYSTEM_PROMPT, HRIS_TOOLS } from '@/modules/hris/agent'
@@ -18,7 +18,7 @@ import { CRM_SYSTEM_PROMPT, CRM_TOOLS } from '@/modules/crm/agent'
 import { PAYROLL_SYSTEM_PROMPT, PAYROLL_TOOLS } from '@/modules/payroll/agent'
 import { runSubAgent } from '@/lib/agents/sub-agent'
 
-export const ORCHESTRATOR_TOOLS: Anthropic.Tool[] = [
+export const ORCHESTRATOR_TOOLS: ClaudeTool[] = [
   {
     name: 'delegate_to_ats',
     description:
@@ -132,7 +132,6 @@ Then call request_approval so the recruiter can review and approve before you st
 Be concise. Use names, not IDs. If you don't know what the recruiter means, ask one clarifying question rather than guessing.`
 
 interface ExecutorContext {
-  client:    Anthropic
   model:     string
   orgId:     string
   supabase:  SupabaseClient
@@ -156,7 +155,6 @@ export async function executeOrchestratorTool(
   switch (name) {
     case 'delegate_to_ats':
       return runSubAgent({
-        client:       ctx.client,
         model:        ctx.model,
         tools:        ATS_TOOLS,
         systemPrompt: ATS_SYSTEM_PROMPT,
@@ -168,7 +166,6 @@ export async function executeOrchestratorTool(
 
     case 'delegate_to_hris':
       return runSubAgent({
-        client:       ctx.client,
         model:        ctx.model,
         tools:        HRIS_TOOLS,
         systemPrompt: HRIS_SYSTEM_PROMPT,
@@ -180,7 +177,6 @@ export async function executeOrchestratorTool(
 
     case 'delegate_to_crm':
       return runSubAgent({
-        client:       ctx.client,
         model:        ctx.model,
         tools:        CRM_TOOLS,
         systemPrompt: CRM_SYSTEM_PROMPT,
@@ -192,7 +188,6 @@ export async function executeOrchestratorTool(
 
     case 'delegate_to_payroll':
       return runSubAgent({
-        client:       ctx.client,
         model:        ctx.model,
         tools:        PAYROLL_TOOLS,
         systemPrompt: PAYROLL_SYSTEM_PROMPT,

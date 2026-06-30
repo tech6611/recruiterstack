@@ -1,11 +1,11 @@
 /**
  * AI Copilot — Tool definitions and implementations
  *
- * COPILOT_TOOLS  : Anthropic tool schema array (passed to the API)
+ * COPILOT_TOOLS  : Claude-format tool schema array (translated to Gemini by lib/ai/llm.ts)
  * executeTool()  : Routes a tool call to the right Supabase query
  */
 
-import Anthropic from '@anthropic-ai/sdk'
+import { generateText, type ClaudeTool } from '@/lib/ai/llm'
 import sgMail from '@sendgrid/mail'
 import { SupabaseClient } from '@supabase/supabase-js'
 import type { Capability } from '@/lib/permissions'
@@ -147,7 +147,7 @@ import type {
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
-export const COPILOT_TOOLS: Anthropic.Tool[] = [
+export const COPILOT_TOOLS: ClaudeTool[] = [
   {
     name: 'search_candidates',
     description:
@@ -2602,10 +2602,8 @@ async function draftApplicationEmail(
   const recName    = recruiter_name ?? 'The Recruiting Team'
   const recTitle   = recruiter_title ?? ''
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return 'Error: ANTHROPIC_API_KEY not configured — cannot draft email.'
+  if (!process.env.GEMINI_API_KEY) return 'Error: GEMINI_API_KEY not configured — cannot draft email.'
 
-  const client = new Anthropic({ apiKey })
   const prompt = `Write ${TEMPLATE_DESC[templateKey]} email from a recruiter to a job candidate.
 
 Context:
@@ -2625,12 +2623,11 @@ Requirements:
 Respond with ONLY valid JSON: {"subject": "...", "body": "..."}`
 
   try {
-    const msg = await client.messages.create({
-      model:      'claude-haiku-4-5-20251001',
-      max_tokens: 600,
-      messages:   [{ role: 'user', content: prompt }],
+    const { text } = await generateText(prompt, {
+      model: 'claude-haiku-4-5-20251001',
+      maxTokens: 600,
     })
-    const raw   = msg.content[0].type === 'text' ? msg.content[0].text.trim() : ''
+    const raw   = text.trim()
     const json  = raw.startsWith('{') ? raw : (raw.match(/\{[\s\S]*\}/)?.[0] ?? '')
     const draft = JSON.parse(json) as { subject: string; body: string }
     return `EMAIL DRAFT (${templateKey}) for ${candidate?.full_name ?? 'candidate'}:\n\nSubject: ${draft.subject}\n\n${draft.body}`

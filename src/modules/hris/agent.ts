@@ -7,8 +7,8 @@
  * trigger consequence of a hire disposition, not an agent action.
  */
 
-import type Anthropic from '@anthropic-ai/sdk'
 import { COPILOT_TOOLS } from '@/lib/copilot-tools'
+import type { ClaudeTool } from '@/lib/ai/llm'
 
 const HRIS_TOOL_NAMES = new Set([
   'list_employees',
@@ -41,7 +41,7 @@ const HRIS_TOOL_NAMES = new Set([
   'update_okr_status',
 ])
 
-export const HRIS_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
+export const HRIS_TOOLS: ClaudeTool[] = COPILOT_TOOLS.filter(t =>
   HRIS_TOOL_NAMES.has(t.name),
 )
 

@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { getCandidateRoleMatchContext } from '@/modules/ats/domain/role-profiles'
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+import { generateText } from '@/lib/ai/llm'
 
 // POST /api/email/draft  { candidate_id, role_id, company_name?, recruiter_name?, recruiter_title?, recruiter_email? }
 // Returns { subject, body }
@@ -83,20 +81,14 @@ Respond with ONLY valid JSON — no markdown:
   "body": "<full email body with newlines as \\n>"
 }`
 
-  const message = await client.messages.create({
+  const { text } = await generateText(prompt, {
     model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    messages: [{ role: 'user', content: prompt }],
+    maxTokens: 1024,
   })
-
-  const content = message.content[0]
-  if (content.type !== 'text') {
-    return NextResponse.json({ error: 'Unexpected Claude response' }, { status: 500 })
-  }
 
   let result: { subject: string; body: string }
   try {
-    const raw = content.text.trim()
+    const raw = text.trim()
     const json = raw.startsWith('```') ? raw.replace(/```(?:json)?\n?/g, '').trim() : raw
     result = JSON.parse(json)
   } catch {

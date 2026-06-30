@@ -8,8 +8,8 @@
  * paths are delicate; agent writes can be added in a follow-up).
  */
 
-import type Anthropic from '@anthropic-ai/sdk'
 import { COPILOT_TOOLS } from '@/lib/copilot-tools'
+import type { ClaudeTool } from '@/lib/ai/llm'
 
 const CRM_TOOL_NAMES = new Set([
   'list_sequences',
@@ -17,7 +17,7 @@ const CRM_TOOL_NAMES = new Set([
   'list_candidate_sequence_history',
 ])
 
-export const CRM_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
+export const CRM_TOOLS: ClaudeTool[] = COPILOT_TOOLS.filter(t =>
   CRM_TOOL_NAMES.has(t.name),
 )
 

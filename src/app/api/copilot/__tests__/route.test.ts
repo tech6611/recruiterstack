@@ -2,22 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createMockSupabase, createMockRequest } from '@/test/helpers'
 import { createAdminClient } from '@/lib/supabase/server'
 
-vi.mock('@anthropic-ai/sdk', () => {
-  return {
-    default: class MockAnthropic {
-      messages = {
-        stream: vi.fn().mockReturnValue({
-          [Symbol.asyncIterator]: async function* () {
-            yield { type: 'message_start', message: { content: [] } }
-            yield { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hello' } }
-            yield { type: 'message_stop' }
-          },
-          finalMessage: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'Hello' }], stop_reason: 'end_turn' }),
-        }),
-      }
-    },
-  }
-})
+vi.mock('@/lib/ai/llm', () => ({
+  copilotConfig: vi.fn(() => ({})),
+  messagesToContents: vi.fn(() => []),
+  functionResultsContent: vi.fn(() => ({ role: 'user', parts: [] })),
+  CopilotTurn: class MockCopilotTurn {
+    model = 'gemini-2.5-pro'
+    calls: unknown[] = []
+    usage = { input_tokens: 0, output_tokens: 0 }
+    async *stream() {
+      yield { type: 'text', delta: 'Hello' }
+    }
+    get text() { return 'Hello' }
+    get modelContent() { return { role: 'model', parts: [{ text: 'Hello' }] } }
+  },
+}))
 
 vi.mock('@/lib/api/rate-limit', () => ({
   checkAuthRateLimit: vi.fn(() => Promise.resolve(null)),

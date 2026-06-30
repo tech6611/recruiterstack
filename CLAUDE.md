@@ -30,7 +30,7 @@ npm run audit:canonical # Report direct table access by migration status
 - **Framework:** Next.js 14 (App Router), React 18, TypeScript 5
 - **Database:** Supabase (PostgreSQL), 48+ migrations in `supabase/migrations/`
 - **Auth:** Clerk (user auth + org management), multi-tenant via org_id
-- **AI:** Anthropic SDK — Claude Sonnet for quality tasks, Claude Haiku for speed/cost
+- **AI:** Google GenAI SDK (Gemini) — Gemini 2.5 Pro for quality tasks, Gemini 2.5 Flash for speed/cost. Call sites still pass the old Claude tier names (e.g. `claude-sonnet-4-6`); a central wrapper (`src/lib/ai/llm.ts`, Django `ai/llm.py`) translates them to Gemini, so swapping providers is a one-file change.
 - **Email:** SendGrid
 - **Calendar:** Google Calendar API, Microsoft Graph (Outlook), Zoom
 - **Styling:** Tailwind CSS 3.4
@@ -46,8 +46,8 @@ npm run audit:canonical # Report direct table access by migration status
 
 These are conceptual personas implemented across multiple endpoints and flows:
 
-1. **Drafter** — JD generation from hiring manager intake. Uses Claude Sonnet. Flow: `/intake/[token]` → `/api/intake/[token]/generate-jd` → `lib/ai/jd-generator.ts`
-2. **Scout** — Candidate sourcing & import. CSV parsing via Claude Haiku. Endpoints: `/api/sourcing/import`, `/api/sourcing/parse-cv`, `/api/sourcing/parse-profile`
+1. **Drafter** — JD generation from hiring manager intake. Uses Gemini 2.5 Pro. Flow: `/intake/[token]` → `/api/intake/[token]/generate-jd` → `lib/ai/jd-generator.ts`
+2. **Scout** — Candidate sourcing & import. CSV parsing via Gemini 2.5 Flash. Endpoints: `/api/sourcing/import`, `/api/sourcing/parse-cv`, `/api/sourcing/parse-profile`
 3. **Sifter** — AI scoring (0-100) with weighted rubrics. Auto-advance/auto-reject. Flow: `/api/jobs/[id]/score` → `lib/ai/job-scorer.ts` + `lib/ai/autopilot.ts`. SSE streaming for progress.
 4. **Scheduler** — Interview scheduling with calendar integration. Self-schedule via `/schedule/[token]`. Agent API: `/api/agent/schedule-interview`. Calendar helpers: `lib/google/calendar.ts`, `lib/microsoft/calendar.ts`
 5. **Closer** — Offer management & approval workflows. AI-drafted offer letters via `/api/applications/[id]/email-draft`
@@ -68,7 +68,7 @@ src/
 ├── lib/
 │   ├── ai/                 # AI logic (jd-generator, job-scorer, matcher, autopilot)
 │   ├── api/                # API helpers (cache, rate-limit, search, csv, etc.)
-│   ├── copilot-tools.ts    # ~38 Anthropic tool definitions for copilot
+│   ├── copilot-tools.ts    # ~38 copilot tool definitions (Claude-format, translated to Gemini by lib/ai/llm.ts)
 │   ├── domain/             # Canonical domain facades (people, candidates, applications, openings, job-pipelines, ...)
 │   ├── supabase/           # Supabase clients (browser + server)
 │   ├── google/             # Google Calendar integration
@@ -133,7 +133,7 @@ Interview → Offer → Employee Profile). **Before adding model-heavy features,
 
 Required for local dev:
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- `ANTHROPIC_API_KEY`
+- `GEMINI_API_KEY`
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
 - `NEXT_PUBLIC_APP_URL`
 

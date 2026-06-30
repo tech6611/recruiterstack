@@ -10,13 +10,13 @@
  * run outside of a Clerk session context.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
 import sgMail from '@sendgrid/mail'
 import { createAdminClient } from '@/lib/supabase/server'
 import { scoreApplicationForJob } from './job-scorer'
 import { parseAiJson } from '@/lib/ai/parse-ai-response'
 import { emailDraftResponseSchema } from '@/lib/ai/schemas'
 import { trackUsage } from '@/lib/ai/track-usage'
+import { generateText } from '@/lib/ai/llm'
 import type { Candidate, HiringRequest, PipelineStage } from '@/lib/types/database'
 
 export type AutopilotAction = 'advanced' | 'rejected' | 'none' | 'skipped'
@@ -38,20 +38,15 @@ async function generateRejectionEmail(
   recruiterName:  string,
   companyName:    string,
 ): Promise<{ subject: string; body: string } | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
 
-  const client    = new Anthropic({ apiKey })
   const firstName = candidateName.split(' ')[0]
 
   try {
     const MODEL = 'claude-haiku-4-5-20251001'
-    const message = await client.messages.create({
-      model:      MODEL,
-      max_tokens: 400,
-      messages: [{
-        role:    'user',
-        content: `Write a respectful, empathetic rejection email from a recruiter to a job candidate.
+    const { text, usage, model } = await generateText(
+      `Write a respectful, empathetic rejection email from a recruiter to a job candidate.
 
 <candidate_context>
 Candidate first name: ${firstName}
@@ -70,13 +65,12 @@ Requirements:
 - No placeholder brackets like [date] or [company] — use the real values above
 
 Respond with ONLY valid JSON (no markdown): {"subject": "...", "body": "..."}`,
-      }],
-    })
+      { model: MODEL, maxTokens: 400 },
+    )
 
-    trackUsage('autopilot-rejection-email', MODEL, message.usage)
+    trackUsage('autopilot-rejection-email', model, usage)
 
-    const raw  = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-    return parseAiJson(raw, emailDraftResponseSchema, 'Autopilot Rejection Email')
+    return parseAiJson(text.trim(), emailDraftResponseSchema, 'Autopilot Rejection Email')
   } catch {
     return null
   }

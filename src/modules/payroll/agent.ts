@@ -8,8 +8,8 @@
  * would Asha's net be?" type questions without writing payslips.
  */
 
-import type Anthropic from '@anthropic-ai/sdk'
 import { COPILOT_TOOLS } from '@/lib/copilot-tools'
+import type { ClaudeTool } from '@/lib/ai/llm'
 
 const PAYROLL_TOOL_NAMES = new Set([
   'list_payroll_runs',
@@ -19,7 +19,7 @@ const PAYROLL_TOOL_NAMES = new Set([
 
 export { PAYROLL_TOOL_NAMES }
 
-export const PAYROLL_TOOLS: Anthropic.Tool[] = COPILOT_TOOLS.filter(t =>
+export const PAYROLL_TOOLS: ClaudeTool[] = COPILOT_TOOLS.filter(t =>
   PAYROLL_TOOL_NAMES.has(t.name),
 )
 

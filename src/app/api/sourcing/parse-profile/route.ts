@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { withCapability } from '@/lib/api/helpers'
+import { generateText } from '@/lib/ai/llm'
 
 export const maxDuration = 30
 
@@ -20,12 +20,10 @@ export const POST = withCapability('recruiting:edit', async (request) => {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 })
+    return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 503 })
   }
-
-  const client = new Anthropic({ apiKey })
 
   const prompt = `Extract structured candidate information from the following text. The text may be a LinkedIn profile, resume snippet, email bio, or any professional profile.
 
@@ -51,13 +49,12 @@ Text to parse:
 ${text.slice(0, 6000)}`
 
   try {
-    const message = await client.messages.create({
-      model:      'claude-haiku-4-5-20251001',
-      max_tokens: 800,
-      messages:   [{ role: 'user', content: prompt }],
+    const { text } = await generateText(prompt, {
+      model:     'claude-haiku-4-5-20251001',
+      maxTokens: 800,
     })
 
-    const raw       = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+    const raw       = text.trim()
     const json      = raw.startsWith('{') ? raw : (raw.match(/\{[\s\S]*\}/)?.[0] ?? '{}')
     const candidate = JSON.parse(json)
 

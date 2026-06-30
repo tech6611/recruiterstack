@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { withCapability } from '@/lib/api/helpers'
+import { generateFromPdf } from '@/lib/ai/llm'
 
 export const maxDuration = 30
 
@@ -26,31 +26,17 @@ export const POST = withCapability('recruiting:edit', async (request) => {
     return NextResponse.json({ error: 'File must be under 10 MB' }, { status: 400 })
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 })
+    return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 503 })
   }
 
-  const client = new Anthropic({ apiKey })
   const arrayBuffer = await file.arrayBuffer()
   const base64 = Buffer.from(arrayBuffer).toString('base64')
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: { type: 'base64', media_type: 'application/pdf', data: base64 },
-            },
-            {
-              type: 'text',
-              text: `Extract candidate information from this CV/resume. Return ONLY valid JSON — no markdown, no explanation:
+    const { text } = await generateFromPdf(
+      `Extract candidate information from this CV/resume. Return ONLY valid JSON — no markdown, no explanation:
 {
   "name": "<full name>",
   "email": "<email address or null>",
@@ -61,18 +47,11 @@ export const POST = withCapability('recruiting:edit', async (request) => {
   "skills": [<array of technical skills, frameworks, tools — max 15 items>],
   "linkedin_url": "<LinkedIn profile URL or null>"
 }`,
-            },
-          ],
-        },
-      ] as any,
-    })
+      base64,
+      { model: 'claude-sonnet-4-6', maxTokens: 1024 },
+    )
 
-    const content = message.content[0]
-    if (content.type !== 'text') {
-      return NextResponse.json({ error: 'Unexpected response from Claude' }, { status: 500 })
-    }
-
-    const raw  = content.text.trim()
+    const raw  = text.trim()
     const json = raw.startsWith('```') ? raw.replace(/```(?:json)?\n?/g, '').trim() : raw
     const candidate = JSON.parse(json)
 

@@ -2,6 +2,10 @@ import { logger } from '@/lib/logger'
 
 /** Approximate cost per 1M tokens (USD) as of 2025 */
 const PRICING: Record<string, { input: number; output: number }> = {
+  // Gemini (current provider)
+  'gemini-2.5-pro':            { input: 1.25,  output: 10.0  },
+  'gemini-2.5-flash':          { input: 0.30,  output: 2.50  },
+  // Claude (legacy — kept for rollback / any un-migrated path)
   'claude-opus-4-6':           { input: 15.0,  output: 75.0  },
   'claude-sonnet-4-6':         { input: 3.0,   output: 15.0  },
   'claude-haiku-4-5-20251001': { input: 0.80,  output: 4.0   },
@@ -14,7 +18,7 @@ interface Usage {
 
 /**
  * Log token usage and estimated cost for an AI API call.
- * Called after every Anthropic API call for cost visibility.
+ * Called after every AI API call for cost visibility.
  */
 export function trackUsage(module: string, model: string, usage: Usage): void {
   const pricing = PRICING[model] ?? { input: 3.0, output: 15.0 }

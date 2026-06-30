@@ -8,7 +8,6 @@
  * or hands off via escalate_to_recruiter.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { notify } from '@/lib/notifications'
@@ -193,9 +192,8 @@ export async function handleWhatsAppInbound(job: QueuedJob): Promise<void> {
   }
 
   // ── Run the responder agent ───────────────────────────────────────────────
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    logger.warn('[whatsapp-responder] ANTHROPIC_API_KEY not set; storing message without reply')
+  if (!process.env.GEMINI_API_KEY) {
+    logger.warn('[whatsapp-responder] GEMINI_API_KEY not set; storing message without reply')
     await notifyRecruiter(orgId, 'New WhatsApp reply', `"${body.slice(0, 200)}"`, conversationId)
     await markProcessed('no_api_key')
     return
@@ -215,9 +213,7 @@ ${renderTranscript(history)}
 
 Reply to the candidate now via send_whatsapp_reply, or escalate via escalate_to_recruiter.`
 
-  const client = new Anthropic({ apiKey })
   const result = await runSubAgent({
-    client,
     model: RESPONDER_MODEL,
     tools: WHATSAPP_RESPONDER_TOOLS,
     systemPrompt: responderSystemPrompt(conversation),

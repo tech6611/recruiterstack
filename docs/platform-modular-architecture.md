@@ -146,7 +146,7 @@ we want to go (Pillar 2: "talk to it, the job gets done").
   the pre-hire and kicks off onboarding. Because everything shares one DB +
   domain layer, this is **function calls, not API integrations** — the monolith
   advantage again.
-- Implementable on the Anthropic Agent SDK / sub-agent patterns; the orchestrator
+- Implementable on the Google GenAI SDK / sub-agent patterns; the orchestrator
   is itself a tool-use loop whose "tools" are the sub-agents.
 
 ## Migration path (incremental, non-disruptive)

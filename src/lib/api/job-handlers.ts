@@ -11,7 +11,7 @@ import { runAutopilot } from '@/lib/ai/autopilot'
 import { matchCandidateToRole } from '@/lib/ai/matcher'
 import { createAdminClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
-import Anthropic from '@anthropic-ai/sdk'
+import { generateText } from '@/lib/ai/llm'
 import sgMail from '@sendgrid/mail'
 import type { Candidate, Role } from '@/lib/types/database'
 import {
@@ -52,8 +52,8 @@ registerHandler('ai_summary', async (job: QueuedJob) => {
   const { candidateId } = job.payload as { candidateId: string }
   if (!candidateId) throw new Error('Missing candidateId in payload')
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured')
 
   const supabase = createAdminClient()
 
@@ -130,14 +130,12 @@ Write a professional, factual summary covering:
 
 Be concise, direct, and useful for a recruiter who hasn't reviewed this profile before. Do not fabricate details not in the data.`
 
-  const client = new Anthropic({ apiKey })
-  const message = await client.messages.create({
+  const { text } = await generateText(prompt, {
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 800,
-    messages: [{ role: 'user', content: prompt }],
+    maxTokens: 800,
   })
 
-  const summary = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+  const summary = text.trim()
 
   await saveCandidateAiSummary(supabase, job.org_id, candidateId, summary)
 

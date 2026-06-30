@@ -32,7 +32,7 @@ npm run dev          # http://localhost:3000
 ```
 
 You'll need the environment variables listed in **[`CLAUDE.md`](./CLAUDE.md#environment-variables)**.
-Required: Supabase, Anthropic, and Clerk keys. Optional integrations (email,
+Required: Supabase, Google (Gemini), and Clerk keys. Optional integrations (email,
 calendar, Slack, rate limiting, error tracking) degrade gracefully when unset.
 
 ## Common commands
@@ -50,7 +50,7 @@ npm run audit:canonical # Report direct table access by migration status
 ## Stack at a glance
 
 Next.js 14 (App Router) · React 18 · TypeScript 5 · Supabase (PostgreSQL) ·
-Clerk (auth + orgs) · Anthropic SDK (Claude Sonnet/Haiku) · SendGrid · Tailwind ·
+Clerk (auth + orgs) · Google GenAI SDK (Gemini 2.5 Pro/Flash) · SendGrid · Tailwind ·
 Vitest. Hosted on Vercel. See [`CLAUDE.md`](./CLAUDE.md) for the full breakdown.
 
 ## Repo conventions

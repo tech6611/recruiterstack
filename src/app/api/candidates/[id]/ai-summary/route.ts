@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/server'
 import { withCapability } from '@/lib/api/helpers'
 import { enqueue } from '@/lib/api/job-queue'
 import { runInBackground } from '@/lib/api/background'
 import { logger } from '@/lib/logger'
 import { trackUsage } from '@/lib/ai/track-usage'
+import { generateText } from '@/lib/ai/llm'
 
 // GET /api/candidates/[id]/ai-summary — poll for generated summary
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
@@ -43,10 +43,10 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
     return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY is not configured.' },
+      { error: 'GEMINI_API_KEY is not configured.' },
       { status: 503 },
     )
   }
@@ -62,7 +62,7 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
   } catch {
     logger.warn('Queue unavailable, falling back to runInBackground', { candidateId })
     runInBackground(async () => {
-      await generateAndStoreSummary(candidateId, orgId, apiKey)
+      await generateAndStoreSummary(candidateId, orgId)
     })
   }
 
@@ -73,7 +73,7 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
 })
 
 /** Generate AI summary and write it to the candidates table */
-async function generateAndStoreSummary(candidateId: string, orgId: string, apiKey: string) {
+async function generateAndStoreSummary(candidateId: string, orgId: string) {
   const supabase = createAdminClient()
 
   // ── Fetch candidate + all applications + events + scorecards ────────────────
@@ -179,18 +179,16 @@ Write a professional, factual summary covering:
 
 Be concise, direct, and useful for a recruiter who hasn't reviewed this profile before. Do not fabricate details not in the data.`
 
-  const client = new Anthropic({ apiKey })
   const MODEL = 'claude-haiku-4-5-20251001'
 
-  const message = await client.messages.create({
-    model:      MODEL,
-    max_tokens: 800,
-    messages:   [{ role: 'user', content: prompt }],
+  const { text, usage, model } = await generateText(prompt, {
+    model:     MODEL,
+    maxTokens: 800,
   })
 
-  trackUsage('ai-summary', MODEL, message.usage)
+  trackUsage('ai-summary', model, usage)
 
-  const summary = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+  const summary = text.trim()
 
   // Store the summary on the candidate record
   const { error: updateErr } = await supabase

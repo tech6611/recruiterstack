@@ -12,6 +12,16 @@ entries on top.
 ## 2026-06-30
 
 ### Changed
+- **Migrated all AI from Anthropic (Claude) to Google (Gemini).** Every AI call
+  now routes through a single swappable wrapper (`src/lib/ai/llm.ts`) that maps
+  the old Claude tier names to Gemini — Opus/Sonnet → Gemini 2.5 Pro, Haiku →
+  Gemini 2.5 Flash. Covers JD generation, scoring/autopilot, sourcing/CV/PDF
+  parsing, email drafting, the WhatsApp responder, the HR-case auto-answer, and
+  the streaming copilot orchestrator + sub-agents (which now run a Gemini
+  tool-loop instead of the Anthropic SDK). Driven by cost. Call sites are
+  unchanged; the `@anthropic-ai/sdk` package is retained (unused) for rollback.
+  New required env var: `GEMINI_API_KEY` (replaces `ANTHROPIC_API_KEY`). Privacy
+  page now discloses Google's Gemini API as the AI data processor.
 - **Sharper text contrast — brighter sidebar, darker body type.** Brightened the
   espresso sidebar's nav text and icons (inactive items + active/brand text toward
   near-white) so they stand out on the dark strip; darkened the platform's
