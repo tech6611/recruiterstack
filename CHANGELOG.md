@@ -11,31 +11,73 @@ entries on top.
 
 ## 2026-06-30
 
-### Changed
-- **Approval chains page now groups chains by target type into foldable sections.**
-  The `/admin/approvals` list was a flat mix of Requisition, Pipeline, and Offer
-  chains; it now stacks three collapsible cards in a fixed order — Requisitions,
-  then Pipelines (jobs), then Offers — each with a click-to-fold header and a count
-  badge. Empty groups still show so the structure stays visible; chain rows keep
-  their Edit/Archive actions and Catch-all/Archived tags, and the fallback-gap
-  banners are unchanged. (`src/app/(dashboard)/admin/approvals/page.tsx`.)
-- **Candidates hiring funnel now matches the Jobs/Requisitions card style.** Flipped
-  the funnel cards so the count sits on top and the stage label below (like the
-  Jobs and Requisitions summary cards), and re-tinted them by *position* instead
-  of by meaning so the first five cards run the same warm sequence those pages use
-  (sand → honey → sage → clay → stone); extra stages continue with blue-grey, then
-  rose. Trade-off: Hired/Rejected no longer read green/red — colour now follows the
-  card's slot for a consistent look. (`src/app/(dashboard)/candidates/page.tsx`.)
+### Added
+- **Copilot sync, Phase 4 (batch 1) — candidate tags & tasks.** Added
+  `list_candidate_tags`, `add_candidate_tag`, `list_candidate_tasks`, and
+  `create_candidate_task` so the chatbot can tag candidates and set follow-up
+  tasks. The tag/task read+write logic moved into a shared
+  `src/modules/ats/domain/candidate-annotations.ts` facade that the
+  `/api/candidates/[id]/{tags,tasks}` routes now call too. Added 6 facade unit
+  tests. (`src/lib/copilot-tools.ts`, `src/modules/ats/domain/candidate-annotations.ts`.)
+- **Copilot sync, Phase 4 (batch 2) — screening questions.** Added
+  `list_screening_questions`, `create_screening_question`, and
+  `get_job_screening_form` so the chatbot can read the screening-question library,
+  add a question (with field-type/options/EEO validation), and show a job's
+  effective application-form questions. Wraps the existing
+  `src/modules/ats/domain/screening.ts` facade. (`src/lib/copilot-tools.ts`.)
 
-### Removed
-- **Retired the duplicate "Job pipelines" page (`/req-jobs`).** It listed the same
-  `jobs` table as the main Jobs board (`/jobs`), so it was redundant. The
-  `/req-jobs` index now redirects to `/jobs` (old links/bookmarks still work), and
-  the few in-app links that pointed at it (the job-detail "back" link, the
-  post-delete redirect, and the intake confirmation email) now point to `/jobs`.
-  The job-management detail view at `/req-jobs/[id]` and the `/api/req-jobs` API
-  are unchanged. (`src/app/(dashboard)/req-jobs/page.tsx`,
-  `src/components/req-jobs/JobDetail.tsx`, `src/app/api/intake/[token]/route.ts`.)
+- **Copilot sync, Phase 3 — approvals + candidate sourcing reachable from chat.**
+  Approvals: added `list_pending_approvals` ("what needs my approval?"),
+  `get_approval`, and `decide_approval` (approve/reject a step on behalf of the
+  current user; rejections require a ≥ 20-char comment). The inbox/detail read
+  logic moved into a shared `src/lib/approvals/queries.ts` facade that the
+  `/api/approvals/inbox` and `/api/approvals/[id]` routes now also call.
+  Sourcing (Scout): added `import_candidates_csv` — paste CSV, AI-parses it, and
+  creates canonical candidate profiles (dedup by email). The parse + create logic
+  moved into a shared `src/modules/ats/domain/sourcing.ts` facade that the
+  `/api/sourcing/import` and `/api/sourcing/confirm` routes now call. Added 8
+  facade unit tests. (`src/lib/copilot-tools.ts`, `src/lib/approvals/queries.ts`,
+  `src/modules/ats/domain/sourcing.ts`.)
+- **Copilot sync, Phase 2b — chatbot can now run the full job lifecycle.** Added
+  six tools: `create_job_from_opening` (the only supported job-creation path —
+  builds a draft job from an approved requisition), `submit_job_for_approval`,
+  `publish_job`, `pause_job`, `resume_job`, and `withdraw_job`. Extracted all of
+  this — the create gate, the approval submit, and the publish/pause/resume/
+  withdraw transitions (with their postings cascades + webhook emits) — into a
+  new canonical `src/modules/ats/domain/job-lifecycle.ts` facade, and refactored
+  the seven `/api/req-jobs/*` routes to call it, so the website and the chatbot
+  share one code path with identical guards. Retired the legacy
+  `create_job_and_pipeline` tool (it created req-less jobs, which the product no
+  longer allows): it now refuses and walks the agent through the proper
+  requisition → approval → job flow. Added 13 facade unit tests.
+  (`src/modules/ats/domain/job-lifecycle.ts`, `src/lib/copilot-tools.ts`,
+  `src/app/api/req-jobs/**`.)
+
+### Fixed
+- **req-jobs route test updated for the approved-requisition rule.** The commit
+  that began requiring an approved requisition to create a job left its own
+  `req-jobs` route test posting a bare `{ title }` (now a 422), so the test
+  failed. Updated it to link an approved requisition (expects 201) and added two
+  cases asserting the 422 guard (no requisition / unapproved requisition).
+  (`src/app/api/req-jobs/__tests__/route.test.ts`.)
+
+### Added
+- **Copilot sync, Phase 2a — chatbot can now manage requisitions (openings).**
+  Added five copilot tools: `create_opening` (draft requisition),
+  `submit_opening_for_approval` (enforces the ≥ 50-char justification + required
+  custom fields, then routes through the approval engine), `list_openings`,
+  `get_opening`, and `lookup_opening_options` (returns departments, locations,
+  comp bands, and team members so the agent can map names → IDs). Introduced a
+  canonical `createOpening` / `submitOpeningForApproval` facade in
+  `src/modules/ats/domain/openings.ts` and repointed `POST /api/openings` and
+  `POST /api/openings/[id]/submit` at it, so the website and the chatbot share
+  one code path. Threaded the acting user (`userId`) through the copilot stack
+  (route → orchestrator → sub-agent → tools) so opening/approval writes record a
+  real actor; background agents pass none and those tools refuse cleanly.
+  Reframed the legacy `create_job_and_pipeline` as an explicit ad-hoc shortcut
+  that steers users to `create_opening` for real roles. Added direct facade unit
+  tests. (`src/lib/copilot-tools.ts`, `src/modules/ats/domain/openings.ts`,
+  `src/lib/agents/*`.)
 
 ### Changed
 - **A job can only be created from an approved requisition.** Closed the loophole
@@ -50,6 +92,9 @@ entries on top.
   - **New version** (clone) now reuses the requisition the source job is linked
     to and requires it to have passed approval; `POST /api/req-jobs/:id/clone`
     enforces this server-side.
+  - The copilot's `create_job_and_pipeline` and `create_intake_request` tools now
+    refuse to create req-less jobs and point the user to the requisition flow
+    (full conversational requisition support comes later).
 
 ### Added
 - **"No req" warning badge.** Jobs with no linked requisition are flagged — a
@@ -57,6 +102,41 @@ entries on top.
   list — so older req-less jobs are easy to spot and fix.
   (`src/app/(dashboard)/jobs/page.tsx`, `src/components/req-jobs/JobDetail.tsx`,
   `src/modules/ats/domain/job-pipelines.ts`.)
+
+### Fixed
+- **Copilot ⇄ canonical-jobs sync, Phase 0 (stop the bleeding).** The chatbot's
+  recruiting tools still read the retired `hiring_requests` table and a
+  non-existent `candidates.full_name` column, so several tools silently returned
+  empty results, "Unknown job", or errored on today's data. Repointed the
+  copilot's application facade and tools at the canonical `jobs` spine
+  (`job_id`, `jobs.title`, `departments.name`) and fixed the column name. Repairs
+  `get_recruiting_analytics` (read dead table → empty funnel), `get_inbox`,
+  `bulk_add_to_pipeline`, `bulk_score_applications`, `bulk_reject_below_score`,
+  `create_scorecard`, `draft_application_email`, and `list_jobs`
+  active-candidate counts; clears the "Unknown job" label from
+  `search_candidates` / `get_candidate` / `move_application_to_stage` /
+  `find_stale_applications` and the outreach/WhatsApp send tools. No new tools,
+  no behavior change for the rest of the app (these helpers are copilot-only).
+  (`src/modules/ats/domain/applications.ts`, `src/lib/copilot-tools.ts`.)
+
+### Changed
+- **Copilot sync, Phase 1 (de-stale vocabulary + permissions).** Refreshed the
+  chatbot's job-status filter (`list_jobs`) to the real lifecycle words
+  (`draft/pending_approval/approved/open/paused/withdrawn/closed/archived`) —
+  the old values matched nothing. Removed the lifecycle-status field from
+  `update_job` (it used to instruct the agent to write the invalid `'posted'`
+  status and bypass the pause/withdraw/publish safety steps); it now edits job
+  content only, and real lifecycle transitions are reserved for the dedicated
+  tools coming in Phase 2. Added the new `on_hold` status to
+  `update_candidate_status` and `update_application_status`. Tightened
+  `request_time_off` from the read-only `leave:view` capability to `leave:edit`
+  (it commits days off and can target any employee). (`src/lib/copilot-tools.ts`.)
+
+### Docs
+- **Copilot drift audit.** Added `docs/copilot-drift-audit.md` — a full
+  capability-by-capability comparison of the chatbot's 75 tools against the
+  current product, with a phased remediation plan (Phase 0 above is the first
+  step).
 
 - **Rich-text fields: saved view now matches the editor (WYSIWYG).** Blank lines
   the author added (empty paragraphs) used to collapse to nothing once saved —

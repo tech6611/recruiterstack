@@ -4,6 +4,7 @@ import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { openingCreateSchema } from '@/lib/validations/openings'
+import { createOpening } from '@/modules/ats/domain/openings'
 import type { Opening } from '@/lib/types/requisitions'
 
 type StatusFilter = Opening['status']
@@ -75,50 +76,13 @@ export async function POST(req: NextRequest) {
   const body = await parseBody(req, openingCreateSchema)
   if (body instanceof NextResponse) return body
 
-  // If the user supplied a comp_band_id, compute out_of_band by comparing
-  // to the linked band's range. If comp values match the band, out_of_band=false.
+  // Insert hides behind the canonical facade so the copilot `create_opening`
+  // tool and this route share one code path (out_of_band computation included).
   const supabase = createAdminClient()
-  let outOfBand = body.out_of_band
-  if (body.comp_band_id && (body.comp_min !== null || body.comp_max !== null)) {
-    const { data: band } = await supabase
-      .from('compensation_bands')
-      .select('min_salary, max_salary')
-      .eq('id', body.comp_band_id)
-      .eq('org_id', orgId)
-      .maybeSingle()
-    if (band) {
-      const b = band as { min_salary: number; max_salary: number }
-      const minOut = body.comp_min !== null && Number(body.comp_min) < b.min_salary
-      const maxOut = body.comp_max !== null && Number(body.comp_max) > b.max_salary
-      outOfBand = minOut || maxOut
-    }
+  try {
+    const data = await createOpening(supabase, orgId, userId, body)
+    return NextResponse.json({ data }, { status: 201 })
+  } catch (error) {
+    return handleSupabaseError(error as { code: string; message: string })
   }
-
-  const { data, error } = await supabase
-    .from('openings')
-    .insert({
-      org_id:            orgId,
-      title:             body.title,
-      department_id:     body.department_id ?? null,
-      location_id:       body.location_id ?? null,
-      employment_type:   body.employment_type,
-      comp_min:          body.comp_min,
-      comp_max:          body.comp_max,
-      comp_currency:     body.comp_currency,
-      comp_band_id:      body.comp_band_id ?? null,
-      out_of_band:       outOfBand,
-      target_start_date: body.target_start_date,
-      hiring_manager_id: body.hiring_manager_id ?? null,
-      recruiter_id:      body.recruiter_id ?? userId,          // default: current user
-      justification:     body.justification ?? null,
-      external_id:       body.external_id ?? null,
-      custom_fields:     body.custom_fields ?? {},
-      status:            'draft',
-      created_by:        userId,
-    })
-    .select()
-    .single()
-
-  if (error) return handleSupabaseError(error)
-  return NextResponse.json({ data }, { status: 201 })
 }

@@ -74,7 +74,41 @@ import {
   updateOfferRow,
   listOffers,
 } from '@/modules/ats/domain/offers'
-import { fetchLegacyAnalyticsInputs } from '@/modules/ats/domain/reporting'
+import { fetchCanonicalAnalyticsInputs } from '@/modules/ats/domain/reporting'
+import {
+  createOpening,
+  submitOpeningForApproval,
+  OpeningSubmitError,
+  listOpenings,
+  getOpeningDetail,
+  listOpeningLookups,
+} from '@/modules/ats/domain/openings'
+import {
+  createJobFromApprovedOpening,
+  submitJobForApproval,
+  publishJob,
+  pauseJob,
+  resumeJob,
+  withdrawJob,
+} from '@/modules/ats/domain/job-lifecycle'
+import { openingCreateSchema } from '@/lib/validations/openings'
+import { jobIntakeCreateSchema } from '@/lib/validations/jobs'
+import { listPendingApprovalsForUser, getApprovalDetail } from '@/lib/approvals/queries'
+import { decideOnStep, ApprovalError } from '@/lib/approvals/engine'
+import { parseCandidatesCsv, createCandidatesFromParsed, SourcingError } from '@/modules/ats/domain/sourcing'
+import {
+  listCandidateTags,
+  addCandidateTag,
+  listCandidateTasks,
+  createCandidateTask,
+  AnnotationError,
+} from '@/modules/ats/domain/candidate-annotations'
+import {
+  listScreeningQuestions,
+  createScreeningQuestion,
+  getJobScreeningForm,
+} from '@/modules/ats/domain/screening'
+import { screeningQuestionInputSchema } from '@/lib/validations/screening'
 import {
   getEmployeeByPerson,
   listDirectReports,
@@ -195,8 +229,8 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
       properties: {
         status_filter: {
           type: 'string',
-          enum: ['intake_pending', 'intake_submitted', 'jd_generated', 'jd_sent', 'jd_approved', 'posted'],
-          description: 'Optional: filter by job status',
+          enum: ['draft', 'pending_approval', 'approved', 'open', 'paused', 'withdrawn', 'closed', 'archived'],
+          description: "Optional: filter by job status. 'open' = live/accepting applications; 'paused' = temporarily off; 'withdrawn'/'closed'/'archived' = ended.",
         },
       },
     },
@@ -288,7 +322,7 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
   {
     name: 'create_job_and_pipeline',
     description:
-      'Create a new hiring request (job). Pipeline stages are auto-created. Use filled_by_recruiter=true to set up the full job immediately without sending an intake form to a hiring manager.',
+      'Quick shortcut: create a standalone job pipeline immediately (stages auto-created), WITHOUT a requisition or approval. Use only for ad-hoc/experimental pipelines. For a real role that needs headcount approval, a comp band, a hiring manager, or budget sign-off, use create_opening instead (the proper requisition flow).',
     input_schema: {
       type: 'object',
       properties: {
@@ -303,6 +337,250 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
         remote_ok:            { type: 'boolean', description: 'Whether remote is acceptable (default: false)' },
       },
       required: ['position_title', 'hiring_manager_name'],
+    },
+  },
+  // ── Openings / Requisitions ───────────────────────────────────────────────
+  {
+    name: 'lookup_opening_options',
+    description:
+      'Resolve free-text into the IDs an opening needs. Returns the org\'s departments, locations, compensation bands, and team members (with the user_id to use for hiring_manager_id / recruiter_id). Call this first when the user names a department, location, comp band, hiring manager, or recruiter so you can map names → IDs before create_opening.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'create_opening',
+    description:
+      'Create a DRAFT requisition (opening) — the canonical headcount/req object that gates publishing a job. Only `title` is required; resolve any names to IDs with lookup_opening_options first. A justification (≥ 50 chars) is required later to submit for approval, so it is best to collect one now. After creating, use submit_opening_for_approval to route it for approval.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title:             { type: 'string',  description: 'Role title, e.g. "Senior Backend Engineer" (required)' },
+        department_id:     { type: 'string',  description: 'Department UUID (from lookup_opening_options)' },
+        location_id:       { type: 'string',  description: 'Location UUID (from lookup_opening_options)' },
+        employment_type:   { type: 'string',  enum: ['full_time', 'part_time', 'contract', 'intern', 'temp'], description: 'Defaults to full_time' },
+        comp_min:          { type: 'number',  description: 'Minimum compensation' },
+        comp_max:          { type: 'number',  description: 'Maximum compensation (must be ≥ comp_min)' },
+        comp_currency:     { type: 'string',  description: '3-letter currency code, e.g. "USD" (default USD)' },
+        comp_band_id:      { type: 'string',  description: 'Compensation band UUID (from lookup_opening_options)' },
+        target_start_date: { type: 'string',  description: 'Target start date, YYYY-MM-DD' },
+        hiring_manager_id: { type: 'string',  description: 'Hiring manager user_id (from lookup_opening_options team list)' },
+        recruiter_id:      { type: 'string',  description: 'Recruiter user_id (defaults to the current user)' },
+        justification:     { type: 'string',  description: 'Why this role is needed (≥ 50 chars recommended; required to submit)' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'submit_opening_for_approval',
+    description:
+      'Submit a DRAFT opening for approval (draft → pending approval, or approved if no approval chain applies). Requires a justification of at least 50 characters and any required custom fields. Surfaces approval errors clearly.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        opening_id: { type: 'string', description: 'UUID of the draft opening to submit' },
+      },
+      required: ['opening_id'],
+    },
+  },
+  {
+    name: 'list_openings',
+    description: 'List requisitions (openings), newest first, with department/location names. Optionally filter by status.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['draft', 'pending_approval', 'approved', 'open', 'filled', 'closed', 'archived'], description: 'Optional status filter' },
+        limit:  { type: 'number', description: 'Max results (default 25)' },
+      },
+    },
+  },
+  {
+    name: 'get_opening',
+    description: 'Get one requisition (opening) in full: title, status, employment type, compensation, target start date, and justification.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        opening_id: { type: 'string', description: 'UUID of the opening' },
+      },
+      required: ['opening_id'],
+    },
+  },
+  // ── Job lifecycle ─────────────────────────────────────────────────────────
+  {
+    name: 'create_job_from_opening',
+    description:
+      'Create a draft JOB (apply pipeline) from an APPROVED requisition (opening). This is the only supported way to create a job — get the opening approved first (create_opening → submit_opening_for_approval). The new job starts in draft; then submit_job_for_approval → publish_job to take it live.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        opening_id:      { type: 'string',  description: 'UUID of an APPROVED opening to create the job from (required)' },
+        title:           { type: 'string',  description: 'Job title (required)' },
+        description:     { type: 'string',  description: 'Job description / JD (optional)' },
+        department:      { type: 'string',  description: 'Department name; created if new (optional)' },
+        confidentiality: { type: 'string',  enum: ['public', 'confidential'], description: 'Defaults to public' },
+      },
+      required: ['opening_id', 'title'],
+    },
+  },
+  {
+    name: 'submit_job_for_approval',
+    description: 'Submit a DRAFT job for approval (draft → pending approval, or approved if no chain applies).',
+    input_schema: {
+      type: 'object',
+      properties: { job_id: { type: 'string', description: 'UUID of the draft job' } },
+      required: ['job_id'],
+    },
+  },
+  {
+    name: 'publish_job',
+    description: 'Publish an APPROVED job to take it live (approved → open); mints the public apply link. Requires at least one approved requisition linked to the job. First go-live only — use resume_job to revive a paused job.',
+    input_schema: {
+      type: 'object',
+      properties: { job_id: { type: 'string', description: 'UUID of the approved job' } },
+      required: ['job_id'],
+    },
+  },
+  {
+    name: 'pause_job',
+    description: 'Temporarily pause a live job (open → paused). Stops new applications and unpublishes live job-board postings. Reversible with resume_job (the same apply link revives).',
+    input_schema: {
+      type: 'object',
+      properties: { job_id: { type: 'string', description: 'UUID of the open job' } },
+      required: ['job_id'],
+    },
+  },
+  {
+    name: 'resume_job',
+    description: 'Resume a paused job (paused → open). Revives the original apply link. (External job-board postings are not auto-relisted.)',
+    input_schema: {
+      type: 'object',
+      properties: { job_id: { type: 'string', description: 'UUID of the paused job' } },
+      required: ['job_id'],
+    },
+  },
+  {
+    name: 'withdraw_job',
+    description: 'Permanently withdraw a job (open/paused → withdrawn, TERMINAL). Kills the public apply link for good and unpublishes live postings. Cannot be undone — use pause_job if you only want a temporary stop.',
+    input_schema: {
+      type: 'object',
+      properties: { job_id: { type: 'string', description: 'UUID of the open or paused job' } },
+      required: ['job_id'],
+    },
+  },
+  // ── Approvals ─────────────────────────────────────────────────────────────
+  {
+    name: 'list_pending_approvals',
+    description: "List approval requests awaiting the CURRENT user's decision (requisitions, jobs, offers). Each item includes the approval_id and step_id needed to decide. Use this to answer \"what needs my approval?\".",
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_approval',
+    description: 'Get the full state of one approval: its target, status, and each step with approvers and decisions.',
+    input_schema: {
+      type: 'object',
+      properties: { approval_id: { type: 'string', description: 'UUID of the approval' } },
+      required: ['approval_id'],
+    },
+  },
+  {
+    name: 'decide_approval',
+    description: "Approve or reject an approval step on behalf of the current user. Get approval_id + step_id from list_pending_approvals first. A rejection REQUIRES a comment of at least 20 characters explaining why.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        approval_id: { type: 'string', description: 'UUID of the approval' },
+        step_id:     { type: 'string', description: 'UUID of the step to decide (from list_pending_approvals)' },
+        decision:    { type: 'string', enum: ['approved', 'rejected'], description: 'Your decision' },
+        comment:     { type: 'string', description: 'Optional for approve; REQUIRED (≥ 20 chars) for reject' },
+      },
+      required: ['approval_id', 'step_id', 'decision'],
+    },
+  },
+  // ── Sourcing (Scout) ──────────────────────────────────────────────────────
+  {
+    name: 'import_candidates_csv',
+    description:
+      'Bulk-import candidates from raw CSV text (paste the CSV — any column naming works). AI-parses the rows and creates canonical candidate profiles, deduping by email. Rows without an email are skipped. Returns how many were created/skipped. (To then put them in a job pipeline, use bulk_add_to_pipeline with the job and candidate IDs.)',
+    input_schema: {
+      type: 'object',
+      properties: {
+        csv_text: { type: 'string', description: 'Raw CSV text including a header row (max ~100 candidates)' },
+      },
+      required: ['csv_text'],
+    },
+  },
+  // ── Candidate tags & tasks ────────────────────────────────────────────────
+  {
+    name: 'list_candidate_tags',
+    description: 'List the tags on a candidate.',
+    input_schema: {
+      type: 'object',
+      properties: { candidate_id: { type: 'string', description: 'UUID of the candidate' } },
+      required: ['candidate_id'],
+    },
+  },
+  {
+    name: 'add_candidate_tag',
+    description: 'Add a tag to a candidate (tags are lower-cased; duplicates are rejected).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        candidate_id: { type: 'string', description: 'UUID of the candidate' },
+        tag:          { type: 'string', description: 'Tag text, e.g. "referral" or "top-prospect"' },
+      },
+      required: ['candidate_id', 'tag'],
+    },
+  },
+  {
+    name: 'list_candidate_tasks',
+    description: 'List the follow-up tasks on a candidate (open tasks first, then completed).',
+    input_schema: {
+      type: 'object',
+      properties: { candidate_id: { type: 'string', description: 'UUID of the candidate' } },
+      required: ['candidate_id'],
+    },
+  },
+  {
+    name: 'create_candidate_task',
+    description: 'Create a follow-up task on a candidate (e.g. "call back", "send assessment").',
+    input_schema: {
+      type: 'object',
+      properties: {
+        candidate_id:  { type: 'string', description: 'UUID of the candidate' },
+        title:         { type: 'string', description: 'Task title (required)' },
+        description:   { type: 'string', description: 'Optional detail' },
+        due_date:      { type: 'string', description: 'Optional due date, YYYY-MM-DD' },
+        assignee_name: { type: 'string', description: 'Optional person responsible' },
+      },
+      required: ['candidate_id', 'title'],
+    },
+  },
+  // ── Screening questions ───────────────────────────────────────────────────
+  {
+    name: 'list_screening_questions',
+    description: "List the org's reusable screening-question library (the questions that can be added to a job's application form).",
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'create_screening_question',
+    description: "Add a reusable screening question to the org library. Single/multi-select questions need at least one option. EEO questions are voluntary demographic questions hidden from the hiring team.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        label:      { type: 'string', description: 'The question text (required)' },
+        field_type: { type: 'string', enum: ['short_text', 'long_text', 'yes_no', 'single_select', 'multi_select', 'number', 'date', 'file', 'url'], description: 'Answer type (required)' },
+        options:    { type: 'array', items: { type: 'string' }, description: 'Choices for single_select/multi_select' },
+        help_text:  { type: 'string', description: 'Optional helper text shown under the question' },
+        is_eeo:     { type: 'boolean', description: 'Mark as a voluntary EEO/demographic question (default false)' },
+      },
+      required: ['label', 'field_type'],
+    },
+  },
+  {
+    name: 'get_job_screening_form',
+    description: "Show a job's effective screening form (its own questions, or the org default template if the job has no override).",
+    input_schema: {
+      type: 'object',
+      properties: { job_id: { type: 'string', description: 'UUID of the job' } },
+      required: ['job_id'],
     },
   },
   {
@@ -457,14 +735,14 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'update_candidate_status',
-    description: "Update a candidate's overall status. Use 'hired' when closing an offer, 'inactive' when no longer pursuing, 'interviewing' when in active interviews.",
+    description: "Update a candidate's overall status. Use 'hired' when closing an offer, 'inactive' when no longer pursuing, 'interviewing' when in active interviews, 'on_hold' to park a candidate temporarily.",
     input_schema: {
       type: 'object',
       properties: {
         candidate_id: { type: 'string', description: 'UUID of the candidate' },
         status: {
           type: 'string',
-          enum: ['active', 'inactive', 'interviewing', 'offer_extended', 'hired', 'rejected'],
+          enum: ['active', 'on_hold', 'inactive', 'interviewing', 'offer_extended', 'hired', 'rejected'],
           description: 'New candidate status',
         },
         reason: { type: 'string', description: 'Optional reason for the change' },
@@ -474,7 +752,7 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'update_application_status',
-    description: 'Change the status of one or more applications (reject, hire, withdraw, or re-activate). For bulk rejection after scoring, prefer bulk_reject_below_score.',
+    description: "Change the status of one or more applications (reject, hire, withdraw, put on hold, or re-activate). For bulk rejection after scoring, prefer bulk_reject_below_score.",
     input_schema: {
       type: 'object',
       properties: {
@@ -485,7 +763,7 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
         },
         status: {
           type: 'string',
-          enum: ['active', 'rejected', 'hired', 'withdrawn'],
+          enum: ['active', 'on_hold', 'rejected', 'hired', 'withdrawn'],
           description: 'Target status',
         },
         reason: { type: 'string', description: 'Optional reason (stored in event log)' },
@@ -536,17 +814,13 @@ export const COPILOT_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'update_job',
-    description: "Update an existing job's status, title, hiring manager, or requirements. Use status 'posted' to publish, 'paused' to pause, or update details after creation.",
+    description: "Update a job's content (title or requirements/description). Does NOT change lifecycle status — publishing, pausing, resuming, and withdrawing a job are separate actions with their own safety steps (use the dedicated lifecycle tools). Identity fields are locked once a job is approved.",
     input_schema: {
       type: 'object',
       properties: {
-        job_id:               { type: 'string', description: 'UUID of the hiring request' },
-        status:               { type: 'string', enum: ['intake_pending', 'intake_submitted', 'jd_generated', 'jd_sent', 'jd_approved', 'posted'], description: 'New status' },
-        position_title:       { type: 'string', description: 'Updated job title' },
-        hiring_manager_name:  { type: 'string', description: 'Updated hiring manager name' },
-        key_requirements:     { type: 'string', description: 'Updated key requirements' },
-        location:             { type: 'string', description: 'Updated location' },
-        headcount:            { type: 'number', description: 'Updated headcount' },
+        job_id:           { type: 'string', description: 'UUID of the job' },
+        position_title:   { type: 'string', description: 'Updated job title' },
+        key_requirements: { type: 'string', description: 'Updated key requirements (folded into the job description)' },
       },
       required: ['job_id'],
     },
@@ -1231,6 +1505,25 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   send_whatsapp_message: 'recruiting:edit', send_assessment: 'recruiting:edit',
   draft_application_email: 'recruiting:edit', create_role: 'recruiting:edit',
   update_role: 'recruiting:edit', create_intake_request: 'recruiting:edit',
+  // Openings / Requisitions
+  lookup_opening_options: 'openings:view', list_openings: 'openings:view',
+  get_opening: 'openings:view', create_opening: 'openings:edit',
+  submit_opening_for_approval: 'openings:edit',
+  // Job lifecycle
+  create_job_from_opening: 'recruiting:edit', submit_job_for_approval: 'recruiting:edit',
+  publish_job: 'recruiting:edit', pause_job: 'recruiting:edit',
+  resume_job: 'recruiting:edit', withdraw_job: 'recruiting:edit',
+  // Approvals
+  list_pending_approvals: 'approvals:view', get_approval: 'approvals:view',
+  decide_approval: 'approvals:approve',
+  // Sourcing (Scout)
+  import_candidates_csv: 'recruiting:edit',
+  // Candidate tags & tasks
+  list_candidate_tags: 'recruiting:view', list_candidate_tasks: 'recruiting:view',
+  add_candidate_tag: 'recruiting:edit', create_candidate_task: 'recruiting:edit',
+  // Screening questions
+  list_screening_questions: 'recruiting:view', get_job_screening_form: 'recruiting:view',
+  create_screening_question: 'recruiting:edit',
   // Analytics
   get_recruiting_analytics: 'analytics:view',
   // People
@@ -1253,7 +1546,10 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   list_expiring_documents: 'documents:view',
   // Leave
   get_employee_leave_balance: 'leave:view', list_holidays: 'leave:view',
-  list_time_off: 'leave:view', request_time_off: 'leave:view', decide_time_off: 'leave:approve',
+  list_time_off: 'leave:view',
+  // request_time_off commits days off and can target any employee (resolved by
+  // email/id), so it needs a write capability, not the read-only leave:view.
+  request_time_off: 'leave:edit', decide_time_off: 'leave:approve',
 }
 
 export async function executeTool(
@@ -1265,6 +1561,9 @@ export async function executeTool(
   /** When provided, the tool runs only if its required capability is held.
    *  Omit (background jobs) to run unrestricted. */
   capabilities?: Set<Capability> | null,
+  /** Acting user. Required by tools that record an actor (create/submit opening,
+   *  job lifecycle, approvals); those tools error cleanly when it is absent. */
+  userId?: string | null,
 ): Promise<string> {
   if (capabilities) {
     const required = TOOL_CAPABILITIES[name]
@@ -1311,6 +1610,34 @@ export async function executeTool(
       case 'create_scorecard':           return await createScorecard(input, orgId, supabase)
       case 'draft_application_email':    return await draftApplicationEmail(input, orgId, supabase)
       case 'create_intake_request':      return await createIntakeRequest(input, orgId, supabase)
+      // Openings / Requisitions
+      case 'lookup_opening_options':     return await lookupOpeningOptions(orgId, supabase)
+      case 'create_opening':             return await createOpeningTool(input, orgId, supabase, userId)
+      case 'submit_opening_for_approval': return await submitOpeningTool(input, orgId, supabase, userId)
+      case 'list_openings':              return await listOpeningsTool(input, orgId, supabase)
+      case 'get_opening':                return await getOpeningTool(input, orgId, supabase)
+      // Job lifecycle
+      case 'create_job_from_opening':    return await createJobFromOpeningTool(input, orgId, supabase, userId)
+      case 'submit_job_for_approval':    return await submitJobTool(input, orgId, supabase, userId)
+      case 'publish_job':                return await jobTransitionTool('publish', input, orgId, supabase)
+      case 'pause_job':                  return await jobTransitionTool('pause', input, orgId, supabase)
+      case 'resume_job':                 return await jobTransitionTool('resume', input, orgId, supabase)
+      case 'withdraw_job':               return await jobTransitionTool('withdraw', input, orgId, supabase)
+      // Approvals
+      case 'list_pending_approvals':     return await listPendingApprovalsTool(orgId, supabase, userId)
+      case 'get_approval':               return await getApprovalTool(input, orgId, supabase)
+      case 'decide_approval':            return await decideApprovalTool(input, supabase, userId)
+      // Sourcing (Scout)
+      case 'import_candidates_csv':      return await importCandidatesCsvTool(input, orgId, supabase)
+      // Candidate tags & tasks
+      case 'list_candidate_tags':        return await listCandidateTagsTool(input, orgId, supabase)
+      case 'add_candidate_tag':          return await addCandidateTagTool(input, orgId, supabase)
+      case 'list_candidate_tasks':       return await listCandidateTasksTool(input, orgId, supabase)
+      case 'create_candidate_task':      return await createCandidateTaskTool(input, orgId, supabase)
+      // Screening questions
+      case 'list_screening_questions':   return await listScreeningQuestionsTool(orgId, supabase)
+      case 'create_screening_question':  return await createScreeningQuestionTool(input, orgId, supabase)
+      case 'get_job_screening_form':     return await getJobScreeningFormTool(input, orgId, supabase)
       case 'schedule_interview':         return await scheduleInterview(input, orgId, supabase)
       case 'get_interviews':             return await getInterviews(input, orgId, supabase)
       case 'update_interview_status':    return await updateInterviewStatus(input, orgId, supabase)
@@ -1713,16 +2040,25 @@ async function createJobAndPipeline(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { position_title, key_requirements } = input
-
-  // `department` arrives as free text from the agent, not a department_id FK, so
-  // we omit it from the canonical insert; title + description carry over.
-  const job = await createCanonicalJobForAgent(supabase, orgId, {
-    title:       position_title,
-    description: key_requirements ?? null,
-  })
-
-  return `Created job "${job.title}" — ID: ${job.id}. Pipeline stages are being auto-created.`
+  // Gated: a job can only be created from an APPROVED requisition (opening).
+  // The copilot has no way to create or pick an approved requisition yet, so it
+  // must not create req-less jobs directly (which the server now rejects too —
+  // see /api/req-jobs POST). Direct the user to the proper flow. The
+  // createCanonicalJobForAgent helper is left in place for the future copilot
+  // rework that will mint/approve requisitions conversationally.
+  void createCanonicalJobForAgent
+  void supabase
+  void orgId
+  const { position_title } = input
+  return [
+    `Don't use this tool — a job can only be created from an *approved requisition*.`,
+    ``,
+    `To create "${position_title ?? 'this role'}", do this conversationally instead:`,
+    `1. create_opening — draft the requisition (collect a justification of ≥ 50 chars).`,
+    `2. submit_opening_for_approval — route it for approval and get it approved.`,
+    `3. create_job_from_opening — create the job from the approved requisition.`,
+    `4. submit_job_for_approval → publish_job — take the job live.`,
+  ].join('\n')
 }
 
 async function searchCandidatePool(
@@ -1810,7 +2146,7 @@ async function bulkAddToPipeline(
   for (const candidate_id of toAdd) {
     const { data: app, error: appErr } = await insertPipelineApplication(supabase, orgId, {
       candidateId: candidate_id,
-      hiringRequestId: job_id,
+      jobId: job_id,
       stageId: firstStage?.id ?? null,
       source,
     })
@@ -2234,18 +2570,18 @@ async function updateJob(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { job_id, status, position_title, key_requirements } = input
+  const { job_id, position_title, key_requirements } = input
 
   const job = await getCanonicalJobById(supabase, orgId, job_id)
   if (!job) return 'Job not found in your organization.'
 
-  // Build update payload only from provided fields, mapped to canonical `jobs`
-  // columns (title, description, status). Legacy-only fields (hiring_manager_name,
-  // location, headcount) have no canonical column; key_requirements is folded into
-  // the job description.
+  // Content-only update mapped to canonical `jobs` columns (title, description).
+  // Lifecycle status is deliberately NOT writable here — transitions (publish,
+  // pause, resume, withdraw) run their own cascades (un/publish postings, clear
+  // the apply token, re-approval) via the dedicated lifecycle endpoints, so a raw
+  // status write would corrupt the record and skip those steps.
   const updates: CanonicalJobUpdate = {}
-  if (status         != null) updates.status      = status
-  if (position_title != null) updates.title       = position_title
+  if (position_title  != null) updates.title       = position_title
   if (key_requirements != null) updates.description = key_requirements
 
   if (Object.keys(updates).length === 0) return 'No fields provided to update.'
@@ -2406,9 +2742,10 @@ async function getRecruitingAnalytics(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { jobs, apps, stages } = await fetchLegacyAnalyticsInputs(supabase, orgId)
+  const { jobs, apps, stages } = await fetchCanonicalAnalyticsInputs(supabase, orgId)
 
-  const ACTIVE_JOB_STATUSES = ['active', 'jd_approved', 'jd_sent', 'jd_generated', 'posted']
+  // Canonical JobStatus values that represent a live/working requisition.
+  const ACTIVE_JOB_STATUSES = ['approved', 'open', 'paused']
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const activeJobs = jobs.filter((j: any) => ACTIVE_JOB_STATUSES.includes(j.status))
 
@@ -2472,14 +2809,15 @@ async function getInbox(
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
   const [eventsRes, stale] = await Promise.all([
-    supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
       .from('application_events')
       .select(`
         id, event_type, from_stage, to_stage, note, created_by, created_at,
         application:applications(
           id, status,
-          candidate:candidates(full_name, email),
-          job:hiring_requests(position_title)
+          candidate:candidates(full_name:name, email),
+          job:jobs(position_title:title)
         )
       `)
       .eq('org_id', orgId)
@@ -2596,7 +2934,7 @@ async function draftApplicationEmail(
 
   const firstName  = candidate?.full_name?.split(' ')[0] ?? 'there'
   const jobTitle   = job?.position_title ?? 'the position'
-  const dept       = job?.department
+  const dept       = job?.department?.name
   const stageName  = stage?.name ?? 'Applied'
   const company    = company_name   ?? 'our company'
   const recName    = recruiter_name ?? 'The Recruiting Team'
@@ -2645,32 +2983,472 @@ async function createIntakeRequest(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { position_title, hiring_manager_name, hiring_manager_email } = input
+  // Gated: an intake request creates a canonical draft job, which now can only
+  // exist against an APPROVED requisition (opening). The copilot can't create or
+  // pick an approved requisition yet, so it must not create req-less intake jobs
+  // directly. Direct the user to the proper flow. createCanonicalIntakeJob is
+  // left in place for the future copilot rework.
+  void createCanonicalIntakeJob
+  void supabase
+  void orgId
+  const { position_title } = input
+  return [
+    `I can't create an intake request directly anymore — every job now starts from an *approved requisition*.`,
+    ``,
+    `To get "${position_title ?? 'this role'}" moving:`,
+    `1. Open Requisitions and create a requisition for the role.`,
+    `2. Submit it for approval and get it approved.`,
+    `3. From the approved requisition, click "Create job" — that's where the JD / intake gets written.`,
+  ].join('\n')
+}
 
-  if (!position_title?.trim() || !hiring_manager_name?.trim() || !hiring_manager_email?.trim()) {
-    return 'Error: position_title, hiring_manager_name, and hiring_manager_email are required.'
-  }
+// ── Openings / Requisitions tools ──────────────────────────────────────────────
 
-  // Phase 3 / C5.5: an intake is now a canonical `job` (status 'draft' until
-  // the HM submits / it's approved). jobs.intake_token (migration 069) keys the
-  // /intake/<token> URL, mirroring how apply_token keys /apply.
-  const r = await createCanonicalIntakeJob(supabase, orgId, {
-    title:              position_title.trim(),
-    hiringManagerName:  hiring_manager_name.trim(),
-    hiringManagerEmail: hiring_manager_email.trim(),
-  })
-  const appUrl    = process.env.NEXT_PUBLIC_APP_URL || 'https://app.recruiterstack.com'
-  const intakeUrl = `${appUrl}/intake/${r.intake_token}`
+async function lookupOpeningOptions(
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { departments, locations, compBands, team } = await listOpeningLookups(supabase, orgId)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const deptLines = departments.length
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? departments.map((d: any) => `  • ${d.name} — id: ${d.id}`).join('\n')
+    : '  (none)'
+  const locLines = locations.length
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? locations.map((l: any) => `  • ${l.name}${l.city ? ` (${l.city})` : ''} — id: ${l.id}`).join('\n')
+    : '  (none)'
+  const bandLines = compBands.length
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? compBands.map((b: any) => `  • ${b.name}${b.level ? ` [${b.level}]` : ''} ${b.min_salary}–${b.max_salary} ${b.currency} — id: ${b.id}`).join('\n')
+    : '  (none)'
+  const teamLines = team.length
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? team.map((m: any) => {
+        const u = m.users
+        const name = u?.full_name || u?.email || 'Unknown'
+        return `  • ${name}${m.role ? ` (${m.role})` : ''} — user_id: ${m.user_id}`
+      }).join('\n')
+    : '  (none)'
 
   return [
-    `Intake request created for "${r.title}" (HM: ${hiring_manager_name}).`,
-    `Status: draft (intake pending) | ID: ${r.id}`,
-    ``,
-    `Intake URL (share this with the hiring manager):`,
-    intakeUrl,
-    ``,
-    `Note: Email NOT sent automatically. Copy the URL above and forward it to ${hiring_manager_email}.`,
+    `OPENING LOOKUP OPTIONS (use these IDs with create_opening):`,
+    `\nDepartments:`, deptLines,
+    `\nLocations:`, locLines,
+    `\nCompensation bands:`, bandLines,
+    `\nTeam members (for hiring_manager_id / recruiter_id):`, teamLines,
   ].join('\n')
+}
+
+async function createOpeningTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+  userId?: string | null,
+): Promise<string> {
+  if (!userId) return 'Error: creating a requisition requires a signed-in user, which is not available in this context.'
+
+  const parsed = openingCreateSchema.safeParse({
+    title:             input.title,
+    department_id:     input.department_id,
+    location_id:       input.location_id,
+    employment_type:   input.employment_type,
+    comp_min:          input.comp_min,
+    comp_max:          input.comp_max,
+    comp_currency:     input.comp_currency,
+    comp_band_id:      input.comp_band_id,
+    target_start_date: input.target_start_date,
+    hiring_manager_id: input.hiring_manager_id,
+    recruiter_id:      input.recruiter_id,
+    justification:     input.justification,
+  })
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
+    return `Invalid opening details: ${msg}`
+  }
+
+  try {
+    const opening = await createOpening(supabase, orgId, userId, parsed.data)
+    const hasJustification = !!opening.justification && opening.justification.trim().length >= 50
+    return [
+      `Created draft requisition "${opening.title}" — ID: ${opening.id} (status: draft).`,
+      hasJustification
+        ? `Next: call submit_opening_for_approval to route it for approval.`
+        : `Next: add a justification of at least 50 characters, then submit_opening_for_approval.`,
+    ].join('\n')
+  } catch (err) {
+    return `Error creating opening: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
+}
+
+async function submitOpeningTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+  userId?: string | null,
+): Promise<string> {
+  if (!userId) return 'Error: submitting a requisition requires a signed-in user, which is not available in this context.'
+  const { opening_id } = input
+  if (!opening_id) return 'Error: opening_id is required.'
+
+  try {
+    const result = await submitOpeningForApproval(supabase, orgId, userId, opening_id)
+    if (result.autoApproved || result.status === 'approved') {
+      return `Opening submitted and auto-approved (no approval chain applied). Status: ${result.status}.`
+    }
+    return `Opening submitted for approval. Status: ${result.status}. Approval ID: ${result.approvalId}.`
+  } catch (err) {
+    if (err instanceof OpeningSubmitError) return `Cannot submit: ${err.message}`
+    return `Error submitting opening: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
+}
+
+async function listOpeningsTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { status, limit } = input
+  const rows = await listOpenings(supabase, orgId, { status: status ?? null, limit })
+  if (!rows.length) return status ? `No openings with status "${status}".` : 'No openings found.'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lines = rows.map((o: any) => {
+    const dept = o.department?.name
+    const loc  = o.location?.name
+    const comp = (o.comp_min || o.comp_max)
+      ? ` | ${o.comp_min ?? '?'}–${o.comp_max ?? '?'} ${o.comp_currency ?? ''}`.trimEnd()
+      : ''
+    const meta = [dept, loc].filter(Boolean).join(', ')
+    return `• ${o.title} | ${o.status}${meta ? ` | ${meta}` : ''}${comp} | id: ${o.id}`
+  })
+  return `Openings (${rows.length}):\n${lines.join('\n')}`
+}
+
+async function getOpeningTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { opening_id } = input
+  if (!opening_id) return 'Error: opening_id is required.'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const o = await getOpeningDetail(supabase, orgId, opening_id) as any
+  if (!o) return 'Opening not found in your organization.'
+
+  const comp = (o.comp_min || o.comp_max)
+    ? `${o.comp_min ?? '?'}–${o.comp_max ?? '?'} ${o.comp_currency ?? ''}`
+    : 'Not set'
+  return [
+    `Requisition: ${o.title}`,
+    `Status: ${o.status} | Employment: ${o.employment_type}`,
+    `Department: ${o.department?.name ?? '—'} | Location: ${o.location?.name ?? '—'}`,
+    `Compensation: ${comp}${o.out_of_band ? ' (OUT OF BAND)' : ''}`,
+    `Target start: ${o.target_start_date ?? '—'}`,
+    `Justification: ${o.justification ?? '—'}`,
+    `ID: ${o.id}`,
+  ].join('\n')
+}
+
+// ── Job lifecycle tools ────────────────────────────────────────────────────────
+
+async function createJobFromOpeningTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+  userId?: string | null,
+): Promise<string> {
+  if (!userId) return 'Error: creating a job requires a signed-in user, which is not available in this context.'
+
+  const parsed = jobIntakeCreateSchema.safeParse({
+    title:           input.title,
+    description:     input.description,
+    department:      input.department,
+    confidentiality: input.confidentiality,
+    link_opening_id: input.opening_id,
+  })
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
+    return `Invalid job details: ${msg}`
+  }
+
+  const result = await createJobFromApprovedOpening(supabase, orgId, userId, parsed.data)
+  if (!result.ok) return `Cannot create job: ${result.error}`
+  const job = result.job as { id: string; title?: string }
+  return [
+    `Created draft job "${job.title ?? input.title}" — ID: ${job.id} (status: draft), linked to the approved requisition.`,
+    `Next: submit_job_for_approval, then publish_job to take it live.`,
+  ].join('\n')
+}
+
+async function submitJobTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+  userId?: string | null,
+): Promise<string> {
+  if (!userId) return 'Error: submitting a job requires a signed-in user, which is not available in this context.'
+  const { job_id } = input
+  if (!job_id) return 'Error: job_id is required.'
+
+  const result = await submitJobForApproval(supabase, orgId, userId, job_id)
+  if (!result.ok) return `Cannot submit job: ${result.error}`
+  if (result.status === 'approved') return `Job submitted and auto-approved (no approval chain applied). It can now be published.`
+  return `Job submitted for approval. Status: ${result.status}. Approval ID: ${result.approvalId}.`
+}
+
+/** Shared handler for the no-arg job transitions (publish/pause/resume/withdraw). */
+async function jobTransitionTool(
+  action: 'publish' | 'pause' | 'resume' | 'withdraw',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { job_id } = input
+  if (!job_id) return 'Error: job_id is required.'
+
+  const fn = { publish: publishJob, pause: pauseJob, resume: resumeJob, withdraw: withdrawJob }[action]
+  const result = await fn(supabase, orgId, job_id)
+  if (!result.ok) return `Cannot ${action} job: ${result.error}`
+
+  const past = { publish: 'published (now live)', pause: 'paused', resume: 'resumed (live again)', withdraw: 'withdrawn (terminal)' }[action]
+  return `Job ${past}. Status: ${result.status}.`
+}
+
+// ── Approval tools ─────────────────────────────────────────────────────────────
+
+async function listPendingApprovalsTool(
+  orgId: string,
+  supabase: SupabaseClient,
+  userId?: string | null,
+): Promise<string> {
+  if (!userId) return 'Error: listing your approvals requires a signed-in user, which is not available in this context.'
+  const items = await listPendingApprovalsForUser(supabase, orgId, userId)
+  if (!items.length) return 'You have no approvals awaiting your decision. ✓'
+
+  const lines = items.map(i =>
+    `• ${i.target_type_label}: "${i.target_title}"${i.requested_by_name ? ` — requested by ${i.requested_by_name}` : ''} | approval_id: ${i.approval_id} | step_id: ${i.step_id}`,
+  )
+  return `Awaiting your decision (${items.length}):\n${lines.join('\n')}\n\nUse decide_approval with the approval_id + step_id to approve or reject.`
+}
+
+async function getApprovalTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { approval_id } = input
+  if (!approval_id) return 'Error: approval_id is required.'
+  const detail = await getApprovalDetail(supabase, orgId, approval_id)
+  if (!detail) return 'Approval not found in your organization.'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const a = detail.approval as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stepLines = (detail.steps as any[]).map(s => `  • Step ${s.step_index}: ${s.status}`)
+  return [
+    `Approval ${a.id}`,
+    `Target: ${a.target_type} (${a.target_id})`,
+    `Status: ${a.status} | Current step index: ${a.current_step_index}`,
+    `Steps:`,
+    stepLines.length ? stepLines.join('\n') : '  (none)',
+  ].join('\n')
+}
+
+async function decideApprovalTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  supabase: SupabaseClient,
+  userId?: string | null,
+): Promise<string> {
+  if (!userId) return 'Error: deciding an approval requires a signed-in user, which is not available in this context.'
+  const { approval_id, step_id, decision, comment } = input
+  if (!approval_id || !step_id) return 'Error: approval_id and step_id are required.'
+  if (decision !== 'approved' && decision !== 'rejected') return "Error: decision must be 'approved' or 'rejected'."
+  if (decision === 'rejected' && (!comment || String(comment).trim().length < 20)) {
+    return 'A rejection requires a comment of at least 20 characters explaining why.'
+  }
+
+  void supabase // decideOnStep opens its own admin client internally.
+  try {
+    const result = await decideOnStep({
+      approvalId: approval_id,
+      stepId:     step_id,
+      userId,
+      decision,
+      comment:    comment ?? null,
+    })
+    return `Recorded your "${decision}" decision. Approval status: ${result.status}.`
+  } catch (err) {
+    if (err instanceof ApprovalError) return `Cannot record decision: ${err.message}`
+    return `Error deciding approval: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
+}
+
+// ── Sourcing (Scout) tools ─────────────────────────────────────────────────────
+
+async function importCandidatesCsvTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { csv_text } = input
+  if (!csv_text?.trim()) return 'Error: csv_text is required.'
+
+  let parsed
+  try {
+    parsed = await parseCandidatesCsv(csv_text)
+  } catch (err) {
+    if (err instanceof SourcingError) return `Could not parse CSV: ${err.message}`
+    return `Error parsing CSV: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
+  if (parsed.length === 0) return 'No candidates found in that CSV (each row needs at least a name or email).'
+
+  const { created, skipped, errors } = await createCandidatesFromParsed(supabase, orgId, parsed)
+  const lines = [
+    `Imported ${created} candidate(s) from ${parsed.length} parsed row(s). Skipped ${skipped} (no email or already on file).`,
+  ]
+  if (errors.length) lines.push(`Errors (${errors.length}): ${errors.slice(0, 5).join('; ')}${errors.length > 5 ? '…' : ''}`)
+  return lines.join('\n')
+}
+
+// ── Candidate tags & tasks tools ───────────────────────────────────────────────
+
+async function listCandidateTagsTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { candidate_id } = input
+  if (!candidate_id) return 'Error: candidate_id is required.'
+  const tags = await listCandidateTags(supabase, orgId, candidate_id)
+  if (!tags.length) return 'No tags on this candidate.'
+  return `Tags: ${tags.map(t => (t as { tag: string }).tag).join(', ')}`
+}
+
+async function addCandidateTagTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { candidate_id, tag } = input
+  if (!candidate_id || !tag) return 'Error: candidate_id and tag are required.'
+  try {
+    const row = await addCandidateTag(supabase, orgId, candidate_id, tag)
+    return `Added tag "${(row as { tag: string }).tag}".`
+  } catch (err) {
+    if (err instanceof AnnotationError) return `Cannot add tag: ${err.message}`
+    return `Error adding tag: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
+}
+
+async function listCandidateTasksTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { candidate_id } = input
+  if (!candidate_id) return 'Error: candidate_id is required.'
+  const tasks = await listCandidateTasks(supabase, orgId, candidate_id)
+  if (!tasks.length) return 'No tasks on this candidate.'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lines = (tasks as any[]).map(t => {
+    const done = t.completed_at ? '✓' : '○'
+    const due  = t.due_date ? ` (due ${t.due_date})` : ''
+    return `  ${done} ${t.title}${due}${t.assignee_name ? ` — ${t.assignee_name}` : ''}`
+  })
+  return `Tasks (${tasks.length}):\n${lines.join('\n')}`
+}
+
+async function createCandidateTaskTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { candidate_id, title, description, due_date, assignee_name } = input
+  if (!candidate_id || !title) return 'Error: candidate_id and title are required.'
+  try {
+    const row = await createCandidateTask(supabase, orgId, candidate_id, {
+      title,
+      description:  description ?? null,
+      dueDate:      due_date ?? null,
+      assigneeName: assignee_name ?? null,
+    })
+    return `Created task "${(row as { title: string }).title}"${due_date ? ` (due ${due_date})` : ''}.`
+  } catch (err) {
+    if (err instanceof AnnotationError) return `Cannot create task: ${err.message}`
+    return `Error creating task: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
+}
+
+// ── Screening question tools ───────────────────────────────────────────────────
+
+async function listScreeningQuestionsTool(
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const qs = await listScreeningQuestions(supabase, orgId)
+  if (!qs.length) return 'No screening questions in the library yet.'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lines = (qs as any[]).map(q =>
+    `• ${q.label} [${q.field_type}]${q.is_eeo ? ' (EEO)' : ''}${Array.isArray(q.options) && q.options.length ? ` — options: ${q.options.join(', ')}` : ''} | id: ${q.id}`,
+  )
+  return `Screening questions (${qs.length}):\n${lines.join('\n')}`
+}
+
+async function createScreeningQuestionTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const parsed = screeningQuestionInputSchema.safeParse({
+    label:      input.label,
+    field_type: input.field_type,
+    options:    input.options,
+    help_text:  input.help_text,
+    is_eeo:     input.is_eeo,
+  })
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
+    return `Invalid screening question: ${msg}`
+  }
+  try {
+    const q = await createScreeningQuestion(supabase, orgId, parsed.data)
+    return `Added screening question "${(q as { label: string }).label}" — id: ${(q as { id: string }).id}.`
+  } catch (err) {
+    return `Error creating screening question: ${err instanceof Error ? err.message : 'Unknown error'}`
+  }
+}
+
+async function getJobScreeningFormTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const { job_id } = input
+  if (!job_id) return 'Error: job_id is required.'
+  const form = await getJobScreeningForm(supabase, orgId, job_id)
+  if (!form.fields.length) return 'This job has no screening questions (and no org default template).'
+  const lines = form.fields.map(f =>
+    `• ${f.label} [${f.field_type}]${f.required ? ' *required*' : ''}${f.is_eeo ? ' (EEO)' : ''}`,
+  )
+  return `Screening form (${form.fields.length} question(s)):\n${lines.join('\n')}`
 }
 
 // ── Interview tools ───────────────────────────────────────────────────────────

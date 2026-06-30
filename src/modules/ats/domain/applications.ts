@@ -91,9 +91,14 @@ export async function listActiveApplicationsByCandidatesWithJobTitle(
   orgId: string,
   candidateIds: string[],
 ): Promise<Array<{ candidate_id: string; hiring_request: { position_title: string } | null }>> {
-  const { data } = await supabase
+  // Canonical: job title comes from `jobs.title` (applications.job_id). The
+  // embed is aliased `hiring_request` and the column `position_title:title` so
+  // the returned shape is unchanged for callers. Client cast `any` for the
+  // not-yet-typed canonical `job_id` relationship (as in reporting.ts).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
     .from('applications')
-    .select('candidate_id, hiring_request:hiring_requests(position_title)')
+    .select('candidate_id, hiring_request:jobs(position_title:title)')
     .in('candidate_id', candidateIds)
     .eq('org_id', orgId)
     .eq('status', 'active')
@@ -121,17 +126,20 @@ export async function listActiveApplicationsForJobPipeline(
   return (data ?? []) as any
 }
 
-/** hiring_request_id for every active application across the given jobs.
- *  Used to count active candidates per job in the copilot job list. */
+/** Canonical job_id for every active application across the given jobs.
+ *  Used to count active candidates per job in the copilot job list. The output
+ *  key stays `hiring_request_id` (aliased from `job_id`) so the caller is
+ *  unchanged; the filter matches canonical `applications.job_id`. */
 export async function listActiveApplicationHiringRequestIds(
   supabase: Supabase,
   orgId: string,
   jobIds: string[],
 ): Promise<Array<{ hiring_request_id: string }>> {
-  const { data } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
     .from('applications')
-    .select('hiring_request_id')
-    .in('hiring_request_id', jobIds)
+    .select('hiring_request_id:job_id')
+    .in('job_id', jobIds)
     .eq('org_id', orgId)
     .eq('status', 'active')
 
@@ -150,9 +158,10 @@ export async function listActiveApplicationsForStaleCheck(
   data: any[] | null
   error: { message: string } | null
 }> {
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('applications')
-    .select('id, applied_at, pipeline_stages(name), hiring_request:hiring_requests(position_title), candidate:candidates(name)')
+    .select('id, applied_at, pipeline_stages(name), hiring_request:jobs(position_title:title), candidate:candidates(name)')
     .eq('org_id', orgId)
     .eq('status', 'active')
 
@@ -174,9 +183,10 @@ export async function listApplicationsForCandidateWithJobAndStage(
   pipeline_stages: { name: string } | null
   hiring_request: { position_title: string; status: string } | null
 }>> {
-  const { data } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
     .from('applications')
-    .select('id, status, applied_at, ai_score, pipeline_stages(name), hiring_request:hiring_requests(position_title, status)')
+    .select('id, status, applied_at, ai_score, pipeline_stages(name), hiring_request:jobs(position_title:title, status)')
     .eq('candidate_id', candidateId)
     .eq('org_id', orgId)
     .order('applied_at', { ascending: false })
@@ -196,9 +206,10 @@ export async function getApplicationStageContext(
   data: any | null
   error: { message: string } | null
 }> {
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('applications')
-    .select('id, pipeline_stages(name), candidate:candidates(name), hiring_request:hiring_requests(position_title)')
+    .select('id, pipeline_stages(name), candidate:candidates(name), hiring_request:jobs(position_title:title)')
     .eq('id', applicationId)
     .eq('org_id', orgId)
     .single()
@@ -237,9 +248,10 @@ export async function getApplicationCandidateAndJob(
   data: any | null
   error: { message: string } | null
 }> {
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('applications')
-    .select('id, candidate:candidates(name), hiring_request:hiring_requests(position_title)')
+    .select('id, candidate:candidates(name), hiring_request:jobs(position_title:title)')
     .eq('id', applicationId)
     .eq('org_id', orgId)
     .single()
@@ -249,17 +261,19 @@ export async function getApplicationCandidateAndJob(
 }
 
 /** candidate_id of existing applications for a job among a candidate set,
- *  used to skip duplicates when adding candidates to a pipeline. */
+ *  used to skip duplicates when adding candidates to a pipeline. The id passed
+ *  is a canonical `jobs.id`, matched against `applications.job_id`. */
 export async function listExistingApplicationCandidateIds(
   supabase: Supabase,
   orgId: string,
-  hiringRequestId: string,
+  jobId: string,
   candidateIds: string[],
 ): Promise<Array<{ candidate_id: string }>> {
-  const { data } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
     .from('applications')
     .select('candidate_id')
-    .eq('hiring_request_id', hiringRequestId)
+    .eq('job_id', jobId)
     .eq('org_id', orgId)
     .in('candidate_id', candidateIds)
 
@@ -267,24 +281,26 @@ export async function listExistingApplicationCandidateIds(
   return (data ?? []) as any
 }
 
-/** Insert one application into a legacy job pipeline and return its id.
+/** Insert one application into a canonical job pipeline and return its id.
  *  Returns { data, error } so the caller can `continue` on failure exactly
- *  as before. Sets applied_at to now and status to 'active'. */
+ *  as before. The id passed (`jobId`) is a canonical `jobs.id`, written to
+ *  `applications.job_id`. Sets applied_at to now and status to 'active'. */
 export async function insertPipelineApplication(
   supabase: Supabase,
   orgId: string,
-  input: { candidateId: string; hiringRequestId: string; stageId: string | null; source: string },
+  input: { candidateId: string; jobId: string; stageId: string | null; source: string },
 ): Promise<{ data: { id: string } | null; error: { message: string } | null }> {
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('applications')
     .insert({
-      candidate_id:      input.candidateId,
-      hiring_request_id: input.hiringRequestId,
-      stage_id:          input.stageId,
-      status:            'active',
-      source:            input.source,
-      org_id:            orgId,
-      applied_at:        new Date().toISOString(),
+      candidate_id: input.candidateId,
+      job_id:       input.jobId,
+      stage_id:     input.stageId,
+      status:       'active',
+      source:       input.source,
+      org_id:       orgId,
+      applied_at:   new Date().toISOString(),
     } as never)
     .select('id')
     .single()
@@ -298,16 +314,17 @@ export async function insertPipelineApplication(
 export async function listUnscoredActiveApplicationsWithCandidate(
   supabase: Supabase,
   orgId: string,
-  hiringRequestId: string,
+  jobId: string,
 ): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, unknown>[] | null
   error: { message: string } | null
 }> {
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('applications')
     .select('id, candidate:candidates(*)')
-    .eq('hiring_request_id', hiringRequestId)
+    .eq('job_id', jobId)
     .eq('org_id', orgId)
     .eq('status', 'active')
     .is('ai_scored_at', null)
@@ -347,9 +364,10 @@ export async function getApplicationCandidateEmailAndJob(
   data: any | null
   error: { message: string } | null
 }> {
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('applications')
-    .select('id, candidate:candidates(name, email), hiring_request:hiring_requests(position_title)')
+    .select('id, candidate:candidates(name, email), hiring_request:jobs(position_title:title)')
     .eq('id', applicationId)
     .eq('org_id', orgId)
     .single()
@@ -369,9 +387,10 @@ export async function getApplicationCandidateIdAndJob(
   data: any | null
   error: { message: string } | null
 }> {
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('applications')
-    .select('id, candidate_id, hiring_request:hiring_requests(position_title)')
+    .select('id, candidate_id, hiring_request:jobs(position_title:title)')
     .eq('id', applicationId)
     .eq('org_id', orgId)
     .single()
@@ -451,17 +470,18 @@ export async function updateApplicationStageById(
 export async function listActiveApplicationsBelowScore(
   supabase: Supabase,
   orgId: string,
-  hiringRequestId: string,
+  jobId: string,
   belowScore: number,
 ): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, unknown>[] | null
   error: { message: string } | null
 }> {
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('applications')
     .select('id, ai_score, candidate:candidates(name)')
-    .eq('hiring_request_id', hiringRequestId)
+    .eq('job_id', jobId)
     .eq('org_id', orgId)
     .eq('status', 'active')
     .not('ai_score', 'is', null)
@@ -501,12 +521,17 @@ export async function listStaleActiveApplicationsForInbox(
   job: { position_title: string } | null
   stage: { name: string } | null
 }>> {
-  const { data } = await supabase
+  // Canonical: candidate name is `candidates.name` (aliased to full_name) and
+  // job title is `jobs.title` (aliased to position_title), so the returned shape
+  // is unchanged for the caller. Client cast `any` for the canonical job_id
+  // relationship.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
     .from('applications')
     .select(`
         id, status, applied_at, stage_id,
-        candidate:candidates(full_name),
-        job:hiring_requests(position_title),
+        candidate:candidates(full_name:name),
+        job:jobs(position_title:title),
         stage:pipeline_stages(name)
       `)
     .eq('org_id', orgId)
@@ -530,9 +555,10 @@ export async function getApplicationCandidateFullNameAndJob(
   data: any | null
   error: { message: string } | null
 }> {
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('applications')
-    .select('id, candidate:candidates(full_name), job:hiring_requests(position_title)')
+    .select('id, candidate:candidates(full_name:name), job:jobs(position_title:title)')
     .eq('id', applicationId)
     .eq('org_id', orgId)
     .single()
@@ -553,12 +579,17 @@ export async function getApplicationForEmailDraft(
   data: any | null
   error: { message: string } | null
 }> {
-  const { data, error } = await supabase
+  // Canonical: candidate name is `candidates.name` (aliased to full_name); job
+  // title is `jobs.title` (aliased to position_title) and department resolves
+  // through the `departments` relation (canonical jobs hold a department_id FK,
+  // not a text column) — surfaced as `department.name` for the caller.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('applications')
     .select(`
       id, status,
-      candidate:candidates(full_name, email),
-      job:hiring_requests(position_title, department),
+      candidate:candidates(full_name:name, email),
+      job:jobs(position_title:title, department:departments(name)),
       stage:pipeline_stages(name)
     `)
     .eq('id', applicationId)

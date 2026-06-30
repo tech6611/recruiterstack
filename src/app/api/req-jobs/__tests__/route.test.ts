@@ -16,11 +16,36 @@ describe('/api/req-jobs', () => {
     mock.results.set('users', { data: { id: 'user-1' }, error: null })  // resolveUserIdFromClerk
   })
 
-  it('creates a draft job', async () => {
+  // A job can only be created from an APPROVED requisition (commit:
+  // "Require an approved requisition to create a job"), so the POST body must
+  // carry link_opening_id pointing at an approved opening.
+  const APPROVED_OPENING_ID = '123e4567-e89b-42d3-a456-426614174000'
+
+  it('creates a draft job from an approved requisition', async () => {
+    mock.results.set('openings', { data: { id: APPROVED_OPENING_ID, status: 'approved' }, error: null })
     mock.results.set('jobs', { data: { id: 'j1', title: 'Eng', status: 'draft' }, error: null })
-    const req = createMockRequest('POST', 'http://localhost:3000/api/req-jobs', { title: 'Eng' })
+    const req = createMockRequest('POST', 'http://localhost:3000/api/req-jobs', {
+      title: 'Eng',
+      link_opening_id: APPROVED_OPENING_ID,
+    })
     const res = await CREATE(req)
     expect(res.status).toBe(201)
+  })
+
+  it('rejects job creation without an approved requisition (422)', async () => {
+    const req = createMockRequest('POST', 'http://localhost:3000/api/req-jobs', { title: 'Eng' })
+    const res = await CREATE(req)
+    expect(res.status).toBe(422)
+  })
+
+  it('rejects creation when the linked requisition is not approved (422)', async () => {
+    mock.results.set('openings', { data: { id: APPROVED_OPENING_ID, status: 'draft' }, error: null })
+    const req = createMockRequest('POST', 'http://localhost:3000/api/req-jobs', {
+      title: 'Eng',
+      link_opening_id: APPROVED_OPENING_ID,
+    })
+    const res = await CREATE(req)
+    expect(res.status).toBe(422)
   })
 
   it('rejects empty title', async () => {
