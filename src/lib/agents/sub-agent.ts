@@ -24,6 +24,9 @@ export interface SubAgentOptions {
   /** The natural-language task the orchestrator is delegating. */
   task: string
   orgId: string
+  /** Acting user, forwarded to tools that must record an actor (create/submit
+   *  opening, approvals). Absent for background/system contexts. */
+  userId?: string | null
   supabase: SupabaseClient
   /** Caller's RBAC capabilities. When set, tools are capability-gated; omit for
    *  background/system contexts (WhatsApp responder, autopilot) to run unrestricted. */
@@ -65,7 +68,7 @@ export async function runSubAgent(opts: SubAgentOptions): Promise<string> {
     const results: Anthropic.ToolResultBlockParam[] = []
     for (const tu of toolUses) {
       const input = (tu.input ?? {}) as Record<string, unknown>
-      const result = await executeTool(tu.name, input, opts.orgId, opts.supabase, opts.capabilities)
+      const result = await executeTool(tu.name, input, opts.orgId, opts.supabase, opts.capabilities, opts.userId)
       results.push({ type: 'tool_result', tool_use_id: tu.id, content: result })
     }
     conversation.push({ role: 'user', content: results })

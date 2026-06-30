@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
             }
 
             const result = await executeOrchestratorTool(tc.name, parsedInput, {
-              client, model: MODEL, orgId, supabase, capabilities,
+              client, model: MODEL, orgId, userId, supabase, capabilities,
             })
             send({ type: 'tool_done', id: tc.id, name: tc.name, summary: toolSummary(tc.name, result) })
 

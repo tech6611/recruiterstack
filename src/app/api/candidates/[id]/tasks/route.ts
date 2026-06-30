@@ -1,23 +1,18 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
+import { listCandidateTasks, createCandidateTask, AnnotationError } from '@/modules/ats/domain/candidate-annotations'
+import type { TaskStatus } from '@/lib/types/database'
 
 // GET /api/candidates/[id]/tasks
 // Returns tasks ordered: incomplete first (by due_date asc), then completed (by completed_at desc)
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
-  const { data, error } = await supabase
-    .from('candidate_tasks')
-    .select('*')
-    .eq('candidate_id', params.id)
-    .eq('org_id', orgId)
-    .order('completed_at', { ascending: true, nullsFirst: true })
-    .order('due_date',      { ascending: true, nullsFirst: false })
-    .order('created_at',    { ascending: false })
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    const data = await listCandidateTasks(supabase, orgId, params.id)
+    return NextResponse.json({ data })
+  } catch (err) {
+    const status = err instanceof AnnotationError ? err.status : 500
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status })
   }
-
-  return NextResponse.json({ data: data ?? [] })
 })
 
 // POST /api/candidates/[id]/tasks
@@ -29,43 +24,19 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const title = (body.title as string | undefined)?.trim()
-  if (!title) {
-    return NextResponse.json({ error: 'title is required' }, { status: 400 })
+  try {
+    const data = await createCandidateTask(supabase, orgId, params.id, {
+      title:         body.title as string,
+      description:   (body.description    as string | undefined) ?? null,
+      dueDate:       (body.due_date       as string | undefined) ?? null,
+      assigneeName:  (body.assignee_name  as string | undefined) ?? null,
+      applicationId: (body.application_id as string | undefined) ?? null,
+      createdBy:     (body.created_by     as string | undefined) ?? null,
+      status:        (body.status         as TaskStatus | undefined),
+    })
+    return NextResponse.json({ data }, { status: 201 })
+  } catch (err) {
+    const status = err instanceof AnnotationError ? err.status : 500
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status })
   }
-
-  const baseInsert = {
-    org_id:         orgId,
-    candidate_id:   params.id,
-    application_id: (body.application_id as string | undefined) ?? null,
-    title,
-    description:    (body.description   as string | undefined) ?? null,
-    due_date:       (body.due_date       as string | undefined) ?? null,
-    assignee_name:  (body.assignee_name  as string | undefined) ?? null,
-    created_by:     (body.created_by     as string | undefined) ?? 'Recruiter',
-  }
-
-  const statusValue = ((body.status as string | undefined) ?? 'to_do') as import('@/lib/types/database').TaskStatus
-
-  const { data, error } = await supabase
-    .from('candidate_tasks')
-    .insert({ ...baseInsert, status: statusValue })
-    .select()
-    .single()
-
-  if (error) {
-    // PGRST204/42703: status column hasn't been added via migration yet — retry without it
-    if (error.code === '42703' || error.message?.includes('status')) {
-      const { data: data2, error: error2 } = await supabase
-        .from('candidate_tasks')
-        .insert(baseInsert)
-        .select()
-        .single()
-      if (error2) return NextResponse.json({ error: error2.message }, { status: 500 })
-      return NextResponse.json({ data: { ...data2, status: statusValue } }, { status: 201 })
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ data }, { status: 201 })
 })

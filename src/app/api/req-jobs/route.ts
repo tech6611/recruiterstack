@@ -4,31 +4,7 @@ import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { jobIntakeCreateSchema } from '@/lib/validations/jobs'
-import type { SupabaseClient } from '@supabase/supabase-js'
-
-/** Find an org-scoped department by name, creating it if absent. */
-async function findOrCreateDepartment(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any>,
-  orgId: string,
-  name: string,
-): Promise<string | null> {
-  const trimmed = name.trim()
-  if (!trimmed) return null
-  const { data: existing } = await supabase
-    .from('departments')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('name', trimmed)
-    .maybeSingle()
-  if (existing) return (existing as { id: string }).id
-  const { data: created } = await supabase
-    .from('departments')
-    .insert({ org_id: orgId, name: trimmed })
-    .select('id')
-    .single()
-  return created ? (created as { id: string }).id : null
-}
+import { createJobFromApprovedOpening } from '@/modules/ats/domain/job-lifecycle'
 
 /**
  * GET /api/req-jobs — list with filters + pagination.
@@ -113,61 +89,9 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // A job can only exist against an APPROVED requisition (opening). This is the
-  // single source of truth for that rule — the New Job UI, the clone flow, and
-  // the copilot tools all funnel through here. Without an approved opening to
-  // link, refuse to create the job at all (no orphan/req-less jobs, no inline
-  // minting of unapproved seats).
-  if (!body.link_opening_id) {
-    return NextResponse.json(
-      { error: 'A job can only be created from an approved requisition. Pick an approved requisition first.' },
-      { status: 422 },
-    )
-  }
-
-  const { data: linkedOpening } = await supabase
-    .from('openings')
-    .select('id, status')
-    .eq('id', body.link_opening_id)
-    .eq('org_id', orgId)
-    .maybeSingle()
-  if (!linkedOpening) {
-    return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 })
-  }
-  if ((linkedOpening as { status: string }).status !== 'approved') {
-    return NextResponse.json(
-      { error: 'That requisition is not approved yet. A job can only be created from an approved requisition.' },
-      { status: 422 },
-    )
-  }
-
-  const departmentId = await findOrCreateDepartment(supabase, orgId, body.department)
-
-  const { data: job, error } = await supabase
-    .from('jobs')
-    .insert({
-      org_id:          orgId,
-      title:           body.title,
-      department_id:   departmentId,
-      description:     body.description || null,
-      confidentiality: body.confidentiality,
-      custom_fields:   Object.keys(body.intake).length > 0 ? { intake: body.intake } : {},
-      status:          'draft',
-      created_by:      userId,
-    })
-    .select()
-    .single()
-
-  if (error) return handleSupabaseError(error)
-  const jobRow = job as { id: string }
-
-  // Link the approved requisition to the new job. Ignore a duplicate link
-  // (composite PK) gracefully.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: linkErr } = await (supabase as any)
-    .from('job_openings')
-    .insert({ job_id: jobRow.id, opening_id: body.link_opening_id, linked_by: userId })
-  if (linkErr && linkErr.code !== '23505') return handleSupabaseError(linkErr)
-
-  return NextResponse.json({ data: job }, { status: 201 })
+  // The approved-requisition gate + insert + opening link live in the canonical
+  // job-lifecycle facade, shared with the copilot `create_job_from_opening` tool.
+  const result = await createJobFromApprovedOpening(supabase, orgId, userId, body)
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.code })
+  return NextResponse.json({ data: result.job }, { status: 201 })
 }
