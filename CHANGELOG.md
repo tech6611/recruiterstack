@@ -11,7 +11,27 @@ entries on top.
 
 ## 2026-06-30
 
-### Fixed
+### Changed
+- **A job can only be created from an approved requisition.** Closed the loophole
+  that let approved/live jobs exist with no requisition behind them. Now every
+  job-creation path requires a link to an **approved** requisition (opening):
+  - `POST /api/req-jobs` rejects creation unless `link_opening_id` points to an
+    org-owned, approved opening; the old inline "mint a seat per location" path
+    is removed (it created unapproved headcount on the fly).
+  - **New Job** on `/jobs` no longer opens the JD form directly — it first opens
+    a chooser of the org's approved requisitions; picking one carries its
+    title/department/location/comp/start-date into the form and links it.
+  - **New version** (clone) now reuses the requisition the source job is linked
+    to and requires it to have passed approval; `POST /api/req-jobs/:id/clone`
+    enforces this server-side.
+
+### Added
+- **"No req" warning badge.** Jobs with no linked requisition are flagged — a
+  banner on the job detail view and a small amber "No req" badge in the jobs
+  list — so older req-less jobs are easy to spot and fix.
+  (`src/app/(dashboard)/jobs/page.tsx`, `src/components/req-jobs/JobDetail.tsx`,
+  `src/modules/ats/domain/job-pipelines.ts`.)
+
 - **Rich-text fields: saved view now matches the editor (WYSIWYG).** Blank lines
   the author added (empty paragraphs) used to collapse to nothing once saved —
   the read-only renderer now gives them a one-line height so the spacing the

@@ -30,34 +30,6 @@ async function findOrCreateDepartment(
   return created ? (created as { id: string }).id : null
 }
 
-/** Find an org-scoped location by name, creating it if absent. */
-async function findOrCreateLocation(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any>,
-  orgId: string,
-  name: string,
-): Promise<string | null> {
-  const trimmed = name.trim()
-  if (!trimmed) return null
-  const { data: existing } = await supabase
-    .from('locations')
-    .select('id')
-    .eq('org_id', orgId)
-    .eq('name', trimmed)
-    .maybeSingle()
-  if (existing) return (existing as { id: string }).id
-  const remoteType =
-    trimmed.toLowerCase() === 'remote' ? 'remote'
-    : trimmed.toLowerCase() === 'hybrid' ? 'hybrid'
-    : 'onsite'
-  const { data: created } = await supabase
-    .from('locations')
-    .insert({ org_id: orgId, name: trimmed, remote_type: remoteType })
-    .select('id')
-    .single()
-  return created ? (created as { id: string }).id : null
-}
-
 /**
  * GET /api/req-jobs — list with filters + pagination.
  *
@@ -141,6 +113,34 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient()
 
+  // A job can only exist against an APPROVED requisition (opening). This is the
+  // single source of truth for that rule — the New Job UI, the clone flow, and
+  // the copilot tools all funnel through here. Without an approved opening to
+  // link, refuse to create the job at all (no orphan/req-less jobs, no inline
+  // minting of unapproved seats).
+  if (!body.link_opening_id) {
+    return NextResponse.json(
+      { error: 'A job can only be created from an approved requisition. Pick an approved requisition first.' },
+      { status: 422 },
+    )
+  }
+
+  const { data: linkedOpening } = await supabase
+    .from('openings')
+    .select('id, status')
+    .eq('id', body.link_opening_id)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (!linkedOpening) {
+    return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 })
+  }
+  if ((linkedOpening as { status: string }).status !== 'approved') {
+    return NextResponse.json(
+      { error: 'That requisition is not approved yet. A job can only be created from an approved requisition.' },
+      { status: 422 },
+    )
+  }
+
   const departmentId = await findOrCreateDepartment(supabase, orgId, body.department)
 
   const { data: job, error } = await supabase
@@ -161,72 +161,13 @@ export async function POST(req: NextRequest) {
   if (error) return handleSupabaseError(error)
   const jobRow = job as { id: string }
 
-  // When created from an already-approved requisition, link that existing
-  // opening to the new job instead of minting fresh seats. Verify org
-  // ownership first; ignore a duplicate link (composite PK) gracefully.
-  if (body.link_opening_id) {
-    const { data: existingOpening } = await supabase
-      .from('openings')
-      .select('id')
-      .eq('id', body.link_opening_id)
-      .eq('org_id', orgId)
-      .maybeSingle()
-    if (existingOpening) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: linkErr } = await (supabase as any)
-        .from('job_openings')
-        .insert({ job_id: jobRow.id, opening_id: body.link_opening_id, linked_by: userId })
-      if (linkErr && linkErr.code !== '23505') return handleSupabaseError(linkErr)
-    }
-  }
-
-  // Create one opening per seat for each location row, then link them to the
-  // job via the job_openings M2M. A row with N seats expands to N openings —
-  // each opening is a single funded headcount seat (migration 035).
-  const openingRows = body.openings.filter(o => o.location.trim() || o.seats > 0)
-  if (openingRows.length > 0) {
-    const locationCache = new Map<string, string | null>()
-    const inserts: Array<Record<string, unknown>> = []
-    for (const row of openingRows) {
-      const key = row.location.trim()
-      if (!locationCache.has(key)) {
-        locationCache.set(key, await findOrCreateLocation(supabase, orgId, key))
-      }
-      const locationId = locationCache.get(key) ?? null
-      for (let i = 0; i < Math.max(1, row.seats); i++) {
-        inserts.push({
-          org_id:        orgId,
-          title:         body.title,
-          department_id: departmentId,
-          location_id:   locationId,
-          comp_min:      body.comp_min,
-          comp_max:      body.comp_max,
-          status:        'draft',
-          created_by:    userId,
-          recruiter_id:  userId,
-        })
-      }
-    }
-
-    if (inserts.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any
-      const { data: createdOpenings, error: openErr } = await db
-        .from('openings')
-        .insert(inserts)
-        .select('id')
-      if (openErr) return handleSupabaseError(openErr)
-      const links = (createdOpenings ?? []).map((o: { id: string }) => ({
-        job_id:     jobRow.id,
-        opening_id: o.id,
-        linked_by:  userId,
-      }))
-      if (links.length > 0) {
-        const { error: linkErr } = await db.from('job_openings').insert(links)
-        if (linkErr) return handleSupabaseError(linkErr)
-      }
-    }
-  }
+  // Link the approved requisition to the new job. Ignore a duplicate link
+  // (composite PK) gracefully.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: linkErr } = await (supabase as any)
+    .from('job_openings')
+    .insert({ job_id: jobRow.id, opening_id: body.link_opening_id, linked_by: userId })
+  if (linkErr && linkErr.code !== '23505') return handleSupabaseError(linkErr)
 
   return NextResponse.json({ data: job }, { status: 201 })
 }

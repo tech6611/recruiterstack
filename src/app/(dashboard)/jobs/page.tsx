@@ -7,9 +7,10 @@ import {
   Briefcase, Plus, Search, Clock, X, Mail, FileText, Send,
   CheckCircle, Check, Users, PenLine, Wand2, RefreshCw, Loader2, Sparkles, Paperclip,
   ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft, GripVertical, Archive, Ban,
-  CalendarDays, SlidersHorizontal, Pencil,
+  CalendarDays, SlidersHorizontal, Pencil, AlertTriangle,
 } from 'lucide-react'
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
+import type { Opening, Department, Location as LocationRow } from '@/lib/types/requisitions'
 import type { Editor } from '@tiptap/react'
 import EditHMModal from '@/components/EditHMModal'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
@@ -341,9 +342,14 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
     return (
       <div className="p-6 space-y-5">
         <div>
-          <button onClick={() => setMode(null)} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors">
-            <ArrowLeft className="h-4 w-4" />Back
-          </button>
+          {/* When created from an approved requisition (the only entry point now)
+              there is no two-card mode picker to go "Back" to, so the button is
+              hidden — the user closes the drawer to start over. */}
+          {!fromOpening && (
+            <button onClick={() => setMode(null)} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors">
+              <ArrowLeft className="h-4 w-4" />Back
+            </button>
+          )}
           <h2 className="text-lg font-bold text-slate-900">
             {mode === 'send_to_hm' ? 'Send Intake to Hiring Manager' : 'Create Full Hiring Request'}
           </h2>
@@ -607,6 +613,134 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Requisition chooser — the front door to creating a job
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A job can only be created from an APPROVED requisition (enforced server-side in
+ * /api/req-jobs POST). So "New Job" no longer opens the JD form directly — it
+ * first asks the user to pick one of their approved requisitions. Picking one
+ * carries its title/department/location/comp/start-date into the New Job drawer
+ * and links that requisition to the new job (no new headcount is minted).
+ */
+function RequisitionChooser({ onPick }: { onPick: (o: FromOpening) => void }) {
+  const [openings, setOpenings] = useState<Opening[]>([])
+  const [depts, setDepts]       = useState<Department[]>([])
+  const [locs, setLocs]         = useState<LocationRow[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [q, setQ]               = useState('')
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/openings?status=approved').then(r => r.json()).then(d => (d.data ?? []) as Opening[]),
+      fetch('/api/departments').then(r => r.json()).then(d => (d.data ?? []) as Department[]),
+      fetch('/api/locations').then(r => r.json()).then(d => (d.data ?? []) as LocationRow[]),
+    ])
+      .then(([o, d, l]) => { setOpenings(o); setDepts(d); setLocs(l) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const deptById = useMemo(() => new Map(depts.map(d => [d.id, d.name])), [depts])
+  const locById  = useMemo(() => new Map(locs.map(l => [l.id, l.name])), [locs])
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    if (!needle) return openings
+    return openings.filter(o => o.title.toLowerCase().includes(needle))
+  }, [openings, q])
+
+  const pick = (o: Opening) => onPick({
+    id:                o.id,
+    title:             o.title,
+    department:        o.department_id ? (deptById.get(o.department_id) ?? '') : '',
+    location:          o.location_id   ? (locById.get(o.location_id)    ?? '') : '',
+    comp_min:          o.comp_min != null ? String(o.comp_min) : '',
+    comp_max:          o.comp_max != null ? String(o.comp_max) : '',
+    target_start_date: o.target_start_date ?? '',
+    hm_name:           '',
+  })
+
+  return (
+    <div className="p-6 space-y-5">
+      <div>
+        <h2 className="text-lg font-bold text-slate-900">Pick an approved requisition</h2>
+        <p className="text-sm text-slate-500 mt-1">
+          A job can only be created from an approved requisition. Choose one to write its job description.
+        </p>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search approved requisitions…"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+        />
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 rounded-xl border border-slate-200 bg-slate-50 animate-pulse" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-12 px-6 text-center">
+          <CheckCircle className="h-9 w-9 text-slate-200 mx-auto mb-2" />
+          <p className="text-sm font-medium text-slate-600">
+            {openings.length === 0 ? 'No approved requisitions yet' : 'No approved requisitions match your search'}
+          </p>
+          <p className="text-xs text-slate-400 mt-1 mb-4">
+            {openings.length === 0
+              ? 'Create a requisition and get it approved before you can create a job.'
+              : 'Try a different search.'}
+          </p>
+          {openings.length === 0 && (
+            <a
+              href="/openings/new"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />New requisition
+            </a>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(o => {
+            const dept = o.department_id ? deptById.get(o.department_id) : null
+            const loc  = o.location_id   ? locById.get(o.location_id)    : null
+            const comp = o.comp_min != null && o.comp_max != null
+              ? `${o.comp_currency} ${Number(o.comp_min).toLocaleString()}–${Number(o.comp_max).toLocaleString()}`
+              : null
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => pick(o)}
+                className="w-full text-left rounded-xl border border-slate-200 bg-white p-4 hover:border-emerald-400 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold text-slate-900 text-sm">{o.title}</p>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    <CheckCircle className="h-3 w-3" />Approved
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {[dept, loc, comp].filter(Boolean).join(' · ') || 'No details'}
+                </p>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Jobs list helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -846,6 +980,9 @@ export default function JobsPage() {
 
   // ── UI ────────────────────────────────────────────────────────────────────
   const [showDrawer, setShowDrawer] = useState(false)
+  // "New Job" first opens this chooser of approved requisitions; picking one
+  // opens the drawer with that requisition prefilled & linked.
+  const [showReqChooser, setShowReqChooser] = useState(false)
   // When opened from an approved requisition, these prefill the drawer and tell
   // it to link that existing opening instead of minting new seats.
   const [drawerFromOpening, setDrawerFromOpening] = useState<FromOpening | null>(null)
@@ -1150,7 +1287,22 @@ export default function JobsPage() {
       case 'ticket':
         return <td key={colId} className="px-3 py-3.5"><span className="text-xs font-mono font-semibold text-slate-400">{job.ticket_number ?? '—'}</span></td>
       case 'position':
-        return <td key={colId} className="px-3 py-3.5"><p className="font-semibold text-sm text-slate-900">{job.position_title}</p>{job.department && <p className="text-xs text-slate-400 mt-0.5">{job.department}</p>}</td>
+        return (
+          <td key={colId} className="px-3 py-3.5">
+            <div className="flex items-center gap-1.5">
+              <p className="font-semibold text-sm text-slate-900">{job.position_title}</p>
+              {job.opening_count === 0 && (
+                <span
+                  title="No approved requisition linked to this job"
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                >
+                  <AlertTriangle className="h-3 w-3" />No req
+                </span>
+              )}
+            </div>
+            {job.department && <p className="text-xs text-slate-400 mt-0.5">{job.department}</p>}
+          </td>
+        )
       case 'pipeline':
         return <td key={colId} className="px-3 py-3.5"><PipelineBar stages={job.stage_counts} /></td>
       case 'manager':
@@ -1316,7 +1468,7 @@ export default function JobsPage() {
           </button>
 
           <button
-            onClick={() => setShowDrawer(true)}
+            onClick={() => setShowReqChooser(true)}
             className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm"
           >
             <Plus className="h-4 w-4" />
@@ -1428,7 +1580,7 @@ export default function JobsPage() {
           <Briefcase className="h-10 w-10 text-slate-200 mx-auto mb-3" />
           <p className="text-sm font-medium text-slate-500">No jobs yet</p>
           <p className="text-xs text-slate-400 mt-1 mb-4">Create your first job to get started</p>
-          <button onClick={() => setShowDrawer(true)}
+          <button onClick={() => setShowReqChooser(true)}
             className="inline-flex items-center gap-1.5 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors">
             <Plus className="h-3.5 w-3.5" />New Job
           </button>
@@ -1497,6 +1649,26 @@ export default function JobsPage() {
 
         {/* ── Past block (closed/archived jobs, simple self-contained list) ── */}
         <PastJobsBlock jobs={pastJobs} />
+        </div>
+      )}
+
+      {/* ── Requisition chooser (front door to New Job) ──────────────────── */}
+      {showReqChooser && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={() => setShowReqChooser(false)} />
+          <div className="w-full max-w-2xl bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
+              <span className="text-sm font-semibold text-slate-500">New Job</span>
+              <button onClick={() => setShowReqChooser(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <RequisitionChooser
+                onPick={o => { setDrawerFromOpening(o); setShowReqChooser(false); setShowDrawer(true) }}
+              />
+            </div>
+          </div>
         </div>
       )}
 

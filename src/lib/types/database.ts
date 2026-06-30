@@ -994,6 +994,8 @@ export interface JobWithPipeline extends HiringRequest {
 
 export interface JobListItem extends HiringRequest {
   total_candidates: number
+  // Linked requisitions; 0 → no approved requisition behind the job (warning badge).
+  opening_count?: number
   stage_counts: { stage_id: string; stage_name: string; color: StageColor; count: number }[]
 }
 

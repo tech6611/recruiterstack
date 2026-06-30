@@ -256,11 +256,24 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   }
 
   async function newVersion() {
+    // A job — including a new version — can only exist against an approved
+    // requisition. Reuse the requisition this job is already linked to (it has
+    // passed approval). If somehow none has, there's nothing approved to clone
+    // into, so we stop with a clear message rather than create an orphan.
+    const approvedOpening = linkedOpenings.find(o => ['approved', 'open', 'filled'].includes(o.status))
+    if (!approvedOpening) {
+      toast.error('A new version needs an approved requisition to clone into, but this job has none linked. Link an approved requisition first.')
+      return
+    }
     if (!confirm(
-      'Create a new draft version of this job?\n\nIt copies the JD and intake content into a fresh draft you can change freely, then re-submit for approval. The current job is left exactly as it is.'
+      'Create a new draft version of this job?\n\nIt copies the JD and intake content into a fresh draft you can change freely, then re-submit for approval. It stays linked to the same approved requisition. The current job is left exactly as it is.'
     )) return
     setCloning(true)
-    const res = await fetch(`/api/req-jobs/${job.id}/clone`, { method: 'POST' })
+    const res = await fetch(`/api/req-jobs/${job.id}/clone`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opening_id: approvedOpening.id }),
+    })
     setCloning(false)
     const body = await res.json().catch(() => ({}))
     if (!res.ok) { toast.error(body.error ?? 'Could not create new version'); return }
@@ -449,6 +462,20 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           )}
         </div>
       </div>
+
+      {/* D2: every job must trace back to an approved requisition. Older jobs
+          created before that rule (or that lost their link) have none — flag
+          them so the gap is visible and can be fixed by linking one below. */}
+      {linkedOpenings.length === 0 && (
+        <div className="mb-5 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+          <div>
+            <span className="font-medium">No requisition linked.</span>{' '}
+            Every job should be backed by an approved requisition. This one isn&apos;t — link an approved
+            requisition in the <span className="font-medium">Requisitions</span> section below.
+          </div>
+        </div>
+      )}
 
       {editing && lockedSubstance && (
         <div className="mb-5 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">

@@ -33,6 +33,10 @@ export interface PublicScreeningField {
 
 export interface LegacyJobPipelineSummary extends HiringRequest {
   total_candidates: number
+  // How many requisitions (openings) this job is linked to. 0 means the job has
+  // no approved requisition behind it — surfaced as a warning badge on the board
+  // (every job is now supposed to trace back to an approved requisition).
+  opening_count: number
   stage_counts: {
     stage_id: string
     stage_name: string
@@ -186,7 +190,7 @@ export async function listCanonicalJobBoardSummaries(
 ): Promise<LegacyJobPipelineSummary[]> {
   // job_id columns / apply_token are not yet in generated types (migrations
   // 066/068); cast the client as in rbac.ts.
-  const [jobsRes, stagesRes, appsRes] = await Promise.all([
+  const [jobsRes, stagesRes, appsRes, linksRes] = await Promise.all([
     (supabase as any)
       .from('jobs')
       .select('id, org_id, title, status, created_at, custom_fields, department:departments(name)')
@@ -204,11 +208,16 @@ export async function listCanonicalJobBoardSummaries(
       .select('id, job_id, stage_id, status')
       .eq('org_id', orgId)
       .not('job_id', 'is', null),
+    // Linked requisitions per job — used to flag req-less jobs on the board.
+    (supabase as any)
+      .from('job_openings')
+      .select('job_id'),
   ])
 
   if (jobsRes.error) throw jobsRes.error
   if (stagesRes.error) throw stagesRes.error
   if (appsRes.error) throw appsRes.error
+  if (linksRes.error) throw linksRes.error
 
   const stages = (stagesRes.data ?? []) as Array<
     Pick<PipelineStage, 'id' | 'job_id' | 'name' | 'color' | 'order_index'>
@@ -216,6 +225,10 @@ export async function listCanonicalJobBoardSummaries(
   const apps = (appsRes.data ?? []) as Array<
     Pick<Application, 'id' | 'job_id' | 'stage_id' | 'status'>
   >
+  const openingCountByJob = new Map<string, number>()
+  for (const l of (linksRes.data ?? []) as Array<{ job_id: string }>) {
+    openingCountByJob.set(l.job_id, (openingCountByJob.get(l.job_id) ?? 0) + 1)
+  }
 
   return ((jobsRes.data ?? []) as CanonicalJobRow[]).map(row => {
     const jobStages = stages
@@ -227,6 +240,7 @@ export async function listCanonicalJobBoardSummaries(
     return {
       ...canonicalJobToHiringRequest(row),
       total_candidates: jobApps.length,
+      opening_count: openingCountByJob.get(row.id) ?? 0,
       stage_counts: jobStages.map(s => ({
         stage_id: s.id,
         stage_name: s.name,
