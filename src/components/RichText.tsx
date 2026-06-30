@@ -22,14 +22,23 @@ import { cn } from '@/lib/utils'
 
 const HTML_TAG = /<\/?[a-z][\s\S]*>/i
 
+// These rules are kept in lockstep with the editor's own styling
+// (RichTextEditor's [&_.tiptap_*] rules) so the saved/read-only view is a
+// pixel match for what the author saw while typing — same heading weight,
+// same paragraph/list spacing. If you change one, change the other.
 const RICH_TEXT_CLASS = cn(
   'text-sm text-slate-700 leading-relaxed',
-  '[&_p]:my-1',
-  '[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1',
-  '[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1',
-  '[&_li]:my-0.5',
-  '[&_h1]:text-base [&_h1]:font-semibold [&_h1]:my-1.5',
-  '[&_h2]:text-sm  [&_h2]:font-semibold [&_h2]:my-1.5',
+  '[&_p]:my-0.5',
+  // Empty paragraphs are intentional blank lines the author added in the editor.
+  // Without content the browser collapses them to ~0 height, so the spacing that
+  // showed while editing disappears after saving. Give them a one-line height so
+  // the rendered view matches the editor.
+  '[&_p:empty]:min-h-[1.5em]',
+  '[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-0.5',
+  '[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-0.5',
+  '[&_li]:my-0',
+  '[&_h1]:text-base [&_h1]:font-bold [&_h1]:my-1',
+  '[&_h2]:text-sm  [&_h2]:font-semibold [&_h2]:my-1',
   '[&_strong]:font-semibold',
   '[&_em]:italic',
   '[&_a]:text-emerald-600 [&_a]:underline',

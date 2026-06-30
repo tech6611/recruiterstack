@@ -9,6 +9,17 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-06-30
+
+### Fixed
+- **Rich-text fields: saved view now matches the editor (WYSIWYG).** Blank lines
+  the author added (empty paragraphs) used to collapse to nothing once saved —
+  the read-only renderer now gives them a one-line height so the spacing the
+  author saw while typing is preserved. Also brought the saved view's heading
+  weight (H1 now bold, not semibold) and paragraph/list spacing into lockstep
+  with the editor so what you type is exactly what renders. Affects every place
+  rich text is shown (job detail, intake, public apply). (`components/RichText.tsx`.)
+
 ## 2026-06-28
 
 ### Added
