@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, AlertTriangle, Pencil } from 'lucide-react'
+import { Plus, AlertTriangle, Pencil, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -30,11 +30,34 @@ const TARGET_LABEL: Record<TargetType, string> = {
   offer:   'Offer',
 }
 
+// Plural section headings + the fixed display order the admin asked for:
+// Requisitions first, then Pipelines (jobs), then Offers.
+const TARGET_ORDER: TargetType[] = ['opening', 'job', 'offer']
+const SECTION_LABEL: Record<TargetType, string> = {
+  opening: 'Requisitions',
+  job:     'Pipelines',
+  offer:   'Offers',
+}
+
 export default function ApprovalChainsListPage() {
   const router = useRouter()
   const [items, setItems]     = useState<Chain[]>([])
   const [loaded, setLoaded]   = useState(false)
   const [creating, setCreating] = useState<TargetType | null>(null)
+  // Which sections are folded shut. All open by default.
+  const [collapsed, setCollapsed] = useState<Record<TargetType, boolean>>({
+    opening: false, job: false, offer: false,
+  })
+  const toggleSection = (t: TargetType) =>
+    setCollapsed(prev => ({ ...prev, [t]: !prev[t] }))
+
+  // Bucket the flat list into the three target types so each gets its own
+  // foldable card, rendered in the fixed reqs < jobs < offers order.
+  const grouped = useMemo<Record<TargetType, Chain[]>>(() => {
+    const g: Record<TargetType, Chain[]> = { opening: [], job: [], offer: [] }
+    for (const c of items) g[c.target_type]?.push(c)
+    return g
+  }, [items])
 
   async function refresh() {
     const r = await fetch('/api/admin/approval-chains').then(x => x.json()).catch(() => ({ data: [] }))
@@ -140,52 +163,82 @@ export default function ApprovalChainsListPage() {
 
       {!loaded ? (
         <p className="text-xs text-slate-400">Loading…</p>
-      ) : items.length === 0 ? (
-        <Card><CardContent><p className="py-8 text-center text-sm text-slate-500">No chains yet.</p></CardContent></Card>
       ) : (
-        <div className="space-y-2">
-          {items.map(c => (
-            <Link key={c.id} href={`/admin/approvals/${c.id}`}>
-              <Card className={cn('hover:shadow-md transition-shadow', !c.is_active && 'opacity-60')}>
-                <CardContent>
-                  <div className="flex items-center justify-between gap-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                        {c.name}
-                        {c.scope_conditions == null && (
-                          <span className="text-[10px] uppercase font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
-                            Catch-all
-                          </span>
-                        )}
-                        {!c.is_active && (
-                          <span className="text-[10px] uppercase font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
-                            Archived
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5">{TARGET_LABEL[c.target_type]} · {c.description ?? 'No description'}</div>
-                    </div>
-                    <span className="text-[10px] uppercase font-semibold text-slate-400 hidden sm:inline">
-                      Updated {new Date(c.updated_at).toLocaleDateString()}
-                    </span>
-                    {/* Explicit Edit affordance. The whole card is already a link
-                        to the editor; this button just makes that discoverable.
-                        It intentionally does NOT stop propagation, so the click
-                        bubbles up to the row's <Link> and opens the editor. */}
-                    <Button variant="outline" size="sm">
-                      <Pencil className="h-3.5 w-3.5" /> Edit
-                    </Button>
-                    <ChainRowActions
-                      chainId={c.id}
-                      chainName={c.name}
-                      isActive={c.is_active}
-                      onChanged={refresh}
-                    />
+        <div className="space-y-4">
+          {TARGET_ORDER.map(t => {
+            const chains   = grouped[t]
+            const isOpen   = !collapsed[t]
+            const Chevron  = isOpen ? ChevronDown : ChevronRight
+            return (
+              <Card key={t} className="overflow-hidden">
+                {/* Foldable section header — click anywhere to collapse/expand. */}
+                <button
+                  type="button"
+                  onClick={() => toggleSection(t)}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+                >
+                  <Chevron className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span className="text-sm font-semibold text-slate-900">{SECTION_LABEL[t]}</span>
+                  <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">
+                    {chains.length}
+                  </span>
+                </button>
+
+                {isOpen && (
+                  <div className="border-t border-slate-100 p-2 space-y-2">
+                    {chains.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-slate-400">
+                        No {SECTION_LABEL[t].toLowerCase()} chains yet.
+                      </p>
+                    ) : (
+                      chains.map(c => (
+                        <Link key={c.id} href={`/admin/approvals/${c.id}`}>
+                          <Card className={cn('hover:shadow-md transition-shadow', !c.is_active && 'opacity-60')}>
+                            <CardContent>
+                              <div className="flex items-center justify-between gap-3 py-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                                    {c.name}
+                                    {c.scope_conditions == null && (
+                                      <span className="text-[10px] uppercase font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+                                        Catch-all
+                                      </span>
+                                    )}
+                                    {!c.is_active && (
+                                      <span className="text-[10px] uppercase font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
+                                        Archived
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-slate-500 mt-0.5">{TARGET_LABEL[c.target_type]} · {c.description ?? 'No description'}</div>
+                                </div>
+                                <span className="text-[10px] uppercase font-semibold text-slate-400 hidden sm:inline">
+                                  Updated {new Date(c.updated_at).toLocaleDateString()}
+                                </span>
+                                {/* Explicit Edit affordance. The whole card is already a link
+                                    to the editor; this button just makes that discoverable.
+                                    It intentionally does NOT stop propagation, so the click
+                                    bubbles up to the row's <Link> and opens the editor. */}
+                                <Button variant="outline" size="sm">
+                                  <Pencil className="h-3.5 w-3.5" /> Edit
+                                </Button>
+                                <ChainRowActions
+                                  chainId={c.id}
+                                  chainName={c.name}
+                                  isActive={c.is_active}
+                                  onChanged={refresh}
+                                />
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      ))
+                    )}
                   </div>
-                </CardContent>
+                )}
               </Card>
-            </Link>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

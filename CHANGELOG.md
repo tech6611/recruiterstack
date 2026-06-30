@@ -12,6 +12,13 @@ entries on top.
 ## 2026-06-30
 
 ### Changed
+- **Approval chains page now groups chains by target type into foldable sections.**
+  The `/admin/approvals` list was a flat mix of Requisition, Pipeline, and Offer
+  chains; it now stacks three collapsible cards in a fixed order — Requisitions,
+  then Pipelines (jobs), then Offers — each with a click-to-fold header and a count
+  badge. Empty groups still show so the structure stays visible; chain rows keep
+  their Edit/Archive actions and Catch-all/Archived tags, and the fallback-gap
+  banners are unchanged. (`src/app/(dashboard)/admin/approvals/page.tsx`.)
 - **Candidates hiring funnel now matches the Jobs/Requisitions card style.** Flipped
   the funnel cards so the count sits on top and the stage label below (like the
   Jobs and Requisitions summary cards), and re-tinted them by *position* instead
