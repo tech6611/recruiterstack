@@ -348,7 +348,6 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
                     <span className={`text-[11px] font-semibold ${def.accent.ink} truncate leading-tight`}>{def.name}</span>
                   </div>
                   <p className={`text-2xl font-bold ${def.accent.ink} leading-none`}>{count}</p>
-                  <p className={`text-[10px] ${def.accent.sub} mt-1`}>candidates</p>
                 </div>
 
                 {/* Arrow connector */}
