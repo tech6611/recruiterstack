@@ -366,7 +366,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
     setArchiving(false)
     if (!res.ok) { toast.error('Archive failed'); return }
     toast.success('Archived')
-    router.push('/req-jobs')
+    router.push('/jobs')
   }
 
   async function unlinkOpening(openingId: string) {
@@ -387,8 +387,8 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
 
   return (
     <>
-      <Link href="/req-jobs" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 mb-4">
-        <ArrowLeft className="h-4 w-4" /> Back to pipelines
+      <Link href="/jobs" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 mb-4">
+        <ArrowLeft className="h-4 w-4" /> Back to jobs
       </Link>
 
       <div className="flex items-start justify-between gap-4 mb-6">

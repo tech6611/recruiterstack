@@ -92,7 +92,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   const hiringManagerName = (intakeBag.hiring_manager_name as string | undefined) || 'The hiring manager'
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  const dashboardUrl = `${appUrl}/req-jobs`
+  const dashboardUrl = `${appUrl}/jobs`
   const statusUrl = `${appUrl}/intake/${params.token}/status`
 
   // Slack: notify recruiter channel

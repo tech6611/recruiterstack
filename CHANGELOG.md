@@ -11,6 +11,16 @@ entries on top.
 
 ## 2026-06-30
 
+### Removed
+- **Retired the duplicate "Job pipelines" page (`/req-jobs`).** It listed the same
+  `jobs` table as the main Jobs board (`/jobs`), so it was redundant. The
+  `/req-jobs` index now redirects to `/jobs` (old links/bookmarks still work), and
+  the few in-app links that pointed at it (the job-detail "back" link, the
+  post-delete redirect, and the intake confirmation email) now point to `/jobs`.
+  The job-management detail view at `/req-jobs/[id]` and the `/api/req-jobs` API
+  are unchanged. (`src/app/(dashboard)/req-jobs/page.tsx`,
+  `src/components/req-jobs/JobDetail.tsx`, `src/app/api/intake/[token]/route.ts`.)
+
 ### Changed
 - **A job can only be created from an approved requisition.** Closed the loophole
   that let approved/live jobs exist with no requisition behind them. Now every
