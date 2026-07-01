@@ -22,11 +22,13 @@ entries on top.
 
 ### Fixed
 - **AI scoring/matching failed with "AI returned invalid JSON".** After the
-  Claude→Gemini switch, the tight output-token caps (600/512/400) meant Gemini
-  2.5's hidden "thinking" tokens truncated the JSON reply mid-object. Added a
-  `json` mode to `generateText` (sets `responseMimeType: application/json` so
-  Gemini can't wrap the answer in prose/markdown) and raised the budgets to 2048
-  for the job scorer, matcher, and autopilot rejection-email draft.
+  Claude→Gemini switch, Gemini 2.5's hidden "thinking" tokens consumed the
+  output-token budget and truncated the JSON reply mid-object. Fixed in
+  `generateText`'s `json` mode: it now (a) sets `responseMimeType:
+  application/json` so Gemini can't wrap the answer in prose/markdown, (b)
+  disables thinking (`thinkingConfig.thinkingBudget = 0`) so the whole budget
+  goes to the actual answer, and (c) the callers raised their budgets to 2048.
+  Applies to the job scorer, matcher, and autopilot rejection-email draft.
 
 ### Added
 - **Requisition field manifest — one source of truth for copilot inserts.** New

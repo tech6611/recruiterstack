@@ -61,9 +61,11 @@ interface GenerateTextOptions {
   maxTokens?: number
   system?: string
   temperature?: number
-  /** When true, ask Gemini to return strictly JSON (responseMimeType). Use for
-   *  callers that immediately `JSON.parse` the reply — it stops Gemini from
-   *  wrapping the answer in prose/markdown, which otherwise breaks the parse. */
+  /** When true, ask Gemini to return strictly JSON (responseMimeType) AND turn
+   *  off the model's hidden "thinking" tokens. Use for callers that immediately
+   *  `JSON.parse` the reply: JSON mode stops prose/markdown wrapping, and
+   *  disabling thinking stops those hidden tokens from eating the output budget
+   *  and truncating the JSON mid-object (the "AI returned invalid JSON" bug). */
   json?: boolean
 }
 
@@ -81,7 +83,9 @@ export async function generateText(
     contents: prompt,
     config: {
       maxOutputTokens: maxTokens,
-      ...(json ? { responseMimeType: 'application/json' } : {}),
+      ...(json
+        ? { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
+        : {}),
       ...(system ? { systemInstruction: system } : {}),
       ...(temperature != null ? { temperature } : {}),
     },
