@@ -100,6 +100,9 @@ interface GenerateFromPdfOptions {
   model?: string
   maxTokens?: number
   mimeType?: string
+  /** Same as generateText's `json`: force a strict-JSON reply and turn off the
+   *  model's hidden "thinking" so it can't eat the budget and truncate the JSON. */
+  json?: boolean
 }
 
 /**
@@ -111,7 +114,7 @@ export async function generateFromPdf(
   pdfBase64: string,
   opts: GenerateFromPdfOptions = {},
 ): Promise<LLMResult> {
-  const { model = DEFAULT_MODEL, maxTokens = 2048, mimeType = 'application/pdf' } = opts
+  const { model = DEFAULT_MODEL, maxTokens = 2048, mimeType = 'application/pdf', json } = opts
   const resolved = resolveModel(model)
   const ai = getClient()
 
@@ -121,7 +124,12 @@ export async function generateFromPdf(
       { inlineData: { mimeType, data: pdfBase64 } },
       { text: prompt },
     ],
-    config: { maxOutputTokens: maxTokens },
+    config: {
+      maxOutputTokens: maxTokens,
+      ...(json
+        ? { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
+        : {}),
+    },
   })
 
   const text = response.text

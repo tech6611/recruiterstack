@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useMemo, useEffect } from 'react'
+import { createContext, useContext, useMemo, useEffect, useRef } from 'react'
 import { useCandidate } from '@/lib/hooks/useCandidate'
 import { useScorecards } from '@/lib/hooks/useScorecards'
 import { useTags } from '@/lib/hooks/useTags'
@@ -88,6 +88,31 @@ export function CandidateProfileProvider({ candidateId, children }: { candidateI
     scorecardsHook.loadScorecards(candidateHook.activeApps)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateHook.candidate, candidateHook.activeApps, scorecardsHook.loadScorecards])
+
+  // Auto-parse the CV once per candidate when we have a resume on file but the
+  // profile still looks unparsed (public apply flow stores the file, never reads
+  // it). Fills blanks only, so it's safe to fire automatically.
+  const parseAttempted = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const c = candidateHook.candidate
+    if (!c || !c.resume_url) return
+    const looksUnparsed =
+      (!c.skills || c.skills.length === 0) &&
+      !c.current_title &&
+      (c.experience_years ?? 0) === 0
+    if (!looksUnparsed || parseAttempted.current.has(c.id)) return
+    parseAttempted.current.add(c.id)
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/candidates/${c.id}/parse-cv`, { method: 'POST' })
+        const json = await res.json().catch(() => null)
+        if (res.ok && json?.data?.updated) await candidateHook.reload()
+      } catch {
+        // Best-effort enrichment; a failure just leaves the profile as-is.
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidateHook.candidate])
 
   const value = useMemo<CandidateProfileContextValue>(() => ({
     ...candidateHook,

@@ -11,6 +11,19 @@ entries on top.
 
 ## 2026-07-01
 
+### Fixed
+- **Candidate resumes wouldn't load in-app, and CV fields weren't pulled through.**
+  Two problems, both fixed: (1) the private `resumes` storage bucket was being
+  linked with public URLs, so the in-app viewer/download got a "Bucket not found"
+  error — resumes now stream through a new `GET /api/candidates/[id]/resume` that
+  mints a short-lived signed link and redirects, keeping candidate PII private.
+  (2) The public apply flow stores the CV file but never reads it, so profiles came
+  up blank (empty skills, no title). A new `POST /api/candidates/[id]/parse-cv`
+  extracts title, location, years, skills, LinkedIn and phone from the PDF and fills
+  in **only the blank fields** (never overwrites recruiter-entered data). It runs
+  automatically the first time a candidate profile is opened when the profile looks
+  unparsed, and there's a manual "Re-parse CV" button on the Resume panel.
+
 ### Changed
 - **Tinted the Approvals section headers with the brand palette.** On Admin →
   Approvals, each foldable section header (Openings / Offers → pine-green, Jobs →

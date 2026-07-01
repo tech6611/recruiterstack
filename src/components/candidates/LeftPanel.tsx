@@ -147,7 +147,7 @@ export default React.memo(function LeftPanel({
           )}
           {candidate.resume_url && (
             <a
-              href={candidate.resume_url}
+              href={`/api/candidates/${candidate.id}/resume`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2.5 text-slate-600 hover:text-emerald-700 transition-colors"

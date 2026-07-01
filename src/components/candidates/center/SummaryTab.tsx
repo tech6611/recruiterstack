@@ -5,6 +5,7 @@ import type { Candidate, Application, AiRecommendation, HiringRequest } from '@/
 import VoiceCallDetailModal from '../VoiceCallDetailModal'
 import { ScoreRing } from '@/components/ui/ScoreRing'
 import { Panel } from '@/components/ui/card'
+import { useCandidateProfile } from '../CandidateProfileContext'
 
 interface VoiceCallSummary {
   id: string
@@ -50,10 +51,26 @@ const REC_CONFIG: Record<AiRecommendation, { label: string; color: string; bg: s
 
 
 export default function SummaryTab({ candidate, applications }: SummaryTabProps) {
+  const { reload } = useCandidateProfile()
   const [summary, setSummary] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState('')
   const mountedRef = useRef(true)
+
+  // Re-run CV extraction on demand (fills blank profile fields from the resume).
+  const [reparsing, setReparsing] = useState(false)
+  const reparse = async () => {
+    setReparsing(true)
+    try {
+      const res = await fetch(`/api/candidates/${candidate.id}/parse-cv`, { method: 'POST' })
+      const json = await res.json().catch(() => null)
+      if (res.ok && json?.data?.updated) await reload()
+    } catch {
+      // Non-critical — leave the profile as-is on failure.
+    } finally {
+      if (mountedRef.current) setReparsing(false)
+    }
+  }
 
   // Phone screen call history
   const [calls, setCalls] = useState<VoiceCallSummary[]>([])
@@ -322,16 +339,27 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
         icon={FileText}
         title="Resume / CV"
         action={candidate.resume_url ? (
-          <a href={candidate.resume_url} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800">
-            <ExternalLink className="h-3 w-3" /> Download
-          </a>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={reparse}
+              disabled={reparsing}
+              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 disabled:opacity-60"
+              title="Re-read this CV and fill in any blank profile fields (skills, title, etc.)"
+            >
+              {reparsing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              {reparsing ? 'Reading…' : 'Re-parse CV'}
+            </button>
+            <a href={`/api/candidates/${candidate.id}/resume`} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800">
+              <ExternalLink className="h-3 w-3" /> Download
+            </a>
+          </div>
         ) : undefined}
       >
         <div className="p-2">
           {candidate.resume_url ? (
             <iframe
-              src={candidate.resume_url}
+              src={`/api/candidates/${candidate.id}/resume`}
               className="h-[500px] w-full rounded-xl border border-slate-100"
               title="Resume"
             />

@@ -43,3 +43,16 @@ export const emailDraftResponseSchema = z.object({
 }).strip()
 
 export type EmailDraftResponse = z.infer<typeof emailDraftResponseSchema>
+
+// ── Parsed CV / Resume ───────────────────────────────────────────────────────
+
+export const parsedCvSchema = z.object({
+  current_title:    z.string().nullable().catch(null),
+  location:         z.string().nullable().catch(null),
+  experience_years: z.number().min(0).max(60).nullable().catch(null),
+  skills:           z.array(z.string()).catch([]),
+  linkedin_url:     z.string().nullable().catch(null),
+  phone:            z.string().nullable().catch(null),
+}).strip()
+
+export type ParsedCv = z.infer<typeof parsedCvSchema>
