@@ -11,6 +11,29 @@ entries on top.
 
 ## 2026-07-01
 
+### Added
+- **Requisition field manifest — one source of truth for copilot inserts.** New
+  `src/modules/ats/domain/opening-fields.ts` defines every agent-settable opening
+  field once; the copilot's `create_requisition` tool schema is now generated from
+  it and the save path is driven by it, so the tool, the domain create, and the DB
+  table can no longer drift apart. A compile-time drift check fails `typecheck` if
+  `openings` gains a business column the manifest neither maps nor excludes.
+
+### Fixed
+- **Copilot silently dropped requisition location & hiring manager.** The
+  `create_requisition` tool never exposed `location` or `hiring_manager`, and the
+  handler discarded any field it didn't recognise, so "Bangalore / tech@…" vanished.
+  The tool now accepts location (by name) and hiring manager (by email), resolves
+  them to ids, and *refuses to silently drop* an unknown field — it errors with a
+  clear message (e.g. `No location named "Bangalore"`) instead.
+
+### Fixed
+- **Requisition Hiring-manager / Recruiter dropdowns only listed already-assigned
+  people.** The opening detail page fetched just the requisition's current HM,
+  recruiter, and creator, so no one else on the team (including yourself) appeared
+  in the pickers. It now lists all active `org_members`, matching the New Opening
+  form.
+
 ### Fixed
 - **Copilot recruiting analytics returned all zeros.** `get_recruiting_analytics`
   still read the retired `hiring_requests` table (wiped), so every funnel/source/

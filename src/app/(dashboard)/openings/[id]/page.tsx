@@ -27,12 +27,18 @@ export default async function OpeningDetailPage({ params }: { params: { id: stri
   const opening = rowData as Opening | null
   if (!opening) notFound()
 
-  const [{ data: deptsData }, { data: locsData }, { data: bandsData }, { data: usersData }] = await Promise.all([
+  const [{ data: deptsData }, { data: locsData }, { data: bandsData }, { data: membersData }] = await Promise.all([
     supabase.from('departments').select('id, name').eq('org_id', orgId).eq('is_active', true),
     supabase.from('locations').select('id, name').eq('org_id', orgId).eq('is_active', true),
     supabase.from('compensation_bands').select('id, name, currency, min_salary, max_salary, department_id, location_id, level, is_active, org_id, created_at, updated_at').eq('org_id', orgId).eq('is_active', true),
-    supabase.from('users').select('id, full_name, email').in('id', [opening.hiring_manager_id, opening.recruiter_id, opening.created_by].filter(Boolean) as string[]),
+    // Every active org member is a valid hiring-manager / recruiter, so list them
+    // all — not just whoever is already assigned to this requisition.
+    supabase.from('org_members').select('users:user_id (id, full_name, email)').eq('org_id', orgId).eq('is_active', true),
   ])
+
+  const usersData = ((membersData ?? []) as unknown as { users: Pick<User, 'id' | 'full_name' | 'email'> | null }[])
+    .map(m => m.users)
+    .filter((u): u is Pick<User, 'id' | 'full_name' | 'email'> => u != null)
 
   return (
     <div className="p-6 max-w-5xl mx-auto">

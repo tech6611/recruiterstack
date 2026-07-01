@@ -28,8 +28,12 @@ import {
   listApprovedOpenings,
   listOpenings,
   createOpening,
-  findDepartmentByName,
 } from '@/modules/ats/domain/openings'
+import {
+  openingToolInputSchema,
+  buildOpeningCreateInput,
+  FieldResolutionError,
+} from '@/modules/ats/domain/opening-fields'
 import { submitForApproval, ApprovalError } from '@/lib/approvals/engine'
 import {
   searchCandidatesForAgent,
@@ -671,21 +675,10 @@ export const COPILOT_TOOLS: ClaudeTool[] = [
   },
   {
     name: 'create_requisition',
-    description: 'Create a new requisition (an "opening" — approved-headcount request). This is the FIRST step in opening a role: it appears on the Requisitions page as a draft. Only the position title is required. To move it toward approval, follow with submit_requisition. Do NOT use this to create a job pipeline — a job comes later, from an APPROVED requisition (create_job_and_pipeline).',
-    input_schema: {
-      type: 'object',
-      properties: {
-        title:             { type: 'string', description: 'Job title for the requisition' },
-        department:        { type: 'string', description: 'Department name (optional — must match an existing department)' },
-        employment_type:   { type: 'string', enum: ['full_time', 'part_time', 'contract', 'intern', 'temp'], description: 'Employment type (optional, default full_time)' },
-        comp_min:          { type: 'number', description: 'Minimum compensation (optional)' },
-        comp_max:          { type: 'number', description: 'Maximum compensation (optional)' },
-        comp_currency:     { type: 'string', description: 'Three-letter currency code (optional, default USD)' },
-        target_start_date: { type: 'string', description: 'Target start date, YYYY-MM-DD (optional)' },
-        justification:     { type: 'string', description: 'Business justification for the headcount (optional here, but required — min 50 chars — before it can be submitted for approval)' },
-      },
-      required: ['title'],
-    },
+    description: 'Create a new requisition (an "opening" — approved-headcount request). This is the FIRST step in opening a role: it appears on the Requisitions page as a draft. Only the position title is required; you may also set department, work location, hiring manager, employment type, compensation, target start date, and justification. To move it toward approval, follow with submit_requisition. Do NOT use this to create a job pipeline — a job comes later, from an APPROVED requisition (create_job_and_pipeline).',
+    // Schema is generated from the opening field manifest (single source of
+    // truth) so it can never drift from what the save path accepts.
+    input_schema: openingToolInputSchema(),
   },
   {
     name: 'list_requisitions',
@@ -2718,48 +2711,33 @@ async function createRequisition(
   supabase: SupabaseClient,
   userId?: string | null,
 ): Promise<string> {
-  const { title, department, employment_type, comp_min, comp_max, comp_currency, target_start_date, justification } = input
-
-  if (!title?.trim()) {
+  if (!input.title?.trim()) {
     return 'Error: a title is required to create a requisition.'
   }
   if (!userId) {
     return 'Error: could not identify the acting user, so the requisition was not created.'
   }
 
-  // Resolve an optional department name to its id — the approval chain routes by
-  // department, so surface a clear error rather than silently dropping it.
-  let departmentId: string | null = null
-  if (department?.trim()) {
-    const dept = await findDepartmentByName(supabase, orgId, department)
-    if (!dept) {
-      return `No department named "${department}" exists. Create it first, or leave the department out.`
-    }
-    departmentId = dept.id
+  // Build the create input from the field manifest: every provided arg is either
+  // resolved (name/email → id) or written through, and an arg with no home errors
+  // instead of being silently dropped. Resolver misses (e.g. unknown location)
+  // return a clear, user-facing message.
+  let createInput
+  try {
+    createInput = await buildOpeningCreateInput({ supabase, orgId }, input)
+  } catch (e) {
+    if (e instanceof FieldResolutionError) return e.message
+    throw e
   }
 
-  const opening = await createOpening(
-    supabase,
-    orgId,
-    {
-      title:            title.trim(),
-      departmentId,
-      employmentType:   employment_type ?? undefined,
-      compMin:          comp_min ?? null,
-      compMax:          comp_max ?? null,
-      compCurrency:     comp_currency ?? undefined,
-      targetStartDate:  target_start_date ?? null,
-      justification:    justification ?? null,
-    },
-    userId,
-  )
+  const opening = await createOpening(supabase, orgId, createInput, userId)
 
   const lines = [
     `Requisition created for "${opening.title}".`,
     `Status: draft | ID: ${opening.id}`,
     `It now appears on the Requisitions page under "Awaiting Approval".`,
   ]
-  if (!justification || justification.trim().length < 50) {
+  if (!createInput.justification || createInput.justification.trim().length < 50) {
     lines.push(`Next: add a justification (at least 50 characters), then submit it for approval.`)
   } else {
     lines.push(`Next: submit it for approval when you're ready.`)

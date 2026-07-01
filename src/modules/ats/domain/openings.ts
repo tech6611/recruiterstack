@@ -61,6 +61,8 @@ export async function listOpenings(
 export interface CreateOpeningInput {
   title: string
   departmentId?: string | null
+  locationId?: string | null
+  hiringManagerId?: string | null
   employmentType?: 'full_time' | 'part_time' | 'contract' | 'intern' | 'temp'
   compMin?: number | null
   compMax?: number | null
@@ -85,6 +87,8 @@ export async function createOpening(
       org_id:            orgId,
       title:             input.title,
       department_id:     input.departmentId ?? null,
+      location_id:       input.locationId ?? null,
+      hiring_manager_id: input.hiringManagerId ?? null,
       employment_type:   input.employmentType ?? 'full_time',
       comp_min:          input.compMin ?? null,
       comp_max:          input.compMax ?? null,
@@ -118,4 +122,46 @@ export async function findDepartmentByName(
 
   if (error) throw error
   return (data ?? null) as { id: string; name: string } | null
+}
+
+/** Resolve an (active) location by case-insensitive name within an org. Returns
+ *  null when there is no match — the copilot tool surfaces a clear error. */
+export async function findLocationByName(
+  supabase: Supabase,
+  orgId: string,
+  name: string,
+): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await supabase
+    .from('locations')
+    .select('id, name')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .ilike('name', name.trim())
+    .maybeSingle()
+
+  if (error) throw error
+  return (data ?? null) as { id: string; name: string } | null
+}
+
+/** Resolve an org member by case-insensitive email. Scoped through the
+ *  org_members bridge so only active members of THIS org resolve (the users
+ *  table itself is global). Returns null when there is no match. */
+export async function findUserByEmail(
+  supabase: Supabase,
+  orgId: string,
+  email: string,
+): Promise<{ id: string; full_name: string | null; email: string } | null> {
+  const { data, error } = await supabase
+    .from('org_members')
+    .select('users:users!inner(id, full_name, email)')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .ilike('users.email', email.trim())
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return null
+  // The embedded `users` relation comes back as a nested object.
+  const u = (data as unknown as { users: { id: string; full_name: string | null; email: string } }).users
+  return { id: u.id, full_name: u.full_name, email: u.email }
 }
