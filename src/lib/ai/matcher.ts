@@ -49,7 +49,10 @@ Respond with ONLY valid JSON — no markdown, no extra text:
 
   const { text, usage, model } = await withRetry(() => generateText(prompt, {
     model: MODEL,
-    maxTokens: 512,
+    // Headroom for Gemini 2.5's hidden "thinking" tokens; JSON mode so the reply
+    // is strictly parseable (see job-scorer for the same Claude→Gemini fix).
+    maxTokens: 2048,
+    json: true,
   }), { label: 'Matcher' })
 
   trackUsage('matcher', model, usage)

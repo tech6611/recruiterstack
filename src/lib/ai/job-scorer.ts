@@ -129,7 +129,11 @@ export async function scoreApplicationForJob(
 ): Promise<JobScoreResponse> {
   const { text, usage, model } = await withRetry(() => generateText(buildPrompt(candidate, job), {
     model:     MODEL,
-    maxTokens: 600,
+    // Headroom so Gemini 2.5's hidden "thinking" tokens can't truncate the JSON
+    // (600 was ample for Claude Haiku, which didn't think).
+    maxTokens: 2048,
+    // Force a pure-JSON reply so parseAiJson never chokes on prose/markdown.
+    json:      true,
   }), { label: 'Job Scorer' })
 
   trackUsage('job-scorer', model, usage)

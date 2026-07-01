@@ -65,7 +65,9 @@ Requirements:
 - No placeholder brackets like [date] or [company] — use the real values above
 
 Respond with ONLY valid JSON (no markdown): {"subject": "...", "body": "..."}`,
-      { model: MODEL, maxTokens: 400 },
+      // Headroom for Gemini 2.5's hidden "thinking" tokens; JSON mode so the
+      // reply is strictly parseable (see job-scorer for the same fix).
+      { model: MODEL, maxTokens: 2048, json: true },
     )
 
     trackUsage('autopilot-rejection-email', model, usage)

@@ -11,6 +11,14 @@ entries on top.
 
 ## 2026-07-01
 
+### Fixed
+- **AI scoring/matching failed with "AI returned invalid JSON".** After the
+  Claude→Gemini switch, the tight output-token caps (600/512/400) meant Gemini
+  2.5's hidden "thinking" tokens truncated the JSON reply mid-object. Added a
+  `json` mode to `generateText` (sets `responseMimeType: application/json` so
+  Gemini can't wrap the answer in prose/markdown) and raised the budgets to 2048
+  for the job scorer, matcher, and autopilot rejection-email draft.
+
 ### Added
 - **Requisition field manifest — one source of truth for copilot inserts.** New
   `src/modules/ats/domain/opening-fields.ts` defines every agent-settable opening

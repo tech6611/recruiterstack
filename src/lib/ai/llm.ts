@@ -61,6 +61,10 @@ interface GenerateTextOptions {
   maxTokens?: number
   system?: string
   temperature?: number
+  /** When true, ask Gemini to return strictly JSON (responseMimeType). Use for
+   *  callers that immediately `JSON.parse` the reply — it stops Gemini from
+   *  wrapping the answer in prose/markdown, which otherwise breaks the parse. */
+  json?: boolean
 }
 
 /** Single-shot text generation. Returns text + usage + resolved model. */
@@ -68,7 +72,7 @@ export async function generateText(
   prompt: string,
   opts: GenerateTextOptions = {},
 ): Promise<LLMResult> {
-  const { model = DEFAULT_MODEL, maxTokens = 1024, system, temperature } = opts
+  const { model = DEFAULT_MODEL, maxTokens = 1024, system, temperature, json } = opts
   const resolved = resolveModel(model)
   const ai = getClient()
 
@@ -77,6 +81,7 @@ export async function generateText(
     contents: prompt,
     config: {
       maxOutputTokens: maxTokens,
+      ...(json ? { responseMimeType: 'application/json' } : {}),
       ...(system ? { systemInstruction: system } : {}),
       ...(temperature != null ? { temperature } : {}),
     },
