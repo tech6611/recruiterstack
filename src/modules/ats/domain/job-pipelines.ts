@@ -653,14 +653,33 @@ export interface CreateCanonicalJobInput {
   description?: string | null
 }
 
-/** Net-new canonical job for create_job_and_pipeline. Inserts into `jobs` with
- *  status 'open' so it can immediately accept applications; the migration-066
- *  jobs-insert trigger seeds the 6 default pipeline_stages keyed on job_id. */
-export async function createCanonicalJobForAgent(
+/** Gate-enforcing job creation: a job may only be created from an APPROVED
+ *  requisition (opening), mirroring POST /api/req-jobs (the single source of
+ *  truth for that rule). Verifies the opening is approved, inserts the job as
+ *  'draft', and links the two via job_openings. Throws 'OPENING_NOT_FOUND' or
+ *  'OPENING_NOT_APPROVED' so callers can surface a precise, actionable message.
+ *  linked_by is nullable (migration 035), so agent contexts without a userId
+ *  pass null. */
+export async function createCanonicalJobFromApprovedOpening(
   supabase: Supabase,
   orgId: string,
+  openingId: string,
   input: CreateCanonicalJobInput,
+  linkedBy?: string | null,
 ): Promise<{ id: string; title: string }> {
+  const { data: opening, error: openingErr } = await supabase
+    .from('openings')
+    .select('id, status')
+    .eq('id', openingId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (openingErr) throw openingErr
+  if (!opening) throw new Error('OPENING_NOT_FOUND')
+  if ((opening as { status: string }).status !== 'approved') {
+    throw new Error('OPENING_NOT_APPROVED')
+  }
+
   // cast: jobs columns are not yet in the generated Database types
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
@@ -669,14 +688,25 @@ export async function createCanonicalJobForAgent(
       title:         input.title,
       department_id: input.department_id ?? null,
       description:   input.description ?? null,
-      status:        'open',
+      status:        'draft',
       org_id:        orgId,
+      created_by:    linkedBy ?? null,
     })
     .select('id, title')
     .single()
 
   if (error) throw error
-  return data as { id: string; title: string }
+  const job = data as { id: string; title: string }
+
+  // Link the approved requisition to the new job. Ignore a duplicate link
+  // (composite PK) gracefully.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: linkErr } = await (supabase as any)
+    .from('job_openings')
+    .insert({ job_id: job.id, opening_id: openingId, linked_by: linkedBy ?? null })
+  if (linkErr && linkErr.code !== '23505') throw linkErr
+
+  return job
 }
 
 // ── Canonical intake creation (Phase 3 / C5.5) ───────────────────────────────
@@ -694,6 +724,8 @@ export interface CreateCanonicalIntakeInput {
   title: string
   hiringManagerName?: string | null
   hiringManagerEmail?: string | null
+  /** Internal users.id — jobs.created_by is NOT NULL. */
+  createdBy: string
 }
 
 export async function createCanonicalIntakeJob(
@@ -709,6 +741,7 @@ export async function createCanonicalIntakeJob(
       title:         input.title,
       status:        'draft',
       org_id:        orgId,
+      created_by:    input.createdBy,
       custom_fields: {
         intake: {
           hiring_manager_name:  input.hiringManagerName ?? null,

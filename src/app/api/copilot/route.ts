@@ -51,12 +51,19 @@ function toolLabel(name: string): string {
   return labels[name] ?? `⚙️ Running ${name}...`
 }
 
-// ── Compact summary from tool result string ────────────────────────────────
-function toolSummary(name: string, result: string): string {
-  // Use the first meaningful line of the result, capped at 80 chars
-  const first = result.split('\n').find(l => l.trim()) ?? result
-  const trimmed = first.replace(/^[•\-*]\s*/, '').trim()
-  return trimmed.length > 80 ? trimmed.slice(0, 77) + '…' : trimmed
+// ── Compact "done" chip summary ─────────────────────────────────────────────
+// The orchestrator only executes delegate_* tools, whose result IS the
+// sub-agent's full reply — which the orchestrator then relays in its own final
+// text. Echoing that reply in the chip duplicates the answer, so we show a
+// neutral "responded" chip instead and let the text bubble carry the content.
+function toolSummary(name: string): string {
+  const done: Record<string, string> = {
+    delegate_to_ats:     'Recruiting agent responded',
+    delegate_to_hris:    'HRIS agent responded',
+    delegate_to_crm:     'CRM agent responded',
+    delegate_to_payroll: 'Payroll agent responded',
+  }
+  return done[name] ?? 'Done'
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -148,9 +155,9 @@ export async function POST(request: NextRequest) {
 
           for (const call of turn.calls) {
             const result = await executeOrchestratorTool(call.name, call.args, {
-              model: MODEL, orgId, supabase, capabilities,
+              model: MODEL, orgId, userId, supabase, capabilities,
             })
-            send({ type: 'tool_done', id: call.id, name: call.name, summary: toolSummary(call.name, result) })
+            send({ type: 'tool_done', id: call.id, name: call.name, summary: toolSummary(call.name) })
             toolResults.push({ name: call.name, result })
           }
 

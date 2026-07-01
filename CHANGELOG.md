@@ -11,7 +11,21 @@ entries on top.
 
 ## 2026-07-01
 
+### Fixed
+- **Copilot could not create requisitions or jobs.** Every AI-driven insert into
+  `jobs` failed on the `created_by` NOT NULL constraint because the acting user's
+  id was never threaded to the copilot's tools. Now passed through the copilot
+  chain (route → orchestrator → sub-agent → tools) and stamped as `created_by`,
+  matching the website's New Job / New Requisition path.
+- **Copilot showed each answer twice.** The delegated sub-agent's reply rendered
+  as both a green status chip and the message bubble. The chip is now a neutral
+  "… agent responded" so the answer appears once.
+
 ### Changed
+- **Copilot job creation now enforces the approved-requisition gate.** The
+  `create_job_and_pipeline` tool refuses to create a job without an approved
+  requisition — it lists the approved ones to pick from, or explains none exist —
+  mirroring `POST /api/req-jobs` (the single source of truth for that rule).
 - **Sidebar: widened the espresso rail (140px → 166px)** so the full
   "RecruiterStack" logo text fits without truncation.
 - **Jobs list: single global search across both panes.** Removed the separate

@@ -136,6 +136,9 @@ Be concise. Use names, not IDs.`
 interface ExecutorContext {
   model:     string
   orgId:     string
+  /** Internal users.id of the acting user — set as created_by on writes that
+   *  require it (e.g. canonical jobs). Null in background/system contexts. */
+  userId?:   string | null
   supabase:  SupabaseClient
   /** Caller's RBAC capabilities, threaded to sub-agent tools (RBAC Slice 3). */
   capabilities?: Set<Capability> | null
@@ -162,6 +165,7 @@ export async function executeOrchestratorTool(
         systemPrompt: ATS_SYSTEM_PROMPT,
         task,
         orgId:        ctx.orgId,
+        userId:       ctx.userId,
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
       })
@@ -173,6 +177,7 @@ export async function executeOrchestratorTool(
         systemPrompt: HRIS_SYSTEM_PROMPT,
         task,
         orgId:        ctx.orgId,
+        userId:       ctx.userId,
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
       })
@@ -184,6 +189,7 @@ export async function executeOrchestratorTool(
         systemPrompt: CRM_SYSTEM_PROMPT,
         task,
         orgId:        ctx.orgId,
+        userId:       ctx.userId,
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
       })
@@ -195,6 +201,7 @@ export async function executeOrchestratorTool(
         systemPrompt: PAYROLL_SYSTEM_PROMPT,
         task,
         orgId:        ctx.orgId,
+        userId:       ctx.userId,
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
       })

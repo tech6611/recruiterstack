@@ -22,6 +22,9 @@ export interface SubAgentOptions {
   /** The natural-language task the orchestrator is delegating. */
   task: string
   orgId: string
+  /** Internal users.id of the acting user — threaded to tools that stamp
+   *  created_by (e.g. canonical job creation). Null in background contexts. */
+  userId?: string | null
   supabase: SupabaseClient
   /** Caller's RBAC capabilities. When set, tools are capability-gated; omit for
    *  background/system contexts (WhatsApp responder, autopilot) to run unrestricted. */
@@ -39,6 +42,6 @@ export async function runSubAgent(opts: SubAgentOptions): Promise<string> {
     maxTokens:     MAX_TOKENS,
     maxIterations: opts.maxIterations,
     executeTool:   (name, args) =>
-      executeTool(name, args, opts.orgId, opts.supabase, opts.capabilities),
+      executeTool(name, args, opts.orgId, opts.supabase, opts.capabilities, opts.userId),
   })
 }

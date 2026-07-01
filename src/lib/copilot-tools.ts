@@ -13,7 +13,7 @@ import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import {
   countCanonicalJobs,
   createCanonicalIntakeJob,
-  createCanonicalJobForAgent,
+  createCanonicalJobFromApprovedOpening,
   findCanonicalJobsForAgent,
   getCanonicalJobBoardDetail,
   getCanonicalJobById,
@@ -24,6 +24,10 @@ import {
   updateCanonicalJob,
   type CanonicalJobUpdate,
 } from '@/modules/ats/domain/job-pipelines'
+import {
+  getOpeningById,
+  listApprovedOpenings,
+} from '@/modules/ats/domain/openings'
 import {
   searchCandidatesForAgent,
   countCandidatesByStatus,
@@ -288,12 +292,12 @@ export const COPILOT_TOOLS: ClaudeTool[] = [
   {
     name: 'create_job_and_pipeline',
     description:
-      'Create a new hiring request (job). Pipeline stages are auto-created. Use filled_by_recruiter=true to set up the full job immediately without sending an intake form to a hiring manager.',
+      'Create a new job (with auto-created pipeline stages) from an APPROVED requisition. A job cannot be created without one — pass the opening_id of an approved requisition. If you don\'t have it, call the tool without opening_id: it returns the approved requisitions to choose from, or tells you none exist (create + approve a requisition first).',
     input_schema: {
       type: 'object',
       properties: {
         position_title:       { type: 'string',  description: 'Job title, e.g. "Senior Backend Engineer"' },
-        hiring_manager_name:  { type: 'string',  description: 'Hiring manager\'s name (use "TBD" if unknown)' },
+        opening_id:           { type: 'string',  description: 'ID of the APPROVED requisition (opening) this job is created from. Required to actually create the job. Omit to get the list of approved requisitions to pick from.' },
         location:             { type: 'string',  description: 'City / remote policy, e.g. "New York" or "Remote"' },
         headcount:            { type: 'number',  description: 'Number of hires needed (default: 1)' },
         department:           { type: 'string',  description: 'Department or team, e.g. "Engineering"' },
@@ -302,7 +306,7 @@ export const COPILOT_TOOLS: ClaudeTool[] = [
         nice_to_haves:        { type: 'string',  description: 'Nice-to-have qualifications' },
         remote_ok:            { type: 'boolean', description: 'Whether remote is acceptable (default: false)' },
       },
-      required: ['position_title', 'hiring_manager_name'],
+      required: ['position_title'],
     },
   },
   {
@@ -1265,6 +1269,9 @@ export async function executeTool(
   /** When provided, the tool runs only if its required capability is held.
    *  Omit (background jobs) to run unrestricted. */
   capabilities?: Set<Capability> | null,
+  /** Internal users.id of the acting user — stamped as created_by on writes
+   *  that require it (canonical job creation). Null in background contexts. */
+  userId?: string | null,
 ): Promise<string> {
   if (capabilities) {
     const required = TOOL_CAPABILITIES[name]
@@ -1283,7 +1290,7 @@ export async function executeTool(
       case 'move_application_to_stage': return await moveApplicationToStage(input, orgId, supabase)
       case 'add_note_to_application':   return await addNoteToApplication(input, orgId, supabase)
       // Autonomous workflow tools
-      case 'create_job_and_pipeline':   return await createJobAndPipeline(input, orgId, supabase)
+      case 'create_job_and_pipeline':   return await createJobAndPipeline(input, orgId, supabase, userId)
       case 'search_candidate_pool':     return await searchCandidatePool(input, orgId, supabase)
       case 'bulk_add_to_pipeline':      return await bulkAddToPipeline(input, orgId, supabase)
       case 'bulk_score_applications':   return await bulkScoreApplications(input, orgId, supabase)
@@ -1310,7 +1317,7 @@ export async function executeTool(
       case 'get_inbox':                  return await getInbox(orgId, supabase)
       case 'create_scorecard':           return await createScorecard(input, orgId, supabase)
       case 'draft_application_email':    return await draftApplicationEmail(input, orgId, supabase)
-      case 'create_intake_request':      return await createIntakeRequest(input, orgId, supabase)
+      case 'create_intake_request':      return await createIntakeRequest(input, orgId, supabase, userId)
       case 'schedule_interview':         return await scheduleInterview(input, orgId, supabase)
       case 'get_interviews':             return await getInterviews(input, orgId, supabase)
       case 'update_interview_status':    return await updateInterviewStatus(input, orgId, supabase)
@@ -1712,17 +1719,50 @@ async function createJobAndPipeline(
   input: Record<string, any>,
   orgId: string,
   supabase: SupabaseClient,
+  userId?: string | null,
 ): Promise<string> {
-  const { position_title, key_requirements } = input
+  const { position_title, key_requirements, opening_id } = input
+
+  if (!userId) {
+    return 'Error: could not identify the acting user, so the job was not created.'
+  }
+
+  // GATE: a job can only be created from an APPROVED requisition (opening),
+  // mirroring POST /api/req-jobs. Without one, refuse — no orphan/req-less jobs.
+  if (!opening_id) {
+    const approved = await listApprovedOpenings(supabase, orgId)
+    if (approved.length === 0) {
+      return (
+        `Can't create the job yet — every job must come from an approved requisition, and this org has none approved. ` +
+        `Create a requisition first and get it approved, then I can create the job against it.`
+      )
+    }
+    const list = approved.map(o => `• ${o.title} (opening_id: ${o.id})`).join('\n')
+    return (
+      `A job must be created from an approved requisition. Which one should I use?\n${list}\n` +
+      `Reply with the requisition, and I'll create the job against it.`
+    )
+  }
+
+  const opening = await getOpeningById(supabase, orgId, opening_id)
+  if (!opening) {
+    return `That requisition wasn't found. Pick one of the org's approved requisitions.`
+  }
+  if (opening.status !== 'approved') {
+    return (
+      `The requisition "${opening.title}" isn't approved yet (status: ${opening.status}). ` +
+      `A job can only be created from an approved requisition.`
+    )
+  }
 
   // `department` arrives as free text from the agent, not a department_id FK, so
   // we omit it from the canonical insert; title + description carry over.
-  const job = await createCanonicalJobForAgent(supabase, orgId, {
+  const job = await createCanonicalJobFromApprovedOpening(supabase, orgId, opening_id, {
     title:       position_title,
     description: key_requirements ?? null,
-  })
+  }, userId)
 
-  return `Created job "${job.title}" — ID: ${job.id}. Pipeline stages are being auto-created.`
+  return `Created job "${job.title}" from approved requisition "${opening.title}" — ID: ${job.id}. Pipeline stages are being auto-created.`
 }
 
 async function searchCandidatePool(
@@ -2641,11 +2681,15 @@ async function createIntakeRequest(
   input: Record<string, any>,
   orgId: string,
   supabase: SupabaseClient,
+  userId?: string | null,
 ): Promise<string> {
   const { position_title, hiring_manager_name, hiring_manager_email } = input
 
   if (!position_title?.trim() || !hiring_manager_name?.trim() || !hiring_manager_email?.trim()) {
     return 'Error: position_title, hiring_manager_name, and hiring_manager_email are required.'
+  }
+  if (!userId) {
+    return 'Error: could not identify the acting user, so the requisition was not created.'
   }
 
   // Phase 3 / C5.5: an intake is now a canonical `job` (status 'draft' until
@@ -2655,6 +2699,7 @@ async function createIntakeRequest(
     title:              position_title.trim(),
     hiringManagerName:  hiring_manager_name.trim(),
     hiringManagerEmail: hiring_manager_email.trim(),
+    createdBy:          userId,
   })
   const appUrl    = process.env.NEXT_PUBLIC_APP_URL || 'https://app.recruiterstack.com'
   const intakeUrl = `${appUrl}/intake/${r.intake_token}`

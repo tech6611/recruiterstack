@@ -16,11 +16,28 @@ describe('/api/req-jobs', () => {
     mock.results.set('users', { data: { id: 'user-1' }, error: null })  // resolveUserIdFromClerk
   })
 
-  it('creates a draft job', async () => {
+  const OPENING_UUID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
+
+  it('creates a draft job from an approved requisition', async () => {
+    mock.results.set('openings', { data: { id: OPENING_UUID, status: 'approved' }, error: null })
     mock.results.set('jobs', { data: { id: 'j1', title: 'Eng', status: 'draft' }, error: null })
-    const req = createMockRequest('POST', 'http://localhost:3000/api/req-jobs', { title: 'Eng' })
+    mock.results.set('job_openings', { data: { job_id: 'j1', opening_id: OPENING_UUID }, error: null })
+    const req = createMockRequest('POST', 'http://localhost:3000/api/req-jobs', { title: 'Eng', link_opening_id: OPENING_UUID })
     const res = await CREATE(req)
     expect(res.status).toBe(201)
+  })
+
+  it('rejects a job with no requisition linked', async () => {
+    const req = createMockRequest('POST', 'http://localhost:3000/api/req-jobs', { title: 'Eng' })
+    const res = await CREATE(req)
+    expect(res.status).toBe(422)
+  })
+
+  it('rejects a job when the requisition is not approved', async () => {
+    mock.results.set('openings', { data: { id: OPENING_UUID, status: 'draft' }, error: null })
+    const req = createMockRequest('POST', 'http://localhost:3000/api/req-jobs', { title: 'Eng', link_opening_id: OPENING_UUID })
+    const res = await CREATE(req)
+    expect(res.status).toBe(422)
   })
 
   it('rejects empty title', async () => {
