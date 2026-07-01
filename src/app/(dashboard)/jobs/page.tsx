@@ -1562,16 +1562,6 @@ export default function JobsPage() {
             </tbody>
           </table>
         </div>
-      ) : jobs.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-16 text-center">
-          <Briefcase className="h-10 w-10 text-slate-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-slate-500">No jobs yet</p>
-          <p className="text-xs text-slate-400 mt-1 mb-4">Create your first job to get started</p>
-          <button onClick={() => setShowReqChooser(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors">
-            <Plus className="h-3.5 w-3.5" />New Job
-          </button>
-        </div>
       ) : (
         <div className="space-y-6">
         {/* ── Active block (the full-featured table) ──────────────────────── */}
@@ -1597,7 +1587,7 @@ export default function JobsPage() {
               {displayedJobs.length === 0 ? (
                 <tr>
                   <td colSpan={visibleCols.length + 1} className="px-5 py-10 text-center text-sm text-slate-400">
-                    No results match your filters.
+                    {activeJobs.length === 0 ? 'No active jobs yet.' : 'No results match your filters.'}
                   </td>
                 </tr>
               ) : displayedJobs.map(job => (

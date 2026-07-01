@@ -47,6 +47,12 @@ entries on top.
   status dropdown remains as a shared refine-filter and the Hiring Funnel stays on
   top as the summary overview. Completes the Jobs / Openings / Candidates
   consistency pass.
+- **Jobs & Candidates: always show the Active/Past two-pane view, even when
+  empty.** Removed the full-page "No jobs yet" / "No candidates yet" screens that
+  replaced the whole layout at zero items. Both pages now always render the two
+  panes (matching Openings), with empty panes showing a gentle "No active jobs
+  yet" / "No past candidates yet" message. The header Add/New buttons remain the
+  entry point for a first record.
 
 ## 2026-06-30
 
