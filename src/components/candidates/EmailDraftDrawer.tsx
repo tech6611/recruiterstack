@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react'
 import {
   Wand2, X, Send, Loader2, Check, ChevronDown,
-  Plus, Trash2, Clock, Calendar, Pencil,
+  Plus, Trash2, Clock, Calendar, Pencil, AlertTriangle,
 } from 'lucide-react'
 import { useSettings } from '@/lib/hooks/useSettings'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
@@ -274,6 +274,20 @@ export default function EmailDraftDrawer({
   const [sendError,   setSendError]   = useState('')
   const [sentSubject, setSentSubject] = useState('')
   const [sentSched,   setSentSched]   = useState<string | null>(null)
+
+  // Which address candidate emails actually send from, and whether this org has
+  // verified its own domain. Null while loading. See /api/org/sender-status.
+  const [senderStatus, setSenderStatus] =
+    useState<{ verified: boolean; fromEmail: string; domain: string | null } | null>(null)
+
+  // ── Load sender status (fallback-address warning) ─────────────────────────
+
+  useEffect(() => {
+    fetch('/api/org/sender-status')
+      .then(r => r.json())
+      .then(json => { if (json.data) setSenderStatus(json.data) })
+      .catch(() => {})
+  }, [])
 
   // ── Load saved templates ──────────────────────────────────────────────────
 
@@ -866,8 +880,32 @@ export default function EmailDraftDrawer({
               {/* From (read-only) */}
               <div className="flex items-center gap-3 px-5 py-2 border-b border-slate-100">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 w-7 shrink-0">From</span>
-                <span className="text-xs text-slate-500 truncate">{fromName}</span>
+                <span className="text-xs text-slate-500 truncate">
+                  {fromName}
+                  {senderStatus?.fromEmail && (
+                    <span className="text-slate-400"> &lt;{senderStatus.fromEmail}&gt;</span>
+                  )}
+                </span>
+                {senderStatus && !senderStatus.verified && (
+                  <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200 shrink-0">
+                    <AlertTriangle className="h-3 w-3" />
+                    Domain not verified
+                  </span>
+                )}
               </div>
+
+              {/* Fallback-address notice */}
+              {senderStatus && !senderStatus.verified && (
+                <div className="flex items-start gap-2 px-5 py-2 border-b border-amber-100 bg-amber-50/50">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-[11px] leading-relaxed text-amber-800">
+                    Your organization hasn&apos;t verified its own sending domain yet, so this
+                    email will be sent from the shared address{' '}
+                    <span className="font-medium">{senderStatus.fromEmail}</span>. Candidates
+                    will see that address as the sender.
+                  </p>
+                </div>
+              )}
 
               {/* Subject */}
               <div className="flex items-center gap-3 px-5 py-2 border-b border-slate-100">

@@ -11,6 +11,15 @@ entries on top.
 
 ## 2026-07-01
 
+### Added
+- **Fallback-sender warning in the email composer.** New `GET /api/org/sender-status`
+  reports whether the org has verified its own sending domain (always `false` today,
+  since per-org verified sending hasn't shipped yet). The Draft Email drawer now shows
+  the real sending address next to the display name, plus an amber "Domain not verified"
+  pill and a plain-English notice that emails will go from the shared RecruiterStack
+  address. The endpoint is the seam per-org verified sending fills in later — once an
+  org verifies a domain the warning auto-hides.
+
 ### Fixed
 - **AI scoring/matching failed with "AI returned invalid JSON".** After the
   Claude→Gemini switch, the tight output-token caps (600/512/400) meant Gemini
