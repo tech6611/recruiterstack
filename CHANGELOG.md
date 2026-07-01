@@ -19,6 +19,20 @@ entries on top.
   Active table and the Past list. First step toward making the Jobs / Openings /
   Candidates list pages consistent (shared header search, time filter, and
   Active/Past two-pane layout).
+- **Requisitions (Openings) list: shared header toolbar to match Jobs.** Replaced
+  the two per-block search boxes with a single global search in the page header
+  that filters both the Active and Past blocks; broadened search from title-only
+  to title + department + location; and added the same time filter (Last 7 days /
+  30 days / 3 months / All / Custom range on `created_at`) Jobs uses. Department
+  and location dropdowns are now one shared filter bar driving both blocks.
+- **Candidates list: two-pane Active/Past layout to match Jobs & Requisitions.**
+  Split the single candidate table into stacked "Active" (active, on_hold,
+  interviewing, offer_extended) and "Past" (hired, rejected, inactive) panes, each
+  with its own count badge, sortable columns, and pagination. Moved the search box
+  up into the page header (next to the time filter) so it filters both panes; the
+  status dropdown remains as a shared refine-filter and the Hiring Funnel stays on
+  top as the summary overview. Completes the Jobs / Openings / Candidates
+  consistency pass.
 
 ## 2026-06-30
 

@@ -71,6 +71,13 @@ const FUNNEL_PALETTE: FunnelAccent[] = [
 ]
 const funnelAccent = (idx: number): FunnelAccent => FUNNEL_PALETTE[idx % FUNNEL_PALETTE.length]
 
+// Active/Past split — mirrors the two-pane layout on the Jobs and Requisitions
+// pages. "Active" = candidates still moving through hiring; "Past" = closed-out
+// (hired/rejected) or dormant (inactive). Together these cover all CandidateStatus
+// values, so every candidate lands in exactly one pane.
+const ACTIVE_CANDIDATE_STATUSES: CandidateStatus[] = ['active', 'on_hold', 'interviewing', 'offer_extended']
+const PAST_CANDIDATE_STATUSES:   CandidateStatus[] = ['hired', 'rejected', 'inactive']
+
 // Funnel stages map 1:1 to the real CandidateStatus values (database.ts), so every
 // card shows a true count drawn straight from candidate.status — the same vocabulary
 // the Pipeline (Kanban) page uses. Each stage's `id` IS the status value, which makes
@@ -402,11 +409,168 @@ const BLANK_FORM = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CandidatesBlock — one pane (Active or Past): count badge + sortable table +
+// its own pagination. Filtering/sorting is done by the page; `rows` arrive ready
+// to display, `total` is the pane's unfiltered count (for the badge). Rendered
+// twice, mirroring the Active/Past blocks on the Jobs and Requisitions pages.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CandidatesBlock({
+  title, accent, rows, total, page, onPageChange, sortKey, sortDir, onSort, emptyText,
+}: {
+  title:        string
+  accent:       string
+  rows:         CandidateListItem[]
+  total:        number
+  page:         number
+  onPageChange: React.Dispatch<React.SetStateAction<number>>
+  sortKey:      SortKey
+  sortDir:      'asc' | 'desc'
+  onSort:       (key: SortKey) => void
+  emptyText:    string
+}) {
+  const router = useRouter()
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const paginated  = rows.slice((safePage - 1) * PAGE_SIZE, (safePage - 1) * PAGE_SIZE + PAGE_SIZE)
+
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 text-slate-300 ml-1" />
+    return sortDir === 'asc'
+      ? <ChevronUp className="h-3 w-3 text-slate-500 ml-1" />
+      : <ChevronDown className="h-3 w-3 text-slate-500 ml-1" />
+  }
+
+  const thCls = 'px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide select-none cursor-pointer hover:text-slate-800 transition-colors'
+
+  return (
+    <section className="space-y-3">
+      {/* Pane header with a count badge */}
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
+        <span className={`inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold ${accent}`}>
+          {total}
+        </span>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+        {rows.length === 0 ? (
+          <div className="py-12 text-center">
+            <Users className="h-9 w-9 text-slate-200 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-500">
+              {total === 0 ? emptyText : 'No candidates match your filters'}
+            </p>
+          </div>
+        ) : (
+          <>
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-10">#</th>
+                  <th className={thCls} onClick={() => onSort('name')}>
+                    <span className="flex items-center">Name <SortIcon col="name" /></span>
+                  </th>
+                  <th className={thCls} onClick={() => onSort('current_title')}>
+                    <span className="flex items-center">Current Title <SortIcon col="current_title" /></span>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-default">
+                    Active Jobs
+                  </th>
+                  <th className={thCls} onClick={() => onSort('status')}>
+                    <span className="flex items-center">Status <SortIcon col="status" /></span>
+                  </th>
+                  <th className={thCls} onClick={() => onSort('created_at')}>
+                    <span className="flex items-center">Added <SortIcon col="created_at" /></span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((c, idx) => {
+                  const s = STATUS_CONFIG[c.status]
+                  return (
+                    <tr
+                      key={c.id}
+                      onClick={() => router.push(`/candidates/${c.id}`)}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      {/* Row number */}
+                      <td className="px-4 py-3.5 text-xs text-slate-400 font-medium tabular-nums">
+                        {(safePage - 1) * PAGE_SIZE + idx + 1}
+                      </td>
+                      {/* Name + email */}
+                      <td className="px-4 py-3.5">
+                        <p className="font-semibold text-sm text-slate-900">{c.name}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{c.email}</p>
+                      </td>
+                      {/* Current title */}
+                      <td className="px-4 py-3.5 text-sm text-slate-600">
+                        {c.current_title ?? <span className="text-slate-300">—</span>}
+                      </td>
+                      {/* Active jobs badge */}
+                      <td className="px-4 py-3.5">
+                        {c.active_applications_count > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                            <Users className="h-3 w-3" />
+                            {c.active_applications_count} job{c.active_applications_count !== 1 ? 's' : ''}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-sm">—</span>
+                        )}
+                      </td>
+                      {/* Status badge */}
+                      <td className="px-4 py-3.5">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${s.color}`}>
+                          {s.icon}{s.label}
+                        </span>
+                      </td>
+                      {/* Added date */}
+                      <td className="px-4 py-3.5 text-xs text-slate-400">
+                        {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+              <p className="text-xs text-slate-400">
+                {rows.length < total
+                  ? `${rows.length} match${rows.length !== 1 ? 'es' : ''} · ${total} total`
+                  : `${total} candidate${total !== 1 ? 's' : ''}`}
+              </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => onPageChange(p => Math.max(1, p - 1))}
+                    disabled={safePage === 1}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-3 w-3" /> Prev
+                  </button>
+                  <span className="text-xs text-slate-400 tabular-nums">{safePage} / {totalPages}</span>
+                  <button
+                    onClick={() => onPageChange(p => Math.min(totalPages, p + 1))}
+                    disabled={safePage === totalPages}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function CandidatesPage() {
-  const router = useRouter()
   const { orgId } = useAuth()
 
   // ── List state ─────────────────────────────────────────────────────────────
@@ -416,7 +580,8 @@ export default function CandidatesPage() {
   const [filterStatus, setFilterStatus] = useState<CandidateStatus | 'all'>('all')
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-  const [page, setPage] = useState(1)
+  const [activePage, setActivePage] = useState(1)
+  const [pastPage,   setPastPage]   = useState(1)
   const [timeFilter, setTimeFilter]       = useState<TimeFilter>('all')
   const [showTimePicker, setShowTimePicker] = useState(false)
   const [customFrom, setCustomFrom]       = useState('')
@@ -444,17 +609,14 @@ export default function CandidatesPage() {
 
   // ── Sorting ────────────────────────────────────────────────────────────────
   const toggleSort = (key: SortKey) => {
-    setPage(1)
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
   }
 
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 text-slate-300 ml-1" />
-    return sortDir === 'asc'
-      ? <ChevronUp className="h-3 w-3 text-slate-500 ml-1" />
-      : <ChevronDown className="h-3 w-3 text-slate-500 ml-1" />
-  }
+  // Reset both panes to page 1 whenever any filter or sort changes.
+  useEffect(() => {
+    setActivePage(1); setPastPage(1)
+  }, [search, filterStatus, timeFilter, customFrom, customTo, sortKey, sortDir])
 
   // ── Derived ────────────────────────────────────────────────────────────────
   // Time filter is the page-level scope: it narrows the candidate set that BOTH the
@@ -472,7 +634,9 @@ export default function CandidatesPage() {
     return candidates.filter(c => now - new Date(c.created_at).getTime() <= ms)
   }, [candidates, timeFilter, customFrom, customTo])
 
-  const filtered = useMemo(() => {
+  // Search + status refinement + sort, shared by both panes. Splitting into
+  // Active/Past happens after, so both panes reflect the same search/sort.
+  const refined = useMemo(() => {
     let result = [...timeScoped]
     if (filterStatus !== 'all') result = result.filter(c => c.status === filterStatus)
     if (search.trim()) {
@@ -495,14 +659,17 @@ export default function CandidatesPage() {
     return result
   }, [timeScoped, filterStatus, search, sortKey, sortDir])
 
+  // Split the refined set into the two panes.
+  const activeRows = useMemo(() => refined.filter(c => ACTIVE_CANDIDATE_STATUSES.includes(c.status)), [refined])
+  const pastRows   = useMemo(() => refined.filter(c => PAST_CANDIDATE_STATUSES.includes(c.status)),   [refined])
+
+  // Pane count badges: full (time-scoped) counts per group, so they line up with
+  // the Hiring Funnel above rather than shrinking as you type in the search box.
+  const activeTotal = useMemo(() => timeScoped.filter(c => ACTIVE_CANDIDATE_STATUSES.includes(c.status)).length, [timeScoped])
+  const pastTotal   = useMemo(() => timeScoped.filter(c => PAST_CANDIDATE_STATUSES.includes(c.status)).length,   [timeScoped])
+
   const timeLabel = timeFilter === '7d' ? 'Last 7 days' : timeFilter === '30d' ? 'Last 30 days'
     : timeFilter === '3m' ? 'Last 3 months' : timeFilter === 'custom' ? 'Custom range' : 'All time'
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE
-    return filtered.slice(start, start + PAGE_SIZE)
-  }, [filtered, page])
 
   // ── Drawer helpers ─────────────────────────────────────────────────────────
   const closeDrawer = () => {
@@ -565,8 +732,6 @@ export default function CandidatesPage() {
     fetchCandidates()
   }
 
-  const thCls = 'px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide select-none cursor-pointer hover:text-slate-800 transition-colors'
-
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 space-y-6">
@@ -578,6 +743,28 @@ export default function CandidatesPage() {
           <p className="text-sm text-slate-500 mt-0.5">Your talent pool across all roles</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Global search — filters both the Active and Past panes */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            <input
+              value={search}
+              onChange={e => {
+                setSearch(e.target.value)
+                if (e.target.value.length > 2) trackEvent('candidates_searched', { query_length: e.target.value.length })
+              }}
+              placeholder="Search name, email, title…"
+              className={`h-10 w-56 rounded-xl border pl-8 pr-8 text-sm outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition ${
+                search
+                  ? 'border-slate-300 bg-slate-50 text-slate-800'
+                  : 'border-slate-200 bg-white text-slate-700 placeholder-slate-400'
+              }`}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                <X className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600" />
+              </button>
+            )}
+          </div>
           {/* Time filter — scopes the whole page (funnel + list) */}
           <div className="relative">
             <button
@@ -600,7 +787,7 @@ export default function CandidatesPage() {
                     <button
                       key={opt.value}
                       onClick={() => {
-                        setTimeFilter(opt.value); setPage(1)
+                        setTimeFilter(opt.value)
                         if (opt.value !== 'custom') setShowTimePicker(false)
                       }}
                       className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -615,12 +802,12 @@ export default function CandidatesPage() {
                     <div className="px-2 pt-2 pb-1 border-t border-slate-100 mt-1 space-y-2">
                       <div>
                         <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
-                        <input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setPage(1) }}
+                        <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
                           className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
                       </div>
                       <div>
                         <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
-                        <input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setPage(1) }}
+                        <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
                           className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
                       </div>
                       <button onClick={() => setShowTimePicker(false)}
@@ -659,30 +846,13 @@ export default function CandidatesPage() {
       {/* Hiring Funnel — scoped to the selected time range (header time filter) */}
       <PipelineFunnel candidates={timeScoped} />
 
-      {/* Filters */}
+      {/* Filters — status refine + clear. Search and time filter live in the header. */}
       <div className="flex items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <input
-            value={search}
-            onChange={e => {
-              setSearch(e.target.value); setPage(1)
-              if (e.target.value.length > 2) trackEvent('candidates_searched', { query_length: e.target.value.length })
-            }}
-            placeholder="Search name, email, title…"
-            className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
-              <X className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600" />
-            </button>
-          )}
-        </div>
         <select
           value={filterStatus}
           onChange={e => {
             const val = e.target.value as CandidateStatus | 'all'
-            setFilterStatus(val); setPage(1)
+            setFilterStatus(val)
             if (val !== 'all') trackEvent('candidates_filtered', { filter_type: val })
           }}
           className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
@@ -695,7 +865,7 @@ export default function CandidatesPage() {
 
         {(filterStatus !== 'all' || search || timeFilter !== 'all') && (
           <button
-            onClick={() => { setFilterStatus('all'); setSearch(''); setTimeFilter('all'); setCustomFrom(''); setCustomTo(''); setPage(1) }}
+            onClick={() => { setFilterStatus('all'); setSearch(''); setTimeFilter('all'); setCustomFrom(''); setCustomTo('') }}
             className="shrink-0 whitespace-nowrap text-xs text-slate-500 hover:text-slate-800 transition-colors"
           >
             Clear filters
@@ -747,110 +917,31 @@ export default function CandidatesPage() {
           </button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide w-10">#</th>
-                <th className={thCls} onClick={() => toggleSort('name')}>
-                  <span className="flex items-center">Name <SortIcon col="name" /></span>
-                </th>
-                <th className={thCls} onClick={() => toggleSort('current_title')}>
-                  <span className="flex items-center">Current Title <SortIcon col="current_title" /></span>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-default">
-                  Active Jobs
-                </th>
-                <th className={thCls} onClick={() => toggleSort('status')}>
-                  <span className="flex items-center">Status <SortIcon col="status" /></span>
-                </th>
-                <th className={thCls} onClick={() => toggleSort('created_at')}>
-                  <span className="flex items-center">Added <SortIcon col="created_at" /></span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">
-                    No results match your filters.
-                  </td>
-                </tr>
-              ) : paginated.map((c, idx) => {
-                const s = STATUS_CONFIG[c.status]
-                return (
-                  <tr
-                    key={c.id}
-                    onClick={() => router.push(`/candidates/${c.id}`)}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors cursor-pointer"
-                  >
-                    {/* Row number */}
-                    <td className="px-4 py-3.5 text-xs text-slate-400 font-medium tabular-nums">
-                      {(page - 1) * PAGE_SIZE + idx + 1}
-                    </td>
-                    {/* Name + email */}
-                    <td className="px-4 py-3.5">
-                      <p className="font-semibold text-sm text-slate-900">{c.name}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">{c.email}</p>
-                    </td>
-                    {/* Current title */}
-                    <td className="px-4 py-3.5 text-sm text-slate-600">
-                      {c.current_title ?? <span className="text-slate-300">—</span>}
-                    </td>
-                    {/* Active jobs badge */}
-                    <td className="px-4 py-3.5">
-                      {c.active_applications_count > 0 ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
-                          <Users className="h-3 w-3" />
-                          {c.active_applications_count} job{c.active_applications_count !== 1 ? 's' : ''}
-                        </span>
-                      ) : (
-                        <span className="text-slate-300 text-sm">—</span>
-                      )}
-                    </td>
-                    {/* Status badge */}
-                    <td className="px-4 py-3.5">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${s.color}`}>
-                        {s.icon}{s.label}
-                      </span>
-                    </td>
-                    {/* Added date */}
-                    <td className="px-4 py-3.5 text-xs text-slate-400">
-                      {new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-          {filtered.length > 0 && (
-            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-              <p className="text-xs text-slate-400">
-                {filtered.length < candidates.length
-                  ? `${filtered.length} match${filtered.length !== 1 ? 'es' : ''} · ${candidates.length} total`
-                  : `${candidates.length} candidate${candidates.length !== 1 ? 's' : ''}`}
-              </p>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft className="h-3 w-3" /> Prev
-                  </button>
-                  <span className="text-xs text-slate-400 tabular-nums">{page} / {totalPages}</span>
-                  <button
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Next <ChevronRight className="h-3 w-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+        <div className="space-y-6">
+          <CandidatesBlock
+            title="Active"
+            accent="text-emerald-700"
+            rows={activeRows}
+            total={activeTotal}
+            page={activePage}
+            onPageChange={setActivePage}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={toggleSort}
+            emptyText="No active candidates"
+          />
+          <CandidatesBlock
+            title="Past"
+            accent="text-slate-500"
+            rows={pastRows}
+            total={pastTotal}
+            page={pastPage}
+            onPageChange={setPastPage}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={toggleSort}
+            emptyText="No past candidates yet"
+          />
         </div>
       )}
 

@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Clock, CheckCircle, Send, Archive, FileText, Briefcase } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { Plus, Search, Clock, CheckCircle, Send, Archive, FileText, Briefcase, CalendarDays, Check, X } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
 import { STAT_TONE, statTileClass, type StatTone } from '@/lib/ui/stat-tones'
@@ -28,9 +27,21 @@ const STATUS_CONFIG: Record<Opening['status'], { label: string; color: string; i
 const ACTIVE_STATUSES: Opening['status'][] = ['draft', 'pending_approval', 'approved', 'open']
 const PAST_STATUSES:   Opening['status'][] = ['filled', 'closed', 'archived']
 
+// Time filter presets — mirrors the Jobs page so both list pages share the same
+// created_at date scoping (Last 7 days / 30 days / 3 months / All / Custom range).
+type TimeFilter = '7d' | '30d' | '3m' | 'all' | 'custom'
+const TIME_OPTS: { value: TimeFilter; label: string }[] = [
+  { value: '7d',     label: 'Last 7 days'   },
+  { value: '30d',    label: 'Last 30 days'  },
+  { value: '3m',     label: 'Last 3 months' },
+  { value: 'all',    label: 'All time'      },
+  { value: 'custom', label: 'Custom range'  },
+]
+
 // The five summary stat-cards (Total / Awaiting Approval / Approved / Open /
-// Closed). Now a static at-a-glance overview — the Active/Past split below does
-// the filtering, and each block has its own search.
+// Closed). A static at-a-glance overview — the Active/Past split below does the
+// listing, and a single shared toolbar (search / time / dept / location) filters
+// both blocks at once.
 const STAT_CARDS: ReadonlyArray<{
   key:      string
   label:    string
@@ -45,72 +56,38 @@ const STAT_CARDS: ReadonlyArray<{
 ]
 
 /**
- * A self-contained requisitions block: its own header label + search/dept/location
- * filters + table. Used twice on the page — once for Active, once for Past.
+ * A presentational requisitions block: header label + count badge + table. All
+ * filtering is done by the page and passed down — `rows` are the already-filtered
+ * requisitions, `total` is the block's unfiltered count (for the badge + footer).
+ * Rendered twice on the page — once for Active, once for Past.
  */
 function OpeningsBlock({
-  title, accent, openings, depts, locs, emptyText,
+  title, accent, rows, total, deptById, locById, emptyText,
 }: {
   title:     string
   accent:    string          // tailwind text colour for the count badge
-  openings:  Opening[]
-  depts:     Department[]
-  locs:      LocationRow[]
+  rows:      Opening[]
+  total:     number
+  deptById:  Map<string, Department>
+  locById:   Map<string, LocationRow>
   emptyText: string
 }) {
-  const [q, setQ]           = useState('')
-  const [deptId, setDeptId] = useState('')
-  const [locId, setLocId]   = useState('')
-
-  const deptById = useMemo(() => new Map(depts.map(d => [d.id, d])), [depts])
-  const locById  = useMemo(() => new Map(locs.map(l => [l.id, l])),  [locs])
-
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    return openings.filter(o =>
-      (!needle || o.title.toLowerCase().includes(needle)) &&
-      (!deptId || o.department_id === deptId) &&
-      (!locId  || o.location_id === locId),
-    )
-  }, [openings, q, deptId, locId])
-
   return (
     <section className="space-y-3">
       {/* Block header with a count badge */}
       <div className="flex items-center gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
         <span className={cn('inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold', accent)}>
-          {openings.length}
+          {total}
         </span>
       </div>
 
       <Card className="overflow-clip border-slate-300 shadow-sm">
-        {/* Filter bar — lives inside the block so each block searches itself */}
-        <div className="flex flex-wrap gap-2 p-3 border-b border-slate-100 bg-slate-50/60">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search title…"
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              className="pl-9 bg-white"
-            />
-          </div>
-          <Select value={deptId} onChange={e => setDeptId(e.target.value)} className="w-44 bg-white">
-            <option value="">All departments</option>
-            {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </Select>
-          <Select value={locId} onChange={e => setLocId(e.target.value)} className="w-44 bg-white">
-            <option value="">All locations</option>
-            {locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </Select>
-        </div>
-
-        {filtered.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="py-12 text-center">
             <Briefcase className="h-9 w-9 text-slate-200 mx-auto mb-2" />
             <p className="text-sm font-medium text-slate-500">
-              {openings.length === 0 ? emptyText : 'No requisitions match your filters'}
+              {total === 0 ? emptyText : 'No requisitions match your filters'}
             </p>
           </div>
         ) : (
@@ -127,7 +104,7 @@ function OpeningsBlock({
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(o => {
+                {rows.map(o => {
                   const dept = o.department_id ? deptById.get(o.department_id) : null
                   const loc  = o.location_id   ? locById.get(o.location_id)    : null
                   const sc   = STATUS_CONFIG[o.status]
@@ -159,7 +136,7 @@ function OpeningsBlock({
 
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50">
               <p className="text-xs text-slate-400">
-                Showing {filtered.length} of {openings.length} requisition{openings.length !== 1 ? 's' : ''}
+                Showing {rows.length} of {total} requisition{total !== 1 ? 's' : ''}
               </p>
             </div>
           </>
@@ -175,6 +152,15 @@ export default function OpeningsListPage() {
   const [depts,  setDepts]  = useState<Department[]>([])
   const [locs,   setLocs]   = useState<LocationRow[]>([])
 
+  // ── Shared filter state (drives BOTH the Active and Past blocks) ──────────
+  const [q,      setQ]      = useState('')
+  const [deptId, setDeptId] = useState('')
+  const [locId,  setLocId]  = useState('')
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all')
+  const [customFrom,  setCustomFrom]  = useState('')
+  const [customTo,    setCustomTo]    = useState('')
+  const [showTimePicker, setShowTimePicker] = useState(false)
+
   useEffect(() => {
     fetch('/api/departments').then(r => r.json()).then(({ data }) => setDepts(data ?? []))
     fetch('/api/locations').then(r => r.json()).then(({ data }) => setLocs(data ?? []))
@@ -187,9 +173,46 @@ export default function OpeningsListPage() {
       .catch(() => setLoaded(true))
   }, [])
 
+  const deptById = useMemo(() => new Map(depts.map(d => [d.id, d])), [depts])
+  const locById  = useMemo(() => new Map(locs.map(l => [l.id, l])),  [locs])
+
   // Split into the two blocks by status.
   const active = useMemo(() => items.filter(o => ACTIVE_STATUSES.includes(o.status)), [items])
   const past   = useMemo(() => items.filter(o => PAST_STATUSES.includes(o.status)),   [items])
+
+  // One shared filter applied to whichever block we're rendering. Search matches
+  // title + department name + location name; dept/location dropdowns and the time
+  // filter (on created_at) narrow further — identical scoping for both blocks.
+  const applyFilters = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    const now = Date.now()
+    return (list: Opening[]) => list.filter(o => {
+      if (deptId && o.department_id !== deptId) return false
+      if (locId  && o.location_id   !== locId)  return false
+      if (needle) {
+        const deptName = o.department_id ? (deptById.get(o.department_id)?.name ?? '') : ''
+        const locName  = o.location_id   ? (locById.get(o.location_id)?.name  ?? '') : ''
+        const hay = `${o.title} ${deptName} ${locName}`.toLowerCase()
+        if (!hay.includes(needle)) return false
+      }
+      if (timeFilter !== 'all') {
+        if (timeFilter === 'custom') {
+          if (customFrom && new Date(o.created_at) < new Date(customFrom)) return false
+          if (customTo   && new Date(o.created_at) > new Date(customTo + 'T23:59:59')) return false
+        } else {
+          const ms = timeFilter === '7d' ? 7 * 86_400_000 : timeFilter === '30d' ? 30 * 86_400_000 : 91 * 86_400_000
+          if (now - new Date(o.created_at).getTime() > ms) return false
+        }
+      }
+      return true
+    })
+  }, [q, deptId, locId, timeFilter, customFrom, customTo, deptById, locById])
+
+  const activeRows = useMemo(() => applyFilters(active), [applyFilters, active])
+  const pastRows   = useMemo(() => applyFilters(past),   [applyFilters, past])
+
+  const timeLabel = timeFilter === '7d' ? 'Last 7 days' : timeFilter === '30d' ? 'Last 30 days'
+    : timeFilter === '3m' ? 'Last 3 months' : timeFilter === 'custom' ? 'Custom range' : 'All time'
 
   // Stat-card values (static overview over all items).
   const counts = useMemo(() => {
@@ -209,12 +232,94 @@ export default function OpeningsListPage() {
           <h1 className="text-2xl font-bold text-slate-900">Requisitions</h1>
           <p className="text-sm text-slate-500 mt-0.5">Approved headcount for your team</p>
         </div>
-        <Link
-          href="/openings/new"
-          className="inline-flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm"
-        >
-          <Plus className="h-4 w-4" /> New requisition
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* Global search (filters both Active and Past) */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search requisitions…"
+              className={`h-9 w-52 rounded-xl border pl-8 pr-8 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                q
+                  ? 'border-slate-300 bg-slate-50 text-slate-800'
+                  : 'border-slate-200 bg-white text-slate-700 placeholder-slate-400'
+              }`}
+            />
+            {q && (
+              <button
+                onClick={() => setQ('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Time filter icon + dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowTimePicker(p => !p)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                timeFilter !== 'all'
+                  ? 'border-slate-300 bg-slate-50 text-slate-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
+              }`}
+              title="Time filter"
+            >
+              <CalendarDays className="h-4 w-4" />
+              {timeFilter !== 'all' && <span className="text-xs">{timeLabel}</span>}
+            </button>
+            {showTimePicker && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 w-52">
+                  {TIME_OPTS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setTimeFilter(opt.value)
+                        if (opt.value !== 'custom') setShowTimePicker(false)
+                      }}
+                      className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                        timeFilter === opt.value ? 'bg-slate-50 text-slate-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {opt.label}
+                      {timeFilter === opt.value && <Check className="h-3 w-3 ml-auto shrink-0" />}
+                    </button>
+                  ))}
+                  {timeFilter === 'custom' && (
+                    <div className="px-2 pt-2 pb-1 border-t border-slate-100 mt-1 space-y-2">
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
+                        <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
+                        <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
+                      </div>
+                      <button onClick={() => setShowTimePicker(false)}
+                        className="w-full text-xs bg-[#221b14] text-white rounded-lg py-1.5 hover:bg-[#33271b] transition-colors font-semibold">
+                        Apply
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <Link
+            href="/openings/new"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm"
+          >
+            <Plus className="h-4 w-4" /> New requisition
+          </Link>
+        </div>
       </div>
 
       {/* ── Stat cards (static overview) ────────────────────────────────── */}
@@ -234,6 +339,20 @@ export default function OpeningsListPage() {
               <p className={`mt-0.5 text-xs font-medium ${STAT_TONE[stat.tone].sub}`}>{stat.label}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Shared department / location filter bar (drives both blocks) ─── */}
+      {loaded && (
+        <div className="flex flex-wrap gap-2">
+          <Select value={deptId} onChange={e => setDeptId(e.target.value)} className="w-44 bg-white">
+            <option value="">All departments</option>
+            {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </Select>
+          <Select value={locId} onChange={e => setLocId(e.target.value)} className="w-44 bg-white">
+            <option value="">All locations</option>
+            {locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </Select>
         </div>
       )}
 
@@ -264,17 +383,19 @@ export default function OpeningsListPage() {
           <OpeningsBlock
             title="Active"
             accent="text-emerald-700"
-            openings={active}
-            depts={depts}
-            locs={locs}
+            rows={activeRows}
+            total={active.length}
+            deptById={deptById}
+            locById={locById}
             emptyText="No active requisitions"
           />
           <OpeningsBlock
             title="Past"
             accent="text-slate-500"
-            openings={past}
-            depts={depts}
-            locs={locs}
+            rows={pastRows}
+            total={past.length}
+            deptById={deptById}
+            locById={locById}
             emptyText="No past requisitions yet"
           />
         </div>
