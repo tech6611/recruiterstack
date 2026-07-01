@@ -39,6 +39,35 @@ const SECTION_LABEL: Record<TargetType, string> = {
   offer:   'Offers',
 }
 
+// Header-row tint per section, using the brand palette (emerald = pine,
+// gold = amber accent). Each entry colours only the top "first line" of the
+// pane: background fill, hover, chevron/title/count-badge text.
+const HEADER_TONE: Record<TargetType, {
+  bar: string; hover: string; chevron: string; title: string; badge: string
+}> = {
+  opening: {
+    bar:     'bg-emerald-50',
+    hover:   'hover:bg-emerald-100',
+    chevron: 'text-emerald-600',
+    title:   'text-emerald-900',
+    badge:   'text-emerald-700 bg-emerald-100',
+  },
+  job: {
+    bar:     'bg-gold-50',
+    hover:   'hover:bg-gold-100',
+    chevron: 'text-gold-600',
+    title:   'text-gold-900',
+    badge:   'text-gold-700 bg-gold-100',
+  },
+  offer: {
+    bar:     'bg-emerald-50',
+    hover:   'hover:bg-emerald-100',
+    chevron: 'text-emerald-600',
+    title:   'text-emerald-900',
+    badge:   'text-emerald-700 bg-emerald-100',
+  },
+}
+
 export default function ApprovalChainsListPage() {
   const router = useRouter()
   const [items, setItems]     = useState<Chain[]>([])
@@ -169,17 +198,22 @@ export default function ApprovalChainsListPage() {
             const chains   = grouped[t]
             const isOpen   = !collapsed[t]
             const Chevron  = isOpen ? ChevronDown : ChevronRight
+            const tone     = HEADER_TONE[t]
             return (
               <Card key={t} className="overflow-hidden">
-                {/* Foldable section header — click anywhere to collapse/expand. */}
+                {/* Foldable section header — click anywhere to collapse/expand.
+                    The first line is tinted per-section with the brand palette. */}
                 <button
                   type="button"
                   onClick={() => toggleSection(t)}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+                  className={cn(
+                    'flex w-full items-center gap-2 px-4 py-3 text-left transition-colors',
+                    tone.bar, tone.hover,
+                  )}
                 >
-                  <Chevron className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="text-sm font-semibold text-slate-900">{SECTION_LABEL[t]}</span>
-                  <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">
+                  <Chevron className={cn('h-4 w-4 shrink-0', tone.chevron)} />
+                  <span className={cn('text-sm font-semibold', tone.title)}>{SECTION_LABEL[t]}</span>
+                  <span className={cn('text-[11px] font-semibold rounded-full px-2 py-0.5', tone.badge)}>
                     {chains.length}
                   </span>
                 </button>

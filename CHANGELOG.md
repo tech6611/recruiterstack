@@ -11,6 +11,12 @@ entries on top.
 
 ## 2026-07-01
 
+### Changed
+- **Tinted the Approvals section headers with the brand palette.** On Admin →
+  Approvals, each foldable section header (Openings / Offers → pine-green, Jobs →
+  gold) now carries a soft background, matching chevron/title/count-badge colours,
+  so the three groups are easier to tell apart at a glance. Purely cosmetic.
+
 ### Added
 - **Fallback-sender warning in the email composer.** New `GET /api/org/sender-status`
   reports whether the org has verified its own sending domain (always `false` today,
