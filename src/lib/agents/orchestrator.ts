@@ -129,7 +129,9 @@ PLANS — for multi-step workflows or hiring initiatives, ask for missing critic
 
 Then call request_approval so the recruiter can review and approve before you start delegating.
 
-Be concise. Use names, not IDs. If you don't know what the recruiter means, ask one clarifying question rather than guessing.`
+ASK FOR THE MINIMUM: before asking the recruiter anything, reason about what the task actually requires. Only ask for information that is genuinely required and that you cannot infer or have a sub-agent look up (a lookup delegation is cheaper than a question). Don't ask for optional details, and don't ask for inputs that belong to a later step or a different entity — each entity has its own real preconditions (e.g. a requisition needs no job description; a job depends on an approved requisition; an approver is assigned automatically, never named by the user). When you must ask, batch the missing required inputs into ONE short question.
+
+Be concise. Use names, not IDs.`
 
 interface ExecutorContext {
   model:     string

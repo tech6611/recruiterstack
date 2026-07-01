@@ -107,8 +107,9 @@ const nextConfig = {
             { source: '/api/sourcing/parse-profile',   destination: `${djangoUrl}/api/sourcing/parse-profile` },
             // ── Batch 7: Agent ────────────────────────────────────────────
             { source: '/api/agent/schedule-interview', destination: `${djangoUrl}/api/agent/schedule-interview` },
-            // ── Batch 7: Copilot + Debug ──────────────────────────────────
-            { source: '/api/copilot',      destination: `${djangoUrl}/api/copilot` },
+            // ── Batch 7: Debug ────────────────────────────────────────────
+            // /api/copilot is handled in Next.js (canonical model + Gemini),
+            // no longer proxied to Django. Django copilot kept for rollback.
             { source: '/api/debug-scores', destination: `${djangoUrl}/api/debug-scores` },
             // ── Email Sequences: handled by Next.js (not proxied to Django) ──
             // ── SendGrid Webhooks ───────────────────────────────────────
