@@ -781,24 +781,25 @@ const PAST_JOB_STATUSES = new Set(['closed', 'archived', 'withdrawn'])
 const isPastJobStatus = (s: string) => PAST_JOB_STATUSES.has(s)
 
 /**
- * The "Past" block: a self-contained, simple list of closed/archived jobs with
- * its own search bar. Mirrors the Requisitions Past block. The Active block keeps
- * the full-featured table (drag, column config, filters) above it.
+ * The "Past" block: a simple list of closed/archived jobs. It shares the page's
+ * single global search (passed in via `search`) rather than owning its own search
+ * bar. The Active block keeps the full-featured table (drag, column config,
+ * filters) above it.
  */
-function PastJobsBlock({ jobs }: { jobs: JobListItem[] }) {
+function PastJobsBlock({ jobs, search }: { jobs: JobListItem[]; search: string }) {
   const router = useRouter()
-  const [q, setQ] = useState('')
 
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase()
+    const needle = search.trim().toLowerCase()
     if (!needle) return jobs
     return jobs.filter(j =>
       j.position_title.toLowerCase().includes(needle) ||
       (j.department ?? '').toLowerCase().includes(needle) ||
       (j.hiring_manager_name ?? '').toLowerCase().includes(needle) ||
+      (j.ticket_number ?? '').toLowerCase().includes(needle) ||
       (j.location ?? '').toLowerCase().includes(needle),
     )
-  }, [jobs, q])
+  }, [jobs, search])
 
   return (
     <section className="space-y-3">
@@ -808,20 +809,6 @@ function PastJobsBlock({ jobs }: { jobs: JobListItem[] }) {
       </div>
 
       <div className="rounded-2xl border border-slate-300 bg-white shadow-sm" style={{ overflow: 'clip' }}>
-        {/* Own search bar */}
-        <div className="flex flex-wrap gap-2 p-3 border-b border-slate-100 bg-slate-50/60">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search past jobs…"
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-
         {filtered.length === 0 ? (
           <div className="py-12 text-center">
             <Briefcase className="h-9 w-9 text-slate-200 mx-auto mb-2" />
@@ -1647,8 +1634,8 @@ export default function JobsPage() {
         </div>
         </section>
 
-        {/* ── Past block (closed/archived jobs, simple self-contained list) ── */}
-        <PastJobsBlock jobs={pastJobs} />
+        {/* ── Past block (closed/archived jobs, shares the global search) ── */}
+        <PastJobsBlock jobs={pastJobs} search={jobSearch} />
         </div>
       )}
 
