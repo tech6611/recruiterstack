@@ -12,7 +12,6 @@ import type { Capability } from '@/lib/permissions'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import {
   countCanonicalJobs,
-  createCanonicalIntakeJob,
   createCanonicalJobFromApprovedOpening,
   findCanonicalJobsForAgent,
   getCanonicalJobBoardDetail,
@@ -27,7 +26,11 @@ import {
 import {
   getOpeningById,
   listApprovedOpenings,
+  listOpenings,
+  createOpening,
+  findDepartmentByName,
 } from '@/modules/ats/domain/openings'
+import { submitForApproval, ApprovalError } from '@/lib/approvals/engine'
 import {
   searchCandidatesForAgent,
   countCandidatesByStatus,
@@ -78,7 +81,7 @@ import {
   updateOfferRow,
   listOffers,
 } from '@/modules/ats/domain/offers'
-import { fetchLegacyAnalyticsInputs } from '@/modules/ats/domain/reporting'
+import { fetchCanonicalAnalyticsInputs } from '@/modules/ats/domain/reporting'
 import {
   getEmployeeByPerson,
   listDirectReports,
@@ -667,18 +670,43 @@ export const COPILOT_TOOLS: ClaudeTool[] = [
     },
   },
   {
-    name: 'create_intake_request',
-    description: 'Create a new hiring request and generate an intake form link to send to the hiring manager. Returns the intake URL for the recruiter to forward. Does NOT send the email automatically — the recruiter must share the link.',
+    name: 'create_requisition',
+    description: 'Create a new requisition (an "opening" — approved-headcount request). This is the FIRST step in opening a role: it appears on the Requisitions page as a draft. Only the position title is required. To move it toward approval, follow with submit_requisition. Do NOT use this to create a job pipeline — a job comes later, from an APPROVED requisition (create_job_and_pipeline).',
     input_schema: {
       type: 'object',
       properties: {
-        position_title:         { type: 'string', description: 'Job title for the new role' },
-        hiring_manager_name:    { type: 'string', description: 'Hiring manager full name' },
-        hiring_manager_email:   { type: 'string', description: 'Hiring manager email (required to generate the intake link)' },
-        department:             { type: 'string', description: 'Department (optional)' },
-        hiring_manager_slack:   { type: 'string', description: 'HM Slack handle e.g. @john (optional — for Slack notification)' },
+        title:             { type: 'string', description: 'Job title for the requisition' },
+        department:        { type: 'string', description: 'Department name (optional — must match an existing department)' },
+        employment_type:   { type: 'string', enum: ['full_time', 'part_time', 'contract', 'intern', 'temp'], description: 'Employment type (optional, default full_time)' },
+        comp_min:          { type: 'number', description: 'Minimum compensation (optional)' },
+        comp_max:          { type: 'number', description: 'Maximum compensation (optional)' },
+        comp_currency:     { type: 'string', description: 'Three-letter currency code (optional, default USD)' },
+        target_start_date: { type: 'string', description: 'Target start date, YYYY-MM-DD (optional)' },
+        justification:     { type: 'string', description: 'Business justification for the headcount (optional here, but required — min 50 chars — before it can be submitted for approval)' },
       },
-      required: ['position_title', 'hiring_manager_name', 'hiring_manager_email'],
+      required: ['title'],
+    },
+  },
+  {
+    name: 'list_requisitions',
+    description: 'List requisitions (openings) for the org, newest first, with their status. Use to answer "what requisitions do I have", "which are approved/awaiting approval", etc. Optional status filter.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['draft', 'pending_approval', 'approved', 'open', 'filled', 'closed', 'archived'], description: 'Optional status filter' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'submit_requisition',
+    description: 'Submit a DRAFT requisition for approval — moves it to pending_approval and routes it to the right approver automatically (by department). Requires a justification of at least 50 characters on the requisition. In orgs where the requester is the only approver, this auto-approves immediately. Do not name an approver — routing is automatic.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        opening_id: { type: 'string', description: 'UUID of the draft requisition to submit (from create_requisition or list_requisitions)' },
+      },
+      required: ['opening_id'],
     },
   },
   // ── Interview & Offer tools ───────────────────────────────────────────────
@@ -1234,7 +1262,9 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   create_self_schedule_invite: 'recruiting:edit', send_outreach_email: 'recruiting:edit',
   send_whatsapp_message: 'recruiting:edit', send_assessment: 'recruiting:edit',
   draft_application_email: 'recruiting:edit', create_role: 'recruiting:edit',
-  update_role: 'recruiting:edit', create_intake_request: 'recruiting:edit',
+  update_role: 'recruiting:edit',
+  create_requisition: 'recruiting:edit', submit_requisition: 'recruiting:edit',
+  list_requisitions: 'recruiting:view',
   // Analytics
   get_recruiting_analytics: 'analytics:view',
   // People
@@ -1317,7 +1347,9 @@ export async function executeTool(
       case 'get_inbox':                  return await getInbox(orgId, supabase)
       case 'create_scorecard':           return await createScorecard(input, orgId, supabase)
       case 'draft_application_email':    return await draftApplicationEmail(input, orgId, supabase)
-      case 'create_intake_request':      return await createIntakeRequest(input, orgId, supabase, userId)
+      case 'create_requisition':         return await createRequisition(input, orgId, supabase, userId)
+      case 'list_requisitions':          return await listRequisitions(input, orgId, supabase)
+      case 'submit_requisition':         return await submitRequisition(input, orgId, supabase, userId)
       case 'schedule_interview':         return await scheduleInterview(input, orgId, supabase)
       case 'get_interviews':             return await getInterviews(input, orgId, supabase)
       case 'update_interview_status':    return await updateInterviewStatus(input, orgId, supabase)
@@ -1850,7 +1882,7 @@ async function bulkAddToPipeline(
   for (const candidate_id of toAdd) {
     const { data: app, error: appErr } = await insertPipelineApplication(supabase, orgId, {
       candidateId: candidate_id,
-      hiringRequestId: job_id,
+      jobId: job_id,
       stageId: firstStage?.id ?? null,
       source,
     })
@@ -2446,9 +2478,12 @@ async function getRecruitingAnalytics(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { jobs, apps, stages } = await fetchLegacyAnalyticsInputs(supabase, orgId)
+  const { jobs, apps, stages } = await fetchCanonicalAnalyticsInputs(supabase, orgId)
 
-  const ACTIVE_JOB_STATUSES = ['active', 'jd_approved', 'jd_sent', 'jd_generated', 'posted']
+  // Canonical job statuses that count as "actively recruiting" (jobs enum:
+  // draft|pending_approval|approved|open|closed|archived). 'open' = live/accepting,
+  // 'approved' = ready to post — both can be gathering candidates.
+  const ACTIVE_JOB_STATUSES = ['open', 'approved']
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const activeJobs = jobs.filter((j: any) => ACTIVE_JOB_STATUSES.includes(j.status))
 
@@ -2636,7 +2671,7 @@ async function draftApplicationEmail(
 
   const firstName  = candidate?.full_name?.split(' ')[0] ?? 'there'
   const jobTitle   = job?.position_title ?? 'the position'
-  const dept       = job?.department
+  const dept       = job?.department?.name
   const stageName  = stage?.name ?? 'Applied'
   const company    = company_name   ?? 'our company'
   const recName    = recruiter_name ?? 'The Recruiting Team'
@@ -2676,43 +2711,132 @@ Respond with ONLY valid JSON: {"subject": "...", "body": "..."}`
   }
 }
 
-async function createIntakeRequest(
+async function createRequisition(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   input: Record<string, any>,
   orgId: string,
   supabase: SupabaseClient,
   userId?: string | null,
 ): Promise<string> {
-  const { position_title, hiring_manager_name, hiring_manager_email } = input
+  const { title, department, employment_type, comp_min, comp_max, comp_currency, target_start_date, justification } = input
 
-  if (!position_title?.trim() || !hiring_manager_name?.trim() || !hiring_manager_email?.trim()) {
-    return 'Error: position_title, hiring_manager_name, and hiring_manager_email are required.'
+  if (!title?.trim()) {
+    return 'Error: a title is required to create a requisition.'
   }
   if (!userId) {
     return 'Error: could not identify the acting user, so the requisition was not created.'
   }
 
-  // Phase 3 / C5.5: an intake is now a canonical `job` (status 'draft' until
-  // the HM submits / it's approved). jobs.intake_token (migration 069) keys the
-  // /intake/<token> URL, mirroring how apply_token keys /apply.
-  const r = await createCanonicalIntakeJob(supabase, orgId, {
-    title:              position_title.trim(),
-    hiringManagerName:  hiring_manager_name.trim(),
-    hiringManagerEmail: hiring_manager_email.trim(),
-    createdBy:          userId,
-  })
-  const appUrl    = process.env.NEXT_PUBLIC_APP_URL || 'https://app.recruiterstack.com'
-  const intakeUrl = `${appUrl}/intake/${r.intake_token}`
+  // Resolve an optional department name to its id — the approval chain routes by
+  // department, so surface a clear error rather than silently dropping it.
+  let departmentId: string | null = null
+  if (department?.trim()) {
+    const dept = await findDepartmentByName(supabase, orgId, department)
+    if (!dept) {
+      return `No department named "${department}" exists. Create it first, or leave the department out.`
+    }
+    departmentId = dept.id
+  }
 
-  return [
-    `Intake request created for "${r.title}" (HM: ${hiring_manager_name}).`,
-    `Status: draft (intake pending) | ID: ${r.id}`,
-    ``,
-    `Intake URL (share this with the hiring manager):`,
-    intakeUrl,
-    ``,
-    `Note: Email NOT sent automatically. Copy the URL above and forward it to ${hiring_manager_email}.`,
-  ].join('\n')
+  const opening = await createOpening(
+    supabase,
+    orgId,
+    {
+      title:            title.trim(),
+      departmentId,
+      employmentType:   employment_type ?? undefined,
+      compMin:          comp_min ?? null,
+      compMax:          comp_max ?? null,
+      compCurrency:     comp_currency ?? undefined,
+      targetStartDate:  target_start_date ?? null,
+      justification:    justification ?? null,
+    },
+    userId,
+  )
+
+  const lines = [
+    `Requisition created for "${opening.title}".`,
+    `Status: draft | ID: ${opening.id}`,
+    `It now appears on the Requisitions page under "Awaiting Approval".`,
+  ]
+  if (!justification || justification.trim().length < 50) {
+    lines.push(`Next: add a justification (at least 50 characters), then submit it for approval.`)
+  } else {
+    lines.push(`Next: submit it for approval when you're ready.`)
+  }
+  return lines.join('\n')
+}
+
+async function listRequisitions(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const rows = await listOpenings(supabase, orgId, input.status ?? null)
+  if (rows.length === 0) {
+    return input.status
+      ? `No requisitions with status "${input.status}".`
+      : 'No requisitions yet.'
+  }
+  const lines = rows
+    .slice(0, 25)
+    .map(r => `• ${r.title} — ${r.status} | ID: ${r.id}`)
+  const header = input.status
+    ? `Requisitions (status: ${input.status}): ${rows.length}`
+    : `Requisitions: ${rows.length}`
+  return [header, ...lines].join('\n')
+}
+
+async function submitRequisition(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+  userId?: string | null,
+): Promise<string> {
+  const { opening_id } = input
+  if (!opening_id) return 'Error: opening_id is required.'
+  if (!userId) {
+    return 'Error: could not identify the acting user, so the requisition was not submitted.'
+  }
+
+  const opening = await getOpeningById(supabase, orgId, opening_id)
+  if (!opening) return `Requisition not found: ${opening_id}`
+  if (opening.status !== 'draft') {
+    return `This requisition is already "${opening.status}" — only draft requisitions can be submitted.`
+  }
+  if (!opening.justification || opening.justification.trim().length < 50) {
+    return 'This requisition needs a justification of at least 50 characters before it can be submitted. Add one, then submit.'
+  }
+
+  let result
+  try {
+    result = await submitForApproval({
+      orgId,
+      targetType:  'opening',
+      targetId:    opening.id,
+      target:      opening as unknown as Record<string, unknown>,
+      requesterId: userId,
+    })
+  } catch (err) {
+    if (err instanceof ApprovalError) {
+      return `Could not submit for approval: ${err.message}`
+    }
+    throw err
+  }
+
+  const newStatus = result.status === 'approved' ? 'approved' : 'pending_approval'
+  await supabase
+    .from('openings')
+    .update({ approval_id: result.approvalId, status: newStatus } as never)
+    .eq('id', opening.id)
+    .eq('org_id', orgId)
+
+  if (result.status === 'approved') {
+    return `Requisition "${opening.title}" was submitted and auto-approved (you were the only approver). You can now create a job from it.`
+  }
+  return `Requisition "${opening.title}" was submitted for approval and is now pending_approval.`
 }
 
 // ── Interview tools ───────────────────────────────────────────────────────────

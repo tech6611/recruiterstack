@@ -12,6 +12,17 @@ entries on top.
 ## 2026-07-01
 
 ### Fixed
+- **Copilot recruiting analytics returned all zeros.** `get_recruiting_analytics`
+  still read the retired `hiring_requests` table (wiped), so every funnel/source/
+  velocity figure came back empty. Now reads the canonical `jobs` spine via
+  `fetchCanonicalAnalyticsInputs`, and its "active jobs" filter uses canonical
+  statuses (`open`/`approved`) instead of legacy ones.
+- **Copilot showed "Unknown job" everywhere.** Ten copilot read-tools (inbox,
+  candidate view, notes, scorecards, outreach email, WhatsApp, application events,
+  stale-check, email drafting) looked up the job title on the retired
+  `hiring_requests` table, so any candidate on a canonical job showed no title —
+  and AI-drafted emails lost the role/department context. All now read the title
+  (and department) from canonical `jobs`, aliased so callers are unchanged.
 - **Copilot could not create requisitions or jobs.** Every AI-driven insert into
   `jobs` failed on the `created_by` NOT NULL constraint because the acting user's
   id was never threaded to the copilot's tools. Now passed through the copilot
@@ -20,6 +31,24 @@ entries on top.
 - **Copilot showed each answer twice.** The delegated sub-agent's reply rendered
   as both a green status chip and the message bubble. The chip is now a neutral
   "… agent responded" so the answer appears once.
+- **Copilot created "requisitions" that never appeared on the Requisitions page.**
+  The `create_intake_request` tool wrote to the retired intake flow (and the intake
+  form no longer exists on the frontend), so the copilot's requisitions vanished.
+  Replaced it with three tools that use the canonical spine: `create_requisition`
+  (creates a draft `opening` that shows on the Requisitions page),
+  `list_requisitions`, and `submit_requisition` (routes a draft for approval via
+  the existing approval engine). The ATS system prompt was updated to match.
+- **Copilot bulk add-to-pipeline and bulk-score silently did nothing.** Both wrote
+  to / queried the retired `hiring_request_id` anchor, so newly added applications
+  used the wrong column and the scorer found no candidates to score. Both now use
+  the canonical `job_id` anchor, matching how real applications are stored.
+
+### Schema
+- **Added the `notifications` table (migration 076).** The app has always created,
+  listed, and marked notifications from code, but no migration ever created the
+  table — so in production every `GET /api/notifications` returned 500 (PostgREST
+  "Could not find the table 'public.notifications'"). Columns mirror the code's
+  `Notification` type exactly; org-scoped, RLS with a service-role policy.
 
 ### Changed
 - **Copilot job creation now enforces the approved-requisition gate.** The
