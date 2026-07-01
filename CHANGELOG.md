@@ -9,6 +9,17 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-01
+
+### Changed
+- **Sidebar: widened the espresso rail (140px → 166px)** so the full
+  "RecruiterStack" logo text fits without truncation.
+- **Jobs list: single global search across both panes.** Removed the separate
+  search box inside the "Past" block; the header search now filters both the
+  Active table and the Past list. First step toward making the Jobs / Openings /
+  Candidates list pages consistent (shared header search, time filter, and
+  Active/Past two-pane layout).
+
 ## 2026-06-30
 
 ### Changed

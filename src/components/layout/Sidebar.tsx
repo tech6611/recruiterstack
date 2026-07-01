@@ -320,7 +320,7 @@ export function Sidebar() {
   return (
     <>
       {/* ── Desktop rail (md+) ─────────────────────────────────────────── */}
-      <aside className="relative hidden h-full w-[140px] shrink-0 flex-col border-r border-[#34291e] bg-[#221b14] md:flex">
+      <aside className="relative hidden h-full w-[166px] shrink-0 flex-col border-r border-[#34291e] bg-[#221b14] md:flex">
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 border-b border-white/10 px-3">
           <BrandMark />
