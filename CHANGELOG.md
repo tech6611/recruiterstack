@@ -11,7 +11,19 @@ entries on top.
 
 ## 2026-07-02
 
+### Changed
+- **Public apply page redesigned into a two-tab layout.** Centered company
+  logo → job title → `Department · Location`, then **Job details** /
+  **Application form** tabs (Job details has an "Apply for this role" button
+  that jumps to the form), mirroring the Kula/Multiplier reference.
+
 ### Added
+- **Phone, LinkedIn, and Resume are now required on every application.** Red
+  `*`, inline hints, and a disabled Submit until all are valid (LinkedIn must be
+  a valid URL); enforced again on the Django `/api/apply` endpoint.
+- **Fixed the CV picker.** "Upload file" now opens the file dialog on click and
+  "Google Drive link" reveals/focuses the link field — previously only drag &
+  drop worked.
 - **Email-format validation on job applications.** The public apply form now
   rejects malformed email addresses — a gentle inline hint under the Email field
   (and a disabled Submit) on the client, plus a hard `EMAIL_REGEX` check on the
