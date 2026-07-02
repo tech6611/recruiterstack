@@ -785,7 +785,7 @@ const isPastJobStatus = (s: string) => PAST_JOB_STATUSES.has(s)
 type PaneTone = { bar: string; title: string; chevron: string }
 const PANE_TINT: { active: PaneTone; past: PaneTone } = {
   active: { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]' },
-  past:   { bar: 'bg-[#f4eee1] hover:bg-[#ebe2cf]', title: 'text-[#5c5341]', chevron: 'text-[#b29a73]' },
+  past:   { bar: 'bg-[#f5cec5] hover:bg-[#efbcb0]', title: 'text-[#82271b]', chevron: 'text-[#d24e34]' },
 }
 
 /**
@@ -822,7 +822,7 @@ function PastJobsBlock({ jobs, search }: { jobs: JobListItem[]; search: string }
           ? <ChevronDown className={`h-4 w-4 shrink-0 ${PANE_TINT.past.chevron}`} />
           : <ChevronRight className={`h-4 w-4 shrink-0 ${PANE_TINT.past.chevron}`} />}
         <span className={`text-sm font-semibold uppercase tracking-wide ${PANE_TINT.past.title}`}>Past</span>
-        <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#5c5341]">{jobs.length}</span>
+        <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#82271b]">{jobs.length}</span>
       </button>
 
       {open && (

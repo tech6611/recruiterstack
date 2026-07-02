@@ -15,8 +15,8 @@ entries on top.
 - **Jobs / Candidates / Requisitions: foldable Active & Past panes with a
   coloured header bar.** Each pane's header is now a click-to-collapse/expand bar
   (chevron + label + count), matching the fold pattern on the Approvals page. The
-  header "fixed block" is tinted — sage green for Active, warm sand for Past — with
-  the count badge recoloured to sit on it. All three pages share one `PANE_TINT`
+  header "fixed block" is tinted — sage green for Active, rose for Past — with the
+  count badge recoloured to sit on it. All three pages share one `PANE_TINT`
   constant so the colours stay in lockstep.
 
 ## 2026-07-01

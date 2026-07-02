@@ -60,7 +60,7 @@ const STAT_CARDS: ReadonlyArray<{
 type PaneTone = { bar: string; title: string; chevron: string }
 const PANE_TINT: { active: PaneTone; past: PaneTone } = {
   active: { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]' },
-  past:   { bar: 'bg-[#f4eee1] hover:bg-[#ebe2cf]', title: 'text-[#5c5341]', chevron: 'text-[#b29a73]' },
+  past:   { bar: 'bg-[#f5cec5] hover:bg-[#efbcb0]', title: 'text-[#82271b]', chevron: 'text-[#d24e34]' },
 }
 
 /**
@@ -412,7 +412,7 @@ export default function OpeningsListPage() {
           <OpeningsBlock
             title="Past"
             tint={PANE_TINT.past}
-            accent="text-[#5c5341]"
+            accent="text-[#82271b]"
             rows={pastRows}
             total={past.length}
             deptById={deptById}
