@@ -15,7 +15,7 @@ import type { Editor } from '@tiptap/react'
 import EditHMModal from '@/components/EditHMModal'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
 import { inputCls, labelCls } from '@/lib/ui/styles'
-import { STAT_TONE, statTileClass } from '@/lib/ui/stat-tones'
+import { StatCards } from '@/components/ui/stat-cards'
 import { trackEvent } from '@/lib/analytics'
 
 // Convert plain text (e.g. extracted from an imported PDF/TXT) into simple HTML
@@ -784,8 +784,8 @@ const isPastJobStatus = (s: string) => PAST_JOB_STATUSES.has(s)
 // restyle both panes at once — the single place that controls Active/Past colours.
 type PaneTone = { bar: string; title: string; chevron: string }
 const PANE_TINT: { active: PaneTone; past: PaneTone } = {
-  active: { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]' },
-  past:   { bar: 'bg-[#f5cec5] hover:bg-[#efbcb0]', title: 'text-[#82271b]', chevron: 'text-[#d24e34]' },
+  active: { bar: 'bg-[#f4eee1] hover:bg-[#ece4d3]', title: 'text-[#4f4335]', chevron: 'text-[#a1876a]' },
+  past:   { bar: 'bg-[#eae6dd] hover:bg-[#e0dbce]', title: 'text-[#4f483d]', chevron: 'text-[#9a8f7d]' },
 }
 
 /**
@@ -822,7 +822,7 @@ function PastJobsBlock({ jobs, search }: { jobs: JobListItem[]; search: string }
           ? <ChevronDown className={`h-4 w-4 shrink-0 ${PANE_TINT.past.chevron}`} />
           : <ChevronRight className={`h-4 w-4 shrink-0 ${PANE_TINT.past.chevron}`} />}
         <span className={`text-sm font-semibold uppercase tracking-wide ${PANE_TINT.past.title}`}>Past</span>
-        <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#82271b]">{jobs.length}</span>
+        <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#4f483d]">{jobs.length}</span>
       </button>
 
       {open && (
@@ -1490,29 +1490,22 @@ export default function JobsPage() {
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-slate-200 bg-white p-3.5 animate-pulse">
-              <div className="h-7 w-10 rounded bg-slate-200 mb-2" /><div className="h-3 w-20 rounded bg-slate-100" />
+            <div key={i} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 animate-pulse">
+              <div className="h-10 w-10 shrink-0 rounded-lg bg-slate-200" />
+              <div className="flex-1"><div className="h-5 w-10 rounded bg-slate-200" /><div className="h-2.5 w-16 rounded bg-slate-100 mt-1.5" /></div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {([
-            { label: 'Total',           value: counts.total,    tone: 'slate', filter: 'all'            },
-            { label: "Awaiting Input",  value: counts.awaiting, tone: 'amber', filter: 'intake_pending' },
-            { label: 'To be Published', value: counts.ready,    tone: 'pine',  filter: 'jd_approved'  },
-            { label: 'Active',          value: counts.active,   tone: 'gold',  filter: 'posted'         },
-            { label: 'Closed',          value: counts.closed,   tone: 'stone', filter: 'closed'         },
-          ] as const).map(stat => (
-            <div
-              key={stat.label}
-              className={statTileClass(stat.tone, false)}
-            >
-              <p className={`text-2xl font-bold ${STAT_TONE[stat.tone].ink}`}>{stat.value}</p>
-              <p className={`mt-0.5 text-xs font-medium ${STAT_TONE[stat.tone].sub}`}>{stat.label}</p>
-            </div>
-          ))}
-        </div>
+        <StatCards
+          cards={[
+            { key: 'total',    label: 'Total',           value: counts.total,    tone: 'slate', icon: <Briefcase className="h-4 w-4" /> },
+            { key: 'awaiting', label: 'Awaiting Input',  value: counts.awaiting, tone: 'amber', icon: <Clock className="h-4 w-4" /> },
+            { key: 'ready',    label: 'To be Published', value: counts.ready,    tone: 'pine',  icon: <Send className="h-4 w-4" /> },
+            { key: 'active',   label: 'Active',          value: counts.active,   tone: 'gold',  icon: <CheckCircle className="h-4 w-4" /> },
+            { key: 'closed',   label: 'Closed',          value: counts.closed,   tone: 'stone', icon: <Archive className="h-4 w-4" /> },
+          ]}
+        />
       )}
 
       {/* ── Filter bar ──────────────────────────────────────────────────── */}
@@ -1598,7 +1591,7 @@ export default function JobsPage() {
               ? <ChevronDown className={`h-4 w-4 shrink-0 ${PANE_TINT.active.chevron}`} />
               : <ChevronRight className={`h-4 w-4 shrink-0 ${PANE_TINT.active.chevron}`} />}
             <span className={`text-sm font-semibold uppercase tracking-wide ${PANE_TINT.active.title}`}>Active</span>
-            <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#0c4634]">{activeJobs.length}</span>
+            <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#4f4335]">{activeJobs.length}</span>
           </button>
 
           {activeOpen && (

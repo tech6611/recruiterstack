@@ -357,7 +357,7 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
                   onDragOver={e => handleDragOver(e, def.id)}
                   onDrop={() => handleDrop(def.id)}
                   onDragEnd={handleDragEnd}
-                  className={`flex flex-1 min-w-0 flex-col rounded-xl border px-4 py-3 select-none cursor-grab active:cursor-grabbing transition-all ${
+                  className={`flex flex-1 min-w-0 items-center gap-3 rounded-xl border p-4 select-none cursor-grab active:cursor-grabbing transition-all ${
                     accent.fill
                   } ${
                     accent.border
@@ -367,10 +367,12 @@ function PipelineFunnel({ candidates }: { candidates: CandidateListItem[] }) {
                     'shadow-sm hover:shadow-md hover:-translate-y-0.5'
                   }`}
                 >
-                  <p className={`text-2xl font-bold ${accent.ink} leading-none`}>{count}</p>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${accent.dot}`} />
-                    <span className={`text-[11px] font-semibold ${accent.ink} truncate leading-tight`}>{def.name}</span>
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/55 ${accent.ink} [&>svg]:h-[21px] [&>svg]:w-[21px]`}>
+                    {STATUS_CONFIG[def.id as CandidateStatus]?.icon}
+                  </span>
+                  <div className="min-w-0">
+                    <p className={`text-2xl font-bold leading-none tabular-nums ${accent.ink}`}>{count}</p>
+                    <p className={`mt-1 truncate text-xs font-medium ${accent.sub}`}>{def.name}</p>
                   </div>
                 </div>
 
@@ -413,8 +415,8 @@ const BLANK_FORM = {
 // Active/Past header colours.
 type PaneTone = { bar: string; title: string; chevron: string }
 const PANE_TINT: { active: PaneTone; past: PaneTone } = {
-  active: { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]' },
-  past:   { bar: 'bg-[#f5cec5] hover:bg-[#efbcb0]', title: 'text-[#82271b]', chevron: 'text-[#d24e34]' },
+  active: { bar: 'bg-[#f4eee1] hover:bg-[#ece4d3]', title: 'text-[#4f4335]', chevron: 'text-[#a1876a]' },
+  past:   { bar: 'bg-[#eae6dd] hover:bg-[#e0dbce]', title: 'text-[#4f483d]', chevron: 'text-[#9a8f7d]' },
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -929,7 +931,7 @@ export default function CandidatesPage() {
           <CandidatesBlock
             title="Active"
             tint={PANE_TINT.active}
-            accent="text-[#0c4634]"
+            accent="text-[#4f4335]"
             rows={activeRows}
             total={activeTotal}
             page={activePage}
@@ -942,7 +944,7 @@ export default function CandidatesPage() {
           <CandidatesBlock
             title="Past"
             tint={PANE_TINT.past}
-            accent="text-[#82271b]"
+            accent="text-[#4f483d]"
             rows={pastRows}
             total={pastTotal}
             page={pastPage}

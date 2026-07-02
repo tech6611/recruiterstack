@@ -45,26 +45,28 @@ const SECTION_LABEL: Record<TargetType, string> = {
 const HEADER_TONE: Record<TargetType, {
   bar: string; hover: string; chevron: string; title: string; badge: string
 }> = {
+  // Theme 1 "Signal" — each section a distinct hue: Requisitions green,
+  // Pipelines amber, Offers blue. Intensity: +1 notch (deeper than the base 50s).
   opening: {
-    bar:     'bg-emerald-50',
-    hover:   'hover:bg-emerald-100',
-    chevron: 'text-emerald-600',
-    title:   'text-emerald-900',
-    badge:   'text-emerald-700 bg-emerald-100',
+    bar:     'bg-[#d6f5e5]',
+    hover:   'hover:bg-[#c6efd9]',
+    chevron: 'text-[#059669]',
+    title:   'text-[#065f46]',
+    badge:   'text-[#047857] bg-[#bff0d8]',
   },
   job: {
-    bar:     'bg-gold-50',
-    hover:   'hover:bg-gold-100',
-    chevron: 'text-gold-600',
-    title:   'text-gold-900',
-    badge:   'text-gold-700 bg-gold-100',
+    bar:     'bg-[#fde8c8]',
+    hover:   'hover:bg-[#fbdfb0]',
+    chevron: 'text-[#c26f04]',
+    title:   'text-[#854d0e]',
+    badge:   'text-[#a16207] bg-[#fbdfa6]',
   },
   offer: {
-    bar:     'bg-emerald-50',
-    hover:   'hover:bg-emerald-100',
-    chevron: 'text-emerald-600',
-    title:   'text-emerald-900',
-    badge:   'text-emerald-700 bg-emerald-100',
+    bar:     'bg-[#dde9fe]',
+    hover:   'hover:bg-[#cbdcfd]',
+    chevron: 'text-[#2f6fe0]',
+    title:   'text-[#1e3a8a]',
+    badge:   'text-[#1d4ed8] bg-[#c9defb]',
   },
 }
 

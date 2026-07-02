@@ -39,20 +39,21 @@ entries on top.
 - **Jobs / Candidates / Requisitions: foldable Active & Past panes with a
   coloured header bar.** Each pane's header is now a click-to-collapse/expand bar
   (chevron + label + count), matching the fold pattern on the Approvals page. The
-  header "fixed block" is tinted — sage green for Active, rose for Past — with the
-  count badge recoloured to sit on it. All three pages share one `PANE_TINT`
-  constant so the colours stay in lockstep.
-- **Unified summary cards with per-stage infographics across all three list
-  pages.** Jobs, Candidates, and Requisitions now render their top summary tiles
-  through one shared `StatCards` component — identical type, size, and alignment
-  everywhere. Each stage tile carries a stage icon in a rounded chip and a
-  proportion bar showing that stage's share of the total. The Candidates page's
-  bespoke drag-to-reorder Hiring Funnel is replaced by these consistent cards
-  (Total · Active · Interviewing · Offer Extended · Hired).
+  header "fixed block" is tinted with existing page neutrals only — warm **sand**
+  for Active, **stone** for Past (no new hues) — with the count badge recoloured
+  to sit on it. All three pages share one `PANE_TINT` constant so the colours stay
+  in lockstep.
+- **Consistent summary cards with a stage icon across all three list pages.**
+  Jobs and Requisitions render their top summary tiles through one shared
+  `StatCards` component — a compact tile with the stage icon in a tinted chip and
+  the count + label beside it, identical type/size/alignment on both. The
+  Candidates Hiring Funnel is kept (with its drag-to-reorder "Customise funnel"),
+  and its stage cards were restyled to use the exact same icon-chip + count +
+  label layout and fonts, so the three pages now read consistently.
 - **Approvals: each section gets its own colour.** The Requisitions / Pipelines /
   Offers foldable sections were previously two greens + amber (Requisitions and
   Offers looked identical). Now Requisitions is green, Pipelines amber, Offers
-  blue ("Signal" theme) so the three read as distinct.
+  blue ("Signal" theme, +1 intensity) so the three read as distinct.
 
 ## 2026-07-01
 

@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { Plus, Search, Clock, CheckCircle, Send, Archive, FileText, Briefcase, CalendarDays, Check, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
-import { STAT_TONE, statTileClass, type StatTone } from '@/lib/ui/stat-tones'
+import { type StatTone } from '@/lib/ui/stat-tones'
+import { StatCards } from '@/components/ui/stat-cards'
 import { cn } from '@/lib/utils'
 import type { Opening, Department, Location as LocationRow } from '@/lib/types/requisitions'
 
@@ -46,21 +47,22 @@ const STAT_CARDS: ReadonlyArray<{
   key:      string
   label:    string
   tone:     StatTone
+  icon:     React.ReactNode
   statuses: Opening['status'][] | null     // null = all (the Total card)
 }> = [
-  { key: 'all',      label: 'Total',             tone: 'slate', statuses: null },
-  { key: 'pending',  label: 'Awaiting Approval', tone: 'amber', statuses: ['draft', 'pending_approval'] },
-  { key: 'approved', label: 'Approved',          tone: 'pine',  statuses: ['approved'] },
-  { key: 'open',     label: 'Open',              tone: 'gold',  statuses: ['open'] },
-  { key: 'closed',   label: 'Closed',            tone: 'stone', statuses: ['filled', 'closed', 'archived'] },
+  { key: 'all',      label: 'Total',             tone: 'slate', icon: <FileText className="h-4 w-4" />,    statuses: null },
+  { key: 'pending',  label: 'Awaiting Approval', tone: 'amber', icon: <Clock className="h-4 w-4" />,       statuses: ['draft', 'pending_approval'] },
+  { key: 'approved', label: 'Approved',          tone: 'pine',  icon: <CheckCircle className="h-4 w-4" />, statuses: ['approved'] },
+  { key: 'open',     label: 'Open',              tone: 'gold',  icon: <Send className="h-4 w-4" />,        statuses: ['open'] },
+  { key: 'closed',   label: 'Closed',            tone: 'stone', icon: <Archive className="h-4 w-4" />,     statuses: ['filled', 'closed', 'archived'] },
 ]
 
 // Foldable pane header ("fixed block") tints. COLOUR OPTION: swap these values to
 // restyle both panes at once — the single place that controls Active/Past colours.
 type PaneTone = { bar: string; title: string; chevron: string }
 const PANE_TINT: { active: PaneTone; past: PaneTone } = {
-  active: { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]' },
-  past:   { bar: 'bg-[#f5cec5] hover:bg-[#efbcb0]', title: 'text-[#82271b]', chevron: 'text-[#d24e34]' },
+  active: { bar: 'bg-[#f4eee1] hover:bg-[#ece4d3]', title: 'text-[#4f4335]', chevron: 'text-[#a1876a]' },
+  past:   { bar: 'bg-[#eae6dd] hover:bg-[#e0dbce]', title: 'text-[#4f483d]', chevron: 'text-[#9a8f7d]' },
 }
 
 /**
@@ -345,20 +347,19 @@ export default function OpeningsListPage() {
       {!loaded ? (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-slate-200 bg-white p-3.5 animate-pulse">
-              <div className="h-7 w-10 rounded bg-slate-200 mb-2" /><div className="h-3 w-20 rounded bg-slate-100" />
+            <div key={i} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 animate-pulse">
+              <div className="h-10 w-10 shrink-0 rounded-lg bg-slate-200" />
+              <div className="flex-1"><div className="h-5 w-10 rounded bg-slate-200" /><div className="h-2.5 w-16 rounded bg-slate-100 mt-1.5" /></div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {STAT_CARDS.map(stat => (
-            <div key={stat.key} className={statTileClass(stat.tone, false)}>
-              <p className={`text-2xl font-bold ${STAT_TONE[stat.tone].ink}`}>{cardValue(stat.statuses)}</p>
-              <p className={`mt-0.5 text-xs font-medium ${STAT_TONE[stat.tone].sub}`}>{stat.label}</p>
-            </div>
-          ))}
-        </div>
+        <StatCards
+          cards={STAT_CARDS.map(stat => ({
+            key: stat.key, label: stat.label, tone: stat.tone,
+            value: cardValue(stat.statuses), icon: stat.icon,
+          }))}
+        />
       )}
 
       {/* ── Shared department / location filter bar (drives both blocks) ─── */}
@@ -402,7 +403,7 @@ export default function OpeningsListPage() {
           <OpeningsBlock
             title="Active"
             tint={PANE_TINT.active}
-            accent="text-[#0c4634]"
+            accent="text-[#4f4335]"
             rows={activeRows}
             total={active.length}
             deptById={deptById}
@@ -412,7 +413,7 @@ export default function OpeningsListPage() {
           <OpeningsBlock
             title="Past"
             tint={PANE_TINT.past}
-            accent="text-[#82271b]"
+            accent="text-[#4f483d]"
             rows={pastRows}
             total={past.length}
             deptById={deptById}
