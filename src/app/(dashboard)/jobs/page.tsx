@@ -784,7 +784,7 @@ const isPastJobStatus = (s: string) => PAST_JOB_STATUSES.has(s)
 // restyle both panes at once — the single place that controls Active/Past colours.
 type PaneTone = { bar: string; title: string; chevron: string }
 const PANE_TINT: { active: PaneTone; past: PaneTone } = {
-  active: { bar: 'bg-[#f4eee1] hover:bg-[#ece4d3]', title: 'text-[#4f4335]', chevron: 'text-[#a1876a]' },
+  active: { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]' },
   past:   { bar: 'bg-[#eae6dd] hover:bg-[#e0dbce]', title: 'text-[#4f483d]', chevron: 'text-[#9a8f7d]' },
 }
 
@@ -1591,7 +1591,7 @@ export default function JobsPage() {
               ? <ChevronDown className={`h-4 w-4 shrink-0 ${PANE_TINT.active.chevron}`} />
               : <ChevronRight className={`h-4 w-4 shrink-0 ${PANE_TINT.active.chevron}`} />}
             <span className={`text-sm font-semibold uppercase tracking-wide ${PANE_TINT.active.title}`}>Active</span>
-            <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#4f4335]">{activeJobs.length}</span>
+            <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#0c4634]">{activeJobs.length}</span>
           </button>
 
           {activeOpen && (

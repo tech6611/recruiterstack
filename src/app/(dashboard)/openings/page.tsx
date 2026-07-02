@@ -61,7 +61,7 @@ const STAT_CARDS: ReadonlyArray<{
 // restyle both panes at once — the single place that controls Active/Past colours.
 type PaneTone = { bar: string; title: string; chevron: string }
 const PANE_TINT: { active: PaneTone; past: PaneTone } = {
-  active: { bar: 'bg-[#f4eee1] hover:bg-[#ece4d3]', title: 'text-[#4f4335]', chevron: 'text-[#a1876a]' },
+  active: { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]' },
   past:   { bar: 'bg-[#eae6dd] hover:bg-[#e0dbce]', title: 'text-[#4f483d]', chevron: 'text-[#9a8f7d]' },
 }
 
@@ -403,7 +403,7 @@ export default function OpeningsListPage() {
           <OpeningsBlock
             title="Active"
             tint={PANE_TINT.active}
-            accent="text-[#4f4335]"
+            accent="text-[#0c4634]"
             rows={activeRows}
             total={active.length}
             deptById={deptById}
