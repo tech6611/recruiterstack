@@ -33,8 +33,6 @@ const nextConfig = {
         async rewrites() {
           const djangoUrl = process.env.DJANGO_API_URL;
           return [
-            // TEMP diagnostic proxy — remove after SendGrid env issue resolved
-            { source: '/api/debug/:path*', destination: `${djangoUrl}/api/debug/:path*` },
             // ── Batch 1: Simple CRUD ──────────────────────────────────────
             { source: '/api/roles/:path*', destination: `${djangoUrl}/api/roles/:path*` },
             { source: '/api/roles', destination: `${djangoUrl}/api/roles` },

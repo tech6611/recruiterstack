@@ -11,6 +11,18 @@ entries on top.
 
 ## 2026-07-02
 
+### Added
+- **Email-format validation on job applications.** The public apply form now
+  rejects malformed email addresses — a gentle inline hint under the Email field
+  (and a disabled Submit) on the client, plus a hard `EMAIL_REGEX` check on the
+  Django `/api/apply` endpoint (previously only presence was checked). Prevents
+  storing obviously-broken addresses that bounce on the first recruiter email.
+  Note: this is format-only; it does not verify the mailbox exists.
+
+### Removed
+- **Temporary `/api/debug/env-check` diagnostic endpoint** (Django + the Vercel
+  proxy rewrite) used to debug SendGrid env-var propagation on Railway.
+
 ### Changed
 - **Jobs / Candidates / Requisitions: foldable Active & Past panes with a
   coloured header bar.** Each pane's header is now a click-to-collapse/expand bar
@@ -18,6 +30,17 @@ entries on top.
   header "fixed block" is tinted — sage green for Active, rose for Past — with the
   count badge recoloured to sit on it. All three pages share one `PANE_TINT`
   constant so the colours stay in lockstep.
+- **Unified summary cards with per-stage infographics across all three list
+  pages.** Jobs, Candidates, and Requisitions now render their top summary tiles
+  through one shared `StatCards` component — identical type, size, and alignment
+  everywhere. Each stage tile carries a stage icon in a rounded chip and a
+  proportion bar showing that stage's share of the total. The Candidates page's
+  bespoke drag-to-reorder Hiring Funnel is replaced by these consistent cards
+  (Total · Active · Interviewing · Offer Extended · Hired).
+- **Approvals: each section gets its own colour.** The Requisitions / Pipelines /
+  Offers foldable sections were previously two greens + amber (Requisitions and
+  Offers looked identical). Now Requisitions is green, Pipelines amber, Offers
+  blue ("Signal" theme) so the three read as distinct.
 
 ## 2026-07-01
 

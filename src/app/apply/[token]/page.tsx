@@ -36,6 +36,11 @@ interface JobInfo {
 
 const DEFAULT_BRAND = '#059669' // emerald-600 — the app's default accent
 
+// Basic email shape check — mirrors the backend's EMAIL_REGEX. Catches
+// malformed addresses (missing @, no domain, spaces); it does not verify
+// that the mailbox actually exists.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 // Build the Google Fonts stylesheet URL for the chosen family.
 function googleFontHref(family: string): string {
   return `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
@@ -132,6 +137,7 @@ export default function ApplyPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || !email.trim()) return
+    if (!EMAIL_RE.test(email.trim())) { setError('Please enter a valid email address.'); return }
 
     // Only the questions currently shown (conditional logic) are submitted.
     const screeningFields = (job?.screening?.fields ?? []).filter(f => isFieldVisible(f, answers))
@@ -250,6 +256,9 @@ export default function ApplyPage() {
   // controlling answer matches.
   const visibleScreening = job.screening.fields.filter(f => isFieldVisible(f, answers))
 
+  // Gentle inline nudge: only flag once they've typed something that isn't a valid shape.
+  const emailInvalid = email.trim() !== '' && !EMAIL_RE.test(email.trim())
+
   return (
     <div
       className="min-h-screen bg-slate-50"
@@ -342,8 +351,16 @@ export default function ApplyPage() {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="jane@example.com"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  aria-invalid={emailInvalid}
+                  className={`w-full rounded-xl border px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:border-transparent ${
+                    emailInvalid
+                      ? 'border-red-300 focus:ring-red-400'
+                      : 'border-slate-200 focus:ring-emerald-500'
+                  }`}
                 />
+                {emailInvalid && (
+                  <p className="mt-1.5 text-xs text-red-600">That doesn&apos;t look like a valid email address.</p>
+                )}
               </div>
             </div>
 
@@ -520,7 +537,7 @@ export default function ApplyPage() {
 
             <button
               type="submit"
-              disabled={submitting || !name.trim() || !email.trim()}
+              disabled={submitting || !name.trim() || !email.trim() || emailInvalid}
               style={{ backgroundColor: brand }}
               className="w-full flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60 shadow-sm"
             >
