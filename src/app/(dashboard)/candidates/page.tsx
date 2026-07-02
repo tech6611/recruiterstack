@@ -408,17 +408,28 @@ const BLANK_FORM = {
   skills: [] as string[],
 }
 
+// Foldable pane header ("fixed block") tints. COLOUR OPTION: swap these values
+// to restyle both panes at once — this is the single place that controls the
+// Active/Past header colours.
+type PaneTone = { bar: string; title: string; chevron: string }
+const PANE_TINT: { active: PaneTone; past: PaneTone } = {
+  active: { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]' },
+  past:   { bar: 'bg-[#f4eee1] hover:bg-[#ebe2cf]', title: 'text-[#5c5341]', chevron: 'text-[#b29a73]' },
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// CandidatesBlock — one pane (Active or Past): count badge + sortable table +
-// its own pagination. Filtering/sorting is done by the page; `rows` arrive ready
-// to display, `total` is the pane's unfiltered count (for the badge). Rendered
-// twice, mirroring the Active/Past blocks on the Jobs and Requisitions pages.
+// CandidatesBlock — one foldable pane (Active or Past): a coloured header bar
+// (click to collapse/expand) + count badge + sortable table + its own pagination.
+// Filtering/sorting is done by the page; `rows` arrive ready to display, `total`
+// is the pane's unfiltered count (for the badge). Rendered twice, mirroring the
+// Active/Past blocks on the Jobs and Requisitions pages.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function CandidatesBlock({
-  title, accent, rows, total, page, onPageChange, sortKey, sortDir, onSort, emptyText,
+  title, tint, accent, rows, total, page, onPageChange, sortKey, sortDir, onSort, emptyText,
 }: {
   title:        string
+  tint:         PaneTone
   accent:       string
   rows:         CandidateListItem[]
   total:        number
@@ -430,6 +441,7 @@ function CandidatesBlock({
   emptyText:    string
 }) {
   const router = useRouter()
+  const [open, setOpen] = useState(true)
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
@@ -445,16 +457,24 @@ function CandidatesBlock({
   const thCls = 'px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide select-none cursor-pointer hover:text-slate-800 transition-colors'
 
   return (
-    <section className="space-y-3">
-      {/* Pane header with a count badge */}
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
-        <span className={`inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold ${accent}`}>
+    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+      {/* Foldable pane header — the coloured "fixed block". Click to collapse/expand. */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`flex w-full items-center gap-2 px-4 py-3 text-left transition-colors ${tint.bar}`}
+      >
+        {open
+          ? <ChevronDown className={`h-4 w-4 shrink-0 ${tint.chevron}`} />
+          : <ChevronRight className={`h-4 w-4 shrink-0 ${tint.chevron}`} />}
+        <span className={`text-sm font-semibold uppercase tracking-wide ${tint.title}`}>{title}</span>
+        <span className={`inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold ${accent}`}>
           {total}
         </span>
-      </div>
+      </button>
 
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+      {open && (
+        <div className="border-t border-slate-100">
         {rows.length === 0 ? (
           <div className="py-12 text-center">
             <Users className="h-9 w-9 text-slate-200 mx-auto mb-2" />
@@ -561,8 +581,9 @@ function CandidatesBlock({
             </div>
           </>
         )}
-      </div>
-    </section>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -907,7 +928,8 @@ export default function CandidatesPage() {
         <div className="space-y-6">
           <CandidatesBlock
             title="Active"
-            accent="text-emerald-700"
+            tint={PANE_TINT.active}
+            accent="text-[#0c4634]"
             rows={activeRows}
             total={activeTotal}
             page={activePage}
@@ -919,7 +941,8 @@ export default function CandidatesPage() {
           />
           <CandidatesBlock
             title="Past"
-            accent="text-slate-500"
+            tint={PANE_TINT.past}
+            accent="text-[#5c5341]"
             rows={pastRows}
             total={pastTotal}
             page={pastPage}

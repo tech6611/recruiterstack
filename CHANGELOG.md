@@ -9,6 +9,16 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-02
+
+### Changed
+- **Jobs / Candidates / Requisitions: foldable Active & Past panes with a
+  coloured header bar.** Each pane's header is now a click-to-collapse/expand bar
+  (chevron + label + count), matching the fold pattern on the Approvals page. The
+  header "fixed block" is tinted — sage green for Active, warm sand for Past — with
+  the count badge recoloured to sit on it. All three pages share one `PANE_TINT`
+  constant so the colours stay in lockstep.
+
 ## 2026-07-01
 
 ### Fixed

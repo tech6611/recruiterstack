@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Briefcase, Plus, Search, Clock, X, Mail, FileText, Send,
   CheckCircle, Check, Users, PenLine, Wand2, RefreshCw, Loader2, Sparkles, Paperclip,
-  ChevronUp, ChevronDown, ChevronsUpDown, ArrowLeft, GripVertical, Archive, Ban,
+  ChevronUp, ChevronDown, ChevronRight, ChevronsUpDown, ArrowLeft, GripVertical, Archive, Ban,
   CalendarDays, SlidersHorizontal, Pencil, AlertTriangle,
 } from 'lucide-react'
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
@@ -780,14 +780,23 @@ function jobDetailHref(status: string, id: string): string {
 const PAST_JOB_STATUSES = new Set(['closed', 'archived', 'withdrawn'])
 const isPastJobStatus = (s: string) => PAST_JOB_STATUSES.has(s)
 
+// Foldable pane header ("fixed block") tints. COLOUR OPTION: swap these values to
+// restyle both panes at once — the single place that controls Active/Past colours.
+type PaneTone = { bar: string; title: string; chevron: string }
+const PANE_TINT: { active: PaneTone; past: PaneTone } = {
+  active: { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]' },
+  past:   { bar: 'bg-[#f4eee1] hover:bg-[#ebe2cf]', title: 'text-[#5c5341]', chevron: 'text-[#b29a73]' },
+}
+
 /**
- * The "Past" block: a simple list of closed/archived jobs. It shares the page's
+ * The "Past" block: a foldable list of closed/archived jobs. It shares the page's
  * single global search (passed in via `search`) rather than owning its own search
  * bar. The Active block keeps the full-featured table (drag, column config,
  * filters) above it.
  */
 function PastJobsBlock({ jobs, search }: { jobs: JobListItem[]; search: string }) {
   const router = useRouter()
+  const [open, setOpen] = useState(true)
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase()
@@ -802,13 +811,22 @@ function PastJobsBlock({ jobs, search }: { jobs: JobListItem[]; search: string }
   }, [jobs, search])
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Past</h2>
-        <span className="inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{jobs.length}</span>
-      </div>
+    <div className="rounded-2xl border border-slate-300 bg-white shadow-sm" style={{ overflow: 'clip' }}>
+      {/* Foldable pane header — the coloured "fixed block". Click to collapse/expand. */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`flex w-full items-center gap-2 px-4 py-3 text-left transition-colors ${PANE_TINT.past.bar}`}
+      >
+        {open
+          ? <ChevronDown className={`h-4 w-4 shrink-0 ${PANE_TINT.past.chevron}`} />
+          : <ChevronRight className={`h-4 w-4 shrink-0 ${PANE_TINT.past.chevron}`} />}
+        <span className={`text-sm font-semibold uppercase tracking-wide ${PANE_TINT.past.title}`}>Past</span>
+        <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#5c5341]">{jobs.length}</span>
+      </button>
 
-      <div className="rounded-2xl border border-slate-300 bg-white shadow-sm" style={{ overflow: 'clip' }}>
+      {open && (
+        <div className="border-t border-slate-100">
         {filtered.length === 0 ? (
           <div className="py-12 text-center">
             <Briefcase className="h-9 w-9 text-slate-200 mx-auto mb-2" />
@@ -861,8 +879,9 @@ function PastJobsBlock({ jobs, search }: { jobs: JobListItem[]; search: string }
             </div>
           </>
         )}
-      </div>
-    </section>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -953,6 +972,9 @@ export default function JobsPage() {
 
   // ── Global search ─────────────────────────────────────────────────────────
   const [jobSearch, setJobSearch] = useState('')
+
+  // Foldable "Active" pane (the Past pane manages its own open state internally).
+  const [activeOpen, setActiveOpen] = useState(true)
 
   // ── Time filter ───────────────────────────────────────────────────────────
   const [timeFilter, setTimeFilter]   = useState<TimeFilter>('all')
@@ -1564,13 +1586,23 @@ export default function JobsPage() {
         </div>
       ) : (
         <div className="space-y-6">
-        {/* ── Active block (the full-featured table) ──────────────────────── */}
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Active</h2>
-            <span className="inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{activeJobs.length}</span>
-          </div>
+        {/* ── Active block (the full-featured, foldable table) ────────────── */}
         <div className="rounded-2xl border border-slate-300 bg-white shadow-sm" style={{ overflow: 'clip' }}>
+          {/* Foldable pane header — the coloured "fixed block". Click to collapse/expand. */}
+          <button
+            type="button"
+            onClick={() => setActiveOpen(o => !o)}
+            className={`flex w-full items-center gap-2 px-4 py-3 text-left transition-colors ${PANE_TINT.active.bar}`}
+          >
+            {activeOpen
+              ? <ChevronDown className={`h-4 w-4 shrink-0 ${PANE_TINT.active.chevron}`} />
+              : <ChevronRight className={`h-4 w-4 shrink-0 ${PANE_TINT.active.chevron}`} />}
+            <span className={`text-sm font-semibold uppercase tracking-wide ${PANE_TINT.active.title}`}>Active</span>
+            <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#0c4634]">{activeJobs.length}</span>
+          </button>
+
+          {activeOpen && (
+          <div className="border-t border-slate-100">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -1621,8 +1653,9 @@ export default function JobsPage() {
               {manualOrder && <p className="text-xs text-slate-500">Custom row order active</p>}
             </div>
           )}
+          </div>
+          )}
         </div>
-        </section>
 
         {/* ── Past block (closed/archived jobs, shares the global search) ── */}
         <PastJobsBlock jobs={pastJobs} search={jobSearch} />

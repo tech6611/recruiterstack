@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Clock, CheckCircle, Send, Archive, FileText, Briefcase, CalendarDays, Check, X } from 'lucide-react'
+import { Plus, Search, Clock, CheckCircle, Send, Archive, FileText, Briefcase, CalendarDays, Check, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
 import { STAT_TONE, statTileClass, type StatTone } from '@/lib/ui/stat-tones'
@@ -55,16 +55,25 @@ const STAT_CARDS: ReadonlyArray<{
   { key: 'closed',   label: 'Closed',            tone: 'stone', statuses: ['filled', 'closed', 'archived'] },
 ]
 
+// Foldable pane header ("fixed block") tints. COLOUR OPTION: swap these values to
+// restyle both panes at once — the single place that controls Active/Past colours.
+type PaneTone = { bar: string; title: string; chevron: string }
+const PANE_TINT: { active: PaneTone; past: PaneTone } = {
+  active: { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]' },
+  past:   { bar: 'bg-[#f4eee1] hover:bg-[#ebe2cf]', title: 'text-[#5c5341]', chevron: 'text-[#b29a73]' },
+}
+
 /**
- * A presentational requisitions block: header label + count badge + table. All
- * filtering is done by the page and passed down — `rows` are the already-filtered
- * requisitions, `total` is the block's unfiltered count (for the badge + footer).
- * Rendered twice on the page — once for Active, once for Past.
+ * A presentational, foldable requisitions block: a coloured header bar (click to
+ * collapse/expand) + count badge + table. All filtering is done by the page and
+ * passed down — `rows` are the already-filtered requisitions, `total` is the
+ * block's unfiltered count. Rendered twice — once for Active, once for Past.
  */
 function OpeningsBlock({
-  title, accent, rows, total, deptById, locById, emptyText,
+  title, tint, accent, rows, total, deptById, locById, emptyText,
 }: {
   title:     string
+  tint:      PaneTone
   accent:    string          // tailwind text colour for the count badge
   rows:      Opening[]
   total:     number
@@ -72,17 +81,26 @@ function OpeningsBlock({
   locById:   Map<string, LocationRow>
   emptyText: string
 }) {
+  const [open, setOpen] = useState(true)
   return (
-    <section className="space-y-3">
-      {/* Block header with a count badge */}
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
-        <span className={cn('inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold', accent)}>
+    <Card className="overflow-clip border-slate-300 shadow-sm">
+      {/* Foldable pane header — the coloured "fixed block". Click to collapse/expand. */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={cn('flex w-full items-center gap-2 px-4 py-3 text-left transition-colors', tint.bar)}
+      >
+        {open
+          ? <ChevronDown className={cn('h-4 w-4 shrink-0', tint.chevron)} />
+          : <ChevronRight className={cn('h-4 w-4 shrink-0', tint.chevron)} />}
+        <span className={cn('text-sm font-semibold uppercase tracking-wide', tint.title)}>{title}</span>
+        <span className={cn('inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold', accent)}>
           {total}
         </span>
-      </div>
+      </button>
 
-      <Card className="overflow-clip border-slate-300 shadow-sm">
+      {open && (
+        <div className="border-t border-slate-100">
         {rows.length === 0 ? (
           <div className="py-12 text-center">
             <Briefcase className="h-9 w-9 text-slate-200 mx-auto mb-2" />
@@ -141,8 +159,9 @@ function OpeningsBlock({
             </div>
           </>
         )}
-      </Card>
-    </section>
+        </div>
+      )}
+    </Card>
   )
 }
 
@@ -382,7 +401,8 @@ export default function OpeningsListPage() {
         <div className="space-y-6">
           <OpeningsBlock
             title="Active"
-            accent="text-emerald-700"
+            tint={PANE_TINT.active}
+            accent="text-[#0c4634]"
             rows={activeRows}
             total={active.length}
             deptById={deptById}
@@ -391,7 +411,8 @@ export default function OpeningsListPage() {
           />
           <OpeningsBlock
             title="Past"
-            accent="text-slate-500"
+            tint={PANE_TINT.past}
+            accent="text-[#5c5341]"
             rows={pastRows}
             total={past.length}
             deptById={deptById}
