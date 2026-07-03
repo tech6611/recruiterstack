@@ -304,14 +304,14 @@ export default function ApplyPage() {
         {/* ── Centered header: logo · title · meta ──────────────────────── */}
         <div className="flex flex-col items-center text-center mb-8">
           {branding?.logo_url ? (
-            <div className="mb-5 inline-flex items-center rounded-xl bg-white px-5 py-4 shadow-sm ring-1 ring-slate-200/70">
+            <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={branding.logo_url}
                 alt={`${companyName} logo`}
-                className="h-16 w-auto max-w-[300px] object-contain"
+                className="mb-5 h-16 w-auto max-w-[300px] object-contain"
               />
-            </div>
+            </>
           ) : (
             <div className="flex items-center gap-2 mb-5">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600">

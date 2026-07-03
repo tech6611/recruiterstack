@@ -12,12 +12,13 @@ entries on top.
 ## 2026-07-03
 
 ### Changed
-- **Public logo now sits on a neutral white chip.** The apply page and its
-  live preview wrap the org's uploaded logo in a white, subtly-ringed chip
-  (matching the careers page), so a logo of any color/background reads cleanly
-  instead of looking cramped. Bumped the apply-page logo to `h-12`. Added
-  transparent-background guidance under the Logo upload (and a size hint under
-  Hero image) in the careers settings card.
+- **Public logo presentation cleaned up.** On the light apply page (and its
+  live preview) the org's uploaded logo now renders directly on the page —
+  transparent, no white box — and larger (`h-16`). The white backing chip is
+  kept only on the careers-page hero, where the logo sits on a dark photo and
+  needs a light backing to read. Added transparent-background guidance under
+  the Logo upload (and a size hint under Hero image) in the careers settings
+  card.
 - **Approvals inbox restyled to match the other list pages.** The Pending
   decisions and History sections are now foldable tinted panes (honey for
   Pending, stone for History) like the Approval chains / Requisitions pages,
