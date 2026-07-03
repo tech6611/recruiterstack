@@ -92,6 +92,11 @@ export interface CanonicalApplyJobPreview {
   position_title: string
   department: string | null
   location: string | null
+  // Work arrangement + seniority read from custom_fields.intake, shown as meta
+  // chips on the apply page. `remote_ok` maps to a Remote/On-site work-type chip.
+  remote_ok: boolean | null
+  level: string | null
+  employment_type: string | null
   generated_jd: string | null
   // Structured JD sections, read from custom_fields.intake (Publish JD Phase 1).
   // Candidate-safe only — internal intake (HM contact, budget, notes) is excluded.
@@ -394,7 +399,10 @@ export async function getCanonicalApplyJobPreview(
   return {
     position_title: row.title,
     department: row.department?.name ?? null,
-    location: null,
+    location: text(intake.location),
+    remote_ok: typeof intake.remote_ok === 'boolean' ? intake.remote_ok : null,
+    level: text(intake.level),
+    employment_type: text(intake.employment_type),
     generated_jd: row.description,
     responsibilities: text(intake.team_context),
     requirements: text(intake.key_requirements),
@@ -795,6 +803,7 @@ export interface CanonicalIntakeJob {
 export interface CanonicalIntakeFields {
   team_context?: string | null
   level?: string | null
+  employment_type?: string | null
   headcount?: number | null
   location?: string | null
   remote_ok?: boolean | null
@@ -915,6 +924,7 @@ export async function submitCanonicalIntakeJob(
     ...readIntakeBag(args.existingCustomFields),
     team_context: args.fields.team_context ?? null,
     level: args.fields.level ?? null,
+    employment_type: args.fields.employment_type ?? null,
     headcount: args.fields.headcount ?? 1,
     location: args.fields.location ?? null,
     remote_ok: args.fields.remote_ok ?? false,

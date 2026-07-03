@@ -41,6 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     position_title?: string           // HM can update the title
     team_context: string
     level?: string
+    employment_type?: string
     headcount?: number
     location?: string
     remote_ok?: boolean
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       fields: {
         team_context: body.team_context || null,
         level: body.level || null,
+        employment_type: body.employment_type || null,
         headcount: body.headcount || 1,
         location: body.location || null,
         remote_ok: body.remote_ok || false,

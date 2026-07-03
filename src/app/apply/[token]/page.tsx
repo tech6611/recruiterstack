@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import {
   Zap, CheckCircle, Loader2, AlertCircle,
   Upload, Link2, FileText, X, CloudUpload, ArrowRight,
+  MapPin, Building2, Home, BarChart3, Briefcase,
 } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
 import { RichText } from '@/components/RichText'
@@ -26,6 +27,9 @@ interface JobInfo {
   position_title: string
   department: string | null
   location: string | null
+  remote_ok: boolean | null
+  level: string | null
+  employment_type: string | null
   generated_jd: string | null
   responsibilities: string | null
   requirements: string | null
@@ -48,6 +52,17 @@ const isValidUrl = (s: string) => URL_RE.test(s.trim())
 // Build the Google Fonts stylesheet URL for the chosen family.
 function googleFontHref(family: string): string {
   return `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
+}
+
+// A single job-meta pill (department, location, work type, seniority) shown
+// under the title — mirrors the tag row on modern careers pages.
+function MetaChip({ icon: Icon, label }: { icon: typeof MapPin; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+      <Icon className="h-3.5 w-3.5 text-slate-400" />
+      {label}
+    </span>
+  )
 }
 
 function JdSection({ title, body }: { title: string; body: string | null }) {
@@ -309,7 +324,7 @@ export default function ApplyPage() {
               <img
                 src={branding.logo_url}
                 alt={`${companyName} logo`}
-                className="mb-5 h-16 w-auto max-w-[300px] object-contain"
+                className="mb-6 h-24 w-auto max-w-[380px] object-contain"
               />
             </>
           ) : (
@@ -322,10 +337,16 @@ export default function ApplyPage() {
           )}
 
           <h1 className="text-3xl font-bold text-slate-900">{job.position_title}</h1>
-          {(job.department || job.location) && (
-            <p className="mt-2 text-sm text-slate-500">
-              {[job.department, job.location].filter(Boolean).join('  ·  ')}
-            </p>
+          {(job.department || job.location || job.employment_type || job.remote_ok !== null || job.level) && (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              {job.department && <MetaChip icon={Building2} label={job.department} />}
+              {job.location && <MetaChip icon={MapPin} label={job.location} />}
+              {job.employment_type && <MetaChip icon={Briefcase} label={job.employment_type} />}
+              {job.remote_ok !== null && (
+                <MetaChip icon={Home} label={job.remote_ok ? 'Remote' : 'On-site'} />
+              )}
+              {job.level && <MetaChip icon={BarChart3} label={job.level} />}
+            </div>
           )}
         </div>
 

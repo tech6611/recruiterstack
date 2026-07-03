@@ -13,6 +13,8 @@ import { trackEvent } from '@/lib/analytics'
 
 const LEVEL_OPTIONS = ['Intern', 'Junior', 'Mid-level', 'Senior', 'Lead', 'Staff', 'Principal', 'Director', 'VP']
 
+const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary']
+
 const CITIES = [
   'Remote', 'Hybrid',
   'New York, NY', 'San Francisco, CA', 'Los Angeles, CA', 'Chicago, IL', 'Austin, TX',
@@ -117,6 +119,7 @@ export default function IntakePage() {
   const [form, setForm] = useState({
     team_context: '',
     level: '',
+    employment_type: '',
     headcount: 1,
     remote_ok: false,
     key_requirements: '',
@@ -413,6 +416,13 @@ export default function IntakePage() {
                 <select value={form.level} onChange={e => set('level', e.target.value)} className={inputCls}>
                   <option value="">Select level…</option>
                   {LEVEL_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Employment Type</label>
+                <select value={form.employment_type} onChange={e => set('employment_type', e.target.value)} className={inputCls}>
+                  <option value="">Select type…</option>
+                  {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>

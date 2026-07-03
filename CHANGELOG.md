@@ -11,7 +11,21 @@ entries on top.
 
 ## 2026-07-03
 
+### Added
+- **Apply page: employment-type field.** The hiring-manager intake form now has
+  an Employment Type dropdown (Full-time, Part-time, Contract, Internship,
+  Temporary), stored on `custom_fields.intake.employment_type` and surfaced to
+  candidates as a job-meta chip on the apply page.
+
 ### Changed
+- **Apply page: bigger logo + job-meta chips.** The uploaded org logo is now
+  `h-24` (larger than the job title, as intended). Under the title we now show a
+  row of pill chips for the details we capture at intake — department, location,
+  employment type, work type (Remote / On-site from `remote_ok`), and seniority
+  level — instead of the old plain `department · location` line. The apply-
+  preview data now carries `location`, `remote_ok`, `level`, and
+  `employment_type` from `custom_fields.intake` (location was previously always
+  blank).
 - **Public logo presentation cleaned up.** On the light apply page (and its
   live preview) the org's uploaded logo now renders directly on the page —
   transparent, no white box — and larger (`h-16`). The white backing chip is
