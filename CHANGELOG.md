@@ -11,6 +11,15 @@ entries on top.
 
 ## 2026-07-03
 
+### Changed
+- **Approvals inbox restyled to match the other list pages.** The Pending
+  decisions and History sections are now foldable tinted panes (honey for
+  Pending, stone for History) like the Approval chains / Requisitions pages,
+  with the History search-and-filter row tucked inside its pane. Added a
+  summary stat-card strip on top: Total / Pending / Approved / Rejected.
+- **Approval chains page got the same stat-card strip.** Total chains /
+  Requisitions / Pipelines / Offers counts above the foldable sections.
+
 ### Fixed
 - **Public apply links returned "This link is no longer valid."** The Clerk
   middleware's public matcher used `/api/apply/(.*)`, which matches

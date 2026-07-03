@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, AlertTriangle, Pencil, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, AlertTriangle, Pencil, ChevronDown, ChevronRight, Network, FileText, Briefcase, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { StatCards } from '@/components/ui/stat-cards'
 import { ChainRowActions } from '@/components/approvals/ChainRowActions'
 import { cn } from '@/lib/utils'
 
@@ -196,6 +197,16 @@ export default function ApprovalChainsListPage() {
         <p className="text-xs text-slate-400">Loading…</p>
       ) : (
         <div className="space-y-4">
+          {/* Summary stat cards — same at-a-glance strip as the other list pages. */}
+          <StatCards
+            cards={[
+              { key: 'total',    label: 'Total chains', value: items.length,           tone: 'slate', icon: <Network className="h-4 w-4" /> },
+              { key: 'opening',  label: 'Requisitions', value: grouped.opening.length, tone: 'pine',  icon: <FileText className="h-4 w-4" /> },
+              { key: 'job',      label: 'Pipelines',    value: grouped.job.length,     tone: 'amber', icon: <Briefcase className="h-4 w-4" /> },
+              { key: 'offer',    label: 'Offers',       value: grouped.offer.length,   tone: 'gold',  icon: <Wallet className="h-4 w-4" /> },
+            ]}
+          />
+
           {TARGET_ORDER.map(t => {
             const chains   = grouped[t]
             const isOpen   = !collapsed[t]

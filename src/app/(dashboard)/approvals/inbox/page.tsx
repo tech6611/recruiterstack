@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckSquare, ChevronDown, ChevronRight } from 'lucide-react'
+import { CheckSquare, ChevronDown, ChevronRight, Clock, CheckCircle, XCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { StatCards } from '@/components/ui/stat-cards'
 import { DecisionModal } from '@/components/approvals/DecisionModal'
 import { cn } from '@/lib/utils'
 
@@ -53,12 +54,22 @@ const STATUS_BADGE: Record<string, string> = {
   cancelled: 'bg-slate-200 text-slate-600',
 }
 
+// Foldable pane header tints — same treatment as the Requisitions / Jobs list
+// pages and the Approval chains page: Pending gets the honey "waiting" tint,
+// History the muted stone "past" tint.
+type PaneTone = { bar: string; title: string; chevron: string; badge: string }
+const PANE_TINT: { pending: PaneTone; history: PaneTone } = {
+  pending: { bar: 'bg-[#fbe7bc] hover:bg-[#f7dfae]', title: 'text-[#6f450f]', chevron: 'text-[#b97e14]', badge: 'text-[#8a5a14]' },
+  history: { bar: 'bg-[#eae6dd] hover:bg-[#e0dbce]', title: 'text-[#4f483d]', chevron: 'text-[#9a8f7d]', badge: 'text-[#8a7f6f]' },
+}
+
 export default function ApprovalInboxPage() {
   const [items, setItems]     = useState<InboxItem[]>([])
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [loaded, setLoaded]   = useState(false)
   const [open,  setOpen]      = useState<InboxItem | null>(null)
   const [pendingOpen, setPendingOpen] = useState(true)
+  const [historyOpen, setHistoryOpen] = useState(true)
 
   // History filters
   const [q, setQ]               = useState('')
@@ -100,29 +111,38 @@ export default function ApprovalInboxPage() {
       {!loaded ? (
         <p className="text-sm text-slate-400">Loading…</p>
       ) : (
-        <div className="space-y-8">
-          {/* ── Pending decisions (collapsible) ───────────────────── */}
-          <section>
+        <div className="space-y-4">
+          {/* Summary stat cards — same at-a-glance strip as the other list pages. */}
+          <StatCards
+            cards={[
+              { key: 'total',    label: 'Total',      value: items.length + history.length,                              tone: 'slate', icon: <CheckSquare className="h-4 w-4" /> },
+              { key: 'pending',  label: 'Pending',    value: items.length,                                               tone: 'amber', icon: <Clock className="h-4 w-4" /> },
+              { key: 'approved', label: 'Approved',   value: history.filter(h => h.my_decision === 'approved').length,   tone: 'pine',  icon: <CheckCircle className="h-4 w-4" /> },
+              { key: 'rejected', label: 'Rejected',   value: history.filter(h => h.my_decision === 'rejected').length,   tone: 'stone', icon: <XCircle className="h-4 w-4" /> },
+            ]}
+          />
+
+          {/* ── Pending decisions (foldable pane) ─────────────────── */}
+          <Card className="overflow-clip border-slate-300 shadow-sm">
             <button
+              type="button"
               onClick={() => setPendingOpen(o => !o)}
-              className="flex w-full items-center gap-2 mb-3 text-left"
+              className={cn('flex w-full items-center gap-2 px-4 py-3 text-left transition-colors', PANE_TINT.pending.bar)}
             >
-              {pendingOpen ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronRight className="h-4 w-4 text-slate-500" />}
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Pending decisions</h2>
-              <span className="inline-flex items-center justify-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+              {pendingOpen
+                ? <ChevronDown className={cn('h-4 w-4 shrink-0', PANE_TINT.pending.chevron)} />
+                : <ChevronRight className={cn('h-4 w-4 shrink-0', PANE_TINT.pending.chevron)} />}
+              <span className={cn('text-sm font-semibold uppercase tracking-wide', PANE_TINT.pending.title)}>Pending decisions</span>
+              <span className={cn('inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold', PANE_TINT.pending.badge)}>
                 {items.length}
               </span>
             </button>
 
             {pendingOpen && (
               items.length === 0 ? (
-                <Card>
-                  <CardContent>
-                    <p className="py-6 text-center text-sm text-slate-500">No pending decisions.</p>
-                  </CardContent>
-                </Card>
+                <p className="border-t border-slate-100 py-8 text-center text-sm text-slate-500">No pending decisions.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3 border-t border-slate-100 p-3">
                   {items.map(item => {
                     const isOverdue = item.due_at != null && new Date(item.due_at).getTime() < Date.now()
                     return (
@@ -157,37 +177,48 @@ export default function ApprovalInboxPage() {
                 </div>
               )
             )}
-          </section>
+          </Card>
 
-          {/* ── History (static) ──────────────────────────────────── */}
-          <section>
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">History</h2>
-              <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  value={q}
-                  onChange={e => setQ(e.target.value)}
-                  placeholder="Search title or requester…"
-                  className="h-8 w-56 text-sm"
-                />
-                <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="h-8 text-sm">
-                  <option value="all">All statuses</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="pending">Pending</option>
-                  <option value="cancelled">Cancelled</option>
-                </Select>
-                <Select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="h-8 text-sm">
-                  <option value="all">All types</option>
-                  <option value="job">Job posting</option>
-                  <option value="opening">Requisition</option>
-                  <option value="offer">Offer</option>
-                </Select>
-              </div>
-            </div>
+          {/* ── History (foldable pane) ───────────────────────────── */}
+          <Card className="overflow-clip border-slate-300 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(o => !o)}
+              className={cn('flex w-full items-center gap-2 px-4 py-3 text-left transition-colors', PANE_TINT.history.bar)}
+            >
+              {historyOpen
+                ? <ChevronDown className={cn('h-4 w-4 shrink-0', PANE_TINT.history.chevron)} />
+                : <ChevronRight className={cn('h-4 w-4 shrink-0', PANE_TINT.history.chevron)} />}
+              <span className={cn('text-sm font-semibold uppercase tracking-wide', PANE_TINT.history.title)}>History</span>
+              <span className={cn('inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold', PANE_TINT.history.badge)}>
+                {history.length}
+              </span>
+            </button>
 
-            <Card>
-              <CardContent className="p-0">
+            {historyOpen && (
+              <div className="border-t border-slate-100">
+                <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
+                  <Input
+                    value={q}
+                    onChange={e => setQ(e.target.value)}
+                    placeholder="Search title or requester…"
+                    className="h-8 w-56 text-sm"
+                  />
+                  <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="h-8 text-sm">
+                    <option value="all">All statuses</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="pending">Pending</option>
+                    <option value="cancelled">Cancelled</option>
+                  </Select>
+                  <Select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="h-8 text-sm">
+                    <option value="all">All types</option>
+                    <option value="job">Job posting</option>
+                    <option value="opening">Requisition</option>
+                    <option value="offer">Offer</option>
+                  </Select>
+                </div>
+
                 {filteredHistory.length === 0 ? (
                   <p className="py-8 text-center text-sm text-slate-500">
                     {history.length === 0 ? "You haven't decided on any approvals yet." : 'No approvals match these filters.'}
@@ -233,9 +264,9 @@ export default function ApprovalInboxPage() {
                     </table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </section>
+              </div>
+            )}
+          </Card>
         </div>
       )}
 
