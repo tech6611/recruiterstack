@@ -105,12 +105,14 @@ export function BrandedApplyPreview({
           <div className="max-w-2xl mx-auto flex items-center gap-2.5">
             {branding?.logo_url ? (
               <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={branding.logo_url}
-                  alt={`${branding.company_name ?? 'Company'} logo`}
-                  className="h-7 w-auto max-w-[140px] rounded object-contain"
-                />
+                <span className="inline-flex items-center rounded-lg bg-white p-1.5 ring-1 ring-slate-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={branding.logo_url}
+                    alt={`${branding.company_name ?? 'Company'} logo`}
+                    className="h-7 w-auto max-w-[140px] object-contain"
+                  />
+                </span>
                 {branding.company_name && (
                   <span className="text-sm font-bold text-slate-900">{branding.company_name}</span>
                 )}

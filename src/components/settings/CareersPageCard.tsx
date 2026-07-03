@@ -206,6 +206,7 @@ export function CareersPageCard() {
                     <Upload className="h-3.5 w-3.5" /> {form.logo_url ? 'Replace' : 'Upload'}
                   </Button>
                 </div>
+                <p className="text-[11px] text-slate-400">PNG with a transparent background works best — it sits cleanly on any color. Square or wide both work.</p>
               </div>
               <div className="space-y-1.5">
                 <Label>Hero image</Label>
@@ -225,6 +226,7 @@ export function CareersPageCard() {
                     <Upload className="h-3.5 w-3.5" /> {form.hero_image_url ? 'Replace' : 'Upload'}
                   </Button>
                 </div>
+                <p className="text-[11px] text-slate-400">A wide banner photo for the top of your careers page — JPG or PNG, around 1600×500.</p>
               </div>
             </div>
 
