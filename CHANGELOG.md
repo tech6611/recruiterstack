@@ -9,6 +9,16 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-03
+
+### Fixed
+- **Public apply links returned "This link is no longer valid."** The Clerk
+  middleware's public matcher used `/api/apply/(.*)`, which matches
+  `/api/apply/upload` but not the bare `/api/apply` that loads and submits an
+  application — so `/api/apply?token=…` was redirected to sign-in, and the apply
+  page parsed that HTML as JSON and fell back to the "not valid" screen. Widened
+  to `/api/apply(.*)` (and `/api/intake(.*)`) so the bare endpoints are public.
+
 ## 2026-07-02
 
 ### Changed
