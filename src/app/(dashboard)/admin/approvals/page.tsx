@@ -3,11 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, AlertTriangle, Pencil, ChevronDown, ChevronRight, Network, FileText, Briefcase, Wallet } from 'lucide-react'
+import { Plus, AlertTriangle, Pencil, ChevronDown, ChevronRight, FileText, Briefcase, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { StatCards } from '@/components/ui/stat-cards'
 import { ChainRowActions } from '@/components/approvals/ChainRowActions'
 import { cn } from '@/lib/utils'
 
@@ -38,6 +37,14 @@ const SECTION_LABEL: Record<TargetType, string> = {
   opening: 'Requisitions',
   job:     'Pipelines',
   offer:   'Offers',
+}
+
+// Small infographic icon shown right before each section label, matching the
+// icons used for these entities elsewhere in the app.
+const SECTION_ICON: Record<TargetType, typeof FileText> = {
+  opening: FileText,
+  job:     Briefcase,
+  offer:   Wallet,
 }
 
 // Header-row tint per section, using the brand palette (emerald = pine,
@@ -197,20 +204,11 @@ export default function ApprovalChainsListPage() {
         <p className="text-xs text-slate-400">Loading…</p>
       ) : (
         <div className="space-y-4">
-          {/* Summary stat cards — same at-a-glance strip as the other list pages. */}
-          <StatCards
-            cards={[
-              { key: 'total',    label: 'Total chains', value: items.length,           tone: 'slate', icon: <Network className="h-4 w-4" /> },
-              { key: 'opening',  label: 'Requisitions', value: grouped.opening.length, tone: 'pine',  icon: <FileText className="h-4 w-4" /> },
-              { key: 'job',      label: 'Pipelines',    value: grouped.job.length,     tone: 'amber', icon: <Briefcase className="h-4 w-4" /> },
-              { key: 'offer',    label: 'Offers',       value: grouped.offer.length,   tone: 'gold',  icon: <Wallet className="h-4 w-4" /> },
-            ]}
-          />
-
           {TARGET_ORDER.map(t => {
             const chains   = grouped[t]
             const isOpen   = !collapsed[t]
             const Chevron  = isOpen ? ChevronDown : ChevronRight
+            const Icon     = SECTION_ICON[t]
             const tone     = HEADER_TONE[t]
             return (
               <Card key={t} className="overflow-hidden">
@@ -225,6 +223,7 @@ export default function ApprovalChainsListPage() {
                   )}
                 >
                   <Chevron className={cn('h-4 w-4 shrink-0', tone.chevron)} />
+                  <Icon className={cn('h-4 w-4 shrink-0', tone.title)} />
                   <span className={cn('text-sm font-semibold', tone.title)}>{SECTION_LABEL[t]}</span>
                   <span className={cn('text-[11px] font-semibold rounded-full px-2 py-0.5', tone.badge)}>
                     {chains.length}

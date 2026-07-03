@@ -12,13 +12,20 @@ entries on top.
 ## 2026-07-03
 
 ### Changed
+- **Public logo now sits on a neutral white chip.** The apply page and its
+  live preview wrap the org's uploaded logo in a white, subtly-ringed chip
+  (matching the careers page), so a logo of any color/background reads cleanly
+  instead of looking cramped. Bumped the apply-page logo to `h-12`. Added
+  transparent-background guidance under the Logo upload (and a size hint under
+  Hero image) in the careers settings card.
 - **Approvals inbox restyled to match the other list pages.** The Pending
   decisions and History sections are now foldable tinted panes (honey for
   Pending, stone for History) like the Approval chains / Requisitions pages,
   with the History search-and-filter row tucked inside its pane. Added a
   summary stat-card strip on top: Total / Pending / Approved / Rejected.
-- **Approval chains page got the same stat-card strip.** Total chains /
-  Requisitions / Pipelines / Offers counts above the foldable sections.
+- **Approval chains page: section icons.** Each foldable section header
+  (Requisitions / Pipelines / Offers) now shows a small entity icon right
+  before its label, matching the icons used for those entities elsewhere.
 
 ### Fixed
 - **Public apply links returned "This link is no longer valid."** The Clerk
