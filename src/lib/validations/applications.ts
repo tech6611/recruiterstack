@@ -35,6 +35,15 @@ export const publicApplySchema = z.object({
   linkedin_url: z.string().url().optional(),
   cover_letter: z.string().optional(),
   cv_url: z.string().url().optional(),
+  // Resume-autofill enrichment (Phase 2). These come from parsing the uploaded
+  // CV and are stored on the candidate profile so the recruiter's dashboard
+  // arrives pre-filled. They're relayed by the client, so we bound every field
+  // to keep a tampered payload harmless; they were already grounded (checked
+  // against the resume text) server-side by /api/apply/parse-cv.
+  current_title: z.string().max(200).optional(),
+  location: z.string().max(200).optional(),
+  skills: z.array(z.string().min(1).max(80)).max(20).optional(),
+  experience_years: z.number().int().min(0).max(60).optional(),
   // Custom screening-question answers (Publish JD Phase 3c). The label is
   // resolved server-side from the job's form, so the client only sends the
   // field id + the candidate's value.

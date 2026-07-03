@@ -78,6 +78,40 @@ describe('publicApplySchema', () => {
     })
     expect(result.success).toBe(true)
   })
+
+  it('accepts resume-autofill enrichment fields (Phase 2)', () => {
+    const result = publicApplySchema.safeParse({
+      token: 'abc123',
+      name: 'Test',
+      email: 'test@example.com',
+      current_title: 'Senior Engineer',
+      location: 'Bengaluru, India',
+      skills: ['React', 'TypeScript'],
+      experience_years: 8,
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.skills).toEqual(['React', 'TypeScript'])
+      expect(result.data.experience_years).toBe(8)
+    }
+  })
+
+  it('rejects out-of-bounds enrichment (too many skills / bad years)', () => {
+    expect(publicApplySchema.safeParse({
+      token: 'abc123', name: 'Test', email: 'test@example.com',
+      skills: Array.from({ length: 21 }, (_, i) => `skill${i}`),
+    }).success).toBe(false)
+
+    expect(publicApplySchema.safeParse({
+      token: 'abc123', name: 'Test', email: 'test@example.com',
+      experience_years: 999,
+    }).success).toBe(false)
+
+    expect(publicApplySchema.safeParse({
+      token: 'abc123', name: 'Test', email: 'test@example.com',
+      experience_years: -1,
+    }).success).toBe(false)
+  })
 })
 
 describe('applicationUpdateSchema', () => {
