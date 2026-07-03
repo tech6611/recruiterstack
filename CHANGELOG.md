@@ -12,6 +12,25 @@ entries on top.
 ## 2026-07-04
 
 ### Added
+- **Logo auto-centering on upload.** When a logo is uploaded on the Careers
+  page settings, the browser now tight-crops its artwork and re-pads it evenly
+  before saving (`src/lib/branding/normalize-logo.ts`, wired into
+  `CareersPageCard`). Logos frequently carry uneven or excessive transparent
+  padding, which both made them look off-center on the apply/careers pages and
+  opened an oversized gap to the elements below them, even though the layout
+  centers the image box correctly. Normalization measures the true rendered
+  bounds — `getBBox()` for SVG (so it handles text wordmarks, which need a font
+  engine to size) and an alpha-channel scan for PNG/WebP — trims to those
+  bounds, then re-pads by an even 5% margin so the logo is centered on both
+  axes and fills its display box (no phantom padding inflating the spacing).
+  Runs client-side (the only place that can render SVG text) and falls back to
+  the original file on any error, so it never blocks an upload. To fix an
+  already-uploaded logo, re-upload it via Settings → Careers page.
+
+### Changed
+- **Apply page: evened the header spacing.** The logo's bottom margin was
+  reduced (`mb-6` → `mb-4`) so the logo→title gap sits closer to the
+  title→chips rhythm instead of looking disproportionately large.
 - **Apply page: resume autofill Phase 2 — profile enrichment.** The extra
   fields the CV parser already extracts (current title, location, skills, years
   of experience) are now saved onto the candidate profile when the application

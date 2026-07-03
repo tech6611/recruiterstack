@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { recenterLogo } from '@/lib/branding/normalize-logo'
 
 // Curated Google Fonts the careers page can render. Phase 2b loads the chosen
 // family; here we just store the name.
@@ -98,8 +99,11 @@ export function CareersPageCard() {
 
   async function uploadImage(kind: 'logo' | 'hero', file: File) {
     setUploading(kind)
+    // Re-center the logo's artwork so uneven padding can't make it look
+    // off-center on the careers/apply pages. Hero banners are left untouched.
+    const prepared = kind === 'logo' ? await recenterLogo(file) : file
     const fd = new FormData()
-    fd.append('file', file)
+    fd.append('file', prepared)
     fd.append('kind', kind)
     const res = await fetch('/api/org-settings/branding-upload', { method: 'POST', body: fd })
     setUploading(null)

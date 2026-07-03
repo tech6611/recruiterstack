@@ -402,11 +402,11 @@ export default function ApplyPage() {
               <img
                 src={branding.logo_url}
                 alt={`${companyName} logo`}
-                className="mb-6 h-24 w-auto max-w-[380px] object-contain"
+                className="mb-4 h-24 w-auto max-w-[380px] object-contain"
               />
             </>
           ) : (
-            <div className="flex items-center gap-2 mb-5">
+            <div className="flex items-center gap-2 mb-4">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600">
                 <Zap className="h-4 w-4 text-white" />
               </div>
