@@ -9,9 +9,42 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-04
+
+### Added
+- **Apply page: resume autofill Phase 2 — profile enrichment.** The extra
+  fields the CV parser already extracts (current title, location, skills, years
+  of experience) are now saved onto the candidate profile when the application
+  is submitted, so a new applicant's profile arrives pre-filled instead of
+  blank. The apply page stashes the grounded parse result and sends it with the
+  submission; `publicApplySchema` gains optional, bounded `current_title`,
+  `location`, `skills[]`, `experience_years` (client-relayed, so every field is
+  capped to keep a tampered payload harmless). `/api/apply` passes them into
+  `findOrCreateCandidateProfile`. Enrichment applies to **new** profiles only —
+  a returning candidate keeps their existing details. Mirrored on the Django
+  backend (separate repo `recruiterstack-api`): `ApplyView.post` now reads and
+  bounds the same fields via a new `_clean_enrichment` helper and passes them
+  into the inline `Candidate.objects.create` (no DB migration — the columns
+  already exist). Both sides covered by tests.
+
 ## 2026-07-03
 
 ### Added
+- **Apply page: autofill from resume.** Candidates can now upload their CV and
+  have the form fill itself in (name, email, phone, LinkedIn), matching the
+  pattern used by ATSs like Kula/Multiplier. New public, token-gated,
+  rate-limited endpoint `POST /api/apply/parse-cv` reads the resume and returns
+  hallucination-checked fields. Guardrail stack (per the resume-parsing research):
+  deterministic regex extracts email/phone/LinkedIn straight from the resume
+  text (never the AI); Gemini (strict JSON, temperature 0) handles the name and
+  richer fields; every AI value is **grounded** — dropped unless it actually
+  appears in the resume text; autofill only fills *empty* fields and never
+  overwrites what the candidate typed; any failure is silent (manual entry).
+  Adds `unpdf` (PDF→text) and `mammoth` (DOCX→text) for server-side extraction.
+  Extra fields (title, location, skills, experience) are extracted and grounded
+  too, ready for Phase 2 (saving them to the candidate profile, which needs a
+  matching Django change). Pure grounding/regex logic in
+  `src/lib/apply/resume-autofill.ts` with 13 unit tests.
 - **Apply page: employment-type field.** The hiring-manager intake form now has
   an Employment Type dropdown (Full-time, Part-time, Contract, Internship,
   Temporary), stored on `custom_fields.intake.employment_type` and surfaced to

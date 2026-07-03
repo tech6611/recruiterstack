@@ -103,6 +103,8 @@ interface GenerateFromPdfOptions {
   /** Same as generateText's `json`: force a strict-JSON reply and turn off the
    *  model's hidden "thinking" so it can't eat the budget and truncate the JSON. */
   json?: boolean
+  /** 0 = most literal/deterministic. Use 0 for extraction to reduce drift. */
+  temperature?: number
 }
 
 /**
@@ -114,7 +116,7 @@ export async function generateFromPdf(
   pdfBase64: string,
   opts: GenerateFromPdfOptions = {},
 ): Promise<LLMResult> {
-  const { model = DEFAULT_MODEL, maxTokens = 2048, mimeType = 'application/pdf', json } = opts
+  const { model = DEFAULT_MODEL, maxTokens = 2048, mimeType = 'application/pdf', json, temperature } = opts
   const resolved = resolveModel(model)
   const ai = getClient()
 
@@ -129,6 +131,7 @@ export async function generateFromPdf(
       ...(json
         ? { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
         : {}),
+      ...(temperature != null ? { temperature } : {}),
     },
   })
 

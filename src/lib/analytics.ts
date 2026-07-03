@@ -12,6 +12,7 @@ type AnalyticsEvents = {
   // Public conversion events
   apply_page_viewed: { job_title: string }
   cv_uploaded: { file_size_kb: number }
+  cv_autofill_used: { fields_filled: number }
   application_submitted: { job_title: string; has_cv: boolean; has_cover_letter: boolean }
   intake_page_viewed: { position_title: string }
   jd_generation_started: { source: 'intake' | 'dashboard' }

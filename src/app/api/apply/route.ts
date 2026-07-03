@@ -51,7 +51,10 @@ export async function POST(request: NextRequest) {
   const body = await parseBody(request, publicApplySchema)
   if (body instanceof NextResponse) return body
 
-  const { token, name, email, phone, linkedin_url, cover_letter, cv_url, screening_answers } = body
+  const {
+    token, name, email, phone, linkedin_url, cover_letter, cv_url, screening_answers,
+    current_title, location, skills, experience_years,
+  } = body
 
   // ── Verify token & get job ────────────────────────────────────────────────
   const job = await getCanonicalApplyJobByToken(supabase, token)
@@ -101,6 +104,12 @@ export async function POST(request: NextRequest) {
       phone: phone ?? null,
       resume_url: cv_url ?? null,
       linkedin_url: linkedin_url ?? null,
+      // Resume-autofill enrichment (Phase 2). Only takes effect for a
+      // brand-new profile; a returning candidate keeps their existing details.
+      current_title: current_title ?? null,
+      location: location ?? null,
+      skills: skills ?? undefined,
+      experience_years: experience_years ?? undefined,
     })
     candidateId = candidate.id
   } catch (err) {

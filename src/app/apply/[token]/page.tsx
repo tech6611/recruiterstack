@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Zap, CheckCircle, Loader2, AlertCircle,
-  Upload, Link2, FileText, X, CloudUpload, ArrowRight,
+  Upload, Link2, FileText, X, CloudUpload, ArrowRight, Sparkles,
   MapPin, Building2, Home, BarChart3, Briefcase,
 } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
@@ -58,8 +58,8 @@ function googleFontHref(family: string): string {
 // under the title — mirrors the tag row on modern careers pages.
 function MetaChip({ icon: Icon, label }: { icon: typeof MapPin; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-      <Icon className="h-3.5 w-3.5 text-slate-400" />
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 px-3.5 py-1.5 text-sm font-medium text-slate-600 shadow-sm">
+      <Icon className="h-4 w-4 text-slate-400" />
       {label}
     </span>
   )
@@ -119,6 +119,24 @@ export default function ApplyPage() {
   const [submitted, setSubmitted]   = useState(false)
   const [error, setError]           = useState('')
 
+  // Resume autofill state. Runs as soon as a CV file is chosen: reads the
+  // resume and prefills empty fields. It never overwrites what the candidate
+  // has typed, and a failure is silent — they just fill the form manually.
+  type AutofillStatus = 'idle' | 'reading' | 'done' | 'error'
+  const [autofillStatus, setAutofillStatus] = useState<AutofillStatus>('idle')
+  const [autofillFilled, setAutofillFilled] = useState<string[]>([])
+
+  // Extra resume-parsed fields that aren't on the form (title, location,
+  // skills, years) but enrich the candidate profile when the form is submitted
+  // (Phase 2). Tied to the current CV; cleared when the file is removed.
+  interface ParsedProfile {
+    current_title: string | null
+    location: string | null
+    skills: string[]
+    experience_years: number | null
+  }
+  const [parsedProfile, setParsedProfile] = useState<ParsedProfile | null>(null)
+
   useEffect(() => {
     fetch(`/api/apply?token=${token}`)
       .then(r => {
@@ -148,6 +166,60 @@ export default function ApplyPage() {
     setCvError('')
     setCvFile(file)
     trackEvent('cv_uploaded', { file_size_kb: Math.round(file.size / 1024) })
+    void runAutofill(file)
+  }
+
+  // Fill a text field only if the candidate hasn't already typed something —
+  // their input always wins over the resume.
+  const fillIfEmpty = (
+    setter: (updater: (prev: string) => string) => void,
+    value: string | null,
+  ): boolean => {
+    if (!value) return false
+    let didFill = false
+    setter(prev => {
+      if (prev.trim()) return prev
+      didFill = true
+      return value
+    })
+    return didFill
+  }
+
+  const runAutofill = async (file: File) => {
+    setAutofillStatus('reading')
+    setAutofillFilled([])
+    setParsedProfile(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('token', token)
+      const res = await fetch('/api/apply/parse-cv', { method: 'POST', body: fd })
+      if (!res.ok) { setAutofillStatus('idle'); return } // silent — manual entry
+      const { candidate } = await res.json()
+      if (!candidate) { setAutofillStatus('idle'); return }
+
+      // Stash the extra parsed fields (not on the form) to enrich the profile
+      // on submit. These were grounded server-side, so they're safe to keep.
+      setParsedProfile({
+        current_title: candidate.current_title ?? null,
+        location: candidate.location ?? null,
+        skills: Array.isArray(candidate.skills) ? candidate.skills : [],
+        experience_years:
+          typeof candidate.experience_years === 'number' ? candidate.experience_years : null,
+      })
+
+      const filled: string[] = []
+      if (fillIfEmpty(setName, candidate.name)) filled.push('name')
+      if (fillIfEmpty(setEmail, candidate.email)) filled.push('email')
+      if (fillIfEmpty(setPhone, candidate.phone)) filled.push('phone')
+      if (fillIfEmpty(setLinkedin, candidate.linkedin_url)) filled.push('LinkedIn')
+
+      setAutofillFilled(filled)
+      setAutofillStatus(filled.length ? 'done' : 'idle')
+      if (filled.length) trackEvent('cv_autofill_used', { fields_filled: filled.length })
+    } catch {
+      setAutofillStatus('idle') // network hiccup — fall back to manual entry
+    }
   }
 
   const handleFileDrop = (e: React.DragEvent) => {
@@ -232,6 +304,12 @@ export default function ApplyPage() {
         linkedin_url: linkedin.trim(),
         cover_letter: coverLetter.trim() || undefined,
         cv_url:       finalCvUrl,
+        // Resume-autofill enrichment (Phase 2) — only when we actually parsed
+        // the uploaded CV. Stored on the candidate profile server-side.
+        current_title:    parsedProfile?.current_title || undefined,
+        location:         parsedProfile?.location || undefined,
+        skills:           parsedProfile?.skills.length ? parsedProfile.skills : undefined,
+        experience_years: parsedProfile?.experience_years ?? undefined,
         screening_answers: screeningFields.map(f => {
           const v = answers[f.id]
           return { field_id: f.id, value: v === undefined || v === '' ? null : v }
@@ -399,6 +477,49 @@ export default function ApplyPage() {
             <h2 className="text-lg font-bold text-slate-900 mb-6">Apply for this role</h2>
 
             <form onSubmit={handleSubmit} className="space-y-5">
+              {/* ── Autofill from resume ──────────────────────────────────── */}
+              <div
+                className={`rounded-xl border-2 border-dashed px-4 py-3.5 transition-colors ${
+                  autofillStatus === 'done'
+                    ? 'border-emerald-300 bg-emerald-50/60'
+                    : 'border-slate-300 bg-slate-50'
+                }`}
+              >
+                {autofillStatus === 'reading' ? (
+                  <div className="flex items-center gap-2.5 text-sm text-slate-600">
+                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                    Reading your resume and filling in your details…
+                  </div>
+                ) : autofillStatus === 'done' ? (
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
+                    <p className="text-sm text-slate-700">
+                      Filled in your {autofillFilled.join(', ')} from your resume.{' '}
+                      <span className="text-slate-500">Please review everything below before submitting.</span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles className="h-4 w-4 shrink-0 text-slate-400" />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">Autofill from resume</p>
+                        <p className="text-xs text-slate-500">
+                          Upload your CV and we&apos;ll fill in the form for you. PDF or Word.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={chooseUpload}
+                      className="shrink-0 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      Upload file
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Name + Email */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -507,7 +628,7 @@ export default function ApplyPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => { setCvFile(null); setCvError('') }}
+                        onClick={() => { setCvFile(null); setCvError(''); setParsedProfile(null); setAutofillStatus('idle') }}
                         className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-colors"
                       >
                         <X className="h-4 w-4" />
