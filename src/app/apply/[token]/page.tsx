@@ -60,6 +60,13 @@ function readableText(hex: string): string {
   return lum > 150 ? '#1e293b' : '#ffffff' // 1e293b = slate-800
 }
 
+// A screening answer counts as empty if it's null/undefined, a blank string, or
+// an empty array (multi-select). Shared by the submit gate and the on-submit +
+// server-side required checks so all three agree.
+function isAnswerEmpty(v: AnswerValue | undefined): boolean {
+  return v == null || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.length === 0)
+}
+
 // Build the Google Fonts stylesheet URL for the chosen family.
 function googleFontHref(family: string): string {
   return `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
@@ -249,12 +256,18 @@ export default function ApplyPage() {
   const emailInvalid    = email.trim() !== ''    && !EMAIL_RE.test(email.trim())
   const linkedinInvalid = linkedin.trim() !== '' && !isValidUrl(linkedin.trim())
   const resumeProvided  = (cvMode === 'upload' && !!cvFile) || (cvMode === 'drive' && isValidUrl(cvDriveUrl.trim()))
+  // Every required question that's currently shown must be answered. Mirrors the
+  // on-submit + server-side checks, so the button reflects them too.
+  const requiredQuestionsAnswered = (job?.screening?.fields ?? [])
+    .filter(f => f.required && isFieldVisible(f, answers))
+    .every(f => !isAnswerEmpty(answers[f.id]))
   const canSubmit =
     !submitting &&
     !!name.trim() && !!email.trim() && !emailInvalid &&
     !!phone.trim() &&
     !!linkedin.trim() && !linkedinInvalid &&
-    resumeProvided
+    resumeProvided &&
+    requiredQuestionsAnswered
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -271,9 +284,7 @@ export default function ApplyPage() {
     // Required screening questions must be answered.
     for (const f of screeningFields) {
       if (!f.required) continue
-      const v = answers[f.id]
-      const empty = v == null || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.length === 0)
-      if (empty) { setError(`Please answer: ${f.label}`); return }
+      if (isAnswerEmpty(answers[f.id])) { setError(`Please answer: ${f.label}`); return }
     }
 
     setSubmitting(true)
