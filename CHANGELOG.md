@@ -11,8 +11,22 @@ entries on top.
 
 ## 2026-07-04
 
-### Added
-- **Logo auto-centering on upload.** When a logo is uploaded on the Careers
+### Fixed
+- **Resume/CV parsing returned 422 for every PDF (autofill never worked).** JSON
+  mode in the Gemini wrapper (`lib/ai/llm.ts`) always set `thinkingBudget: 0` to
+  stop hidden "thinking" tokens truncating the reply — but **gemini-2.5-pro
+  rejects that** ("Budget 0 is invalid — this model only works in thinking
+  mode"), so the call threw and the route returned a generic "Could not read
+  this resume." This silently broke every pro-based JSON extraction: the public
+  apply autofill (`/api/apply/parse-cv`), the recruiter CV parser
+  (`/api/candidates/[id]/parse-cv`), and the candidate↔role matcher
+  (`lib/ai/matcher.ts`). Fix: only disable thinking for flash-tier models (which
+  support it); pro keeps thinking on, and JSON mode still guarantees a parseable
+  reply. Also switched the public `/api/apply/parse-cv` to gemini-2.5-flash — it
+  is candidate-facing and latency-sensitive, and Flash is fast, cheap, and
+  accurate enough for these structured fields. Added `llm.test.ts` locking the
+  per-tier thinking behavior so this can't regress. (Flash callers — autopilot,
+  job-scorer — were unaffected and are unchanged.)
   page settings, the browser now tight-crops its artwork and re-pads it evenly
   before saving (`src/lib/branding/normalize-logo.ts`, wired into
   `CareersPageCard`). Logos frequently carry uneven or excessive transparent
