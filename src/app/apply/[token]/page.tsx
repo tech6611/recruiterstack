@@ -433,7 +433,7 @@ export default function ApplyPage() {
           {hasJd && (
             <button
               onClick={() => setTab('details')}
-              className={`-mb-px pb-3 text-sm font-semibold transition-colors border-b-2 ${
+              className={`-mb-px pb-3 text-base font-semibold transition-colors border-b-2 ${
                 tab === 'details' ? 'text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
               style={tab === 'details' ? { borderColor: brand } : undefined}
@@ -443,7 +443,7 @@ export default function ApplyPage() {
           )}
           <button
             onClick={() => setTab('form')}
-            className={`-mb-px pb-3 text-sm font-semibold transition-colors border-b-2 ${
+            className={`-mb-px pb-3 text-base font-semibold transition-colors border-b-2 ${
               tab === 'form' ? 'text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'
             }`}
             style={tab === 'form' ? { borderColor: brand } : undefined}

@@ -1,8 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="200" viewBox="0 0 760 200" role="img" aria-label="RecruiterStack">
-  <!-- transparent background: no rect -->
-
-  <!-- logo tile (espresso, so it reads on white / light) -->
-  <g transform="translate(20 50)">
+<svg xmlns="http://www.w3.org/2000/svg" width="576" height="116" viewBox="0 0 576 116" role="img" aria-label="RecruiterStack">
+  <!-- Tight-cropped, symmetric 8px margin on all sides → centered on both axes -->
+  <g transform="translate(8 8)">
     <rect width="100" height="100" rx="22" fill="#221b14"/>
     <g transform="translate(50 50) scale(2.5) translate(-12 -12)"
        fill="none" stroke="#f6efe3" stroke-width="2"
@@ -12,7 +10,7 @@
       <path d="m3 18 9 5 9-5" opacity="0.55"/>
     </g>
   </g>
-
-  <!-- wordmark in espresso -->
-  <text x="150" y="118" font-family="Inter, Arial, sans-serif" font-size="62" font-weight="700" fill="#221b14">RecruiterStack</text>
+  <!-- textLength pins the wordmark width so the layout math is exact, not font-dependent -->
+  <text x="128" y="76" textLength="440" lengthAdjust="spacingAndGlyphs"
+        font-family="Inter, Arial, sans-serif" font-size="62" font-weight="700" fill="#221b14">RecruiterStack</text>
 </svg>

@@ -28,6 +28,13 @@ entries on top.
   already-uploaded logo, re-upload it via Settings → Careers page.
 
 ### Changed
+- **Apply page: enlarged the section tabs.** "Job details" and "Application
+  form" bumped from `text-sm` (14px) to `text-base` (16px) so they read at a
+  comfortable size relative to the title and chips.
+- **Synced the repo wordmark to the centered version.**
+  `public/logo-wordmark-light.svg` now matches the mathematically centered
+  artwork (tight-cropped with an even 8px margin, `textLength`-pinned wordmark)
+  that is also the live logo in storage.
 - **Apply page: evened the header spacing.** The logo's bottom margin was
   reduced (`mb-6` → `mb-4`) so the logo→title gap sits closer to the
   title→chips rhythm instead of looking disproportionately large.
