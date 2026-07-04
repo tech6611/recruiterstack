@@ -31,6 +31,16 @@ export interface PreviewJobInfo {
 
 const DEFAULT_BRAND = '#059669' // emerald-600 — the app's default accent
 
+// Legible text colour for a coloured button: dark on light, white on dark —
+// mirrors the live apply page so the preview matches.
+function readableText(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return '#ffffff'
+  const n = parseInt(m[1], 16)
+  const lum = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)
+  return lum > 150 ? '#1e293b' : '#ffffff'
+}
+
 // Sample (disabled) styling for the always-collected built-in fields. The real
 // custom questions below use the live, editable styling from the shared module.
 const SAMPLE_INPUT_CLASS =
@@ -77,7 +87,10 @@ export function BrandedApplyPreview({
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
   const setAnswer = (id: string, v: AnswerValue) => setAnswers(prev => ({ ...prev, [id]: v }))
 
-  const brand = branding?.brand_color || DEFAULT_BRAND
+  // Buttons use the accent colour (the brand/primary colour is often a pale
+  // page-theme colour that renders an invisible button). Matches the live page.
+  const accent = branding?.accent_color || DEFAULT_BRAND
+  const accentText = readableText(accent)
   const font  = branding?.brand_font || null
   const visibleScreening = fields.filter(f => isFieldVisible(f, answers))
 
@@ -199,8 +212,8 @@ export function BrandedApplyPreview({
               <button
                 type="button"
                 disabled
-                style={{ backgroundColor: brand }}
-                className="w-full rounded-xl px-6 py-3.5 text-sm font-bold text-white opacity-70 cursor-not-allowed shadow-sm"
+                style={{ backgroundColor: accent, color: accentText }}
+                className="w-full rounded-xl px-6 py-3.5 text-sm font-bold opacity-70 cursor-not-allowed shadow-sm"
               >
                 Submit Application
               </button>
