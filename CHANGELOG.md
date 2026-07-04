@@ -27,6 +27,9 @@ entries on top.
   accurate enough for these structured fields. Added `llm.test.ts` locking the
   per-tier thinking behavior so this can't regress. (Flash callers — autopilot,
   job-scorer — were unaffected and are unchanged.)
+
+### Added
+- **Logo auto-centering on upload.** When a logo is uploaded on the Careers
   page settings, the browser now tight-crops its artwork and re-pads it evenly
   before saving (`src/lib/branding/normalize-logo.ts`, wired into
   `CareersPageCard`). Logos frequently carry uneven or excessive transparent
@@ -40,6 +43,19 @@ entries on top.
   Runs client-side (the only place that can render SVG text) and falls back to
   the original file on any error, so it never blocks an upload. To fix an
   already-uploaded logo, re-upload it via Settings → Careers page.
+- **Careers page: live preview in settings.** The Careers-page settings card now
+  shows a miniature, live-updating render of the public careers page (hero,
+  logo, colors, font, tagline, company name, and a sample role card) that
+  updates as fields change — so customers see how their branding lands before
+  publishing, instead of only via the open-in-new-tab "Preview page" link. The
+  preview loads the chosen Google Font so the type is accurate, and faithfully
+  mirrors the real hero markup (including that a wordmark logo plus the company
+  name shows the name twice — surfacing that redundancy so it can be caught).
+- **Careers page: remove an uploaded logo or hero image.** Both the Logo and
+  Hero image slots gain a "Remove" button (previously you could only Replace,
+  never clear). Removing the hero falls the banner back to a clean solid
+  brand-color band. Clarified the hero-image helper text: it's optional, and the
+  logo should not be uploaded there.
 
 ### Changed
 - **Apply page: enlarged the section tabs.** "Job details" and "Application

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Globe, Upload, ExternalLink } from 'lucide-react'
+import { Globe, Upload, ExternalLink, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -166,6 +166,9 @@ export function CareersPageCard() {
           <p className="text-xs text-slate-400">Loading…</p>
         ) : (
           <div className="space-y-5">
+            {/* Live preview — mirrors the public careers page as fields change */}
+            <CareersPreview form={form} company={companyName} />
+
             {/* Page address (slug) */}
             <div className="space-y-1.5">
               <Label htmlFor="careers_slug">Page address</Label>
@@ -209,6 +212,11 @@ export function CareersPageCard() {
                   <Button type="button" variant="outline" size="sm" loading={uploading === 'logo'} onClick={() => logoInput.current?.click()}>
                     <Upload className="h-3.5 w-3.5" /> {form.logo_url ? 'Replace' : 'Upload'}
                   </Button>
+                  {form.logo_url && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setForm(f => ({ ...f, logo_url: null }))}>
+                      <X className="h-3.5 w-3.5" /> Remove
+                    </Button>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-400">PNG with a transparent background works best — it sits cleanly on any color. Square or wide both work.</p>
               </div>
@@ -229,8 +237,13 @@ export function CareersPageCard() {
                   <Button type="button" variant="outline" size="sm" loading={uploading === 'hero'} onClick={() => heroInput.current?.click()}>
                     <Upload className="h-3.5 w-3.5" /> {form.hero_image_url ? 'Replace' : 'Upload'}
                   </Button>
+                  {form.hero_image_url && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setForm(f => ({ ...f, hero_image_url: null }))}>
+                      <X className="h-3.5 w-3.5" /> Remove
+                    </Button>
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-400">A wide banner photo for the top of your careers page — JPG or PNG, around 1600×500.</p>
+                <p className="text-[11px] text-slate-400">A wide banner photo for the top of your careers page — JPG or PNG, around 1600×500. Optional — leave empty for a clean solid-color banner. Don’t upload your logo here; use the Logo slot.</p>
               </div>
             </div>
 
@@ -316,5 +329,83 @@ export function CareersPageCard() {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+// Loads the chosen Google Font into the document so the preview renders in the
+// real family, not a fallback. Leaves the <link> in place across font switches.
+function useGoogleFont(family: string) {
+  useEffect(() => {
+    if (!family) return
+    const id = `gf-${family.replace(/\s+/g, '-')}`
+    if (document.getElementById(id)) return
+    const link = document.createElement('link')
+    link.id = id
+    link.rel = 'stylesheet'
+    link.href = `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
+    document.head.appendChild(link)
+  }, [family])
+}
+
+// A miniature, live-updating render of the public careers page. Faithfully
+// mirrors the hero + roles markup (colors, font, logo, hero, tagline, name) so
+// customers see exactly how their branding lands before they publish.
+function CareersPreview({ form, company }: { form: FormState; company: string }) {
+  const brand = form.brand_color || '#2563eb'
+  const accent = form.accent_color || '#1f7a5a'
+  const font = form.brand_font || 'Inter'
+  const name = company || 'Your company'
+  const hasHero = !!form.hero_image_url
+
+  useGoogleFont(font)
+
+  return (
+    <div className="space-y-1.5">
+      <Label>Live preview</Label>
+      <div
+        className="overflow-hidden rounded-xl border border-slate-200 shadow-sm"
+        style={{ fontFamily: `'${font}', system-ui, sans-serif` }}
+      >
+        {/* Hero */}
+        <div className="relative overflow-hidden" style={hasHero ? undefined : { backgroundColor: brand }}>
+          {hasHero && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={form.hero_image_url!} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-slate-900/55" />
+            </>
+          )}
+          <div className="relative px-5 py-8">
+            {form.logo_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={form.logo_url} alt="" className="mb-3 h-9 w-auto rounded-md bg-white/95 p-1.5 object-contain" />
+            )}
+            <p className="text-lg font-bold leading-tight text-white">{name}</p>
+            {form.tagline && <p className="mt-1 text-xs text-white/85">{form.tagline}</p>}
+          </div>
+        </div>
+
+        {/* Body: a sample role card */}
+        <div className="bg-slate-50 px-5 py-5">
+          <p className="mb-2 text-xs font-bold text-slate-900">Open roles</p>
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-slate-900">Senior Customer Success Manager</p>
+              <p className="mt-0.5 text-[10px] text-slate-500">Customer Success</p>
+            </div>
+            <span
+              className="shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold text-white"
+              style={{ backgroundColor: brand }}
+            >
+              Apply
+            </span>
+          </div>
+          <p className="mt-3 text-center text-[10px] text-slate-400">
+            Powered by <span className="font-semibold" style={{ color: accent }}>RecruiterStack</span>
+          </p>
+        </div>
+      </div>
+      <p className="text-[11px] text-slate-400">Updates as you edit — this is how your public careers page will look.</p>
+    </div>
   )
 }
