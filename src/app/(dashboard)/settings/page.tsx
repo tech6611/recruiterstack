@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle, Check, Building2, User, Sparkles, Database, Bell, Plug, LayoutList, Calendar, Video, Monitor, SlidersHorizontal, Briefcase, Users } from 'lucide-react'
+import { CheckCircle, Check, Building2, User, Sparkles, Database, Bell, Plug, LayoutList, Calendar, Video, Monitor, SlidersHorizontal, Briefcase, Users, Globe } from 'lucide-react'
 import { useSettings, KANBAN_CARD_FIELD_OPTIONS } from '@/lib/hooks/useSettings'
 import { useCapabilities } from '@/components/providers/CapabilitiesProvider'
 import { inputCls } from '@/lib/ui/styles'
@@ -18,7 +18,7 @@ import { GroupsCard } from '@/components/settings/GroupsCard'
 import { CustomFieldsCard } from '@/components/settings/CustomFieldsCard'
 import { WhatsAppCard } from '@/components/settings/WhatsAppCard'
 
-type TabId = 'general' | 'integrations' | 'workspace' | 'team'
+type TabId = 'general' | 'integrations' | 'workspace' | 'careers' | 'team'
 
 export default function SettingsPage() {
   const { settings, save, loaded } = useSettings()
@@ -72,7 +72,7 @@ export default function SettingsPage() {
   // Deep-link to a tab via ?tab= (used by the dashboard onboarding checklist).
   useEffect(() => {
     const t = searchParams.get('tab')
-    if (t === 'general' || t === 'integrations' || t === 'workspace' || t === 'team') {
+    if (t === 'general' || t === 'integrations' || t === 'workspace' || t === 'careers' || t === 'team') {
       setActiveTab(t)
     }
   }, [searchParams])
@@ -347,6 +347,7 @@ export default function SettingsPage() {
     { id: 'general',      label: 'General',        icon: SlidersHorizontal },
     { id: 'integrations', label: 'Integrations',   icon: Plug },
     { id: 'workspace',    label: 'Workspace',      icon: Briefcase, adminOnly: true },
+    { id: 'careers',      label: 'Careers page',   icon: Globe,     adminOnly: true },
     { id: 'team',         label: 'Team & Agents',  icon: Users,     adminOnly: true },
   ]
 
@@ -890,8 +891,7 @@ export default function SettingsPage() {
 
           {activeTab === 'workspace' && canManageSettings && (
             // Masonry columns: each card keeps its natural height and packs
-            // vertically, so a short card (e.g. Company info) no longer stretches
-            // to match the tall Careers card sitting beside it.
+            // vertically, so short cards no longer stretch to match a taller one.
             <div className="columns-1 lg:columns-2 gap-6 [&>*]:mb-6 [&>*]:break-inside-avoid">
               <CompanyInfoCard />
               <DepartmentsCard />
@@ -899,8 +899,11 @@ export default function SettingsPage() {
               <CompBandsCard />
               <GroupsCard />
               <CustomFieldsCard />
-              <CareersPageCard />
             </div>
+          )}
+
+          {activeTab === 'careers' && canManageSettings && (
+            <CareersPageCard />
           )}
 
           {activeTab === 'team' && canManageSettings && (

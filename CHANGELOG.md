@@ -58,6 +58,12 @@ entries on top.
   logo should not be uploaded there.
 
 ### Changed
+- **Settings: Careers page moved to its own tab.** The Careers-page card had
+  grown into a mini-page (live preview + ~10 fields) and dwarfed everything in
+  the Workspace grid. It now has a dedicated "Careers page" sidebar tab where it
+  gets full width, with the form on the left and the live preview in a sticky
+  panel on the right (stacked, preview-on-top, on narrow screens). Workspace now
+  holds only the short org-data cards, which tile cleanly.
 - **Settings → Workspace: masonry card layout.** The workspace cards were in a
   2-column grid, where grid rows forced every card to match the tallest one — so
   the short Company-info card stretched to the height of the tall Careers card

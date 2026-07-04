@@ -165,10 +165,9 @@ export function CareersPageCard() {
         {!loaded ? (
           <p className="text-xs text-slate-400">Loading…</p>
         ) : (
-          <div className="space-y-5">
-            {/* Live preview — mirrors the public careers page as fields change */}
-            <CareersPreview form={form} company={companyName} />
-
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+            {/* Form column */}
+            <div className="space-y-5 order-2 lg:order-1">
             {/* Page address (slug) */}
             <div className="space-y-1.5">
               <Label htmlFor="careers_slug">Page address</Label>
@@ -324,6 +323,14 @@ export function CareersPageCard() {
                 </a>
               ) : <span />}
               <Button onClick={save} loading={saving}>Save</Button>
+            </div>
+            </div>
+
+            {/* Preview column — sticky beside the form on wide screens */}
+            <div className="order-1 lg:order-2">
+              <div className="lg:sticky lg:top-6">
+                <CareersPreview form={form} company={companyName} />
+              </div>
             </div>
           </div>
         )}
