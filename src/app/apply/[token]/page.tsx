@@ -49,6 +49,17 @@ const URL_RE = /^(https?:\/\/)?([\w-]+\.)+[\w-]{2,}(\/\S*)?$/i
 
 const isValidUrl = (s: string) => URL_RE.test(s.trim())
 
+// Pick a legible text colour for a coloured button: dark text on light
+// backgrounds, white on dark. Guards against a pale brand/accent colour
+// rendering an invisible (white-on-white) button label.
+function readableText(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return '#ffffff'
+  const n = parseInt(m[1], 16)
+  const lum = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)
+  return lum > 150 ? '#1e293b' : '#ffffff' // 1e293b = slate-800
+}
+
 // Build the Google Fonts stylesheet URL for the chosen family.
 function googleFontHref(family: string): string {
   return `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
@@ -370,7 +381,11 @@ export default function ApplyPage() {
 
   // ── Form ──────────────────────────────────────────────────────────────────
   const branding = job.branding
-  const brand = branding?.brand_color || DEFAULT_BRAND
+  // The action colour for buttons / the active-tab underline. Uses the org's
+  // accent colour — the primary/brand colour is often a pale page-theme colour
+  // that renders an invisible button. Falls back to the app default.
+  const accent = branding?.accent_color || DEFAULT_BRAND
+  const accentText = readableText(accent)
   const font  = branding?.brand_font || null
   const companyName = branding?.company_name || 'RecruiterStack'
 
@@ -436,7 +451,7 @@ export default function ApplyPage() {
               className={`-mb-px pb-3 text-base font-semibold transition-colors border-b-2 ${
                 tab === 'details' ? 'text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
-              style={tab === 'details' ? { borderColor: brand } : undefined}
+              style={tab === 'details' ? { borderColor: accent } : undefined}
             >
               Job details
             </button>
@@ -446,7 +461,7 @@ export default function ApplyPage() {
             className={`-mb-px pb-3 text-base font-semibold transition-colors border-b-2 ${
               tab === 'form' ? 'text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'
             }`}
-            style={tab === 'form' ? { borderColor: brand } : undefined}
+            style={tab === 'form' ? { borderColor: accent } : undefined}
           >
             Application form
           </button>
@@ -463,7 +478,7 @@ export default function ApplyPage() {
             </div>
             <button
               onClick={() => setTab('form')}
-              style={{ backgroundColor: brand }}
+              style={{ backgroundColor: accent, color: accentText }}
               className="w-full flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm"
             >
               Apply for this role <ArrowRight className="h-4 w-4" />
@@ -729,7 +744,7 @@ export default function ApplyPage() {
               <button
                 type="submit"
                 disabled={!canSubmit}
-                style={{ backgroundColor: brand }}
+                style={{ backgroundColor: accent, color: accentText }}
                 className="w-full flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60 shadow-sm"
               >
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
