@@ -389,7 +389,11 @@ function CareersPreview({ form, company }: { form: FormState; company: string })
               // eslint-disable-next-line @next/next/no-img-element
               <img src={form.logo_url} alt="" className="mb-3 h-9 w-auto rounded-md bg-white/95 p-1.5 object-contain" />
             )}
-            <p className="text-lg font-bold leading-tight" style={{ color: text.strong }}>{name}</p>
+            {/* A logo already carries the brand (often the name itself), so hide
+                the name text when a logo is present to avoid showing it twice. */}
+            {!form.logo_url && (
+              <p className="text-lg font-bold leading-tight" style={{ color: text.strong }}>{name}</p>
+            )}
             {form.tagline && <p className="mt-1 text-xs" style={{ color: text.muted }}>{form.tagline}</p>}
           </div>
         </div>

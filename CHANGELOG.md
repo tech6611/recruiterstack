@@ -11,6 +11,15 @@ entries on top.
 
 ## 2026-07-04
 
+### Changed
+- **Careers hero: hide the company-name heading when a logo is present.** A
+  wordmark logo already spells out the company name, so drawing the name again as
+  a text heading right beside it showed the brand twice, stacked. Now the name
+  heading is hidden visually whenever a logo is uploaded (kept in the page's
+  hidden structure for screen readers and search engines); with no logo, the name
+  renders as before. Applied to both the public careers hero and the settings
+  live preview.
+
 ### Fixed
 - **Careers hero: unreadable name/tagline on light brand colors.** The hero
   drew the company name and tagline in fixed white text, which assumed a dark

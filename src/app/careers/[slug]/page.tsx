@@ -143,7 +143,14 @@ function Hero({ branding, brand, company }: { branding: CareersPageBranding; bra
             className="mb-6 h-14 w-auto rounded-lg bg-white/95 p-2 object-contain"
           />
         )}
-        <h1 className="text-3xl sm:text-4xl font-bold" style={{ color: text.strong }}>{company}</h1>
+        {/* A logo already carries the brand (often the name itself), so we keep
+            the name for a11y/SEO but hide it visually to avoid showing it twice. */}
+        <h1
+          className={branding.logo_url ? 'sr-only' : 'text-3xl sm:text-4xl font-bold'}
+          style={branding.logo_url ? undefined : { color: text.strong }}
+        >
+          {company}
+        </h1>
         {branding.tagline && (
           <p className="mt-3 max-w-2xl text-base sm:text-lg" style={{ color: text.muted }}>{branding.tagline}</p>
         )}
