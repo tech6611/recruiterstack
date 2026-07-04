@@ -29,6 +29,22 @@ export function resolveModel(model: string): string {
   return MODEL_MAP[model] ?? DEFAULT_MODEL
 }
 
+/**
+ * Build the extra `config` for JSON mode. We always force strict JSON output
+ * (responseMimeType). We ALSO disable the model's hidden "thinking" tokens —
+ * but ONLY for flash-tier models: gemini-2.5-pro mandates thinking mode and
+ * returns a 400 ("Budget 0 is invalid") if you pass thinkingBudget: 0. JSON
+ * mode keeps the reply parseable either way; on pro we simply leave thinking on
+ * (callers give token headroom for it).
+ */
+export function jsonModeConfig(resolvedModel: string): Record<string, unknown> {
+  const cfg: Record<string, unknown> = { responseMimeType: 'application/json' }
+  if (resolvedModel.includes('flash')) {
+    cfg.thinkingConfig = { thinkingBudget: 0 }
+  }
+  return cfg
+}
+
 /** Token usage in the Anthropic-compatible shape `trackUsage` expects. */
 export interface Usage {
   input_tokens: number
@@ -83,9 +99,7 @@ export async function generateText(
     contents: prompt,
     config: {
       maxOutputTokens: maxTokens,
-      ...(json
-        ? { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
-        : {}),
+      ...(json ? jsonModeConfig(resolved) : {}),
       ...(system ? { systemInstruction: system } : {}),
       ...(temperature != null ? { temperature } : {}),
     },
@@ -128,9 +142,7 @@ export async function generateFromPdf(
     ],
     config: {
       maxOutputTokens: maxTokens,
-      ...(json
-        ? { responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
-        : {}),
+      ...(json ? jsonModeConfig(resolved) : {}),
       ...(temperature != null ? { temperature } : {}),
     },
   })

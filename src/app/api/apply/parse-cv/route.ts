@@ -14,6 +14,12 @@ const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.doc
 const DOC = 'application/msword'
 const ALLOWED = [PDF, DOCX, DOC]
 
+// gemini-2.5-flash (via the Haiku alias). This is a public, latency-sensitive
+// endpoint and Flash is fast, cheap, and accurate enough for these always-present
+// structured fields; the candidate reviews every value anyway. (Flash also
+// supports thinkingBudget:0, which the pro model rejects — see llm.ts.)
+const MODEL = 'claude-haiku-4-5-20251001'
+
 // The extraction contract. Kept deliberately narrow and always-optional so the
 // model has nowhere to wander; every value is re-checked against the resume
 // text by buildAutofill() before it can reach the form.
@@ -91,7 +97,7 @@ export async function POST(request: NextRequest) {
       // Send the PDF to Gemini directly — vision handles multi-column layouts
       // better than dumped text. temperature 0 keeps it literal.
       const { text } = await generateFromPdf(EXTRACTION_PROMPT, buffer.toString('base64'), {
-        model: 'claude-sonnet-4-6',
+        model: MODEL,
         maxTokens: 1024,
         json: true,
         temperature: 0,
@@ -104,7 +110,7 @@ export async function POST(request: NextRequest) {
       }
       const { text } = await generateText(
         `${EXTRACTION_PROMPT}\n\n--- RESUME TEXT ---\n${sourceText.slice(0, 20000)}`,
-        { model: 'claude-sonnet-4-6', maxTokens: 1024, json: true, temperature: 0 },
+        { model: MODEL, maxTokens: 1024, json: true, temperature: 0 },
       )
       raw = JSON.parse(text)
     }
