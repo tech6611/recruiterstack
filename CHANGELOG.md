@@ -58,6 +58,12 @@ entries on top.
   logo should not be uploaded there.
 
 ### Changed
+- **Settings → Workspace: masonry card layout.** The workspace cards were in a
+  2-column grid, where grid rows forced every card to match the tallest one — so
+  the short Company-info card stretched to the height of the tall Careers card
+  beside it, wasting a large empty block. Switched to a masonry column layout
+  (`columns-2` + `break-inside-avoid`) so each card keeps its natural height and
+  the short cards pack vertically, filling the space instead of stretching.
 - **Apply page: enlarged the section tabs.** "Job details" and "Application
   form" bumped from `text-sm` (14px) to `text-base` (16px) so they read at a
   comfortable size relative to the title and chips.

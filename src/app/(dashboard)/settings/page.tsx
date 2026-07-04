@@ -889,14 +889,17 @@ export default function SettingsPage() {
           )}
 
           {activeTab === 'workspace' && canManageSettings && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            // Masonry columns: each card keeps its natural height and packs
+            // vertically, so a short card (e.g. Company info) no longer stretches
+            // to match the tall Careers card sitting beside it.
+            <div className="columns-1 lg:columns-2 gap-6 [&>*]:mb-6 [&>*]:break-inside-avoid">
               <CompanyInfoCard />
-              <CareersPageCard />
               <DepartmentsCard />
               <LocationsCard />
               <CompBandsCard />
               <GroupsCard />
               <CustomFieldsCard />
+              <CareersPageCard />
             </div>
           )}
 
