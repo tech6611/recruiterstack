@@ -12,6 +12,15 @@ entries on top.
 ## 2026-07-04
 
 ### Fixed
+- **Careers hero: unreadable name/tagline on light brand colors.** The hero
+  drew the company name and tagline in fixed white text, which assumed a dark
+  brand color. Pick a light primary color (e.g. a pale cream) and the name
+  washed out to an invisible ghost behind the logo — on the live careers page,
+  not just the settings preview. Added a small luminance helper
+  (`src/lib/branding/contrast.ts`) that picks dark text on light backgrounds and
+  white text on dark ones; applied to both the public careers hero and the
+  settings live preview so they match. (When a hero *image* is set, the existing
+  dark overlay means white text still reads, so that case is unchanged.)
 - **Resume/CV parsing returned 422 for every PDF (autofill never worked).** JSON
   mode in the Gemini wrapper (`lib/ai/llm.ts`) always set `thinkingBudget: 0` to
   stop hidden "thinking" tokens truncating the reply — but **gemini-2.5-pro

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { recenterLogo } from '@/lib/branding/normalize-logo'
+import { readableTextOn } from '@/lib/branding/contrast'
 
 // Curated Google Fonts the careers page can render. Phase 2b loads the chosen
 // family; here we just store the name.
@@ -363,6 +364,7 @@ function CareersPreview({ form, company }: { form: FormState; company: string })
   const font = form.brand_font || 'Inter'
   const name = company || 'Your company'
   const hasHero = !!form.hero_image_url
+  const text = hasHero ? { strong: '#ffffff', muted: 'rgba(255,255,255,0.85)' } : readableTextOn(brand)
 
   useGoogleFont(font)
 
@@ -387,8 +389,8 @@ function CareersPreview({ form, company }: { form: FormState; company: string })
               // eslint-disable-next-line @next/next/no-img-element
               <img src={form.logo_url} alt="" className="mb-3 h-9 w-auto rounded-md bg-white/95 p-1.5 object-contain" />
             )}
-            <p className="text-lg font-bold leading-tight text-white">{name}</p>
-            {form.tagline && <p className="mt-1 text-xs text-white/85">{form.tagline}</p>}
+            <p className="text-lg font-bold leading-tight" style={{ color: text.strong }}>{name}</p>
+            {form.tagline && <p className="mt-1 text-xs" style={{ color: text.muted }}>{form.tagline}</p>}
           </div>
         </div>
 

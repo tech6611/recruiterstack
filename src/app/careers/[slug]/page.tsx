@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { MapPin, Building2, ArrowRight, Briefcase } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCareersPageBySlug, type CareersPageBranding } from '@/modules/ats/domain/job-pipelines'
+import { readableTextOn } from '@/lib/branding/contrast'
 
 const DEFAULT_BRAND  = '#2563eb'
 const DEFAULT_ACCENT = '#10b981'
@@ -116,6 +117,9 @@ export default async function CareersPage({ params }: { params: { slug: string }
 
 function Hero({ branding, brand, company }: { branding: CareersPageBranding; brand: string; company: string }) {
   const hasHero = !!branding.hero_image_url
+  // With a hero image there's a dark overlay, so white always reads. On a solid
+  // brand color, pick text that contrasts — dark on light brands, white on dark.
+  const text = hasHero ? { strong: '#ffffff', muted: 'rgba(255,255,255,0.85)' } : readableTextOn(brand)
 
   return (
     <header
@@ -139,9 +143,9 @@ function Hero({ branding, brand, company }: { branding: CareersPageBranding; bra
             className="mb-6 h-14 w-auto rounded-lg bg-white/95 p-2 object-contain"
           />
         )}
-        <h1 className="text-3xl sm:text-4xl font-bold text-white">{company}</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold" style={{ color: text.strong }}>{company}</h1>
         {branding.tagline && (
-          <p className="mt-3 max-w-2xl text-base sm:text-lg text-white/85">{branding.tagline}</p>
+          <p className="mt-3 max-w-2xl text-base sm:text-lg" style={{ color: text.muted }}>{branding.tagline}</p>
         )}
       </div>
     </header>
