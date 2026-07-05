@@ -11,6 +11,24 @@ entries on top.
 
 ## 2026-07-05
 
+### Changed
+- **Sequences now schedule stages dynamically instead of snapshotting at enroll
+  time.** Enrollment used to pre-queue a job for every stage that existed at that
+  moment, so stages added later never fired for already-enrolled candidates.
+  Now enrollment schedules only the first stage; after each send the handler
+  reads the LIVE stage list, sends the next *unsent* stage, and schedules the
+  one after (`src/lib/sequences/schedule.ts`, `job-handlers.ts`, `enroll/route.ts`).
+  Result: stages added mid-sequence are picked up by people still in flight;
+  deleted stages are cleanly skipped (no ghost send); finished enrollments are
+  left alone; reply/pause stops still honoured. Step delays are now measured from
+  the previous step rather than from enrollment.
+
+### Fixed
+- **New sequence stages are ordered server-side (append at end).** The add-stage
+  API assigned `order_index` from the client, defaulting to `1`, which could
+  scramble ordering; the server now sets it to current max + 1
+  (`sequences/[id]/stages/route.ts`).
+
 ### Added
 - **Sequences auto-stop on candidate reply (reply detection).** Sequence
   emails now carry a per-enrollment `Reply-To` token

@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { auth } from '@clerk/nextjs/server'
 import { withCapability } from '@/lib/api/helpers'
 import { enqueue } from '@/lib/api/job-queue'
+import { computeStageDelaySeconds } from '@/lib/sequences/schedule'
 import { logger } from '@/lib/logger'
 
 // POST /api/sequences/[id]/enroll — enroll candidates
@@ -81,104 +82,38 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Enqueue jobs for each enrollment × each stage
+  // Schedule ONLY the first stage per enrollment. Every subsequent stage is
+  // scheduled dynamically by the sequence_email handler after each send, so the
+  // sequence's LIVE stage list drives people still in flight — stages added or
+  // removed later take effect, instead of a snapshot frozen at enroll time.
+  const orderedStages = (stages ?? []).slice()
+    .sort((a: { order_index: number }, b: { order_index: number }) => a.order_index - b.order_index)
+  const firstStage = orderedStages[0]
   const nowDate = new Date()
-  const nowMs = nowDate.getTime()
   let totalJobsEnqueued = 0
 
   for (const enrollment of enrollmentRecords) {
-    for (let i = 0; i < (stages ?? []).length; i++) {
-      const stage = stages[i]
+    // Keep next_send_at null: the enqueued job is the sole trigger, so the
+    // dormant /sequences/process cron can never create a duplicate.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('sequence_enrollments') as any)
+      .update({ next_send_at: null })
+      .eq('id', enrollment.id)
 
-      // Calculate when this stage should fire
-      let delaySeconds: number
+    if (!firstStage) continue // no stages yet — enrollment waits, nothing to schedule
 
-      if (stage.send_at) {
-        // Exact datetime override — send at this specific moment
-        const sendAtMs = new Date(stage.send_at).getTime()
-        delaySeconds = Math.max(0, Math.round((sendAtMs - nowMs) / 1000))
-
-      } else if (stage.send_at_time) {
-        // Time-of-day scheduling: "send at HH:MM in timezone"
-        const tz = stage.send_timezone || 'Asia/Kolkata'
-        const [targetH, targetM] = stage.send_at_time.split(':').map(Number)
-
-        // Get current date parts in the target timezone using Intl (works regardless of system tz)
-        const fmt = new Intl.DateTimeFormat('en-US', {
-          timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-        })
-        const parts = fmt.formatToParts(nowDate)
-        const get = (t: string) => parseInt(parts.find(p => p.type === t)!.value)
-        const tzYear = get('year'), tzMonth = get('month') - 1, tzDay = get('day')
-        const tzHour = get('hour'), tzMinute = get('minute')
-
-        // Calculate tz offset: realUTC = fakeUTC + offset
-        const nowFakeUtc = Date.UTC(tzYear, tzMonth, tzDay, tzHour, tzMinute, 0)
-        const tzOffsetMs = nowMs - nowFakeUtc
-
-        // Build target time in the timezone (as fake UTC)
-        const extraDays = stage.delay_days ?? 0
-        let targetFakeUtc = Date.UTC(tzYear, tzMonth, tzDay + extraDays, targetH, targetM, 0)
-
-        // If target time already passed today and no delay_days, push to tomorrow
-        const targetRealUtc = targetFakeUtc + tzOffsetMs
-        if (targetRealUtc <= nowMs && extraDays === 0) {
-          targetFakeUtc += 86_400_000 // +1 day
-        }
-
-        delaySeconds = Math.max(0, Math.round((targetFakeUtc + tzOffsetMs - nowMs) / 1000))
-
-      } else {
-        // Relative delay from enrollment time
-        if (i === 0 && (stage.delay_days ?? 0) === 0 && (stage.delay_minutes ?? 0) === 0) {
-          delaySeconds = 0 // First stage with no delay: send immediately
-        } else {
-          const daySeconds = (stage.delay_days ?? 0) * 86400
-          const minSeconds = (stage.delay_minutes ?? 0) * 60
-          delaySeconds = Math.max(daySeconds + minSeconds, i > 0 ? 60 : 0) // min 60s gap for stages 2+
-        }
-      }
-
-      try {
-        await enqueue({
-          orgId,
-          jobType: 'sequence_email',
-          payload: {
-            enrollmentId: enrollment.id,
-            sequenceId: params.id,
-            stageId: stage.id,
-            stageIndex: i,  // 0-based — handler uses this for progress tracking
-          },
-          delaySeconds,
-        })
-        totalJobsEnqueued++
-      } catch (err) {
-        logger.error('Failed to enqueue sequence email', err, {
-          enrollmentId: enrollment.id, stageId: stage.id,
-        })
-      }
-    }
-
-    // If per-stage jobs were created, clear next_send_at so the cron doesn't create duplicate legacy jobs
-    if (totalJobsEnqueued > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from('sequence_enrollments') as any)
-        .update({ next_send_at: null })
-        .eq('id', enrollment.id)
-    }
-
-    // Fallback: if no stages found or all enqueues failed, create a single legacy job
-    if (totalJobsEnqueued === 0) {
-      try {
-        await enqueue({
-          orgId,
-          jobType: 'sequence_email',
-          payload: { enrollmentId: enrollment.id, sequenceId: params.id },
-        })
-      } catch (err) {
-        logger.error('Failed to enqueue fallback sequence email', err, { enrollmentId: enrollment.id })
-      }
+    try {
+      await enqueue({
+        orgId,
+        jobType: 'sequence_email',
+        payload: { enrollmentId: enrollment.id, sequenceId: params.id },
+        delaySeconds: computeStageDelaySeconds(firstStage, nowDate, true),
+      })
+      totalJobsEnqueued++
+    } catch (err) {
+      logger.error('Failed to enqueue first sequence email', err, {
+        enrollmentId: enrollment.id, sequenceId: params.id,
+      })
     }
   }
 

@@ -5,6 +5,7 @@
  */
 
 import { registerHandler, enqueue, type QueuedJob } from './job-queue'
+import { computeStageDelaySeconds } from '@/lib/sequences/schedule'
 import { handleSlaCheck } from '@/lib/approvals/sla-handler'
 import { handleWebhookDelivery } from '@/lib/webhooks/delivery'
 import { runAutopilot } from '@/lib/ai/autopilot'
@@ -225,8 +226,8 @@ registerHandler('slack_notify', async (job: QueuedJob) => {
 // ── Sequence Email ────────────────────────────────────────────────────────────
 
 registerHandler('sequence_email', async (job: QueuedJob) => {
-  const { enrollmentId, sequenceId, stageId, stageIndex } = job.payload as {
-    enrollmentId: string; sequenceId: string; stageId?: string; stageIndex?: number
+  const { enrollmentId, sequenceId } = job.payload as {
+    enrollmentId: string; sequenceId: string
   }
   if (!enrollmentId || !sequenceId) throw new Error('Missing enrollmentId or sequenceId')
 
@@ -246,25 +247,35 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     return
   }
 
-  // Fetch the specific stage (or fall back to current_stage_index for legacy jobs)
-  let stage
-  if (stageId) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase.from('sequence_stages') as any)
-      .select('*').eq('id', stageId).single()
-    stage = data
-  } else {
-    // Legacy: fetch by order_index — handles both 0-based (new) and 1-based (Django) indexing
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: stages } = await (supabase.from('sequence_stages') as any)
-      .select('*').eq('sequence_id', sequenceId).order('order_index', { ascending: true })
-    const idx = stageIndex ?? enrollment.current_stage_index ?? 0
-    // Try matching by order_index first (handles 1-based), fall back to array index (0-based)
-    stage = stages?.find((s: { order_index: number }) => s.order_index === idx) ?? stages?.[idx]
-  }
+  // Read the LIVE stage list plus which stages this enrollment has already been
+  // sent, then pick the next UNSENT stage. This is what makes stage adds/deletes
+  // take effect for people still in flight — there is no enroll-time snapshot.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: liveStages } = await (supabase.from('sequence_stages') as any)
+    .select('*').eq('sequence_id', sequenceId).order('order_index', { ascending: true })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sentRows } = await (supabase.from('sequence_emails') as any)
+    .select('stage_id').eq('enrollment_id', enrollmentId).eq('status', 'sent')
+
+  const sentStageIds = new Set((sentRows ?? []).map((r: { stage_id: string }) => r.stage_id))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ordered = (liveStages ?? []) as any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nextUnsent = () => ordered.find((s: any) => !sentStageIds.has(s.id))
+  const stage = nextUnsent()
 
   if (!stage) {
-    logger.warn('Stage not found, skipping', { enrollmentId, stageId, stageIndex })
+    // No unsent stage remains — the enrollment has reached the end of the
+    // sequence as it currently stands. Mark it completed.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('sequence_enrollments') as any)
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        current_stage_index: sentStageIds.size,
+      })
+      .eq('id', enrollmentId)
+    logger.info('Sequence completed — no unsent stages remain', { enrollmentId, sequenceId })
     return
   }
 
@@ -363,20 +374,32 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
       status: 'sent', sent_at: new Date().toISOString(), org_id: job.org_id,
     })
 
-  // Update enrollment progress
-  const currentIdx = stageIndex ?? enrollment.current_stage_index ?? 0
+  // Advance the display cursor (number of stages sent so far).
+  const sentCount = sentStageIds.size + 1
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase.from('sequence_enrollments') as any)
-    .update({ current_stage_index: currentIdx + 1 })
+    .update({ current_stage_index: sentCount })
     .eq('id', enrollmentId)
 
-  // Check if this was the last stage — fetch total stage count
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { count } = await (supabase.from('sequence_stages') as any)
-    .select('id', { count: 'exact', head: true })
-    .eq('sequence_id', sequenceId)
+  // Schedule the FOLLOWING stage dynamically from the live list: mark this stage
+  // as now-sent, then look for the next unsent stage. If one exists, enqueue it
+  // with its own delay (relative to now). If not, the enrollment is complete.
+  sentStageIds.add(stage.id)
+  const followingStage = nextUnsent()
 
-  if (currentIdx + 1 >= (count ?? 0)) {
+  if (followingStage) {
+    try {
+      await enqueue({
+        orgId: job.org_id,
+        jobType: 'sequence_email',
+        payload: { enrollmentId, sequenceId },
+        delaySeconds: computeStageDelaySeconds(followingStage, new Date(), false),
+      })
+    } catch (err) {
+      logger.error('Failed to schedule next sequence stage', err, { enrollmentId, sequenceId })
+    }
+  } else {
+    // That was the last stage in the sequence as it currently stands — complete.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('sequence_enrollments') as any)
       .update({ status: 'completed', completed_at: new Date().toISOString() })

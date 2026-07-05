@@ -16,10 +16,21 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
 
   if (!seq) return NextResponse.json({ error: 'Sequence not found' }, { status: 404 })
 
+  // Append new stages at the end: assign order_index = current max + 1 on the
+  // server. (The client used to default this to 1, which scrambled ordering and
+  // could make a new stage look like the first step.)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: lastStage } = await (supabase.from('sequence_stages') as any)
+    .select('order_index')
+    .eq('sequence_id', params.id)
+    .order('order_index', { ascending: false })
+    .limit(1)
+  const nextOrderIndex = ((lastStage?.[0]?.order_index as number | undefined) ?? 0) + 1
+
   const stage = {
     org_id: orgId,
     sequence_id: params.id,
-    order_index: body.order_index ?? 1,
+    order_index: nextOrderIndex,
     delay_days: body.delay_days ?? 0,
     delay_minutes: body.delay_minutes ?? 0,
     subject: body.subject ?? '',
