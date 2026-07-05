@@ -72,11 +72,14 @@ function BenefitsBlock({ section, brand }: { section: CareersBenefitsSection; br
         {section.items.map((item, i) => (
           <div key={i} className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 shadow-sm" style={{ backgroundColor: cardBg }}>
             {item.image_url ? (
-              // Natural shape: the image spans the card top edge-to-edge with no
-              // side gaps and shows in full (no crop). Illustrations that share
-              // one aspect ratio stay aligned across cards.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.image_url} alt="" className="block w-full" />
+              // Uniform band: every card's image sits in a fixed-shape box (so
+              // heights match across cards) and is shown in full, never cropped.
+              // Leftover space around an odd-shaped image takes the card fill
+              // colour, so it blends in — set the fill to match your artwork.
+              <div className="aspect-[4/3] w-full" style={{ backgroundColor: cardBg }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.image_url} alt="" className="h-full w-full object-contain" />
+              </div>
             ) : null}
             <div className="flex flex-1 flex-col p-5">
               {!item.image_url && <div className="mb-3 h-1.5 w-8 rounded-full" style={{ backgroundColor: brand }} />}

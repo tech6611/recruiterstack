@@ -360,7 +360,7 @@ function BenefitsFields({ section, onUpdate }: { section: Extract<SectionDraft, 
       </div>
       <ColorField label="Card fill colour (optional)" value={section.card_color}
         onChange={card_color => onUpdate({ card_color })}
-        hint="Applies to every card in this grid. Leave blank for white." />
+        hint="Fills every card and the space around images. Set it to match your artwork's background so images blend in. Leave blank for white." />
       <div className="space-y-2">
         {section.items.map((item, i) => (
           <div key={i} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">

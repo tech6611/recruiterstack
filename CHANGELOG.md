@@ -41,18 +41,19 @@ entries on top.
   (native HTML5 drag; up/down arrows still work). Story/spotlight images gained
   an **Image height** field and a **Fill vs Fit** toggle on top of width and
   placement, with a hint that only *Full width* placement can span the page.
-  Benefit-card images now span the card top **edge-to-edge at their natural
-  shape** (no crop, no side gaps) inside equal-height cards, so illustrations
-  that share one aspect ratio line up. Image upload now
+  Benefit-card images now sit in a **uniform fixed-shape band** and are shown in
+  full (`object-contain`, never cropped); any space around an odd-shaped image
+  takes the card fill colour so it blends in, so every card's image lines up.
+  Image upload now
   accepts **SVG and GIF** too (client picker + server), and re-selecting the
   same file after a failed attempt works. No migration — new fields live in the
   existing `content_sections` JSON.
 
 ### Fixed
-- **Careers benefit images no longer trimmed.** A fixed band height with
-  `object-cover` was cropping tall illustrations (e.g. balloon tops). Benefit
-  images now render at natural aspect ratio — full width, full height, no crop
-  and no gap.
+- **Careers benefit images — uniform bands, no crop, no gaps.** Images now sit
+  in a fixed-shape band, centered and shown in full (`object-contain`); leftover
+  space takes the card fill colour so mismatched-shape images blend and every
+  card's image lines up.
 - **Careers content — heading buttons now enlarge text.** In careers body copy,
   H1/H2 rendered *smaller* than body text (RichText's compact defaults), so the
   heading buttons appeared to shrink text. Careers blocks now render H1/H2 as
