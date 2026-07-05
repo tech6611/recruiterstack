@@ -9,6 +9,51 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-05
+
+### Changed
+- **Careers page redesign — on par with leading ATS career sites (Phase 1).**
+  Reworked the public careers page (`/careers/[slug]`) toward the Kula/Plum-style
+  quality bar:
+  - **Top nav bar** — logo (or company name) on the left, a brand-accent "View
+    open roles" button on the right; sticky on scroll.
+  - **Hero** now centers the company name + tagline with an "Explore open roles"
+    CTA that jumps to the roles grid.
+  - **Job cards** moved from a plain list to a responsive 1/2/3-column grid, each
+    card showing a department chip (tinted with the brand color) plus
+    location / employment-type / remote-or-onsite / seniority badges — data we
+    already collected at intake but never surfaced here.
+  - **Color roles clarified**: the *primary* brand color drives the hero block and
+    chip tints, while the *accent* color drives every call-to-action (nav button,
+    hero button, Apply). CTAs now pick a legible text color automatically, which
+    fixes Apply buttons washing out to a greyed, unreadable state on pale brand
+    colors. Careers and apply pages now use the accent color for actions
+    consistently.
+  - The settings **live preview** mirrors all of the above.
+
+### Added
+- **Careers page — search, filters, and configurable branding (Phases 2 & 3).**
+  Builds on the redesign so each customer's page can look and read like their own:
+  - **Search + filters** on the roles grid — a keyword search box plus
+    department and location dropdowns, all running instantly in the browser.
+    Filters only appear when there's enough to filter, with tidy empty states.
+  - **Custom hero copy** — optional hero headline and subheadline fields; when
+    left blank they fall back to the company name and tagline.
+  - **Top-navigation links** — admins can add up to 6 named links (e.g. "About
+    us", "Our vision") shown in the top-right nav.
+  - **Configurable nav CTA** — the top-right button's label and destination are
+    now editable (defaults to "View open roles" jumping to the roles grid).
+  - **"Powered by RecruiterStack" toggle** — can be hidden from the public page.
+  - Link inputs are sanitized (block `javascript:`/`data:`/`vbscript:` URLs) in
+    validation and again at render as defense-in-depth.
+  - Settings form gains controls + live preview for all of the above.
+
+### Schema
+- **Migration 077** (`077_careers_nav_and_hero.sql`) adds to `org_settings`:
+  `hero_headline`, `hero_subheadline`, `nav_links` (JSONB), `nav_cta_label`,
+  `nav_cta_url`, `show_powered_by`. Additive and idempotent
+  (`ADD COLUMN IF NOT EXISTS`).
+
 ## 2026-07-04
 
 ### Changed

@@ -15,6 +15,17 @@ const emptyToNull = (schema: z.ZodTypeAny) =>
 // Hex color like #1a2b3c or #abc.
 const hexColor = z.string().trim().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'Use a hex color like #2563eb')
 
+// A link target for a nav link/CTA — absolute URL, relative path, or #anchor.
+// Blocks javascript:/data: schemes so a stored link can't inject script.
+const safeHref = z.string().trim().max(300)
+  .refine(s => !/^\s*(javascript|data|vbscript):/i.test(s), 'That link is not allowed')
+
+// One top-nav link: a short label pointing at a safe href.
+const navLink = z.object({
+  label: z.string().trim().min(1, 'Add a label').max(40),
+  url:   safeHref.pipe(z.string().min(1, 'Add a link')),
+})
+
 export const orgSettingsUpdateSchema = z.object({
   slack_webhook_url: z.string().url().nullish(),
   // Admin-only fields (enforced in the handler, not the schema)
@@ -35,6 +46,13 @@ export const orgSettingsUpdateSchema = z.object({
   brand_font:     emptyToNull(z.string().trim().max(60)),
   tagline:        emptyToNull(z.string().trim().max(160)),
   about:          emptyToNull(z.string().trim().max(4000)),
+  // Careers hero copy + top-nav config + footer toggle (migration 077)
+  hero_headline:    emptyToNull(z.string().trim().max(80)),
+  hero_subheadline: emptyToNull(z.string().trim().max(200)),
+  nav_links:        z.array(navLink).max(6).optional(),
+  nav_cta_label:    emptyToNull(z.string().trim().max(30)),
+  nav_cta_url:      emptyToNull(safeHref),
+  show_powered_by:  z.boolean().optional(),
 })
 
 export type OrgSettingsUpdateInput = z.infer<typeof orgSettingsUpdateSchema>

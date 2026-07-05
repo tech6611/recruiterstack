@@ -16,7 +16,8 @@ export async function GET() {
     .select(
       'company_name, company_size, industry, website, ' +
       'careers_slug, careers_public, logo_url, hero_image_url, ' +
-      'brand_color, accent_color, brand_font, tagline, about'
+      'brand_color, accent_color, brand_font, tagline, about, ' +
+      'hero_headline, hero_subheadline, nav_links, nav_cta_label, nav_cta_url, show_powered_by'
     )
     .eq('org_id', orgId)
     .maybeSingle()
@@ -26,6 +27,8 @@ export async function GET() {
       company_name: null, company_size: null, industry: null, website: null,
       careers_slug: null, careers_public: false, logo_url: null, hero_image_url: null,
       brand_color: null, accent_color: null, brand_font: null, tagline: null, about: null,
+      hero_headline: null, hero_subheadline: null, nav_links: [], nav_cta_label: null,
+      nav_cta_url: null, show_powered_by: true,
     },
   })
 }

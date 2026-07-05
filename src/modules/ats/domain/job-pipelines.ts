@@ -420,6 +420,11 @@ export async function getCanonicalApplyJobPreview(
 // apply_token) are listed. org_settings.careers_* columns are not in the
 // generated Database types yet; cast the client as elsewhere in this module.
 
+export interface CareersNavLink {
+  label: string
+  url: string
+}
+
 export interface CareersPageBranding {
   company_name: string | null
   tagline: string | null
@@ -429,18 +434,45 @@ export interface CareersPageBranding {
   brand_color: string | null
   accent_color: string | null
   brand_font: string | null
+  hero_headline: string | null
+  hero_subheadline: string | null
+  nav_links: CareersNavLink[]
+  nav_cta_label: string | null
+  nav_cta_url: string | null
+  show_powered_by: boolean
 }
 
 export interface CareersPageJob {
   title: string
   department: string | null
   location: string | null
+  employment_type: string | null
+  remote_ok: boolean | null
+  level: string | null
   apply_token: string
 }
 
 export interface CareersPage {
   branding: CareersPageBranding
   jobs: CareersPageJob[]
+}
+
+// Coerce the stored nav_links JSON into a clean {label,url}[]. Validation blocks
+// bad entries on write, but this guards render too (older rows, unsafe schemes).
+function sanitizeNavLinks(raw: unknown): CareersNavLink[] {
+  if (!Array.isArray(raw)) return []
+  const links: CareersNavLink[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const label = (item as Record<string, unknown>).label
+    const url = (item as Record<string, unknown>).url
+    if (typeof label !== 'string' || typeof url !== 'string') continue
+    if (!label.trim() || !url.trim()) continue
+    if (/^\s*(javascript|data|vbscript):/i.test(url)) continue
+    links.push({ label: label.trim(), url: url.trim() })
+    if (links.length >= 6) break
+  }
+  return links
 }
 
 export async function getCareersPageBySlug(
@@ -451,7 +483,7 @@ export async function getCareersPageBySlug(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: org, error: orgErr } = await (supabase as any)
     .from('org_settings')
-    .select('org_id, careers_public, company_name, tagline, about, logo_url, hero_image_url, brand_color, accent_color, brand_font')
+    .select('org_id, careers_public, company_name, tagline, about, logo_url, hero_image_url, brand_color, accent_color, brand_font, hero_headline, hero_subheadline, nav_links, nav_cta_label, nav_cta_url, show_powered_by')
     .ilike('careers_slug', slug)
     .maybeSingle()
 
@@ -484,10 +516,16 @@ export async function getCareersPageBySlug(
     .map(r => {
       const intake = (r.custom_fields?.intake ?? {}) as Record<string, unknown>
       const loc = intake.location
+      const empType = intake.employment_type
+      const lvl = intake.level
+      const remote = intake.remote_ok
       return {
         title: r.title,
         department: r.department?.name ?? null,
         location: typeof loc === 'string' && loc.trim() ? loc : null,
+        employment_type: typeof empType === 'string' && empType.trim() ? empType : null,
+        remote_ok: typeof remote === 'boolean' ? remote : null,
+        level: typeof lvl === 'string' && lvl.trim() ? lvl : null,
         apply_token: r.apply_token as string,
       }
     })
@@ -502,6 +540,12 @@ export async function getCareersPageBySlug(
       brand_color: org.brand_color ?? null,
       accent_color: org.accent_color ?? null,
       brand_font: org.brand_font ?? null,
+      hero_headline: org.hero_headline ?? null,
+      hero_subheadline: org.hero_subheadline ?? null,
+      nav_links: sanitizeNavLinks(org.nav_links),
+      nav_cta_label: org.nav_cta_label ?? null,
+      nav_cta_url: org.nav_cta_url ?? null,
+      show_powered_by: org.show_powered_by ?? true,
     },
     jobs,
   }

@@ -78,6 +78,8 @@ export async function PATCH(request: NextRequest) {
   const brandingFields = [
     'careers_slug', 'careers_public', 'logo_url', 'hero_image_url',
     'brand_color', 'accent_color', 'brand_font', 'tagline', 'about',
+    'hero_headline', 'hero_subheadline', 'nav_links', 'nav_cta_label',
+    'nav_cta_url', 'show_powered_by',
   ] as const
 
   const adminFieldPresent =
@@ -130,6 +132,12 @@ export async function PATCH(request: NextRequest) {
   if (parsed.brand_font        !== undefined) patch.brand_font        = parsed.brand_font ?? null
   if (parsed.tagline           !== undefined) patch.tagline           = parsed.tagline ?? null
   if (parsed.about             !== undefined) patch.about             = parsed.about ?? null
+  if (parsed.hero_headline     !== undefined) patch.hero_headline     = parsed.hero_headline ?? null
+  if (parsed.hero_subheadline  !== undefined) patch.hero_subheadline  = parsed.hero_subheadline ?? null
+  if (parsed.nav_links         !== undefined) patch.nav_links         = parsed.nav_links
+  if (parsed.nav_cta_label     !== undefined) patch.nav_cta_label     = parsed.nav_cta_label ?? null
+  if (parsed.nav_cta_url       !== undefined) patch.nav_cta_url       = parsed.nav_cta_url ?? null
+  if (parsed.show_powered_by   !== undefined) patch.show_powered_by   = parsed.show_powered_by
 
   const { data, error } = await supabase
     .from('org_settings')

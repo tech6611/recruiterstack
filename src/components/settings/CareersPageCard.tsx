@@ -46,22 +46,35 @@ function slugError(slug: string): string | null {
   return null
 }
 
+interface NavLinkForm {
+  label: string
+  url:   string
+}
+
 interface FormState {
-  careers_slug:   string
-  careers_public: boolean
-  logo_url:       string | null
-  hero_image_url: string | null
-  brand_color:    string
-  accent_color:   string
-  brand_font:     string
-  tagline:        string
-  about:          string
+  careers_slug:     string
+  careers_public:   boolean
+  logo_url:         string | null
+  hero_image_url:   string | null
+  brand_color:      string
+  accent_color:     string
+  brand_font:       string
+  tagline:          string
+  about:            string
+  hero_headline:    string
+  hero_subheadline: string
+  nav_links:        NavLinkForm[]
+  nav_cta_label:    string
+  nav_cta_url:      string
+  show_powered_by:  boolean
 }
 
 const EMPTY: FormState = {
   careers_slug: '', careers_public: false, logo_url: null, hero_image_url: null,
   brand_color: '#2563eb', accent_color: '#1f7a5a', brand_font: 'Inter',
   tagline: '', about: '',
+  hero_headline: '', hero_subheadline: '', nav_links: [],
+  nav_cta_label: '', nav_cta_url: '', show_powered_by: true,
 }
 
 export function CareersPageCard() {
@@ -92,6 +105,19 @@ export function CareersPageCard() {
           brand_font:     data?.brand_font ?? 'Inter',
           tagline:        data?.tagline ?? '',
           about:          data?.about ?? '',
+          hero_headline:    data?.hero_headline ?? '',
+          hero_subheadline: data?.hero_subheadline ?? '',
+          nav_links:        Array.isArray(data?.nav_links)
+            ? data.nav_links
+                .filter((l: unknown): l is NavLinkForm =>
+                  !!l && typeof l === 'object' &&
+                  typeof (l as NavLinkForm).label === 'string' &&
+                  typeof (l as NavLinkForm).url === 'string')
+                .map((l: NavLinkForm) => ({ label: l.label, url: l.url }))
+            : [],
+          nav_cta_label:    data?.nav_cta_label ?? '',
+          nav_cta_url:      data?.nav_cta_url ?? '',
+          show_powered_by:  data?.show_powered_by ?? true,
         })
         setLoaded(true)
       })
@@ -143,6 +169,14 @@ export function CareersPageCard() {
         brand_font:     form.brand_font || null,
         tagline:        form.tagline.trim() || null,
         about:          form.about.trim() || null,
+        hero_headline:    form.hero_headline.trim() || null,
+        hero_subheadline: form.hero_subheadline.trim() || null,
+        nav_links:        form.nav_links
+          .map(l => ({ label: l.label.trim(), url: l.url.trim() }))
+          .filter(l => l.label && l.url),
+        nav_cta_label:    form.nav_cta_label.trim() || null,
+        nav_cta_url:      form.nav_cta_url.trim() || null,
+        show_powered_by:  form.show_powered_by,
       }),
     })
     setSaving(false)
@@ -285,10 +319,68 @@ export function CareersPageCard() {
               </Select>
             </div>
 
+            {/* Hero copy */}
+            <div className="space-y-1.5">
+              <Label htmlFor="hero_headline">Hero headline</Label>
+              <Input id="hero_headline" maxLength={80} placeholder="Advance your career with us" value={form.hero_headline} onChange={e => setForm({ ...form, hero_headline: e.target.value })} />
+              <p className="text-[11px] text-slate-400">The big line at the top of the page. Leave empty to use your company name.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="hero_subheadline">Hero subheadline</Label>
+              <Input id="hero_subheadline" maxLength={200} placeholder="Come do the best work of your life with a world-class team." value={form.hero_subheadline} onChange={e => setForm({ ...form, hero_subheadline: e.target.value })} />
+              <p className="text-[11px] text-slate-400">The supporting line under the headline. Leave empty to use your tagline.</p>
+            </div>
+
             {/* Tagline */}
             <div className="space-y-1.5">
               <Label htmlFor="tagline">Tagline</Label>
               <Input id="tagline" maxLength={160} placeholder="Build the future of hiring with us" value={form.tagline} onChange={e => setForm({ ...form, tagline: e.target.value })} />
+              <p className="text-[11px] text-slate-400">A short line used for search-engine previews (and the hero subheadline if you leave that empty).</p>
+            </div>
+
+            {/* Top navigation */}
+            <div className="space-y-2">
+              <Label>Top navigation links</Label>
+              <p className="-mt-1 text-[11px] text-slate-400">Links shown in the top bar, e.g. “About us” or “Our vision”. Up to 6.</p>
+              {form.nav_links.map((link, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    aria-label={`Link ${i + 1} label`}
+                    maxLength={40}
+                    placeholder="About us"
+                    value={link.label}
+                    onChange={e => setForm(f => ({ ...f, nav_links: f.nav_links.map((l, j) => j === i ? { ...l, label: e.target.value } : l) }))}
+                  />
+                  <Input
+                    aria-label={`Link ${i + 1} URL`}
+                    maxLength={300}
+                    placeholder="https://yoursite.com/about"
+                    value={link.url}
+                    onChange={e => setForm(f => ({ ...f, nav_links: f.nav_links.map((l, j) => j === i ? { ...l, url: e.target.value } : l) }))}
+                  />
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setForm(f => ({ ...f, nav_links: f.nav_links.filter((_, j) => j !== i) }))}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              {form.nav_links.length < 6 && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setForm(f => ({ ...f, nav_links: [...f.nav_links, { label: '', url: '' }] }))}>
+                  Add link
+                </Button>
+              )}
+            </div>
+
+            {/* Top-right CTA button */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="nav_cta_label">Top-right button label</Label>
+                <Input id="nav_cta_label" maxLength={30} placeholder="View open roles" value={form.nav_cta_label} onChange={e => setForm({ ...form, nav_cta_label: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="nav_cta_url">Top-right button link</Label>
+                <Input id="nav_cta_url" maxLength={300} placeholder="#roles" value={form.nav_cta_url} onChange={e => setForm({ ...form, nav_cta_url: e.target.value })} />
+              </div>
+              <p className="text-[11px] text-slate-400 sm:col-span-2">Leave both empty for a default “View open roles” button that jumps to your job list.</p>
             </div>
 
             {/* About */}
@@ -308,6 +400,20 @@ export function CareersPageCard() {
               <span>
                 <span className="block text-sm font-medium text-slate-800">Make this page public</span>
                 <span className="block text-xs text-slate-400">When on, anyone with the link can see your open jobs. When off, the page is hidden.</span>
+              </span>
+            </label>
+
+            {/* Powered-by toggle */}
+            <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.show_powered_by}
+                onChange={e => setForm({ ...form, show_powered_by: e.target.checked })}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-800">Show “Powered by RecruiterStack”</span>
+                <span className="block text-xs text-slate-400">A small credit in the page footer. Turn off to hide it.</span>
               </span>
             </label>
 
@@ -365,6 +471,7 @@ function CareersPreview({ form, company }: { form: FormState; company: string })
   const name = company || 'Your company'
   const hasHero = !!form.hero_image_url
   const text = hasHero ? { strong: '#ffffff', muted: 'rgba(255,255,255,0.85)' } : readableTextOn(brand)
+  const accentText = readableTextOn(accent).strong
 
   useGoogleFont(font)
 
@@ -375,6 +482,31 @@ function CareersPreview({ form, company }: { form: FormState; company: string })
         className="overflow-hidden rounded-xl border border-slate-200 shadow-sm"
         style={{ fontFamily: `'${font}', system-ui, sans-serif` }}
       >
+        {/* Top nav: logo (or name) left, brand-accent CTA right */}
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5">
+          {form.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={form.logo_url} alt="" className="h-6 w-auto max-w-[110px] object-contain" />
+          ) : (
+            <span className="text-xs font-bold text-slate-900">{name}</span>
+          )}
+          <div className="flex items-center gap-2">
+            {form.nav_links.slice(0, 3).map((link, i) => (
+              link.label.trim() ? (
+                <span key={i} className="hidden text-[10px] font-semibold text-slate-500 sm:inline">
+                  {link.label}
+                </span>
+              ) : null
+            ))}
+            <span
+              className="rounded-md px-2.5 py-1 text-[10px] font-bold"
+              style={{ backgroundColor: accent, color: accentText }}
+            >
+              {form.nav_cta_label || 'View open roles'}
+            </span>
+          </div>
+        </div>
+
         {/* Hero */}
         <div className="relative overflow-hidden" style={hasHero ? undefined : { backgroundColor: brand }}>
           {hasHero && (
@@ -384,31 +516,35 @@ function CareersPreview({ form, company }: { form: FormState; company: string })
               <div className="absolute inset-0 bg-slate-900/55" />
             </>
           )}
-          <div className="relative px-5 py-8">
-            {form.logo_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={form.logo_url} alt="" className="mb-3 h-9 w-auto rounded-md bg-white/95 p-1.5 object-contain" />
+          <div className="relative px-5 py-9 text-center">
+            <p className="text-xl font-bold leading-tight" style={{ color: text.strong }}>{form.hero_headline || name}</p>
+            {(form.hero_subheadline || form.tagline) && (
+              <p className="mt-1.5 text-xs" style={{ color: text.muted }}>{form.hero_subheadline || form.tagline}</p>
             )}
-            {/* A logo already carries the brand (often the name itself), so hide
-                the name text when a logo is present to avoid showing it twice. */}
-            {!form.logo_url && (
-              <p className="text-lg font-bold leading-tight" style={{ color: text.strong }}>{name}</p>
-            )}
-            {form.tagline && <p className="mt-1 text-xs" style={{ color: text.muted }}>{form.tagline}</p>}
+            <span
+              className="mt-4 inline-flex rounded-lg px-3 py-1.5 text-[10px] font-bold"
+              style={{ backgroundColor: accent, color: accentText }}
+            >
+              Explore open roles
+            </span>
           </div>
         </div>
 
         {/* Body: a sample role card */}
         <div className="bg-slate-50 px-5 py-5">
-          <p className="mb-2 text-xs font-bold text-slate-900">Open roles</p>
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-slate-900">Senior Customer Success Manager</p>
-              <p className="mt-0.5 text-[10px] text-slate-500">Customer Success</p>
-            </div>
+          <p className="mb-2.5 text-xs font-bold text-slate-900">Open roles</p>
+          <div className="flex flex-col rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <span
-              className="shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold text-white"
-              style={{ backgroundColor: brand }}
+              className="mb-2 inline-flex w-fit rounded-full px-2 py-0.5 text-[9px] font-semibold"
+              style={{ backgroundColor: `${brand}14`, color: brand }}
+            >
+              Customer Success
+            </span>
+            <p className="text-xs font-bold text-slate-900">Senior Customer Success Manager</p>
+            <p className="mt-1 text-[10px] text-slate-500">Bengaluru · Full-time · Hybrid</p>
+            <span
+              className="mt-3 inline-flex w-fit rounded-lg px-2.5 py-1 text-[10px] font-bold"
+              style={{ backgroundColor: accent, color: accentText }}
             >
               Apply
             </span>
