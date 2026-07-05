@@ -682,7 +682,7 @@ function SectionsPreview({
                   <div key={idx} className="overflow-hidden rounded-md border border-slate-200" style={{ backgroundColor: cardBg }}>
                     {i.image_url.trim() ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={i.image_url} alt="" className="h-12 w-full object-cover" />
+                      <img src={i.image_url} alt="" className="block w-full" />
                     ) : null}
                     <div className="p-2">
                       {!i.image_url.trim() && <div className="mb-1 h-1 w-4 rounded-full" style={{ backgroundColor: brand }} />}
