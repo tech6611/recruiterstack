@@ -16,7 +16,7 @@ import TextAlign    from '@tiptap/extension-text-align'
 import Placeholder  from '@tiptap/extension-placeholder'
 import Link         from '@tiptap/extension-link'
 import Image        from '@tiptap/extension-image'
-import { TextStyle } from '@tiptap/extension-text-style'
+import { TextStyle, FontFamily, FontSize } from '@tiptap/extension-text-style'
 import { Color }     from '@tiptap/extension-color'
 import Highlight     from '@tiptap/extension-highlight'
 import {
@@ -101,6 +101,57 @@ function ColorBtn({ title, value, fallback, onPick, onClear, children }: ColorBt
   )
 }
 
+// A compact dropdown rendered inside the toolbar. The first option is the
+// "default" (empty value) — leaving it selected applies no inline font/size, so
+// the text keeps the page's font and the editor's default size untouched.
+interface SelectFieldProps {
+  title:   string
+  value:   string
+  onChange: (v: string) => void
+  options: { label: string; value: string }[]
+  width?:  string
+}
+
+function SelectField({ title, value, onChange, options, width = 'w-[92px]' }: SelectFieldProps) {
+  return (
+    <select
+      title={title}
+      value={value}
+      // Prevent the mousedown from stealing editor selection before change fires
+      onMouseDown={e => e.stopPropagation()}
+      onChange={e => onChange(e.target.value)}
+      className={`${width} rounded border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-600 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-400`}
+    >
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  )
+}
+
+// Curated font families offered inline. The empty-value first entry keeps the
+// surrounding page font, so untouched text renders exactly as it does today.
+const FONT_FAMILIES: { label: string; value: string }[] = [
+  { label: 'Font',        value: '' },
+  { label: 'Inter',       value: 'Inter' },
+  { label: 'Roboto',      value: 'Roboto' },
+  { label: 'Open Sans',   value: 'Open Sans' },
+  { label: 'Lato',        value: 'Lato' },
+  { label: 'Montserrat',  value: 'Montserrat' },
+  { label: 'Poppins',     value: 'Poppins' },
+  { label: 'Merriweather', value: 'Merriweather' },
+  { label: 'Georgia',     value: 'Georgia' },
+  { label: 'Courier New', value: 'Courier New' },
+]
+
+// Font sizes offered inline. The empty first entry means "default size".
+const FONT_SIZES: { label: string; value: string }[] = [
+  { label: 'Size', value: '' },
+  { label: 'Small',  value: '12px' },
+  { label: 'Normal', value: '14px' },
+  { label: 'Medium', value: '18px' },
+  { label: 'Large',  value: '24px' },
+  { label: 'Huge',   value: '32px' },
+]
+
 // ── Public helper — strip HTML → plain text for emails / GCal ────────────
 
 export function stripHtml(html: string): string {
@@ -147,6 +198,8 @@ export function RichTextEditor({
       StarterKit,
       Underline,
       TextStyle,
+      FontFamily,
+      FontSize,
       Color,
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
@@ -213,6 +266,32 @@ export function RichTextEditor({
         >
           <Highlighter size={sz} />
         </ColorBtn>
+
+        <Divider />
+
+        {/* Font family + size — leaving either on its default keeps current look */}
+        <SelectField
+          title="Font"
+          value={editor.getAttributes('textStyle').fontFamily ?? ''}
+          onChange={v => {
+            const chain = editor.chain().focus()
+            if (v) chain.setFontFamily(v).run()
+            else chain.unsetFontFamily().run()
+          }}
+          options={FONT_FAMILIES}
+          width="w-[104px]"
+        />
+        <SelectField
+          title="Font size"
+          value={editor.getAttributes('textStyle').fontSize ?? ''}
+          onChange={v => {
+            const chain = editor.chain().focus()
+            if (v) chain.setFontSize(v).run()
+            else chain.unsetFontSize().run()
+          }}
+          options={FONT_SIZES}
+          width="w-[84px]"
+        />
 
         <Divider />
 

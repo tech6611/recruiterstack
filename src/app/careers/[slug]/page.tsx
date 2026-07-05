@@ -12,10 +12,40 @@ const DEFAULT_BRAND  = '#2563eb'
 const DEFAULT_ACCENT = '#10b981'
 const DEFAULT_FONT   = 'Inter'
 
-// Build the Google Fonts stylesheet URL for the chosen family.
-function googleFontHref(family: string): string {
-  const name = family.replace(/ /g, '+')
-  return `https://fonts.googleapis.com/css2?family=${name}:wght@400;500;600;700&display=swap`
+// Web fonts we serve via Google Fonts. System fonts (Georgia, Courier New) are
+// available everywhere and need no stylesheet.
+const GOOGLE_FONTS = new Set([
+  'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins',
+  'Merriweather', 'Source Sans 3', 'Nunito', 'Work Sans', 'DM Sans',
+])
+
+// Collect every Google font used on the page: the page-level brand font plus any
+// per-text-box font a user picked inside the editor (stored as inline
+// font-family styles in the branding HTML). Those custom fonts only render if
+// we load them here, so we scan the HTML and request them all in one stylesheet.
+function collectGoogleFonts(branding: CareersPageBranding, pageFont: string): string[] {
+  const found = new Set<string>([pageFont])
+  const blobs = [
+    branding.hero_headline ?? '', branding.hero_subheadline ?? '',
+    branding.tagline ?? '', branding.about ?? '',
+    JSON.stringify(branding.content_sections ?? []),
+  ]
+  const re = /font-family:\s*([^;"'}]+)/gi
+  for (const blob of blobs) {
+    let m: RegExpExecArray | null
+    while ((m = re.exec(blob)) !== null) {
+      found.add(m[1].trim().replace(/^['"]|['"]$/g, ''))
+    }
+  }
+  return Array.from(found).filter(f => GOOGLE_FONTS.has(f))
+}
+
+// Build one Google Fonts stylesheet URL requesting every family we need.
+function googleFontsHref(families: string[]): string {
+  const q = families
+    .map(f => `family=${f.replace(/ /g, '+')}:wght@400;500;600;700`)
+    .join('&')
+  return `https://fonts.googleapis.com/css2?${q}&display=swap`
 }
 
 // Rich fields hold HTML now; search-engine title/description must be plain text.
@@ -50,11 +80,12 @@ export default async function CareersPage({ params }: { params: { slug: string }
   const accent = branding.accent_color || DEFAULT_ACCENT
   const font   = branding.brand_font   || DEFAULT_FONT
   const company = branding.company_name ?? 'Careers'
+  const fontHref = googleFontsHref(collectGoogleFonts(branding, font))
 
   return (
     <div className="min-h-screen bg-slate-50" style={{ fontFamily: `'${font}', system-ui, sans-serif` }}>
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link rel="stylesheet" href={googleFontHref(font)} />
+      <link rel="stylesheet" href={fontHref} />
 
       <Nav branding={branding} company={company} accent={accent} />
       <Hero branding={branding} brand={brand} accent={accent} company={company} rolesCount={jobs.length} />

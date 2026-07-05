@@ -28,6 +28,14 @@ entries on top.
   spans and highlight marks; the domain sanitizer validates colours, widths, and
   drops empty/unsafe content). No new migration — sections live in the existing
   `content_sections` JSON and hero copy in existing columns.
+- **Careers editor — per-text-box font & font size.** The rich editor now has
+  **Font** and **Size** dropdowns; leaving either on its default keeps the exact
+  current look (defaults unchanged — the picks are opt-in inline styles). Fonts
+  are curated Google/system families (`FontFamily` / `FontSize` from
+  `@tiptap/extension-text-style`). The public careers page scans the branding
+  HTML and loads every picked Google font in one stylesheet, and the settings
+  surface preloads them so editors and the live preview render accurately. No
+  migration — picks are stored as inline styles in the existing HTML.
 
 ### Changed
 - **Careers job cards — trimmed top space, readable department pill, bigger

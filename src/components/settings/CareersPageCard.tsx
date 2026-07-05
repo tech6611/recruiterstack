@@ -107,6 +107,10 @@ export function CareersPageCard() {
   // one-click way to match the CTA buttons to the logo.
   const [logoColor, setLogoColor] = useState<string | null>(null)
 
+  // Preload the fonts offered inside the rich editors so per-text-box font picks
+  // preview accurately here (the public page loads them too).
+  useEditorFonts()
+
   useEffect(() => {
     fetch('/api/org-settings/company')
       .then(r => r.json())
@@ -514,17 +518,32 @@ export function CareersPageCard() {
 
 // Loads the chosen Google Font into the document so the preview renders in the
 // real family, not a fallback. Leaves the <link> in place across font switches.
+function loadGoogleFont(family: string) {
+  if (!family) return
+  const id = `gf-${family.replace(/\s+/g, '-')}`
+  if (document.getElementById(id)) return
+  const link = document.createElement('link')
+  link.id = id
+  link.rel = 'stylesheet'
+  link.href = `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
+  document.head.appendChild(link)
+}
+
 function useGoogleFont(family: string) {
-  useEffect(() => {
-    if (!family) return
-    const id = `gf-${family.replace(/\s+/g, '-')}`
-    if (document.getElementById(id)) return
-    const link = document.createElement('link')
-    link.id = id
-    link.rel = 'stylesheet'
-    link.href = `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
-    document.head.appendChild(link)
-  }, [family])
+  useEffect(() => { loadGoogleFont(family) }, [family])
+}
+
+// Google-hosted families a user can pick per-text-box inside the rich editor
+// (mirrors RichTextEditor's FONT_FAMILIES minus the system fonts). We preload
+// them on the careers settings surface so both the editors and the live preview
+// render the chosen font accurately.
+const EDITOR_GOOGLE_FONTS = [
+  'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat',
+  'Poppins', 'Merriweather',
+]
+
+function useEditorFonts() {
+  useEffect(() => { EDITOR_GOOGLE_FONTS.forEach(loadGoogleFont) }, [])
 }
 
 // A miniature, live-updating render of the public careers page. Faithfully
