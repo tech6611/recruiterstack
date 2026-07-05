@@ -30,40 +30,52 @@ const navLink = z.object({
 // An ordered list of freeform blocks the org can add below "About" on their
 // public careers page. Four block types; each carries a client-generated id so
 // the editor can reorder/remove them. Rich-text bodies are sanitized at render.
-const richBody = z.string().trim().max(8000)
+// Every copy field is now rich HTML (colour, highlight, bold, lists…), so the
+// limits allow markup overhead. Required-looking fields (item title, cta
+// headline) aren't min(1) here — the editor drops visually-empty blocks before
+// saving, and the render-time sanitizer drops anything that slips through.
+const richHeading = z.string().trim().max(2000)
+const richBody    = z.string().trim().max(12000)
+// Image width like "60%" or "320px" (or blank for auto).
+const imageWidth  = z.string().trim().max(12).optional().or(z.literal(''))
+const imageAlign  = z.enum(['left', 'right', 'center']).optional()
 
 const textSection = z.object({
   id:    z.string().max(50),
   type:  z.literal('text'),
-  title: z.string().trim().max(120).optional().or(z.literal('')),
+  title: richHeading.optional().or(z.literal('')),
   body:  richBody,
 })
 
 const benefitsSection = z.object({
-  id:    z.string().max(50),
-  type:  z.literal('benefits'),
-  title: z.string().trim().max(120).optional().or(z.literal('')),
+  id:         z.string().max(50),
+  type:       z.literal('benefits'),
+  title:      richHeading.optional().or(z.literal('')),
+  card_color: hexColor.optional().or(z.literal('')),
   items: z.array(z.object({
-    title: z.string().trim().min(1, 'Add a title').max(80),
-    body:  z.string().trim().max(400).optional().or(z.literal('')),
+    title:     richHeading.optional().or(z.literal('')),
+    body:      richBody.optional().or(z.literal('')),
+    image_url: z.string().trim().url().optional().or(z.literal('')),
   })).max(12),
 })
 
 const storySection = z.object({
-  id:         z.string().max(50),
-  type:       z.literal('story'),
-  title:      z.string().trim().max(120).optional().or(z.literal('')),
-  body:       richBody.optional().or(z.literal('')),
-  image_url:  z.string().trim().url().optional().or(z.literal('')),
-  link_label: z.string().trim().max(60).optional().or(z.literal('')),
-  link_url:   safeHref.optional().or(z.literal('')),
+  id:          z.string().max(50),
+  type:        z.literal('story'),
+  title:       richHeading.optional().or(z.literal('')),
+  body:        richBody.optional().or(z.literal('')),
+  image_url:   z.string().trim().url().optional().or(z.literal('')),
+  image_width: imageWidth,
+  image_align: imageAlign,
+  link_label:  z.string().trim().max(60).optional().or(z.literal('')),
+  link_url:    safeHref.optional().or(z.literal('')),
 })
 
 const ctaSection = z.object({
   id:           z.string().max(50),
   type:         z.literal('cta'),
-  headline:     z.string().trim().min(1, 'Add a headline').max(120),
-  subtext:      z.string().trim().max(300).optional().or(z.literal('')),
+  headline:     richHeading,
+  subtext:      richBody.optional().or(z.literal('')),
   button_label: z.string().trim().max(40).optional().or(z.literal('')),
   button_url:   safeHref.optional().or(z.literal('')),
 })
@@ -90,11 +102,11 @@ export const orgSettingsUpdateSchema = z.object({
   brand_color:    emptyToNull(hexColor),
   accent_color:   emptyToNull(hexColor),
   brand_font:     emptyToNull(z.string().trim().max(60)),
-  tagline:        emptyToNull(z.string().trim().max(160)),
+  tagline:        emptyToNull(z.string().trim().max(2000)),  // rich HTML now
   about:          emptyToNull(z.string().trim().max(12000)), // rich HTML now, so allow markup overhead
   // Careers hero copy + top-nav config + footer toggle (migration 077)
-  hero_headline:    emptyToNull(z.string().trim().max(80)),
-  hero_subheadline: emptyToNull(z.string().trim().max(200)),
+  hero_headline:    emptyToNull(z.string().trim().max(2000)),  // rich HTML now
+  hero_subheadline: emptyToNull(z.string().trim().max(4000)),  // rich HTML now
   nav_links:        z.array(navLink).max(6).optional(),
   nav_cta_label:    emptyToNull(z.string().trim().max(30)),
   nav_cta_url:      emptyToNull(safeHref),

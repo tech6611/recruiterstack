@@ -16,11 +16,15 @@ import TextAlign    from '@tiptap/extension-text-align'
 import Placeholder  from '@tiptap/extension-placeholder'
 import Link         from '@tiptap/extension-link'
 import Image        from '@tiptap/extension-image'
+import { TextStyle } from '@tiptap/extension-text-style'
+import { Color }     from '@tiptap/extension-color'
+import Highlight     from '@tiptap/extension-highlight'
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   Heading1, Heading2, List, ListOrdered,
   AlignLeft, AlignCenter, AlignRight,
   Link2, Image as ImageIcon, Link2Off,
+  Baseline, Highlighter,
 } from 'lucide-react'
 
 // ── Toolbar helpers ────────────────────────────────────────────────────────
@@ -52,6 +56,49 @@ function ToolbarBtn({ active, title, onClick, children }: ToolbarBtnProps) {
 
 function Divider() {
   return <div className="w-px h-4 bg-slate-200 mx-1 self-center" />
+}
+
+// A colour picker rendered as a toolbar button: the icon sits above a thin
+// colour bar showing the current value, and a hidden native <input type=color>
+// captures the choice so users get the full spectrum, not a fixed palette.
+interface ColorBtnProps {
+  title:   string
+  value:   string       // current colour ('' when none)
+  fallback: string      // swatch shown when value is empty
+  onPick:  (hex: string) => void
+  onClear: () => void
+  children: React.ReactNode
+}
+
+function ColorBtn({ title, value, fallback, onPick, onClear, children }: ColorBtnProps) {
+  return (
+    <div className="relative flex items-center">
+      <label
+        title={title}
+        onMouseDown={e => e.preventDefault()}
+        className="flex cursor-pointer flex-col items-center gap-0.5 rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+      >
+        {children}
+        <span className="h-[3px] w-4 rounded-full" style={{ backgroundColor: value || fallback }} />
+        <input
+          type="color"
+          value={value || fallback}
+          onChange={e => onPick(e.target.value)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
+      </label>
+      {value && (
+        <button
+          type="button"
+          title="Clear"
+          onMouseDown={e => { e.preventDefault(); onClear() }}
+          className="ml-0.5 text-[10px] font-bold text-slate-400 hover:text-slate-700"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  )
 }
 
 // ── Public helper — strip HTML → plain text for emails / GCal ────────────
@@ -99,6 +146,9 @@ export function RichTextEditor({
     extensions: [
       StarterKit,
       Underline,
+      TextStyle,
+      Color,
+      Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Placeholder.configure({ placeholder }),
       Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-emerald-600 underline cursor-pointer' } }),
@@ -141,6 +191,28 @@ export function RichTextEditor({
         <ToolbarBtn title="Strikethrough"       active={editor.isActive('strike')}     onClick={() => editor.chain().focus().toggleStrike().run()}>
           <Strikethrough size={sz} />
         </ToolbarBtn>
+
+        <Divider />
+
+        {/* Text colour + highlight — full spectrum via native colour input */}
+        <ColorBtn
+          title="Text colour"
+          value={editor.getAttributes('textStyle').color ?? ''}
+          fallback="#0f172a"
+          onPick={hex => editor.chain().focus().setColor(hex).run()}
+          onClear={() => editor.chain().focus().unsetColor().run()}
+        >
+          <Baseline size={sz} />
+        </ColorBtn>
+        <ColorBtn
+          title="Highlight colour"
+          value={editor.getAttributes('highlight').color ?? ''}
+          fallback="#fef08a"
+          onPick={hex => editor.chain().focus().setHighlight({ color: hex }).run()}
+          onClear={() => editor.chain().focus().unsetHighlight().run()}
+        >
+          <Highlighter size={sz} />
+        </ColorBtn>
 
         <Divider />
 

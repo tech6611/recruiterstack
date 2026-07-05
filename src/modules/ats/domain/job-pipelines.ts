@@ -436,14 +436,18 @@ export interface CareersBenefitsSection {
   id: string
   type: 'benefits'
   title?: string
-  items: { title: string; body?: string }[]
+  card_color?: string
+  items: { title: string; body?: string; image_url?: string }[]
 }
+export type CareersImageAlign = 'left' | 'right' | 'center'
 export interface CareersStorySection {
   id: string
   type: 'story'
   title?: string
   body?: string
   image_url?: string
+  image_width?: string
+  image_align?: CareersImageAlign
   link_label?: string
   link_url?: string
 }
@@ -517,6 +521,30 @@ function safeUrl(v: unknown): string {
   const s = str(v)
   return /^\s*(javascript|data|vbscript):/i.test(s) ? '' : s
 }
+// True when an HTML string has no visible text/image — used to drop blocks that
+// look empty even though Tiptap wrote an empty "<p></p>".
+function htmlEmpty(s: string): boolean {
+  if (!s) return true
+  if (/<img\b/i.test(s)) return false
+  return s.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim() === ''
+}
+function rich(v: unknown): string {
+  const s = str(v)
+  return htmlEmpty(s) ? '' : s
+}
+// A hex colour or ''. Guards the stored card fill against junk values.
+function hex(v: unknown): string {
+  const s = str(v)
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ? s : ''
+}
+// "60%" or "320px" (or '' for auto). Anything else is dropped.
+function imgWidth(v: unknown): string {
+  const s = str(v)
+  return /^\d{1,4}(px|%)$/.test(s) ? s : ''
+}
+function imgAlign(v: unknown): CareersImageAlign | undefined {
+  return v === 'left' || v === 'right' || v === 'center' ? v : undefined
+}
 function sanitizeContentSections(raw: unknown): CareersContentSection[] {
   if (!Array.isArray(raw)) return []
   const out: CareersContentSection[] = []
@@ -526,44 +554,46 @@ function sanitizeContentSections(raw: unknown): CareersContentSection[] {
     const id = str(o.id) || `s${out.length}`
     switch (o.type) {
       case 'text': {
-        const body = str(o.body)
+        const body = rich(o.body)
         if (!body) continue
-        out.push({ id, type: 'text', title: str(o.title) || undefined, body })
+        out.push({ id, type: 'text', title: rich(o.title) || undefined, body })
         break
       }
       case 'benefits': {
         const items = Array.isArray(o.items)
           ? o.items
               .map(it => (it && typeof it === 'object' ? it as Record<string, unknown> : {}))
-              .map(it => ({ title: str(it.title), body: str(it.body) || undefined }))
-              .filter(it => it.title)
+              .map(it => ({ title: rich(it.title), body: rich(it.body) || undefined, image_url: safeUrl(it.image_url) || undefined }))
+              .filter(it => it.title || it.body || it.image_url)
               .slice(0, 12)
           : []
         if (items.length === 0) continue
-        out.push({ id, type: 'benefits', title: str(o.title) || undefined, items })
+        out.push({ id, type: 'benefits', title: rich(o.title) || undefined, card_color: hex(o.card_color) || undefined, items })
         break
       }
       case 'story': {
-        const body = str(o.body)
+        const body = rich(o.body)
         const image = safeUrl(o.image_url)
-        const title = str(o.title)
+        const title = rich(o.title)
         if (!body && !image && !title) continue
         out.push({
           id, type: 'story',
           title: title || undefined,
           body: body || undefined,
           image_url: image || undefined,
+          image_width: image ? (imgWidth(o.image_width) || undefined) : undefined,
+          image_align: image ? imgAlign(o.image_align) : undefined,
           link_label: str(o.link_label) || undefined,
           link_url: safeUrl(o.link_url) || undefined,
         })
         break
       }
       case 'cta': {
-        const headline = str(o.headline)
+        const headline = rich(o.headline)
         if (!headline) continue
         out.push({
           id, type: 'cta', headline,
-          subtext: str(o.subtext) || undefined,
+          subtext: rich(o.subtext) || undefined,
           button_label: str(o.button_label) || undefined,
           button_url: safeUrl(o.button_url) || undefined,
         })

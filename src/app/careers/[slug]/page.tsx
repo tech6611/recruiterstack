@@ -18,14 +18,25 @@ function googleFontHref(family: string): string {
   return `https://fonts.googleapis.com/css2?family=${name}:wght@400;500;600;700&display=swap`
 }
 
+// Rich fields hold HTML now; search-engine title/description must be plain text.
+function toPlain(s: string | null | undefined): string {
+  return (s ?? '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&nbsp;/gi, ' ').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const supabase = createAdminClient()
   const data = await getCareersPageBySlug(supabase, params.slug)
   if (!data) return { title: 'Careers' }
   const name = data.branding.company_name ?? 'Careers'
+  const tagline = toPlain(data.branding.tagline)
   return {
     title: `${name} — Careers`,
-    description: data.branding.tagline ?? `Open roles at ${name}.`,
+    description: tagline || `Open roles at ${name}.`,
   }
 }
 
@@ -132,6 +143,8 @@ function Hero({
   const text = hasHero ? { strong: '#ffffff', muted: 'rgba(255,255,255,0.85)' } : readableTextOn(brand)
   const accentText = readableTextOn(accent).strong
   // Custom hero copy when set, else fall back to the company name + tagline.
+  // Copy is rich HTML now — RichText renders it (and also handles the plain
+  // company-name fallback). User colour spans override the contrast colour.
   const headline = branding.hero_headline || company
   const subheadline = branding.hero_subheadline || branding.tagline
 
@@ -148,14 +161,15 @@ function Hero({
         </>
       )}
 
-      <div className="relative max-w-5xl mx-auto px-4 py-20 sm:py-24 text-center">
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight" style={{ color: text.strong }}>
-          {headline}
-        </h1>
+      <div className="relative max-w-5xl mx-auto px-4 py-20 sm:py-24 text-center" style={{ color: text.strong }}>
+        <RichText
+          html={headline}
+          className="!text-4xl sm:!text-5xl font-bold tracking-tight !text-inherit [&_p]:my-0 [&_p]:leading-tight"
+        />
         {subheadline && (
-          <p className="mt-4 mx-auto max-w-2xl text-base sm:text-lg" style={{ color: text.muted }}>
-            {subheadline}
-          </p>
+          <div className="mt-4 mx-auto max-w-2xl" style={{ color: text.muted }}>
+            <RichText html={subheadline} className="!text-base sm:!text-lg !text-inherit [&_p]:my-0" />
+          </div>
         )}
         {rolesCount > 0 && (
           <a

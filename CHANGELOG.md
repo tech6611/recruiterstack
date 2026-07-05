@@ -11,7 +11,29 @@ entries on top.
 
 ## 2026-07-05
 
+### Added
+- **Careers page — full rich text everywhere + image controls (Phase B
+  refinement).** Every copy field on the careers page (hero headline,
+  subheadline, tagline, and every content-section heading/body) is now a
+  Google-Docs-style rich editor, and the editor gained **text colour** and
+  **highlight colour** pickers (full spectrum via a native colour input) on top
+  of bold/headings/lists/align/link (`RichTextEditor.tsx`, powered by new
+  `@tiptap/extension-text-style` / `-color` / `-highlight`). Content sections
+  also gained:
+  - **Benefits grid:** an optional image per card, an optional card fill
+    colour, and a rich-text card body.
+  - **Story / spotlight:** image **placement** (left of text / right of text /
+    full width) and a manual **width** (e.g. `60%` or `320px`).
+  Stored HTML is sanitized on write (Zod) and at render (DOMPurify keeps colour
+  spans and highlight marks; the domain sanitizer validates colours, widths, and
+  drops empty/unsafe content). No new migration — sections live in the existing
+  `content_sections` JSON and hero copy in existing columns.
+
 ### Changed
+- **Careers job cards — trimmed top space, readable department pill, bigger
+  type.** Reduced the card's top padding and the gap above the Apply button,
+  bumped every font except the job title, and fixed the department pill washing
+  out on pale brand colours (falls back to dark slate when the brand is light).
 - **Sequences now schedule stages dynamically instead of snapshotting at enroll
   time.** Enrollment used to pre-queue a job for every stage that existed at that
   moment, so stages added later never fired for already-enrolled candidates.

@@ -122,31 +122,36 @@ export function RolesSection({
 // washes out on a pale brand color.
 function JobCard({ job, brand, accent }: { job: CareersPageJob; brand: string; accent: string }) {
   const accentText = readableTextOn(accent).strong
+  // The department pill sits on a near-white brand tint. On a pale brand colour
+  // the brand-coloured label washes out to nothing, so fall back to a dark slate
+  // when the brand is light (readableTextOn returns dark text only on a light bg).
+  const brandIsLight = readableTextOn(brand).strong !== '#ffffff'
+  const deptColor = brandIsLight ? '#334155' : brand
   return (
     <Link
       href={`/apply/${job.apply_token}`}
-      className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+      className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-white px-5 pb-5 pt-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
     >
       {job.department && (
         <span
-          className="mb-3 inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold"
-          style={{ backgroundColor: `${brand}14`, color: brand }}
+          className="mb-2.5 inline-flex w-fit items-center rounded-full px-3 py-1 text-sm font-semibold"
+          style={{ backgroundColor: `${brand}1f`, color: deptColor }}
         >
           {job.department}
         </span>
       )}
       <p className="text-lg font-bold text-slate-900">{job.title}</p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-slate-500">
         {job.location && <MetaChip icon={MapPin} label={job.location} />}
         {job.employment_type && <MetaChip icon={Briefcase} label={job.employment_type} />}
         {job.remote_ok !== null && <MetaChip icon={Home} label={job.remote_ok ? 'Remote' : 'On-site'} />}
         {job.level && <MetaChip icon={BarChart3} label={job.level} />}
       </div>
 
-      <div className="mt-auto pt-6">
+      <div className="mt-auto pt-5">
         <span
-          className="inline-flex w-fit items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition-opacity group-hover:opacity-90"
+          className="inline-flex w-fit items-center gap-1.5 rounded-xl px-5 py-2.5 text-base font-bold transition-opacity group-hover:opacity-90"
           style={{ backgroundColor: accent, color: accentText }}
         >
           Apply <ArrowRight className="h-4 w-4" />
@@ -159,7 +164,7 @@ function JobCard({ job, brand, accent }: { job: CareersPageJob; brand: string; a
 function MetaChip({ icon: Icon, label }: { icon: typeof MapPin; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <Icon className="h-4 w-4 text-slate-400" /> {label}
+      <Icon className="h-[18px] w-[18px] text-slate-400" /> {label}
     </span>
   )
 }

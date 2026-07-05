@@ -14,12 +14,12 @@ import { recenterLogo } from '@/lib/branding/normalize-logo'
 import { extractLogoColor } from '@/lib/branding/logo-color'
 import { readableTextOn } from '@/lib/branding/contrast'
 
-// The About field is now rich HTML. Older records hold plain text (no tags); the
-// editor treats its seed as HTML, so wrap plain text in paragraphs (blank lines →
-// separate <p>, single newlines → <br>) to preserve structure. HTML is passed
-// through untouched.
+// Rich HTML fields (About, hero copy, tagline). Older records hold plain text
+// (no tags); the editor treats its seed as HTML, so wrap plain text in paragraphs
+// (blank lines → separate <p>, single newlines → <br>) to preserve structure.
+// HTML is passed through untouched.
 const HTML_TAG = /<\/?[a-z][\s\S]*>/i
-function seedAboutHtml(value: string | null | undefined): string {
+function seedRichHtml(value: string | null | undefined): string {
   if (!value) return ''
   if (HTML_TAG.test(value)) return value
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -122,10 +122,10 @@ export function CareersPageCard() {
           brand_color:    data?.brand_color ?? '#2563eb',
           accent_color:   data?.accent_color ?? '#1f7a5a',
           brand_font:     data?.brand_font ?? 'Inter',
-          tagline:        data?.tagline ?? '',
-          about:          seedAboutHtml(data?.about),
-          hero_headline:    data?.hero_headline ?? '',
-          hero_subheadline: data?.hero_subheadline ?? '',
+          tagline:        seedRichHtml(data?.tagline),
+          about:          seedRichHtml(data?.about),
+          hero_headline:    seedRichHtml(data?.hero_headline),
+          hero_subheadline: seedRichHtml(data?.hero_subheadline),
           nav_links:        Array.isArray(data?.nav_links)
             ? data.nav_links
                 .filter((l: unknown): l is NavLinkForm =>
@@ -194,10 +194,10 @@ export function CareersPageCard() {
         brand_color:    form.brand_color || null,
         accent_color:   form.accent_color || null,
         brand_font:     form.brand_font || null,
-        tagline:        form.tagline.trim() || null,
+        tagline:        isHtmlEmpty(form.tagline) ? null : form.tagline,
         about:          isHtmlEmpty(form.about) ? null : form.about,
-        hero_headline:    form.hero_headline.trim() || null,
-        hero_subheadline: form.hero_subheadline.trim() || null,
+        hero_headline:    isHtmlEmpty(form.hero_headline) ? null : form.hero_headline,
+        hero_subheadline: isHtmlEmpty(form.hero_subheadline) ? null : form.hero_subheadline,
         nav_links:        form.nav_links
           .map(l => ({ label: l.label.trim(), url: l.url.trim() }))
           .filter(l => l.label && l.url),
@@ -358,23 +358,30 @@ export function CareersPageCard() {
               </Select>
             </div>
 
-            {/* Hero copy */}
+            {/* Hero copy — rich text so the headline/subheadline can carry colour,
+                highlight and emphasis. */}
             <div className="space-y-1.5">
-              <Label htmlFor="hero_headline">Hero headline</Label>
-              <Input id="hero_headline" maxLength={80} placeholder="Advance your career with us" value={form.hero_headline} onChange={e => setForm({ ...form, hero_headline: e.target.value })} />
+              <Label>Hero headline</Label>
+              <RichTextEditor value={form.hero_headline} minHeight={44}
+                onChange={html => setForm({ ...form, hero_headline: html })}
+                placeholder="Advance your career with us" />
               <p className="text-[11px] text-slate-400">The big line at the top of the page. Leave empty to use your company name.</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="hero_subheadline">Hero subheadline</Label>
-              <Input id="hero_subheadline" maxLength={200} placeholder="Come do the best work of your life with a world-class team." value={form.hero_subheadline} onChange={e => setForm({ ...form, hero_subheadline: e.target.value })} />
+              <Label>Hero subheadline</Label>
+              <RichTextEditor value={form.hero_subheadline} minHeight={44}
+                onChange={html => setForm({ ...form, hero_subheadline: html })}
+                placeholder="Come do the best work of your life with a world-class team." />
               <p className="text-[11px] text-slate-400">The supporting line under the headline. Leave empty to use your tagline.</p>
             </div>
 
             {/* Tagline */}
             <div className="space-y-1.5">
-              <Label htmlFor="tagline">Tagline</Label>
-              <Input id="tagline" maxLength={160} placeholder="Build the future of hiring with us" value={form.tagline} onChange={e => setForm({ ...form, tagline: e.target.value })} />
-              <p className="text-[11px] text-slate-400">A short line used for search-engine previews (and the hero subheadline if you leave that empty).</p>
+              <Label>Tagline</Label>
+              <RichTextEditor value={form.tagline} minHeight={44}
+                onChange={html => setForm({ ...form, tagline: html })}
+                placeholder="Build the future of hiring with us" />
+              <p className="text-[11px] text-slate-400">A short line used for search-engine previews (and the hero subheadline if you leave that empty). Formatting is ignored in search previews.</p>
             </div>
 
             {/* Top navigation */}
@@ -576,9 +583,9 @@ function CareersPreview({ form, company }: { form: FormState; company: string })
             </>
           )}
           <div className="relative px-5 py-9 text-center">
-            <p className="text-xl font-bold leading-tight" style={{ color: text.strong }}>{form.hero_headline || name}</p>
-            {(form.hero_subheadline || form.tagline) && (
-              <p className="mt-1.5 text-xs" style={{ color: text.muted }}>{form.hero_subheadline || form.tagline}</p>
+            <p className="text-xl font-bold leading-tight" style={{ color: text.strong }}>{stripHtml(form.hero_headline) || name}</p>
+            {(stripHtml(form.hero_subheadline) || stripHtml(form.tagline)) && (
+              <p className="mt-1.5 text-xs" style={{ color: text.muted }}>{stripHtml(form.hero_subheadline) || stripHtml(form.tagline)}</p>
             )}
             <span
               className="mt-4 inline-flex rounded-lg px-3 py-1.5 text-[10px] font-bold"
@@ -628,9 +635,9 @@ function SectionsPreview({
 }: { sections: SectionDraft[]; brand: string; accent: string; accentText: string }) {
   const visible = sections.filter(s => {
     if (s.type === 'text') return !isHtmlEmpty(s.body)
-    if (s.type === 'benefits') return s.items.some(i => i.title.trim())
-    if (s.type === 'story') return !!(s.title.trim() || !isHtmlEmpty(s.body) || s.image_url.trim())
-    return !!s.headline.trim()
+    if (s.type === 'benefits') return s.items.some(i => !isHtmlEmpty(i.title) || !isHtmlEmpty(i.body) || i.image_url.trim())
+    if (s.type === 'story') return !!(!isHtmlEmpty(s.title) || !isHtmlEmpty(s.body) || s.image_url.trim())
+    return !isHtmlEmpty(s.headline)
   })
   if (visible.length === 0) return null
 
@@ -640,21 +647,28 @@ function SectionsPreview({
         if (s.type === 'text') {
           return (
             <div key={s.id}>
-              {s.title.trim() && <p className="mb-1 text-[11px] font-bold text-slate-900">{s.title}</p>}
+              {!isHtmlEmpty(s.title) && <p className="mb-1 text-[11px] font-bold text-slate-900">{stripHtml(s.title)}</p>}
               <p className="line-clamp-3 text-[10px] text-slate-500">{stripHtml(s.body)}</p>
             </div>
           )
         }
         if (s.type === 'benefits') {
-          const items = s.items.filter(i => i.title.trim())
+          const items = s.items.filter(i => !isHtmlEmpty(i.title) || !isHtmlEmpty(i.body) || i.image_url.trim())
+          const cardBg = s.card_color || '#ffffff'
           return (
             <div key={s.id}>
-              {s.title.trim() && <p className="mb-1.5 text-[11px] font-bold text-slate-900">{s.title}</p>}
+              {!isHtmlEmpty(s.title) && <p className="mb-1.5 text-[11px] font-bold text-slate-900">{stripHtml(s.title)}</p>}
               <div className="grid grid-cols-2 gap-1.5">
                 {items.slice(0, 4).map((i, idx) => (
-                  <div key={idx} className="rounded-md border border-slate-200 bg-white p-2">
-                    <div className="mb-1 h-1 w-4 rounded-full" style={{ backgroundColor: brand }} />
-                    <p className="text-[10px] font-semibold text-slate-800">{i.title}</p>
+                  <div key={idx} className="overflow-hidden rounded-md border border-slate-200" style={{ backgroundColor: cardBg }}>
+                    {i.image_url.trim() ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={i.image_url} alt="" className="h-10 w-full object-cover" />
+                    ) : null}
+                    <div className="p-2">
+                      {!i.image_url.trim() && <div className="mb-1 h-1 w-4 rounded-full" style={{ backgroundColor: brand }} />}
+                      <p className="text-[10px] font-semibold text-slate-800">{stripHtml(i.title) || stripHtml(i.body)}</p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -662,14 +676,15 @@ function SectionsPreview({
           )
         }
         if (s.type === 'story') {
+          const stacked = s.image_align === 'center'
           return (
-            <div key={s.id} className="flex gap-2">
+            <div key={s.id} className={stacked ? 'space-y-1.5' : 'flex gap-2'}>
               {s.image_url.trim() && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={s.image_url} alt="" className="h-12 w-16 shrink-0 rounded object-cover" />
+                <img src={s.image_url} alt="" className={stacked ? 'h-16 w-full rounded object-cover' : 'h-12 w-16 shrink-0 rounded object-cover'} />
               )}
               <div>
-                {s.title.trim() && <p className="text-[11px] font-bold text-slate-900">{s.title}</p>}
+                {!isHtmlEmpty(s.title) && <p className="text-[11px] font-bold text-slate-900">{stripHtml(s.title)}</p>}
                 <p className="line-clamp-2 text-[10px] text-slate-500">{stripHtml(s.body)}</p>
               </div>
             </div>
@@ -677,7 +692,7 @@ function SectionsPreview({
         }
         return (
           <div key={s.id} className="rounded-lg px-3 py-4 text-center" style={{ backgroundColor: brand }}>
-            <p className="text-[11px] font-bold" style={{ color: readableTextOn(brand).strong }}>{s.headline}</p>
+            <p className="text-[11px] font-bold" style={{ color: readableTextOn(brand).strong }}>{stripHtml(s.headline)}</p>
             {s.button_label.trim() && (
               <span className="mt-2 inline-flex rounded-md px-2 py-1 text-[9px] font-bold"
                 style={{ backgroundColor: accent, color: accentText }}>
