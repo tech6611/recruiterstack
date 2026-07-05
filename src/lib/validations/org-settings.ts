@@ -45,7 +45,7 @@ export const orgSettingsUpdateSchema = z.object({
   accent_color:   emptyToNull(hexColor),
   brand_font:     emptyToNull(z.string().trim().max(60)),
   tagline:        emptyToNull(z.string().trim().max(160)),
-  about:          emptyToNull(z.string().trim().max(4000)),
+  about:          emptyToNull(z.string().trim().max(12000)), // rich HTML now, so allow markup overhead
   // Careers hero copy + top-nav config + footer toggle (migration 077)
   hero_headline:    emptyToNull(z.string().trim().max(80)),
   hero_subheadline: emptyToNull(z.string().trim().max(200)),

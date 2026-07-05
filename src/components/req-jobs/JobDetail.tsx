@@ -67,6 +67,9 @@ function initForm(job: Job) {
     confidentiality:   job.confidentiality ?? 'public',
     // Full JD / intake fields — rich HTML so bullets & formatting survive.
     level:             intake.level ?? '',
+    employment_type:   intake.employment_type ?? '',
+    location:          intake.location ?? '',
+    remote_ok:         intake.remote_ok,
     team_context:      intake.team_context ?? '',
     key_requirements:  intake.key_requirements ?? '',
     nice_to_have:      intake.nice_to_have ?? '',
@@ -74,6 +77,10 @@ function initForm(job: Job) {
     target_start_date: intake.target_start_date ?? '',
   }
 }
+
+// Employment-type choices mirror the intake form so the edit dropdown offers the
+// same options.
+const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary']
 
 // Levels mirror the New Job create form (jobs/page.tsx) so the edit dropdown
 // offers the same choices.
@@ -88,6 +95,10 @@ function readIntake(job: Job) {
     key_requirements:  text(i.key_requirements),
     nice_to_have:      text(i.nice_to_have),
     level:             text(i.level),
+    employment_type:   text(i.employment_type),
+    location:          text(i.location),
+    // remote_ok is a genuine tri-state: true / false / not-answered (null).
+    remote_ok:         typeof i.remote_ok === 'boolean' ? i.remote_ok : null,
     notes:             text(i.notes),
     target_start_date: text(i.target_start_date),
     hm_name:           text(i.hm_name),
@@ -213,6 +224,9 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
         intake: {
           ...existingIntake,
           level:             form.level.trim(),
+          employment_type:   form.employment_type.trim(),
+          location:          form.location.trim(),
+          remote_ok:         form.remote_ok,
           team_context:      isHtmlEmpty(form.team_context)     ? '' : form.team_context,
           key_requirements:  isHtmlEmpty(form.key_requirements) ? '' : form.key_requirements,
           nice_to_have:      isHtmlEmpty(form.nice_to_have)     ? '' : form.nice_to_have,
@@ -561,14 +575,41 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                       </div>
                     )}
 
-                    {/* ── Level (editable) ─────────────────────────────────── */}
-                    <div className="space-y-1.5">
-                      <Label>Level</Label>
-                      <Select value={form.level} onChange={e => setForm(f => ({ ...f, level: e.target.value }))}>
-                        <option value="">—</option>
-                        {LEVEL_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                      </Select>
+                    {/* ── Level + job details (editable; not approval-locked) ─ */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label>Level</Label>
+                        <Select value={form.level} onChange={e => setForm(f => ({ ...f, level: e.target.value }))}>
+                          <option value="">—</option>
+                          {LEVEL_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Employment type</Label>
+                        <Select value={form.employment_type} onChange={e => setForm(f => ({ ...f, employment_type: e.target.value }))}>
+                          <option value="">—</option>
+                          {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Location</Label>
+                        <Input value={form.location}
+                          onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                          placeholder="Bengaluru, Remote, London…" />
+                      </div>
+                      <div className="flex items-end">
+                        <label className="flex items-center gap-2.5 cursor-pointer py-2.5">
+                          <input type="checkbox" checked={!!form.remote_ok}
+                            onChange={e => setForm(f => ({ ...f, remote_ok: e.target.checked }))}
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
+                          <span className="text-sm font-semibold text-slate-700">Remote OK</span>
+                        </label>
+                      </div>
                     </div>
+                    <p className="-mt-2 text-xs text-slate-400">
+                      Employment type, location &amp; remote show as chips on your public careers page. Editing them
+                      does not require re-approval.
+                    </p>
 
                     {/* ── JD body + requirements (editable any status) ─────── */}
                     <div className="space-y-1.5">
@@ -626,6 +667,24 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                         <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Confidentiality</dt>
                         <dd className="text-slate-800 mt-0.5 capitalize">{job.confidentiality}</dd>
                       </div>
+                      {intake.location && (
+                        <div>
+                          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Location</dt>
+                          <dd className="text-slate-800 mt-0.5">{intake.location}</dd>
+                        </div>
+                      )}
+                      {intake.employment_type && (
+                        <div>
+                          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Employment type</dt>
+                          <dd className="text-slate-800 mt-0.5">{intake.employment_type}</dd>
+                        </div>
+                      )}
+                      {intake.remote_ok !== null && (
+                        <div>
+                          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Work mode</dt>
+                          <dd className="text-slate-800 mt-0.5">{intake.remote_ok ? 'Remote OK' : 'On-site'}</dd>
+                        </div>
+                      )}
                     </dl>
                     {job.description && (
                       <div className="mt-5 pt-4 border-t border-slate-100">

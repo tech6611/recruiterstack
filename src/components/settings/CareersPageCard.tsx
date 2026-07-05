@@ -8,9 +8,22 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor, isHtmlEmpty } from '@/components/RichTextEditor'
 import { recenterLogo } from '@/lib/branding/normalize-logo'
+import { extractLogoColor } from '@/lib/branding/logo-color'
 import { readableTextOn } from '@/lib/branding/contrast'
+
+// The About field is now rich HTML. Older records hold plain text (no tags); the
+// editor treats its seed as HTML, so wrap plain text in paragraphs (blank lines →
+// separate <p>, single newlines → <br>) to preserve structure. HTML is passed
+// through untouched.
+const HTML_TAG = /<\/?[a-z][\s\S]*>/i
+function seedAboutHtml(value: string | null | undefined): string {
+  if (!value) return ''
+  if (HTML_TAG.test(value)) return value
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return value.split(/\n{2,}/).map(b => `<p>${esc(b).replace(/\n/g, '<br>')}</p>`).join('')
+}
 
 // Curated Google Fonts the careers page can render. Phase 2b loads the chosen
 // family; here we just store the name.
@@ -87,6 +100,9 @@ export function CareersPageCard() {
   const logoInput = useRef<HTMLInputElement>(null)
   const heroInput = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState<'logo' | 'hero' | null>(null)
+  // A brand colour pulled from the most recently uploaded logo, offered as a
+  // one-click way to match the CTA buttons to the logo.
+  const [logoColor, setLogoColor] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/org-settings/company')
@@ -104,7 +120,7 @@ export function CareersPageCard() {
           accent_color:   data?.accent_color ?? '#1f7a5a',
           brand_font:     data?.brand_font ?? 'Inter',
           tagline:        data?.tagline ?? '',
-          about:          data?.about ?? '',
+          about:          seedAboutHtml(data?.about),
           hero_headline:    data?.hero_headline ?? '',
           hero_subheadline: data?.hero_subheadline ?? '',
           nav_links:        Array.isArray(data?.nav_links)
@@ -142,6 +158,13 @@ export function CareersPageCard() {
     const { url } = await res.json()
     setForm(f => ({ ...f, [kind === 'logo' ? 'logo_url' : 'hero_image_url']: url }))
     toast.success(`${kind === 'logo' ? 'Logo' : 'Hero image'} uploaded`)
+
+    // Pull a representative colour off the logo so the user can match the CTA
+    // buttons to it in one click. Best-effort — a null read just hides the offer.
+    if (kind === 'logo') {
+      const color = await extractLogoColor(prepared)
+      setLogoColor(color)
+    }
   }
 
   const slugErr = slugError(form.careers_slug)
@@ -168,7 +191,7 @@ export function CareersPageCard() {
         accent_color:   form.accent_color || null,
         brand_font:     form.brand_font || null,
         tagline:        form.tagline.trim() || null,
-        about:          form.about.trim() || null,
+        about:          isHtmlEmpty(form.about) ? null : form.about,
         hero_headline:    form.hero_headline.trim() || null,
         hero_subheadline: form.hero_subheadline.trim() || null,
         nav_links:        form.nav_links
@@ -308,6 +331,17 @@ export function CareersPageCard() {
                   />
                   <Input id="accent_color" value={form.accent_color} onChange={e => setForm({ ...form, accent_color: e.target.value })} />
                 </div>
+                <p className="text-[11px] text-slate-400">This colors the “Apply” and “View open roles” buttons.</p>
+                {logoColor && logoColor.toLowerCase() !== form.accent_color.toLowerCase() && (
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, accent_color: logoColor }))}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 hover:text-slate-900"
+                  >
+                    <span className="h-3 w-3 rounded-full border border-slate-300" style={{ backgroundColor: logoColor }} />
+                    Match your logo ({logoColor})
+                  </button>
+                )}
               </div>
             </div>
 
@@ -383,10 +417,15 @@ export function CareersPageCard() {
               <p className="text-[11px] text-slate-400 sm:col-span-2">Leave both empty for a default “View open roles” button that jumps to your job list.</p>
             </div>
 
-            {/* About */}
+            {/* About — rich text so customers can add headings, bullets, links */}
             <div className="space-y-1.5">
-              <Label htmlFor="about">About</Label>
-              <Textarea id="about" maxLength={4000} placeholder="A few sentences about your company, culture, and mission." value={form.about} onChange={e => setForm({ ...form, about: e.target.value })} />
+              <Label>About</Label>
+              <RichTextEditor
+                value={form.about}
+                minHeight={140}
+                onChange={html => setForm({ ...form, about: html })}
+                placeholder="A few sentences about your company, culture, and mission. Use the toolbar for headings, bullets, and links."
+              />
             </div>
 
             {/* Public toggle */}

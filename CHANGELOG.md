@@ -11,6 +11,37 @@ entries on top.
 
 ## 2026-07-05
 
+### Added
+- **Sequences auto-stop on candidate reply (reply detection).** Sequence
+  emails now carry a per-enrollment `Reply-To` token
+  (`reply+<enrollmentId>@reply.recruiterstack.in`, override via
+  `SEQUENCE_REPLY_DOMAIN`). Candidate replies land in SendGrid Inbound Parse →
+  the Django `/api/webhooks/sendgrid/inbound` webhook (updated to match the
+  token deterministically, with the old email/recency match kept as fallback)
+  marks the enrollment `replied`, and both senders already skip non-active
+  enrollments — so remaining stages stop automatically. Requires an MX record
+  on the `reply.` subdomain + a SendGrid Inbound Parse host (infra, one-time).
+- **Careers page polish — richer job cards, logo color match, and a real
+  rich-text About (Phase A).** Feedback pass after comparing our page against
+  Kula/Multiplier:
+  - **Search + filters always show** when a page has any roles (previously
+    hidden unless there were several roles across multiple departments), so
+    every page reads like a proper careers site from the first role.
+  - **Nav links slightly larger** in the top-right so they read as navigation,
+    not fine print.
+  - **Job-edit form gains employment type, location, and remote/on-site** —
+    these already showed as chips on the public cards but couldn't be edited
+    per job. Editing them does *not* trigger re-approval (they're descriptive,
+    not part of the role's substance).
+  - **Match-your-logo accent color** — after uploading a logo, the settings
+    page reads its dominant brand color and offers a one-click "Match your
+    logo" button next to the Accent color field, so the Apply / View-open-roles
+    buttons pick up the logo's color instead of a hand-picked hex.
+  - **About is now a Gmail-style rich-text editor** (headings, bold, bullets,
+    links) rather than a plain box, and renders as sanitized HTML on the public
+    page. Legacy plain-text About values are wrapped into paragraphs on load, so
+    nothing is lost.
+
 ### Changed
 - **Careers page redesign — on par with leading ATS career sites (Phase 1).**
   Reworked the public careers page (`/careers/[slug]`) toward the Kula/Plum-style

@@ -40,7 +40,10 @@ export function RolesSection({
     })
   }, [jobs, query, dept, loc])
 
-  const showFilters = jobs.length > 0 && (departments.length > 1 || locations.length > 1 || jobs.length > 4)
+  // Show the search + filter bar whenever there are roles. Each dropdown appears
+  // only when there's at least one value to pick from, so we never render an
+  // empty "All locations" control on a page whose jobs carry no location.
+  const showFilters = jobs.length > 0
 
   return (
     <section id="roles" className="scroll-mt-20">
@@ -63,7 +66,7 @@ export function RolesSection({
               className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
             />
           </div>
-          {departments.length > 1 && (
+          {departments.length >= 1 && (
             <select
               value={dept}
               onChange={e => setDept(e.target.value)}
@@ -73,7 +76,7 @@ export function RolesSection({
               {departments.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           )}
-          {locations.length > 1 && (
+          {locations.length >= 1 && (
             <select
               value={loc}
               onChange={e => setLoc(e.target.value)}

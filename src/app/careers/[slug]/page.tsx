@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCareersPageBySlug, type CareersPageBranding } from '@/modules/ats/domain/job-pipelines'
 import { readableTextOn } from '@/lib/branding/contrast'
+import { RichText } from '@/components/RichText'
 import { RolesSection } from './roles-section'
 
 const DEFAULT_BRAND  = '#2563eb'
@@ -51,7 +52,7 @@ export default async function CareersPage({ params }: { params: { slug: string }
         {branding.about && (
           <section className="mb-12 max-w-3xl">
             <h2 className="text-lg font-bold text-slate-900 mb-3">About {company}</h2>
-            <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-wrap">{branding.about}</p>
+            <RichText html={branding.about} className="text-slate-600" />
           </section>
         )}
 
@@ -95,7 +96,7 @@ function Nav({ branding, company, accent }: { branding: CareersPageBranding; com
               key={`${link.label}-${link.url}`}
               href={link.url}
               {...(external(link.url) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-              className="hidden rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:text-slate-900 sm:inline-flex"
+              className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:text-slate-900 sm:inline-flex"
             >
               {link.label}
             </a>
@@ -103,7 +104,7 @@ function Nav({ branding, company, accent }: { branding: CareersPageBranding; com
           <a
             href={ctaUrl}
             {...(external(ctaUrl) ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition-opacity hover:opacity-90"
+            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90"
             style={{ backgroundColor: accent, color: accentText }}
           >
             {ctaLabel}
