@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { RichTextEditor, isHtmlEmpty } from '@/components/RichTextEditor'
+import { RichTextEditor, isHtmlEmpty, stripHtml } from '@/components/RichTextEditor'
+import { ContentSectionsEditor, toDrafts, cleanDrafts, type SectionDraft } from '@/components/settings/ContentSectionsEditor'
 import { recenterLogo } from '@/lib/branding/normalize-logo'
 import { extractLogoColor } from '@/lib/branding/logo-color'
 import { readableTextOn } from '@/lib/branding/contrast'
@@ -80,6 +81,7 @@ interface FormState {
   nav_cta_label:    string
   nav_cta_url:      string
   show_powered_by:  boolean
+  content_sections: SectionDraft[]
 }
 
 const EMPTY: FormState = {
@@ -88,6 +90,7 @@ const EMPTY: FormState = {
   tagline: '', about: '',
   hero_headline: '', hero_subheadline: '', nav_links: [],
   nav_cta_label: '', nav_cta_url: '', show_powered_by: true,
+  content_sections: [],
 }
 
 export function CareersPageCard() {
@@ -134,6 +137,7 @@ export function CareersPageCard() {
           nav_cta_label:    data?.nav_cta_label ?? '',
           nav_cta_url:      data?.nav_cta_url ?? '',
           show_powered_by:  data?.show_powered_by ?? true,
+          content_sections: toDrafts(data?.content_sections),
         })
         setLoaded(true)
       })
@@ -200,6 +204,7 @@ export function CareersPageCard() {
         nav_cta_label:    form.nav_cta_label.trim() || null,
         nav_cta_url:      form.nav_cta_url.trim() || null,
         show_powered_by:  form.show_powered_by,
+        content_sections: cleanDrafts(form.content_sections),
       }),
     })
     setSaving(false)
@@ -428,6 +433,21 @@ export function CareersPageCard() {
               />
             </div>
 
+            {/* Custom content sections */}
+            <div className="space-y-1.5">
+              <Label>Page sections</Label>
+              <p className="text-[11px] text-slate-400">
+                Add custom blocks below your open roles — a benefits grid, a team or founder story,
+                a call-to-action banner, or a free-form text section. Reorder with the arrows.
+              </p>
+              <div className="pt-1">
+                <ContentSectionsEditor
+                  value={form.content_sections}
+                  onChange={next => setForm(f => ({ ...f, content_sections: next }))}
+                />
+              </div>
+            </div>
+
             {/* Public toggle */}
             <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer">
               <input
@@ -588,12 +608,85 @@ function CareersPreview({ form, company }: { form: FormState; company: string })
               Apply
             </span>
           </div>
+          <SectionsPreview sections={form.content_sections} brand={brand} accent={accent} accentText={accentText} />
+
           <p className="mt-3 text-center text-[10px] text-slate-400">
             Powered by <span className="font-semibold" style={{ color: accent }}>RecruiterStack</span>
           </p>
         </div>
       </div>
       <p className="text-[11px] text-slate-400">Updates as you edit — this is how your public careers page will look.</p>
+    </div>
+  )
+}
+
+// Miniature render of the custom content sections inside the live preview, so
+// adding a benefits grid / story / CTA shows up immediately. Empty blocks are
+// skipped (mirrors the public page, which drops sections with no content).
+function SectionsPreview({
+  sections, brand, accent, accentText,
+}: { sections: SectionDraft[]; brand: string; accent: string; accentText: string }) {
+  const visible = sections.filter(s => {
+    if (s.type === 'text') return !isHtmlEmpty(s.body)
+    if (s.type === 'benefits') return s.items.some(i => i.title.trim())
+    if (s.type === 'story') return !!(s.title.trim() || !isHtmlEmpty(s.body) || s.image_url.trim())
+    return !!s.headline.trim()
+  })
+  if (visible.length === 0) return null
+
+  return (
+    <div className="mt-5 space-y-4">
+      {visible.map(s => {
+        if (s.type === 'text') {
+          return (
+            <div key={s.id}>
+              {s.title.trim() && <p className="mb-1 text-[11px] font-bold text-slate-900">{s.title}</p>}
+              <p className="line-clamp-3 text-[10px] text-slate-500">{stripHtml(s.body)}</p>
+            </div>
+          )
+        }
+        if (s.type === 'benefits') {
+          const items = s.items.filter(i => i.title.trim())
+          return (
+            <div key={s.id}>
+              {s.title.trim() && <p className="mb-1.5 text-[11px] font-bold text-slate-900">{s.title}</p>}
+              <div className="grid grid-cols-2 gap-1.5">
+                {items.slice(0, 4).map((i, idx) => (
+                  <div key={idx} className="rounded-md border border-slate-200 bg-white p-2">
+                    <div className="mb-1 h-1 w-4 rounded-full" style={{ backgroundColor: brand }} />
+                    <p className="text-[10px] font-semibold text-slate-800">{i.title}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        }
+        if (s.type === 'story') {
+          return (
+            <div key={s.id} className="flex gap-2">
+              {s.image_url.trim() && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={s.image_url} alt="" className="h-12 w-16 shrink-0 rounded object-cover" />
+              )}
+              <div>
+                {s.title.trim() && <p className="text-[11px] font-bold text-slate-900">{s.title}</p>}
+                <p className="line-clamp-2 text-[10px] text-slate-500">{stripHtml(s.body)}</p>
+              </div>
+            </div>
+          )
+        }
+        return (
+          <div key={s.id} className="rounded-lg px-3 py-4 text-center" style={{ backgroundColor: brand }}>
+            <p className="text-[11px] font-bold" style={{ color: readableTextOn(brand).strong }}>{s.headline}</p>
+            {s.button_label.trim() && (
+              <span className="mt-2 inline-flex rounded-md px-2 py-1 text-[9px] font-bold"
+                style={{ backgroundColor: accent, color: accentText }}>
+                {s.button_label}
+              </span>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

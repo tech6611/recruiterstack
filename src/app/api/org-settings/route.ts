@@ -79,7 +79,7 @@ export async function PATCH(request: NextRequest) {
     'careers_slug', 'careers_public', 'logo_url', 'hero_image_url',
     'brand_color', 'accent_color', 'brand_font', 'tagline', 'about',
     'hero_headline', 'hero_subheadline', 'nav_links', 'nav_cta_label',
-    'nav_cta_url', 'show_powered_by',
+    'nav_cta_url', 'show_powered_by', 'content_sections',
   ] as const
 
   const adminFieldPresent =
@@ -138,6 +138,7 @@ export async function PATCH(request: NextRequest) {
   if (parsed.nav_cta_label     !== undefined) patch.nav_cta_label     = parsed.nav_cta_label ?? null
   if (parsed.nav_cta_url       !== undefined) patch.nav_cta_url       = parsed.nav_cta_url ?? null
   if (parsed.show_powered_by   !== undefined) patch.show_powered_by   = parsed.show_powered_by
+  if (parsed.content_sections  !== undefined) patch.content_sections  = parsed.content_sections
 
   const { data, error } = await supabase
     .from('org_settings')

@@ -6,6 +6,7 @@ import { getCareersPageBySlug, type CareersPageBranding } from '@/modules/ats/do
 import { readableTextOn } from '@/lib/branding/contrast'
 import { RichText } from '@/components/RichText'
 import { RolesSection } from './roles-section'
+import { ContentSections } from './content-sections'
 
 const DEFAULT_BRAND  = '#2563eb'
 const DEFAULT_ACCENT = '#10b981'
@@ -58,6 +59,13 @@ export default async function CareersPage({ params }: { params: { slug: string }
 
         {/* Open roles — search + filters run client-side over this list */}
         <RolesSection jobs={jobs} brand={brand} accent={accent} />
+
+        {/* Custom content blocks (benefits, stories, CTA, prose) */}
+        {branding.content_sections.length > 0 && (
+          <div className="mt-16">
+            <ContentSections sections={branding.content_sections} brand={brand} accent={accent} />
+          </div>
+        )}
       </main>
 
       {branding.show_powered_by && (

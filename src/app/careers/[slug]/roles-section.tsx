@@ -129,27 +129,27 @@ function JobCard({ job, brand, accent }: { job: CareersPageJob; brand: string; a
     >
       {job.department && (
         <span
-          className="mb-3 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[11px] font-semibold"
+          className="mb-3 inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold"
           style={{ backgroundColor: `${brand}14`, color: brand }}
         >
           {job.department}
         </span>
       )}
-      <p className="text-base font-bold text-slate-900">{job.title}</p>
+      <p className="text-lg font-bold text-slate-900">{job.title}</p>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-500">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
         {job.location && <MetaChip icon={MapPin} label={job.location} />}
         {job.employment_type && <MetaChip icon={Briefcase} label={job.employment_type} />}
         {job.remote_ok !== null && <MetaChip icon={Home} label={job.remote_ok ? 'Remote' : 'On-site'} />}
         {job.level && <MetaChip icon={BarChart3} label={job.level} />}
       </div>
 
-      <div className="mt-auto pt-5">
+      <div className="mt-auto pt-6">
         <span
-          className="inline-flex w-fit items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-opacity group-hover:opacity-90"
+          className="inline-flex w-fit items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition-opacity group-hover:opacity-90"
           style={{ backgroundColor: accent, color: accentText }}
         >
-          Apply <ArrowRight className="h-3.5 w-3.5" />
+          Apply <ArrowRight className="h-4 w-4" />
         </span>
       </div>
     </Link>
@@ -158,8 +158,8 @@ function JobCard({ job, brand, accent }: { job: CareersPageJob; brand: string; a
 
 function MetaChip({ icon: Icon, label }: { icon: typeof MapPin; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1">
-      <Icon className="h-3.5 w-3.5 text-slate-400" /> {label}
+    <span className="inline-flex items-center gap-1.5">
+      <Icon className="h-4 w-4 text-slate-400" /> {label}
     </span>
   )
 }

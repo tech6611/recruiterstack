@@ -425,6 +425,39 @@ export interface CareersNavLink {
   url: string
 }
 
+// Custom content blocks shown below "About" on the public page (migration 078).
+export interface CareersTextSection {
+  id: string
+  type: 'text'
+  title?: string
+  body: string
+}
+export interface CareersBenefitsSection {
+  id: string
+  type: 'benefits'
+  title?: string
+  items: { title: string; body?: string }[]
+}
+export interface CareersStorySection {
+  id: string
+  type: 'story'
+  title?: string
+  body?: string
+  image_url?: string
+  link_label?: string
+  link_url?: string
+}
+export interface CareersCtaSection {
+  id: string
+  type: 'cta'
+  headline: string
+  subtext?: string
+  button_label?: string
+  button_url?: string
+}
+export type CareersContentSection =
+  | CareersTextSection | CareersBenefitsSection | CareersStorySection | CareersCtaSection
+
 export interface CareersPageBranding {
   company_name: string | null
   tagline: string | null
@@ -440,6 +473,7 @@ export interface CareersPageBranding {
   nav_cta_label: string | null
   nav_cta_url: string | null
   show_powered_by: boolean
+  content_sections: CareersContentSection[]
 }
 
 export interface CareersPageJob {
@@ -475,6 +509,73 @@ function sanitizeNavLinks(raw: unknown): CareersNavLink[] {
   return links
 }
 
+// Coerce stored content_sections JSON into clean typed blocks. Like nav links,
+// validation guards writes; this also guards render against old/bad rows and
+// strips unsafe link schemes. Unknown block types are dropped.
+function str(v: unknown): string { return typeof v === 'string' ? v.trim() : '' }
+function safeUrl(v: unknown): string {
+  const s = str(v)
+  return /^\s*(javascript|data|vbscript):/i.test(s) ? '' : s
+}
+function sanitizeContentSections(raw: unknown): CareersContentSection[] {
+  if (!Array.isArray(raw)) return []
+  const out: CareersContentSection[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const o = item as Record<string, unknown>
+    const id = str(o.id) || `s${out.length}`
+    switch (o.type) {
+      case 'text': {
+        const body = str(o.body)
+        if (!body) continue
+        out.push({ id, type: 'text', title: str(o.title) || undefined, body })
+        break
+      }
+      case 'benefits': {
+        const items = Array.isArray(o.items)
+          ? o.items
+              .map(it => (it && typeof it === 'object' ? it as Record<string, unknown> : {}))
+              .map(it => ({ title: str(it.title), body: str(it.body) || undefined }))
+              .filter(it => it.title)
+              .slice(0, 12)
+          : []
+        if (items.length === 0) continue
+        out.push({ id, type: 'benefits', title: str(o.title) || undefined, items })
+        break
+      }
+      case 'story': {
+        const body = str(o.body)
+        const image = safeUrl(o.image_url)
+        const title = str(o.title)
+        if (!body && !image && !title) continue
+        out.push({
+          id, type: 'story',
+          title: title || undefined,
+          body: body || undefined,
+          image_url: image || undefined,
+          link_label: str(o.link_label) || undefined,
+          link_url: safeUrl(o.link_url) || undefined,
+        })
+        break
+      }
+      case 'cta': {
+        const headline = str(o.headline)
+        if (!headline) continue
+        out.push({
+          id, type: 'cta', headline,
+          subtext: str(o.subtext) || undefined,
+          button_label: str(o.button_label) || undefined,
+          button_url: safeUrl(o.button_url) || undefined,
+        })
+        break
+      }
+      default: continue
+    }
+    if (out.length >= 20) break
+  }
+  return out
+}
+
 export async function getCareersPageBySlug(
   supabase: Supabase,
   slug: string,
@@ -483,7 +584,7 @@ export async function getCareersPageBySlug(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: org, error: orgErr } = await (supabase as any)
     .from('org_settings')
-    .select('org_id, careers_public, company_name, tagline, about, logo_url, hero_image_url, brand_color, accent_color, brand_font, hero_headline, hero_subheadline, nav_links, nav_cta_label, nav_cta_url, show_powered_by')
+    .select('org_id, careers_public, company_name, tagline, about, logo_url, hero_image_url, brand_color, accent_color, brand_font, hero_headline, hero_subheadline, nav_links, nav_cta_label, nav_cta_url, show_powered_by, content_sections')
     .ilike('careers_slug', slug)
     .maybeSingle()
 
@@ -546,6 +647,7 @@ export async function getCareersPageBySlug(
       nav_cta_label: org.nav_cta_label ?? null,
       nav_cta_url: org.nav_cta_url ?? null,
       show_powered_by: org.show_powered_by ?? true,
+      content_sections: sanitizeContentSections(org.content_sections),
     },
     jobs,
   }

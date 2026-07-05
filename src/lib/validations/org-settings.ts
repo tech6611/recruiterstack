@@ -26,6 +26,52 @@ const navLink = z.object({
   url:   safeHref.pipe(z.string().min(1, 'Add a link')),
 })
 
+// ── Careers content sections (migration 078) ────────────────────────────────
+// An ordered list of freeform blocks the org can add below "About" on their
+// public careers page. Four block types; each carries a client-generated id so
+// the editor can reorder/remove them. Rich-text bodies are sanitized at render.
+const richBody = z.string().trim().max(8000)
+
+const textSection = z.object({
+  id:    z.string().max(50),
+  type:  z.literal('text'),
+  title: z.string().trim().max(120).optional().or(z.literal('')),
+  body:  richBody,
+})
+
+const benefitsSection = z.object({
+  id:    z.string().max(50),
+  type:  z.literal('benefits'),
+  title: z.string().trim().max(120).optional().or(z.literal('')),
+  items: z.array(z.object({
+    title: z.string().trim().min(1, 'Add a title').max(80),
+    body:  z.string().trim().max(400).optional().or(z.literal('')),
+  })).max(12),
+})
+
+const storySection = z.object({
+  id:         z.string().max(50),
+  type:       z.literal('story'),
+  title:      z.string().trim().max(120).optional().or(z.literal('')),
+  body:       richBody.optional().or(z.literal('')),
+  image_url:  z.string().trim().url().optional().or(z.literal('')),
+  link_label: z.string().trim().max(60).optional().or(z.literal('')),
+  link_url:   safeHref.optional().or(z.literal('')),
+})
+
+const ctaSection = z.object({
+  id:           z.string().max(50),
+  type:         z.literal('cta'),
+  headline:     z.string().trim().min(1, 'Add a headline').max(120),
+  subtext:      z.string().trim().max(300).optional().or(z.literal('')),
+  button_label: z.string().trim().max(40).optional().or(z.literal('')),
+  button_url:   safeHref.optional().or(z.literal('')),
+})
+
+const contentSection = z.discriminatedUnion('type', [
+  textSection, benefitsSection, storySection, ctaSection,
+])
+
 export const orgSettingsUpdateSchema = z.object({
   slack_webhook_url: z.string().url().nullish(),
   // Admin-only fields (enforced in the handler, not the schema)
@@ -53,6 +99,10 @@ export const orgSettingsUpdateSchema = z.object({
   nav_cta_label:    emptyToNull(z.string().trim().max(30)),
   nav_cta_url:      emptyToNull(safeHref),
   show_powered_by:  z.boolean().optional(),
+  // Custom content sections (migration 078)
+  content_sections: z.array(contentSection).max(20).optional(),
 })
+
+export type CareersContentSection = z.infer<typeof contentSection>
 
 export type OrgSettingsUpdateInput = z.infer<typeof orgSettingsUpdateSchema>

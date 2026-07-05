@@ -21,6 +21,22 @@ entries on top.
   marks the enrollment `replied`, and both senders already skip non-active
   enrollments — so remaining stages stop automatically. Requires an MX record
   on the `reply.` subdomain + a SendGrid Inbound Parse host (infra, one-time).
+- **Careers page — custom content sections (Phase B).** A section builder in
+  Careers settings lets each org add, reorder, and delete content blocks that
+  render on the public page below the open roles. Four block types:
+  - **Text** — a titled rich-text block (headings, bold, bullets, links).
+  - **Benefits grid** — a heading plus a grid of perk cards (title + optional
+    blurb), e.g. "Our unique approach to benefits".
+  - **Story / spotlight** — an image beside rich text with an optional link,
+    e.g. "Meet the team", a founder note, or a documentary link.
+  - **Call-to-action banner** — a big headline + optional button, e.g.
+    "Ready to do the best work of your career?".
+  Blocks reorder with up/down arrows; the settings live preview mirrors them.
+  Bodies and links are sanitized on write (Zod) and again at render (the domain
+  sanitizer drops empty/unknown blocks and unsafe link schemes). Story images
+  upload to the existing company-assets bucket (new `story` upload kind).
+- **Careers job cards — larger, more readable type.** Bumped the title, meta
+  chips, and Apply button sizes now that cards carry more detail.
 - **Careers page polish — richer job cards, logo color match, and a real
   rich-text About (Phase A).** Feedback pass after comparing our page against
   Kula/Multiplier:
@@ -80,6 +96,10 @@ entries on top.
   - Settings form gains controls + live preview for all of the above.
 
 ### Schema
+- **Migration 078** (`078_careers_content_sections.sql`) adds
+  `content_sections` (JSONB, default `[]`) to `org_settings` — an ordered list
+  of custom content blocks (text / benefits / story / CTA) for the public
+  careers page. Additive and idempotent (`ADD COLUMN IF NOT EXISTS`).
 - **Migration 077** (`077_careers_nav_and_hero.sql`) adds to `org_settings`:
   `hero_headline`, `hero_subheadline`, `nav_links` (JSONB), `nav_cta_label`,
   `nav_cta_url`, `show_powered_by`. Additive and idempotent

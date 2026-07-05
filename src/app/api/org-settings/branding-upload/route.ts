@@ -6,7 +6,7 @@ import { getViewerScope, assertCapability } from '@/lib/rbac'
 const BUCKET = 'company-assets'
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
-const ALLOWED_KINDS = ['logo', 'hero'] as const
+const ALLOWED_KINDS = ['logo', 'hero', 'story'] as const
 
 /**
  * POST /api/org-settings/branding-upload
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'file and kind are required' }, { status: 400 })
   }
   if (!ALLOWED_KINDS.includes(kind as (typeof ALLOWED_KINDS)[number])) {
-    return NextResponse.json({ error: 'kind must be "logo" or "hero".' }, { status: 400 })
+    return NextResponse.json({ error: 'kind must be "logo", "hero", or "story".' }, { status: 400 })
   }
   if (!ALLOWED_TYPES.includes(file.type)) {
     return NextResponse.json(
