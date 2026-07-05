@@ -328,11 +328,19 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
 
   sgMail.setApiKey(apiKey)
 
+  // Reply-To carries a per-enrollment token so an inbound reply (caught by
+  // SendGrid Inbound Parse on the reply subdomain) maps deterministically back
+  // to THIS enrollment, letting the inbound webhook mark it 'replied' and
+  // auto-stop the remaining stages. See recruiterstack-api sequences/views_webhooks.py.
+  const replyDomain = process.env.SEQUENCE_REPLY_DOMAIN || 'reply.recruiterstack.in'
+  const replyTo = `reply+${enrollmentId}@${replyDomain}`
+
   let sendgridMessageId: string | null = null
   try {
     const [response] = await sgMail.send({
       to: candidate.email,
       from: { email: stage.send_on_behalf_email || fromEmail, name: stage.send_on_behalf_of || 'RecruiterStack' },
+      replyTo,
       subject,
       html: body,
     })
