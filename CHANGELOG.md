@@ -41,8 +41,9 @@ entries on top.
   (native HTML5 drag; up/down arrows still work). Story/spotlight images gained
   an **Image height** field and a **Fill vs Fit** toggle on top of width and
   placement, with a hint that only *Full width* placement can span the page.
-  Benefit-card images now use **object-contain** (no more cropping) inside
-  equal-height cards, so a grid of illustrations lines up. Image upload now
+  Benefit-card images now fill the card top **edge-to-edge** (object-cover, no
+  padding) inside equal-height cards, so a grid of illustrations lines up with
+  no gaps. Image upload now
   accepts **SVG and GIF** too (client picker + server), and re-selecting the
   same file after a failed attempt works. No migration — new fields live in the
   existing `content_sections` JSON.
