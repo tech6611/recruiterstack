@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { readableTextOn } from '@/lib/branding/contrast'
@@ -48,11 +49,16 @@ function RichHeading({
   )
 }
 
+// Applied to careers body copy so heading buttons (H1/H2) render as real,
+// larger headings instead of RichText's compact defaults (where H2 is smaller
+// than body text). Users' own inline font-size picks still win over these.
+const BODY_HEADINGS = '[&_h1]:!text-2xl [&_h1]:!font-bold [&_h2]:!text-xl [&_h2]:!font-semibold'
+
 function TextBlock({ section }: { section: CareersTextSection }) {
   return (
     <section className="max-w-3xl">
       {section.title && <RichHeading html={section.title} size="!text-xl" className="mb-3" />}
-      <RichText html={section.body} className="text-base text-slate-600" />
+      <RichText html={section.body} className={cn('text-base text-slate-600', BODY_HEADINGS)} />
     </section>
   )
 }
@@ -62,17 +68,19 @@ function BenefitsBlock({ section, brand }: { section: CareersBenefitsSection; br
   return (
     <section>
       {section.title && <RichHeading html={section.title} size="!text-2xl" className="mb-6" />}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {section.items.map((item, i) => (
-          <div key={i} className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm" style={{ backgroundColor: cardBg }}>
+          <div key={i} className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 shadow-sm" style={{ backgroundColor: cardBg }}>
             {item.image_url ? (
+              // Contain (not cover) so illustrations show whole and never crop; a
+              // fixed image band keeps every card's text starting at the same line.
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.image_url} alt="" className="h-36 w-full object-cover" />
+              <img src={item.image_url} alt="" className="h-44 w-full object-contain p-4" />
             ) : null}
-            <div className="p-5">
+            <div className="flex flex-1 flex-col p-5">
               {!item.image_url && <div className="mb-3 h-1.5 w-8 rounded-full" style={{ backgroundColor: brand }} />}
               {item.title && <RichHeading html={item.title} size="!text-lg" className="[&_p]:leading-snug" />}
-              {item.body && <RichText html={item.body} className="mt-1.5 text-sm text-slate-500" />}
+              {item.body && <RichText html={item.body} className="mt-1.5 text-sm text-slate-500 [&_h1]:!text-lg [&_h2]:!text-base" />}
             </div>
           </div>
         ))}
@@ -86,20 +94,28 @@ function StoryBlock({ section, accent }: { section: CareersStorySection; accent:
   const align = section.image_align ?? 'left'
   const hasImg = !!section.image_url
 
+  const fit = section.image_fit ?? 'cover'
+  const imgStyle: CSSProperties = {}
+  if (section.image_width) imgStyle.width = section.image_width
+  if (section.image_height) imgStyle.height = section.image_height
   const image = hasImg ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={section.image_url!}
       alt=""
-      style={section.image_width ? { width: section.image_width } : undefined}
-      className={cn('rounded-2xl object-cover shadow-sm', align === 'center' ? 'mx-auto w-full max-w-3xl' : 'w-full')}
+      style={Object.keys(imgStyle).length ? imgStyle : undefined}
+      className={cn(
+        'rounded-2xl shadow-sm',
+        fit === 'contain' ? 'object-contain' : 'object-cover',
+        align === 'center' ? 'mx-auto w-full max-w-3xl' : 'w-full',
+      )}
     />
   ) : null
 
   const copy = (
     <div>
       {section.title && <RichHeading html={section.title} size="!text-2xl" className="mb-3" />}
-      {section.body && <RichText html={section.body} className="text-base text-slate-600" />}
+      {section.body && <RichText html={section.body} className={cn('text-base text-slate-600', BODY_HEADINGS)} />}
       {section.link_url && section.link_label && (
         <a
           href={section.link_url}

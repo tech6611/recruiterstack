@@ -95,7 +95,7 @@ export default async function CareersPage({ params }: { params: { slug: string }
         {branding.about && (
           <section className="mb-12 max-w-3xl">
             <h2 className="text-lg font-bold text-slate-900 mb-3">About {company}</h2>
-            <RichText html={branding.about} className="text-slate-600" />
+            <RichText html={branding.about} className="text-slate-600 [&_h1]:!text-2xl [&_h1]:!font-bold [&_h2]:!text-xl [&_h2]:!font-semibold" />
           </section>
         )}
 

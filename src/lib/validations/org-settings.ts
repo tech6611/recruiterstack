@@ -36,9 +36,10 @@ const navLink = z.object({
 // saving, and the render-time sanitizer drops anything that slips through.
 const richHeading = z.string().trim().max(2000)
 const richBody    = z.string().trim().max(12000)
-// Image width like "60%" or "320px" (or blank for auto).
+// Image width/height like "60%" or "320px" (or blank for auto).
 const imageWidth  = z.string().trim().max(12).optional().or(z.literal(''))
 const imageAlign  = z.enum(['left', 'right', 'center']).optional()
+const imageFit    = z.enum(['cover', 'contain']).optional()
 
 const textSection = z.object({
   id:    z.string().max(50),
@@ -64,9 +65,11 @@ const storySection = z.object({
   type:        z.literal('story'),
   title:       richHeading.optional().or(z.literal('')),
   body:        richBody.optional().or(z.literal('')),
-  image_url:   z.string().trim().url().optional().or(z.literal('')),
-  image_width: imageWidth,
-  image_align: imageAlign,
+  image_url:    z.string().trim().url().optional().or(z.literal('')),
+  image_width:  imageWidth,
+  image_height: imageWidth,
+  image_fit:    imageFit,
+  image_align:  imageAlign,
   link_label:  z.string().trim().max(60).optional().or(z.literal('')),
   link_url:    safeHref.optional().or(z.literal('')),
 })

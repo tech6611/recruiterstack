@@ -440,6 +440,7 @@ export interface CareersBenefitsSection {
   items: { title: string; body?: string; image_url?: string }[]
 }
 export type CareersImageAlign = 'left' | 'right' | 'center'
+export type CareersImageFit = 'cover' | 'contain'
 export interface CareersStorySection {
   id: string
   type: 'story'
@@ -447,6 +448,8 @@ export interface CareersStorySection {
   body?: string
   image_url?: string
   image_width?: string
+  image_height?: string
+  image_fit?: CareersImageFit
   image_align?: CareersImageAlign
   link_label?: string
   link_url?: string
@@ -545,6 +548,9 @@ function imgWidth(v: unknown): string {
 function imgAlign(v: unknown): CareersImageAlign | undefined {
   return v === 'left' || v === 'right' || v === 'center' ? v : undefined
 }
+function imgFit(v: unknown): CareersImageFit | undefined {
+  return v === 'cover' || v === 'contain' ? v : undefined
+}
 function sanitizeContentSections(raw: unknown): CareersContentSection[] {
   if (!Array.isArray(raw)) return []
   const out: CareersContentSection[] = []
@@ -582,6 +588,8 @@ function sanitizeContentSections(raw: unknown): CareersContentSection[] {
           body: body || undefined,
           image_url: image || undefined,
           image_width: image ? (imgWidth(o.image_width) || undefined) : undefined,
+          image_height: image ? (imgWidth(o.image_height) || undefined) : undefined,
+          image_fit: image ? imgFit(o.image_fit) : undefined,
           image_align: image ? imgAlign(o.image_align) : undefined,
           link_label: str(o.link_label) || undefined,
           link_url: safeUrl(o.link_url) || undefined,

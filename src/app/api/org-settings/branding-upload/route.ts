@@ -5,7 +5,7 @@ import { getViewerScope, assertCapability } from '@/lib/rbac'
 
 const BUCKET = 'company-assets'
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
-const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
+const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'image/gif']
 const ALLOWED_KINDS = ['logo', 'hero', 'story'] as const
 
 /**
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   }
   if (!ALLOWED_TYPES.includes(file.type)) {
     return NextResponse.json(
-      { error: 'Only PNG, JPG, WebP, or SVG images are accepted.' },
+      { error: 'Only PNG, JPG, WebP, SVG, or GIF images are accepted.' },
       { status: 415 }
     )
   }

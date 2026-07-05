@@ -36,6 +36,22 @@ entries on top.
   HTML and loads every picked Google font in one stylesheet, and the settings
   surface preloads them so editors and the live preview render accurately. No
   migration — picks are stored as inline styles in the existing HTML.
+- **Careers content sections — drag-to-reorder, story image sizing, and more
+  upload formats.** Sections can now be reordered by dragging the grip handle
+  (native HTML5 drag; up/down arrows still work). Story/spotlight images gained
+  an **Image height** field and a **Fill vs Fit** toggle on top of width and
+  placement, with a hint that only *Full width* placement can span the page.
+  Benefit-card images now use **object-contain** (no more cropping) inside
+  equal-height cards, so a grid of illustrations lines up. Image upload now
+  accepts **SVG and GIF** too (client picker + server), and re-selecting the
+  same file after a failed attempt works. No migration — new fields live in the
+  existing `content_sections` JSON.
+
+### Fixed
+- **Careers content — heading buttons now enlarge text.** In careers body copy,
+  H1/H2 rendered *smaller* than body text (RichText's compact defaults), so the
+  heading buttons appeared to shrink text. Careers blocks now render H1/H2 as
+  proper larger headings; users' own inline font-size picks still win.
 
 ### Changed
 - **Careers job cards — trimmed top space, readable department pill, bigger
