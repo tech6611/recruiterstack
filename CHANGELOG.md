@@ -20,6 +20,13 @@ entries on top.
   sequence continues forward (no backlog burst). Also scopes the update to the
   caller's org.
 
+### Changed
+- **Sequences list now groups into foldable Active / Archived panes.** The flat
+  list is split into two collapsible coloured panes (green Active — open by
+  default — and tan Archived — collapsed), mirroring the Openings page style,
+  each with a count badge. Archived rows gained a Restore action. Colours live
+  in one `PANE_TINT` config at the top of the page.
+
 ### Added
 - **Step delays now support minutes and hours, not just days.** The sequence
   step editor's delay unit dropdown offers minutes / hours / days / business

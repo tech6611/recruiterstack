@@ -5,8 +5,9 @@ import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Mail, Loader2,
-  Play, Pause, Archive, ChevronRight,
+  Play, Pause, Archive, ChevronRight, ChevronDown,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { Sequence, SequenceStatus } from '@/lib/types/database'
 
 // ── Status config ───────────────────────────────────────────────────────────
@@ -15,6 +16,15 @@ const STATUS_BADGE: Record<SequenceStatus, { label: string; cls: string }> = {
   draft:    { label: 'Draft',    cls: 'bg-slate-100 text-slate-600 border-slate-200' },
   active:   { label: 'Active',   cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   archived: { label: 'Archived', cls: 'bg-red-50 text-red-600 border-red-200' },
+}
+
+// Foldable pane header tints — the "filled colour" blocks, mirroring the
+// Openings page so Sequences matches the rest of the app. Swap these two rows
+// to restyle both panes at once.
+type PaneTone = { bar: string; title: string; chevron: string; badge: string }
+const PANE_TINT: { active: PaneTone; archived: PaneTone } = {
+  active:   { bar: 'bg-[#d9ece1] hover:bg-[#cbe4d7]', title: 'text-[#0c4634]', chevron: 'text-[#2f9c72]', badge: 'text-[#0c4634]' },
+  archived: { bar: 'bg-[#eae6dd] hover:bg-[#e0dbce]', title: 'text-[#4f483d]', chevron: 'text-[#9a8f7d]', badge: 'text-[#4f483d]' },
 }
 
 // ── Page ────────────────────────────────────────────────────────────────────
@@ -65,6 +75,10 @@ export default function SequencesPage() {
     })
     if (res.ok) load()
   }
+
+  // Two buckets: everything not archived (active + draft) vs archived.
+  const activeSeqs = sequences.filter(s => s.status !== 'archived')
+  const archivedSeqs = sequences.filter(s => s.status === 'archived')
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -121,93 +135,176 @@ export default function SequencesPage() {
         </div>
       )}
 
-      {/* Sequence list */}
+      {/* Sequence list — grouped into foldable Active / Archived panes */}
       {sequences.length > 0 && (
-        <div className="space-y-2">
-          {sequences.map(seq => {
-            const badge = STATUS_BADGE[seq.status] ?? STATUS_BADGE.draft
-            const replyRate = seq.enrollment_count && seq.reply_count
-              ? Math.round((seq.reply_count / seq.enrollment_count) * 100)
-              : 0
+        <div className="space-y-4">
+          <SequencePane
+            title="Active"
+            tone={PANE_TINT.active}
+            count={activeSeqs.length}
+            defaultOpen
+            emptyText="No active sequences yet."
+          >
+            {activeSeqs.map(seq => (
+              <SequenceRow key={seq.id} seq={seq} onOpen={() => router.push(`/sequences/${seq.id}`)} onStatus={handleStatusChange} />
+            ))}
+          </SequencePane>
 
-            return (
-              <div
-                key={seq.id}
-                onClick={() => router.push(`/sequences/${seq.id}`)}
-                className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 hover:border-slate-300 hover:shadow-sm cursor-pointer transition-all"
-              >
-                {/* Icon */}
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                  seq.status === 'active' ? 'bg-emerald-50' : 'bg-slate-50'
-                }`}>
-                  <Mail className={`h-5 w-5 ${seq.status === 'active' ? 'text-emerald-500' : 'text-slate-400'}`} />
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{seq.name}</p>
-                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
-                      {badge.label}
-                    </span>
-                  </div>
-                  {seq.description && (
-                    <p className="text-xs text-slate-400 mt-0.5 truncate">{seq.description}</p>
-                  )}
-                </div>
-
-                {/* Stats */}
-                <div className="flex items-center gap-6 shrink-0 text-xs text-slate-500">
-                  <div className="text-center">
-                    <p className="font-bold text-slate-700">{seq.stage_count ?? 0}</p>
-                    <p>Stages</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-bold text-slate-700">{seq.enrollment_count ?? 0}</p>
-                    <p>Enrolled</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-bold text-emerald-600">{seq.reply_count ?? 0}{replyRate ? ` (${replyRate}%)` : ''}</p>
-                    <p>Replied</p>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                     onClick={e => e.stopPropagation()}>
-                  {seq.status === 'draft' && (
-                    <button
-                      onClick={() => handleStatusChange(seq.id, 'active')}
-                      title="Activate"
-                      className="rounded-lg p-1.5 text-emerald-500 hover:bg-emerald-50 transition-colors"
-                    >
-                      <Play className="h-4 w-4" />
-                    </button>
-                  )}
-                  {seq.status === 'active' && (
-                    <button
-                      onClick={() => handleStatusChange(seq.id, 'draft')}
-                      title="Pause (set to draft)"
-                      className="rounded-lg p-1.5 text-amber-500 hover:bg-amber-50 transition-colors"
-                    >
-                      <Pause className="h-4 w-4" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleStatusChange(seq.id, 'archived')}
-                    title="Archive"
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 transition-colors"
-                  >
-                    <Archive className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <ChevronRight className="h-4 w-4 text-slate-300 shrink-0" />
-              </div>
-            )
-          })}
+          <SequencePane
+            title="Archived"
+            tone={PANE_TINT.archived}
+            count={archivedSeqs.length}
+            defaultOpen={false}
+            emptyText="Nothing archived."
+          >
+            {archivedSeqs.map(seq => (
+              <SequenceRow key={seq.id} seq={seq} onOpen={() => router.push(`/sequences/${seq.id}`)} onStatus={handleStatusChange} />
+            ))}
+          </SequencePane>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Foldable pane ─────────────────────────────────────────────────────────────
+
+// A coloured, click-to-collapse header block + a soft-filled body holding the
+// rows. Rendered twice — Active and Archived.
+function SequencePane({
+  title, tone, count, defaultOpen, emptyText, children,
+}: {
+  title: string
+  tone: PaneTone
+  count: number
+  defaultOpen: boolean
+  emptyText: string
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={cn('flex w-full items-center gap-2 px-4 py-3 text-left transition-colors', tone.bar)}
+      >
+        {open
+          ? <ChevronDown className={cn('h-4 w-4 shrink-0', tone.chevron)} />
+          : <ChevronRight className={cn('h-4 w-4 shrink-0', tone.chevron)} />}
+        <span className={cn('text-sm font-semibold uppercase tracking-wide', tone.title)}>{title}</span>
+        <span className={cn('inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold', tone.badge)}>
+          {count}
+        </span>
+      </button>
+
+      {open && (
+        <div className="space-y-2 border-t border-slate-100 bg-slate-50/50 p-2">
+          {count === 0
+            ? <p className="py-8 text-center text-sm text-slate-400">{emptyText}</p>
+            : children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Sequence row ──────────────────────────────────────────────────────────────
+
+function SequenceRow({
+  seq, onOpen, onStatus,
+}: {
+  seq: Sequence
+  onOpen: () => void
+  onStatus: (id: string, status: SequenceStatus) => void
+}) {
+  const badge = STATUS_BADGE[seq.status] ?? STATUS_BADGE.draft
+  const replyRate = seq.enrollment_count && seq.reply_count
+    ? Math.round((seq.reply_count / seq.enrollment_count) * 100)
+    : 0
+
+  return (
+    <div
+      onClick={onOpen}
+      className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 hover:border-slate-300 hover:shadow-sm cursor-pointer transition-all"
+    >
+      {/* Icon */}
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+        seq.status === 'active' ? 'bg-emerald-50' : 'bg-slate-50'
+      }`}>
+        <Mail className={`h-5 w-5 ${seq.status === 'active' ? 'text-emerald-500' : 'text-slate-400'}`} />
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-slate-800 truncate">{seq.name}</p>
+          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
+            {badge.label}
+          </span>
+        </div>
+        {seq.description && (
+          <p className="text-xs text-slate-400 mt-0.5 truncate">{seq.description}</p>
+        )}
+      </div>
+
+      {/* Stats */}
+      <div className="flex items-center gap-6 shrink-0 text-xs text-slate-500">
+        <div className="text-center">
+          <p className="font-bold text-slate-700">{seq.stage_count ?? 0}</p>
+          <p>Stages</p>
+        </div>
+        <div className="text-center">
+          <p className="font-bold text-slate-700">{seq.enrollment_count ?? 0}</p>
+          <p>Enrolled</p>
+        </div>
+        <div className="text-center">
+          <p className="font-bold text-emerald-600">{seq.reply_count ?? 0}{replyRate ? ` (${replyRate}%)` : ''}</p>
+          <p>Replied</p>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+           onClick={e => e.stopPropagation()}>
+        {seq.status === 'draft' && (
+          <button
+            onClick={() => onStatus(seq.id, 'active')}
+            title="Activate"
+            className="rounded-lg p-1.5 text-emerald-500 hover:bg-emerald-50 transition-colors"
+          >
+            <Play className="h-4 w-4" />
+          </button>
+        )}
+        {seq.status === 'active' && (
+          <button
+            onClick={() => onStatus(seq.id, 'draft')}
+            title="Pause (set to draft)"
+            className="rounded-lg p-1.5 text-amber-500 hover:bg-amber-50 transition-colors"
+          >
+            <Pause className="h-4 w-4" />
+          </button>
+        )}
+        {seq.status === 'archived' ? (
+          <button
+            onClick={() => onStatus(seq.id, 'draft')}
+            title="Restore (set to draft)"
+            className="rounded-lg p-1.5 text-emerald-500 hover:bg-emerald-50 transition-colors"
+          >
+            <Play className="h-4 w-4" />
+          </button>
+        ) : (
+          <button
+            onClick={() => onStatus(seq.id, 'archived')}
+            title="Archive"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 transition-colors"
+          >
+            <Archive className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      <ChevronRight className="h-4 w-4 text-slate-300 shrink-0" />
     </div>
   )
 }
