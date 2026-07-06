@@ -9,6 +9,26 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-06
+
+### Fixed
+- **Sequences: resuming a paused enrollment now continues sending.** Pausing
+  breaks the send chain (the due job runs, sees a non-active enrollment, and
+  returns without scheduling the next step), so resume previously did nothing.
+  Resuming (`/api/enrollments/[id]` → `active`) now re-enqueues the chain — only
+  if nothing is already queued — so the next unsent step goes out and the
+  sequence continues forward (no backlog burst). Also scopes the update to the
+  caller's org.
+
+### Added
+- **Step delays now support minutes and hours, not just days.** The sequence
+  step editor's delay unit dropdown offers minutes / hours / days / business
+  days (stored via existing `delay_minutes`/`delay_days`; hours = minutes×60). A
+  fixed clock time ("at HH:MM") now shows only for day-level delays, so minute/
+  hour steps are cleanly relative to the previous step — no accidental
+  next-day rollover. Shared mapping helpers in `src/lib/sequences/schedule.ts`
+  with tests.
+
 ## 2026-07-05
 
 ### Added

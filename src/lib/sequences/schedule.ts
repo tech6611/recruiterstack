@@ -74,3 +74,31 @@ export function computeStageDelaySeconds(
   if (isFirst && daySeconds === 0 && minSeconds === 0) return 0
   return Math.max(daySeconds + minSeconds, isFirst ? 0 : 60)
 }
+
+// ── Delay unit ↔ stored fields ────────────────────────────────────────────────
+// The step editor lets a user pick an amount + unit (minutes/hours/days). We
+// store only delay_days + delay_minutes (+ delay_business_days), so these map a
+// UI amount/unit to those columns and back. Hours are stored as minutes×60.
+
+export type DelayUnit = 'minutes' | 'hours' | 'days' | 'business_days'
+
+export function toDelayFields(value: number, unit: DelayUnit): {
+  delay_days: number; delay_minutes: number; delay_business_days: boolean
+} {
+  const v = Math.max(0, Math.floor(value || 0))
+  switch (unit) {
+    case 'minutes':       return { delay_days: 0, delay_minutes: v,      delay_business_days: false }
+    case 'hours':         return { delay_days: 0, delay_minutes: v * 60, delay_business_days: false }
+    case 'days':          return { delay_days: v, delay_minutes: 0,      delay_business_days: false }
+    case 'business_days': return { delay_days: v, delay_minutes: 0,      delay_business_days: true  }
+  }
+}
+
+export function fromDelayFields(
+  delayDays: number, delayMinutes: number, businessDays: boolean,
+): { value: number; unit: DelayUnit } {
+  if (delayDays > 0) return { value: delayDays, unit: businessDays ? 'business_days' : 'days' }
+  if (delayMinutes > 0 && delayMinutes % 60 === 0) return { value: delayMinutes / 60, unit: 'hours' }
+  if (delayMinutes > 0) return { value: delayMinutes, unit: 'minutes' }
+  return { value: 0, unit: 'minutes' }
+}

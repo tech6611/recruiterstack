@@ -6,6 +6,7 @@ import {
   Wand2, ChevronDown, Send, CheckCircle,
 } from 'lucide-react'
 import type { SequenceStage, SequenceChannel, StageCondition } from '@/lib/types/database'
+import { toDelayFields, fromDelayFields, type DelayUnit } from '@/lib/sequences/schedule'
 import { RichTextEditor } from '@/components/RichTextEditor'
 import { useSettings } from '@/lib/hooks/useSettings'
 import type { Editor } from '@tiptap/react'
@@ -81,9 +82,10 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [subject, setSubject]             = useState(stage?.subject ?? '')
   const [body, setBody]                   = useState(stage?.body ?? '')
   const [editorKey, setEditorKey]         = useState(0)
-  const [delayDays, setDelayDays]         = useState(stage?.delay_days ?? 0)
-  const [delayMinutes, setDelayMinutes]   = useState(stage?.delay_minutes ?? 0)
-  const [businessDays, setBusinessDays]   = useState(stage?.delay_business_days ?? false)
+  const initialDelay = fromDelayFields(stage?.delay_days ?? 0, stage?.delay_minutes ?? 0, stage?.delay_business_days ?? false)
+  const [delayValue, setDelayValue]       = useState(initialDelay.value)
+  const [delayUnit, setDelayUnit]         = useState<DelayUnit>(initialDelay.unit)
+  const isDayUnit = delayUnit === 'days' || delayUnit === 'business_days'
   const [sendTime, setSendTime]           = useState(stage?.send_at_time?.slice(0, 5) ?? '')
   const [sendTz, setSendTz]              = useState(stage?.send_timezone && stage.send_timezone !== 'UTC' ? stage.send_timezone : 'Asia/Kolkata')
   const [condition, setCondition]         = useState<StageCondition | ''>(stage?.condition ?? '')
@@ -264,18 +266,21 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
     setSaving(true)
     setError('')
 
+    const { delay_days, delay_minutes, delay_business_days } = toDelayFields(delayValue, delayUnit)
     const payload: Record<string, unknown> = {
-      delay_days: delayDays,
-      delay_minutes: delayMinutes,
+      delay_days,
+      delay_minutes,
       subject,
       body,
       send_on_behalf_of: soboName,
       send_on_behalf_email: soboEmail,
       channel,
       send_at: null,
-      send_at_time: sendTime || null,
+      // A fixed clock time only applies to day-level delays; minute/hour delays
+      // are purely relative to the previous step.
+      send_at_time: isDayUnit ? (sendTime || null) : null,
       send_timezone: sendTz,
-      delay_business_days: businessDays,
+      delay_business_days,
       condition: condition || null,
     }
 
@@ -354,66 +359,74 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
               <Clock className="h-3.5 w-3.5" /> Scheduling
             </label>
 
-            {/* Single inline row: [days] [type ▼] (date preview) at [time] [tz ▼] */}
+            {/* Inline row: [amount] [unit ▼] — plus, for day-level delays only, (date) at [time] [tz ▼] */}
             <div className="flex flex-wrap items-center gap-1.5 text-sm text-slate-700">
               <input
                 type="number"
                 min={0}
                 max={90}
-                value={delayDays}
-                onChange={e => setDelayDays(Number(e.target.value))}
+                value={delayValue}
+                onChange={e => setDelayValue(Number(e.target.value))}
                 className="w-14 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-center text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               />
               <select
-                value={businessDays ? 'business' : 'calendar'}
-                onChange={e => setBusinessDays(e.target.value === 'business')}
+                value={delayUnit}
+                onChange={e => setDelayUnit(e.target.value as DelayUnit)}
                 className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               >
-                <option value="calendar">{delayDays === 1 ? 'day' : 'days'}</option>
-                <option value="business">business {delayDays === 1 ? 'day' : 'days'}</option>
+                <option value="minutes">{delayValue === 1 ? 'minute' : 'minutes'}</option>
+                <option value="hours">{delayValue === 1 ? 'hour' : 'hours'}</option>
+                <option value="days">{delayValue === 1 ? 'day' : 'days'}</option>
+                <option value="business_days">business {delayValue === 1 ? 'day' : 'days'}</option>
               </select>
 
-              {/* Date preview — shows computed target date */}
-              {delayDays > 0 && (
+              {/* Date preview — only meaningful for day-level delays */}
+              {isDayUnit && delayValue > 0 && (
                 <span className="text-xs text-slate-400">
                   ({(() => {
                     const target = new Date()
                     let added = 0
-                    while (added < delayDays) {
+                    while (added < delayValue) {
                       target.setDate(target.getDate() + 1)
-                      if (!businessDays || target.getDay() !== 0 && target.getDay() !== 6) added++
+                      if (delayUnit !== 'business_days' || (target.getDay() !== 0 && target.getDay() !== 6)) added++
                     }
                     return target.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
                   })()})
                 </span>
               )}
 
-              <span className="text-slate-400">at</span>
-
-              <input
-                type="time"
-                value={sendTime}
-                onChange={e => setSendTime(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-              />
-
-              <select
-                value={sendTz}
-                onChange={e => setSendTz(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-              >
-                {TIMEZONES.map(tz => {
-                  // Short labels for common timezones
-                  const labels: Record<string, string> = {
-                    'Asia/Kolkata': 'IST', 'America/New_York': 'EST', 'America/Chicago': 'CST',
-                    'America/Denver': 'MST', 'America/Los_Angeles': 'PST', 'Europe/London': 'GMT',
-                    'Europe/Berlin': 'CET', 'Europe/Paris': 'CET', 'Asia/Singapore': 'SGT',
-                    'Asia/Tokyo': 'JST', 'Australia/Sydney': 'AEDT', 'UTC': 'UTC',
-                  }
-                  return <option key={tz} value={tz}>{labels[tz] ?? tz.replace(/_/g, ' ')}</option>
-                })}
-              </select>
+              {/* A specific clock time only applies to day-level delays */}
+              {isDayUnit && (
+                <>
+                  <span className="text-slate-400">at</span>
+                  <input
+                    type="time"
+                    value={sendTime}
+                    onChange={e => setSendTime(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                  />
+                  <select
+                    value={sendTz}
+                    onChange={e => setSendTz(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                  >
+                    {TIMEZONES.map(tz => {
+                      // Short labels for common timezones
+                      const labels: Record<string, string> = {
+                        'Asia/Kolkata': 'IST', 'America/New_York': 'EST', 'America/Chicago': 'CST',
+                        'America/Denver': 'MST', 'America/Los_Angeles': 'PST', 'Europe/London': 'GMT',
+                        'Europe/Berlin': 'CET', 'Europe/Paris': 'CET', 'Asia/Singapore': 'SGT',
+                        'Asia/Tokyo': 'JST', 'Australia/Sydney': 'AEDT', 'UTC': 'UTC',
+                      }
+                      return <option key={tz} value={tz}>{labels[tz] ?? tz.replace(/_/g, ' ')}</option>
+                    })}
+                  </select>
+                </>
+              )}
             </div>
+            {!isDayUnit && (
+              <p className="text-[11px] text-slate-400">Sends this long after the previous step.</p>
+            )}
           </div>
 
           {/* ── 3. Conditional Logic (stage 2+) ──────────────────────────── */}
