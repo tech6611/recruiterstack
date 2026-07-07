@@ -37,6 +37,9 @@ entries on top.
 - Architecture memo + decision record (DR-001) produced for the two-backend
   consolidation: keep Next.js as the single app backend, retire the duplicated
   Django REST layer, keep the voice-AI service standalone.
+- **Added `docs/backlog.md`** — a central "parking lot" for plans not being worked on
+  now. Seeded with the Django consolidation item (+ safety net, reversible plan) and
+  lighter noted items from the architecture/perf review.
 
 ## 2026-07-06
 
