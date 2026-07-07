@@ -9,6 +9,17 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-08
+
+### Changed
+- **Sequence Enrollments is now a two-pane workspace.** Left = who's enrolled (or
+  a live preview of a pending selection); right = the three "Add Candidate" tools
+  — Manual search · Bulk filter · Auto-enrollment rules — with a switcher. The
+  bulk/manual pop-out drawers are gone (inline panels now); as you build a manual
+  selection or a filter, the left panel previews exactly who would be enrolled
+  (`enroll-by-filter` dryRun now returns candidate names). The automation-rule
+  tag/stage value is a real dropdown of existing values (with a "Custom…" escape).
+
 ## 2026-07-07
 
 ### Added

@@ -3,15 +3,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Loader2, Plus, Trash2, Pencil, X,
+  ArrowLeft, Loader2, Plus, Trash2, Pencil,
   ArrowDown, Play, Pause, Mail, Users, TrendingUp,
   User, Clock, Zap, Filter, ChevronDown,
 } from 'lucide-react'
-import type { Sequence, SequenceStage, SequenceEnrollment, SequenceStatus, Candidate } from '@/lib/types/database'
+import type { Sequence, SequenceStage, SequenceEnrollment, SequenceStatus } from '@/lib/types/database'
 import SequenceStageEditor from '@/components/sequences/SequenceStageEditor'
 import SequenceAnalytics from '@/components/sequences/SequenceAnalytics'
 import SequenceAutomations from '@/components/sequences/SequenceAutomations'
-import BulkEnrollDrawer from '@/components/sequences/BulkEnrollDrawer'
+import ManualEnrollPanel from '@/components/sequences/ManualEnrollPanel'
+import BulkEnrollPanel from '@/components/sequences/BulkEnrollPanel'
 
 // ── Status config ───────────────────────────────────────────────────────────
 
@@ -53,52 +54,20 @@ export default function SequenceDetailPage() {
   const [editorOpen, setEditorOpen]       = useState(false)
   const [editingStage, setEditingStage]   = useState<SequenceStage | null>(null)
 
-  // Add candidates state
-  const [showAddCandidates, setShowAddCandidates] = useState(false)
-  const [showBulkEnroll, setShowBulkEnroll]       = useState(false)
-  const [addMenuOpen, setAddMenuOpen]             = useState(false)
-  const [candidateSearch, setCandidateSearch]       = useState('')
-  const [searchResults, setSearchResults]           = useState<Candidate[]>([])
-  const [searching, setSearching]                   = useState(false)
-  const [selectedCandidates, setSelectedCandidates] = useState<Candidate[]>([])
-  const [enrollingDirect, setEnrollingDirect]       = useState(false)
+  // Add-candidate workspace state
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [activeTool, setActiveTool]   = useState<'manual' | 'bulk' | 'automation'>('manual')
+  const [preview, setPreview]         = useState<{ count: number | null; candidates: { id: string; name: string; email: string }[] }>({ count: null, candidates: [] })
 
-  // ── Candidate search for direct enrollment ─────────────────────────────
-  const searchCandidates = async (q: string) => {
-    setCandidateSearch(q)
-    if (q.length < 2) { setSearchResults([]); return }
-    setSearching(true)
-    const res = await fetch(`/api/candidates?search=${encodeURIComponent(q)}&limit=10`)
-    if (res.ok) {
-      const json = await res.json()
-      setSearchResults(json.data ?? [])
-    }
-    setSearching(false)
-  }
+  // Panels push their current selection here → the left panel previews it.
+  const handlePreview = useCallback((count: number | null, candidates: { id: string; name: string; email: string }[]) => {
+    setPreview({ count, candidates })
+  }, [])
 
-  const toggleCandidate = (c: Candidate) => {
-    setSelectedCandidates(prev =>
-      prev.find(x => x.id === c.id) ? prev.filter(x => x.id !== c.id) : [...prev, c]
-    )
-  }
-
-  const enrollSelected = async () => {
-    if (selectedCandidates.length === 0) return
-    setEnrollingDirect(true)
-    const res = await fetch(`/api/sequences/${id}/enroll`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidate_ids: selectedCandidates.map(c => c.id) }),
-    })
-    setEnrollingDirect(false)
-    if (res.ok) {
-      setSelectedCandidates([])
-      setCandidateSearch('')
-      setSearchResults([])
-      setShowAddCandidates(false)
-      loadEnrollments()
-      loadSequence()
-    }
+  const selectTool = (t: 'manual' | 'bulk' | 'automation') => {
+    setActiveTool(t)
+    setPreview({ count: null, candidates: [] })
+    setTab('enrollments')
   }
 
   const loadSequence = useCallback(async () => {
@@ -239,19 +208,19 @@ export default function SequenceDetailPage() {
                 <div className="fixed inset-0 z-40" onClick={() => setAddMenuOpen(false)} />
                 <div className="absolute right-0 top-full z-50 mt-1.5 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
                   <button
-                    onClick={() => { setAddMenuOpen(false); setShowAddCandidates(true) }}
+                    onClick={() => { setAddMenuOpen(false); selectTool('manual') }}
                     className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                   >
                     <User className="h-4 w-4 text-slate-400" /> Select manually
                   </button>
                   <button
-                    onClick={() => { setAddMenuOpen(false); setShowBulkEnroll(true) }}
+                    onClick={() => { setAddMenuOpen(false); selectTool('bulk') }}
                     className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                   >
                     <Filter className="h-4 w-4 text-slate-400" /> Bulk enroll by filter
                   </button>
                   <button
-                    onClick={() => { setAddMenuOpen(false); setTab('enrollments') }}
+                    onClick={() => { setAddMenuOpen(false); selectTool('automation') }}
                     className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                   >
                     <Zap className="h-4 w-4 text-slate-400" /> Auto-enrollment rules
@@ -395,70 +364,94 @@ export default function SequenceDetailPage() {
         </div>
       )}
 
-      {/* ─── Enrollments Tab ─────────────────────────────────────────────── */}
+      {/* ─── Enrollments Tab (two-pane workspace) ────────────────────────── */}
       {tab === 'enrollments' && (
-        <div className="space-y-8">
-          {/* Conditions — auto-enrollment rules */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* LEFT — enrolled candidates, or a live preview of a pending selection */}
           <div>
-            <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-800">
-              <Zap className="h-4 w-4 text-emerald-500" /> Auto-enrollment rules
-            </h3>
-            <SequenceAutomations sequenceId={id} active={seq.status === 'active'} />
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                <Users className="h-4 w-4 text-slate-500" />
+                {preview.candidates.length > 0 ? 'Preview — will be enrolled' : 'Enrolled candidates'}
+              </h3>
+              <span className="text-xs font-medium text-slate-400">
+                {preview.candidates.length > 0 ? (preview.count ?? preview.candidates.length) : enrollments.length}
+              </span>
+            </div>
+
+            {preview.candidates.length > 0 ? (
+              <div className="space-y-2">
+                {preview.candidates.map(c => (
+                  <div key={c.id} className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/40 px-4 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">{c.name || 'Unknown'}</p>
+                      <p className="truncate text-xs text-slate-400">{c.email}</p>
+                    </div>
+                  </div>
+                ))}
+                {typeof preview.count === 'number' && preview.count > preview.candidates.length && (
+                  <p className="text-center text-[11px] text-slate-400">+ {preview.count - preview.candidates.length} more</p>
+                )}
+              </div>
+            ) : enrollLoading ? (
+              <div className="flex items-center justify-center gap-2 py-12 text-slate-400">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+              </div>
+            ) : enrollments.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 py-14 text-center">
+                <Users className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+                <p className="text-sm text-slate-500">No candidates enrolled yet</p>
+                <p className="mt-1 text-xs text-slate-400">Use the panel on the right to add some →</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {enrollments.map(e => (
+                  <div key={e.id} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-800">{e.candidate_name || 'Unknown'}</p>
+                      <p className="text-xs text-slate-400">{e.candidate_email || ''}</p>
+                    </div>
+                    <div className="text-center text-xs text-slate-500">Stage {e.current_stage_index} / {stages.length}</div>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${ENROLL_STATUS_CLS[e.status] ?? 'bg-slate-100 text-slate-600'}`}>{e.status}</span>
+                    {e.status === 'active' && (
+                      <button onClick={() => updateEnrollmentStatus(e.id, 'paused')} className="rounded-lg p-1 text-amber-500 hover:bg-amber-50" title="Pause"><Pause className="h-3.5 w-3.5" /></button>
+                    )}
+                    {e.status === 'paused' && (
+                      <button onClick={() => updateEnrollmentStatus(e.id, 'active')} className="rounded-lg p-1 text-emerald-500 hover:bg-emerald-50" title="Resume"><Play className="h-3.5 w-3.5" /></button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setAddMenuOpen(true)}
+              className="mt-3 flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-emerald-600"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Add or edit who&apos;s enrolled
+            </button>
           </div>
 
-          {/* Enrolled candidates */}
-          <div>
-            <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-800">
-              <Users className="h-4 w-4 text-slate-500" /> Enrolled candidates
-            </h3>
-          {enrollLoading ? (
-            <div className="flex items-center gap-2 py-12 justify-center text-slate-400">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading enrollments...
-            </div>
-          ) : enrollments.length === 0 ? (
-            <div className="text-center py-16">
-              <Users className="h-8 w-8 text-slate-300 mx-auto mb-3" />
-              <p className="text-sm text-slate-500">No candidates enrolled yet</p>
-              <p className="text-xs text-slate-400 mt-1">Enroll candidates from their profile or the candidates list</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {enrollments.map(e => (
-                <div key={e.id} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800">{e.candidate_name || 'Unknown'}</p>
-                    <p className="text-xs text-slate-400">{e.candidate_email || ''}</p>
-                  </div>
-                  <div className="text-xs text-slate-500 text-center">
-                    Stage {e.current_stage_index} / {stages.length}
-                  </div>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${ENROLL_STATUS_CLS[e.status] ?? 'bg-slate-100 text-slate-600'}`}>
-                    {e.status}
-                  </span>
-                  {e.status === 'active' && (
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => updateEnrollmentStatus(e.id, 'paused')}
-                        className="rounded-lg p-1 text-amber-500 hover:bg-amber-50"
-                        title="Pause"
-                      >
-                        <Pause className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-                  {e.status === 'paused' && (
-                    <button
-                      onClick={() => updateEnrollmentStatus(e.id, 'active')}
-                      className="rounded-lg p-1 text-emerald-500 hover:bg-emerald-50"
-                      title="Resume"
-                    >
-                      <Play className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
+          {/* RIGHT — all "Add Candidate" operations */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1">
+              {([['manual', 'Manual'], ['bulk', 'Bulk filter'], ['automation', 'Rules']] as const).map(([k, l]) => (
+                <button
+                  key={k}
+                  onClick={() => selectTool(k)}
+                  className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition-all ${activeTool === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >{l}</button>
               ))}
             </div>
-          )}
+            {activeTool === 'manual' && (
+              <ManualEnrollPanel sequenceId={id} active={seq.status === 'active'} onPreviewChange={handlePreview} onEnrolled={() => { loadEnrollments(); loadSequence() }} />
+            )}
+            {activeTool === 'bulk' && (
+              <BulkEnrollPanel sequenceId={id} active={seq.status === 'active'} onPreviewChange={handlePreview} onEnrolled={() => { loadEnrollments(); loadSequence() }} />
+            )}
+            {activeTool === 'automation' && (
+              <SequenceAutomations sequenceId={id} active={seq.status === 'active'} />
+            )}
           </div>
         </div>
       )}
@@ -466,16 +459,6 @@ export default function SequenceDetailPage() {
       {/* ─── Analytics Tab ───────────────────────────────────────────────── */}
       {tab === 'analytics' && (
         <SequenceAnalytics sequenceId={id} />
-      )}
-
-      {/* ─── Bulk Enroll Drawer ──────────────────────────────────────────── */}
-      {showBulkEnroll && (
-        <BulkEnrollDrawer
-          sequenceId={id}
-          active={seq.status === 'active'}
-          onClose={() => setShowBulkEnroll(false)}
-          onEnrolled={() => { loadEnrollments(); loadSequence() }}
-        />
       )}
 
       {/* ─── Stage Editor Drawer ─────────────────────────────────────────── */}
@@ -490,125 +473,6 @@ export default function SequenceDetailPage() {
         />
       )}
 
-      {/* ─── Add Candidates Drawer ─────────────────────────────────────────── */}
-      {showAddCandidates && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowAddCandidates(false)} />
-          <div className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-slate-500" />
-                <h2 className="text-base font-bold text-slate-900">Add Candidates to Sequence</h2>
-              </div>
-              <button onClick={() => setShowAddCandidates(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-              {/* Sequence info */}
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold text-emerald-600">{seq.name}</p>
-                <p className="text-[11px] text-slate-500">{stages.length} stages · {seq.status}</p>
-              </div>
-
-              {seq.status !== 'active' && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <p className="text-xs font-medium text-amber-700">Sequence is not active</p>
-                  <p className="text-[11px] text-amber-600">Activate the sequence first before enrolling candidates.</p>
-                </div>
-              )}
-
-              {/* Search */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Search Candidates</label>
-                <input
-                  type="text"
-                  value={candidateSearch}
-                  onChange={e => searchCandidates(e.target.value)}
-                  placeholder="Search by name, email, or skills..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                />
-              </div>
-
-              {/* Search results */}
-              {searching && (
-                <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Searching...
-                </div>
-              )}
-
-              {searchResults.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs text-slate-400">{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</p>
-                  {searchResults.map(c => {
-                    const isSelected = selectedCandidates.some(x => x.id === c.id)
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => toggleCandidate(c)}
-                        className={`w-full flex items-center gap-3 rounded-xl border-2 px-3.5 py-2.5 text-left transition-all ${
-                          isSelected
-                            ? 'border-slate-500 bg-slate-50'
-                            : 'border-slate-200 bg-white hover:border-slate-300'
-                        }`}
-                      >
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {c.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-800 truncate">{c.name}</p>
-                          <p className="text-xs text-slate-400 truncate">{c.email}{c.current_title ? ` · ${c.current_title}` : ''}</p>
-                        </div>
-                        {isSelected && (
-                          <span className="text-xs font-semibold text-emerald-600">Selected</span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Selected candidates */}
-              {selectedCandidates.length > 0 && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                  <p className="text-xs font-semibold text-emerald-700 mb-1">
-                    {selectedCandidates.length} selected
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedCandidates.map(c => (
-                      <span key={c.id} className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                        {c.name}
-                        <button onClick={() => toggleCandidate(c)} className="text-emerald-500 hover:text-emerald-800">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-slate-100 px-6 py-4 flex justify-end gap-3 shrink-0">
-              <button onClick={() => setShowAddCandidates(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-                Cancel
-              </button>
-              <button
-                onClick={enrollSelected}
-                disabled={enrollingDirect || selectedCandidates.length === 0 || seq.status !== 'active'}
-                className="flex items-center gap-2 rounded-xl bg-[#221b14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors"
-              >
-                {enrollingDirect && <Loader2 className="h-4 w-4 animate-spin" />}
-                Enroll {selectedCandidates.length > 0 ? `(${selectedCandidates.length})` : ''}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

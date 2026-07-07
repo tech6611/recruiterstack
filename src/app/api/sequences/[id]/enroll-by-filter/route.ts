@@ -16,9 +16,18 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
   const filters = body.filters ?? {}
   const candidateIds = await resolveFilteredCandidateIds(supabase, orgId, filters)
 
-  // Preview: just the count.
+  // Preview: count + a sample of the matched candidates (for the live left panel).
   if (body.dryRun) {
-    return NextResponse.json({ data: { matched: candidateIds.length } })
+    const sampleIds = candidateIds.slice(0, 200)
+    let preview: Array<{ id: string; name: string; email: string }> = []
+    if (sampleIds.length) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase.from('candidates') as any)
+        .select('id, name, email').in('id', sampleIds)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      preview = (data ?? []).map((c: any) => ({ id: c.id, name: c.name ?? '', email: c.email ?? '' }))
+    }
+    return NextResponse.json({ data: { matched: candidateIds.length, preview } })
   }
 
   if (candidateIds.length === 0) {

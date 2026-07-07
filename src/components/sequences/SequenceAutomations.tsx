@@ -36,6 +36,7 @@ export default function SequenceAutomations({ sequenceId, active }: { sequenceId
   const [triggerValue, setTriggerValue] = useState('')
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [customMode, setCustomMode] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -104,7 +105,7 @@ export default function SequenceAutomations({ sequenceId, active }: { sequenceId
             Trigger
             <select
               value={triggerType}
-              onChange={e => setTriggerType(e.target.value as TriggerType)}
+              onChange={e => { setTriggerType(e.target.value as TriggerType); setTriggerValue(''); setCustomMode(false) }}
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
             >
               <option value="tag_added">When a candidate is tagged…</option>
@@ -113,18 +114,30 @@ export default function SequenceAutomations({ sequenceId, active }: { sequenceId
           </label>
           <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500">
             {VALUE_LABEL[triggerType]}
-            <input
-              list="automation-value-options"
-              value={triggerValue}
-              onChange={e => setTriggerValue(e.target.value)}
-              placeholder={VALUE_PLACEHOLDER[triggerType]}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-            />
-            <datalist id="automation-value-options">
-              {(triggerType === 'tag_added' ? options.tags : options.stages).map(v => (
-                <option key={v} value={v} />
-              ))}
-            </datalist>
+            {customMode ? (
+              <input
+                autoFocus
+                value={triggerValue}
+                onChange={e => setTriggerValue(e.target.value)}
+                placeholder={VALUE_PLACEHOLDER[triggerType]}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              />
+            ) : (
+              <select
+                value={triggerValue}
+                onChange={e => {
+                  if (e.target.value === '__custom__') { setCustomMode(true); setTriggerValue('') }
+                  else setTriggerValue(e.target.value)
+                }}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              >
+                <option value="">Select a {VALUE_LABEL[triggerType].toLowerCase()}…</option>
+                {(triggerType === 'tag_added' ? options.tags : options.stages).map(v => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+                <option value="__custom__">Custom…</option>
+              </select>
+            )}
           </label>
           <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500 sm:col-span-2">
             Name (optional)
