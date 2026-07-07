@@ -12,6 +12,13 @@ entries on top.
 ## 2026-07-07
 
 ### Added
+- **Bulk enroll by filter.** A "Bulk enroll" drawer on the sequence page lets you
+  build a candidate segment from any combination of **Department / Jobs / Stages /
+  Tags / Application status** (multi-select — AND across boxes, OR within), see a
+  live match count, and enroll the whole cohort at once. Canonical-model resolver
+  (`src/modules/crm/domain/candidate-filter.ts`, `POST /api/sequences/[id]/enroll-by-filter`),
+  reuses the idempotent `enrollCandidate` (skips already-enrolled), excludes
+  do-not-contact tags by default.
 - **Event-driven auto-enrollment rules (Slice 1).** An **Automations tab** on
   each sequence's page defines rules that auto-enroll a candidate into that
   sequence when an event fires: **tag added** (`candidate_tags`) or **application
