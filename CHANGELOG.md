@@ -11,6 +11,21 @@ entries on top.
 
 ## 2026-07-07
 
+### Added
+- **Event-driven auto-enrollment rules (Slice 1).** New **Automations** screen
+  (`/automations`) to define rules that auto-enroll a candidate into a sequence
+  when an event fires: **tag added** (`candidate_tags`) or **application moved to
+  a named stage** (`application_events` `stage_moved`). A lightweight poll
+  (`scanAutomations`) runs on the queue-processing cron, matches new events since
+  a cursor to enabled rules, and enrolls via the shared `enrollCandidate` —
+  idempotent (skips anyone already active/paused). Enrollment logic extracted to
+  `src/modules/crm/domain/enroll.ts` and reused by the enroll API route. New
+  `/api/automations` CRUD; no Django changes.
+
+### Schema
+- **079** — `sequence_enrollment_rules` (org rules: trigger_type/value → sequence)
+  and `automation_scan_state` (poll cursor). Requires applying migration 079.
+
 ### Changed
 - **Moved Vercel compute region `iad1` (US-East) → `sin1` (Singapore) to co-locate
   with the Supabase database.** Root-caused the ~2.5s TTFB on logged-in pages

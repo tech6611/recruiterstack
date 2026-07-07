@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { processJobs } from '@/lib/api/job-queue'
+import { createAdminClient } from '@/lib/supabase/server'
+import { scanAutomations } from '@/modules/crm/domain/automations'
+import { logger } from '@/lib/logger'
 
 // Register all handlers on first import
 import '@/lib/api/job-handlers'
@@ -24,5 +27,14 @@ export async function POST(req: NextRequest) {
 
   const processed = await processJobs(5)
 
-  return NextResponse.json({ processed })
+  // Evaluate auto-enrollment rules on the same cron tick (cheap no-op when no
+  // rules exist). Never let a scan failure fail the queue drain.
+  let automations = { tagEnrolled: 0, stageEnrolled: 0 }
+  try {
+    automations = await scanAutomations(createAdminClient())
+  } catch (err) {
+    logger.error('Automation scan failed', err)
+  }
+
+  return NextResponse.json({ processed, automations })
 }
