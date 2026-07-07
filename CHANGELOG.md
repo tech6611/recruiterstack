@@ -34,6 +34,11 @@ entries on top.
   and `automation_scan_state` (poll cursor). Requires applying migration 079.
 
 ### Changed
+- **Sequence page: unified how candidates get in.** The header "Add Candidates"
+  button is now a dropdown → *Select manually · Bulk enroll by filter ·
+  Auto-enrollment rules*. The standalone **Automations tab is gone**; its rules
+  now live at the top of the **Enrollments** tab, so you view who's enrolled and
+  edit the auto-enroll conditions in one place.
 - **Moved Vercel compute region `iad1` (US-East) → `sin1` (Singapore) to co-locate
   with the Supabase database.** Root-caused the ~2.5s TTFB on logged-in pages
   (`/api/jobs` 2457ms, `/api/candidates` 2059ms — measured via `scripts/measure-perf.mjs`)

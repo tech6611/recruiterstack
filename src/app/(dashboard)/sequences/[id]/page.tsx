@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Loader2, Plus, Trash2, Pencil, X,
   ArrowDown, Play, Pause, Mail, Users, TrendingUp,
-  User, Clock, Zap, Filter,
+  User, Clock, Zap, Filter, ChevronDown,
 } from 'lucide-react'
 import type { Sequence, SequenceStage, SequenceEnrollment, SequenceStatus, Candidate } from '@/lib/types/database'
 import SequenceStageEditor from '@/components/sequences/SequenceStageEditor'
@@ -32,7 +32,7 @@ const ENROLL_STATUS_CLS: Record<string, string> = {
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type Tab = 'stages' | 'enrollments' | 'analytics' | 'automations'
+type Tab = 'stages' | 'enrollments' | 'analytics'
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +56,7 @@ export default function SequenceDetailPage() {
   // Add candidates state
   const [showAddCandidates, setShowAddCandidates] = useState(false)
   const [showBulkEnroll, setShowBulkEnroll]       = useState(false)
+  const [addMenuOpen, setAddMenuOpen]             = useState(false)
   const [candidateSearch, setCandidateSearch]       = useState('')
   const [searchResults, setSearchResults]           = useState<Candidate[]>([])
   const [searching, setSearching]                   = useState(false)
@@ -225,18 +226,40 @@ export default function SequenceDetailPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => setShowBulkEnroll(true)}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-emerald-100 transition-colors"
-          >
-            <Filter className="h-4 w-4" /> Bulk enroll
-          </button>
-          <button
-            onClick={() => setShowAddCandidates(true)}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-emerald-100 transition-colors"
-          >
-            <Users className="h-4 w-4" /> Add Candidates
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setAddMenuOpen(o => !o)}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-emerald-100 transition-colors"
+            >
+              <Users className="h-4 w-4" /> Add Candidates
+              <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+            </button>
+            {addMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setAddMenuOpen(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1.5 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                  <button
+                    onClick={() => { setAddMenuOpen(false); setShowAddCandidates(true) }}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <User className="h-4 w-4 text-slate-400" /> Select manually
+                  </button>
+                  <button
+                    onClick={() => { setAddMenuOpen(false); setShowBulkEnroll(true) }}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <Filter className="h-4 w-4 text-slate-400" /> Bulk enroll by filter
+                  </button>
+                  <button
+                    onClick={() => { setAddMenuOpen(false); setTab('enrollments') }}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <Zap className="h-4 w-4 text-slate-400" /> Auto-enrollment rules
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button
             onClick={toggleStatus}
             className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
@@ -259,7 +282,6 @@ export default function SequenceDetailPage() {
           { id: 'stages' as Tab,      label: 'Stages',      icon: Mail,       count: stages.length },
           { id: 'enrollments' as Tab, label: 'Enrollments', icon: Users,      count: seq.enrollment_count ?? 0 },
           { id: 'analytics' as Tab,   label: 'Analytics',   icon: TrendingUp },
-          { id: 'automations' as Tab, label: 'Automations', icon: Zap },
         ]).map(t => (
           <button
             key={t.id}
@@ -375,7 +397,20 @@ export default function SequenceDetailPage() {
 
       {/* ─── Enrollments Tab ─────────────────────────────────────────────── */}
       {tab === 'enrollments' && (
-        <div>
+        <div className="space-y-8">
+          {/* Conditions — auto-enrollment rules */}
+          <div>
+            <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-800">
+              <Zap className="h-4 w-4 text-emerald-500" /> Auto-enrollment rules
+            </h3>
+            <SequenceAutomations sequenceId={id} active={seq.status === 'active'} />
+          </div>
+
+          {/* Enrolled candidates */}
+          <div>
+            <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-800">
+              <Users className="h-4 w-4 text-slate-500" /> Enrolled candidates
+            </h3>
           {enrollLoading ? (
             <div className="flex items-center gap-2 py-12 justify-center text-slate-400">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading enrollments...
@@ -424,17 +459,13 @@ export default function SequenceDetailPage() {
               ))}
             </div>
           )}
+          </div>
         </div>
       )}
 
       {/* ─── Analytics Tab ───────────────────────────────────────────────── */}
       {tab === 'analytics' && (
         <SequenceAnalytics sequenceId={id} />
-      )}
-
-      {/* ─── Automations Tab ─────────────────────────────────────────────── */}
-      {tab === 'automations' && (
-        <SequenceAutomations sequenceId={id} active={seq.status === 'active'} />
       )}
 
       {/* ─── Bulk Enroll Drawer ──────────────────────────────────────────── */}
