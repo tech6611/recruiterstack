@@ -5,12 +5,13 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Loader2, Plus, Trash2, Pencil, X,
   ArrowDown, Play, Pause, Mail, Users, TrendingUp,
-  User, Clock, Zap,
+  User, Clock, Zap, Filter,
 } from 'lucide-react'
 import type { Sequence, SequenceStage, SequenceEnrollment, SequenceStatus, Candidate } from '@/lib/types/database'
 import SequenceStageEditor from '@/components/sequences/SequenceStageEditor'
 import SequenceAnalytics from '@/components/sequences/SequenceAnalytics'
 import SequenceAutomations from '@/components/sequences/SequenceAutomations'
+import BulkEnrollDrawer from '@/components/sequences/BulkEnrollDrawer'
 
 // ── Status config ───────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ export default function SequenceDetailPage() {
 
   // Add candidates state
   const [showAddCandidates, setShowAddCandidates] = useState(false)
+  const [showBulkEnroll, setShowBulkEnroll]       = useState(false)
   const [candidateSearch, setCandidateSearch]       = useState('')
   const [searchResults, setSearchResults]           = useState<Candidate[]>([])
   const [searching, setSearching]                   = useState(false)
@@ -223,6 +225,12 @@ export default function SequenceDetailPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowBulkEnroll(true)}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-emerald-100 transition-colors"
+          >
+            <Filter className="h-4 w-4" /> Bulk enroll
+          </button>
           <button
             onClick={() => setShowAddCandidates(true)}
             className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-emerald-100 transition-colors"
@@ -427,6 +435,16 @@ export default function SequenceDetailPage() {
       {/* ─── Automations Tab ─────────────────────────────────────────────── */}
       {tab === 'automations' && (
         <SequenceAutomations sequenceId={id} active={seq.status === 'active'} />
+      )}
+
+      {/* ─── Bulk Enroll Drawer ──────────────────────────────────────────── */}
+      {showBulkEnroll && (
+        <BulkEnrollDrawer
+          sequenceId={id}
+          active={seq.status === 'active'}
+          onClose={() => setShowBulkEnroll(false)}
+          onEnrolled={() => { loadEnrollments(); loadSequence() }}
+        />
       )}
 
       {/* ─── Stage Editor Drawer ─────────────────────────────────────────── */}
