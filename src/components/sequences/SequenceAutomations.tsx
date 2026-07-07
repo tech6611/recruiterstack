@@ -28,6 +28,7 @@ const VALUE_PLACEHOLDER: Record<TriggerType, string> = { tag_added: 'e.g. passiv
  */
 export default function SequenceAutomations({ sequenceId, active }: { sequenceId: string; active: boolean }) {
   const [rules, setRules] = useState<Rule[]>([])
+  const [options, setOptions] = useState<{ tags: string[]; stages: string[] }>({ tags: [], stages: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -39,10 +40,14 @@ export default function SequenceAutomations({ sequenceId, active }: { sequenceId
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-    const res = await fetch(`/api/automations?sequence_id=${sequenceId}`)
-    const json = await res.json()
-    if (!res.ok) { setError(json.error ?? 'Failed to load rules'); setLoading(false); return }
-    setRules(json.data ?? [])
+    const [rRes, oRes] = await Promise.all([
+      fetch(`/api/automations?sequence_id=${sequenceId}`),
+      fetch('/api/automations/options'),
+    ])
+    const rJson = await rRes.json()
+    if (!rRes.ok) { setError(rJson.error ?? 'Failed to load rules'); setLoading(false); return }
+    setRules(rJson.data ?? [])
+    if (oRes.ok) { const oJson = await oRes.json(); setOptions(oJson.data ?? { tags: [], stages: [] }) }
     setLoading(false)
   }, [sequenceId])
 
@@ -109,11 +114,17 @@ export default function SequenceAutomations({ sequenceId, active }: { sequenceId
           <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500">
             {VALUE_LABEL[triggerType]}
             <input
+              list="automation-value-options"
               value={triggerValue}
               onChange={e => setTriggerValue(e.target.value)}
               placeholder={VALUE_PLACEHOLDER[triggerType]}
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
             />
+            <datalist id="automation-value-options">
+              {(triggerType === 'tag_added' ? options.tags : options.stages).map(v => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
           </label>
           <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500 sm:col-span-2">
             Name (optional)
