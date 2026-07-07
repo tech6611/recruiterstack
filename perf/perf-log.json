@@ -1,0 +1,302 @@
+[
+  {
+    "timestamp": "2026-07-07T10:58:22.861Z",
+    "base_url": "https://recruiterstack.in",
+    "authed": false,
+    "reps": 4,
+    "results": [
+      {
+        "label": "landing page",
+        "path": "/",
+        "status": 307,
+        "ttfb_median_ms": 39,
+        "ttfb_min_ms": 33,
+        "ttfb_max_ms": 1085,
+        "needs_auth": false
+      },
+      {
+        "label": "jobs page",
+        "path": "/jobs",
+        "status": 307,
+        "ttfb_median_ms": 36,
+        "ttfb_min_ms": 34,
+        "ttfb_max_ms": 37,
+        "needs_auth": true
+      },
+      {
+        "label": "API · jobs list",
+        "path": "/api/jobs",
+        "status": 307,
+        "ttfb_median_ms": 33,
+        "ttfb_min_ms": 31,
+        "ttfb_max_ms": 36,
+        "needs_auth": true
+      },
+      {
+        "label": "API · dashboard",
+        "path": "/api/dashboard",
+        "status": 307,
+        "ttfb_median_ms": 34,
+        "ttfb_min_ms": 28,
+        "ttfb_max_ms": 63,
+        "needs_auth": true
+      },
+      {
+        "label": "API · candidates",
+        "path": "/api/candidates",
+        "status": 307,
+        "ttfb_median_ms": 29,
+        "ttfb_min_ms": 28,
+        "ttfb_max_ms": 31,
+        "needs_auth": true
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-07-07T11:07:41.594Z",
+    "base_url": "https://recruiterstack.in",
+    "authed": true,
+    "reps": 5,
+    "results": [
+      {
+        "label": "landing page",
+        "path": "/",
+        "status": 307,
+        "ttfb_median_ms": 41,
+        "ttfb_min_ms": 34,
+        "ttfb_max_ms": 54,
+        "needs_auth": false
+      },
+      {
+        "label": "jobs page (browser)",
+        "path": "/jobs",
+        "status": 307,
+        "ttfb_median_ms": 37,
+        "ttfb_min_ms": 35,
+        "ttfb_max_ms": 72,
+        "needs_auth": false
+      },
+      {
+        "label": "API · jobs LIST →Next.js",
+        "path": "/api/jobs",
+        "status": 307,
+        "ttfb_median_ms": 34,
+        "ttfb_min_ms": 32,
+        "ttfb_max_ms": 36,
+        "needs_auth": false
+      },
+      {
+        "label": "API · dashboard →Next.js",
+        "path": "/api/dashboard",
+        "status": 307,
+        "ttfb_median_ms": 38,
+        "ttfb_min_ms": 32,
+        "ttfb_max_ms": 41,
+        "needs_auth": false
+      },
+      {
+        "label": "API · candidates →Next.js",
+        "path": "/api/candidates",
+        "status": 307,
+        "ttfb_median_ms": 31,
+        "ttfb_min_ms": 31,
+        "ttfb_max_ms": 34,
+        "needs_auth": false
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-07-07T11:10:40.251Z",
+    "base_url": "https://www.recruiterstack.in",
+    "authed": true,
+    "reps": 5,
+    "results": [
+      {
+        "label": "landing page",
+        "path": "/",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 353,
+        "ttfb_min_ms": 312,
+        "ttfb_max_ms": 415,
+        "needs_auth": false
+      },
+      {
+        "label": "jobs page (browser)",
+        "path": "/jobs",
+        "status": 200,
+        "redirects": 1,
+        "ttfb_median_ms": 364,
+        "ttfb_min_ms": 271,
+        "ttfb_max_ms": 622,
+        "needs_auth": false
+      },
+      {
+        "label": "API · jobs LIST →Next.js",
+        "path": "/api/jobs",
+        "status": 200,
+        "redirects": 1,
+        "ttfb_median_ms": 302,
+        "ttfb_min_ms": 298,
+        "ttfb_max_ms": 400,
+        "needs_auth": false
+      },
+      {
+        "label": "API · dashboard →Next.js",
+        "path": "/api/dashboard",
+        "status": 200,
+        "redirects": 1,
+        "ttfb_median_ms": 362,
+        "ttfb_min_ms": 319,
+        "ttfb_max_ms": 366,
+        "needs_auth": false
+      },
+      {
+        "label": "API · candidates →Next.js",
+        "path": "/api/candidates",
+        "status": 200,
+        "redirects": 1,
+        "ttfb_median_ms": 303,
+        "ttfb_min_ms": 293,
+        "ttfb_max_ms": 419,
+        "needs_auth": false
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-07-07T11:13:56.094Z",
+    "base_url": "https://www.recruiterstack.in",
+    "authed": true,
+    "reps": 3,
+    "results": [
+      {
+        "label": "landing page",
+        "path": "/",
+        "status": 200,
+        "redirects": 1,
+        "ttfb_median_ms": 946,
+        "ttfb_min_ms": 941,
+        "ttfb_max_ms": 1043,
+        "needs_auth": false
+      },
+      {
+        "label": "jobs page (browser)",
+        "path": "/jobs",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 1006,
+        "ttfb_min_ms": 944,
+        "ttfb_max_ms": 1013,
+        "needs_auth": false
+      },
+      {
+        "label": "API · jobs LIST →Next.js",
+        "path": "/api/jobs",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 2457,
+        "ttfb_min_ms": 2385,
+        "ttfb_max_ms": 2947,
+        "needs_auth": false
+      },
+      {
+        "label": "API · dashboard →Next.js",
+        "path": "/api/dashboard",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 838,
+        "ttfb_min_ms": 732,
+        "ttfb_max_ms": 1128,
+        "needs_auth": false
+      },
+      {
+        "label": "API · candidates →Next.js",
+        "path": "/api/candidates",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 2059,
+        "ttfb_min_ms": 1985,
+        "ttfb_max_ms": 2070,
+        "needs_auth": false
+      },
+      {
+        "label": "API · job DETAIL →Django",
+        "path": "/api/jobs/3870f521-c752-4afb-b7c5-1a45cbce9d92",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 2394,
+        "ttfb_min_ms": 615,
+        "ttfb_max_ms": 3908,
+        "needs_auth": false
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-07-07T11:39:53.311Z",
+    "base_url": "https://www.recruiterstack.in",
+    "authed": true,
+    "reps": 3,
+    "results": [
+      {
+        "label": "landing page",
+        "path": "/",
+        "status": 200,
+        "redirects": 1,
+        "ttfb_median_ms": 569,
+        "ttfb_min_ms": 550,
+        "ttfb_max_ms": 640,
+        "needs_auth": false
+      },
+      {
+        "label": "jobs page (browser)",
+        "path": "/jobs",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 542,
+        "ttfb_min_ms": 536,
+        "ttfb_max_ms": 1561,
+        "needs_auth": false
+      },
+      {
+        "label": "API · jobs LIST →Next.js",
+        "path": "/api/jobs",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 710,
+        "ttfb_min_ms": 669,
+        "ttfb_max_ms": 740,
+        "needs_auth": false
+      },
+      {
+        "label": "API · dashboard →Next.js",
+        "path": "/api/dashboard",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 1031,
+        "ttfb_min_ms": 723,
+        "ttfb_max_ms": 1032,
+        "needs_auth": false
+      },
+      {
+        "label": "API · candidates →Next.js",
+        "path": "/api/candidates",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 963,
+        "ttfb_min_ms": 914,
+        "ttfb_max_ms": 1058,
+        "needs_auth": false
+      },
+      {
+        "label": "API · job DETAIL →Django",
+        "path": "/api/jobs/3870f521-c752-4afb-b7c5-1a45cbce9d92",
+        "status": 200,
+        "redirects": 0,
+        "ttfb_median_ms": 766,
+        "ttfb_min_ms": 482,
+        "ttfb_max_ms": 1129,
+        "needs_auth": false
+      }
+    ]
+  }
+]

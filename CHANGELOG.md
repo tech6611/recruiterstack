@@ -9,6 +9,35 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-07
+
+### Changed
+- **Moved Vercel compute region `iad1` (US-East) → `sin1` (Singapore) to co-locate
+  with the Supabase database.** Root-caused the ~2.5s TTFB on logged-in pages
+  (`/api/jobs` 2457ms, `/api/candidates` 2059ms — measured via `scripts/measure-perf.mjs`)
+  to a geography mismatch: functions ran in Washington DC while the DB is in
+  Singapore (`ap-southeast-1`), so every per-request DB round-trip (auth scope +
+  handler queries) crossed ~220ms each and stacked. Handler code was already clean
+  (`listCanonicalJobBoardSummaries` runs its queries in `Promise.all`). Fix is a
+  one-line `vercel.json` region change; takes effect on next deploy. Re-run the
+  perf script after deploy to confirm the drop.
+
+### Added
+- **Backend-consolidation tooling (planning for the Django → Next.js collapse).**
+  Two read-only scripts under `scripts/`:
+  - `migration-checklist.mjs` — reconciles Django routes (`../recruiterstack-api/*/urls.py`)
+    against the `next.config.mjs` proxy rules and `src/app/api` handlers, writing a
+    living checklist to `migration/route-status.md`. Current result: 29 READY,
+    1 LEGACY (`hiring-requests`), 1 KEEP (`voice`), **zero un-portable gaps**.
+  - `measure-perf.mjs` — records TTFB for key pages/APIs and appends timestamped
+    runs to `perf/perf-log.json` (before/after baseline). Reads only; pass
+    `PERF_COOKIE` to measure logged-in routes.
+
+### Docs
+- Architecture memo + decision record (DR-001) produced for the two-backend
+  consolidation: keep Next.js as the single app backend, retire the duplicated
+  Django REST layer, keep the voice-AI service standalone.
+
 ## 2026-07-06
 
 ### Fixed

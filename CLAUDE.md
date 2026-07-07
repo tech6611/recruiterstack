@@ -37,7 +37,7 @@ npm run audit:canonical # Report direct table access by migration status
 - **Rich Text:** Tiptap editor
 - **Rate Limiting:** Upstash Redis
 - **Error Tracking:** Sentry
-- **Hosting:** Vercel (region: iad1)
+- **Hosting:** Vercel (region: `sin1` Singapore — co-located with the Supabase DB in `ap-southeast-1` Singapore; was `iad1`/US-East, which added ~220ms per DB round-trip and ~2.5s page loads)
 - **Testing:** Vitest + Testing Library + jsdom
 
 ## Architecture
