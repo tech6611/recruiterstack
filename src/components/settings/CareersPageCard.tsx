@@ -683,7 +683,7 @@ function SectionsPreview({
                     {i.image_url.trim() ? (
                       <div className="aspect-[4/3] w-full" style={{ backgroundColor: cardBg }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={i.image_url} alt="" className="h-full w-full object-contain" />
+                        <img src={i.image_url} alt="" className="h-full w-full object-fill" />
                       </div>
                     ) : null}
                     <div className="p-2">

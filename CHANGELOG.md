@@ -68,6 +68,16 @@ entries on top.
   now. Seeded with the Django consolidation item (+ safety net, reversible plan) and
   lighter noted items from the architecture/perf review.
 
+## 2026-07-07
+
+### Changed
+- **Careers benefit images — fixed 4:3 box, stretched to fill.** After trying
+  crop (trimmed art) and contain (uneven gaps), benefit images now sit in a
+  fixed 4:3 box and fill it exactly (`object-fill`): every card's image is the
+  same size with no gaps and no crop. Images that aren't 4:3 are stretched to
+  fit. The benefits editor now shows a note recommending ~800×600px (4:3) with a
+  background matching the card colour, so compliant artwork stays crisp.
+
 ## 2026-07-06
 
 ### Fixed

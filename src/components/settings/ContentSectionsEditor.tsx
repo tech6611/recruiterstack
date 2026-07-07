@@ -360,7 +360,13 @@ function BenefitsFields({ section, onUpdate }: { section: Extract<SectionDraft, 
       </div>
       <ColorField label="Card fill colour (optional)" value={section.card_color}
         onChange={card_color => onUpdate({ card_color })}
-        hint="Fills every card and the space around images. Set it to match your artwork's background so images blend in. Leave blank for white." />
+        hint="Fills the card behind the text. Set it to match your artwork's background. Leave blank for white." />
+      <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
+        <strong>Image tip:</strong> each card image sits in a fixed <strong>4:3 box</strong>.
+        For the sharpest result use a landscape image around <strong>800&nbsp;×&nbsp;600&nbsp;px (4:3)</strong>,
+        ideally with a background matching your card colour. Images of other shapes
+        are stretched to fit the box, which can look squished or blurry.
+      </p>
       <div className="space-y-2">
         {section.items.map((item, i) => (
           <div key={i} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">

@@ -72,13 +72,13 @@ function BenefitsBlock({ section, brand }: { section: CareersBenefitsSection; br
         {section.items.map((item, i) => (
           <div key={i} className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 shadow-sm" style={{ backgroundColor: cardBg }}>
             {item.image_url ? (
-              // Uniform band: every card's image sits in a fixed-shape box (so
-              // heights match across cards) and is shown in full, never cropped.
-              // Leftover space around an odd-shaped image takes the card fill
-              // colour, so it blends in — set the fill to match your artwork.
+              // Fixed 4:3 box, filled exactly (object-fill): every card's image
+              // is identical in size with no gaps and no crop. An image that
+              // isn't 4:3 gets stretched to fit — the editor tells users the
+              // recommended size so compliant artwork stays crisp.
               <div className="aspect-[4/3] w-full" style={{ backgroundColor: cardBg }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.image_url} alt="" className="h-full w-full object-contain" />
+                <img src={item.image_url} alt="" className="h-full w-full object-fill" />
               </div>
             ) : null}
             <div className="flex flex-1 flex-col p-5">
