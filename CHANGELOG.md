@@ -12,10 +12,10 @@ entries on top.
 ## 2026-07-07
 
 ### Added
-- **Event-driven auto-enrollment rules (Slice 1).** New **Automations** screen
-  (`/automations`) to define rules that auto-enroll a candidate into a sequence
-  when an event fires: **tag added** (`candidate_tags`) or **application moved to
-  a named stage** (`application_events` `stage_moved`). A lightweight poll
+- **Event-driven auto-enrollment rules (Slice 1).** An **Automations tab** on
+  each sequence's page defines rules that auto-enroll a candidate into that
+  sequence when an event fires: **tag added** (`candidate_tags`) or **application
+  moved to a named stage** (`application_events` `stage_moved`). A lightweight poll
   (`scanAutomations`) runs on the queue-processing cron, matches new events since
   a cursor to enabled rules, and enrolls via the shared `enrollCandidate` —
   idempotent (skips anyone already active/paused). Enrollment logic extracted to

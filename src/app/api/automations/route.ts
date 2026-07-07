@@ -3,13 +3,16 @@ import { withCapability } from '@/lib/api/helpers'
 
 const TRIGGERS = ['tag_added', 'stage_moved']
 
-// GET /api/automations — list this org's auto-enrollment rules (with sequence name)
-export const GET = withCapability('recruiting:view', async (_req, orgId, supabase) => {
+// GET /api/automations — list auto-enrollment rules (optionally scoped to a
+// single sequence via ?sequence_id=), with the target sequence name/status.
+export const GET = withCapability('recruiting:view', async (req, orgId, supabase) => {
+  const sequenceId = new URL(req.url).searchParams.get('sequence_id')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await ((supabase as any).from('sequence_enrollment_rules'))
+  let query = ((supabase as any).from('sequence_enrollment_rules'))
     .select('*, sequences(name, status)')
     .eq('org_id', orgId)
-    .order('created_at', { ascending: false })
+  if (sequenceId) query = query.eq('sequence_id', sequenceId)
+  const { data, error } = await query.order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
 })

@@ -5,11 +5,12 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Loader2, Plus, Trash2, Pencil, X,
   ArrowDown, Play, Pause, Mail, Users, TrendingUp,
-  User, Clock,
+  User, Clock, Zap,
 } from 'lucide-react'
 import type { Sequence, SequenceStage, SequenceEnrollment, SequenceStatus, Candidate } from '@/lib/types/database'
 import SequenceStageEditor from '@/components/sequences/SequenceStageEditor'
 import SequenceAnalytics from '@/components/sequences/SequenceAnalytics'
+import SequenceAutomations from '@/components/sequences/SequenceAutomations'
 
 // ── Status config ───────────────────────────────────────────────────────────
 
@@ -30,7 +31,7 @@ const ENROLL_STATUS_CLS: Record<string, string> = {
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type Tab = 'stages' | 'enrollments' | 'analytics'
+type Tab = 'stages' | 'enrollments' | 'analytics' | 'automations'
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -250,6 +251,7 @@ export default function SequenceDetailPage() {
           { id: 'stages' as Tab,      label: 'Stages',      icon: Mail,       count: stages.length },
           { id: 'enrollments' as Tab, label: 'Enrollments', icon: Users,      count: seq.enrollment_count ?? 0 },
           { id: 'analytics' as Tab,   label: 'Analytics',   icon: TrendingUp },
+          { id: 'automations' as Tab, label: 'Automations', icon: Zap },
         ]).map(t => (
           <button
             key={t.id}
@@ -420,6 +422,11 @@ export default function SequenceDetailPage() {
       {/* ─── Analytics Tab ───────────────────────────────────────────────── */}
       {tab === 'analytics' && (
         <SequenceAnalytics sequenceId={id} />
+      )}
+
+      {/* ─── Automations Tab ─────────────────────────────────────────────── */}
+      {tab === 'automations' && (
+        <SequenceAutomations sequenceId={id} active={seq.status === 'active'} />
       )}
 
       {/* ─── Stage Editor Drawer ─────────────────────────────────────────── */}
