@@ -996,6 +996,9 @@ export interface JobListItem extends HiringRequest {
   total_candidates: number
   // Linked requisitions; 0 → no approved requisition behind the job (warning badge).
   opening_count?: number
+  // True while a "Send to HM" intake job awaits the hiring manager's submission.
+  // Drives the "Awaiting HM's input" badge on the jobs list.
+  awaiting_hm?: boolean
   stage_counts: { stage_id: string; stage_name: string; color: StageColor; count: number }[]
 }
 

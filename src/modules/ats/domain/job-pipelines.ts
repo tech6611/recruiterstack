@@ -50,6 +50,10 @@ export interface LegacyJobPipelineSummary extends HiringRequest {
   // no approved requisition behind it — surfaced as a warning badge on the board
   // (every job is now supposed to trace back to an approved requisition).
   opening_count: number
+  // True while a "Send to HM" intake job is waiting on the hiring manager to
+  // submit (custom_fields.intake.awaiting_hm). Drives the "Awaiting HM's input"
+  // badge; cleared when the HM submits (see submitCanonicalIntakeJob).
+  awaiting_hm: boolean
   stage_counts: {
     stage_id: string
     stage_name: string
@@ -262,11 +266,13 @@ export async function listCanonicalJobBoardSummaries(
       .sort((a, b) => a.order_index - b.order_index)
     const jobApps = apps.filter(a => a.job_id === row.id)
     const activeApps = jobApps.filter(a => a.status === 'active')
+    const intakeBag = readIntakeBag(row.custom_fields ?? null)
 
     return {
       ...canonicalJobToHiringRequest(row),
       total_candidates: jobApps.length,
       opening_count: openingCountByJob.get(row.id) ?? 0,
+      awaiting_hm: intakeBag.awaiting_hm === true,
       stage_counts: jobStages.map(s => ({
         stage_id: s.id,
         stage_name: s.name,
@@ -1184,6 +1190,9 @@ export async function submitCanonicalIntakeJob(
     additional_notes: args.fields.additional_notes ?? null,
     intake_submitted_at: now,
     jd_sent_at: now,
+    // HM has now submitted — clear the "awaiting HM's input" flag so the Jobs
+    // list badge disappears and the recruiter can review/publish.
+    awaiting_hm: false,
   }
   const customFields: Record<string, unknown> = {
     ...args.existingCustomFields,
@@ -1193,7 +1202,9 @@ export async function submitCanonicalIntakeJob(
   const update: Record<string, unknown> = {
     description: args.finalJd,
     custom_fields: customFields,
-    status: 'open',
+    // Decision 1: route back to the recruiter for review/publish rather than
+    // going live automatically. 'approved' is labeled "To be Published" in the UI.
+    status: 'approved',
   }
   if (args.positionTitle?.trim()) update.title = args.positionTitle.trim()
 

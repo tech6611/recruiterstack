@@ -193,9 +193,14 @@ function FileImportButton({ onExtract, field }: { onExtract: (text: string) => v
 
 function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void; onCreated: () => void; fromOpening?: FromOpening | null }) {
   const drawerRouter = useRouter()
-  // Created from an approved requisition → jump straight into the full form and
-  // link the existing requisition rather than collecting new seats.
-  const [mode, setMode] = useState<NewJobMode>(fromOpening ? 'fill_myself' : null)
+  // After the recruiter picks the approved requisition, always offer the two
+  // paths: "Send to Hiring Manager" (email them the intake link) or "Fill it
+  // myself". The chosen requisition (fromOpening) flows through either way.
+  const [mode, setMode] = useState<NewJobMode>(null)
+  // After a "Send to HM" submit, hold the minted intake link so we can show the
+  // recruiter a copy-able link (works even when email is turned off).
+  const [sentInfo, setSentInfo] = useState<{ url: string; emailSent: boolean } | null>(null)
+  const [copied, setCopied] = useState(false)
   const [positionTitle, setPositionTitle] = useState(fromOpening?.title ?? '')
   const [department, setDepartment] = useState(fromOpening?.department ?? '')
   const [hmName, setHmName] = useState(fromOpening?.hm_name ?? '')
@@ -275,6 +280,35 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!positionTitle.trim()) { setError('Position title is required.'); return }
+
+    // "Send to HM" path: create a draft job flagged awaiting the HM's input,
+    // link the approved requisition, and email the HM their intake link. We then
+    // show the recruiter the link so they can copy/share it even if email is off.
+    if (mode === 'send_to_hm') {
+      if (!hmName.trim())  { setError('Hiring manager name is required.'); return }
+      if (!hmEmail.trim()) { setError('Hiring manager email is required to send the intake link.'); return }
+      setLoading(true); setError(null)
+      const res = await fetch('/api/req-jobs/send-intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title:                positionTitle.trim(),
+          department,
+          link_opening_id:      fromOpening?.id ?? null,
+          hiring_manager_name:  hmName.trim(),
+          hiring_manager_email: hmEmail.trim(),
+          intake: { hm_name: hmName.trim(), hm_email: hmEmail.trim(), hm_slack: hmSlack },
+        }),
+      })
+      const json = await res.json()
+      setLoading(false)
+      if (!res.ok) { setError(json.error ?? 'Something went wrong'); return }
+      trackEvent('job_created', { mode: 'send_to_hm', position_title: positionTitle })
+      onCreated()
+      setSentInfo({ url: json.intake_url, emailSent: Boolean(json.email_sent) })
+      return
+    }
+
     if (mode === 'fill_myself') {
       if (isHtmlEmpty(teamContext) || isHtmlEmpty(keyReqs)) {
         setError('Please fill in Team Context and Key Requirements.')
@@ -336,7 +370,59 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
     else onClose()
   }
 
+  const copyIntakeLink = async () => {
+    if (!sentInfo) return
+    try {
+      await navigator.clipboard.writeText(sentInfo.url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setError('Could not copy automatically — select and copy the link manually.')
+    }
+  }
+
   const innerContent = () => {
+    // Post-send confirmation: the intake job is created and (if email is on) the
+    // HM has been emailed. Show the link so the recruiter can copy/share it too.
+    if (sentInfo) {
+      return (
+        <div className="p-6 space-y-6">
+          <div className="flex flex-col items-center text-center gap-3 pt-4">
+            <div className="h-14 w-14 rounded-full bg-emerald-50 flex items-center justify-center">
+              <CheckCircle className="h-7 w-7 text-emerald-600" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900">Intake sent to {hmName || 'the hiring manager'}</h2>
+            <p className="text-sm text-slate-500 max-w-sm">
+              {sentInfo.emailSent
+                ? `We emailed ${hmEmail} their personal intake link. You'll be notified when they submit.`
+                : `Email isn't set up, so we didn't send anything — share the link below with ${hmEmail || 'your hiring manager'} directly.`}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Intake link</label>
+            <div className="flex items-center gap-2">
+              <input readOnly value={sentInfo.url} className={inputCls + ' bg-white text-xs text-slate-600'} onFocus={e => e.target.select()} />
+              <button type="button" onClick={copyIntakeLink}
+                className="shrink-0 flex items-center gap-1.5 rounded-xl bg-slate-800 px-3 py-2.5 text-xs font-semibold text-white hover:bg-slate-900 transition-colors">
+                {copied ? <><Check className="h-3.5 w-3.5" />Copied</> : <>Copy</>}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            This role now shows <span className="font-semibold text-amber-700">Awaiting HM&apos;s input</span> on your jobs list.
+            When the hiring manager submits, it moves to <span className="font-semibold">To be Published</span> for you to review and publish.
+          </div>
+
+          <button type="button" onClick={onClose}
+            className="w-full rounded-xl bg-[#221b14] px-4 py-3 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm">
+            Done
+          </button>
+        </div>
+      )
+    }
+
     if (mode === null) {
       return (
         <div className="p-6 space-y-6">
@@ -371,14 +457,10 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
     return (
       <div className="p-6 space-y-5">
         <div>
-          {/* When created from an approved requisition (the only entry point now)
-              there is no two-card mode picker to go "Back" to, so the button is
-              hidden — the user closes the drawer to start over. */}
-          {!fromOpening && (
-            <button onClick={() => setMode(null)} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors">
-              <ArrowLeft className="h-4 w-4" />Back
-            </button>
-          )}
+          {/* Back returns to the two-card mode picker (Send to HM / Fill myself). */}
+          <button onClick={() => setMode(null)} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-4 transition-colors">
+            <ArrowLeft className="h-4 w-4" />Back
+          </button>
           <h2 className="text-lg font-bold text-slate-900">
             {mode === 'send_to_hm' ? 'Send Intake to Hiring Manager' : 'Create Full Hiring Request'}
           </h2>
@@ -821,6 +903,15 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 
 const DEFAULT_STATUS_CONFIG = { label: 'Unknown', color: 'bg-slate-100 text-slate-500 border-slate-200', icon: <Clock className="h-3 w-3" /> }
 
+// A "Send to HM" intake job sits at status 'draft' but should read as "Awaiting
+// HM's input" until the hiring manager submits, so its badge overrides the plain
+// draft label.
+const AWAITING_HM_CONFIG = { label: "Awaiting HM's Input", color: 'bg-amber-50 text-amber-700 border-amber-200', icon: <Clock className="h-3 w-3" /> }
+function statusBadge(job: { status: string; awaiting_hm?: boolean }) {
+  if (job.awaiting_hm) return AWAITING_HM_CONFIG
+  return STATUS_CONFIG[job.status] ?? DEFAULT_STATUS_CONFIG
+}
+
 // Where a job row opens when clicked. The recruiting Kanban (/jobs/[id]) is the
 // candidate-pipeline view, so it's the right destination for any job that has (or
 // had) a pipeline: 'open' jobs and 'closed' jobs (to review their past
@@ -906,7 +997,7 @@ function PastJobsBlock({ jobs, search }: { jobs: JobListItem[]; search: string }
               </thead>
               <tbody>
                 {filtered.map(j => {
-                  const sc = STATUS_CONFIG[j.status as string] ?? DEFAULT_STATUS_CONFIG
+                  const sc = statusBadge(j)
                   return (
                     <tr
                       key={j.id}
@@ -1350,7 +1441,7 @@ export default function JobsPage() {
 
   // ─── Render a row cell ─────────────────────────────────────────────────────
   const renderCell = (job: JobListItem, colId: ColId) => {
-    const s = STATUS_CONFIG[job.status] ?? DEFAULT_STATUS_CONFIG
+    const s = statusBadge(job)
     switch (colId) {
       case 'ticket':
         return <td key={colId} className="px-3 py-3.5"><span className="text-xs font-mono font-semibold text-slate-400">{job.ticket_number ?? '—'}</span></td>

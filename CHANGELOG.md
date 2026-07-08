@@ -102,6 +102,26 @@ entries on top.
   `remote_ok` boolean is kept in sync (remote → true) so nothing old breaks, and
   older jobs without `work_model` derive it from `remote_ok` (true → remote,
   false → on-site).
+- **"Send to Hiring Manager" wired end-to-end (Phase 2).** After a recruiter picks
+  an approved requisition, the New Job drawer now offers two paths again: **Send to
+  Hiring Manager** or **Fill it myself**.
+  - **Send to HM** creates a draft job linked to the approved requisition, flags it
+    as awaiting the HM's input, and emails the HM a personal intake link (new
+    `renderIntakeInvite` email template). The recruiter then sees a confirmation
+    screen with a **Copy link** button, so the flow works even when email is off.
+    New endpoint: `POST /api/req-jobs/send-intake`.
+  - **"Awaiting HM's input" badge** shows on the jobs list for these jobs (driven by
+    a new `awaiting_hm` flag surfaced through `/api/jobs`), so they're visually
+    distinct from ordinary drafts.
+  - **Back to the recruiter, not auto-live.** When the HM submits their intake, the
+    job now moves to **To be Published** (`approved`) for the recruiter to review and
+    publish — it no longer goes live automatically. The `awaiting_hm` flag clears on
+    submit.
+  - **Intake form title locked.** The role title flows through from the requisition
+    and is now shown read-only on the HM intake form (was editable), keeping the
+    requisition as the single source of truth.
+  - No database migration needed — reuses the existing `approved` status and the
+    job's `custom_fields.intake` JSON bag.
 - **Mandatory-field rules across the requisition / job / intake forms (Phase 1).**
   - **Requisition form** (`/openings/new`): **Title** and **Department** are now
     required to save a draft (Department was optional before).

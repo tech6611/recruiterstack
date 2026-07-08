@@ -50,6 +50,24 @@ export const jobIntakeCreateSchema = z.object({
 
 export type JobIntakeCreateInput = z.infer<typeof jobIntakeCreateSchema>
 
+// ── Send-to-Hiring-Manager intake ────────────────────────────────
+// The "Send to HM" path on the New Job drawer: creates a draft job linked to an
+// approved requisition, flags it as awaiting the HM's input, and emails the HM a
+// public /intake/<token> link. The HM's email is required (that's who we send to);
+// their name is optional. Any locked/flow-through fields (title, department, etc.)
+// ride along in `intake`.
+export const jobSendIntakeSchema = z.object({
+  title:                z.string().trim().min(1).max(200),
+  department:           z.string().trim().max(200).optional().default(''),
+  confidentiality:      z.enum(['public', 'confidential']).optional().default('public'),
+  link_opening_id:      uuidOrNull.optional().default(null),
+  hiring_manager_name:  z.string().trim().max(200).optional().default(''),
+  hiring_manager_email: z.string().trim().email().max(200),
+  intake:               z.record(z.string(), z.unknown()).optional().default({}),
+})
+
+export type JobSendIntakeInput = z.infer<typeof jobSendIntakeSchema>
+
 // Update accepts every base field plus `status` (board-level transitions such as
 // the HM approve action that flips a job to 'open'). status is constrained to the
 // canonical jobs status set (migration 035).

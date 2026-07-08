@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Loader2, CheckCircle, AlertCircle, Sparkles, Wand2, PenLine,
-  RefreshCw, Pencil, Paperclip, X,
+  RefreshCw, Paperclip, X,
 } from 'lucide-react'
 import { inputClsWhite } from '@/lib/ui/styles'
 import { trackEvent } from '@/lib/analytics'
@@ -119,9 +119,8 @@ export default function IntakePage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Editable position title
+  // Position title flows through locked from the requisition (display only).
   const [positionTitle, setPositionTitle] = useState('')
-  const [editingTitle, setEditingTitle] = useState(false)
 
   const [form, setForm] = useState({
     team_context: '',
@@ -379,31 +378,11 @@ export default function IntakePage() {
           <h1 className="text-2xl font-bold text-slate-900">
             Hi {requestInfo?.hiring_manager_name?.split(' ')[0]}! 👋
           </h1>
-          {/* Editable position title */}
+          {/* Position title is set once on the requisition and flows through
+              locked, so the approved requisition stays the single source of truth. */}
           <div className="flex items-center justify-center gap-2 mt-1">
-            {editingTitle ? (
-              <input
-                autoFocus
-                value={positionTitle}
-                onChange={e => setPositionTitle(e.target.value)}
-                onBlur={() => setEditingTitle(false)}
-                onKeyDown={e => e.key === 'Enter' && setEditingTitle(false)}
-                className="text-center text-base font-semibold text-slate-800 bg-white border-b-2 border-blue-400 outline-none px-2 py-0.5 rounded"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditingTitle(true)}
-                className="flex items-center gap-1.5 text-base font-semibold text-slate-700 hover:text-emerald-600 transition-colors group"
-              >
-                {positionTitle}
-                <Pencil className="h-3.5 w-3.5 opacity-40 group-hover:opacity-100 transition-opacity" />
-              </button>
-            )}
+            <span className="text-base font-semibold text-slate-700">{positionTitle}</span>
           </div>
-          <p className="text-slate-500 text-xs mt-1">
-            Click the title above to edit it if needed.
-          </p>
           <p className="text-slate-500 text-sm max-w-md mx-auto">
             Fill in the details below
             {requestInfo?.department ? ` for ${requestInfo.department}` : ''}, then generate or write the Job Description.

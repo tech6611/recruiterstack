@@ -136,6 +136,35 @@ export function renderApprovalSlaBreach(ctx: ApprovalSlaBreachCtx): { subject: s
   return { subject: `Overdue: ${ctx.targetTitle}`, html }
 }
 
+// ── intake_invite (recruiter → hiring manager) ──────────────────────
+//
+// Sent when a recruiter uses "Send to Hiring Manager" on a new job. It carries
+// the public /intake/<token> link the HM uses to fill in the role details and
+// generate a draft JD. Standalone (no BaseCtx deep-link) because the link is a
+// token URL, not an in-app path.
+
+export interface IntakeInviteCtx {
+  hiringManagerName: string | null
+  recruiterName:     string | null
+  positionTitle:     string
+  intakeUrl:         string
+}
+
+export function renderIntakeInvite(ctx: IntakeInviteCtx): { subject: string; html: string } {
+  const greeting = ctx.hiringManagerName ? `Hi ${escapeHtml(ctx.hiringManagerName)},` : 'Hi,'
+  const from = ctx.recruiterName ? `<strong>${escapeHtml(ctx.recruiterName)}</strong>` : 'Your recruiting team'
+  const html = SHELL(`
+    <h2 style="margin:0 0 16px;font-size:18px;">Help us kick off a role</h2>
+    <p>${greeting}</p>
+    <p>${from} would like your input to open the following role:</p>
+    <p style="font-size:15px;font-weight:600;margin:0 0 8px;">${escapeHtml(ctx.positionTitle)}</p>
+    <p style="font-size:13px;color:#64748b;margin:0 0 24px;">It only takes a few minutes. Add the details about the role and what you're looking for, and we'll draft the job description for you to review.</p>
+    <div>${BTN(ctx.intakeUrl, 'Fill out the intake form')}</div>
+    <p style="font-size:12px;color:#94a3b8;margin:24px 0 0;">Or paste this link into your browser:<br>${escapeHtml(ctx.intakeUrl)}</p>
+  `, 'You received this because a recruiter asked for your input on a role.')
+  return { subject: `Your input needed: ${ctx.positionTitle}`, html }
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
