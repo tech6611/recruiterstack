@@ -47,10 +47,10 @@ const nextConfig = {
             // ── Batch 2: Public routes + Email ────────────────────────────
             { source: '/api/apply/upload', destination: `${djangoUrl}/api/apply/upload` },
             { source: '/api/apply', destination: `${djangoUrl}/api/apply` },
-            { source: '/api/intake/preview-jd', destination: `${djangoUrl}/api/intake/preview-jd` },
-            { source: '/api/intake/:token/approve', destination: `${djangoUrl}/api/intake/:token/approve` },
-            { source: '/api/intake/:token/generate-jd', destination: `${djangoUrl}/api/intake/:token/generate-jd` },
-            { source: '/api/intake/:token', destination: `${djangoUrl}/api/intake/:token` },
+            // ── Hiring-manager intake: handled by Next.js (canonical `jobs` /
+            //    intake_token, Phase 3 / C5.5). NOT proxied to Django, whose
+            //    intake endpoints still read the legacy hiring_requests table
+            //    and can't resolve canonical intake links. ──
             { source: '/api/parse-document', destination: `${djangoUrl}/api/parse-document` },
             { source: '/api/resume/parse', destination: `${djangoUrl}/api/resume/parse` },
             { source: '/api/email/draft', destination: `${djangoUrl}/api/email/draft` },

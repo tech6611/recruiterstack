@@ -11,6 +11,14 @@ entries on top.
 
 ## 2026-07-08
 
+### Fixed
+- **Hiring-manager intake links no longer show "Link not valid."** The four
+  `/api/intake/*` routes (form load, `generate-jd`, `approve`, `preview-jd`) were
+  still proxied to the Django backend, which reads the legacy `hiring_requests`
+  table and can't resolve intakes created as canonical `jobs` (Phase 3 / C5.5).
+  Removed those rewrites in `next.config.mjs` so the up-to-date Next.js intake
+  routes handle them.
+
 ### Changed
 - **Location settings form simplified.** Country is now a dropdown (full ISO
   3166-1 list, stored as the 2-letter code) instead of a free-text box that
