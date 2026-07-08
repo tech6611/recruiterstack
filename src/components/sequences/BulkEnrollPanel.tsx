@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { Loader2, Users } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { Loader2, Users, X } from 'lucide-react'
 
 interface Opt { value: string; label: string }
 export interface PreviewCandidate { id: string; name: string; email: string }
@@ -13,33 +13,62 @@ const STATUS_OPTIONS: Opt[] = [
   { value: 'hired', label: 'Hired' },
 ]
 
-function FilterSection({ label, options, selected, onToggle, searchable }: {
-  label: string; options: Opt[]; selected: string[]; onToggle: (v: string) => void; searchable?: boolean
+// A searchable multi-select: the header is a search box, selected values show as
+// chips (so the current filter is always visible), and options fold into a
+// dropdown that opens on focus.
+function MultiSelect({ label, options, selected, onToggle }: {
+  label: string; options: Opt[]; selected: string[]; onToggle: (v: string) => void
 }) {
+  const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
   const shown = q ? options.filter(o => o.label.toLowerCase().includes(q.toLowerCase())) : options
+  const selectedOpts = options.filter(o => selected.includes(o.value))
+
   return (
-    <div>
-      <div className="mb-1 flex items-center justify-between">
-        <label className="text-xs font-semibold text-slate-500">{label}</label>
-        {selected.length > 0 && <span className="text-[11px] font-semibold text-emerald-600">{selected.length} selected</span>}
-      </div>
-      {searchable && options.length > 8 && (
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder={`Search ${label.toLowerCase()}…`}
-          className="mb-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400" />
-      )}
-      {options.length === 0 ? (
-        <p className="text-[11px] text-slate-400">None available</p>
-      ) : (
-        <div className="max-h-32 divide-y divide-slate-50 overflow-y-auto rounded-xl border border-slate-200">
-          {shown.map(o => (
-            <label key={o.value} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-slate-50">
-              <input type="checkbox" checked={selected.includes(o.value)} onChange={() => onToggle(o.value)} className="text-emerald-600 focus:ring-emerald-500" />
-              <span className="truncate text-slate-700">{o.label}</span>
-            </label>
+    <div ref={ref}>
+      <label className="text-xs font-semibold text-slate-500">{label}</label>
+      <div className="relative mt-1">
+        <div
+          className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 focus-within:border-emerald-400"
+          onClick={() => setOpen(true)}
+        >
+          {selectedOpts.map(o => (
+            <span key={o.value} className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+              {o.label}
+              <button onClick={e => { e.stopPropagation(); onToggle(o.value) }} className="text-emerald-500 hover:text-emerald-800"><X className="h-3 w-3" /></button>
+            </span>
           ))}
+          <input
+            value={q}
+            onChange={e => { setQ(e.target.value); setOpen(true) }}
+            onFocus={() => setOpen(true)}
+            placeholder={selectedOpts.length ? 'Add more…' : `Search ${label.toLowerCase()}…`}
+            className="min-w-[90px] flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 outline-none"
+          />
         </div>
-      )}
+        {open && (
+          <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+            {options.length === 0 ? (
+              <p className="px-3 py-2 text-[11px] text-slate-400">None available</p>
+            ) : shown.length === 0 ? (
+              <p className="px-3 py-2 text-[11px] text-slate-400">No matches</p>
+            ) : shown.map(o => (
+              <label key={o.value} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-slate-50">
+                <input type="checkbox" checked={selected.includes(o.value)} onChange={() => onToggle(o.value)} className="text-emerald-600 focus:ring-emerald-500" />
+                <span className="truncate text-slate-700">{o.label}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -75,7 +104,7 @@ export default function BulkEnrollPanel({ sequenceId, active, onPreviewChange, o
     (async () => {
       const [dRes, jRes, oRes] = await Promise.all([fetch('/api/departments'), fetch('/api/jobs'), fetch('/api/automations/options')])
       if (dRes.ok) setDepartments(((await dRes.json()).data ?? []).map((d: { id: string; name: string }) => ({ value: d.id, label: d.name })))
-      if (jRes.ok) setJobs(((await jRes.json()).data ?? []).map((j: { id: string; title: string }) => ({ value: j.id, label: j.title })))
+      if (jRes.ok) setJobs(((await jRes.json()).data ?? []).map((j: { id: string; title: string }) => ({ value: j.id, label: j.title || '(untitled job)' })))
       if (oRes.ok) {
         const o = (await oRes.json()).data ?? { tags: [], stages: [] }
         setStageOpts((o.stages ?? []).map((s: string) => ({ value: s, label: s })))
@@ -90,7 +119,6 @@ export default function BulkEnrollPanel({ sequenceId, active, onPreviewChange, o
 
   const anyFilter = deptIds.length || jobIds.length || stageNames.length || tags.length || statuses.length
 
-  // Live preview → pushes matches up to the left panel.
   useEffect(() => {
     setResult(null)
     if (!anyFilter) { setMatched(null); onPreviewChange(null, []); return }
@@ -130,13 +158,13 @@ export default function BulkEnrollPanel({ sequenceId, active, onPreviewChange, o
           Activate the sequence before enrolling.
         </div>
       )}
-      <p className="text-[11px] text-slate-400">Candidates must match <b>all</b> the boxes you set. The left panel previews who matches.</p>
+      <p className="text-[11px] text-slate-400">Candidates must match <b>all</b> the filters you set. The left panel previews who matches.</p>
 
-      <FilterSection label="Department" options={departments} selected={deptIds} onToggle={toggle(setDeptIds)} searchable />
-      <FilterSection label="Jobs" options={jobs} selected={jobIds} onToggle={toggle(setJobIds)} searchable />
-      <FilterSection label="Stages" options={stageOpts} selected={stageNames} onToggle={toggle(setStageNames)} />
-      <FilterSection label="Tags" options={tagOpts} selected={tags} onToggle={toggle(setTags)} searchable />
-      <FilterSection label="Application status" options={STATUS_OPTIONS} selected={statuses} onToggle={toggle(setStatuses)} />
+      <MultiSelect label="Department" options={departments} selected={deptIds} onToggle={toggle(setDeptIds)} />
+      <MultiSelect label="Jobs" options={jobs} selected={jobIds} onToggle={toggle(setJobIds)} />
+      <MultiSelect label="Stages" options={stageOpts} selected={stageNames} onToggle={toggle(setStageNames)} />
+      <MultiSelect label="Tags" options={tagOpts} selected={tags} onToggle={toggle(setTags)} />
+      <MultiSelect label="Application status" options={STATUS_OPTIONS} selected={statuses} onToggle={toggle(setStatuses)} />
 
       <label className="flex items-center gap-2 text-xs text-slate-600">
         <input type="checkbox" checked={excludeDNC} onChange={e => setExcludeDNC(e.target.checked)} className="text-emerald-600 focus:ring-emerald-500" />

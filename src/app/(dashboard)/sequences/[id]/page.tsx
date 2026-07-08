@@ -49,6 +49,7 @@ export default function SequenceDetailPage() {
   const [nameInput, setNameInput]         = useState('')
   const [enrollments, setEnrollments]     = useState<SequenceEnrollment[]>([])
   const [enrollLoading, setEnrollLoading] = useState(false)
+  const [selectedEnrollIds, setSelectedEnrollIds] = useState<string[]>([])
 
   // Stage editor state
   const [editorOpen, setEditorOpen]       = useState(false)
@@ -136,6 +137,19 @@ export default function SequenceDetailPage() {
   const deleteEnrollment = async (enrollId: string) => {
     if (!confirm('Remove this candidate from the sequence? This stops any pending emails and deletes their enrollment.')) return
     await fetch(`/api/enrollments/${enrollId}`, { method: 'DELETE' })
+    loadEnrollments()
+    loadSequence()
+  }
+
+  const toggleEnrollSelect = (eid: string) =>
+    setSelectedEnrollIds(prev => prev.includes(eid) ? prev.filter(x => x !== eid) : [...prev, eid])
+  const toggleSelectAll = () =>
+    setSelectedEnrollIds(prev => prev.length === enrollments.length ? [] : enrollments.map(e => e.id))
+  const bulkDeleteEnrollments = async () => {
+    if (selectedEnrollIds.length === 0) return
+    if (!confirm(`Remove ${selectedEnrollIds.length} candidate(s) from the sequence?`)) return
+    await Promise.all(selectedEnrollIds.map(eid => fetch(`/api/enrollments/${eid}`, { method: 'DELETE' })))
+    setSelectedEnrollIds([])
     loadEnrollments()
     loadSequence()
   }
@@ -383,8 +397,20 @@ export default function SequenceDetailPage() {
               </div>
             ) : (
               <div className="space-y-2">
+                <div className="flex items-center justify-between px-1 py-1">
+                  <label className="flex items-center gap-2 text-xs text-slate-500">
+                    <input type="checkbox" checked={enrollments.length > 0 && selectedEnrollIds.length === enrollments.length} onChange={toggleSelectAll} className="text-emerald-600 focus:ring-emerald-500" />
+                    Select all
+                  </label>
+                  {selectedEnrollIds.length > 0 && (
+                    <button onClick={bulkDeleteEnrollments} className="flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100">
+                      <Trash2 className="h-3.5 w-3.5" /> Remove {selectedEnrollIds.length}
+                    </button>
+                  )}
+                </div>
                 {enrollments.map(e => (
-                  <div key={e.id} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <div key={e.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <input type="checkbox" checked={selectedEnrollIds.includes(e.id)} onChange={() => toggleEnrollSelect(e.id)} className="text-emerald-600 focus:ring-emerald-500" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-slate-800">{e.candidate_name || 'Unknown'}</p>
                       <p className="text-xs text-slate-400">{e.candidate_email || ''}</p>

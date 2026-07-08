@@ -12,6 +12,13 @@ entries on top.
 ## 2026-07-08
 
 ### Added
+- **Bulk-select enrolled candidates + bulk remove.** The Enrollments list has a
+  "Select all" checkbox and per-row checkboxes; a "Remove N" action deletes the
+  selected enrollments at once.
+- **Bulk filter fields are searchable multi-select dropdowns.** Department / Jobs
+  / Stages / Tags / Status each fold into a dropdown whose header is a search
+  box, with the current selection shown as chips (so you can see what produced a
+  preview). Jobs without a title now show "(untitled job)" instead of blank.
 - **Remove a candidate from a sequence.** Each enrolled row now has a remove
   (trash) button; `DELETE /api/enrollments/[id]` cancels queued sends, drops the
   email records, and deletes the enrollment (org-scoped).
