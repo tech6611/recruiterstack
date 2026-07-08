@@ -57,6 +57,23 @@ const DEPARTMENTS = [
 
 const LEVEL_OPTIONS = ['Intern', 'Junior', 'Mid-level', 'Senior', 'Lead', 'Staff', 'Principal', 'Director', 'VP']
 
+// Work arrangement shown on the job. Value is the stored key; label is what the
+// recruiter sees. Mirrors the intake form so both front doors match.
+const WORK_MODELS = [
+  { value: 'remote', label: 'Remote' },
+  { value: 'hybrid', label: 'Hybrid' },
+  { value: 'onsite', label: 'On-site' },
+] as const
+
+const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary']
+
+// A requisition stores employment_type in canonical form (full_time). Map it to
+// the display label so it pre-fills cleanly when a job is created from a req.
+const EMPLOYMENT_TYPE_FROM_OPENING: Record<string, string> = {
+  full_time: 'Full-time', part_time: 'Part-time', contract: 'Contract',
+  intern: 'Internship', temp: 'Temporary',
+}
+
 const CITIES = [
   'Remote', 'Hybrid',
   'New York, NY', 'San Francisco, CA', 'Los Angeles, CA', 'Chicago, IL', 'Austin, TX',
@@ -77,6 +94,7 @@ interface FromOpening {
   title:             string
   department:        string
   location:          string
+  employment_type:   string
   comp_min:          string
   comp_max:          string
   target_start_date: string
@@ -184,13 +202,15 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
   const [hmEmail, setHmEmail] = useState('')
   const [hmSlack, setHmSlack] = useState('')
   const [level, setLevel] = useState('')
+  const [workModel, setWorkModel] = useState('')
+  const [employmentType, setEmploymentType] = useState(fromOpening?.employment_type ?? '')
+  // Single job location. Pre-filled from the linked requisition; required.
+  const [location, setLocation] = useState(fromOpening?.location ?? '')
   const [openings, setOpenings] = useState<{ location: string; seats: number }[]>([
     { location: fromOpening?.location ?? '', seats: 1 },
   ])
-  const [remoteOk, setRemoteOk] = useState(false)
 
   const totalSeats = openings.reduce((sum, o) => sum + (o.seats || 1), 0)
-  const primaryLocation = openings.find(o => o.location.trim())?.location ?? ''
   const updateOpening = (idx: number, patch: Partial<{ location: string; seats: number }>) =>
     setOpenings(prev => prev.map((o, i) => (i === idx ? { ...o, ...patch } : o)))
   const addOpening = () => setOpenings(prev => [...prev, { location: '', seats: 1 }])
@@ -234,8 +254,8 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        position_title: positionTitle, department, level, location: primaryLocation,
-        remote_ok: remoteOk, headcount: totalSeats,
+        position_title: positionTitle, department, level, location,
+        remote_ok: workModel === 'remote', headcount: totalSeats,
         team_context: stripHtml(teamContext), key_requirements: stripHtml(keyReqs),
         nice_to_haves: stripHtml(niceToHave),
         budget_min: budgetMin ? Number(budgetMin) : undefined,
@@ -255,9 +275,15 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!positionTitle.trim()) { setError('Position title is required.'); return }
-    if (mode === 'fill_myself' && (isHtmlEmpty(teamContext) || isHtmlEmpty(keyReqs))) {
-      setError('Please fill in Team Context and Key Requirements.')
-      return
+    if (mode === 'fill_myself') {
+      if (isHtmlEmpty(teamContext) || isHtmlEmpty(keyReqs)) {
+        setError('Please fill in Team Context and Key Requirements.')
+        return
+      }
+      if (!location.trim())  { setError('Please add a Location.'); return }
+      if (!workModel)        { setError('Please choose a Work model (Remote / Hybrid / On-site).'); return }
+      if (!level)            { setError('Please choose a Level / Seniority.'); return }
+      if (!employmentType)   { setError('Please choose an Employment type.'); return }
     }
     setLoading(true); setError(null)
     // Canonical job-create: the legacy hiring_requests intake flow has been
@@ -272,7 +298,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
         description: jd,
         comp_min:    budgetMin ? Number(budgetMin) : null,
         comp_max:    budgetMax ? Number(budgetMax) : null,
-        remote_ok:   remoteOk,
+        remote_ok:   workModel === 'remote',
         // When linking an approved requisition, don't mint new seats — the
         // existing opening is linked server-side via link_opening_id.
         link_opening_id: fromOpening?.id ?? null,
@@ -283,6 +309,9 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
               .map(o => ({ location: o.location.trim(), seats: o.seats || 1 })),
         intake: {
           level,
+          work_model:      workModel || null,
+          employment_type: employmentType || null,
+          location:        location.trim(),
           hm_name: hmName, hm_email: hmEmail, hm_slack: hmSlack,
           // Store the editor's rich HTML so bullets/bold survive into the
           // detail view and the public apply page. (The AI JD preview above
@@ -363,13 +392,29 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</p>
+            {/* Title + Department are set once on the requisition and flow through
+                locked, so the approved requisition stays the single source of truth. */}
             <div>
-              <label className={labelCls}>Job Title <span className="text-red-500">*</span></label>
-              <AutocompleteInput value={positionTitle} onChange={setPositionTitle} options={JOB_TITLES} placeholder="Senior Product Manager" />
+              <label className={labelCls}>
+                Job Title <span className="text-red-500">*</span>
+                {fromOpening && <span className="ml-1.5 text-xs font-normal text-slate-400">· from requisition</span>}
+              </label>
+              {fromOpening ? (
+                <div className={inputCls + ' bg-slate-50 text-slate-500 cursor-not-allowed select-none'}>{positionTitle || '—'}</div>
+              ) : (
+                <AutocompleteInput value={positionTitle} onChange={setPositionTitle} options={JOB_TITLES} placeholder="Senior Product Manager" />
+              )}
             </div>
             <div>
-              <label className={labelCls}>Department / Team</label>
-              <AutocompleteInput value={department} onChange={setDepartment} options={DEPARTMENTS} placeholder="Engineering, Product, Sales…" />
+              <label className={labelCls}>
+                Department / Team
+                {fromOpening && <span className="ml-1.5 text-xs font-normal text-slate-400">· from requisition</span>}
+              </label>
+              {fromOpening ? (
+                <div className={inputCls + ' bg-slate-50 text-slate-500 cursor-not-allowed select-none'}>{department || '—'}</div>
+              ) : (
+                <AutocompleteInput value={department} onChange={setDepartment} options={DEPARTMENTS} placeholder="Engineering, Product, Sales…" />
+              )}
             </div>
           </div>
 
@@ -399,17 +444,29 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Role Details</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className={labelCls}>Level / Seniority</label>
+                    <label className={labelCls}>Level / Seniority <span className="text-red-500">*</span></label>
                     <select value={level} onChange={e => setLevel(e.target.value)} className={inputCls}>
                       <option value="">Select level…</option>
                       {LEVEL_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
                     </select>
                   </div>
-                  <div className="flex flex-col justify-end">
-                    <label className="flex items-center gap-2 cursor-pointer py-2.5">
-                      <input type="checkbox" checked={remoteOk} onChange={e => setRemoteOk(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
-                      <span className="text-sm font-semibold text-slate-700">Remote OK</span>
-                    </label>
+                  <div>
+                    <label className={labelCls}>Work model <span className="text-red-500">*</span></label>
+                    <select value={workModel} onChange={e => setWorkModel(e.target.value)} className={inputCls}>
+                      <option value="">Select…</option>
+                      {WORK_MODELS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Employment type <span className="text-red-500">*</span></label>
+                    <select value={employmentType} onChange={e => setEmploymentType(e.target.value)} className={inputCls}>
+                      <option value="">Select type…</option>
+                      {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Location <span className="text-red-500">*</span></label>
+                    <AutocompleteInput value={location} onChange={setLocation} options={CITIES} placeholder="Bengaluru, India" />
                   </div>
                 </div>
 
@@ -655,6 +712,7 @@ function RequisitionChooser({ onPick }: { onPick: (o: FromOpening) => void }) {
     title:             o.title,
     department:        o.department_id ? (deptById.get(o.department_id) ?? '') : '',
     location:          o.location_id   ? (locById.get(o.location_id)    ?? '') : '',
+    employment_type:   o.employment_type ? (EMPLOYMENT_TYPE_FROM_OPENING[o.employment_type] ?? '') : '',
     comp_min:          o.comp_min != null ? String(o.comp_min) : '',
     comp_max:          o.comp_max != null ? String(o.comp_max) : '',
     target_start_date: o.target_start_date ?? '',
@@ -1008,6 +1066,7 @@ export default function JobsPage() {
           title:      params.get('title')      ?? '',
           department: params.get('department')  ?? '',
           location:   params.get('location')    ?? '',
+          employment_type:   EMPLOYMENT_TYPE_FROM_OPENING[params.get('employment_type') ?? ''] ?? '',
           comp_min:          params.get('comp_min')          ?? '',
           comp_max:          params.get('comp_max')          ?? '',
           target_start_date: params.get('target_start_date') ?? '',

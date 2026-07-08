@@ -140,6 +140,7 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
     const params = new URLSearchParams({ new: '1', from_opening: opening.id, title: opening.title })
     if (dept?.name) params.set('department', dept.name)
     if (loc?.name)  params.set('location', loc.name)
+    if (opening.employment_type) params.set('employment_type', opening.employment_type)
     if (opening.comp_min != null) params.set('comp_min', String(opening.comp_min))
     if (opening.comp_max != null) params.set('comp_max', String(opening.comp_max))
     if (opening.target_start_date) params.set('target_start_date', opening.target_start_date)

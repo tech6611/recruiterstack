@@ -97,6 +97,10 @@ export function NewOpeningForm() {
       toast.error('Title is required')
       return
     }
+    if (!form.department_id) {
+      toast.error('Department is required')
+      return
+    }
     setSaving(true)
     const payload: Partial<OpeningInsert> = {
       title:             form.title.trim(),
@@ -133,7 +137,7 @@ export function NewOpeningForm() {
       <CardContent>
         <div className="space-y-5 py-2">
           <div className="space-y-1.5">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">Title <span className="text-red-500">*</span></Label>
             <Input
               id="title"
               placeholder="Senior Backend Engineer"
@@ -144,7 +148,7 @@ export function NewOpeningForm() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Department</Label>
+              <Label>Department <span className="text-red-500">*</span></Label>
               <DepartmentCombobox
                 value={form.department_id}
                 onChange={id => setForm(f => ({ ...f, department_id: id, comp_band_id: '' }))}

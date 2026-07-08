@@ -245,6 +245,10 @@ export default function IntakePage() {
   // ── Submit ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.level)            { setSubmitError('Please choose a Level / Seniority.'); return }
+    if (!form.employment_type)  { setSubmitError('Please choose an Employment Type.'); return }
+    if (!form.work_model)       { setSubmitError('Please choose a Work model (Remote / Hybrid / On-site).'); return }
+    if (!location.trim())       { setSubmitError('Please add a Location.'); return }
     if (!form.team_context.trim() || !form.key_requirements.trim()) {
       setSubmitError('Please fill in the team context and key requirements.')
       return
@@ -419,14 +423,14 @@ export default function IntakePage() {
             <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Role Details</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>Level / Seniority</label>
+                <label className={labelCls}>Level / Seniority <span className="text-red-500">*</span></label>
                 <select value={form.level} onChange={e => set('level', e.target.value)} className={inputCls}>
                   <option value="">Select level…</option>
                   {LEVEL_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
               </div>
               <div>
-                <label className={labelCls}>Employment Type</label>
+                <label className={labelCls}>Employment Type <span className="text-red-500">*</span></label>
                 <select value={form.employment_type} onChange={e => set('employment_type', e.target.value)} className={inputCls}>
                   <option value="">Select type…</option>
                   {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -437,11 +441,11 @@ export default function IntakePage() {
                 <input type="number" min={1} max={50} value={form.headcount} onChange={e => set('headcount', e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Location</label>
+                <label className={labelCls}>Location <span className="text-red-500">*</span></label>
                 <LocationInput value={location} onChange={setLocation} />
               </div>
               <div>
-                <label className={labelCls}>Work model</label>
+                <label className={labelCls}>Work model <span className="text-red-500">*</span></label>
                 <select value={form.work_model} onChange={e => set('work_model', e.target.value)} className={inputCls}>
                   <option value="">Select…</option>
                   {WORK_MODELS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
