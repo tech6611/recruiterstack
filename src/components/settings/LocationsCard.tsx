@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
+import { COUNTRIES } from '@/lib/constants/countries'
 
 type RemoteType = 'onsite' | 'remote' | 'hybrid'
 
@@ -74,7 +75,7 @@ export function LocationsCard() {
                     <button onClick={() => setOpen({ mode: 'edit', row: l })} className="text-sm font-medium text-slate-900 hover:text-emerald-700 text-left">
                       {l.name}
                     </button>
-                    <span className="ml-2 text-xs text-slate-500">{l.remote_type}{detail ? ` · ${detail}` : ''}</span>
+                    {detail && <span className="ml-2 text-xs text-slate-500">{detail}</span>}
                     {!l.is_active && <span className="ml-2 text-[10px] uppercase font-semibold text-slate-400">archived</span>}
                   </div>
                   {l.is_active && (
@@ -98,8 +99,6 @@ function LocationDialog({ mode, row, onClose }: { mode: 'add' | 'edit'; row?: Lo
     state:       row?.state ?? '',
     country:     row?.country ?? '',
     postal_code: row?.postal_code ?? '',
-    remote_type: (row?.remote_type ?? 'onsite') as RemoteType,
-    timezone:    row?.timezone ?? '',
     is_active:   row?.is_active ?? true,
   })
   const [submitting, setSubmitting] = useState(false)
@@ -113,10 +112,8 @@ function LocationDialog({ mode, row, onClose }: { mode: 'add' | 'edit'; row?: Lo
       name:        form.name.trim(),
       city:        form.city.trim() || null,
       state:       form.state.trim() || null,
-      country:     form.country.trim().toUpperCase().slice(0, 2) || null,
+      country:     form.country || null,
       postal_code: form.postal_code.trim() || null,
-      remote_type: form.remote_type,
-      timezone:    form.timezone.trim() || null,
       is_active:   form.is_active,
     }
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
@@ -143,19 +140,18 @@ function LocationDialog({ mode, row, onClose }: { mode: 'add' | 'edit'; row?: Lo
             <div className="space-y-1.5"><Label>City</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
             <div className="space-y-1.5"><Label>State / region</Label><Input value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} /></div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5"><Label>Country</Label><Input maxLength={2} placeholder="US" value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>Postal</Label><Input value={form.postal_code} onChange={e => setForm({ ...form, postal_code: e.target.value })} /></div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Type</Label>
-              <Select value={form.remote_type} onChange={e => setForm({ ...form, remote_type: e.target.value as RemoteType })}>
-                <option value="onsite">Onsite</option>
-                <option value="remote">Remote</option>
-                <option value="hybrid">Hybrid</option>
+              <Label>Country</Label>
+              <Select value={form.country} onChange={e => setForm({ ...form, country: e.target.value })}>
+                <option value="">Select…</option>
+                {COUNTRIES.map(c => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
               </Select>
             </div>
+            <div className="space-y-1.5"><Label>Postal</Label><Input value={form.postal_code} onChange={e => setForm({ ...form, postal_code: e.target.value })} /></div>
           </div>
-          <div className="space-y-1.5"><Label>Timezone (IANA)</Label><Input placeholder="America/Los_Angeles" value={form.timezone} onChange={e => setForm({ ...form, timezone: e.target.value })} /></div>
           {mode === 'edit' && (
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} /> Active

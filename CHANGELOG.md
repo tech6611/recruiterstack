@@ -11,6 +11,19 @@ entries on top.
 
 ## 2026-07-08
 
+### Changed
+- **Location settings form simplified.** Country is now a dropdown (full ISO
+  3166-1 list, stored as the 2-letter code) instead of a free-text box that
+  silently truncated to 2 chars. City stays free-text.
+- **Sequence row action tooltips shortened** to single words — `Clone`, `Activate`,
+  `Pause`, `Restore`, `Archive` (were long descriptive sentences).
+
+### Removed
+- **Location form: dropped `Type` (onsite/remote/hybrid) and `Timezone` fields.**
+  Neither was consumed anywhere — `remote_type` describes a job, not an office,
+  and the location `timezone` was written and read back into the form but never
+  used by any scheduling/send logic. DB columns are left intact for now.
+
 ### Fixed
 - **Business-day step delays now actually skip weekends.** Previously the
   `delay_business_days` flag was stored and shown, and the old editor preview
