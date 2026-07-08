@@ -6,7 +6,7 @@ import {
   Wand2, ChevronDown, Send, CheckCircle,
 } from 'lucide-react'
 import type { SequenceStage, SequenceChannel, StageCondition } from '@/lib/types/database'
-import { toDelayFields, fromDelayFields, type DelayUnit } from '@/lib/sequences/schedule'
+import { toDelayFields, fromDelayFields, computeStageDelaySeconds, type DelayUnit } from '@/lib/sequences/schedule'
 import { RichTextEditor } from '@/components/RichTextEditor'
 import { useSettings } from '@/lib/hooks/useSettings'
 import type { Editor } from '@tiptap/react'
@@ -46,20 +46,19 @@ const AI_TEMPLATES = [
   { id: 'breakup',           emoji: '👋', name: 'Final Check-in' },
 ]
 
-const TIMEZONES = [
-  'Asia/Kolkata',
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'Europe/London',
-  'Europe/Berlin',
-  'Europe/Paris',
-  'Asia/Singapore',
-  'Asia/Tokyo',
-  'Australia/Sydney',
-  'UTC',
-]
+// Short labels for the timezone dropdown + the send-time preview. Order here is
+// the dropdown order.
+const TZ_LABELS: Record<string, string> = {
+  'Asia/Kolkata': 'IST', 'America/New_York': 'EST', 'America/Chicago': 'CST',
+  'America/Denver': 'MST', 'America/Los_Angeles': 'PST', 'Europe/London': 'GMT',
+  'Europe/Berlin': 'CET', 'Europe/Paris': 'CET', 'Asia/Singapore': 'SGT',
+  'Asia/Tokyo': 'JST', 'Australia/Sydney': 'AEDT', 'UTC': 'UTC',
+}
+const TIMEZONES = Object.keys(TZ_LABELS)
+
+// The clock time a day-level step defaults to when none is set — so a newly
+// added stage shows a concrete send time instead of a blank field.
+const DEFAULT_SEND_TIME = '09:00'
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
@@ -86,7 +85,9 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [delayValue, setDelayValue]       = useState(initialDelay.value)
   const [delayUnit, setDelayUnit]         = useState<DelayUnit>(initialDelay.unit)
   const isDayUnit = delayUnit === 'days' || delayUnit === 'business_days'
-  const [sendTime, setSendTime]           = useState(stage?.send_at_time?.slice(0, 5) ?? '')
+  // New day-level stages get a sensible default time (9 AM); editing an existing
+  // stage keeps whatever it had (possibly none).
+  const [sendTime, setSendTime]           = useState(stage?.send_at_time?.slice(0, 5) ?? (stage ? '' : DEFAULT_SEND_TIME))
   const [sendTz, setSendTz]              = useState(stage?.send_timezone && stage.send_timezone !== 'UTC' ? stage.send_timezone : 'Asia/Kolkata')
   const [condition, setCondition]         = useState<StageCondition | ''>(stage?.condition ?? '')
   const [soboName, setSoboName]           = useState(stage?.send_on_behalf_of ?? '')
@@ -112,6 +113,25 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [previewSent, setPreviewSent]     = useState(false)
 
   const showCondition = !isFirstStage && (isEdit ? stage!.order_index > 1 : stageCount >= 1)
+
+  // Honest "first send" preview for day-level steps: computed with the SAME
+  // function the sender uses (computeStageDelaySeconds), so what you see is what
+  // actually gets scheduled — in the selected timezone, with the chosen time.
+  const schedulePreview = (() => {
+    if (!isDayUnit) return null
+    const { delay_days, delay_minutes } = toDelayFields(delayValue, delayUnit)
+    const seconds = computeStageDelaySeconds(
+      { send_at_time: sendTime || null, send_timezone: sendTz, delay_days, delay_minutes },
+      new Date(),
+      false,
+    )
+    const target = new Date(Date.now() + seconds * 1000)
+    const when = target.toLocaleString('en-US', {
+      timeZone: sendTz, weekday: 'short', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    })
+    return `${when} ${TZ_LABELS[sendTz] ?? sendTz}`
+  })()
 
   // ── AI Draft Generation ─────────────────────────────────────────────────
 
@@ -380,21 +400,6 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 <option value="business_days">business {delayValue === 1 ? 'day' : 'days'}</option>
               </select>
 
-              {/* Date preview — only meaningful for day-level delays */}
-              {isDayUnit && delayValue > 0 && (
-                <span className="text-xs text-slate-400">
-                  ({(() => {
-                    const target = new Date()
-                    let added = 0
-                    while (added < delayValue) {
-                      target.setDate(target.getDate() + 1)
-                      if (delayUnit !== 'business_days' || (target.getDay() !== 0 && target.getDay() !== 6)) added++
-                    }
-                    return target.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                  })()})
-                </span>
-              )}
-
               {/* A specific clock time only applies to day-level delays */}
               {isDayUnit && (
                 <>
@@ -410,21 +415,21 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                     onChange={e => setSendTz(e.target.value)}
                     className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                   >
-                    {TIMEZONES.map(tz => {
-                      // Short labels for common timezones
-                      const labels: Record<string, string> = {
-                        'Asia/Kolkata': 'IST', 'America/New_York': 'EST', 'America/Chicago': 'CST',
-                        'America/Denver': 'MST', 'America/Los_Angeles': 'PST', 'Europe/London': 'GMT',
-                        'Europe/Berlin': 'CET', 'Europe/Paris': 'CET', 'Asia/Singapore': 'SGT',
-                        'Asia/Tokyo': 'JST', 'Australia/Sydney': 'AEDT', 'UTC': 'UTC',
-                      }
-                      return <option key={tz} value={tz}>{labels[tz] ?? tz.replace(/_/g, ' ')}</option>
-                    })}
+                    {TIMEZONES.map(tz => (
+                      <option key={tz} value={tz}>{TZ_LABELS[tz] ?? tz.replace(/_/g, ' ')}</option>
+                    ))}
                   </select>
                 </>
               )}
             </div>
-            {!isDayUnit && (
+            {isDayUnit ? (
+              schedulePreview && (
+                <p className="text-[11px] text-slate-500">
+                  First send: <span className="font-medium text-slate-700">{schedulePreview}</span>
+                  <span className="text-slate-400"> · in the recipient&apos;s selected timezone</span>
+                </p>
+              )
+            ) : (
               <p className="text-[11px] text-slate-400">Sends this long after the previous step.</p>
             )}
           </div>

@@ -12,6 +12,47 @@ entries on top.
 ## 2026-07-08
 
 ### Added
+- **Real sequence engagement analytics (SendGrid Event Webhook).** New endpoint
+  `POST /api/webhooks/sendgrid/events` receives delivered/open/click/bounce events
+  and writes them to `sequence_emails` (status + `opened_at`/`clicked_at`/
+  `bounced_at` + open/click counts). Each send now enables SendGrid open/click
+  tracking and stamps custom args (`seq_enrollment_id`, `seq_stage_id`) so events
+  map back to the exact enrollment + stage. The Analytics tab's Opened/Clicked/
+  Bounced numbers become real once the webhook is configured in SendGrid (needs
+  `SENDGRID_WEBHOOK_TOKEN`; see `docs/sequences.md` §9). Webhook bypasses Clerk.
+
+### Changed
+- **Send conditions now actually branch.** The `sequence_email` sender evaluates a
+  stage's `condition` ("if no reply / no open / no click") against the previous
+  stage's engagement; a stage whose condition isn't met is recorded as `skipped`
+  and the chain continues to the next stage (previously conditions were stored but
+  ignored, so every stage sent). `skipped` rows are excluded from sent/delivered
+  analytics counts. (Open/click conditions only have signal once the SendGrid
+  event webhook above is live.)
+
+### Added
+- **Duplicate a sequence.** Each row on the Sequences list has a "Duplicate"
+  action that copies the sequence and all its stages (timing, content,
+  conditions) into a fresh **draft** named "… (Copy)". Runtime state
+  (enrollments, sent emails, auto-enroll rules) is intentionally not copied.
+  New endpoint `POST /api/sequences/[id]/clone`.
+
+### Changed
+- **Auto-enrollment rules are now editable in place.** On the sequence
+  Automations / "Rules" tab, clicking a rule expands it into an editable panel
+  (trigger, value, name) with Save/Cancel — previously rows were display-only
+  (toggle + delete). Tag/stage values use a text field with a suggestions list,
+  shared with the "New rule" form so both behave identically.
+- **"Add Candidates" remembers the last tool used.** The Manual / Bulk filter /
+  Rules choice now persists per-browser, so reopening "Add Candidates" returns to
+  the same tool instead of always defaulting to Manual.
+- **Sequence step scheduling shows an honest send-time preview.** For day-level
+  steps the editor now displays the actual first-send moment (e.g. "Tue, Jul 15
+  at 9:00 AM IST"), computed with the same function the sender uses, so the
+  preview reflects the selected timezone (the old date preview ignored it). New
+  day-level steps default their send time to 9:00 AM instead of a blank field.
+
+### Added
 - **Two new auto-enrollment triggers: "When someone applies" and "When
   application status changes to …".** Alongside tag-added and stage-moved, rules
   can now fire on the `applied` event (any new application — no value needed) and

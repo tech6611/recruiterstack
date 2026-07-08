@@ -61,12 +61,25 @@ export default function SequenceDetailPage() {
   const [activeTool, setActiveTool]   = useState<'manual' | 'bulk' | 'automation'>('manual')
   const [preview, setPreview]         = useState<{ count: number | null; candidates: { id: string; name: string; email: string }[] }>({ count: null, candidates: [] })
 
+  // Remember which add-candidates tool was last used (Manual / Bulk / Rules) so
+  // "Add Candidates" reopens to the same choice instead of always Manual — even
+  // across page reloads. Stored per-browser, keyed globally.
+  const ADD_TOOL_KEY = 'sequences.addTool'
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem(ADD_TOOL_KEY) : null
+    if (saved === 'manual' || saved === 'bulk' || saved === 'automation') setActiveTool(saved)
+  }, [])
+
   // Panels push their current selection here → the left list previews it.
   const handlePreview = useCallback((count: number | null, candidates: { id: string; name: string; email: string }[]) => {
     setPreview({ count, candidates })
   }, [])
 
-  const selectTool   = (t: 'manual' | 'bulk' | 'automation') => { setActiveTool(t); setPreview({ count: null, candidates: [] }) }
+  const selectTool   = (t: 'manual' | 'bulk' | 'automation') => {
+    setActiveTool(t)
+    setPreview({ count: null, candidates: [] })
+    try { window.localStorage.setItem(ADD_TOOL_KEY, t) } catch { /* private mode / storage blocked */ }
+  }
   const openAddPane  = () => { setShowAddPane(true); setTab('enrollments') }
   const closeAddPane = () => { setShowAddPane(false); setPreview({ count: null, candidates: [] }) }
 

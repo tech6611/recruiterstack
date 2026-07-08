@@ -266,9 +266,12 @@ export async function getSequenceAnalytics(
     enrollmentStatuses[e.status] = (enrollmentStatuses[e.status] ?? 0) + 1
   }
 
+  // 'skipped' rows are stages a send condition held back — they never went out,
+  // so they don't count as sent/delivered.
+  const NOT_SENT = ['queued', 'failed', 'skipped']
   const allEmails = (emails ?? []) as Array<{ stage_id: string; status: string }>
   const overall = {
-    total_sent:    allEmails.filter(e => e.status !== 'queued' && e.status !== 'failed').length,
+    total_sent:    allEmails.filter(e => !NOT_SENT.includes(e.status)).length,
     total_opened:  allEmails.filter(e => ['opened','clicked','replied'].includes(e.status)).length,
     total_replied: allEmails.filter(e => e.status === 'replied').length,
     total_bounced: allEmails.filter(e => e.status === 'bounced').length,
@@ -281,8 +284,8 @@ export async function getSequenceAnalytics(
       order_index: s.order_index,
       subject:     s.subject,
       delay_days:  s.delay_days,
-      sent:        stageEmails.filter(e => e.status !== 'queued' && e.status !== 'failed').length,
-      delivered:   stageEmails.filter(e => !['queued','failed','bounced'].includes(e.status)).length,
+      sent:        stageEmails.filter(e => !NOT_SENT.includes(e.status)).length,
+      delivered:   stageEmails.filter(e => !['queued','failed','skipped','bounced'].includes(e.status)).length,
       opened:      stageEmails.filter(e => ['opened','clicked','replied'].includes(e.status)).length,
       clicked:     stageEmails.filter(e => ['clicked','replied'].includes(e.status)).length,
       replied:     stageEmails.filter(e => e.status === 'replied').length,
