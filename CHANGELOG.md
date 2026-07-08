@@ -11,6 +11,11 @@ entries on top.
 
 ## 2026-07-08
 
+### Added
+- **Remove a candidate from a sequence.** Each enrolled row now has a remove
+  (trash) button; `DELETE /api/enrollments/[id]` cancels queued sends, drops the
+  email records, and deletes the enrollment (org-scoped).
+
 ### Changed
 - **Add-candidate tools are now a pop-in panel, hidden by default.** The
   Enrollments tab shows just the enrolled list; "Add Candidates" is a plain

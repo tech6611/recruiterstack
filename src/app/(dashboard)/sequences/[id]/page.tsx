@@ -133,6 +133,13 @@ export default function SequenceDetailPage() {
     loadEnrollments()
   }
 
+  const deleteEnrollment = async (enrollId: string) => {
+    if (!confirm('Remove this candidate from the sequence? This stops any pending emails and deletes their enrollment.')) return
+    await fetch(`/api/enrollments/${enrollId}`, { method: 'DELETE' })
+    loadEnrollments()
+    loadSequence()
+  }
+
   // ── Loading / Error ───────────────────────────────────────────────────
 
   if (loading) {
@@ -390,6 +397,7 @@ export default function SequenceDetailPage() {
                     {e.status === 'paused' && (
                       <button onClick={() => updateEnrollmentStatus(e.id, 'active')} className="rounded-lg p-1 text-emerald-500 hover:bg-emerald-50" title="Resume"><Play className="h-3.5 w-3.5" /></button>
                     )}
+                    <button onClick={() => deleteEnrollment(e.id)} className="rounded-lg p-1 text-slate-400 hover:bg-red-50 hover:text-red-500" title="Remove from sequence"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 ))}
               </div>

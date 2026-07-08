@@ -67,3 +67,35 @@ export async function PATCH(
 
   return NextResponse.json({ data })
 }
+
+// DELETE /api/enrollments/[id] — remove a candidate from the sequence entirely.
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const authResult = await requireOrg()
+  if (authResult instanceof NextResponse) return authResult
+  const { orgId } = authResult
+
+  const supabase = createAdminClient()
+
+  // Verify the enrollment belongs to this org before touching anything.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: enr } = await (supabase.from('sequence_enrollments') as any)
+    .select('id').eq('id', params.id).eq('org_id', orgId).maybeSingle()
+  if (!enr) return NextResponse.json({ error: 'Enrollment not found' }, { status: 404 })
+
+  // Cancel any queued sends, drop its email records, then remove the enrollment.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('job_queue') as any)
+    .delete().eq('job_type', 'sequence_email').in('status', ['pending', 'failed'])
+    .filter('payload->>enrollmentId', 'eq', params.id)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('sequence_emails') as any).delete().eq('enrollment_id', params.id)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('sequence_enrollments') as any)
+    .delete().eq('id', params.id).eq('org_id', orgId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return new NextResponse(null, { status: 204 })
+}
