@@ -104,7 +104,9 @@ export default function BulkEnrollPanel({ sequenceId, active, onPreviewChange, o
     (async () => {
       const [dRes, jRes, oRes] = await Promise.all([fetch('/api/departments'), fetch('/api/jobs'), fetch('/api/automations/options')])
       if (dRes.ok) setDepartments(((await dRes.json()).data ?? []).map((d: { id: string; name: string }) => ({ value: d.id, label: d.name })))
-      if (jRes.ok) setJobs(((await jRes.json()).data ?? []).map((j: { id: string; title: string }) => ({ value: j.id, label: j.title || '(untitled job)' })))
+      // /api/jobs is Django-served in prod (title lives under `position_title`) and
+      // Next.js-served locally (`title`) — accept whichever is present.
+      if (jRes.ok) setJobs(((await jRes.json()).data ?? []).map((j: { id: string; title?: string; position_title?: string; name?: string }) => ({ value: j.id, label: j.title || j.position_title || j.name || '(untitled job)' })))
       if (oRes.ok) {
         const o = (await oRes.json()).data ?? { tags: [], stages: [] }
         setStageOpts((o.stages ?? []).map((s: string) => ({ value: s, label: s })))
