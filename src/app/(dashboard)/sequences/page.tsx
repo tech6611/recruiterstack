@@ -5,7 +5,7 @@ import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Mail, Loader2,
-  Play, Pause, Archive, ChevronRight, ChevronDown,
+  Play, Pause, Archive, ChevronRight, ChevronDown, Copy,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Sequence, SequenceStatus } from '@/lib/types/database'
@@ -73,6 +73,16 @@ export default function SequencesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     })
+    if (res.ok) load()
+  }
+
+  // Duplicate a sequence — server copies it (and its stages) into a fresh draft,
+  // which then appears at the top of the Active pane (list is sorted newest-first).
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const handleDuplicate = async (id: string) => {
+    setDuplicatingId(id)
+    const res = await fetch(`/api/sequences/${id}/clone`, { method: 'POST' })
+    setDuplicatingId(null)
     if (res.ok) load()
   }
 
@@ -146,7 +156,7 @@ export default function SequencesPage() {
             emptyText="No active sequences yet."
           >
             {activeSeqs.map(seq => (
-              <SequenceRow key={seq.id} seq={seq} onOpen={() => router.push(`/sequences/${seq.id}`)} onStatus={handleStatusChange} />
+              <SequenceRow key={seq.id} seq={seq} onOpen={() => router.push(`/sequences/${seq.id}`)} onStatus={handleStatusChange} onDuplicate={handleDuplicate} duplicating={duplicatingId === seq.id} />
             ))}
           </SequencePane>
 
@@ -158,7 +168,7 @@ export default function SequencesPage() {
             emptyText="Nothing archived."
           >
             {archivedSeqs.map(seq => (
-              <SequenceRow key={seq.id} seq={seq} onOpen={() => router.push(`/sequences/${seq.id}`)} onStatus={handleStatusChange} />
+              <SequenceRow key={seq.id} seq={seq} onOpen={() => router.push(`/sequences/${seq.id}`)} onStatus={handleStatusChange} onDuplicate={handleDuplicate} duplicating={duplicatingId === seq.id} />
             ))}
           </SequencePane>
         </div>
@@ -212,11 +222,13 @@ function SequencePane({
 // ── Sequence row ──────────────────────────────────────────────────────────────
 
 function SequenceRow({
-  seq, onOpen, onStatus,
+  seq, onOpen, onStatus, onDuplicate, duplicating,
 }: {
   seq: Sequence
   onOpen: () => void
   onStatus: (id: string, status: SequenceStatus) => void
+  onDuplicate: (id: string) => void
+  duplicating: boolean
 }) {
   const badge = STATUS_BADGE[seq.status] ?? STATUS_BADGE.draft
   const replyRate = seq.enrollment_count && seq.reply_count
@@ -267,6 +279,14 @@ function SequenceRow({
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
            onClick={e => e.stopPropagation()}>
+        <button
+          onClick={() => onDuplicate(seq.id)}
+          disabled={duplicating}
+          title="Duplicate — makes a draft copy with the same stages"
+          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-50"
+        >
+          {duplicating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+        </button>
         {seq.status === 'draft' && (
           <button
             onClick={() => onStatus(seq.id, 'active')}

@@ -139,6 +139,7 @@ Required for local dev:
 
 Optional (features degrade gracefully):
 - `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL` (email sending)
+- `SENDGRID_WEBHOOK_TOKEN` (shared secret in the SendGrid Event Webhook URL — enables real sequence open/click/bounce analytics)
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (calendar)
 - `SLACK_WEBHOOK_URL` (notifications)
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (rate limiting)

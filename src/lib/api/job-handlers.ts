@@ -247,35 +247,96 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     return
   }
 
-  // Read the LIVE stage list plus which stages this enrollment has already been
-  // sent, then pick the next UNSENT stage. This is what makes stage adds/deletes
-  // take effect for people still in flight — there is no enroll-time snapshot.
+  const candidate = enrollment.candidates
+  if (!candidate?.email) {
+    logger.error('Candidate has no email', undefined, { enrollmentId })
+    return
+  }
+
+  // Read the LIVE stage list plus every email row this enrollment already has
+  // (sent OR skipped), so we (a) resume at the right place and (b) know what the
+  // candidate did with earlier stages when evaluating send conditions. Reading
+  // the live list is what makes stage adds/deletes take effect for people still
+  // in flight — there is no enroll-time snapshot.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: liveStages } = await (supabase.from('sequence_stages') as any)
     .select('*').eq('sequence_id', sequenceId).order('order_index', { ascending: true })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: sentRows } = await (supabase.from('sequence_emails') as any)
-    .select('stage_id').eq('enrollment_id', enrollmentId).eq('status', 'sent')
+  const { data: emailRows } = await (supabase.from('sequence_emails') as any)
+    .select('stage_id, status, open_count, click_count').eq('enrollment_id', enrollmentId)
 
-  const sentStageIds = new Set((sentRows ?? []).map((r: { stage_id: string }) => r.stage_id))
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ordered = (liveStages ?? []) as any[]
+  const engagementByStage = new Map<string, { status: string; open_count: number; click_count: number }>()
+  const processedStageIds = new Set<string>()
+  for (const r of (emailRows ?? []) as Array<{ stage_id: string; status: string; open_count: number | null; click_count: number | null }>) {
+    engagementByStage.set(r.stage_id, { status: r.status, open_count: r.open_count ?? 0, click_count: r.click_count ?? 0 })
+    // 'sent' and 'skipped' both mean "this stage is handled" — move past it.
+    if (r.status !== 'queued' && r.status !== 'failed') processedStageIds.add(r.stage_id)
+  }
+
+  // Engagement of the most recent ACTUALLY-SENT stage before `s` — the basis for
+  // the "if no open / no click / no reply" send conditions.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nextUnsent = () => ordered.find((s: any) => !sentStageIds.has(s.id))
-  const stage = nextUnsent()
+  const prevEngagement = (s: any) => {
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const p = ordered[i]
+      if (p.order_index >= s.order_index) continue
+      const eng = engagementByStage.get(p.id)
+      if (eng && eng.status !== 'skipped') return eng
+    }
+    return null
+  }
+
+  // A conditional stage is skipped when the candidate already did the thing the
+  // condition guards against on the previous stage. Until SendGrid open/click
+  // tracking is live these fields stay 0, so nothing is skipped — conditions have
+  // no effect yet rather than misfiring.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shouldSkip = (s: any): boolean => {
+    if (!s.condition) return false
+    const eng = prevEngagement(s)
+    if (!eng) return false
+    const opened  = ['opened', 'clicked', 'replied'].includes(eng.status) || eng.open_count > 0
+    const clicked = ['clicked', 'replied'].includes(eng.status) || eng.click_count > 0
+    const replied = eng.status === 'replied'
+    if (s.condition === 'no_reply') return replied
+    if (s.condition === 'no_open')  return opened
+    if (s.condition === 'no_click') return clicked
+    return false
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nextUnprocessed = () => ordered.find((s: any) => !processedStageIds.has(s.id))
+
+  // Walk forward, recording a 'skipped' marker for any stage whose condition
+  // isn't met, until we reach one that should actually send (or run out).
+  let stage = nextUnprocessed()
+  while (stage && shouldSkip(stage)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('sequence_emails') as any).insert({
+      enrollment_id: enrollmentId, stage_id: stage.id, candidate_id: enrollment.candidate_id,
+      to_email: candidate.email, subject: stage.subject ?? '', body: stage.body ?? '',
+      status: 'skipped', org_id: job.org_id,
+    })
+    logger.info('Sequence stage skipped by condition', { enrollmentId, stageId: stage.id, condition: stage.condition })
+    processedStageIds.add(stage.id)
+    engagementByStage.set(stage.id, { status: 'skipped', open_count: 0, click_count: 0 })
+    stage = nextUnprocessed()
+  }
 
   if (!stage) {
-    // No unsent stage remains — the enrollment has reached the end of the
+    // No sendable stage remains — the enrollment has reached the end of the
     // sequence as it currently stands. Mark it completed.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('sequence_enrollments') as any)
       .update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        current_stage_index: sentStageIds.size,
+        current_stage_index: processedStageIds.size,
       })
       .eq('id', enrollmentId)
-    logger.info('Sequence completed — no unsent stages remain', { enrollmentId, sequenceId })
+    logger.info('Sequence completed — no sendable stages remain', { enrollmentId, sequenceId })
     return
   }
 
@@ -288,12 +349,6 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     .eq('status', 'sent')
   if (alreadySent && alreadySent > 0) {
     logger.info('Email already sent for this stage, skipping', { enrollmentId, stageId: stage.id })
-    return
-  }
-
-  const candidate = enrollment.candidates
-  if (!candidate?.email) {
-    logger.error('Candidate has no email', undefined, { enrollmentId })
     return
   }
 
@@ -354,6 +409,14 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
       replyTo,
       subject,
       html: body,
+      // Turn on SendGrid open/click tracking, and stamp our own IDs on the
+      // message so the event webhook can map opens/clicks/bounces back to THIS
+      // enrollment + stage. See /api/webhooks/sendgrid/events.
+      trackingSettings: {
+        openTracking:  { enable: true },
+        clickTracking: { enable: true, enableText: false },
+      },
+      customArgs: { seq_enrollment_id: enrollmentId, seq_stage_id: stage.id },
     })
     sendgridMessageId = response?.headers?.['x-message-id'] ?? null
   } catch (err) {
@@ -374,18 +437,16 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
       status: 'sent', sent_at: new Date().toISOString(), org_id: job.org_id,
     })
 
-  // Advance the display cursor (number of stages sent so far).
-  const sentCount = sentStageIds.size + 1
+  // Mark this stage handled and advance the display cursor (stages done so far).
+  processedStageIds.add(stage.id)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await (supabase.from('sequence_enrollments') as any)
-    .update({ current_stage_index: sentCount })
+    .update({ current_stage_index: processedStageIds.size })
     .eq('id', enrollmentId)
 
-  // Schedule the FOLLOWING stage dynamically from the live list: mark this stage
-  // as now-sent, then look for the next unsent stage. If one exists, enqueue it
-  // with its own delay (relative to now). If not, the enrollment is complete.
-  sentStageIds.add(stage.id)
-  const followingStage = nextUnsent()
+  // Schedule the FOLLOWING stage dynamically from the live list. Its own send
+  // condition (if any) is evaluated when that job runs, not now.
+  const followingStage = nextUnprocessed()
 
   if (followingStage) {
     try {

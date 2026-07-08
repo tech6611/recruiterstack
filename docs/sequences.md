@@ -108,19 +108,28 @@ Requires DB migration **`079_sequence_enrollment_rules.sql`**.
 
 ## 6. Analytics
 
-The Analytics tab reads counts from `sequence_emails`. **Only "sent" is real
-today** — see the gap in §7.
+The Analytics tab reads counts from `sequence_emails`. **Sent / opened / clicked /
+bounced are all real** once the SendGrid **event webhook** is wired up (§9):
+SendGrid posts engagement events to `/api/webhooks/sendgrid/events`, which matches
+them back to the exact enrollment + stage (via custom args stamped on each send)
+and updates `status` / `opened_at` / `clicked_at` / `bounced_at` / `open_count` /
+`click_count`. Until that webhook is configured in the SendGrid dashboard, only
+"sent" populates and the rest read zero. (`skipped` rows — §5 — never went out and
+are excluded from sent/delivered counts.)
 
 ---
 
 ## 7. Honest limitations (looks built, isn't)
 
-- **Engagement analytics** (opens / clicks / replies / bounces): **not tracked.**
-  There's no SendGrid *event* webhook wired to `sequence_emails`, so everything
-  past "sent" reads as zero. (Reply *detection* for auto-stop is separate and does
-  work — see §4.)
-- **Conditional steps** ("if no reply" etc.): stored and shown in the editor but
-  **not enforced** — every step sends.
+- **Conditional steps** ("if no reply / no open / no click"): **enforced** in the
+  sender — a stage whose condition isn't met is recorded as `skipped` and the
+  chain moves on. But "no open" / "no click" only have signal once SendGrid
+  engagement tracking is live (§6/§9); until then those fields are 0, so nothing
+  is skipped (conditions are inert, not broken). "No reply" also overlaps with the
+  reply-stop in §4, which already halts the whole enrollment.
+- **Business-day delays** (`delay_business_days`): stored and offered in the
+  editor, but the scheduler treats them as plain calendar days — weekend-skipping
+  is **not** implemented.
 - **WhatsApp / SMS / LinkedIn steps:** selectable, but the sender **emails
   anyway**. Non-email delivery isn't implemented.
 - **"AI Draft":** canned template text, **not** an AI call.
@@ -142,6 +151,8 @@ today** — see the gap in §7.
 | Sender (dynamic chain) | `src/lib/api/job-handlers.ts` (`sequence_email` handler) |
 | Queue worker + automation scan | `src/app/api/queue/process/route.ts` |
 | Enroll / stages / enrollments APIs | `src/app/api/sequences/[id]/...` |
+| Clone a sequence | `src/app/api/sequences/[id]/clone/route.ts` |
+| SendGrid engagement webhook | `src/app/api/webhooks/sendgrid/events/route.ts` |
 | Rules API | `src/app/api/automations/...` |
 | Pause/resume API | `src/app/api/enrollments/[id]/route.ts` |
 | Reads facade | `src/modules/crm/domain/sequences.ts` |
@@ -156,6 +167,12 @@ today** — see the gap in §7.
 
 - **To make sends fire:** the external pinger must be hitting `/api/queue/process`;
   `SENDGRID_API_KEY` + `SENDGRID_FROM_EMAIL` must be set.
+- **Engagement analytics + open/click conditions need:** the SendGrid **Event
+  Webhook** (Settings → Mail Settings / Event Webhook) pointed at
+  `https://<app>/api/webhooks/sendgrid/events?token=<SENDGRID_WEBHOOK_TOKEN>`, with
+  the delivered/open/click/bounce events enabled. Set `SENDGRID_WEBHOOK_TOKEN` to a
+  random secret and include it in that URL. Open/click tracking itself is enabled
+  per-send in code (no dashboard toggle needed).
 - **Reply-stop needs:** an MX record on the `reply.` subdomain → SendGrid Inbound
   Parse → the Django webhook (one-time infra, done).
 - **Auto-enrollment needs:** migration `079` applied.
