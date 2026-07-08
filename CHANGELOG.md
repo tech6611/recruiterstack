@@ -11,6 +11,14 @@ entries on top.
 
 ## 2026-07-08
 
+### Changed
+- **Sequence UI polish.** Descriptive hover tooltips on the list-row actions
+  (Duplicate / Activate / Pause / Restore / Archive). Switching the step editor's
+  timezone now converts the send time to the same real-world moment (e.g. 9:00 AM
+  IST → 10:30 PM CST) instead of keeping the digits and silently changing when it
+  sends. Opening "Add Candidates" and then switching to Stages/Analytics now closes
+  the Add-candidates panel so it no longer overlays the tab content.
+
 ### Added
 - **Real sequence engagement analytics (SendGrid Event Webhook).** New endpoint
   `POST /api/webhooks/sendgrid/events` receives delivered/open/click/bounce events
@@ -72,6 +80,23 @@ entries on top.
   `remote_ok` boolean is kept in sync (remote → true) so nothing old breaks, and
   older jobs without `work_model` derive it from `remote_ok` (true → remote,
   false → on-site).
+- **Mandatory-field rules across the requisition / job / intake forms (Phase 1).**
+  - **Requisition form** (`/openings/new`): **Title** and **Department** are now
+    required to save a draft (Department was optional before).
+  - **Job form** (New Job drawer) now requires **Location**, **Work model**,
+    **Seniority**, and **Employment type** before you can create a job. The old
+    "Remote OK" checkbox is replaced by the Remote/Hybrid/On-site dropdown, and a
+    new Employment type dropdown was added. Location, work model, and employment
+    type now persist to `custom_fields.intake` (so they show on the public apply
+    page, which previously they didn't for drawer-created jobs).
+  - **Intake form** (`/intake/[token]`) now requires the same four fields
+    (Location, Work model, Seniority, Employment type).
+  - **Flow-through, locked:** when a job is created from an approved requisition,
+    **Title** and **Department** are pre-filled and shown read-only ("· from
+    requisition"), keeping the requisition as the single source of truth.
+    Location + Employment type also pre-fill from the requisition but stay editable
+    (they're optional at the requisition stage). Employment type carries through
+    the `/openings/[id]` "Create job" hand-off as well.
 - **Bulk-select enrolled candidates + bulk remove.** The Enrollments list has a
   "Select all" checkbox and per-row checkboxes; a "Remove N" action deletes the
   selected enrollments at once.
