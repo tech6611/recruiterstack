@@ -11,6 +11,15 @@ entries on top.
 
 ## 2026-07-08
 
+### Fixed
+- **Business-day step delays now actually skip weekends.** Previously the
+  `delay_business_days` flag was stored and shown, and the old editor preview
+  faked weekend-skipping, but the scheduler counted plain calendar days — so the
+  real send could land on a weekend. `computeStageDelaySeconds` now advances over
+  Sat/Sun for business-day delays (both the "at HH:MM" and relative forms), the
+  preview reflects it, and a test locks it in (Thu + 3 business days → the
+  following Tue).
+
 ### Changed
 - **Sequence UI polish.** Descriptive hover tooltips on the list-row actions
   (Duplicate / Activate / Pause / Restore / Archive). Switching the step editor's
