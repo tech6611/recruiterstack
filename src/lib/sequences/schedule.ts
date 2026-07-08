@@ -11,6 +11,24 @@ export interface StageTiming {
   send_timezone?: string | null
   delay_days?: number | null
   delay_minutes?: number | null
+  delay_business_days?: boolean | null
+}
+
+/**
+ * Add `n` business days (Mon–Fri, skipping Sat/Sun) to a calendar date, returning
+ * the resulting {year, month, day}. `month` is 0-indexed (JS convention). The
+ * landing day is always itself a weekday. Weekday math is done in UTC so it is
+ * independent of the host machine's timezone.
+ */
+function addBusinessDays(year: number, month: number, day: number, n: number): { year: number; month: number; day: number } {
+  const d = new Date(Date.UTC(year, month, day))
+  let added = 0
+  while (added < n) {
+    d.setUTCDate(d.getUTCDate() + 1)
+    const dow = d.getUTCDay()
+    if (dow !== 0 && dow !== 6) added++ // 0 = Sunday, 6 = Saturday
+  }
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth(), day: d.getUTCDate() }
 }
 
 /**
@@ -57,20 +75,47 @@ export function computeStageDelaySeconds(
     const tzOffsetMs = fromMs - nowFakeUtc
 
     const extraDays = stage.delay_days ?? 0
-    let targetFakeUtc = Date.UTC(tzYear, tzMonth, tzDay + extraDays, targetH, targetM, 0)
+    const businessDays = !!stage.delay_business_days
+
+    // The target calendar day = today-in-tz + the delay. For business-day delays
+    // we step over weekends; otherwise it's a plain calendar add.
+    const target = businessDays && extraDays > 0
+      ? addBusinessDays(tzYear, tzMonth, tzDay, extraDays)
+      : { year: tzYear, month: tzMonth, day: tzDay + extraDays }
+    let targetFakeUtc = Date.UTC(target.year, target.month, target.day, targetH, targetM, 0)
 
     // If the target time already passed today and there's no explicit day delay,
-    // push to tomorrow.
+    // push to the next day — the next *business* day when this is a business-day step.
     const targetRealUtc = targetFakeUtc + tzOffsetMs
     if (targetRealUtc <= fromMs && extraDays === 0) {
-      targetFakeUtc += 86_400_000
+      const next = businessDays
+        ? addBusinessDays(target.year, target.month, target.day, 1)
+        : { year: target.year, month: target.month, day: target.day + 1 }
+      targetFakeUtc = Date.UTC(next.year, next.month, next.day, targetH, targetM, 0)
     }
 
     return Math.max(0, Math.round((targetFakeUtc + tzOffsetMs - fromMs) / 1000))
   }
 
-  const daySeconds = (stage.delay_days ?? 0) * 86400
+  const delayDays = stage.delay_days ?? 0
   const minSeconds = (stage.delay_minutes ?? 0) * 60
+
+  // Business-day relative delay (no fixed clock time): convert N business days
+  // into the calendar-day span from `from`'s date (in the stage timezone), so a
+  // Thu + "3 business days" lands the following Tue, not Sun.
+  if (stage.delay_business_days && delayDays > 0) {
+    const tz = stage.send_timezone || 'Asia/Kolkata'
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour12: false,
+    }).formatToParts(from)
+    const get = (t: string) => parseInt(parts.find(p => p.type === t)!.value)
+    const y = get('year'), mo = get('month') - 1, d = get('day')
+    const target = addBusinessDays(y, mo, d, delayDays)
+    const calDays = Math.round((Date.UTC(target.year, target.month, target.day) - Date.UTC(y, mo, d)) / 86_400_000)
+    return Math.max(calDays * 86400 + minSeconds, isFirst ? 0 : 60)
+  }
+
+  const daySeconds = delayDays * 86400
   if (isFirst && daySeconds === 0 && minSeconds === 0) return 0
   return Math.max(daySeconds + minSeconds, isFirst ? 0 : 60)
 }

@@ -47,6 +47,38 @@ describe('computeStageDelaySeconds', () => {
   })
 })
 
+describe('computeStageDelaySeconds — business days', () => {
+  // 2026-07-09 is a Thursday. `from` is 02:00 UTC = 07:30 IST, still Thursday.
+  const thu = new Date('2026-07-09T02:00:00.000Z')
+  const istDate = (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+
+  it('timed delay skips the weekend (Thu +3 business days → Tue)', () => {
+    const secs = computeStageDelaySeconds(
+      { send_at_time: '09:00', send_timezone: 'Asia/Kolkata', delay_days: 3, delay_business_days: true },
+      thu, false,
+    )
+    expect(istDate(new Date(thu.getTime() + secs * 1000))).toBe('2026-07-14') // Tuesday
+  })
+
+  it('plain calendar days do NOT skip (Thu +3 days → Sun)', () => {
+    const secs = computeStageDelaySeconds(
+      { send_at_time: '09:00', send_timezone: 'Asia/Kolkata', delay_days: 3, delay_business_days: false },
+      thu, false,
+    )
+    expect(istDate(new Date(thu.getTime() + secs * 1000))).toBe('2026-07-12') // Sunday
+  })
+
+  it('relative delay with no fixed time also skips the weekend (3 biz = 5 calendar days)', () => {
+    const secs = computeStageDelaySeconds(
+      { delay_days: 3, delay_business_days: true, send_timezone: 'Asia/Kolkata' },
+      thu, false,
+    )
+    expect(secs).toBe(5 * 86400)
+    expect(istDate(new Date(thu.getTime() + secs * 1000))).toBe('2026-07-14') // Tuesday
+  })
+})
+
 describe('toDelayFields', () => {
   it('minutes → delay_minutes', () => {
     expect(toDelayFields(2, 'minutes')).toEqual({ delay_days: 0, delay_minutes: 2, delay_business_days: false })

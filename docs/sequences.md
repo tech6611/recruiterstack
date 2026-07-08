@@ -22,7 +22,9 @@ and an ordered list of **steps** (`sequence_stages`). Each step is an email with
   days, or business days** (editor dropdown). A delay is measured **from when the
   previous step sent** (e.g. "2 days" = 2 days after the prior email). A fixed
   clock time ("at 9:00 AM") is only offered for *day*-level delays, so minute/
-  hour steps stay purely relative.
+  hour steps stay purely relative. **Business-day** delays skip Saturdays and
+  Sundays (a Thursday + 3 business days lands the following Tuesday) — the
+  scheduler enforces this, not just the preview.
 - **Send on behalf of** (optional) — a from-name/email override per step.
 
 New steps are appended at the end (the server assigns their order).
@@ -127,9 +129,6 @@ are excluded from sent/delivered counts.)
   engagement tracking is live (§6/§9); until then those fields are 0, so nothing
   is skipped (conditions are inert, not broken). "No reply" also overlaps with the
   reply-stop in §4, which already halts the whole enrollment.
-- **Business-day delays** (`delay_business_days`): stored and offered in the
-  editor, but the scheduler treats them as plain calendar days — weekend-skipping
-  is **not** implemented.
 - **WhatsApp / SMS / LinkedIn steps:** selectable, but the sender **emails
   anyway**. Non-email delivery isn't implemented.
 - **"AI Draft":** canned template text, **not** an AI call.

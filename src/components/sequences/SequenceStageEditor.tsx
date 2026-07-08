@@ -141,9 +141,9 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   // actually gets scheduled — in the selected timezone, with the chosen time.
   const schedulePreview = (() => {
     if (!isDayUnit) return null
-    const { delay_days, delay_minutes } = toDelayFields(delayValue, delayUnit)
+    const { delay_days, delay_minutes, delay_business_days } = toDelayFields(delayValue, delayUnit)
     const seconds = computeStageDelaySeconds(
-      { send_at_time: sendTime || null, send_timezone: sendTz, delay_days, delay_minutes },
+      { send_at_time: sendTime || null, send_timezone: sendTz, delay_days, delay_minutes, delay_business_days },
       new Date(),
       false,
     )
