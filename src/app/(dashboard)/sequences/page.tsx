@@ -282,7 +282,7 @@ function SequenceRow({
         <button
           onClick={() => onDuplicate(seq.id)}
           disabled={duplicating}
-          title="Duplicate — makes a draft copy with the same stages"
+          title="Duplicate this sequence — creates a draft copy with all the same stages (enrolled candidates are not carried over)"
           className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-50"
         >
           {duplicating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
@@ -290,7 +290,7 @@ function SequenceRow({
         {seq.status === 'draft' && (
           <button
             onClick={() => onStatus(seq.id, 'active')}
-            title="Activate"
+            title="Activate — start sending this sequence to enrolled candidates"
             className="rounded-lg p-1.5 text-emerald-500 hover:bg-emerald-50 transition-colors"
           >
             <Play className="h-4 w-4" />
@@ -299,7 +299,7 @@ function SequenceRow({
         {seq.status === 'active' && (
           <button
             onClick={() => onStatus(seq.id, 'draft')}
-            title="Pause (set to draft)"
+            title="Pause — set back to draft so no more emails go out (enrolled candidates are kept)"
             className="rounded-lg p-1.5 text-amber-500 hover:bg-amber-50 transition-colors"
           >
             <Pause className="h-4 w-4" />
@@ -308,7 +308,7 @@ function SequenceRow({
         {seq.status === 'archived' ? (
           <button
             onClick={() => onStatus(seq.id, 'draft')}
-            title="Restore (set to draft)"
+            title="Restore — move this archived sequence back to draft"
             className="rounded-lg p-1.5 text-emerald-500 hover:bg-emerald-50 transition-colors"
           >
             <Play className="h-4 w-4" />
@@ -316,7 +316,7 @@ function SequenceRow({
         ) : (
           <button
             onClick={() => onStatus(seq.id, 'archived')}
-            title="Archive"
+            title="Archive — hide it from the active list; you can restore it anytime"
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 transition-colors"
           >
             <Archive className="h-4 w-4" />

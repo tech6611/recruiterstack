@@ -60,6 +60,28 @@ const TIMEZONES = Object.keys(TZ_LABELS)
 // added stage shows a concrete send time instead of a blank field.
 const DEFAULT_SEND_TIME = '09:00'
 
+// Convert a wall-clock "HH:MM" from one timezone to the equivalent wall-clock in
+// another, keeping the SAME real-world instant (referenced to today). So flipping
+// the dropdown from IST to CST re-labels e.g. 9:00 AM → 9:30 PM rather than
+// silently keeping "9:00" and changing when the email actually sends.
+function convertWallClock(hhmm: string, fromTz: string, toTz: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm
+  const now = new Date()
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: fromTz, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(now)
+  const get = (t: string) => parseInt(parts.find(p => p.type === t)!.value)
+  // fromTz offset such that realUTC = Date.UTC(localParts) + offset.
+  const offset = now.getTime() - Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+  const instant = Date.UTC(get('year'), get('month') - 1, get('day'), h, m, 0) + offset
+  // en-GB with h23 yields a plain "HH:MM".
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: toTz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).format(new Date(instant))
+}
+
 // ── Props ───────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -412,7 +434,13 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                   />
                   <select
                     value={sendTz}
-                    onChange={e => setSendTz(e.target.value)}
+                    onChange={e => {
+                      const nextTz = e.target.value
+                      // Keep the same real-world moment: re-label the time into the
+                      // newly chosen zone (e.g. 9:00 IST → 21:30 CST).
+                      if (sendTime) setSendTime(convertWallClock(sendTime, sendTz, nextTz))
+                      setSendTz(nextTz)
+                    }}
                     className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                   >
                     {TIMEZONES.map(tz => (

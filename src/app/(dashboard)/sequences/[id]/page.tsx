@@ -259,7 +259,12 @@ export default function SequenceDetailPage() {
         ]).map(t => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => {
+              setTab(t.id)
+              // The Add-candidates panel lives on the Enrollments tab; leaving it
+              // should close the panel so it doesn't overlay Stages/Analytics.
+              if (t.id !== 'enrollments') closeAddPane()
+            }}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
               tab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
