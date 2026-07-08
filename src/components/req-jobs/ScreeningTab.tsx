@@ -431,19 +431,34 @@ function FieldEditor({ field, index, total, priorChoiceFields, onChange, onMove,
           )}
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-            <label className="inline-flex items-center gap-1.5 text-slate-700">
-              <input type="checkbox" checked={field.required} onChange={e => onChange({ required: e.target.checked })} />
+            <label className={`inline-flex items-center gap-1.5 ${field.is_eeo ? 'text-slate-400 cursor-not-allowed' : 'text-slate-700'}`}>
+              <input
+                type="checkbox"
+                checked={field.required && !field.is_eeo}
+                disabled={field.is_eeo}
+                onChange={e => onChange({ required: e.target.checked })}
+              />
               Required
             </label>
             <label className="inline-flex items-center gap-1.5 text-slate-700">
-              <input type="checkbox" checked={field.is_eeo} onChange={e => onChange({ is_eeo: e.target.checked })} />
+              <input
+                type="checkbox"
+                checked={field.is_eeo}
+                // EEO answers are voluntary by definition: turning EEO on forces the
+                // question to be optional and clears any auto-disqualify rule so a
+                // voluntary question can never be required or used to knock a
+                // candidate out.
+                onChange={e => onChange(
+                  e.target.checked ? { is_eeo: true, required: false, knockout: null } : { is_eeo: false }
+                )}
+              />
               EEO / voluntary <span className="text-slate-400">(hidden from hiring team)</span>
             </label>
           </div>
 
           <VisibilityEditor field={field} priorChoiceFields={priorChoiceFields} onChange={onChange} />
 
-          {choices.length > 0 && (
+          {choices.length > 0 && !field.is_eeo && (
             <KnockoutEditor field={field} choices={choices} onChange={onChange} />
           )}
         </div>

@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import {
   Zap, CheckCircle, Loader2, AlertCircle,
   Upload, Link2, FileText, X, CloudUpload, ArrowRight, Sparkles,
-  MapPin, Building2, Home, BarChart3, Briefcase,
+  MapPin, Building2, Briefcase, Wallet, Home,
 } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
 import { RichText } from '@/components/RichText'
@@ -28,8 +28,12 @@ interface JobInfo {
   department: string | null
   location: string | null
   remote_ok: boolean | null
+  work_model: 'remote' | 'hybrid' | 'onsite' | null
   level: string | null
   employment_type: string | null
+  salary_min: number | null
+  salary_max: number | null
+  salary_currency: string | null
   generated_jd: string | null
   responsibilities: string | null
   requirements: string | null
@@ -81,6 +85,25 @@ function MetaChip({ icon: Icon, label }: { icon: typeof MapPin; label: string })
       {label}
     </span>
   )
+}
+
+// Work model shown as its own chip, for every arrangement (not just remote).
+const WORK_MODEL_LABEL: Record<'remote' | 'hybrid' | 'onsite', string> = {
+  remote: 'Remote',
+  hybrid: 'Hybrid',
+  onsite: 'On-site',
+}
+
+// Format the public salary range from the linked requisition comp. Null hides the
+// chip. Uses the requisition's currency (e.g. "USD 120,000 – 160,000").
+function salaryChipLabel(job: JobInfo): string | null {
+  const { salary_min: lo, salary_max: hi } = job
+  const cur = job.salary_currency || 'USD'
+  const fmt = (n: number) => `${cur} ${n.toLocaleString()}`
+  if (lo != null && hi != null) return `${fmt(lo)} – ${hi.toLocaleString()}`
+  if (lo != null) return `From ${fmt(lo)}`
+  if (hi != null) return `Up to ${fmt(hi)}`
+  return null
 }
 
 function JdSection({ title, body }: { title: string; body: string | null }) {
@@ -259,7 +282,7 @@ export default function ApplyPage() {
   // Every required question that's currently shown must be answered. Mirrors the
   // on-submit + server-side checks, so the button reflects them too.
   const requiredQuestionsAnswered = (job?.screening?.fields ?? [])
-    .filter(f => f.required && isFieldVisible(f, answers))
+    .filter(f => f.required && !f.is_eeo && isFieldVisible(f, answers))
     .every(f => !isAnswerEmpty(answers[f.id]))
   const canSubmit =
     !submitting &&
@@ -283,7 +306,7 @@ export default function ApplyPage() {
 
     // Required screening questions must be answered.
     for (const f of screeningFields) {
-      if (!f.required) continue
+      if (!f.required || f.is_eeo) continue
       if (isAnswerEmpty(answers[f.id])) { setError(`Please answer: ${f.label}`); return }
     }
 
@@ -441,17 +464,21 @@ export default function ApplyPage() {
           )}
 
           <h1 className="text-3xl font-bold text-slate-900">{job.position_title}</h1>
-          {(job.department || job.location || job.employment_type || job.remote_ok !== null || job.level) && (
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              {job.department && <MetaChip icon={Building2} label={job.department} />}
-              {job.location && <MetaChip icon={MapPin} label={job.location} />}
-              {job.employment_type && <MetaChip icon={Briefcase} label={job.employment_type} />}
-              {job.remote_ok !== null && (
-                <MetaChip icon={Home} label={job.remote_ok ? 'Remote' : 'On-site'} />
-              )}
-              {job.level && <MetaChip icon={BarChart3} label={job.level} />}
-            </div>
-          )}
+          {(() => {
+            const workLabel = job.work_model ? WORK_MODEL_LABEL[job.work_model] : null
+            const salLabel = salaryChipLabel(job)
+            const hasChips = job.department || workLabel || job.location || job.employment_type || salLabel
+            if (!hasChips) return null
+            return (
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                {job.department && <MetaChip icon={Building2} label={job.department} />}
+                {workLabel && <MetaChip icon={Home} label={workLabel} />}
+                {job.location && <MetaChip icon={MapPin} label={job.location} />}
+                {job.employment_type && <MetaChip icon={Briefcase} label={job.employment_type} />}
+                {salLabel && <MetaChip icon={Wallet} label={salLabel} />}
+              </div>
+            )
+          })()}
         </div>
 
         {/* ── Tabs ──────────────────────────────────────────────────────── */}

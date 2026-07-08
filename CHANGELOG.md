@@ -12,6 +12,18 @@ entries on top.
 ## 2026-07-08
 
 ### Added
+- **Salary range chip on the public job page (toggle-controlled).** The public
+  application page can show a salary chip (e.g. `USD 120,000 – 160,000`) read from
+  the **linked requisition's** comp range (`openings.comp_min/max/currency`). A new
+  per-job **"Show salary range on the public application page"** toggle in the job
+  editor controls it (default on); the chip is hidden automatically when no comp
+  range is set.
+- **Work model (Remote / Hybrid / On-site) replaces the "Remote OK" checkbox.** The
+  intake form and the recruiter job editor now use a three-choice dropdown instead
+  of a yes/no toggle. Stored as `custom_fields.intake.work_model`; the legacy
+  `remote_ok` boolean is kept in sync (remote → true) so nothing old breaks, and
+  older jobs without `work_model` derive it from `remote_ok` (true → remote,
+  false → on-site).
 - **Bulk-select enrolled candidates + bulk remove.** The Enrollments list has a
   "Select all" checkbox and per-row checkboxes; a "Remove N" action deletes the
   selected enrollments at once.
@@ -36,6 +48,19 @@ entries on top.
   selection or a filter, the left panel previews exactly who would be enrolled
   (`enroll-by-filter` dryRun now returns candidate names). The automation-rule
   tag/stage value is a real dropdown of existing values (with a "Custom…" escape).
+- **Public job page tag row updated.** Work model is its own chip (Remote / Hybrid
+  / On-site — shown for every arrangement) alongside a separate location chip
+  (city, country). The seniority/level chip ("Staff", etc.) was removed from the
+  public page. Slightly larger gap between the job title and the chips.
+
+### Fixed
+- **EEO / voluntary screening questions can no longer be required or used to
+  disqualify.** In the application-form editor, ticking "EEO / voluntary" now
+  forces the question to be optional (the Required box is disabled) and clears any
+  auto-disqualify rule. The public form and both the client- and server-side
+  submit checks treat EEO questions as never-required — even for older data that
+  marked one both required and voluntary (which showed a contradictory
+  "* (voluntary)").
 
 ## 2026-07-07
 

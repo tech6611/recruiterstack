@@ -82,7 +82,8 @@ export async function POST(request: NextRequest) {
 
   const answerById = new Map(answers.map(a => [a.field_id, a.value]))
   for (const field of form.fields) {
-    if (!field.required) continue
+    // EEO/voluntary questions are never required, even if legacy data marked them so.
+    if (!field.required || field.is_eeo) continue
     // A required field hidden by conditional logic isn't really required.
     if (!isFieldVisible(field, answers)) continue
     const v = answerById.get(field.id)

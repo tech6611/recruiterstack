@@ -16,6 +16,19 @@ import { captureApprovedSubstance } from '@/lib/jobs/substance'
 
 type Supabase = SupabaseClient<Database>
 
+// Work arrangement for a role. Newer intakes store this tri-state directly on
+// custom_fields.intake.work_model; older ones only have the legacy `remote_ok`
+// boolean. `deriveWorkModel` bridges both so the UI can rely on one value.
+export type WorkModel = 'remote' | 'hybrid' | 'onsite'
+
+export function deriveWorkModel(intake: Record<string, unknown>): WorkModel | null {
+  const wm = intake.work_model
+  if (wm === 'remote' || wm === 'hybrid' || wm === 'onsite') return wm
+  // Fall back to the legacy boolean: true → remote, false → onsite, missing → unknown.
+  if (typeof intake.remote_ok === 'boolean') return intake.remote_ok ? 'remote' : 'onsite'
+  return null
+}
+
 // Public-safe view of a screening field for the apply page: rendering metadata
 // plus the conditional-visibility rule (the page needs it to show/hide fields).
 // Knockout rules stay server-side — they're evaluated on submit and never sent
@@ -93,10 +106,18 @@ export interface CanonicalApplyJobPreview {
   department: string | null
   location: string | null
   // Work arrangement + seniority read from custom_fields.intake, shown as meta
-  // chips on the apply page. `remote_ok` maps to a Remote/On-site work-type chip.
+  // chips on the apply page. `remote_ok` is the legacy boolean; `work_model` is
+  // the newer tri-state (remote/hybrid/onsite) and is preferred by the UI.
   remote_ok: boolean | null
+  work_model: WorkModel | null
   level: string | null
   employment_type: string | null
+  // Public salary range, read from the linked requisition (opening) comp — only
+  // when the job's `show_salary` toggle is on AND a comp range exists. Null hides
+  // the salary chip on the apply page.
+  salary_min: number | null
+  salary_max: number | null
+  salary_currency: string | null
   generated_jd: string | null
   // Structured JD sections, read from custom_fields.intake (Publish JD Phase 1).
   // Candidate-safe only — internal intake (HM contact, budget, notes) is excluded.
@@ -334,7 +355,7 @@ export async function getCanonicalApplyJobPreview(
   // apply_token is not in generated types yet (migration 068); cast as in rbac.ts.
   const { data, error } = await (supabase as any)
     .from('jobs')
-    .select('org_id, title, description, status, custom_fields, department:departments(name)')
+    .select('id, org_id, title, description, status, custom_fields, department:departments(name)')
     .eq('apply_token', token)
     .maybeSingle()
 
@@ -345,6 +366,7 @@ export async function getCanonicalApplyJobPreview(
   if (!data) return null
 
   const row = data as {
+    id: string
     org_id: string
     title: string
     description: string | null
@@ -358,6 +380,7 @@ export async function getCanonicalApplyJobPreview(
   if (row.status !== 'open') return null
   const intake = (row.custom_fields?.intake ?? {}) as Record<string, unknown>
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null)
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
   // Pull the org's branding so the apply page can render on-brand (Phase 2c).
   // Independent of the careers_public toggle — that gates only the listing page.
@@ -376,6 +399,36 @@ export async function getCanonicalApplyJobPreview(
         brand_font: brandRow.brand_font ?? null,
       }
     : null
+
+  // Public salary: read the comp range off the linked requisition(s) (openings),
+  // but only when the recruiter has switched the job's `show_salary` toggle on.
+  // Default is ON (undefined → shown); an explicit `false` hides it. When no
+  // linked opening carries a comp range, the salary chip stays hidden.
+  let salary_min: number | null = null
+  let salary_max: number | null = null
+  let salary_currency: string | null = null
+  if (intake.show_salary !== false) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: links } = await (supabase as any)
+      .from('job_openings')
+      .select('opening_id')
+      .eq('job_id', row.id)
+    const openingIds = ((links ?? []) as Array<{ opening_id: string }>).map(l => l.opening_id)
+    if (openingIds.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: ops } = await (supabase as any)
+        .from('openings')
+        .select('comp_min, comp_max, comp_currency')
+        .in('id', openingIds)
+      const withComp = ((ops ?? []) as Array<{ comp_min: number | null; comp_max: number | null; comp_currency: string | null }>)
+        .find(o => o.comp_min != null || o.comp_max != null)
+      if (withComp) {
+        salary_min = num(withComp.comp_min)
+        salary_max = num(withComp.comp_max)
+        salary_currency = withComp.comp_currency ?? 'USD'
+      }
+    }
+  }
 
   // Resolve this job's screening form: the per-job override on
   // custom_fields.screening, else the org default template (inherit-then-override,
@@ -401,8 +454,12 @@ export async function getCanonicalApplyJobPreview(
     department: row.department?.name ?? null,
     location: text(intake.location),
     remote_ok: typeof intake.remote_ok === 'boolean' ? intake.remote_ok : null,
+    work_model: deriveWorkModel(intake),
     level: text(intake.level),
     employment_type: text(intake.employment_type),
+    salary_min,
+    salary_max,
+    salary_currency,
     generated_jd: row.description,
     responsibilities: text(intake.team_context),
     requirements: text(intake.key_requirements),
@@ -991,6 +1048,7 @@ export interface CanonicalIntakeFields {
   headcount?: number | null
   location?: string | null
   remote_ok?: boolean | null
+  work_model?: WorkModel | null
   key_requirements?: string | null
   nice_to_haves?: string | null
   target_companies?: string | null
@@ -1111,7 +1169,12 @@ export async function submitCanonicalIntakeJob(
     employment_type: args.fields.employment_type ?? null,
     headcount: args.fields.headcount ?? 1,
     location: args.fields.location ?? null,
-    remote_ok: args.fields.remote_ok ?? false,
+    // Store the tri-state work model, and keep the legacy `remote_ok` boolean in
+    // sync (remote → true, hybrid/onsite → false) so older readers still work.
+    work_model: args.fields.work_model ?? null,
+    remote_ok: args.fields.work_model
+      ? args.fields.work_model === 'remote'
+      : (args.fields.remote_ok ?? false),
     key_requirements: args.fields.key_requirements ?? null,
     nice_to_haves: args.fields.nice_to_haves ?? null,
     target_companies: args.fields.target_companies ?? null,

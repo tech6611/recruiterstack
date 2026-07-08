@@ -15,6 +15,13 @@ const LEVEL_OPTIONS = ['Intern', 'Junior', 'Mid-level', 'Senior', 'Lead', 'Staff
 
 const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary']
 
+// Work arrangement. Value is the stored key; label is what the HM sees.
+const WORK_MODELS = [
+  { value: 'remote', label: 'Remote' },
+  { value: 'hybrid', label: 'Hybrid' },
+  { value: 'onsite', label: 'On-site' },
+] as const
+
 const CITIES = [
   'Remote', 'Hybrid',
   'New York, NY', 'San Francisco, CA', 'Los Angeles, CA', 'Chicago, IL', 'Austin, TX',
@@ -121,7 +128,7 @@ export default function IntakePage() {
     level: '',
     employment_type: '',
     headcount: 1,
-    remote_ok: false,
+    work_model: '',
     key_requirements: '',
     nice_to_haves: '',
     budget_min: '',
@@ -433,11 +440,12 @@ export default function IntakePage() {
                 <label className={labelCls}>Location</label>
                 <LocationInput value={location} onChange={setLocation} />
               </div>
-              <div className="flex flex-col justify-end">
-                <label className="flex items-center gap-2.5 cursor-pointer py-2.5">
-                  <input type="checkbox" checked={form.remote_ok} onChange={e => set('remote_ok', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
-                  <span className="text-sm font-semibold text-slate-700">Remote OK</span>
-                </label>
+              <div>
+                <label className={labelCls}>Work model</label>
+                <select value={form.work_model} onChange={e => set('work_model', e.target.value)} className={inputCls}>
+                  <option value="">Select…</option>
+                  {WORK_MODELS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
+                </select>
               </div>
             </div>
           </div>

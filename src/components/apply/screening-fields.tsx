@@ -115,7 +115,8 @@ export function ScreeningQuestion({
     <div>
       <label className="block text-sm font-semibold text-slate-700 mb-1.5">
         {field.label}
-        {field.required && <span className="text-red-500"> *</span>}
+        {/* EEO/voluntary questions are never required, even if legacy data marked them so. */}
+        {field.required && !field.is_eeo && <span className="text-red-500"> *</span>}
         {field.is_eeo && <span className="ml-2 text-xs font-normal text-slate-400">(voluntary)</span>}
       </label>
       {field.help_text && <p className="text-xs text-slate-400 mb-1.5">{field.help_text}</p>}

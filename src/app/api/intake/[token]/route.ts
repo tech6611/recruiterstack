@@ -45,6 +45,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     headcount?: number
     location?: string
     remote_ok?: boolean
+    work_model?: 'remote' | 'hybrid' | 'onsite'
     key_requirements: string
     nice_to_haves?: string
     target_companies?: string
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         headcount: body.headcount || 1,
         location: body.location || null,
         remote_ok: body.remote_ok || false,
+        work_model: body.work_model || null,
         key_requirements: body.key_requirements || null,
         nice_to_haves: body.nice_to_haves || null,
         target_companies: body.target_companies || null,

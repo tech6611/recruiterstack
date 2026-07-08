@@ -69,7 +69,8 @@ function initForm(job: Job) {
     level:             intake.level ?? '',
     employment_type:   intake.employment_type ?? '',
     location:          intake.location ?? '',
-    remote_ok:         intake.remote_ok,
+    work_model:        intake.work_model ?? '',
+    show_salary:       intake.show_salary,
     team_context:      intake.team_context ?? '',
     key_requirements:  intake.key_requirements ?? '',
     nice_to_have:      intake.nice_to_have ?? '',
@@ -86,6 +87,14 @@ const EMPLOYMENT_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship', 'T
 // offers the same choices.
 const LEVEL_OPTIONS = ['Intern', 'Junior', 'Mid-level', 'Senior', 'Lead', 'Staff', 'Principal', 'Director', 'VP']
 
+// Work arrangement choices mirror the intake form.
+const WORK_MODELS = [
+  { value: 'remote', label: 'Remote' },
+  { value: 'hybrid', label: 'Hybrid' },
+  { value: 'onsite', label: 'On-site' },
+] as const
+const WORK_MODEL_LABEL: Record<string, string> = { remote: 'Remote', hybrid: 'Hybrid', onsite: 'On-site' }
+
 // Intake fields are collected at job creation and stashed in custom_fields.intake.
 function readIntake(job: Job) {
   const i = (job.custom_fields?.intake ?? {}) as Record<string, unknown>
@@ -99,6 +108,13 @@ function readIntake(job: Job) {
     location:          text(i.location),
     // remote_ok is a genuine tri-state: true / false / not-answered (null).
     remote_ok:         typeof i.remote_ok === 'boolean' ? i.remote_ok : null,
+    // work_model is the newer tri-state; fall back to the legacy remote_ok boolean.
+    work_model:        (i.work_model === 'remote' || i.work_model === 'hybrid' || i.work_model === 'onsite')
+                         ? i.work_model
+                         : typeof i.remote_ok === 'boolean' ? (i.remote_ok ? 'remote' : 'onsite') : '',
+    // Whether to show the requisition salary range on the public application
+    // page. Default ON (undefined → true); recruiters flip it off per role.
+    show_salary:       typeof i.show_salary === 'boolean' ? i.show_salary : true,
     notes:             text(i.notes),
     target_start_date: text(i.target_start_date),
     hm_name:           text(i.hm_name),
@@ -226,7 +242,10 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           level:             form.level.trim(),
           employment_type:   form.employment_type.trim(),
           location:          form.location.trim(),
-          remote_ok:         form.remote_ok,
+          // Store the tri-state work model and keep the legacy boolean in sync.
+          work_model:        form.work_model || null,
+          remote_ok:         form.work_model ? form.work_model === 'remote' : null,
+          show_salary:       form.show_salary,
           team_context:      isHtmlEmpty(form.team_context)     ? '' : form.team_context,
           key_requirements:  isHtmlEmpty(form.key_requirements) ? '' : form.key_requirements,
           nice_to_have:      isHtmlEmpty(form.nice_to_have)     ? '' : form.nice_to_have,
@@ -595,20 +614,30 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                         <Label>Location</Label>
                         <Input value={form.location}
                           onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                          placeholder="Bengaluru, Remote, London…" />
+                          placeholder="Bengaluru, India" />
                       </div>
-                      <div className="flex items-end">
-                        <label className="flex items-center gap-2.5 cursor-pointer py-2.5">
-                          <input type="checkbox" checked={!!form.remote_ok}
-                            onChange={e => setForm(f => ({ ...f, remote_ok: e.target.checked }))}
-                            className="h-4 w-4 rounded border-slate-300 text-emerald-600" />
-                          <span className="text-sm font-semibold text-slate-700">Remote OK</span>
-                        </label>
+                      <div className="space-y-1.5">
+                        <Label>Work model</Label>
+                        <Select value={form.work_model} onChange={e => setForm(f => ({ ...f, work_model: e.target.value }))}>
+                          <option value="">—</option>
+                          {WORK_MODELS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
+                        </Select>
                       </div>
                     </div>
-                    <p className="-mt-2 text-xs text-slate-400">
-                      Employment type, location &amp; remote show as chips on your public careers page. Editing them
-                      does not require re-approval.
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input type="checkbox" checked={!!form.show_salary}
+                        onChange={e => setForm(f => ({ ...f, show_salary: e.target.checked }))}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600" />
+                      <span className="text-sm text-slate-700">
+                        Show salary range on the public application page
+                        <span className="block text-xs text-slate-400">
+                          Uses the linked requisition&apos;s pay range. Hidden automatically if no range is set.
+                        </span>
+                      </span>
+                    </label>
+                    <p className="-mt-1 text-xs text-slate-400">
+                      Employment type, location, work model &amp; salary show as chips on your public careers page.
+                      Editing them does not require re-approval.
                     </p>
 
                     {/* ── JD body + requirements (editable any status) ─────── */}
@@ -679,10 +708,10 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                           <dd className="text-slate-800 mt-0.5">{intake.employment_type}</dd>
                         </div>
                       )}
-                      {intake.remote_ok !== null && (
+                      {intake.work_model && (
                         <div>
-                          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Work mode</dt>
-                          <dd className="text-slate-800 mt-0.5">{intake.remote_ok ? 'Remote OK' : 'On-site'}</dd>
+                          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Work model</dt>
+                          <dd className="text-slate-800 mt-0.5">{WORK_MODEL_LABEL[intake.work_model] ?? intake.work_model}</dd>
                         </div>
                       )}
                     </dl>
