@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 
-const TRIGGERS = ['tag_added', 'stage_moved']
+const TRIGGERS = ['tag_added', 'stage_moved', 'applied', 'status_changed']
 
 // GET /api/automations — list auto-enrollment rules (optionally scoped to a
 // single sequence via ?sequence_id=), with the target sequence name/status.
@@ -23,13 +23,16 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
   const trigger_type = String(body.trigger_type ?? '')
-  const trigger_value = String(body.trigger_value ?? '').trim()
+  // 'applied' fires on every new application → no value needed; store a placeholder.
+  const trigger_value = trigger_type === 'applied' ? 'any' : String(body.trigger_value ?? '').trim()
   const sequence_id = String(body.sequence_id ?? '')
 
   if (!TRIGGERS.includes(trigger_type)) {
     return NextResponse.json({ error: `trigger_type must be one of: ${TRIGGERS.join(', ')}` }, { status: 400 })
   }
-  if (!trigger_value) return NextResponse.json({ error: 'trigger_value is required' }, { status: 400 })
+  if (trigger_type !== 'applied' && !trigger_value) {
+    return NextResponse.json({ error: 'trigger_value is required' }, { status: 400 })
+  }
   if (!sequence_id) return NextResponse.json({ error: 'sequence_id is required' }, { status: 400 })
 
   // The target sequence must belong to this org.

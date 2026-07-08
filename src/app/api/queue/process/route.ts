@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   // Evaluate auto-enrollment rules on the same cron tick (cheap no-op when no
   // rules exist). Never let a scan failure fail the queue drain.
-  let automations = { tagEnrolled: 0, stageEnrolled: 0 }
+  let automations: Record<string, number> = {}
   try {
     automations = await scanAutomations(createAdminClient())
   } catch (err) {

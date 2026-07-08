@@ -14,7 +14,7 @@ export const PATCH = withCapability('recruiting:edit', async (req, orgId, supaba
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
   }
-  if ('trigger_type' in update && !['tag_added', 'stage_moved'].includes(String(update.trigger_type))) {
+  if ('trigger_type' in update && !['tag_added', 'stage_moved', 'applied', 'status_changed'].includes(String(update.trigger_type))) {
     return NextResponse.json({ error: 'Invalid trigger_type' }, { status: 400 })
   }
   update.updated_at = new Date().toISOString()

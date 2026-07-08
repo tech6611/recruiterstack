@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { matchTagRules, matchStageRules, type EnrollmentRule } from '../automations'
+import { matchTagRules, matchStageRules, matchStatusRules, matchAppliedRules, type EnrollmentRule } from '../automations'
 
 const rule = (over: Partial<EnrollmentRule>): EnrollmentRule => ({
   id: 'r', org_id: 'org1', name: '', enabled: true,
@@ -45,5 +45,36 @@ describe('matchStageRules', () => {
   })
   it('ignores tag rules', () => {
     expect(matchStageRules(rules, 'org1', 'Screening').every(r => r.trigger_type === 'stage_moved')).toBe(true)
+  })
+})
+
+describe('matchStatusRules', () => {
+  const rules = [
+    rule({ id: 'a', trigger_type: 'status_changed', trigger_value: 'rejected' }),
+    rule({ id: 'b', trigger_type: 'status_changed', trigger_value: 'hired' }),
+    rule({ id: 'c', trigger_type: 'stage_moved', trigger_value: 'rejected' }),
+    rule({ id: 'd', trigger_type: 'status_changed', trigger_value: 'rejected', enabled: false }),
+  ]
+  it('matches enabled status rules by the new status', () => {
+    expect(matchStatusRules(rules, 'org1', 'rejected').map(r => r.id)).toEqual(['a'])
+  })
+  it('does not match a different status or type', () => {
+    expect(matchStatusRules(rules, 'org1', 'withdrawn')).toEqual([])
+  })
+})
+
+describe('matchAppliedRules', () => {
+  const rules = [
+    rule({ id: 'a', trigger_type: 'applied', trigger_value: 'any' }),
+    rule({ id: 'b', trigger_type: 'applied', trigger_value: 'ignored-too', org_id: 'org1' }),
+    rule({ id: 'c', trigger_type: 'stage_moved', trigger_value: 'Applied' }),
+    rule({ id: 'd', trigger_type: 'applied', trigger_value: 'any', org_id: 'org2' }),
+    rule({ id: 'e', trigger_type: 'applied', trigger_value: 'any', enabled: false }),
+  ]
+  it('matches all enabled applied rules for the org, ignoring value', () => {
+    expect(matchAppliedRules(rules, 'org1').map(r => r.id)).toEqual(['a', 'b'])
+  })
+  it('scopes by org and skips disabled', () => {
+    expect(matchAppliedRules(rules, 'org2').map(r => r.id)).toEqual(['d'])
   })
 })

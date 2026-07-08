@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Trash2, Loader2, Plus } from 'lucide-react'
 
-type TriggerType = 'tag_added' | 'stage_moved'
+type TriggerType = 'tag_added' | 'stage_moved' | 'applied' | 'status_changed'
 
 interface Rule {
   id: string
@@ -17,9 +17,12 @@ interface Rule {
 const TRIGGER_LABEL: Record<TriggerType, string> = {
   tag_added: 'When a candidate is tagged',
   stage_moved: 'When an application moves to stage',
+  applied: 'When someone applies',
+  status_changed: 'When application status changes to',
 }
-const VALUE_LABEL: Record<TriggerType, string> = { tag_added: 'Tag', stage_moved: 'Stage name' }
-const VALUE_PLACEHOLDER: Record<TriggerType, string> = { tag_added: 'e.g. passive-lead', stage_moved: 'e.g. Screening' }
+const VALUE_LABEL: Record<TriggerType, string> = { tag_added: 'Tag', stage_moved: 'Stage name', applied: '', status_changed: 'Status' }
+const VALUE_PLACEHOLDER: Record<TriggerType, string> = { tag_added: 'e.g. passive-lead', stage_moved: 'e.g. Screening', applied: '', status_changed: 'e.g. rejected' }
+const STATUS_OPTIONS = ['active', 'rejected', 'withdrawn', 'hired']
 
 /**
  * Auto-enrollment rules for ONE sequence. Candidates are dropped into this
@@ -55,7 +58,7 @@ export default function SequenceAutomations({ sequenceId, active }: { sequenceId
   useEffect(() => { load() }, [load])
 
   const create = async () => {
-    if (!triggerValue.trim()) { setError('Enter a value for the trigger.'); return }
+    if (triggerType !== 'applied' && !triggerValue.trim()) { setError('Enter a value for the trigger.'); return }
     setSaving(true)
     setError('')
     const res = await fetch('/api/automations', {
@@ -108,37 +111,55 @@ export default function SequenceAutomations({ sequenceId, active }: { sequenceId
               onChange={e => { setTriggerType(e.target.value as TriggerType); setTriggerValue(''); setCustomMode(false) }}
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
             >
-              <option value="tag_added">When a candidate is tagged…</option>
+              <option value="applied">When someone applies</option>
               <option value="stage_moved">When an application moves to stage…</option>
+              <option value="status_changed">When application status changes to…</option>
+              <option value="tag_added">When a candidate is tagged…</option>
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500">
-            {VALUE_LABEL[triggerType]}
-            {customMode ? (
-              <input
-                autoFocus
-                value={triggerValue}
-                onChange={e => setTriggerValue(e.target.value)}
-                placeholder={VALUE_PLACEHOLDER[triggerType]}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-              />
-            ) : (
-              <select
-                value={triggerValue}
-                onChange={e => {
-                  if (e.target.value === '__custom__') { setCustomMode(true); setTriggerValue('') }
-                  else setTriggerValue(e.target.value)
-                }}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-              >
-                <option value="">Select a {VALUE_LABEL[triggerType].toLowerCase()}…</option>
-                {(triggerType === 'tag_added' ? options.tags : options.stages).map(v => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-                <option value="__custom__">Custom…</option>
-              </select>
-            )}
-          </label>
+          {triggerType === 'applied' ? (
+            <div className="flex flex-col justify-end">
+              <span className="mb-1 text-xs font-semibold text-slate-500">Applies to</span>
+              <p className="text-[11px] text-slate-400">Every new application — no value needed.</p>
+            </div>
+          ) : (
+            <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500">
+              {VALUE_LABEL[triggerType]}
+              {triggerType === 'status_changed' ? (
+                <select
+                  value={triggerValue}
+                  onChange={e => setTriggerValue(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                >
+                  <option value="">Select a status…</option>
+                  {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              ) : customMode ? (
+                <input
+                  autoFocus
+                  value={triggerValue}
+                  onChange={e => setTriggerValue(e.target.value)}
+                  placeholder={VALUE_PLACEHOLDER[triggerType]}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                />
+              ) : (
+                <select
+                  value={triggerValue}
+                  onChange={e => {
+                    if (e.target.value === '__custom__') { setCustomMode(true); setTriggerValue('') }
+                    else setTriggerValue(e.target.value)
+                  }}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                >
+                  <option value="">Select a {VALUE_LABEL[triggerType].toLowerCase()}…</option>
+                  {(triggerType === 'tag_added' ? options.tags : options.stages).map(v => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                  <option value="__custom__">Custom…</option>
+                </select>
+              )}
+            </label>
+          )}
           <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500 sm:col-span-2">
             Name (optional)
             <input
@@ -172,7 +193,8 @@ export default function SequenceAutomations({ sequenceId, active }: { sequenceId
             <div key={rule.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
               <div className="min-w-0">
                 <p className="truncate text-sm text-slate-800">
-                  {TRIGGER_LABEL[rule.trigger_type]} <span className="font-semibold">&ldquo;{rule.trigger_value}&rdquo;</span>
+                  {TRIGGER_LABEL[rule.trigger_type]}
+                  {rule.trigger_type !== 'applied' && <span className="font-semibold"> &ldquo;{rule.trigger_value}&rdquo;</span>}
                 </p>
                 {rule.name && <p className="truncate text-xs text-slate-400">{rule.name}</p>}
               </div>

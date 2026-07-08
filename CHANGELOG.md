@@ -12,6 +12,13 @@ entries on top.
 ## 2026-07-08
 
 ### Added
+- **Two new auto-enrollment triggers: "When someone applies" and "When
+  application status changes to …".** Alongside tag-added and stage-moved, rules
+  can now fire on the `applied` event (any new application — no value needed) and
+  on `status_changed` (matched to the new status: active/rejected/withdrawn/hired),
+  so all three application-lifecycle events are covered. The scan cursor now also
+  starts at *now*, so a newly created rule only acts on events going forward
+  (never a retroactive blast of historical events).
 - **Salary range chip on the public job page (toggle-controlled).** The public
   application page can show a salary chip (e.g. `USD 120,000 – 160,000`) read from
   the **linked requisition's** comp range (`openings.comp_min/max/currency`). A new
