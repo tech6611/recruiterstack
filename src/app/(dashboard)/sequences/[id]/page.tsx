@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Loader2, Plus, Trash2, Pencil,
+  ArrowLeft, Loader2, Plus, Trash2, Pencil, X,
   ArrowDown, Play, Pause, Mail, Users, TrendingUp,
-  User, Clock, Zap, Filter, ChevronDown,
+  User, Clock,
 } from 'lucide-react'
 import type { Sequence, SequenceStage, SequenceEnrollment, SequenceStatus } from '@/lib/types/database'
 import SequenceStageEditor from '@/components/sequences/SequenceStageEditor'
@@ -54,21 +54,20 @@ export default function SequenceDetailPage() {
   const [editorOpen, setEditorOpen]       = useState(false)
   const [editingStage, setEditingStage]   = useState<SequenceStage | null>(null)
 
-  // Add-candidate workspace state
-  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  // Add-candidate workspace — the tools live in a right-hand panel that stays
+  // hidden until "Add Candidates" is clicked.
+  const [showAddPane, setShowAddPane] = useState(false)
   const [activeTool, setActiveTool]   = useState<'manual' | 'bulk' | 'automation'>('manual')
   const [preview, setPreview]         = useState<{ count: number | null; candidates: { id: string; name: string; email: string }[] }>({ count: null, candidates: [] })
 
-  // Panels push their current selection here → the left panel previews it.
+  // Panels push their current selection here → the left list previews it.
   const handlePreview = useCallback((count: number | null, candidates: { id: string; name: string; email: string }[]) => {
     setPreview({ count, candidates })
   }, [])
 
-  const selectTool = (t: 'manual' | 'bulk' | 'automation') => {
-    setActiveTool(t)
-    setPreview({ count: null, candidates: [] })
-    setTab('enrollments')
-  }
+  const selectTool   = (t: 'manual' | 'bulk' | 'automation') => { setActiveTool(t); setPreview({ count: null, candidates: [] }) }
+  const openAddPane  = () => { setShowAddPane(true); setTab('enrollments') }
+  const closeAddPane = () => { setShowAddPane(false); setPreview({ count: null, candidates: [] }) }
 
   const loadSequence = useCallback(async () => {
     const res = await fetch(`/api/sequences/${id}`)
@@ -195,40 +194,12 @@ export default function SequenceDetailPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <div className="relative">
-            <button
-              onClick={() => setAddMenuOpen(o => !o)}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-emerald-100 transition-colors"
-            >
-              <Users className="h-4 w-4" /> Add Candidates
-              <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-            </button>
-            {addMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setAddMenuOpen(false)} />
-                <div className="absolute right-0 top-full z-50 mt-1.5 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-                  <button
-                    onClick={() => { setAddMenuOpen(false); selectTool('manual') }}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <User className="h-4 w-4 text-slate-400" /> Select manually
-                  </button>
-                  <button
-                    onClick={() => { setAddMenuOpen(false); selectTool('bulk') }}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <Filter className="h-4 w-4 text-slate-400" /> Bulk enroll by filter
-                  </button>
-                  <button
-                    onClick={() => { setAddMenuOpen(false); selectTool('automation') }}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <Zap className="h-4 w-4 text-slate-400" /> Auto-enrollment rules
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <button
+            onClick={openAddPane}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-emerald-100 transition-colors"
+          >
+            <Users className="h-4 w-4" /> Add Candidates
+          </button>
           <button
             onClick={toggleStatus}
             className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
@@ -364,10 +335,10 @@ export default function SequenceDetailPage() {
         </div>
       )}
 
-      {/* ─── Enrollments Tab (two-pane workspace) ────────────────────────── */}
+      {/* ─── Enrollments Tab ─────────────────────────────────────────────── */}
       {tab === 'enrollments' && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* LEFT — enrolled candidates, or a live preview of a pending selection */}
+        <div>
+          {/* Enrolled candidates, or a live preview of a pending selection */}
           <div>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
@@ -401,7 +372,7 @@ export default function SequenceDetailPage() {
               <div className="rounded-2xl border border-dashed border-slate-200 py-14 text-center">
                 <Users className="mx-auto mb-3 h-8 w-8 text-slate-300" />
                 <p className="text-sm text-slate-500">No candidates enrolled yet</p>
-                <p className="mt-1 text-xs text-slate-400">Use the panel on the right to add some →</p>
+                <p className="mt-1 text-xs text-slate-400">Click <b>Add Candidates</b> to add some</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -425,15 +396,42 @@ export default function SequenceDetailPage() {
             )}
 
             <button
-              onClick={() => setAddMenuOpen(true)}
+              onClick={openAddPane}
               className="mt-3 flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-emerald-600"
             >
               <Pencil className="h-3.5 w-3.5" /> Add or edit who&apos;s enrolled
             </button>
           </div>
+        </div>
+      )}
 
-          {/* RIGHT — all "Add Candidate" operations */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      {/* ─── Analytics Tab ───────────────────────────────────────────────── */}
+      {tab === 'analytics' && (
+        <SequenceAnalytics sequenceId={id} />
+      )}
+
+      {/* ─── Stage Editor Drawer ─────────────────────────────────────────── */}
+      {editorOpen && (
+        <SequenceStageEditor
+          sequenceId={id}
+          stage={editingStage}
+          stageCount={stages.length}
+          isFirstStage={editingStage ? editingStage.order_index === 1 : stages.length === 0}
+          onClose={() => { setEditorOpen(false); setEditingStage(null) }}
+          onSaved={loadSequence}
+        />
+      )}
+
+      {/* ─── Add-candidates panel (pops in from the far right) ─────────────── */}
+      {showAddPane && (
+        <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-slate-200 bg-white shadow-2xl">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
+            <h2 className="text-base font-bold text-slate-900">Add candidates</h2>
+            <button onClick={closeAddPane} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-4">
             <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1">
               {([['manual', 'Manual'], ['bulk', 'Bulk filter'], ['automation', 'Rules']] as const).map(([k, l]) => (
                 <button
@@ -454,23 +452,6 @@ export default function SequenceDetailPage() {
             )}
           </div>
         </div>
-      )}
-
-      {/* ─── Analytics Tab ───────────────────────────────────────────────── */}
-      {tab === 'analytics' && (
-        <SequenceAnalytics sequenceId={id} />
-      )}
-
-      {/* ─── Stage Editor Drawer ─────────────────────────────────────────── */}
-      {editorOpen && (
-        <SequenceStageEditor
-          sequenceId={id}
-          stage={editingStage}
-          stageCount={stages.length}
-          isFirstStage={editingStage ? editingStage.order_index === 1 : stages.length === 0}
-          onClose={() => { setEditorOpen(false); setEditingStage(null) }}
-          onSaved={loadSequence}
-        />
       )}
 
     </div>

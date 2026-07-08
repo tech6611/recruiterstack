@@ -12,6 +12,11 @@ entries on top.
 ## 2026-07-08
 
 ### Changed
+- **Add-candidate tools are now a pop-in panel, hidden by default.** The
+  Enrollments tab shows just the enrolled list; "Add Candidates" is a plain
+  button (dropdown removed) that slides a panel in from the far right holding the
+  three tools (Manual · Bulk filter · Rules). No backdrop, so the left list keeps
+  previewing live who'd be enrolled as you work in the panel.
 - **Sequence Enrollments is now a two-pane workspace.** Left = who's enrolled (or
   a live preview of a pending selection); right = the three "Add Candidate" tools
   — Manual search · Bulk filter · Auto-enrollment rules — with a switcher. The
