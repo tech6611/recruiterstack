@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { computeOpenSlots } from '@/lib/interviews/availability'
+import { getCanonicalCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
 import { logger } from '@/lib/logger'
 
 const BUSINESS_DAY_COUNT = 7
@@ -54,6 +55,17 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
     }
   }
 
+  // Legacy hiring_request_id is null for canonical-job apps, so the join above
+  // is empty — fall back to the canonical job title so the candidate sees the role.
+  let canonicalPositionTitle: string | null = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (!(interview.hiring_request as any)?.position_title) {
+    try {
+      const ctx = await getCanonicalCandidateJobContext(supabase, interview.org_id, interview.application_id)
+      canonicalPositionTitle = ctx?.job?.position_title ?? null
+    } catch { /* non-fatal — title is cosmetic */ }
+  }
+
   return NextResponse.json({
     interview: {
       id:               interview.id,
@@ -70,7 +82,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
       panel:            panelMembers,
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    position_title:     (interview.hiring_request as any)?.position_title ?? null,
+    position_title:     (interview.hiring_request as any)?.position_title ?? canonicalPositionTitle,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     candidate_name:     (interview.candidate as any)?.name ?? null,
     slots,
