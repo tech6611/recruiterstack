@@ -53,6 +53,15 @@ entries on top.
   `isHtmlEmpty()`.
 
 ### Added
+- **Recruiter UI for the new scheduling features (no copilot needed).** Two
+  additions so recruiters can drive availability + manage interviews from the
+  dashboard: (1) a **"🕑 Set hours"** button next to each interviewer in the
+  Schedule Interview modal that copies a no-login availability link for them
+  (new `POST /api/interviewer-links`); (2) an **"Interviews" tab on the candidate
+  profile** listing scheduled interviews with status, meeting link, a
+  **Cancel** action (triggers the calendar cleanup + notifications) and a
+  **Copy reschedule link** for self-schedule interviews. Fills the gap where a
+  scheduled interview couldn't be viewed or cancelled from the UI after booking.
 - **Candidate self-schedule now honours interviewer hours + real availability
   (Phase 2 of AI self-scheduling).** The self-schedule link (`/schedule/[token]`)
   no longer shows a raw 24×7 week grid. It now offers only slots over the **next

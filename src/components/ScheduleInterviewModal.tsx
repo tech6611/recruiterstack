@@ -86,6 +86,9 @@ export default function ScheduleInterviewModal({
 
   const [interviewer,      setInterviewer]      = useState(hmName)
   const [interviewerEmail, setInterviewerEmail] = useState(hmEmail)
+  // "Set hours" availability-link: tracks which member's link was just copied.
+  const [availLinkCopied, setAvailLinkCopied] = useState<string | null>(null)
+  const [availLinkBusy,   setAvailLinkBusy]   = useState<string | null>(null)
   // Preferred host calendar — first panelist with an email by default.
   // Empty string means "let the backend pick the first working panelist".
   const [hostEmail,        setHostEmail]        = useState<string>(hmEmail ?? '')
@@ -263,6 +266,27 @@ export default function ScheduleInterviewModal({
   }, [googleConnected, zoomConnected, msConnected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Send scheduling link ──────────────────────────────────────────────────────
+
+  const handleCopyAvailabilityLink = async (member: PanelMember) => {
+    if (!member.email.trim()) return
+    setAvailLinkBusy(member.email)
+    try {
+      const res = await fetch('/api/interviewer-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: member.email.trim(), name: member.name.trim() || null }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.link) throw new Error(json.error || 'Failed to create link')
+      await navigator.clipboard.writeText(json.link)
+      setAvailLinkCopied(member.email)
+      setTimeout(() => setAvailLinkCopied(c => (c === member.email ? null : c)), 2500)
+    } catch {
+      setError('Could not create the availability link. Please try again.')
+    } finally {
+      setAvailLinkBusy(null)
+    }
+  }
 
   const handleSendLink = async () => {
     if (!interviewer.trim()) {
@@ -550,6 +574,18 @@ export default function ScheduleInterviewModal({
                     title={member.email ? 'Set as primary interviewer (receives calendar invite)' : 'Add email to send invite'}
                   >
                     ✉ {interviewer === member.name && interviewerEmail === member.email ? 'Invite ✓' : 'Invite'}
+                  </button>
+                  <button
+                    onClick={() => handleCopyAvailabilityLink(member)}
+                    disabled={!member.email || availLinkBusy === member.email}
+                    className={`text-[10px] font-medium rounded-full px-2 py-0.5 border transition-colors ${
+                      member.email
+                        ? 'text-slate-400 border-slate-200 hover:border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50 bg-white'
+                        : 'text-slate-300 border-slate-100 bg-white cursor-not-allowed'
+                    }`}
+                    title={member.email ? 'Copy a no-login link this interviewer can use to set their preferred hours' : 'Add email first'}
+                  >
+                    {availLinkBusy === member.email ? '…' : availLinkCopied === member.email ? '🕑 Copied ✓' : '🕑 Set hours'}
                   </button>
                 </div>
                 <button
