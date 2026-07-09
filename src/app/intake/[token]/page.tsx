@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { inputClsWhite } from '@/lib/ui/styles'
 import { trackEvent } from '@/lib/analytics'
+import { RichTextEditor, isHtmlEmpty, stripHtml } from '@/components/RichTextEditor'
+import type { Editor } from '@tiptap/react'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -32,6 +34,23 @@ const CITIES = [
   'Amsterdam, Netherlands', 'Paris, France', 'Zurich, Switzerland', 'Tel Aviv, Israel',
   'Hong Kong', 'Tokyo, Japan', 'São Paulo, Brazil',
 ]
+
+// The rich editor seeds from HTML. Prefill / imported / AI-generated values may
+// arrive as plain text (newlines, no markup), which the editor would collapse.
+// Convert blank-line blocks into <p> paragraphs (single newlines → <br>);
+// anything that already contains HTML tags is passed through untouched.
+const HTML_TAG = /<\/?[a-z][\s\S]*>/i
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+function textToHtml(value: string | null | undefined): string {
+  if (!value) return ''
+  if (HTML_TAG.test(value)) return value
+  return value
+    .split(/\n{2,}/)
+    .map(block => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`)
+    .join('')
+}
 
 interface IntakePrefill {
   level: string | null
@@ -165,6 +184,11 @@ export default function IntakePage() {
   const [generatingJD, setGeneratingJD] = useState(false)
   const [jdGenError, setJdGenError] = useState<string | null>(null)
 
+  // Live Tiptap editor instances, keyed by field. The rich editor doesn't react
+  // to `value` changes after mount, so programmatic inserts (file import) go
+  // through the instance instead of form state.
+  const editorsRef = useRef<Record<string, Editor | null>>({})
+
   // File import
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importingField, setImportingField] = useState<string | null>(null)
@@ -189,13 +213,13 @@ export default function IntakePage() {
       employment_type:   pf.employment_type ?? f.employment_type,
       headcount:         pf.headcount ?? f.headcount,
       work_model:        pf.work_model ?? f.work_model,
-      team_context:      pf.team_context ?? f.team_context,
-      key_requirements:  pf.key_requirements ?? f.key_requirements,
-      nice_to_haves:     pf.nice_to_haves ?? f.nice_to_haves,
+      team_context:      pf.team_context ? textToHtml(pf.team_context) : f.team_context,
+      key_requirements:  pf.key_requirements ? textToHtml(pf.key_requirements) : f.key_requirements,
+      nice_to_haves:     pf.nice_to_haves ? textToHtml(pf.nice_to_haves) : f.nice_to_haves,
       budget_min:        pf.budget_min ?? f.budget_min,
       budget_max:        pf.budget_max ?? f.budget_max,
       target_start_date: pf.target_start_date ?? f.target_start_date,
-      additional_notes:  pf.additional_notes ?? f.additional_notes,
+      additional_notes:  pf.additional_notes ? textToHtml(pf.additional_notes) : f.additional_notes,
     }))
     if (pf.location) setLocation(pf.location)
     if (pf.target_companies) {
@@ -248,12 +272,12 @@ export default function IntakePage() {
     setImportingField(null)
 
     if (res.ok) {
-      const append = (prev: string) => prev ? prev + '\n\n' + data.text : data.text
-      if (field === 'jd') setJd(append)
-      else if (field === 'team_context') set('team_context', append(form.team_context))
-      else if (field === 'key_requirements') set('key_requirements', append(form.key_requirements))
-      else if (field === 'nice_to_haves') set('nice_to_haves', append(form.nice_to_haves))
-      else if (field === 'additional_notes') set('additional_notes', append(form.additional_notes))
+      // The rich editors don't re-read `value` after mount, so append the
+      // extracted text through the live editor instance (which fires onChange
+      // and keeps form state in sync).
+      const ed = editorsRef.current[field]
+      const html = textToHtml(data.text)
+      if (ed) ed.chain().focus('end').insertContent(html).run()
     }
     if (e.target) e.target.value = ''
   }
@@ -274,7 +298,7 @@ export default function IntakePage() {
 
   // ── JD Generation ──
   const handleGenerateJD = async () => {
-    if (!form.team_context.trim() || !form.key_requirements.trim()) {
+    if (isHtmlEmpty(form.team_context) || isHtmlEmpty(form.key_requirements)) {
       setJdGenError('Please fill in Team Context and Key Requirements above before generating.')
       return
     }
@@ -285,6 +309,11 @@ export default function IntakePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...form,
+        // The rich fields hold HTML; the AI prompt wants plain text.
+        team_context: stripHtml(form.team_context),
+        key_requirements: stripHtml(form.key_requirements),
+        nice_to_haves: stripHtml(form.nice_to_haves),
+        additional_notes: stripHtml(form.additional_notes),
         location,
         headcount: Number(form.headcount),
         budget_min: form.budget_min ? Number(form.budget_min) : undefined,
@@ -292,11 +321,13 @@ export default function IntakePage() {
       }),
     })
     const data = await res.json()
+    // Seed the JD editor with the generated text before we drop the loading
+    // state — the editor remounts on !generatingJD and reads `jd` as its content.
+    if (res.ok) setJd(textToHtml(data.jd))
     setGeneratingJD(false)
     if (!res.ok) setJdGenError(data.error ?? 'Failed to generate JD.')
     else {
-      setJd(data.jd)
-      trackEvent('jd_generated', { source: 'intake', word_count: data.jd.trim().split(/\s+/).length })
+      trackEvent('jd_generated', { source: 'intake', word_count: stripHtml(data.jd).trim().split(/\s+/).length })
     }
   }
 
@@ -307,11 +338,11 @@ export default function IntakePage() {
     if (!form.employment_type)  { setSubmitError('Please choose an Employment Type.'); return }
     if (!form.work_model)       { setSubmitError('Please choose a Work model (Remote / Hybrid / On-site).'); return }
     if (!location.trim())       { setSubmitError('Please add a Location.'); return }
-    if (!form.team_context.trim() || !form.key_requirements.trim()) {
+    if (isHtmlEmpty(form.team_context) || isHtmlEmpty(form.key_requirements)) {
       setSubmitError('Please fill in the team context and key requirements.')
       return
     }
-    if (!jd.trim()) {
+    if (isHtmlEmpty(jd)) {
       setSubmitError('Please add a Job Description before submitting.')
       return
     }
@@ -336,10 +367,11 @@ export default function IntakePage() {
     if (!res.ok) { setSubmitError(json.error ?? 'Something went wrong. Please try again.'); return }
     setStatusUrl(json.status_url ?? null)
     setSubmitted(true)
-    trackEvent('intake_submitted', { position_title: positionTitle, has_jd: !!jd.trim() })
+    trackEvent('intake_submitted', { position_title: positionTitle, has_jd: !isHtmlEmpty(jd) })
   }
 
-  const wordCount = jd.trim() ? jd.trim().split(/\s+/).length : 0
+  const jdText = stripHtml(jd)
+  const wordCount = jdText ? jdText.split(/\s+/).length : 0
 
   // Small "pre-filled, editable" marker shown next to fields we seeded from the
   // requisition. It's a hint, not a control — the field itself stays editable.
@@ -509,17 +541,35 @@ export default function IntakePage() {
             <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Team & Role Context</h2>
             <div>
               <label className={labelCls}>What does this person do on your team? <span className="text-red-500">*</span><Prefilled field="team_context" /></label>
-              <textarea required rows={4} value={form.team_context} onChange={e => set('team_context', e.target.value)} placeholder="They'll own the checkout flow, work closely with design, lead 2 junior engineers…" className={inputCls + ' resize-none'} />
+              <RichTextEditor
+                value={form.team_context}
+                onChange={v => set('team_context', v)}
+                onEditorReady={ed => { editorsRef.current.team_context = ed }}
+                placeholder="They'll own the checkout flow, work closely with design, lead 2 junior engineers…"
+                minHeight={120}
+              />
               <ImportBtn field="team_context" />
             </div>
             <div>
               <label className={labelCls}>Key Requirements <span className="text-red-500">*</span><Prefilled field="key_requirements" /></label>
-              <textarea required rows={4} value={form.key_requirements} onChange={e => set('key_requirements', e.target.value)} placeholder="5+ years React, Node.js, shipped production apps, strong communicator…" className={inputCls + ' resize-none'} />
+              <RichTextEditor
+                value={form.key_requirements}
+                onChange={v => set('key_requirements', v)}
+                onEditorReady={ed => { editorsRef.current.key_requirements = ed }}
+                placeholder="5+ years React, Node.js, shipped production apps, strong communicator…"
+                minHeight={120}
+              />
               <ImportBtn field="key_requirements" />
             </div>
             <div>
               <label className={labelCls}>Nice to Have<Prefilled field="nice_to_haves" /></label>
-              <textarea rows={3} value={form.nice_to_haves} onChange={e => set('nice_to_haves', e.target.value)} placeholder="Next.js, fintech background, startup experience…" className={inputCls + ' resize-none'} />
+              <RichTextEditor
+                value={form.nice_to_haves}
+                onChange={v => set('nice_to_haves', v)}
+                onEditorReady={ed => { editorsRef.current.nice_to_haves = ed }}
+                placeholder="Next.js, fintech background, startup experience…"
+                minHeight={96}
+              />
               <ImportBtn field="nice_to_haves" />
             </div>
           </div>
@@ -553,7 +603,13 @@ export default function IntakePage() {
           {/* Notes */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <label className={labelCls}>Anything else we should know?<Prefilled field="additional_notes" /></label>
-            <textarea rows={3} value={form.additional_notes} onChange={e => set('additional_notes', e.target.value)} placeholder="Unique perks, team culture, must-haves not covered above…" className={inputCls + ' resize-none'} />
+            <RichTextEditor
+              value={form.additional_notes}
+              onChange={v => set('additional_notes', v)}
+              onEditorReady={ed => { editorsRef.current.additional_notes = ed }}
+              placeholder="Unique perks, team culture, must-haves not covered above…"
+              minHeight={96}
+            />
             <ImportBtn field="additional_notes" />
           </div>
 
@@ -566,7 +622,7 @@ export default function IntakePage() {
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">Generate with AI from your input above, or write it yourself.</p>
               </div>
-              {jd && <span className="text-xs text-slate-400">{wordCount} words</span>}
+              {!isHtmlEmpty(jd) && <span className="text-xs text-slate-400">{wordCount} words</span>}
             </div>
 
             {jdGenError && (
@@ -603,15 +659,15 @@ export default function IntakePage() {
                 </div>
               ) : (
                 <div>
-                  <textarea
-                    rows={20}
+                  <RichTextEditor
                     value={jd}
-                    onChange={e => setJd(e.target.value)}
+                    onChange={setJd}
+                    onEditorReady={ed => { editorsRef.current.jd = ed }}
                     placeholder={jdMode === 'manual' ? 'Write your JD here, or import from a file below…' : 'The AI-generated JD will appear here. You can edit it freely.'}
-                    className={inputCls + ' resize-y font-mono text-xs leading-relaxed'}
+                    minHeight={360}
                   />
                   <ImportBtn field="jd" />
-                  {jd && (
+                  {!isHtmlEmpty(jd) && (
                     <p className="text-xs text-slate-400 mt-2">
                       You can edit the text above — this is the final version the recruiter will receive.
                     </p>
@@ -624,7 +680,7 @@ export default function IntakePage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={submitting || !jd.trim()}
+            disabled={submitting || isHtmlEmpty(jd)}
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
             {submitting
@@ -633,7 +689,7 @@ export default function IntakePage() {
             }
           </button>
 
-          {!jd.trim() && jdMode !== null && !generatingJD && (
+          {isHtmlEmpty(jd) && jdMode !== null && !generatingJD && (
             <p className="text-xs text-slate-400 text-center -mt-2">Add a Job Description above to enable submission.</p>
           )}
 

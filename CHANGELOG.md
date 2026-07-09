@@ -11,6 +11,18 @@ entries on top.
 
 ## 2026-07-09
 
+### Changed
+- **Intake form text boxes are now the same rich-text editor used elsewhere in
+  the app.** The hiring-manager intake page (`/intake/[token]`) replaces its
+  plain `<textarea>` fields — Team Context, Key Requirements, Nice to Have,
+  Anything else, and the Job Description — with the shared `RichTextEditor`
+  (bold, lists, headings, etc.), matching the recruiter-side JobDetail editor.
+  Content is stored as HTML (consistent with how JobDetail reads these fields);
+  the plain-text AI JD generator still receives stripped text. Pre-filled,
+  imported (PDF/TXT), and AI-generated values are converted to editor HTML so
+  their structure survives, and validation switched from `.trim()` to
+  `isHtmlEmpty()`.
+
 ### Added
 - **Intake form pre-fills from the linked requisition.** When the hiring manager
   opens `/intake/[token]`, fields the recruiter already set on the approved
