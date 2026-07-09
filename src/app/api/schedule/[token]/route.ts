@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { computeOpenSlots } from '@/lib/interviews/availability'
+import { computeOpenSlots, nextBusinessDays, zonedWallClockToUtcMs } from '@/lib/interviews/availability'
+import { getBusyForEmails } from '@/lib/interviews/busy'
+import { getInterviewerPreferences } from '@/modules/ats/domain/interviewer-preferences'
 import { getCanonicalCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
 import { logger } from '@/lib/logger'
 
@@ -9,7 +11,7 @@ const BUSINESS_DAY_COUNT = 7
 // GET /api/schedule/[token] — public, no auth.
 // Returns interview metadata + the open slots the candidate can book across the
 // next 7 business days (interviewer preferred hours ∩ real calendar free/busy).
-export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
   const { token } = params
   const supabase = createAdminClient()
 
@@ -66,6 +68,36 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
     } catch { /* non-fatal — title is cosmetic */ }
   }
 
+  // Temporary diagnostic: ?debug=1 exposes the raw busy blocks + preferred
+  // windows + timing the engine used, so we can see exactly why a day is empty.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let _debug: any = undefined
+  if (req.nextUrl.searchParams.get('debug') === '1' && emails.length > 0) {
+    try {
+      const nowMs  = Date.now()
+      const prefs  = await getInterviewerPreferences(supabase, interview.org_id, emails)
+      const refTz  = prefs[emails[0].toLowerCase()]?.timezone || 'Asia/Kolkata'
+      const dates  = nextBusinessDays(refTz, BUSINESS_DAY_COUNT, nowMs)
+      const last   = dates[dates.length - 1]
+      const rangeEnd = zonedWallClockToUtcMs(refTz, last.y, last.m0, last.d, 1440)
+      const { busy, calendarConnected } = await getBusyForEmails(
+        supabase, interview.org_id, emails,
+        new Date(nowMs).toISOString(), new Date(rangeEnd).toISOString(),
+      )
+      _debug = {
+        now_utc: new Date(nowMs).toISOString(),
+        earliest_bookable_utc: new Date(nowMs + 120 * 60_000).toISOString(),
+        refTz,
+        emails,
+        prefs,
+        calendar_connected: calendarConnected,
+        busy,
+      }
+    } catch (e) {
+      _debug = { error: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
   return NextResponse.json({
     interview: {
       id:               interview.id,
@@ -89,5 +121,6 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
     business_day_count: BUSINESS_DAY_COUNT,
     has_interviewers:   emails.length > 0,
     calendar_checked:   calendarChecked,
+    ...(_debug ? { _debug } : {}),
   }, { headers: { 'Cache-Control': 'no-store' } })
 }
