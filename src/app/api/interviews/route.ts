@@ -54,12 +54,23 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     location, notes, generate_self_schedule, timezone, meeting_platform, panel, host_email,
   } = body
 
-  if (!application_id || !candidate_id || !hiring_request_id || !interviewer_name?.trim() || !scheduled_at) {
+  if (!application_id || !candidate_id || !interviewer_name?.trim() || !scheduled_at) {
     return NextResponse.json(
-      { error: 'application_id, candidate_id, hiring_request_id, interviewer_name, and scheduled_at are required' },
+      { error: 'application_id, candidate_id, interviewer_name, and scheduled_at are required' },
       { status: 400 },
     )
   }
+
+  // Canonical apps have no legacy hiring_request (nullable since migration 067).
+  // Django serializes those nulls as the string "None"; coerce such placeholders
+  // to real null so the uuid columns don't reject them.
+  const cleanUuid = (v: unknown): string | null => {
+    if (typeof v !== 'string') return null
+    const t = v.trim()
+    return t && t !== 'None' && t !== 'null' && t !== 'undefined' ? t : null
+  }
+  const hiringRequestId = cleanUuid(hiring_request_id)
+  const stageId         = cleanUuid(stage_id)
 
   // Generate self-schedule token if requested
   const self_schedule_token   = generate_self_schedule ? randomBytes(20).toString('hex') : null
@@ -176,8 +187,8 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
       org_id:            orgId,
       application_id,
       candidate_id,
-      hiring_request_id,
-      stage_id:          stage_id ?? null,
+      hiring_request_id: hiringRequestId,
+      stage_id:          stageId,
       interviewer_name:  interviewer_name.trim(),
       interviewer_email: interviewer_email?.trim() || null,
       interview_type:    interview_type ?? 'video',
