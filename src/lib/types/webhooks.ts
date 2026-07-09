@@ -16,6 +16,10 @@ export type WebhookEventType =
   | 'approval.step.pending'
   | 'approval.step.decided'
   | 'approval.completed'
+  // Interview lifecycle
+  | 'interview.scheduled'
+  | 'interview.rescheduled'
+  | 'interview.cancelled'
 
 export interface WebhookSubscription {
   id: string

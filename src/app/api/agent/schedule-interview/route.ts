@@ -26,6 +26,7 @@ import { requireOrg } from '@/lib/auth'
 import { randomBytes } from 'crypto'
 import { getValidAccessToken, createMeetEvent, queryFreeBusy } from '@/lib/google/calendar'
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
+import { emitWebhook } from '@/lib/webhooks/emit'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 import { getCanonicalCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
@@ -274,6 +275,17 @@ export async function POST(req: NextRequest) {
       logger.error('[agent-schedule] notification dispatch failed', e)
     }
   })()
+
+  emitWebhook(orgId, 'interview.scheduled', {
+    interview_id:      interviewRow?.id ?? null,
+    application_id,
+    candidate_id,
+    hiring_request_id,
+    scheduled_at,
+    interview_type,
+    duration_minutes,
+    agent_scheduled:   true,
+  }).catch(e => logger.error('[agent-schedule] webhook emit failed', e))
 
   // ── Rich confirmation response ────────────────────────────────────────────
   return NextResponse.json(

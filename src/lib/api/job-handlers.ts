@@ -484,4 +484,55 @@ registerHandler('whatsapp_inbound', async (job: QueuedJob) => {
   const { handleWhatsAppInbound } = await import('@/lib/whatsapp/responder')
   await handleWhatsAppInbound(job)
 })
+
+// ── Interview reminder (24h / 1h before) ──────────────────────────────────────
+// Enqueued at booking / self-schedule time with scheduled_at set into the
+// future. When the job fires we re-fetch the live interview and only send if
+// it's still 'scheduled' at the same time — so a cancel or reschedule in the
+// meantime makes a stale reminder a silent no-op.
+registerHandler('interview_reminder', async (job: QueuedJob) => {
+  const { interviewId, kind, targetScheduledAt, timezone } = job.payload as {
+    interviewId?: string
+    kind?: '24h' | '1h'
+    targetScheduledAt?: string
+    timezone?: string | null
+  }
+  if (!interviewId || !kind) throw new Error('Missing interviewId/kind in payload')
+
+  const supabase = createAdminClient()
+  const { data: iv } = await supabase
+    .from('interviews')
+    .select('*, candidate:candidates(name, email), hiring_request:hiring_requests(position_title)')
+    .eq('id', interviewId)
+    .eq('org_id', job.org_id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .single() as { data: any; error: any }
+
+  // Dropped: interview deleted, no longer scheduled, rescheduled to a new time,
+  // or already in the past. Any of these means this reminder is stale.
+  if (!iv) return
+  if (iv.status !== 'scheduled') return
+  if (targetScheduledAt && iv.scheduled_at !== targetScheduledAt) return
+  if (new Date(iv.scheduled_at).getTime() < Date.now()) return
+
+  const { notifyInterviewReminder } = await import('@/lib/notifications/interview')
+  await notifyInterviewReminder({
+    orgId:            job.org_id,
+    candidateName:    iv.candidate?.name ?? 'Candidate',
+    candidateEmail:   iv.candidate?.email ?? '',
+    interviewerName:  iv.interviewer_name ?? 'Interviewer',
+    interviewerEmail: iv.interviewer_email ?? null,
+    positionTitle:    iv.hiring_request?.position_title ?? 'Position',
+    scheduledAt:      iv.scheduled_at,
+    durationMinutes:  iv.duration_minutes ?? 60,
+    timezone:         timezone ?? null,
+    interviewType:    iv.interview_type ?? 'video',
+    location:         iv.location ?? null,
+    meetLink:         iv.location ?? null,
+    kind,
+  })
+
+  logger.info('Interview reminder sent', { jobId: job.id, interviewId, kind })
+})
+
 export { enqueue as enqueueJob }

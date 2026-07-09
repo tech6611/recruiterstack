@@ -80,6 +80,7 @@ import {
   updateInterviewStatus as updateInterviewStatusRow,
   createSelfScheduleInterview,
 } from '@/modules/ats/domain/interviews'
+import { ensureInterviewerPreferenceLink } from '@/modules/ats/domain/interviewer-preferences'
 import {
   createOfferRow,
   updateOfferRow,
@@ -812,7 +813,7 @@ export const COPILOT_TOOLS: ClaudeTool[] = [
   },
   {
     name: 'create_self_schedule_invite',
-    description: 'Generate a self-schedule link that the candidate can use to book their own interview slot. Returns the link to share with the candidate.',
+    description: 'Generate a self-schedule link the candidate uses to book their own interview slot. The link shows only times over the next 7 business days that fit the interviewer(s) preferred hours AND are free on their calendar — so ALWAYS pass interviewer_email (and additional_interviewer_emails for a panel), otherwise no availability can be shown. Returns the link to share.',
     input_schema: {
       type: 'object',
       properties: {
@@ -820,11 +821,26 @@ export const COPILOT_TOOLS: ClaudeTool[] = [
         candidate_id:      { type: 'string', description: 'UUID of the candidate' },
         hiring_request_id: { type: 'string', description: 'UUID of the hiring request' },
         interviewer_name:  { type: 'string', description: 'Interviewer who will conduct the interview' },
+        interviewer_email: { type: 'string', description: 'Email of the interviewer — REQUIRED for the link to show real availability' },
+        additional_interviewer_emails: { type: 'array', items: { type: 'string' }, description: 'Emails of other panel members (all must be free for a slot to show)' },
         interview_type:    { type: 'string', enum: ['video', 'phone', 'in_person', 'panel', 'technical'], description: 'Type of interview' },
         duration_minutes:  { type: 'number', description: 'Interview duration in minutes (default: 60)' },
         expires_in_days:   { type: 'number', description: 'Days until the self-schedule link expires (default: 7)' },
       },
       required: ['application_id', 'candidate_id', 'hiring_request_id', 'interviewer_name'],
+    },
+  },
+  {
+    name: 'create_interviewer_availability_link',
+    description: 'Generate a no-login link a hiring manager / interviewer can use to set their preferred interview hours (which days, what times, their timezone). Use this before self-scheduling so their availability is accurate. Optionally email the link to them. Returns the link to share.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        interviewer_email: { type: 'string', description: 'Email of the interviewer / hiring manager' },
+        interviewer_name:  { type: 'string', description: 'Their name, for the page + email (optional)' },
+        send_email:        { type: 'boolean', description: 'If true, email the link to the interviewer (default: false)' },
+      },
+      required: ['interviewer_email'],
     },
   },
   {
@@ -1253,6 +1269,7 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   update_offer_status: 'recruiting:edit', create_scorecard: 'recruiting:edit',
   schedule_interview: 'recruiting:edit', update_interview_status: 'recruiting:edit',
   create_self_schedule_invite: 'recruiting:edit', send_outreach_email: 'recruiting:edit',
+  create_interviewer_availability_link: 'recruiting:edit',
   send_whatsapp_message: 'recruiting:edit', send_assessment: 'recruiting:edit',
   draft_application_email: 'recruiting:edit', create_role: 'recruiting:edit',
   update_role: 'recruiting:edit',
@@ -1351,6 +1368,7 @@ export async function executeTool(
       case 'get_offers':                 return await getOffers(input, orgId, supabase)
       case 'send_assessment':            return await sendAssessment(input, orgId, supabase)
       case 'create_self_schedule_invite': return await createSelfScheduleInvite(input, orgId, supabase)
+      case 'create_interviewer_availability_link': return await createInterviewerAvailabilityLink(input, orgId, supabase)
       // Employee lifecycle tools
       case 'list_employees':             return await listEmployeesTool(input, orgId, supabase)
       case 'mark_employee_joined':       return await markEmployeeJoinedTool(input, orgId, supabase)
@@ -3054,7 +3072,7 @@ async function createSelfScheduleInvite(
   supabase: SupabaseClient,
 ): Promise<string> {
   const { application_id, candidate_id, hiring_request_id, interviewer_name,
-    interview_type, duration_minutes, expires_in_days } = input
+    interviewer_email, additional_interviewer_emails, interview_type, duration_minutes, expires_in_days } = input
 
   const { randomBytes } = await import('crypto')
   const token = randomBytes(20).toString('hex')
@@ -3065,15 +3083,28 @@ async function createSelfScheduleInvite(
   const placeholderDate = new Date()
   placeholderDate.setDate(placeholderDate.getDate() + 7)
 
+  // Build the panel so the self-schedule page can compute real availability
+  // from the interviewers' preferred hours + calendars. Without emails the link
+  // still works but shows no interviewer availability.
+  const emails: string[] = [
+    ...(typeof interviewer_email === 'string' ? [interviewer_email] : []),
+    ...(Array.isArray(additional_interviewer_emails) ? additional_interviewer_emails : []),
+  ].map((e: string) => (e || '').trim()).filter(Boolean)
+  const panel = emails.length
+    ? emails.map((email, i) => ({ name: i === 0 ? (interviewer_name ?? '') : '', email }))
+    : null
+
   const { data, error } = await createSelfScheduleInterview(supabase, orgId, {
     application_id, candidate_id, hiring_request_id,
     interviewer_name,
+    interviewer_email: emails[0] ?? null,
     interview_type: interview_type ?? 'video',
     scheduled_at: placeholderDate.toISOString(),
     duration_minutes: duration_minutes ?? 60,
     status: 'scheduled',
     self_schedule_token: token,
     self_schedule_expires_at: expires.toISOString(),
+    panel,
   } as never)
 
   if (error) return `Error: ${error.message}`
@@ -3088,6 +3119,46 @@ async function createSelfScheduleInvite(
   } as never)
 
   return `Self-schedule invite created. Share this link with the candidate: /schedule/${token} (expires in ${expires_in_days ?? 7} days)`
+}
+
+async function createInterviewerAvailabilityLink(
+  input: Record<string, unknown>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const email = typeof input.interviewer_email === 'string' ? input.interviewer_email.trim() : ''
+  const name  = typeof input.interviewer_name === 'string' ? input.interviewer_name.trim() : null
+  const sendEmail = input.send_email === true
+  if (!email) return 'Error: interviewer_email is required'
+
+  const token = await ensureInterviewerPreferenceLink(supabase, orgId, email, name)
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+  const link = `${appUrl}/interviewer/${token}`
+
+  if (sendEmail) {
+    const apiKey    = process.env.SENDGRID_API_KEY
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL
+    if (apiKey && fromEmail) {
+      try {
+        const sgMail = (await import('@sendgrid/mail')).default
+        sgMail.setApiKey(apiKey)
+        const who = name || 'there'
+        await sgMail.send({
+          to: email,
+          from: { email: fromEmail, name: 'RecruiterStack' },
+          subject: 'Set your interview availability',
+          text: `Hi ${who},\n\nPlease set the days and times you're available to interview candidates. It takes a minute and no login is needed:\n\n${link}\n\nThanks!`,
+          html: `<p>Hi ${who},</p><p>Please set the days and times you're available to interview candidates. It takes a minute and no login is needed:</p><p style="margin:24px 0;"><a href="${link}" style="background:#059669;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Set my availability →</a></p><p style="color:#64748b;font-size:13px;">Or paste this link: ${link}</p>`,
+        })
+        return `Availability link created and emailed to ${email}: ${link}`
+      } catch {
+        return `Availability link created (email failed to send, share it manually): ${link}`
+      }
+    }
+    return `Availability link created (email is not configured, share it manually): ${link}`
+  }
+
+  return `Availability link for ${name || email}: ${link}`
 }
 
 // ── Employee lifecycle tools ──────────────────────────────────────────────────

@@ -53,6 +53,76 @@ entries on top.
   `isHtmlEmpty()`.
 
 ### Added
+- **Candidate self-schedule now honours interviewer hours + real availability
+  (Phase 2 of AI self-scheduling).** The self-schedule link (`/schedule/[token]`)
+  no longer shows a raw 24×7 week grid. It now offers only slots over the **next
+  7 business days** that fall inside every interviewer's **preferred hours**
+  (from Phase 1, default Mon–Fri 9–6) **and** are free on their real calendar,
+  shown in the candidate's local timezone and grouped by day. New availability
+  engine (`lib/interviews/availability.ts` — timezone-aware, panel-aware slot
+  computation) + shared calendar busy-aggregation (`lib/interviews/busy.ts`,
+  extracted from the route). The copilot's `create_self_schedule_invite` now
+  takes `interviewer_email` / `additional_interviewer_emails` and stores the
+  panel so availability actually computes. When the org has no calendar
+  connected to check against, the candidate page shows a note that the times are
+  the interviewer's stated hours, not calendar-verified. 15 unit tests cover the
+  tz + interval math. **Also fixed a pre-existing bug:** `/schedule/*` and `/api/schedule/*`
+  were never in the public-route list, so logged-out candidates were bounced to
+  sign-in — now public (like `/apply` and `/intake`).
+- **Interviewer availability preferences (Phase 1 of AI self-scheduling).**
+  Hiring managers / interviewers can now set their preferred interview hours —
+  which weekdays, what times per day, and their timezone — via a **no-login
+  link** (`/interviewer/[token]`), matching the intake-link pattern. Stored in a
+  new `interviewer_preferences` table (migration 080) keyed by (org, email),
+  defaulting to Mon–Fri 9–6 when unset. New facade
+  `modules/ats/domain/interviewer-preferences.ts`, public GET/POST API at
+  `/api/interviewer/[token]`, and a copilot tool
+  `create_interviewer_availability_link` that generates the link and can email
+  it to the interviewer. Made `/interviewer/*` public in middleware. Phase 2
+  will make the candidate self-schedule link honour these hours over the next 7
+  business days. Facade unit tests included.
+- **Outbound webhooks now fire for interviews.** Added three events —
+  `interview.scheduled`, `interview.rescheduled`, `interview.cancelled` — to the
+  webhook system (previously only `opening.*` / `job.*` / `approval.*` events
+  existed). They emit from every place an interview changes state: direct
+  booking and the agent endpoint (`scheduled`), candidate self-schedule
+  (`scheduled`) and reschedule (`rescheduled`), and coordinator cancel/delete
+  (`cancelled`). Each payload carries `interview_id`, `application_id`,
+  `candidate_id`, `hiring_request_id`, and `scheduled_at`. No DB migration or
+  delivery-code change needed — HMAC signing/retries flow through unchanged;
+  subscriptions opt in via their existing `event_types` array. Extended the
+  `WebhookEvent` / `WebhookEventType` unions.
+- **Automatic interview reminders (24h + 1h before).** When an interview is
+  booked at a confirmed time — coordinator direct-booking or candidate
+  self-schedule — RecruiterStack now queues two reminders that email the
+  candidate + interviewer and Slack-DM the interviewer shortly before the
+  interview. Built on the existing `job_queue` (new `interview_reminder` job
+  type) drained by the prod pinger, so no cron/migration was needed. Reminders
+  re-check the live interview when they fire and silently skip if it was
+  cancelled, rescheduled, or moved, so stale reminders never go out.
+  Reschedules queue fresh reminders for the new time. New files
+  `lib/interviews/reminders.ts` + `notifyInterviewReminder`; wired into
+  `/api/interviews` and `/api/schedule/[token]/confirm`, with unit tests.
+
+### Fixed
+- **Candidate reschedule now stores the new meeting's id.** The self-schedule
+  confirm route created a fresh calendar event on reschedule but discarded its
+  id, leaving the interview pointing at the deleted event. It now persists the
+  new `calendar_event_id` + `meeting_platform`, so a later cancel targets the
+  current event.
+- **Cancelling or deleting an interview now cleans up the real calendar event
+  and notifies attendees.** Previously the coordinator cancel (`PATCH` status →
+  `cancelled`) and delete (`DELETE`) on `/api/interviews/[id]` only touched the
+  database — the Google/Teams/Zoom meeting stayed on everyone's calendar and no
+  one was told. Both now remove the underlying event and send cancellation
+  emails (candidate + interviewer) plus a Slack notice. New shared helper
+  `lib/integrations/cancel-event.ts` (`cancelCalendarEvent`) resolves the same
+  host chain used at creation and supports Google, Teams, **and Zoom**; the
+  candidate self-reschedule path (`/api/schedule/[token]/confirm`) now reuses it,
+  which also fixes orphaned Zoom meetings and per-user-hosted events on reschedule.
+  Added `notifyInterviewCancelled` and unit tests for the helper.
+
+### Added
 - **Intake form pre-fills from the linked requisition.** When the hiring manager
   opens `/intake/[token]`, fields the recruiter already set on the approved
   requisition are filled in as editable defaults: employment type, location,
