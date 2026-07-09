@@ -188,7 +188,7 @@ export interface ComputeOpenSlotsOptions {
   durationMinutes: number
   businessDayCount?: number   // default 7
   stepMinutes?: number        // default 30
-  minLeadMinutes?: number     // default 30 (don't offer slots < 30 min away)
+  minLeadMinutes?: number     // default 60 (don't offer slots < 1h away)
   now?: Date
 }
 
@@ -205,7 +205,7 @@ export async function computeOpenSlots(opts: ComputeOpenSlotsOptions): Promise<{
 }> {
   const businessDayCount = opts.businessDayCount ?? 7
   const stepMinutes      = opts.stepMinutes ?? 30
-  const minLeadMinutes   = opts.minLeadMinutes ?? 30
+  const minLeadMinutes   = opts.minLeadMinutes ?? 60
   const nowMs            = (opts.now ?? new Date()).getTime()
 
   const emails = Array.from(new Set(opts.emails.map(e => e.trim().toLowerCase()).filter(Boolean)))
