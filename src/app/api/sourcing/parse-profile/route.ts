@@ -33,6 +33,7 @@ Return ONLY a valid JSON object with these fields (omit any field that is not pr
   "email": "email address",
   "phone": "phone number",
   "current_title": "current job title (most recent role)",
+  "current_company": "current / most recent employer name",
   "location": "city and country/state",
   "experience_years": <total years of professional experience as a number>,
   "skills": ["skill1", "skill2", ...up to 10 skills],

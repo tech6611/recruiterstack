@@ -398,8 +398,6 @@ export async function notifyInterviewCancelled(p: InterviewCancelPayload): Promi
 
 // ── Reminder notifications ────────────────────────────────────────────────────
 
-export type ReminderKind = '24h' | '1h'
-
 export interface InterviewReminderPayload {
   orgId:            string
   candidateName:    string
@@ -413,11 +411,14 @@ export interface InterviewReminderPayload {
   interviewType:    string
   location:         string | null   // Zoom/Meet URL or office address
   meetLink:         string | null
-  kind:             ReminderKind
+  leadMinutes:      number          // how long before the interview this fires
 }
 
-function leadPhrase(kind: ReminderKind): string {
-  return kind === '24h' ? 'in about 24 hours' : 'in about an hour'
+/** Human phrase for "how far ahead" — e.g. 1440 → "in about 24 hours", 30 → "in about 30 minutes". */
+function leadPhrase(mins: number): string {
+  if (mins % 1440 === 0) { const d = mins / 1440; return d === 1 ? 'in about 24 hours' : `in about ${d} days` }
+  if (mins % 60 === 0)   { const h = mins / 60;   return h === 1 ? 'in about an hour'   : `in about ${h} hours` }
+  return `in about ${mins} minutes`
 }
 
 async function sendReminderEmails(p: InterviewReminderPayload): Promise<void> {
@@ -429,7 +430,7 @@ async function sendReminderEmails(p: InterviewReminderPayload): Promise<void> {
 
   const dateStr   = formatDateTime(p.scheduledAt, p.timezone)
   const link      = p.meetLink ?? p.location
-  const lead      = leadPhrase(p.kind)
+  const lead      = leadPhrase(p.leadMinutes)
   const fromField = { email: fromEmail, name: 'RecruiterStack' }
   const typeLabel = {
     video:      'Video Call',
@@ -516,7 +517,7 @@ async function sendReminderSlack(p: InterviewReminderPayload): Promise<void> {
   const dateStr = formatDateTime(p.scheduledAt)
   const link    = p.meetLink ?? p.location
   const dmText = [
-    `⏰ Reminder: interview with *${p.candidateName}* for *${p.positionTitle}* is ${leadPhrase(p.kind)}`,
+    `⏰ Reminder: interview with *${p.candidateName}* for *${p.positionTitle}* is ${leadPhrase(p.leadMinutes)}`,
     `🕒 ${dateStr} (${p.durationMinutes} min)`,
     link ? `🔗 Join: ${link}` : '',
   ].filter(Boolean).join('\n')

@@ -17,6 +17,7 @@ import { CompBandsCard } from '@/components/settings/CompBandsCard'
 import { GroupsCard } from '@/components/settings/GroupsCard'
 import { CustomFieldsCard } from '@/components/settings/CustomFieldsCard'
 import { WhatsAppCard } from '@/components/settings/WhatsAppCard'
+import InterviewRemindersCard from '@/components/settings/InterviewRemindersCard'
 
 type TabId = 'general' | 'integrations' | 'workspace' | 'careers' | 'team'
 
@@ -591,6 +592,9 @@ export default function SettingsPage() {
                   'Save Settings'
                 )}
               </button>
+
+              {/* Interview reminders — self-contained (own endpoint + save) */}
+              <InterviewRemindersCard />
 
               {/* Info cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">

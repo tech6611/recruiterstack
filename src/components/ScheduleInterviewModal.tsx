@@ -991,6 +991,17 @@ export default function ScheduleInterviewModal({
           )}
         </div>
 
+        {/* Reminder note */}
+        <div className="px-6 pt-3 -mb-1">
+          <p className="text-[11px] text-slate-400">
+            📣 Automated reminders are sent to the candidate &amp; interviewer before the interview.{' '}
+            <a href="/settings#interview-reminders" target="_blank" rel="noopener noreferrer"
+              className="text-emerald-600 hover:text-emerald-700 underline">
+              Configure intervals
+            </a>
+          </p>
+        </div>
+
         {/* Footer */}
         <div className="flex items-center gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/60">
           <button onClick={onClose}

@@ -15,6 +15,7 @@ export interface CandidateProfileInput {
   phone?: string | null
   resume_url?: string | null
   current_title?: string | null
+  current_company?: string | null
   location?: string | null
   linkedin_url?: string | null
   skills?: string[]
@@ -73,6 +74,7 @@ export async function createCandidateProfile(
     person_id: person.id,
     resume_url: input.resume_url ?? null,
     current_title: input.current_title ?? null,
+    current_company: input.current_company ?? null,
     location: input.location ?? null,
     skills: input.skills ?? [],
     experience_years: input.experience_years ?? 0,

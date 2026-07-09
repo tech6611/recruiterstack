@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { randomUUID } from 'crypto'
 import { enqueue } from '@/lib/api/job-queue'
-import { computeStageDelaySeconds } from '@/lib/sequences/schedule'
+import { computeStageDelaySeconds, DEFAULT_SEND_WINDOW } from '@/lib/sequences/schedule'
 import { logger } from '@/lib/logger'
 
 export type EnrollResult =
@@ -81,7 +81,7 @@ export async function enrollCandidate(
         orgId,
         jobType: 'sequence_email',
         payload: { enrollmentId, sequenceId },
-        delaySeconds: computeStageDelaySeconds(firstStage, new Date(), true),
+        delaySeconds: computeStageDelaySeconds(firstStage, new Date(), true, DEFAULT_SEND_WINDOW),
       })
     } catch (err) {
       logger.error('Failed to enqueue first sequence email', err, { enrollmentId, sequenceId })

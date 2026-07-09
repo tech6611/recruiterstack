@@ -42,6 +42,7 @@ export const POST = withCapability('recruiting:edit', async (request) => {
   "email": "<email address or null>",
   "phone": "<phone number or null>",
   "current_title": "<most recent job title or null>",
+  "current_company": "<most recent / current employer name or null>",
   "location": "<city, country or null>",
   "experience_years": <total years of professional experience as integer>,
   "skills": [<array of technical skills, frameworks, tools — max 15 items>],

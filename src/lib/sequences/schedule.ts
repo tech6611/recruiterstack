@@ -14,6 +14,82 @@ export interface StageTiming {
   delay_business_days?: boolean | null
 }
 
+// ── Send window (business-hours guardrail) ────────────────────────────────────
+// A safety net so outreach never fires at 3am or on a weekend — bad for
+// deliverability and it reads as spam. Applied only to relative-delay steps
+// (including "send immediately"): if a step would land outside the window, it is
+// pushed forward to the next window open. Steps with an explicit clock time
+// (send_at / send_at_time) are left alone — the user picked that moment on purpose.
+
+export interface SendWindow {
+  timezone: string     // IANA tz the window hours are expressed in
+  startHour: number    // inclusive, 0–23 (earliest send)
+  endHour: number      // exclusive, 0–23 (first hour that's too late)
+  days: number[]       // allowed weekdays, 0=Sun … 6=Sat
+}
+
+// Platform default: weekdays, 8am–8pm India time. Kept generous so it only trims
+// the genuinely antisocial hours.
+export const DEFAULT_SEND_WINDOW: SendWindow = {
+  timezone: 'Asia/Kolkata',
+  startHour: 8,
+  endHour: 20,
+  days: [1, 2, 3, 4, 5],
+}
+
+interface TzParts {
+  year: number; month: number; day: number; hour: number; minute: number; second: number; dow: number
+}
+
+const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+
+/** Wall-clock components of `date` as seen in `tz`. */
+function tzParts(date: Date, tz: string): TzParts {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, weekday: 'short',
+  }).formatToParts(date)
+  const get = (t: string) => parts.find(p => p.type === t)!.value
+  return {
+    year: +get('year'), month: +get('month') - 1, day: +get('day'),
+    hour: +get('hour') % 24, minute: +get('minute'), second: +get('second'),
+    dow: WEEKDAY_INDEX[get('weekday')],
+  }
+}
+
+/** Real UTC Date for a desired wall-clock (y,mo,d,h,m) in `tz`, using the tz
+ *  offset measured at `reference`. */
+function realDateFromLocal(y: number, mo: number, d: number, h: number, m: number, tz: string, reference: Date): Date {
+  const rp = tzParts(reference, tz)
+  const refFakeUtc = Date.UTC(rp.year, rp.month, rp.day, rp.hour, rp.minute, rp.second)
+  const offset = reference.getTime() - refFakeUtc
+  return new Date(Date.UTC(y, mo, d, h, m, 0) + offset)
+}
+
+/**
+ * Return the first instant >= `target` that falls inside the send window. If
+ * `target` is already inside, it's returned unchanged.
+ */
+export function clampToSendWindow(target: Date, window: SendWindow): Date {
+  let cur = target
+  for (let i = 0; i < 14; i++) {
+    const p = tzParts(cur, window.timezone)
+    const dayOk = window.days.includes(p.dow)
+    if (dayOk && p.hour >= window.startHour && p.hour < window.endHour) return cur
+
+    if (dayOk && p.hour < window.startHour) {
+      // Too early today — jump to today's opening time.
+      cur = realDateFromLocal(p.year, p.month, p.day, window.startHour, 0, window.timezone, cur)
+    } else {
+      // Too late, or a non-sending day — jump to the next calendar day's opening
+      // time; the loop re-checks whether that day is allowed.
+      const next = new Date(Date.UTC(p.year, p.month, p.day) + 86_400_000)
+      cur = realDateFromLocal(next.getUTCFullYear(), next.getUTCMonth(), next.getUTCDate(), window.startHour, 0, window.timezone, cur)
+    }
+  }
+  return cur
+}
+
 /**
  * Add `n` business days (Mon–Fri, skipping Sat/Sun) to a calendar date, returning
  * the resulting {year, month, day}. `month` is 0-indexed (JS convention). The
@@ -47,8 +123,17 @@ export function computeStageDelaySeconds(
   stage: StageTiming,
   from: Date,
   isFirst: boolean,
+  window?: SendWindow | null,
 ): number {
   const fromMs = from.getTime()
+
+  // Push a computed relative delay forward if it lands outside the send window.
+  const applyWindow = (seconds: number): number => {
+    if (!window) return seconds
+    const target = new Date(fromMs + seconds * 1000)
+    const clamped = clampToSendWindow(target, window)
+    return Math.max(0, Math.round((clamped.getTime() - fromMs) / 1000))
+  }
 
   if (stage.send_at) {
     const sendAtMs = new Date(stage.send_at).getTime()
@@ -112,12 +197,12 @@ export function computeStageDelaySeconds(
     const y = get('year'), mo = get('month') - 1, d = get('day')
     const target = addBusinessDays(y, mo, d, delayDays)
     const calDays = Math.round((Date.UTC(target.year, target.month, target.day) - Date.UTC(y, mo, d)) / 86_400_000)
-    return Math.max(calDays * 86400 + minSeconds, isFirst ? 0 : 60)
+    return applyWindow(Math.max(calDays * 86400 + minSeconds, isFirst ? 0 : 60))
   }
 
   const daySeconds = delayDays * 86400
-  if (isFirst && daySeconds === 0 && minSeconds === 0) return 0
-  return Math.max(daySeconds + minSeconds, isFirst ? 0 : 60)
+  if (isFirst && daySeconds === 0 && minSeconds === 0) return applyWindow(0)
+  return applyWindow(Math.max(daySeconds + minSeconds, isFirst ? 0 : 60))
 }
 
 // ── Delay unit ↔ stored fields ────────────────────────────────────────────────

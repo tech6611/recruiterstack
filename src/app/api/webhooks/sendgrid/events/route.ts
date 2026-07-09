@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { unsubscribeCandidate } from '@/modules/crm/domain/unsubscribe'
 import { logger } from '@/lib/logger'
 
 interface SendGridEvent {
@@ -66,11 +67,17 @@ export async function POST(req: NextRequest) {
   // Collapse the batch by target row so we do one DB update per email even when
   // a batch carries several opens/clicks for the same message.
   const byRow = new Map<string, Agg>()
+  // Enrollments whose recipient asked out (unsubscribe / spam complaint). These
+  // suppress the whole candidate, not just one email row.
+  const unsubEnrollmentIds = new Set<string>()
   const iso = (ts?: number) => new Date((ts && ts > 0 ? ts : Math.floor(Date.now() / 1000)) * 1000).toISOString()
 
   for (const ev of events) {
     const enrollmentId = ev.seq_enrollment_id
     const stageId = ev.seq_stage_id
+    if (enrollmentId && (ev.event === 'unsubscribe' || ev.event === 'group_unsubscribe' || ev.event === 'spamreport')) {
+      unsubEnrollmentIds.add(enrollmentId)
+    }
     if (!enrollmentId || !stageId) continue // not a tracked sequence email
 
     const key = `${enrollmentId}::${stageId}`
@@ -98,10 +105,22 @@ export async function POST(req: NextRequest) {
     byRow.set(key, agg)
   }
 
-  if (byRow.size === 0) return NextResponse.json({ received: true })
+  if (byRow.size === 0 && unsubEnrollmentIds.size === 0) return NextResponse.json({ received: true })
 
   const supabase = createAdminClient()
   let updated = 0
+
+  // Honour unsubscribe / spam complaints: resolve each enrollment to its
+  // candidate and suppress them (adds do-not-contact tag + stops active
+  // enrollments), so no further sequence email ever reaches them.
+  for (const enrollmentId of Array.from(unsubEnrollmentIds)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: enr } = await (supabase.from('sequence_enrollments') as any)
+      .select('org_id, candidate_id').eq('id', enrollmentId).maybeSingle()
+    if (enr?.org_id && enr?.candidate_id) {
+      await unsubscribeCandidate(supabase, enr.org_id, enr.candidate_id)
+    }
+  }
 
   for (const agg of Array.from(byRow.values())) {
     // Load the row so we can raise (never lower) status and add to counts.

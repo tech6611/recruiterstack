@@ -6,7 +6,7 @@ import {
   Wand2, ChevronDown, Send, CheckCircle,
 } from 'lucide-react'
 import type { SequenceStage, SequenceChannel, StageCondition } from '@/lib/types/database'
-import { toDelayFields, fromDelayFields, computeStageDelaySeconds, type DelayUnit } from '@/lib/sequences/schedule'
+import { toDelayFields, fromDelayFields, computeStageDelaySeconds, DEFAULT_SEND_WINDOW, type DelayUnit } from '@/lib/sequences/schedule'
 import { RichTextEditor } from '@/components/RichTextEditor'
 import { useSettings } from '@/lib/hooks/useSettings'
 import type { Editor } from '@tiptap/react'
@@ -16,19 +16,19 @@ import type { Editor } from '@tiptap/react'
 const TOKENS = [
   { token: '{{candidate_first_name}}', label: 'First Name' },
   { token: '{{candidate_name}}',       label: 'Full Name' },
-  { token: '{{candidate_title}}',      label: 'Title' },
-  { token: '{{candidate_company}}',    label: 'Company' },
+  { token: '{{candidate_title}}',      label: 'Current Title' },
+  { token: '{{candidate_company}}',    label: 'Current Company' },
   { token: '{{candidate_location}}',   label: 'Location' },
   { token: '{{job_title}}',            label: 'Job Title' },
-  { token: '{{company_name}}',         label: 'Company Name' },
+  { token: '{{company_name}}',         label: 'Hiring Company' },
   { token: '{{recruiter_name}}',       label: 'Recruiter' },
 ]
 
-const CHANNELS: { value: SequenceChannel; label: string; icon: string }[] = [
+const CHANNELS: { value: SequenceChannel; label: string; icon: string; soon?: boolean }[] = [
   { value: 'email',    label: 'Email',    icon: '📧' },
-  { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
-  { value: 'sms',      label: 'SMS',      icon: '📱' },
-  { value: 'linkedin', label: 'LinkedIn', icon: '💼' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: '💬', soon: true },
+  { value: 'sms',      label: 'SMS',      icon: '📱', soon: true },
+  { value: 'linkedin', label: 'LinkedIn', icon: '💼', soon: true },
 ]
 
 const CONDITIONS: { value: StageCondition | ''; label: string; description: string }[] = [
@@ -146,6 +146,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
       { send_at_time: sendTime || null, send_timezone: sendTz, delay_days, delay_minutes, delay_business_days },
       new Date(),
       false,
+      DEFAULT_SEND_WINDOW,
     )
     const target = new Date(Date.now() + seconds * 1000)
     const when = target.toLocaleString('en-US', {
@@ -200,7 +201,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
 <p>I've reached out a couple of times and I know timing isn't always right. I don't want to be a bother, so this will be my last message.</p>
 <p>If you're ever open to exploring new opportunities, my door is always open. Feel free to reach out anytime.</p>
 <p>Wishing you all the best!</p>
-<p>{{recruiter_name}}<br/>{{recruiter_title}}, {{company_name}}</p>`,
+<p>{{recruiter_name}}<br/>{{company_name}}</p>`,
       },
     }
 
@@ -375,24 +376,28 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 <button
                   key={ch.value}
                   type="button"
-                  onClick={() => setChannel(ch.value)}
-                  className={`flex flex-col items-center gap-1 rounded-xl border-2 px-3 py-2.5 text-xs font-semibold transition-all ${
-                    channel === ch.value
-                      ? 'border-slate-500 bg-slate-50 text-slate-700'
-                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                  onClick={() => { if (!ch.soon) setChannel(ch.value) }}
+                  disabled={ch.soon}
+                  aria-disabled={ch.soon}
+                  title={ch.soon ? `${ch.label} delivery is coming soon` : undefined}
+                  className={`relative flex flex-col items-center gap-1 rounded-xl border-2 px-3 py-2.5 text-xs font-semibold transition-all ${
+                    ch.soon
+                      ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                      : channel === ch.value
+                        ? 'border-slate-500 bg-slate-50 text-slate-700'
+                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
                   }`}
                 >
                   <span className="text-lg">{ch.icon}</span>
                   {ch.label}
+                  {ch.soon && (
+                    <span className="absolute -top-1.5 -right-1.5 rounded-full bg-slate-200 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-500">
+                      Soon
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
-            {channel !== 'email' && (
-              <p className="text-[11px] text-amber-600 mt-1.5">
-                {channel === 'linkedin' ? 'LinkedIn messages will be logged for tracking. Manual send required via LinkedIn.' :
-                 `${channel.toUpperCase()} delivery coming soon. Messages will be logged for tracking.`}
-              </p>
-            )}
           </div>
 
           {/* ── 2. Scheduling — GEM-style inline row ────────────────────── */}

@@ -713,6 +713,7 @@ export interface Candidate {
   skills: string[]
   experience_years: number
   current_title: string | null
+  current_company: string | null
   location: string | null
   linkedin_url: string | null
   status: CandidateStatus
@@ -723,7 +724,7 @@ export interface Candidate {
 }
 
 export interface CandidateInsert
-  extends Omit<Candidate, 'id' | 'created_at' | 'updated_at' | 'ai_summary' | 'ai_summary_generated_at' | 'phone' | 'resume_url' | 'current_title' | 'location' | 'linkedin_url' | 'person_id'> {
+  extends Omit<Candidate, 'id' | 'created_at' | 'updated_at' | 'ai_summary' | 'ai_summary_generated_at' | 'phone' | 'resume_url' | 'current_title' | 'current_company' | 'location' | 'linkedin_url' | 'person_id'> {
   id?: string
   created_at?: string
   updated_at?: string
@@ -733,6 +734,7 @@ export interface CandidateInsert
   phone?: string | null
   resume_url?: string | null
   current_title?: string | null
+  current_company?: string | null
   location?: string | null
   linkedin_url?: string | null
 }

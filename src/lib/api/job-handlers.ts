@@ -5,7 +5,7 @@
  */
 
 import { registerHandler, enqueue, type QueuedJob } from './job-queue'
-import { computeStageDelaySeconds } from '@/lib/sequences/schedule'
+import { computeStageDelaySeconds, DEFAULT_SEND_WINDOW } from '@/lib/sequences/schedule'
 import { handleSlaCheck } from '@/lib/approvals/sla-handler'
 import { handleWebhookDelivery } from '@/lib/webhooks/delivery'
 import { runAutopilot } from '@/lib/ai/autopilot'
@@ -25,6 +25,7 @@ import {
 } from '@/modules/ats/domain/applications'
 import { getRoleMatchingInputs } from '@/modules/ats/domain/role-profiles'
 import { getApplicationJobTokens } from '@/modules/ats/domain/job-pipelines'
+import { isDoNotContact, unsubscribeUrl, unsubscribeFooterHtml } from '@/modules/crm/domain/unsubscribe'
 
 // ── Autopilot ─────────────────────────────────────────────────────────────────
 
@@ -236,7 +237,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
   // Fetch enrollment — scoped to org
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: enrollment } = await (supabase.from('sequence_enrollments') as any)
-    .select('*, candidates(name, email, current_title, location)')
+    .select('*, candidates(name, email, current_title, current_company, location)')
     .eq('id', enrollmentId)
     .eq('org_id', job.org_id)
     .single()
@@ -250,6 +251,17 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
   const candidate = enrollment.candidates
   if (!candidate?.email) {
     logger.error('Candidate has no email', undefined, { enrollmentId })
+    return
+  }
+
+  // Compliance guard: if the candidate unsubscribed (or was tagged do-not-contact)
+  // since enrolling, stop here and mark the enrollment so no further stages fire.
+  if (await isDoNotContact(supabase, job.org_id, enrollment.candidate_id)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('sequence_enrollments') as any)
+      .update({ status: 'unsubscribed', completed_at: new Date().toISOString() })
+      .eq('id', enrollmentId)
+    logger.info('Sequence stopped — candidate is do-not-contact', { enrollmentId })
     return
   }
 
@@ -371,6 +383,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     '{{candidate_first_name}}': firstName,
     '{{candidate_name}}': candidate.name ?? '',
     '{{candidate_title}}': candidate.current_title ?? '',
+    '{{candidate_company}}': candidate.current_company ?? '',
     '{{candidate_location}}': candidate.location ?? '',
     '{{job_title}}': jobTitle,
     '{{company_name}}': companyName,
@@ -383,6 +396,15 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     subject = subject.replaceAll(token, value)
     body = body.replaceAll(token, value)
   }
+  // Safety net: blank out any leftover {{placeholder}} we don't recognise or
+  // couldn't fill (e.g. missing data), so recipients never see raw {{tokens}}.
+  const leftoverToken = /\{\{\s*[\w.]+\s*\}\}/g
+  subject = subject.replace(leftoverToken, '')
+  body = body.replace(leftoverToken, '')
+
+  // Append a one-click unsubscribe footer so every outbound sequence email is
+  // compliant. The link carries an encrypted {org, candidate} token.
+  body += unsubscribeFooterHtml(unsubscribeUrl(job.org_id, enrollment.candidate_id))
 
   // Send via SendGrid
   const apiKey = process.env.SENDGRID_API_KEY
@@ -454,7 +476,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
         orgId: job.org_id,
         jobType: 'sequence_email',
         payload: { enrollmentId, sequenceId },
-        delaySeconds: computeStageDelaySeconds(followingStage, new Date(), false),
+        delaySeconds: computeStageDelaySeconds(followingStage, new Date(), false, DEFAULT_SEND_WINDOW),
       })
     } catch (err) {
       logger.error('Failed to schedule next sequence stage', err, { enrollmentId, sequenceId })
@@ -485,19 +507,22 @@ registerHandler('whatsapp_inbound', async (job: QueuedJob) => {
   await handleWhatsAppInbound(job)
 })
 
-// ── Interview reminder (24h / 1h before) ──────────────────────────────────────
+// ── Interview reminder (configurable intervals before the interview) ──────────
 // Enqueued at booking / self-schedule time with scheduled_at set into the
 // future. When the job fires we re-fetch the live interview and only send if
 // it's still 'scheduled' at the same time — so a cancel or reschedule in the
 // meantime makes a stale reminder a silent no-op.
 registerHandler('interview_reminder', async (job: QueuedJob) => {
-  const { interviewId, kind, targetScheduledAt, timezone } = job.payload as {
+  const { interviewId, leadMinutes, kind, targetScheduledAt, timezone } = job.payload as {
     interviewId?: string
-    kind?: '24h' | '1h'
+    leadMinutes?: number
+    kind?: '24h' | '1h'   // legacy payloads (before configurable intervals)
     targetScheduledAt?: string
     timezone?: string | null
   }
-  if (!interviewId || !kind) throw new Error('Missing interviewId/kind in payload')
+  // Back-compat: older queued jobs carried kind instead of leadMinutes.
+  const lead = typeof leadMinutes === 'number' ? leadMinutes : kind === '24h' ? 1440 : kind === '1h' ? 60 : null
+  if (!interviewId || lead === null) throw new Error('Missing interviewId/leadMinutes in payload')
 
   const supabase = createAdminClient()
   const { data: iv } = await supabase
@@ -529,10 +554,10 @@ registerHandler('interview_reminder', async (job: QueuedJob) => {
     interviewType:    iv.interview_type ?? 'video',
     location:         iv.location ?? null,
     meetLink:         iv.location ?? null,
-    kind,
+    leadMinutes:      lead,
   })
 
-  logger.info('Interview reminder sent', { jobId: job.id, interviewId, kind })
+  logger.info('Interview reminder sent', { jobId: job.id, interviewId, leadMinutes: lead })
 })
 
 export { enqueue as enqueueJob }

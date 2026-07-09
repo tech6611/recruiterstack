@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, TrendingUp } from 'lucide-react'
+import { Loader2, TrendingUp, Download } from 'lucide-react'
 import type { SequenceAnalytics as AnalyticsData } from '@/lib/types/database'
 
 interface Props {
@@ -11,6 +11,43 @@ interface Props {
 function pct(n: number, total: number): string {
   if (!total) return '0%'
   return `${Math.round((n / total) * 100)}%`
+}
+
+// Wrap a value for CSV: quote it and escape embedded quotes so commas, quotes,
+// and newlines inside a subject line can't break the column layout.
+function csvCell(value: string | number): string {
+  const s = String(value ?? '')
+  return `"${s.replace(/"/g, '""')}"`
+}
+
+// Build a spreadsheet-friendly CSV from the analytics already loaded in the UI —
+// one row per stage plus a totals row. No server round-trip needed.
+function buildCsv(data: AnalyticsData): string {
+  const header = ['Stage', 'Subject', 'Delay (days)', 'Sent', 'Delivered', 'Opened', 'Open %', 'Clicked', 'Click %', 'Replied', 'Reply %', 'Bounced']
+  const rows = data.stages.map(s => [
+    s.order_index, s.subject, s.delay_days,
+    s.sent, s.delivered,
+    s.opened, pct(s.opened, s.sent),
+    s.clicked, pct(s.clicked, s.sent),
+    s.replied, pct(s.replied, s.sent),
+    s.bounced,
+  ])
+  const totals = ['Total', 'All stages', '', data.overall.total_sent, '', data.overall.total_opened, pct(data.overall.total_opened, data.overall.total_sent), '', '', data.overall.total_replied, pct(data.overall.total_replied, data.total_enrollments), data.overall.total_bounced]
+  return [header, ...rows, totals].map(r => r.map(csvCell).join(',')).join('\r\n')
+}
+
+function downloadCsv(data: AnalyticsData): void {
+  const blob = new Blob([buildCsv(data)], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const safeName = (data.sequence_name || 'sequence').replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+  const date = new Date().toISOString().slice(0, 10)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${safeName}-analytics-${date}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 export default function SequenceAnalytics({ sequenceId }: Props) {
@@ -40,6 +77,18 @@ export default function SequenceAnalytics({ sequenceId }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Header + export */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-slate-700">Performance</p>
+        <button
+          type="button"
+          onClick={() => downloadCsv(data)}
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+        >
+          <Download className="h-3.5 w-3.5" /> Download CSV
+        </button>
+      </div>
+
       {/* Overview cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[

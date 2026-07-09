@@ -2,26 +2,27 @@
  * Interview reminder scheduling.
  *
  * Enqueues "interview_reminder" jobs on the durable job queue so the worker
- * fires them at the right time (24h before and 1h before the interview). Uses
- * the same enqueue-with-delay pattern as sequences and approval SLAs — the
- * job's scheduled_at is set into the future, and processJobs() only picks it
- * up once that time arrives.
+ * fires them at the right time before an interview. Uses the same
+ * enqueue-with-delay pattern as sequences and approval SLAs — the job's
+ * scheduled_at is set into the future, and processJobs() only picks it up once
+ * that time arrives.
  *
- * A reminder whose fire time is already in the past (or under a minute away)
- * is skipped — the booking confirmation email already covers imminent
- * interviews. The handler re-checks the live interview when the job runs, so a
+ * The reminder intervals are configurable per org (org_settings.reminder_lead_minutes,
+ * e.g. {1440, 60} = 24h + 1h before). An empty array turns reminders off; a
+ * missing column / row falls back to the 24h + 1h default.
+ *
+ * A reminder whose fire time is already in the past (or under a minute away) is
+ * skipped — the booking confirmation email already covers imminent interviews.
+ * The handler re-checks the live interview when the job runs, so a
  * cancel/reschedule between now and then makes the stale reminder a no-op.
  */
 
 import { enqueue, type JobType } from '@/lib/api/job-queue'
+import { createAdminClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 
-export type ReminderKind = '24h' | '1h'
-
-const REMINDER_LEAD_MS: Record<ReminderKind, number> = {
-  '24h': 24 * 60 * 60 * 1000,
-  '1h':  1 * 60 * 60 * 1000,
-}
+/** Default intervals (minutes before the interview) when the org hasn't configured any. */
+export const DEFAULT_REMINDER_LEAD_MINUTES = [1440, 60]  // 24h, 1h
 
 // Don't bother queuing a reminder that would fire in under a minute.
 const MIN_DELAY_MS = 60 * 1000
@@ -36,9 +37,36 @@ export interface ScheduleRemindersInput {
 }
 
 /**
- * Schedules the 24h and 1h reminders for an interview. Best-effort: never
- * throws, so a queue hiccup can't break the booking flow. Safe to call again
- * after a reschedule — the handler's freshness check drops any older jobs.
+ * Reads the org's configured reminder intervals (minutes before the interview).
+ * Returns the default [1440, 60] when unset; an empty array means "reminders off".
+ */
+export async function getOrgReminderLeadMinutes(orgId: string): Promise<number[]> {
+  try {
+    const supabase = createAdminClient()
+    const { data } = await supabase
+      .from('org_settings')
+      .select('reminder_lead_minutes')
+      .eq('org_id', orgId)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .maybeSingle() as { data: any }
+
+    const arr = data?.reminder_lead_minutes
+    if (Array.isArray(arr)) {
+      // Explicitly set (possibly empty = off). Keep only positive integers.
+      return arr.filter((n: unknown) => typeof n === 'number' && Number.isFinite(n) && n > 0)
+    }
+    return DEFAULT_REMINDER_LEAD_MINUTES
+  } catch {
+    // Column may not exist yet (pre-migration) — fall back to the default.
+    return DEFAULT_REMINDER_LEAD_MINUTES
+  }
+}
+
+/**
+ * Schedules reminders for an interview at the org's configured intervals.
+ * Best-effort: never throws, so a queue hiccup can't break the booking flow.
+ * Safe to call again after a reschedule — the handler's freshness check drops
+ * any older jobs.
  */
 export async function scheduleInterviewReminders(input: ScheduleRemindersInput): Promise<void> {
   const { orgId, interviewId, scheduledAt, timezone = null } = input
@@ -49,10 +77,11 @@ export async function scheduleInterviewReminders(input: ScheduleRemindersInput):
     return
   }
 
+  const leadMinutesList = await getOrgReminderLeadMinutes(orgId)
   const now = Date.now()
 
-  for (const kind of Object.keys(REMINDER_LEAD_MS) as ReminderKind[]) {
-    const delayMs = interviewMs - REMINDER_LEAD_MS[kind] - now
+  for (const leadMinutes of leadMinutesList) {
+    const delayMs = interviewMs - leadMinutes * 60_000 - now
     if (delayMs < MIN_DELAY_MS) continue  // fire time already passed / too soon
 
     try {
@@ -61,7 +90,7 @@ export async function scheduleInterviewReminders(input: ScheduleRemindersInput):
         jobType: JOB_TYPE,
         payload: {
           interviewId,
-          kind,
+          leadMinutes,
           // The interview time this reminder was scheduled for. The handler
           // compares it against the live row to drop reminders left over from
           // before a reschedule.

@@ -258,7 +258,7 @@ export async function getSequenceAnalytics(
   const { data: emails } = enrollmentIds.length === 0
     ? { data: [] }
     : await (supabase.from('sequence_emails') as any)
-        .select('stage_id, status, open_count, click_count')
+        .select('enrollment_id, stage_id, status, open_count, click_count, sent_at')
         .in('enrollment_id', enrollmentIds)
 
   const enrollmentStatuses: Record<string, number> = {}
@@ -269,11 +269,30 @@ export async function getSequenceAnalytics(
   // 'skipped' rows are stages a send condition held back — they never went out,
   // so they don't count as sent/delivered.
   const NOT_SENT = ['queued', 'failed', 'skipped']
-  const allEmails = (emails ?? []) as Array<{ stage_id: string; status: string }>
+  const allEmails = (emails ?? []) as Array<{ enrollment_id: string; stage_id: string; status: string; sent_at: string | null }>
+
+  // Replies are recorded on the ENROLLMENT (by the inbound-reply webhook), not on
+  // the individual email row. Attribute each replied enrollment to the last stage
+  // we actually sent it — that's the message they were replying to — so both the
+  // overall count and per-stage reply rates reflect reality.
+  const repliedEnrollmentIds = new Set(enrollments.filter(e => e.status === 'replied').map(e => e.id))
+  const repliedByStage = new Map<string, number>()
+  const lastSentByEnrollment = new Map<string, { stageId: string; sentAt: string }>()
+  for (const em of allEmails) {
+    if (!repliedEnrollmentIds.has(em.enrollment_id) || NOT_SENT.includes(em.status)) continue
+    const prev = lastSentByEnrollment.get(em.enrollment_id)
+    if (!prev || (em.sent_at ?? '') > prev.sentAt) {
+      lastSentByEnrollment.set(em.enrollment_id, { stageId: em.stage_id, sentAt: em.sent_at ?? '' })
+    }
+  }
+  for (const { stageId } of Array.from(lastSentByEnrollment.values())) {
+    repliedByStage.set(stageId, (repliedByStage.get(stageId) ?? 0) + 1)
+  }
+
   const overall = {
     total_sent:    allEmails.filter(e => !NOT_SENT.includes(e.status)).length,
     total_opened:  allEmails.filter(e => ['opened','clicked','replied'].includes(e.status)).length,
-    total_replied: allEmails.filter(e => e.status === 'replied').length,
+    total_replied: repliedEnrollmentIds.size,
     total_bounced: allEmails.filter(e => e.status === 'bounced').length,
   }
 
@@ -288,7 +307,7 @@ export async function getSequenceAnalytics(
       delivered:   stageEmails.filter(e => !['queued','failed','skipped','bounced'].includes(e.status)).length,
       opened:      stageEmails.filter(e => ['opened','clicked','replied'].includes(e.status)).length,
       clicked:     stageEmails.filter(e => ['clicked','replied'].includes(e.status)).length,
-      replied:     stageEmails.filter(e => e.status === 'replied').length,
+      replied:     repliedByStage.get(s.id) ?? 0,
       bounced:     stageEmails.filter(e => e.status === 'bounced').length,
     }
   })

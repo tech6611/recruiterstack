@@ -29,6 +29,24 @@ entries on top.
   Populated going forward by CSV import, CV parsing, and profile parsing.
 
 ### Added
+- **Sequence unsubscribe / compliance handling.** Every outbound sequence email
+  now carries a one-click unsubscribe footer whose link encodes an encrypted
+  `{org, candidate}` token (AES-256-GCM, so it can't be forged). The public
+  `/unsubscribe/[token]` page stamps the candidate `do-not-contact` and stops all
+  their active enrollments — which the bulk-enrollment filter already excludes, so
+  the suppression sticks. A send-time guard also drops any candidate who became
+  do-not-contact after enrolling, and SendGrid `unsubscribe`/`spamreport` events
+  now suppress the candidate too (previously ignored). New helper
+  `src/modules/crm/domain/unsubscribe.ts`.
+- **Business-hours send window (guardrail against 3am / weekend sends).** Relative
+  sequence steps — including "send immediately" — are now clamped to weekdays
+  08:00–20:00 IST; a step that would land outside the window is pushed to the next
+  window open. Steps with an explicit clock time (`send_at` / `send_at_time`) are
+  left alone. Applied consistently at enroll, at each chained send, and in the
+  step-editor preview. `clampToSendWindow` + `DEFAULT_SEND_WINDOW` in
+  `lib/sequences/schedule.ts`, covered by unit tests.
+- **Sequence analytics CSV export.** The Analytics tab has a "Download CSV" button
+  that builds a per-stage + totals spreadsheet client-side from the loaded data.
 - **Sequence merge fields wired end-to-end.** The sender
   (`lib/api/job-handlers.ts`) now fills `{{candidate_company}}` from the new
   column, and a safety net blanks any unfilled/unknown `{{placeholder}}` so

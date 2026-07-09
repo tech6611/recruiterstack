@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeStageDelaySeconds, toDelayFields, fromDelayFields } from '../schedule'
+import { computeStageDelaySeconds, clampToSendWindow, DEFAULT_SEND_WINDOW, toDelayFields, fromDelayFields } from '../schedule'
 
 describe('computeStageDelaySeconds', () => {
   // 10:00 UTC == 15:30 in Asia/Kolkata (IST, +5:30)
@@ -76,6 +76,44 @@ describe('computeStageDelaySeconds — business days', () => {
     )
     expect(secs).toBe(5 * 86400)
     expect(istDate(new Date(thu.getTime() + secs * 1000))).toBe('2026-07-14') // Tuesday
+  })
+})
+
+describe('clampToSendWindow — weekdays 08:00–20:00 IST', () => {
+  const w = DEFAULT_SEND_WINDOW
+
+  it('leaves a time already inside the window unchanged', () => {
+    const inside = new Date('2026-07-09T10:00:00.000Z') // Thu 15:30 IST
+    expect(clampToSendWindow(inside, w).toISOString()).toBe('2026-07-09T10:00:00.000Z')
+  })
+
+  it('pushes a too-early time to today 08:00 IST', () => {
+    const early = new Date('2026-07-09T01:00:00.000Z') // Thu 06:30 IST
+    expect(clampToSendWindow(early, w).toISOString()).toBe('2026-07-09T02:30:00.000Z') // Thu 08:00 IST
+  })
+
+  it('pushes a too-late time to the next day 08:00 IST', () => {
+    const late = new Date('2026-07-09T16:00:00.000Z') // Thu 21:30 IST
+    expect(clampToSendWindow(late, w).toISOString()).toBe('2026-07-10T02:30:00.000Z') // Fri 08:00 IST
+  })
+
+  it('pushes a weekend time to Monday 08:00 IST', () => {
+    const sat = new Date('2026-07-11T10:00:00.000Z') // Sat 15:30 IST
+    expect(clampToSendWindow(sat, w).toISOString()).toBe('2026-07-13T02:30:00.000Z') // Mon 08:00 IST
+  })
+})
+
+describe('computeStageDelaySeconds — with send window', () => {
+  const w = DEFAULT_SEND_WINDOW
+
+  it('delays an immediate off-hours first send to the window open', () => {
+    const from = new Date('2026-07-09T01:00:00.000Z') // Thu 06:30 IST → window opens 08:00 IST (+1.5h)
+    expect(computeStageDelaySeconds({}, from, true, w)).toBe(5400)
+  })
+
+  it('leaves an in-window relative delay untouched', () => {
+    const from = new Date('2026-07-09T04:00:00.000Z') // Thu 09:30 IST; +30m → 10:00 IST, inside
+    expect(computeStageDelaySeconds({ delay_minutes: 30 }, from, true, w)).toBe(1800)
   })
 })
 

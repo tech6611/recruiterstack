@@ -7,6 +7,7 @@ type ParsedCandidate = {
   email?:            string
   phone?:            string
   current_title?:    string
+  current_company?:  string
   location?:         string
   experience_years?: number
   skills?:           string[]
@@ -50,9 +51,10 @@ export const POST = withCapability('recruiting:edit', async (request, orgId, sup
       const result = await findOrCreateCandidateProfile(supabase, orgId, {
         name:             (c.name ?? email).trim(),
         email,
-        phone:            c.phone?.trim()         ?? null,
-        current_title:    c.current_title?.trim() ?? null,
-        location:         c.location?.trim()      ?? null,
+        phone:            c.phone?.trim()           ?? null,
+        current_title:    c.current_title?.trim()   ?? null,
+        current_company:  c.current_company?.trim() ?? null,
+        location:         c.location?.trim()        ?? null,
         linkedin_url:     c.linkedin_url?.trim()  ?? null,
         skills:           Array.isArray(c.skills) ? c.skills : [],
         experience_years: typeof c.experience_years === 'number' ? c.experience_years : 0,

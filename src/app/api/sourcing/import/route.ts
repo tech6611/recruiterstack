@@ -32,6 +32,7 @@ Extract these fields per row (all optional, but each row must have at least one 
 - email: email address
 - phone: phone number
 - current_title: current job title / role
+- current_company: current employer / company name
 - location: city, country, or region
 - experience_years: years of experience as a number (0 if unknown or not present)
 - skills: array of skill keywords (parse from a skills/technologies column; if none, infer 1-2 from the title)
