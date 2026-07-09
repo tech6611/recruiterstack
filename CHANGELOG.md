@@ -12,6 +12,39 @@ entries on top.
 ## 2026-07-09
 
 ### Fixed
+- **Self-schedule availability was serving stale interviewer hours.** The
+  candidate self-schedule page read interviewer preferred-hours through Next.js's
+  cached data layer, so after a hiring manager changed their hours (e.g. extended
+  Thursday from 6 PM to 11 PM) the engine kept using the old window and hid the
+  new evening slots. The `/api/schedule/[token]` route is now `force-dynamic` /
+  `force-no-store`, so availability always reflects live preferences + calendars.
+- **Lowered the self-schedule minimum-notice buffer from 2 hours to 30 minutes**
+  so candidates can grab same-day/near-term slots (`minLeadMinutes` default in
+  `lib/interviews/availability.ts`).
+
+### Schema
+- **`candidates.current_company` added (migration 081).** Nullable text column so
+  a candidate's current employer can be used as the `{{candidate_company}}` merge
+  field in sequence emails. Additive — existing rows stay NULL and render blank.
+  Populated going forward by CSV import, CV parsing, and profile parsing.
+
+### Added
+- **Sequence merge fields wired end-to-end.** The sender
+  (`lib/api/job-handlers.ts`) now fills `{{candidate_company}}` from the new
+  column, and a safety net blanks any unfilled/unknown `{{placeholder}}` so
+  recipients never see raw tokens. Sourcing parsers (CV/profile/CSV) now extract
+  the candidate's current company.
+
+### Changed
+- **Sequence step editor: clearer channel + token labels.** WhatsApp/SMS/LinkedIn
+  channel options now show a "Soon" badge and are disabled (email is the only
+  live channel), so no one configures a channel that silently sends email.
+  Renamed merge-field chips for clarity: "Current Title", "Current Company"
+  (candidate) vs "Hiring Company" (the role's company). Removed the stray
+  `{{recruiter_title}}` token from the built-in template (no data source in the
+  sequence context).
+
+### Fixed
 - **Intake status page progress card now advances.** The hiring-manager status
   page (`/intake/[token]/status`) still keyed its four steps to retired legacy
   `hiring_requests` statuses (`intake_pending`, `jd_generated`, `posted`, …),

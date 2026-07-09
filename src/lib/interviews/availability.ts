@@ -188,7 +188,7 @@ export interface ComputeOpenSlotsOptions {
   durationMinutes: number
   businessDayCount?: number   // default 7
   stepMinutes?: number        // default 30
-  minLeadMinutes?: number     // default 120 (don't offer slots < 2h away)
+  minLeadMinutes?: number     // default 30 (don't offer slots < 30 min away)
   now?: Date
 }
 
@@ -202,12 +202,10 @@ export async function computeOpenSlots(opts: ComputeOpenSlotsOptions): Promise<{
   interviewerCount: number
   /** False when the org has no calendar connected — slots are stated-hours only. */
   calendarChecked: boolean
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  _interviewersUsed?: any
 }> {
   const businessDayCount = opts.businessDayCount ?? 7
   const stepMinutes      = opts.stepMinutes ?? 30
-  const minLeadMinutes   = opts.minLeadMinutes ?? 120
+  const minLeadMinutes   = opts.minLeadMinutes ?? 30
   const nowMs            = (opts.now ?? new Date()).getTime()
 
   const emails = Array.from(new Set(opts.emails.map(e => e.trim().toLowerCase()).filter(Boolean)))
@@ -245,7 +243,5 @@ export async function computeOpenSlots(opts: ComputeOpenSlotsOptions): Promise<{
     businessDayCount,
     interviewerCount: emails.length,
     calendarChecked: calendarConnected,
-    // TEMP diagnostic: the exact windows fed into computeSlots.
-    _interviewersUsed: interviewers.map(i => ({ email: i.email, timezone: i.timezone, windows: i.windows, busyCount: i.busy.length })),
   }
 }
