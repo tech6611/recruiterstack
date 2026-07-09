@@ -194,7 +194,7 @@ export function Sidebar() {
     const active    = isSectionActive(s)
     const hasFlyout = s.items.length > 0
     const isOpen    = openSection === s.section
-    const cls = `flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-colors ${
+    const cls = `flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-base font-semibold transition-colors ${
       active
         ? 'bg-white/10 text-[#fdfbf7]'
         : 'text-[#c8beac] hover:bg-white/5 hover:text-[#fdfbf7]'
@@ -205,7 +205,7 @@ export function Sidebar() {
     const inner = (
       <>
         <span className="relative shrink-0">
-          <Icon className={`h-[18px] w-[18px] ${active ? 'text-[#fdfbf7]' : 'text-[#9a8f7b]'}`} />
+          <Icon className={`h-5 w-5 ${active ? 'text-[#fdfbf7]' : 'text-[#9a8f7b]'}`} />
           {bucketBadge > 0 && !isOpen && (
             <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#221b14]" />
           )}
@@ -294,13 +294,13 @@ export function Sidebar() {
                   <Link
                     key={href}
                     href={href}
-                    className={`flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-base font-semibold transition-colors ${
                       active
                         ? 'bg-white/10 text-[#fdfbf7]'
                         : 'text-[#c8beac] hover:bg-white/5 hover:text-[#fdfbf7]'
                     }`}
                   >
-                    <ItemIcon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-[#fdfbf7]' : 'text-[#9a8f7b]'}`} />
+                    <ItemIcon className={`h-5 w-5 shrink-0 ${active ? 'text-[#fdfbf7]' : 'text-[#9a8f7b]'}`} />
                     <span className="truncate">{label}</span>
                     {badge > 0 && (
                       <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
@@ -320,9 +320,9 @@ export function Sidebar() {
   return (
     <>
       {/* ── Desktop rail (md+) ─────────────────────────────────────────── */}
-      <aside className="relative hidden h-full w-[166px] shrink-0 flex-col border-r border-[#34291e] bg-[#221b14] md:flex">
+      <aside className="relative hidden h-full w-[200px] shrink-0 flex-col border-r border-[#34291e] bg-[#221b14] md:flex">
         {/* Logo + notifications */}
-        <div className="flex h-14 items-center gap-1.5 border-b border-white/10 px-3">
+        <div className="flex h-14 items-center gap-2 border-b border-white/10 px-3">
           <BrandMark />
           <span className="min-w-0 flex-1 truncate font-display text-[13px] font-bold tracking-tight text-[#fdfbf7]">
             Recruiter<span className="font-extrabold">Stack</span>

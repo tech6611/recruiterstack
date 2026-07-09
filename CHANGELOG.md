@@ -12,6 +12,13 @@ entries on top.
 ## 2026-07-09
 
 ### Fixed
+- **Intake status page progress card now advances.** The hiring-manager status
+  page (`/intake/[token]/status`) still keyed its four steps to retired legacy
+  `hiring_requests` statuses (`intake_pending`, `jd_generated`, `posted`, …),
+  which a canonical intake job never has — so no step ever lit up. Re-keyed the
+  steps and the message banners to the canonical job lifecycle
+  (`draft` → `approved` → `open`), so the card correctly shows created →
+  submitted → with-recruiter → posted.
 - **Stale "Claude" labels in the UI now say Gemini.** The JD-generation loader
   ("… is writing the JD…") on both the intake page and the recruiter Jobs page,
   and the "AI Model" card in Settings ("Claude Sonnet 4.6" → "Google Gemini 2.5
@@ -19,6 +26,12 @@ entries on top.
   central `lib/ai/llm.ts` wrapper. Copy only; no behaviour change.
 
 ### Changed
+- **Sidebar widened and nav labels enlarged.** The desktop rail was a fixed
+  166px, which truncated the "RecruiterStack" wordmark once the bell moved into
+  the header. Widened it to 200px so the full logo + bell fit at normal size,
+  and bumped the nav items (Dashboard, Requisitions, …) from 14px medium to
+  16px semibold with 20px icons for stronger primary navigation. Applied to both
+  the desktop rail and the mobile drawer.
 - **Notifications bell moved from the sidebar footer to the top header.** The
   bell (with its unread badge) now sits at the top of the left rail, to the
   right of the RecruiterStack logo, instead of at the bottom next to the org
