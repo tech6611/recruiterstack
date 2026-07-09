@@ -6,6 +6,12 @@ import { getInterviewerPreferences } from '@/modules/ats/domain/interviewer-pref
 import { getCanonicalCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
 import { logger } from '@/lib/logger'
 
+// Availability depends on live interviewer prefs + calendars. Never cache these
+// reads — a stale cache was serving old preferred-hours (e.g. 6 PM after the HM
+// had extended to 11 PM), silently hiding real slots.
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+
 const BUSINESS_DAY_COUNT = 7
 
 // GET /api/schedule/[token] — public, no auth.
