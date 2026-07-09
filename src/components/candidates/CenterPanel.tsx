@@ -7,13 +7,14 @@ import { useCandidateProfile } from './CandidateProfileContext'
 import ActivitiesTab from './center/ActivitiesTab'
 import SummaryTab from './center/SummaryTab'
 import HistoryTab from './center/HistoryTab'
+import InterviewsTab from './center/InterviewsTab'
 
 type ApplicationWithAttribution = Application & {
   pipeline_stages: { name: string; color: string } | null
   hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number'> | null
 }
 
-const CENTER_TABS = ['Summary', 'Activities', 'History'] as const
+const CENTER_TABS = ['Summary', 'Activities', 'Interviews', 'History'] as const
 type CenterTab = typeof CENTER_TABS[number]
 
 interface CenterPanelProps {
@@ -211,6 +212,9 @@ export default React.memo(function CenterPanel({
             candidate={candidate}
             applications={filteredApps}
           />
+        )}
+        {activeTab === 'Interviews' && (
+          <InterviewsTab candidateId={candidate.id} />
         )}
       </div>
     </div>
