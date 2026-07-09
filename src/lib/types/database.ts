@@ -1491,7 +1491,7 @@ export interface MatchInsert extends Omit<Match, 'id' | 'created_at'> {
 }
 
 // Sequence Row types (without optional computed/joined fields)
-type SequenceRow = Omit<Sequence, 'stages' | 'stage_count' | 'enrollment_count' | 'reply_count'>
+type SequenceRow = Omit<Sequence, 'stages' | 'stage_count' | 'enrollment_count' | 'sent_count' | 'open_count' | 'click_count' | 'reply_count'>
 
 export interface SequenceInsert extends Omit<SequenceRow, 'id' | 'created_at' | 'updated_at'> {
   id?: string
@@ -2017,6 +2017,9 @@ export interface Sequence {
   stages?: SequenceStage[]
   stage_count?: number
   enrollment_count?: number
+  sent_count?: number
+  open_count?: number
+  click_count?: number
   reply_count?: number
 }
 

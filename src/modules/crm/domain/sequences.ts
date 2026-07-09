@@ -18,6 +18,9 @@ export interface SequenceSummary {
   updated_at:       string
   stage_count:      number
   enrollment_count: number
+  sent_count:       number
+  open_count:       number
+  click_count:      number
   reply_count:      number
 }
 
@@ -121,19 +124,49 @@ export async function listSequences(
   const { data: enrollments } = ids.length === 0
     ? { data: [] }
     : await (supabase.from('sequence_enrollments') as any)
-        .select('sequence_id, status')
+        .select('id, sequence_id, status')
         .in('sequence_id', ids)
 
-  const byId = new Map<string, { total: number; replied: number }>()
-  for (const e of (enrollments ?? []) as Array<{ sequence_id: string; status: string }>) {
-    const entry = byId.get(e.sequence_id) ?? { total: 0, replied: 0 }
+  const enrollmentRows = (enrollments ?? []) as Array<{ id: string; sequence_id: string; status: string }>
+
+  const byId = new Map<string, { total: number; replied: number; sent: number; opened: number; clicked: number }>()
+  // enrollment_id → sequence_id, so we can attribute each email row (which only
+  // links to an enrollment, not directly to a sequence) back to its sequence.
+  const seqOfEnrollment = new Map<string, string>()
+  for (const e of enrollmentRows) {
+    seqOfEnrollment.set(e.id, e.sequence_id)
+    const entry = byId.get(e.sequence_id) ?? { total: 0, replied: 0, sent: 0, opened: 0, clicked: 0 }
     entry.total++
     if (e.status === 'replied') entry.replied++
     byId.set(e.sequence_id, entry)
   }
 
+  // Roll up the email funnel (sent / opened / clicked) per sequence. Same status
+  // definitions as the per-sequence Analytics tab so the numbers agree: opened
+  // includes clicked+replied, clicked includes replied. Statuses before a real
+  // send (queued/failed/skipped) don't count as sent.
+  const enrollmentIds = enrollmentRows.map(e => e.id)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: emails } = enrollmentIds.length === 0
+    ? { data: [] }
+    : await (supabase.from('sequence_emails') as any)
+        .select('enrollment_id, status')
+        .in('enrollment_id', enrollmentIds)
+
+  const NOT_SENT = ['queued', 'failed', 'skipped']
+  for (const em of (emails ?? []) as Array<{ enrollment_id: string; status: string }>) {
+    const seqId = seqOfEnrollment.get(em.enrollment_id)
+    if (!seqId) continue
+    const entry = byId.get(seqId)
+    if (!entry) continue
+    if (!NOT_SENT.includes(em.status)) entry.sent++
+    if (['opened', 'clicked', 'replied'].includes(em.status)) entry.opened++
+    if (['clicked', 'replied'].includes(em.status)) entry.clicked++
+  }
+
   return rows.map(r => {
     const stageCount = Array.isArray(r.sequence_stages) ? r.sequence_stages.length : 0
+    const agg = byId.get(r.id)
     return {
       id:               r.id,
       org_id:           r.org_id as string,
@@ -144,8 +177,108 @@ export async function listSequences(
       created_at:       r.created_at as string,
       updated_at:       r.updated_at as string,
       stage_count:      stageCount,
-      enrollment_count: byId.get(r.id)?.total   ?? 0,
-      reply_count:      byId.get(r.id)?.replied ?? 0,
+      enrollment_count: agg?.total   ?? 0,
+      sent_count:       agg?.sent    ?? 0,
+      open_count:       agg?.opened  ?? 0,
+      click_count:      agg?.clicked ?? 0,
+      reply_count:      agg?.replied ?? 0,
+    }
+  })
+}
+
+// One row per sequence for the CSV export. Funnel counts are scoped to activity
+// *within a window* (option B): if `since` is set, only enrollments started on/
+// after it and only emails sent on/after it are counted. `since = null` = all-time.
+export interface SequenceExportRow {
+  name:             string
+  status:           string
+  stage_count:      number
+  enrollment_count: number
+  sent_count:       number
+  open_count:       number
+  click_count:      number
+  reply_count:      number
+  reply_rate:       number   // replied ÷ enrolled, whole-number %
+  created_at:       string
+}
+
+export async function listSequencesForExport(
+  supabase: Supabase,
+  orgId: string,
+  since: Date | null,
+): Promise<SequenceExportRow[]> {
+  const sinceIso = since ? since.toISOString() : null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sequences, error } = await (supabase.from('sequences') as any)
+    .select('*, sequence_stages(id)')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+
+  const rows = (sequences ?? []) as Array<{ id: string; sequence_stages?: unknown[] } & Record<string, unknown>>
+  const ids  = rows.map(r => r.id)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: enrollments } = ids.length === 0
+    ? { data: [] }
+    : await (supabase.from('sequence_enrollments') as any)
+        .select('id, sequence_id, status, started_at')
+        .in('sequence_id', ids)
+
+  const enrollmentRows = (enrollments ?? []) as Array<{ id: string; sequence_id: string; status: string; started_at: string | null }>
+
+  // enrollment_id → sequence_id, so windowed email rows can be attributed back
+  // to their sequence (emails only link to an enrollment, not a sequence).
+  const seqOfEnrollment = new Map<string, string>()
+  const byId = new Map<string, { enrolled: number; sent: number; opened: number; clicked: number; replied: number }>()
+  for (const e of enrollmentRows) {
+    seqOfEnrollment.set(e.id, e.sequence_id)
+    const entry = byId.get(e.sequence_id) ?? { enrolled: 0, sent: 0, opened: 0, clicked: 0, replied: 0 }
+    // Enrolled is scoped by when the candidate was enrolled.
+    if (!sinceIso || (e.started_at ?? '') >= sinceIso) entry.enrolled++
+    byId.set(e.sequence_id, entry)
+  }
+
+  const enrollmentIds = enrollmentRows.map(e => e.id)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: emails } = enrollmentIds.length === 0
+    ? { data: [] }
+    : await (supabase.from('sequence_emails') as any)
+        .select('enrollment_id, status, sent_at')
+        .in('enrollment_id', enrollmentIds)
+
+  // Same status definitions as the on-screen row funnel: opened includes
+  // clicked+replied, clicked includes replied, and pre-send statuses don't count
+  // as sent. Each email is scoped by its send time.
+  const NOT_SENT = ['queued', 'failed', 'skipped']
+  for (const em of (emails ?? []) as Array<{ enrollment_id: string; status: string; sent_at: string | null }>) {
+    if (sinceIso && (em.sent_at ?? '') < sinceIso) continue
+    const seqId = seqOfEnrollment.get(em.enrollment_id)
+    if (!seqId) continue
+    const entry = byId.get(seqId)
+    if (!entry) continue
+    if (!NOT_SENT.includes(em.status)) entry.sent++
+    if (['opened', 'clicked', 'replied'].includes(em.status)) entry.opened++
+    if (['clicked', 'replied'].includes(em.status)) entry.clicked++
+    if (em.status === 'replied') entry.replied++
+  }
+
+  return rows.map(r => {
+    const stageCount = Array.isArray(r.sequence_stages) ? r.sequence_stages.length : 0
+    const agg = byId.get(r.id) ?? { enrolled: 0, sent: 0, opened: 0, clicked: 0, replied: 0 }
+    const replyRate = agg.enrolled > 0 ? Math.round((agg.replied / agg.enrolled) * 100) : 0
+    return {
+      name:             r.name as string,
+      status:           r.status as string,
+      stage_count:      stageCount,
+      enrollment_count: agg.enrolled,
+      sent_count:       agg.sent,
+      open_count:       agg.opened,
+      click_count:      agg.clicked,
+      reply_count:      agg.replied,
+      reply_rate:       replyRate,
+      created_at:       r.created_at as string,
     }
   })
 }

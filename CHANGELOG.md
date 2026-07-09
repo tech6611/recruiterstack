@@ -23,6 +23,30 @@ entries on top.
   the interval (e.g. "in about 4 hours"). Back-compat: older queued reminder
   jobs (24h/1h `kind`) still fire.
 
+### Changed
+- **Sequences list: row actions always visible + full funnel per row.** The
+  Clone / Pause / Archive icons no longer hide until hover — they're always shown
+  (their text tooltips still appear only on hover). Each row now shows the full
+  funnel Stages → Enrolled → Sent → Opened → Clicked → Replied (was only Stages /
+  Enrolled / Replied); `listSequences` rolls the email funnel up per sequence via
+  the enrollment→email link, using the same status definitions as the Analytics
+  tab so the numbers agree. The strip is hidden on very small screens to avoid
+  cramping.
+- **Sequences list: bulk select + bulk actions.** Every row now has a checkbox,
+  and each pane header has a select-all checkbox (with an indeterminate state for
+  partial selections). Once anything is selected, a bulk action bar appears with
+  Clone, Activate, Pause and Archive — applied to all selected sequences in
+  parallel, then the list refreshes and the selection clears. (Activate/Pause are
+  two separate buttons rather than one toggle, since a single toggle is ambiguous
+  when the selection mixes active and paused sequences.)
+- **Sequences list: CSV download with time window.** A new "Download" menu in the
+  header exports one row per sequence (Name, Status, Stages, Enrolled, Sent,
+  Opened, Clicked, Replied, Reply rate, Created) as a CSV. The funnel counts are
+  scoped to *activity within the chosen window* — Last 7 / 30 / 90 days or All
+  time — where a candidate counts if enrolled in the window and an email counts
+  if sent in the window (`listSequencesForExport` in the CRM domain, served by
+  `/api/sequences/export?range=`). CSV only for now; PDF may follow.
+
 ### Fixed
 - **Self-schedule availability was serving stale interviewer hours.** The
   candidate self-schedule page read interviewer preferred-hours through Next.js's
