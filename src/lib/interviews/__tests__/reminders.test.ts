@@ -1,61 +1,78 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { scheduleInterviewReminders } from '../reminders'
+import { scheduleInterviewReminders, getOrgReminderLeadMinutes } from '../reminders'
 import { enqueue } from '@/lib/api/job-queue'
 
 vi.mock('@/lib/api/job-queue', () => ({
   enqueue: vi.fn().mockResolvedValue('job-id'),
 }))
 
+// Mutable holder so tests can control what org_settings.reminder_lead_minutes returns.
+const h = vi.hoisted(() => ({ row: null as null | { reminder_lead_minutes: unknown } }))
+vi.mock('@/lib/supabase/server', () => ({
+  createAdminClient: () => ({
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: h.row }) }) }) }),
+  }),
+}))
+
 const mockedEnqueue = vi.mocked(enqueue)
 const HOUR = 60 * 60 * 1000
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function callsFor(kind: '24h' | '1h') {
-  return mockedEnqueue.mock.calls.filter(([opts]) => (opts.payload as any).kind === kind)
-}
+const leadOf = (call: any) => (call[0].payload as any).leadMinutes
+const callsForLead = (mins: number) => mockedEnqueue.mock.calls.filter(c => leadOf(c) === mins)
 
 describe('scheduleInterviewReminders', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { vi.clearAllMocks(); h.row = null /* → default 24h + 1h */ })
 
-  it('schedules both 24h and 1h reminders for a far-future interview', async () => {
+  it('defaults to 24h + 1h reminders for a far-future interview', async () => {
     const scheduledAt = new Date(Date.now() + 48 * HOUR).toISOString()
     await scheduleInterviewReminders({ orgId: 'org-1', interviewId: 'iv-1', scheduledAt })
 
     expect(mockedEnqueue).toHaveBeenCalledTimes(2)
-    expect(callsFor('24h')).toHaveLength(1)
-    expect(callsFor('1h')).toHaveLength(1)
-
+    expect(callsForLead(1440)).toHaveLength(1)  // 24h
+    expect(callsForLead(60)).toHaveLength(1)     // 1h
     for (const [opts] of mockedEnqueue.mock.calls) {
       expect(opts.jobType).toBe('interview_reminder')
-      expect(opts.orgId).toBe('org-1')
       expect(opts.payload).toMatchObject({ interviewId: 'iv-1', targetScheduledAt: scheduledAt })
       expect(opts.delaySeconds).toBeGreaterThan(0)
     }
   })
 
-  it('fires the 24h reminder ~24h before and the 1h reminder ~1h before', async () => {
+  it('fires each reminder its lead-time before the interview', async () => {
     const scheduledAt = new Date(Date.now() + 48 * HOUR).toISOString()
     await scheduleInterviewReminders({ orgId: 'org-1', interviewId: 'iv-1', scheduledAt })
-
-    const delay24 = callsFor('24h')[0][0].delaySeconds!
-    const delay1  = callsFor('1h')[0][0].delaySeconds!
     // 48h out → 24h reminder fires in ~24h, 1h reminder in ~47h
-    expect(Math.round(delay24 / 3600)).toBe(24)
-    expect(Math.round(delay1 / 3600)).toBe(47)
+    expect(Math.round(callsForLead(1440)[0][0].delaySeconds! / 3600)).toBe(24)
+    expect(Math.round(callsForLead(60)[0][0].delaySeconds! / 3600)).toBe(47)
+  })
+
+  it('uses the org-configured intervals when set', async () => {
+    h.row = { reminder_lead_minutes: [4320, 30] }  // 3 days + 30 min
+    const scheduledAt = new Date(Date.now() + 5 * 24 * HOUR).toISOString()
+    await scheduleInterviewReminders({ orgId: 'org-1', interviewId: 'iv-1', scheduledAt })
+    expect(mockedEnqueue).toHaveBeenCalledTimes(2)
+    expect(callsForLead(4320)).toHaveLength(1)
+    expect(callsForLead(30)).toHaveLength(1)
+    expect(callsForLead(1440)).toHaveLength(0)  // default not used
+  })
+
+  it('sends nothing when the org has reminders turned off (empty array)', async () => {
+    h.row = { reminder_lead_minutes: [] }
+    const scheduledAt = new Date(Date.now() + 48 * HOUR).toISOString()
+    await scheduleInterviewReminders({ orgId: 'org-1', interviewId: 'iv-1', scheduledAt })
+    expect(mockedEnqueue).not.toHaveBeenCalled()
   })
 
   it('skips the 24h reminder when the interview is under 24h away', async () => {
     const scheduledAt = new Date(Date.now() + 3 * HOUR).toISOString()
     await scheduleInterviewReminders({ orgId: 'org-1', interviewId: 'iv-1', scheduledAt })
-
-    expect(callsFor('24h')).toHaveLength(0)
-    expect(callsFor('1h')).toHaveLength(1)
+    expect(callsForLead(1440)).toHaveLength(0)
+    expect(callsForLead(60)).toHaveLength(1)
   })
 
-  it('skips both reminders when the interview is under an hour away', async () => {
+  it('skips all reminders when the interview is under an hour away', async () => {
     const scheduledAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
     await scheduleInterviewReminders({ orgId: 'org-1', interviewId: 'iv-1', scheduledAt })
-
     expect(mockedEnqueue).not.toHaveBeenCalled()
   })
 
@@ -77,5 +94,21 @@ describe('scheduleInterviewReminders', () => {
     await scheduleInterviewReminders({ orgId: 'org-1', interviewId: 'iv-1', scheduledAt, timezone: 'Asia/Kolkata' })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((mockedEnqueue.mock.calls[0][0].payload as any).timezone).toBe('Asia/Kolkata')
+  })
+})
+
+describe('getOrgReminderLeadMinutes', () => {
+  beforeEach(() => { h.row = null })
+
+  it('returns the default when unset', async () => {
+    expect(await getOrgReminderLeadMinutes('org-1')).toEqual([1440, 60])
+  })
+  it('returns stored positive intervals, filtering junk', async () => {
+    h.row = { reminder_lead_minutes: [4320, 0, -5, 60] }
+    expect(await getOrgReminderLeadMinutes('org-1')).toEqual([4320, 60])
+  })
+  it('returns empty (off) when explicitly empty', async () => {
+    h.row = { reminder_lead_minutes: [] }
+    expect(await getOrgReminderLeadMinutes('org-1')).toEqual([])
   })
 })

@@ -11,6 +11,18 @@ entries on top.
 
 ## 2026-07-09
 
+### Added
+- **Configurable interview reminder intervals (migration 082).** Recruiters can
+  now set which reminders go out (e.g. 1 week / 24h / 4h / 1h / 30 min before)
+  in Settings → General → "Interview reminders"; empty = off. Default stays
+  24h + 1h. Stored on `org_settings.reminder_lead_minutes`, read by the reminder
+  scheduler (`lib/interviews/reminders.ts`), saved via a new `/api/scheduling-settings`
+  endpoint (kept out of the Django-proxied org-settings). The Schedule Interview
+  modal now shows a "reminders are sent automatically — configure intervals"
+  note linking to that setting. Reminder emails/Slack phrase the lead time from
+  the interval (e.g. "in about 4 hours"). Back-compat: older queued reminder
+  jobs (24h/1h `kind`) still fire.
+
 ### Fixed
 - **Self-schedule availability was serving stale interviewer hours.** The
   candidate self-schedule page read interviewer preferred-hours through Next.js's
