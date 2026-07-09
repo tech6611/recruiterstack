@@ -202,6 +202,8 @@ export async function computeOpenSlots(opts: ComputeOpenSlotsOptions): Promise<{
   interviewerCount: number
   /** False when the org has no calendar connected — slots are stated-hours only. */
   calendarChecked: boolean
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _interviewersUsed?: any
 }> {
   const businessDayCount = opts.businessDayCount ?? 7
   const stepMinutes      = opts.stepMinutes ?? 30
