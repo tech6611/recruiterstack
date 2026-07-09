@@ -73,7 +73,7 @@ function resourceHref(type: string | null, id: string | null): string | null {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function NotificationBell({ collapsed }: { collapsed?: boolean }) {
+export function NotificationBell({ align = 'bottom' }: { align?: 'top' | 'bottom' }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -199,7 +199,7 @@ export function NotificationBell({ collapsed }: { collapsed?: boolean }) {
       {open && (
         <div
           className={`absolute z-50 w-80 rounded-xl border border-slate-200 bg-white shadow-lg ${
-            collapsed ? 'bottom-0 left-10' : 'bottom-0 left-10'
+            align === 'top' ? 'left-0 top-full mt-2' : 'bottom-0 left-10'
           }`}
           style={{ maxHeight: '28rem' }}
         >

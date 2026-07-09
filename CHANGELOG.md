@@ -11,7 +11,20 @@ entries on top.
 
 ## 2026-07-09
 
+### Fixed
+- **Stale "Claude" labels in the UI now say Gemini.** The JD-generation loader
+  ("… is writing the JD…") on both the intake page and the recruiter Jobs page,
+  and the "AI Model" card in Settings ("Claude Sonnet 4.6" → "Google Gemini 2.5
+  Pro"), were leftover labels — generation already runs on Gemini via the
+  central `lib/ai/llm.ts` wrapper. Copy only; no behaviour change.
+
 ### Changed
+- **Notifications bell moved from the sidebar footer to the top header.** The
+  bell (with its unread badge) now sits at the top of the left rail, to the
+  right of the RecruiterStack logo, instead of at the bottom next to the org
+  name. Its dropdown opens downward via a new `align="top"` prop on
+  `NotificationBell`; header spacing tightened so the logo + bell fit the narrow
+  rail. Applied to both the desktop rail and the mobile drawer.
 - **Intake form text boxes are now the same rich-text editor used elsewhere in
   the app.** The hiring-manager intake page (`/intake/[token]`) replaces its
   plain `<textarea>` fields — Team Context, Key Requirements, Nice to Have,

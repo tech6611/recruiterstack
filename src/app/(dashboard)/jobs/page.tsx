@@ -705,7 +705,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
                 {jdMode !== null && (
                   generatingJD ? (
                     <div className="flex items-center justify-center gap-3 rounded-xl border border-slate-100 bg-slate-50 py-10 text-sm text-slate-600">
-                      <Loader2 className="h-5 w-5 animate-spin" />Claude is writing the JD…
+                      <Loader2 className="h-5 w-5 animate-spin" />Gemini is writing the JD…
                     </div>
                   ) : (
                     <div>

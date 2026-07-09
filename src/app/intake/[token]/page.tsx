@@ -655,7 +655,7 @@ export default function IntakePage() {
             {jdMode !== null && (
               generatingJD ? (
                 <div className="flex items-center justify-center gap-3 rounded-xl border border-violet-100 bg-violet-50 py-12 text-sm text-violet-600">
-                  <Loader2 className="h-5 w-5 animate-spin" />Claude is writing the JD…
+                  <Loader2 className="h-5 w-5 animate-spin" />Gemini is writing the JD…
                 </div>
               ) : (
                 <div>

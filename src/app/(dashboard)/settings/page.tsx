@@ -599,7 +599,7 @@ export default function SettingsPage() {
                     <Sparkles className="h-4 w-4 text-slate-500" />
                     <p className="text-xs font-semibold text-slate-600">AI Model</p>
                   </div>
-                  <p className="text-sm font-medium text-slate-800">Claude Sonnet 4.6</p>
+                  <p className="text-sm font-medium text-slate-800">Google Gemini 2.5 Pro</p>
                   <p className="text-xs text-slate-400">Used for matching, resume parsing, and email drafts</p>
                 </div>
 

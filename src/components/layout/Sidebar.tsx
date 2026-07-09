@@ -321,12 +321,15 @@ export function Sidebar() {
     <>
       {/* ── Desktop rail (md+) ─────────────────────────────────────────── */}
       <aside className="relative hidden h-full w-[166px] shrink-0 flex-col border-r border-[#34291e] bg-[#221b14] md:flex">
-        {/* Logo */}
-        <div className="flex h-14 items-center gap-2 border-b border-white/10 px-3">
+        {/* Logo + notifications */}
+        <div className="flex h-14 items-center gap-1.5 border-b border-white/10 px-3">
           <BrandMark />
-          <span className="truncate font-display text-sm font-bold tracking-tight text-[#fdfbf7]">
+          <span className="min-w-0 flex-1 truncate font-display text-[13px] font-bold tracking-tight text-[#fdfbf7]">
             Recruiter<span className="font-extrabold">Stack</span>
           </span>
+          <div className="shrink-0">
+            <NotificationBell align="top" />
+          </div>
         </div>
 
         {/* Buckets. overflow-visible is required so flyouts (absolutely
@@ -345,7 +348,6 @@ export function Sidebar() {
                 {organization?.name ?? 'RecruiterStack'}
               </p>
             </div>
-            <NotificationBell />
           </div>
         </div>
       </aside>
@@ -375,14 +377,17 @@ export function Sidebar() {
                   Recruiter<span className="font-extrabold">Stack</span>
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setMobileOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#c8beac] hover:bg-white/10 hover:text-[#fdfbf7]"
-                aria-label="Close navigation"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <NotificationBell align="top" />
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[#c8beac] hover:bg-white/10 hover:text-[#fdfbf7]"
+                  aria-label="Close navigation"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <MobileDrawerBody />
             <div className="border-t border-white/10 px-4 py-3">
@@ -393,7 +398,6 @@ export function Sidebar() {
                     {organization?.name ?? 'RecruiterStack'}
                   </p>
                 </div>
-                <NotificationBell />
               </div>
             </div>
           </aside>
