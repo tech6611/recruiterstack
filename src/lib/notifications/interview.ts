@@ -278,3 +278,260 @@ export async function notifyInterviewScheduled(
     console.error('[interview-notify] unexpected error:', e)
   }
 }
+
+// ── Cancellation notifications ────────────────────────────────────────────────
+
+export interface InterviewCancelPayload {
+  orgId:            string
+  candidateName:    string
+  candidateEmail:   string
+  interviewerName:  string
+  interviewerEmail: string | null
+  positionTitle:    string
+  scheduledAt:      string         // ISO UTC of the interview that was cancelled
+  timezone:         string | null  // IANA tz for display, if known
+  recruiterName?:   string
+  recruiterEmail?:  string
+}
+
+async function sendCancelEmails(p: InterviewCancelPayload): Promise<void> {
+  const apiKey    = process.env.SENDGRID_API_KEY
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL
+  if (!apiKey || !fromEmail) return
+
+  sgMail.setApiKey(apiKey)
+
+  const dateStr        = formatDateTime(p.scheduledAt, p.timezone)
+  const recruiterName  = p.recruiterName || 'RecruiterStack'
+  const replyTo        = p.recruiterEmail || fromEmail
+  const fromField      = { email: fromEmail, name: recruiterName }
+
+  const sends: Promise<unknown>[] = []
+
+  // Candidate
+  if (p.candidateEmail) {
+    const text = [
+      `Hi ${p.candidateName},`,
+      '',
+      `Your interview for the ${p.positionTitle} role, previously scheduled for ${dateStr}, has been cancelled.`,
+      '',
+      `We'll be in touch with next steps. If you have any questions, just reply to this email.`,
+      '',
+      `Best,`,
+      recruiterName,
+    ].join('\n')
+    const html = `
+      <p>Hi ${p.candidateName},</p>
+      <p>Your interview for the <strong>${p.positionTitle}</strong> role, previously scheduled for <strong>${dateStr}</strong>, has been <strong>cancelled</strong>.</p>
+      <p>We'll be in touch with next steps. If you have any questions, just reply to this email.</p>
+      <p>Best,<br>${recruiterName}</p>
+    `.trim()
+    sends.push(
+      sgMail.send({
+        to: p.candidateEmail, from: fromField, replyTo,
+        subject: `Interview Cancelled — ${p.positionTitle}`,
+        text, html,
+      }).catch(e => console.error('[interview-notify] candidate cancel email failed:', e)),
+    )
+  }
+
+  // Interviewer
+  if (p.interviewerEmail) {
+    const text = [
+      `Hi ${p.interviewerName},`,
+      '',
+      `The interview with ${p.candidateName} for the ${p.positionTitle} role, scheduled for ${dateStr}, has been cancelled.`,
+      '',
+      `The calendar invite has been removed. No action is needed on your end.`,
+      '',
+      `— ${recruiterName} via RecruiterStack`,
+    ].join('\n')
+    const html = `
+      <p>Hi ${p.interviewerName},</p>
+      <p>The interview with <strong>${p.candidateName}</strong> for the <strong>${p.positionTitle}</strong> role, scheduled for <strong>${dateStr}</strong>, has been <strong>cancelled</strong>.</p>
+      <p>The calendar invite has been removed. No action is needed on your end.</p>
+      <p>— ${recruiterName} via RecruiterStack</p>
+    `.trim()
+    sends.push(
+      sgMail.send({
+        to: p.interviewerEmail, from: fromField, replyTo,
+        subject: `Interview Cancelled: ${p.candidateName} for ${p.positionTitle}`,
+        text, html,
+      }).catch(e => console.error('[interview-notify] interviewer cancel email failed:', e)),
+    )
+  }
+
+  await Promise.allSettled(sends)
+}
+
+async function sendCancelSlack(p: InterviewCancelPayload): Promise<void> {
+  const dateStr = formatDateTime(p.scheduledAt)
+
+  const channelText = [
+    `❌ *Interview Cancelled* — ${p.positionTitle}`,
+    `👤 Candidate: ${p.candidateName}`,
+    `🎤 Interviewer: ${p.interviewerName}`,
+    `🕒 was ${dateStr}`,
+  ].join('\n')
+  await notifySlack(p.orgId, channelText)
+
+  if (p.interviewerEmail) {
+    const dmText = [
+      `❌ Interview cancelled: *${p.candidateName}* for *${p.positionTitle}*`,
+      `🕒 was ${dateStr} — the calendar invite has been removed.`,
+    ].join('\n')
+    await notifySlackDM(p.orgId, p.interviewerEmail, dmText)
+  }
+}
+
+/**
+ * Dispatches interview-cancellation notifications (emails + Slack) concurrently.
+ * Never throws — swallows all errors so the caller's main flow isn't broken.
+ */
+export async function notifyInterviewCancelled(p: InterviewCancelPayload): Promise<void> {
+  try {
+    await Promise.allSettled([sendCancelEmails(p), sendCancelSlack(p)])
+  } catch (e) {
+    console.error('[interview-notify] unexpected cancel error:', e)
+  }
+}
+
+// ── Reminder notifications ────────────────────────────────────────────────────
+
+export type ReminderKind = '24h' | '1h'
+
+export interface InterviewReminderPayload {
+  orgId:            string
+  candidateName:    string
+  candidateEmail:   string
+  interviewerName:  string
+  interviewerEmail: string | null
+  positionTitle:    string
+  scheduledAt:      string          // ISO UTC
+  durationMinutes:  number
+  timezone:         string | null
+  interviewType:    string
+  location:         string | null   // Zoom/Meet URL or office address
+  meetLink:         string | null
+  kind:             ReminderKind
+}
+
+function leadPhrase(kind: ReminderKind): string {
+  return kind === '24h' ? 'in about 24 hours' : 'in about an hour'
+}
+
+async function sendReminderEmails(p: InterviewReminderPayload): Promise<void> {
+  const apiKey    = process.env.SENDGRID_API_KEY
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL
+  if (!apiKey || !fromEmail) return
+
+  sgMail.setApiKey(apiKey)
+
+  const dateStr   = formatDateTime(p.scheduledAt, p.timezone)
+  const link      = p.meetLink ?? p.location
+  const lead      = leadPhrase(p.kind)
+  const fromField = { email: fromEmail, name: 'RecruiterStack' }
+  const typeLabel = {
+    video:      'Video Call',
+    phone:      'Phone Call',
+    in_person:  'In-Person',
+    panel:      'Panel Interview',
+    technical:  'Technical Interview',
+    assessment: 'Assessment',
+  }[p.interviewType] ?? 'Interview'
+
+  const sends: Promise<unknown>[] = []
+
+  // Candidate
+  if (p.candidateEmail) {
+    const text = [
+      `Hi ${p.candidateName},`,
+      '',
+      `A reminder that your interview for the ${p.positionTitle} role is ${lead}.`,
+      '',
+      `Date & Time: ${dateStr}`,
+      `Format:      ${typeLabel}`,
+      `Interviewer: ${p.interviewerName}`,
+      link ? `\nJoin: ${link}` : '',
+      '',
+      `Good luck! If you need to reschedule, please reply to this email.`,
+    ].filter(Boolean).join('\n')
+    const html = `
+      <p>Hi ${p.candidateName},</p>
+      <p>A reminder that your interview for the <strong>${p.positionTitle}</strong> role is <strong>${lead}</strong>.</p>
+      <p>
+        <strong>Date &amp; Time:</strong> ${dateStr}<br>
+        <strong>Format:</strong> ${typeLabel}<br>
+        <strong>Interviewer:</strong> ${p.interviewerName}
+      </p>
+      ${link ? `<p><a href="${link}">Join your interview →</a></p>` : ''}
+      <p>Good luck! If you need to reschedule, please reply to this email.</p>
+    `.trim()
+    sends.push(
+      sgMail.send({
+        to: p.candidateEmail, from: fromField, replyTo: fromEmail,
+        subject: `Reminder: your interview is ${lead} — ${p.positionTitle}`,
+        text, html,
+      }).catch(e => console.error('[interview-notify] candidate reminder email failed:', e)),
+    )
+  }
+
+  // Interviewer
+  if (p.interviewerEmail) {
+    const text = [
+      `Hi ${p.interviewerName},`,
+      '',
+      `A reminder that your interview with ${p.candidateName} for the ${p.positionTitle} role is ${lead}.`,
+      '',
+      `Date & Time: ${dateStr}`,
+      `Candidate:   ${p.candidateName} <${p.candidateEmail}>`,
+      link ? `\nJoin: ${link}` : '',
+      '',
+      `— RecruiterStack`,
+    ].filter(Boolean).join('\n')
+    const html = `
+      <p>Hi ${p.interviewerName},</p>
+      <p>A reminder that your interview with <strong>${p.candidateName}</strong> for the <strong>${p.positionTitle}</strong> role is <strong>${lead}</strong>.</p>
+      <p>
+        <strong>Date &amp; Time:</strong> ${dateStr}<br>
+        <strong>Candidate:</strong> ${p.candidateName} &lt;${p.candidateEmail}&gt;
+      </p>
+      ${link ? `<p><strong>Join:</strong> <a href="${link}">${link}</a></p>` : ''}
+      <p>— RecruiterStack</p>
+    `.trim()
+    sends.push(
+      sgMail.send({
+        to: p.interviewerEmail, from: fromField, replyTo: fromEmail,
+        subject: `Reminder: interview with ${p.candidateName} is ${lead}`,
+        text, html,
+      }).catch(e => console.error('[interview-notify] interviewer reminder email failed:', e)),
+    )
+  }
+
+  await Promise.allSettled(sends)
+}
+
+async function sendReminderSlack(p: InterviewReminderPayload): Promise<void> {
+  if (!p.interviewerEmail) return
+  const dateStr = formatDateTime(p.scheduledAt)
+  const link    = p.meetLink ?? p.location
+  const dmText = [
+    `⏰ Reminder: interview with *${p.candidateName}* for *${p.positionTitle}* is ${leadPhrase(p.kind)}`,
+    `🕒 ${dateStr} (${p.durationMinutes} min)`,
+    link ? `🔗 Join: ${link}` : '',
+  ].filter(Boolean).join('\n')
+  await notifySlackDM(p.orgId, p.interviewerEmail, dmText)
+}
+
+/**
+ * Dispatches an interview reminder (emails + interviewer Slack DM).
+ * Never throws — the queue handler relies on this so a partial send failure
+ * doesn't retry the job and double-send the other half.
+ */
+export async function notifyInterviewReminder(p: InterviewReminderPayload): Promise<void> {
+  try {
+    await Promise.allSettled([sendReminderEmails(p), sendReminderSlack(p)])
+  } catch (e) {
+    console.error('[interview-notify] unexpected reminder error:', e)
+  }
+}

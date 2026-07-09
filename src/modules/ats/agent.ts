@@ -88,7 +88,7 @@ PRECONDITIONS & DEPENDENCIES:
 - Candidate: needs only a name. No dependencies.
 - Job & pipeline: a real job follows from an approved requisition; needs a position title. Don't invent extra required fields, and don't ask for an approver — approval routing is automatic.
 - Add to pipeline / score / outreach: require an existing job/application — look it up or create the job first.
-- Schedule interview: requires an existing application and an interviewer; the candidate must already be in a pipeline.
+- Schedule interview: requires an existing application and an interviewer; the candidate must already be in a pipeline. For candidate self-scheduling to reflect real availability, the interviewer should have set their preferred hours — you can send them a no-login link with create_interviewer_availability_link (optionally emailing it) before creating the self-schedule invite.
 - Offer: requires an existing application (candidate + job) — look these up rather than asking.
 
 CAPABILITIES:

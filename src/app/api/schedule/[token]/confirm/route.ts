@@ -4,6 +4,9 @@ import { getValidAccessToken as getGoogleToken, createMeetEvent } from '@/lib/go
 import { getValidAccessToken as getMSToken, createTeamsMeeting } from '@/lib/microsoft/calendar'
 import { getValidAccessToken as getZoomToken, createZoomMeeting } from '@/lib/zoom/meetings'
 import { decryptSafe, encrypt } from '@/lib/crypto'
+import { cancelCalendarEvent } from '@/lib/integrations/cancel-event'
+import { scheduleInterviewReminders } from '@/lib/interviews/reminders'
+import { emitWebhook } from '@/lib/webhooks/emit'
 import { logger } from '@/lib/logger'
 import type { OrgSettingsUpdate, InterviewUpdate, ApplicationEventInsert } from '@/lib/types/database'
 
@@ -77,44 +80,23 @@ export async function POST(
     .eq('org_id', orgId)
     .single() as { data: any; error: any }
 
-  let meetLink:         string | null = null
-  // calendarEventId stored on calendar events directly — not needed in this scope
-  let resolvedPlatform: string | null = interview.meeting_platform ?? null
+  let meetLink:           string | null = null
+  let newCalendarEventId: string | null = null
+  let resolvedPlatform:   string | null = interview.meeting_platform ?? null
 
-  // Cancel old calendar event if rescheduling
+  // Cancel old calendar event if rescheduling. Uses the shared host-resolver
+  // helper, so it removes Google/Teams/Zoom events on whichever calendar the
+  // event actually lives on (per-user host, or the legacy org account).
   if (reschedule && interview.calendar_event_id && interview.meeting_platform) {
-    try {
-      if (interview.meeting_platform === 'google_meet') {
-        const gAccess  = decryptSafe(settings?.google_oauth_access_token)
-        const gRefresh = decryptSafe(settings?.google_oauth_refresh_token)
-        if (gAccess && gRefresh) {
-          const { access_token } = await getGoogleToken({
-            access_token: gAccess, refresh_token: gRefresh,
-            token_expiry: settings?.google_oauth_token_expiry ?? null,
-          })
-          await fetch(
-            `https://www.googleapis.com/calendar/v3/calendars/primary/events/${interview.calendar_event_id}?sendUpdates=all`,
-            { method: 'DELETE', headers: { Authorization: `Bearer ${access_token}` } }
-          )
-        }
-      } else if (interview.meeting_platform === 'ms_teams') {
-        const mAccess  = decryptSafe(settings?.ms_access_token)
-        const mRefresh = decryptSafe(settings?.ms_refresh_token)
-        if (mAccess && mRefresh) {
-          const { access_token } = await getMSToken({
-            access_token: mAccess, refresh_token: mRefresh,
-            token_expiry: settings?.ms_token_expiry ?? null,
-          })
-          await fetch(
-            `https://graph.microsoft.com/v1.0/me/events/${interview.calendar_event_id}`,
-            { method: 'DELETE', headers: { Authorization: `Bearer ${access_token}` } }
-          )
-        }
-      }
-    } catch (e) {
-      logger.error('[schedule/confirm] Failed to cancel old event', e)
-      // Non-fatal — continue creating new event
-    }
+    const oldPanelEmails = panelEmails.length
+      ? panelEmails
+      : (interview.interviewer_email ? [interview.interviewer_email] : [])
+    await cancelCalendarEvent({
+      meetingPlatform: interview.meeting_platform,
+      calendarEventId: interview.calendar_event_id,
+      panelEmails:     oldPanelEmails,
+      orgId,
+    })
   }
 
   // Create new calendar event
@@ -143,7 +125,7 @@ export async function POST(
           attendees:        attendeeEmails,
           timezone,
         })
-        void created.event_id
+        newCalendarEventId = created.event_id
         meetLink         = created.teams_link
         resolvedPlatform = 'ms_teams'
       } catch (e) { logger.error('[schedule/confirm] Teams creation failed', e) }
@@ -171,7 +153,7 @@ export async function POST(
           duration:   interview.duration_minutes ?? 60,
           timezone,
         })
-        void created.meeting_id
+        newCalendarEventId = created.meeting_id
         meetLink         = created.join_url
         resolvedPlatform = 'zoom'
       } catch (e) { logger.error('[schedule/confirm] Zoom creation failed', e) }
@@ -202,21 +184,25 @@ export async function POST(
           attendees:        attendeeEmails,
           timezone,
         })
-        void created.calendar_event_id
+        newCalendarEventId = created.calendar_event_id
         meetLink         = created.meet_link
         resolvedPlatform = 'google_meet'
       } catch (e) { logger.error('[schedule/confirm] Google Meet creation failed', e) }
     }
   }
 
-  // Update interview row
+  // Update interview row. Persist the NEW calendar event id + platform so a
+  // later cancel/reschedule targets the current event, not the one we just
+  // deleted above.
   const { error: updateError } = await supabase
     .from('interviews')
     .update({
       scheduled_at,
-      status:           'scheduled',
-      location:         meetLink ?? interview.location,
-      updated_at:       new Date().toISOString(),
+      status:            'scheduled',
+      location:          meetLink ?? interview.location,
+      calendar_event_id: newCalendarEventId ?? interview.calendar_event_id,
+      meeting_platform:  resolvedPlatform ?? interview.meeting_platform,
+      updated_at:        new Date().toISOString(),
     } as InterviewUpdate)
     .eq('self_schedule_token', token)
 
@@ -224,6 +210,25 @@ export async function POST(
     logger.error('[schedule/confirm] DB update failed', updateError)
     return NextResponse.json({ error: 'Failed to save your booking. Please try again.' }, { status: 500 })
   }
+
+  // Schedule (or re-schedule) 24h + 1h reminders for the chosen time. Stale
+  // reminders from a previous time are dropped by the handler's freshness check.
+  await scheduleInterviewReminders({
+    orgId,
+    interviewId: interview.id,
+    scheduledAt: scheduled_at,
+    timezone,
+  })
+
+  emitWebhook(orgId, reschedule ? 'interview.rescheduled' : 'interview.scheduled', {
+    interview_id:      interview.id,
+    application_id:    interview.application_id,
+    candidate_id:      interview.candidate_id,
+    hiring_request_id: interview.hiring_request_id,
+    scheduled_at,
+    meeting_platform:  resolvedPlatform,
+    self_scheduled:    true,
+  }).catch(e => logger.error('[schedule/confirm] webhook emit failed', e))
 
   // Log application event
   await supabase.from('application_events').insert({

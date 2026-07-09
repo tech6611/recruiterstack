@@ -21,12 +21,16 @@ const isPublic = createRouteMatcher([
   '/apply/(.*)',
   '/intake/(.*)',
   '/careers/(.*)',
+  '/schedule/(.*)',
+  '/interviewer/(.*)',
   // Public APIs
   '/api/leads',
   // NB: no trailing slash before (.*) — must match the bare `/api/apply`
   // (job load + submission), not just `/api/apply/upload`.
   '/api/apply(.*)',
   '/api/intake(.*)',
+  '/api/schedule(.*)',
+  '/api/interviewer(.*)',
   '/api/parse-document(.*)',
   '/api/resume/parse(.*)',
 ])

@@ -29,6 +29,9 @@ export type WebhookEvent =
   | 'approval.step.pending'
   | 'approval.step.decided'
   | 'approval.completed'
+  | 'interview.scheduled'
+  | 'interview.rescheduled'
+  | 'interview.cancelled'
 
 export async function emitWebhook(
   orgId:   string,

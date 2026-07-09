@@ -23,6 +23,7 @@ export type JobType =
   | 'approval_sla_check'
   | 'webhook_delivery'
   | 'whatsapp_inbound'
+  | 'interview_reminder'
 
 export interface EnqueueOptions {
   orgId: string

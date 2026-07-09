@@ -6,6 +6,8 @@ import { createZoomMeeting } from '@/lib/zoom/meetings'
 import { createTeamsMeeting } from '@/lib/microsoft/calendar'
 import { resolveHost, HostTokenUnavailableError, type ResolvableProvider } from '@/lib/integrations/host-resolver'
 import { notifyInterviewScheduled } from '@/lib/notifications/interview'
+import { scheduleInterviewReminders } from '@/lib/interviews/reminders'
+import { emitWebhook } from '@/lib/webhooks/emit'
 import { logger } from '@/lib/logger'
 import { getCanonicalCandidateJobContext } from '@/modules/ats/domain/job-pipelines'
 import type { InterviewInsert, ApplicationEventInsert } from '@/lib/types/database'
@@ -239,6 +241,29 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
       logger.error('[interviews] notification dispatch failed', e)
     }
   })()
+
+  // ── Schedule 24h + 1h reminders + emit webhook ───────────────────────────
+  // Only for a real confirmed time. A self-schedule link has no time yet — its
+  // reminders/webhook fire when the candidate books (in /schedule/[token]/confirm).
+  if (!generate_self_schedule) {
+    await scheduleInterviewReminders({
+      orgId,
+      interviewId: String(interviewData.id),
+      scheduledAt: scheduled_at,
+      timezone:    timezone ?? null,
+    })
+
+    emitWebhook(orgId, 'interview.scheduled', {
+      interview_id:      interviewData.id,
+      application_id,
+      candidate_id,
+      hiring_request_id,
+      scheduled_at,
+      interview_type:    interview_type ?? 'video',
+      duration_minutes:  duration_minutes ?? 60,
+      meeting_platform:  resolvedPlatform,
+    }).catch(e => logger.error('[interviews] webhook emit failed', e))
+  }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
   const selfScheduleLink = self_schedule_token ? `${appUrl}/schedule/${self_schedule_token}` : null
