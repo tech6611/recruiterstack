@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Loader2, CheckCircle, AlertCircle, Sparkles, Wand2, PenLine,
-  RefreshCw, Paperclip, X,
+  RefreshCw, Paperclip, X, Pencil,
 } from 'lucide-react'
 import { inputClsWhite } from '@/lib/ui/styles'
 import { trackEvent } from '@/lib/analytics'
@@ -33,6 +33,22 @@ const CITIES = [
   'Hong Kong', 'Tokyo, Japan', 'São Paulo, Brazil',
 ]
 
+interface IntakePrefill {
+  level: string | null
+  employment_type: string | null
+  headcount: number | null
+  location: string | null
+  work_model: string | null
+  budget_min: string | null
+  budget_max: string | null
+  target_start_date: string | null
+  team_context: string | null
+  key_requirements: string | null
+  nice_to_haves: string | null
+  target_companies: string | null
+  additional_notes: string | null
+}
+
 interface RequestInfo {
   id: string
   ticket_number: string | null
@@ -43,6 +59,7 @@ interface RequestInfo {
   intake_submitted_at: string | null
   jd_sent_at: string | null
   created_at: string
+  prefill?: IntakePrefill
 }
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
@@ -138,6 +155,10 @@ export default function IntakePage() {
   const [location, setLocation] = useState('')
   const [companies, setCompanies] = useState<string[]>([])
 
+  // Fields that arrived pre-filled from the requisition — used to show the
+  // "pre-filled, editable" pencil marker next to their labels.
+  const [prefilledFields, setPrefilledFields] = useState<Set<string>>(new Set())
+
   // JD state
   const [jd, setJd] = useState('')
   const [jdMode, setJdMode] = useState<'ai' | 'manual' | null>(null)
@@ -154,6 +175,42 @@ export default function IntakePage() {
   const [submitted, setSubmitted] = useState(false)
   const [statusUrl, setStatusUrl] = useState<string | null>(null)
 
+  // Seed the form with whatever the recruiter/requisition already provided, and
+  // remember which fields were pre-filled so we can flag them as editable.
+  const applyPrefill = (pf?: IntakePrefill) => {
+    if (!pf) return
+    const filled = new Set<string>()
+    const mark = (key: string, v: unknown) => {
+      if (v !== null && v !== undefined && v !== '') filled.add(key)
+    }
+    setForm(f => ({
+      ...f,
+      level:             pf.level ?? f.level,
+      employment_type:   pf.employment_type ?? f.employment_type,
+      headcount:         pf.headcount ?? f.headcount,
+      work_model:        pf.work_model ?? f.work_model,
+      team_context:      pf.team_context ?? f.team_context,
+      key_requirements:  pf.key_requirements ?? f.key_requirements,
+      nice_to_haves:     pf.nice_to_haves ?? f.nice_to_haves,
+      budget_min:        pf.budget_min ?? f.budget_min,
+      budget_max:        pf.budget_max ?? f.budget_max,
+      target_start_date: pf.target_start_date ?? f.target_start_date,
+      additional_notes:  pf.additional_notes ?? f.additional_notes,
+    }))
+    if (pf.location) setLocation(pf.location)
+    if (pf.target_companies) {
+      setCompanies(pf.target_companies.split(',').map(s => s.trim()).filter(Boolean))
+    }
+    mark('level', pf.level); mark('employment_type', pf.employment_type)
+    mark('headcount', pf.headcount); mark('location', pf.location)
+    mark('work_model', pf.work_model); mark('budget_min', pf.budget_min)
+    mark('budget_max', pf.budget_max); mark('target_start_date', pf.target_start_date)
+    mark('team_context', pf.team_context); mark('key_requirements', pf.key_requirements)
+    mark('nice_to_haves', pf.nice_to_haves); mark('target_companies', pf.target_companies)
+    mark('additional_notes', pf.additional_notes)
+    setPrefilledFields(filled)
+  }
+
   useEffect(() => {
     fetch(`/api/intake/${token}`)
       .then(r => r.json())
@@ -161,11 +218,13 @@ export default function IntakePage() {
         if (d.error) setLoadError(d.error)
         else {
           setRequestInfo(d.data); setPositionTitle(d.data.position_title)
+          applyPrefill(d.data.prefill as IntakePrefill | undefined)
           trackEvent('intake_page_viewed', { position_title: d.data.position_title })
         }
         setLoading(false)
       })
       .catch(() => { setLoadError('Failed to load form.'); setLoading(false) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
   const set = (key: keyof typeof form, value: string | number | boolean) =>
@@ -281,6 +340,18 @@ export default function IntakePage() {
   }
 
   const wordCount = jd.trim() ? jd.trim().split(/\s+/).length : 0
+
+  // Small "pre-filled, editable" marker shown next to fields we seeded from the
+  // requisition. It's a hint, not a control — the field itself stays editable.
+  const Prefilled = ({ field }: { field: string }) =>
+    prefilledFields.has(field) ? (
+      <span
+        title="Pre-filled from the requisition — edit if needed"
+        className="inline-flex items-center gap-0.5 ml-1.5 align-middle text-[11px] font-medium text-emerald-600"
+      >
+        <Pencil className="h-3 w-3" />
+      </span>
+    ) : null
 
   // ────────────────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -402,29 +473,29 @@ export default function IntakePage() {
             <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Role Details</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>Level / Seniority <span className="text-red-500">*</span></label>
+                <label className={labelCls}>Level / Seniority <span className="text-red-500">*</span><Prefilled field="level" /></label>
                 <select value={form.level} onChange={e => set('level', e.target.value)} className={inputCls}>
                   <option value="">Select level…</option>
                   {LEVEL_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
               </div>
               <div>
-                <label className={labelCls}>Employment Type <span className="text-red-500">*</span></label>
+                <label className={labelCls}>Employment Type <span className="text-red-500">*</span><Prefilled field="employment_type" /></label>
                 <select value={form.employment_type} onChange={e => set('employment_type', e.target.value)} className={inputCls}>
                   <option value="">Select type…</option>
                   {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
-                <label className={labelCls}>Number of Openings</label>
+                <label className={labelCls}>Number of Openings<Prefilled field="headcount" /></label>
                 <input type="number" min={1} max={50} value={form.headcount} onChange={e => set('headcount', e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Location <span className="text-red-500">*</span></label>
+                <label className={labelCls}>Location <span className="text-red-500">*</span><Prefilled field="location" /></label>
                 <LocationInput value={location} onChange={setLocation} />
               </div>
               <div>
-                <label className={labelCls}>Work model <span className="text-red-500">*</span></label>
+                <label className={labelCls}>Work model <span className="text-red-500">*</span><Prefilled field="work_model" /></label>
                 <select value={form.work_model} onChange={e => set('work_model', e.target.value)} className={inputCls}>
                   <option value="">Select…</option>
                   {WORK_MODELS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
@@ -437,17 +508,17 @@ export default function IntakePage() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
             <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Team & Role Context</h2>
             <div>
-              <label className={labelCls}>What does this person do on your team? <span className="text-red-500">*</span></label>
+              <label className={labelCls}>What does this person do on your team? <span className="text-red-500">*</span><Prefilled field="team_context" /></label>
               <textarea required rows={4} value={form.team_context} onChange={e => set('team_context', e.target.value)} placeholder="They'll own the checkout flow, work closely with design, lead 2 junior engineers…" className={inputCls + ' resize-none'} />
               <ImportBtn field="team_context" />
             </div>
             <div>
-              <label className={labelCls}>Key Requirements <span className="text-red-500">*</span></label>
+              <label className={labelCls}>Key Requirements <span className="text-red-500">*</span><Prefilled field="key_requirements" /></label>
               <textarea required rows={4} value={form.key_requirements} onChange={e => set('key_requirements', e.target.value)} placeholder="5+ years React, Node.js, shipped production apps, strong communicator…" className={inputCls + ' resize-none'} />
               <ImportBtn field="key_requirements" />
             </div>
             <div>
-              <label className={labelCls}>Nice to Have</label>
+              <label className={labelCls}>Nice to Have<Prefilled field="nice_to_haves" /></label>
               <textarea rows={3} value={form.nice_to_haves} onChange={e => set('nice_to_haves', e.target.value)} placeholder="Next.js, fintech background, startup experience…" className={inputCls + ' resize-none'} />
               <ImportBtn field="nice_to_haves" />
             </div>
@@ -455,7 +526,7 @@ export default function IntakePage() {
 
           {/* Target Companies */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-3">
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Target Companies</h2>
+            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Target Companies<Prefilled field="target_companies" /></h2>
             <p className="text-xs text-slate-400">Companies you&apos;d specifically like to hire from (optional)</p>
             <TagInput tags={companies} onChange={setCompanies} />
           </div>
@@ -465,15 +536,15 @@ export default function IntakePage() {
             <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Compensation & Timeline</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>Salary Min ($)</label>
+                <label className={labelCls}>Salary Min ($)<Prefilled field="budget_min" /></label>
                 <input type="number" min={0} value={form.budget_min} onChange={e => set('budget_min', e.target.value)} placeholder="120000" className={inputCls} />
               </div>
               <div>
-                <label className={labelCls}>Salary Max ($)</label>
+                <label className={labelCls}>Salary Max ($)<Prefilled field="budget_max" /></label>
                 <input type="number" min={0} value={form.budget_max} onChange={e => set('budget_max', e.target.value)} placeholder="160000" className={inputCls} />
               </div>
               <div className="col-span-2">
-                <label className={labelCls}>Target Start Date</label>
+                <label className={labelCls}>Target Start Date<Prefilled field="target_start_date" /></label>
                 <input value={form.target_start_date} onChange={e => set('target_start_date', e.target.value)} placeholder="ASAP, Q2 2025, June…" className={inputCls} />
               </div>
             </div>
@@ -481,7 +552,7 @@ export default function IntakePage() {
 
           {/* Notes */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <label className={labelCls}>Anything else we should know?</label>
+            <label className={labelCls}>Anything else we should know?<Prefilled field="additional_notes" /></label>
             <textarea rows={3} value={form.additional_notes} onChange={e => set('additional_notes', e.target.value)} placeholder="Unique perks, team culture, must-haves not covered above…" className={inputCls + ' resize-none'} />
             <ImportBtn field="additional_notes" />
           </div>

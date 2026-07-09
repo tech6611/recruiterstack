@@ -1022,6 +1022,26 @@ export async function createCanonicalIntakeJob(
 // jobs.intake_token / custom_fields are not in the generated Database types yet;
 // cast the client as elsewhere in this module.
 
+/** Values known before the HM opens the form — pulled from the linked, approved
+ *  requisition (opening) and/or anything the recruiter already stashed in
+ *  custom_fields.intake. The page uses these to pre-fill the form (editable).
+ *  Any field with no known value is null and the form field starts blank. */
+export interface CanonicalIntakePrefill {
+  level: string | null
+  employment_type: string | null   // form label, e.g. 'Contract'
+  headcount: number | null
+  location: string | null
+  work_model: WorkModel | null
+  budget_min: string | null
+  budget_max: string | null
+  target_start_date: string | null
+  team_context: string | null
+  key_requirements: string | null
+  nice_to_haves: string | null
+  target_companies: string | null
+  additional_notes: string | null
+}
+
 /** Public-safe intake form data, keyed on jobs.intake_token. Mirrors the legacy
  *  hiring_requests intake GET shape consumed by /intake/[token]. */
 export interface CanonicalIntakeJobForm {
@@ -1033,6 +1053,51 @@ export interface CanonicalIntakeJobForm {
   intake_submitted_at: string | null
   jd_sent_at: string | null
   created_at: string | null
+  prefill: CanonicalIntakePrefill
+}
+
+/** Map the requisition's employment_type enum to the intake form's select label. */
+const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
+  full_time: 'Full-time',
+  part_time: 'Part-time',
+  contract:  'Contract',
+  intern:    'Internship',
+  temp:      'Temporary',
+}
+
+/** Row shape for the linked opening we read for pre-fill (subset of `openings`). */
+interface IntakePrefillOpening {
+  employment_type: string | null
+  comp_min: number | null
+  comp_max: number | null
+  target_start_date: string | null
+  location: { name: string | null; remote_type: WorkModel | null } | null
+}
+
+/** Build the pre-fill bag. Anything the recruiter already put in
+ *  custom_fields.intake wins; otherwise fall back to the linked requisition. */
+function buildIntakePrefill(
+  bag: Record<string, unknown>,
+  opening: IntakePrefillOpening | null,
+): CanonicalIntakePrefill {
+  const str = (v: unknown): string | null =>
+    v === null || v === undefined || v === '' ? null : String(v)
+  return {
+    level:            str(bag.level),
+    employment_type:  str(bag.employment_type)
+      ?? (opening?.employment_type ? EMPLOYMENT_TYPE_LABELS[opening.employment_type] ?? null : null),
+    headcount:        typeof bag.headcount === 'number' ? bag.headcount : null,
+    location:         str(bag.location) ?? (opening?.location?.name ?? null),
+    work_model:       (str(bag.work_model) as WorkModel | null) ?? (opening?.location?.remote_type ?? null),
+    budget_min:       str(bag.budget_min) ?? str(opening?.comp_min),
+    budget_max:       str(bag.budget_max) ?? str(opening?.comp_max),
+    target_start_date: str(bag.target_start_date) ?? str(opening?.target_start_date),
+    team_context:     str(bag.team_context),
+    key_requirements: str(bag.key_requirements),
+    nice_to_haves:    str(bag.nice_to_haves) ?? str(bag.nice_to_have),
+    target_companies: str(bag.target_companies),
+    additional_notes: str(bag.additional_notes) ?? str(bag.notes),
+  }
 }
 
 /** Full canonical intake job row needed by the JD-generation + submit paths. */
@@ -1081,7 +1146,7 @@ export async function getCanonicalIntakeJobByToken(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('jobs')
-    .select('id, title, status, created_at, custom_fields, department:departments(name)')
+    .select('id, title, status, created_at, custom_fields, department:departments(name), job_openings(opening_id)')
     .eq('intake_token', token)
     .maybeSingle()
 
@@ -1098,8 +1163,25 @@ export async function getCanonicalIntakeJobByToken(
     created_at: string | null
     custom_fields: Record<string, unknown> | null
     department: { name: string } | null
+    job_openings: { opening_id: string }[] | null
   }
   const bag = readIntakeBag(row.custom_fields)
+
+  // Pull the linked, approved requisition for pre-fill (employment type, comp,
+  // location + work model, target start date). Best-effort: a missing/failed
+  // lookup just leaves those fields blank.
+  let opening: IntakePrefillOpening | null = null
+  const openingId = row.job_openings?.[0]?.opening_id ?? null
+  if (openingId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: op } = await (supabase as any)
+      .from('openings')
+      .select('employment_type, comp_min, comp_max, target_start_date, location:locations(name, remote_type)')
+      .eq('id', openingId)
+      .maybeSingle()
+    if (op) opening = op as IntakePrefillOpening
+  }
+
   return {
     id: row.id,
     position_title: row.title,
@@ -1109,6 +1191,7 @@ export async function getCanonicalIntakeJobByToken(
     intake_submitted_at: (bag.intake_submitted_at as string | undefined) ?? null,
     jd_sent_at: (bag.jd_sent_at as string | undefined) ?? null,
     created_at: row.created_at,
+    prefill: buildIntakePrefill(bag, opening),
   }
 }
 

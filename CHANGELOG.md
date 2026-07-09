@@ -9,6 +9,18 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-09
+
+### Added
+- **Intake form pre-fills from the linked requisition.** When the hiring manager
+  opens `/intake/[token]`, fields the recruiter already set on the approved
+  requisition are filled in as editable defaults: employment type, location,
+  work model (from the location's remote type), salary min/max, and target start
+  date. Each pre-filled field shows a small pencil icon signalling it can be
+  edited. `getCanonicalIntakeJobByToken` now joins the linked opening + location
+  and returns a `prefill` bag (custom_fields.intake values win over the
+  requisition). Fields never captured upstream (level, headcount) stay blank.
+
 ## 2026-07-08
 
 ### Fixed
