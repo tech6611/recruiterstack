@@ -323,8 +323,8 @@ export function Sidebar() {
       <aside className="relative hidden h-full w-[200px] shrink-0 flex-col border-r border-[#34291e] bg-[#221b14] md:flex">
         {/* Logo + notifications */}
         <div className="flex h-14 items-center gap-2 border-b border-white/10 px-3">
-          <BrandMark />
-          <span className="min-w-0 flex-1 truncate font-display text-[13px] font-bold tracking-tight text-[#fdfbf7]">
+          <BrandMark className="h-[34px] w-[34px]" />
+          <span className="min-w-0 flex-1 truncate font-display text-base font-bold tracking-tight text-[#fdfbf7]">
             Recruiter<span className="font-extrabold">Stack</span>
           </span>
           <div className="shrink-0">
@@ -372,8 +372,8 @@ export function Sidebar() {
           <aside className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-[#34291e] bg-[#221b14] shadow-xl">
             <div className="flex h-14 items-center justify-between border-b border-white/10 px-3">
               <div className="flex items-center gap-2">
-                <BrandMark />
-                <span className="truncate font-display text-sm font-bold tracking-tight text-[#fdfbf7]">
+                <BrandMark className="h-[34px] w-[34px]" />
+                <span className="truncate font-display text-base font-bold tracking-tight text-[#fdfbf7]">
                   Recruiter<span className="font-extrabold">Stack</span>
                 </span>
               </div>

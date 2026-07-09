@@ -30,8 +30,10 @@ entries on top.
   166px, which truncated the "RecruiterStack" wordmark once the bell moved into
   the header. Widened it to 200px so the full logo + bell fit at normal size,
   and bumped the nav items (Dashboard, Requisitions, …) from 14px medium to
-  16px semibold with 20px icons for stronger primary navigation. Applied to both
-  the desktop rail and the mobile drawer.
+  16px semibold with 20px icons for stronger primary navigation. Also enlarged
+  the logo — cream tile 28→34px and wordmark 13→16px — so it no longer reads
+  small next to the bigger nav. Applied to both the desktop rail and the mobile
+  drawer.
 - **Notifications bell moved from the sidebar footer to the top header.** The
   bell (with its unread badge) now sits at the top of the left rail, to the
   right of the RecruiterStack logo, instead of at the bottom next to the org
