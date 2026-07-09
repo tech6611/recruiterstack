@@ -41,6 +41,8 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
 
   let slots: { start: string; end: string }[] = []
   let calendarChecked = false
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let interviewersUsed: any = undefined
   if (emails.length > 0) {
     try {
       const result = await computeOpenSlots({
@@ -52,6 +54,8 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
       })
       slots = result.slots
       calendarChecked = result.calendarChecked
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      interviewersUsed = (result as any)._interviewersUsed
     } catch (e) {
       logger.error('[schedule] open-slot computation failed', e)
     }
@@ -89,7 +93,9 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
         earliest_bookable_utc: new Date(nowMs + 120 * 60_000).toISOString(),
         refTz,
         emails,
-        prefs,
+        interview_duration: interview.duration_minutes ?? 60,
+        prefs_from_debug_read: prefs,
+        interviewers_used_by_engine: interviewersUsed,
         calendar_connected: calendarConnected,
         busy,
       }

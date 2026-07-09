@@ -243,5 +243,7 @@ export async function computeOpenSlots(opts: ComputeOpenSlotsOptions): Promise<{
     businessDayCount,
     interviewerCount: emails.length,
     calendarChecked: calendarConnected,
+    // TEMP diagnostic: the exact windows fed into computeSlots.
+    _interviewersUsed: interviewers.map(i => ({ email: i.email, timezone: i.timezone, windows: i.windows, busyCount: i.busy.length })),
   }
 }
