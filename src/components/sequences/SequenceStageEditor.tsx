@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   X, Loader2, User, Clock, MessageSquare, Globe,
-  Wand2, ChevronDown, Send, CheckCircle,
+  Wand2, ChevronDown, Send, CheckCircle, AlertTriangle, BookmarkPlus, FileText,
 } from 'lucide-react'
 import type { SequenceStage, SequenceChannel, StageCondition } from '@/lib/types/database'
 import { toDelayFields, fromDelayFields, computeStageDelaySeconds, DEFAULT_SEND_WINDOW, type DelayUnit } from '@/lib/sequences/schedule'
+import { tokensUsed } from '@/lib/sequences/tokens'
 import { RichTextEditor } from '@/components/RichTextEditor'
 import { useSettings } from '@/lib/hooks/useSettings'
 import type { Editor } from '@tiptap/react'
@@ -45,6 +46,9 @@ const AI_TEMPLATES = [
   { id: 'value_prop',        emoji: '💎', name: 'Value Proposition' },
   { id: 'breakup',           emoji: '👋', name: 'Final Check-in' },
 ]
+
+// A reusable subject/body the user saved for reuse across stages/sequences.
+interface SavedTemplate { id: string; name: string; subject: string; body: string }
 
 // Short labels for the timezone dropdown + the send-time preview. Order here is
 // the dropdown order.
@@ -130,31 +134,55 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const [generating, setGenerating]       = useState(false)
   const aiRef                             = useRef<HTMLDivElement>(null)
 
-  // Preview
+  // Saved templates (#7)
+  const [templates, setTemplates]         = useState<SavedTemplate[]>([])
+  const [tplMenuOpen, setTplMenuOpen]     = useState(false)
+  const [savingTpl, setSavingTpl]         = useState(false)
+  const [tplNotice, setTplNotice]         = useState('')
+
+  // Preview (#10) — a single result object so we can show a clear success/error banner
   const [previewing, setPreviewing]       = useState(false)
-  const [previewSent, setPreviewSent]     = useState(false)
+  const [previewResult, setPreviewResult] = useState<{ ok: boolean; message: string } | null>(null)
+
+  // Load the org's saved templates once so the "Templates" menu can offer them.
+  useEffect(() => {
+    fetch('/api/email-templates')
+      .then(r => r.json())
+      .then(json => setTemplates(Array.isArray(json.data) ? json.data : []))
+      .catch(() => setTemplates([]))
+  }, [])
 
   const showCondition = !isFirstStage && (isEdit ? stage!.order_index > 1 : stageCount >= 1)
 
-  // Honest "first send" preview for day-level steps: computed with the SAME
-  // function the sender uses (computeStageDelaySeconds), so what you see is what
-  // actually gets scheduled — in the selected timezone, with the chosen time.
+  // Honest "expected landing" preview for EVERY timing config, computed with the
+  // SAME function the sender uses (computeStageDelaySeconds), so what you see is
+  // what actually gets scheduled. It also reflects the business-hours guardrail:
+  // if a relative delay would land at 3am or on a weekend it is pushed to the next
+  // window open, and we flag that so the user isn't surprised. Day-level steps show
+  // in the chosen timezone; minute/hour steps show in the business-window timezone.
   const schedulePreview = (() => {
-    if (!isDayUnit) return null
     const { delay_days, delay_minutes, delay_business_days } = toDelayFields(delayValue, delayUnit)
-    const seconds = computeStageDelaySeconds(
-      { send_at_time: sendTime || null, send_timezone: sendTz, delay_days, delay_minutes, delay_business_days },
-      new Date(),
-      false,
-      DEFAULT_SEND_WINDOW,
-    )
-    const target = new Date(Date.now() + seconds * 1000)
+    const timing = {
+      send_at_time: isDayUnit ? (sendTime || null) : null,
+      send_timezone: sendTz,
+      delay_days, delay_minutes, delay_business_days,
+    }
+    const now = new Date()
+    const clampedSeconds = computeStageDelaySeconds(timing, now, false, DEFAULT_SEND_WINDOW)
+    const rawSeconds     = computeStageDelaySeconds(timing, now, false, null)
+    const clamped = clampedSeconds !== rawSeconds
+    const displayTz = isDayUnit ? sendTz : DEFAULT_SEND_WINDOW.timezone
+    const target = new Date(now.getTime() + clampedSeconds * 1000)
     const when = target.toLocaleString('en-US', {
-      timeZone: sendTz, weekday: 'short', month: 'short', day: 'numeric',
+      timeZone: displayTz, weekday: 'short', month: 'short', day: 'numeric',
       hour: 'numeric', minute: '2-digit',
     })
-    return `${when} ${TZ_LABELS[sendTz] ?? sendTz}`
+    return { when: `${when} ${TZ_LABELS[displayTz] ?? displayTz}`, clamped }
   })()
+
+  // Which personalization tags appear in the current draft — drives the #9
+  // "missing detail → natural default" reassurance note.
+  const usedTokens = tokensUsed(subject, body)
 
   // ── AI Draft Generation ─────────────────────────────────────────────────
 
@@ -163,56 +191,70 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
     setAiOpen(false)
     setError('')
 
-    const templates: Record<string, { subject: string; body: string }> = {
-      cold_outreach: {
-        subject: 'Hi {{candidate_first_name}}, exciting opportunity at {{company_name}}',
-        body: `<p>Hi {{candidate_first_name}},</p>
-<p>I came across your profile and was impressed by your experience as {{candidate_title}} at {{candidate_company}}. I think you'd be a great fit for a role we're hiring for at {{company_name}}.</p>
-<p>Would you be open to a quick chat this week? I'd love to share more about what we're building and how your background aligns.</p>
-<p>Best,<br/>{{recruiter_name}}</p>`,
-      },
-      follow_up: {
-        subject: 'Re: Quick follow-up, {{candidate_first_name}}',
-        body: `<p>Hi {{candidate_first_name}},</p>
-<p>Just wanted to follow up on my previous message. I understand you're busy, but I genuinely think this could be a great fit for where you are in your career.</p>
-<p>Happy to work around your schedule — even a 15-minute call would be great.</p>
-<p>Best,<br/>{{recruiter_name}}</p>`,
-      },
-      interview_invite: {
-        subject: '{{company_name}} — Interview for {{job_title}}',
-        body: `<p>Hi {{candidate_first_name}},</p>
-<p>Great news! The team was really impressed with your background and we'd love to move forward with an interview for the {{job_title}} role.</p>
-<p>Would any of the following times work for you this week?</p>
-<ul><li>Option 1: [Date/Time]</li><li>Option 2: [Date/Time]</li><li>Option 3: [Date/Time]</li></ul>
-<p>Looking forward to it!</p>
-<p>Best,<br/>{{recruiter_name}}</p>`,
-      },
-      value_prop: {
-        subject: 'Why {{company_name}} might be your next move, {{candidate_first_name}}',
-        body: `<p>Hi {{candidate_first_name}},</p>
-<p>I wanted to share a few reasons why others with your background have loved joining {{company_name}}:</p>
-<ul><li><strong>Impact:</strong> You'll work on problems that matter at scale</li><li><strong>Growth:</strong> Clear career progression and learning budget</li><li><strong>Team:</strong> Collaborative, senior team with low bureaucracy</li></ul>
-<p>Would love to chat if any of this resonates. No pressure at all.</p>
-<p>Best,<br/>{{recruiter_name}}</p>`,
-      },
-      breakup: {
-        subject: 'Last note from me, {{candidate_first_name}}',
-        body: `<p>Hi {{candidate_first_name}},</p>
-<p>I've reached out a couple of times and I know timing isn't always right. I don't want to be a bother, so this will be my last message.</p>
-<p>If you're ever open to exploring new opportunities, my door is always open. Feel free to reach out anytime.</p>
-<p>Wishing you all the best!</p>
-<p>{{recruiter_name}}<br/>{{company_name}}</p>`,
-      },
-    }
-
-    const tpl = templates[templateId]
-    if (tpl) {
-      setSubject(tpl.subject)
-      setBody(tpl.body)
+    try {
+      const res = await fetch('/api/sequences/ai-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          template_id: templateId,
+          channel,
+          company_name: settings.company_name || undefined,
+          recruiter_name: settings.recruiter_name || undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error ?? 'AI draft failed. Please try again.')
+        return
+      }
+      setSubject(json.data.subject)
+      setBody(json.data.body)
       setEditorKey(k => k + 1)
+    } catch {
+      setError('Could not reach the AI service. Please try again.')
+    } finally {
+      setGenerating(false)
     }
+  }
 
-    setGenerating(false)
+  // ── Saved templates (#7) ─────────────────────────────────────────────────
+
+  const applyTemplate = (tpl: SavedTemplate) => {
+    setSubject(tpl.subject)
+    setBody(tpl.body)
+    setEditorKey(k => k + 1)
+    setTplMenuOpen(false)
+  }
+
+  const saveAsTemplate = async () => {
+    if (!subject.trim() || !body.trim()) {
+      setTplNotice('Add a subject and body before saving a template.')
+      return
+    }
+    const name = window.prompt('Name this template (so you can reuse it later):')
+    if (!name || !name.trim()) return
+
+    setSavingTpl(true)
+    setTplNotice('')
+    try {
+      const res = await fetch('/api/email-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), subject, body }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setTplNotice(json.error ?? 'Could not save template.')
+        return
+      }
+      setTemplates(prev => [...prev, json.data])
+      setTplNotice(`Saved "${json.data.name}" to your templates.`)
+      setTimeout(() => setTplNotice(''), 4000)
+    } catch {
+      setTplNotice('Could not save template.')
+    } finally {
+      setSavingTpl(false)
+    }
   }
 
   // ── Send Preview ────────────────────────────────────────────────────────
@@ -220,17 +262,17 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   const sendPreview = async () => {
     const previewEmail = settings.recruiter_email
     if (!previewEmail) {
-      setError('Set your recruiter email in Settings first to receive previews.')
+      setPreviewResult({ ok: false, message: 'Set your recruiter email in Settings first to receive previews.' })
       return
     }
     if (!subject.trim() || !body.trim()) {
-      setError('Subject and body are required to send a preview.')
+      setPreviewResult({ ok: false, message: 'Add a subject and body before sending a preview.' })
       return
     }
 
     setPreviewing(true)
     setError('')
-    setPreviewSent(false)
+    setPreviewResult(null)
 
     // Replace tokens with sample data for preview
     const sampleContext: Record<string, string> = {
@@ -249,27 +291,35 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
     const renderedSubject = subject.replace(/\{\{(\w+)\}\}/g, (_, key) => sampleContext[key] || `[${key}]`)
     const renderedBody = body.replace(/\{\{(\w+)\}\}/g, (_, key) => sampleContext[key] || `[${key}]`)
 
-    const res = await fetch('/api/email/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: previewEmail,
-        subject: `[PREVIEW] ${renderedSubject}`,
-        body: renderedBody,
-        from_name: soboName || settings.recruiter_name || 'RecruiterStack',
-      }),
-    })
+    try {
+      const res = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: previewEmail,
+          subject: `[PREVIEW] ${renderedSubject}`,
+          body: renderedBody,
+          from_name: soboName || settings.recruiter_name || 'RecruiterStack',
+        }),
+      })
 
-    setPreviewing(false)
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        // A missing SendGrid setup is the most common cause — say so plainly.
+        const hint = res.status === 503 || /sendgrid|not configured|api key/i.test(json.error ?? '')
+          ? 'Email sending isn\'t set up yet (SendGrid). Add your SendGrid keys in Settings to send previews.'
+          : (json.error ?? 'Failed to send preview.')
+        setPreviewResult({ ok: false, message: hint })
+        return
+      }
 
-    if (!res.ok) {
-      const json = await res.json()
-      setError(json.error ?? 'Failed to send preview')
-      return
+      setPreviewResult({ ok: true, message: `Preview sent to ${previewEmail}. Check your inbox (and spam folder).` })
+      setTimeout(() => setPreviewResult(r => (r?.ok ? null : r)), 6000)
+    } catch {
+      setPreviewResult({ ok: false, message: 'Could not reach the email service. Please try again.' })
+    } finally {
+      setPreviewing(false)
     }
-
-    setPreviewSent(true)
-    setTimeout(() => setPreviewSent(false), 4000)
   }
 
   // ── Insert token at cursor position ─────────────────────────────────────
@@ -455,16 +505,21 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 </>
               )}
             </div>
-            {isDayUnit ? (
-              schedulePreview && (
-                <p className="text-[11px] text-slate-500">
-                  First send: <span className="font-medium text-slate-700">{schedulePreview}</span>
-                  <span className="text-slate-400"> · in the recipient&apos;s selected timezone</span>
+            <div className="space-y-1">
+              <p className="text-[11px] text-slate-500">
+                {isDayUnit ? 'Lands' : 'If the previous step finished now, this lands'}:{' '}
+                <span className="font-medium text-slate-700">{schedulePreview.when}</span>
+              </p>
+              {schedulePreview.clamped && (
+                <p className="flex items-start gap-1 text-[11px] text-amber-600">
+                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span>
+                    Adjusted to business hours — sends are held to Mon–Fri, 8am–8pm IST for
+                    deliverability, so this was pushed to the next open window.
+                  </span>
                 </p>
-              )
-            ) : (
-              <p className="text-[11px] text-slate-400">Sends this long after the previous step.</p>
-            )}
+              )}
+            </div>
           </div>
 
           {/* ── 3. Conditional Logic (stage 2+) ──────────────────────────── */}
@@ -531,6 +586,55 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-semibold text-slate-500">Subject Line</label>
 
+              <div className="flex items-center gap-1.5">
+              {/* Saved templates (#7): load a template, or save the current copy */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setTplMenuOpen(o => !o)}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium border transition-colors ${
+                    tplMenuOpen ? 'border-slate-400 bg-slate-50 text-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <FileText className="h-3 w-3 text-slate-500" /> Templates <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+                {tplMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setTplMenuOpen(false)} />
+                    <div className="absolute top-full right-0 mt-1.5 z-30 w-60 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
+                      <p className="px-3.5 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Load a saved template</p>
+                      {templates.length === 0 ? (
+                        <p className="px-3.5 py-2 text-xs text-slate-400">No saved templates yet. Use “Save” to create one.</p>
+                      ) : (
+                        <div className="max-h-56 overflow-y-auto">
+                          {templates.map(t => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => applyTemplate(t)}
+                              className="w-full flex flex-col items-start px-3.5 py-2 text-left hover:bg-slate-50 transition-colors"
+                            >
+                              <span className="text-xs font-medium text-slate-700 truncate w-full">{t.name}</span>
+                              <span className="text-[10px] text-slate-400 truncate w-full">{t.subject}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={saveAsTemplate}
+                disabled={savingTpl}
+                title="Save this subject + body as a reusable template"
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                {savingTpl ? <Loader2 className="h-3 w-3 animate-spin" /> : <BookmarkPlus className="h-3 w-3 text-slate-500" />} Save
+              </button>
+
               {/* AI Draft dropdown */}
               <div ref={aiRef} className="relative">
                 <button
@@ -565,7 +669,11 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                   </div>
                 )}
               </div>
+              </div>
             </div>
+            {tplNotice && (
+              <p className="mb-1.5 text-[11px] font-medium text-slate-500">{tplNotice}</p>
+            )}
 
             <input
               ref={subjectRef}
@@ -614,43 +722,70 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
             </div>
           </div>
 
+          {/* #9: reassure the user that missing values won't leave awkward gaps —
+              each personalization tag falls back to a natural default. */}
+          {usedTokens.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <p className="text-[11px] font-semibold text-slate-500 mb-1.5">If a candidate is missing a detail, we fill in a natural default:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {usedTokens.map(t => (
+                  <span key={t.key} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-600">
+                    <span className="font-semibold text-slate-500">{t.label}</span>
+                    <span className="text-slate-300">→</span>
+                    <span className="italic text-slate-500">“{t.fallback}”</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {error && (
             <p className="text-xs text-red-500 font-medium">{error}</p>
           )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-slate-100 px-6 py-4 flex items-center justify-between shrink-0">
-          {/* Left: Send Preview */}
-          <button
-            type="button"
-            onClick={sendPreview}
-            disabled={previewing || !subject.trim() || !body.trim()}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
-          >
-            {previewing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : previewSent ? (
-              <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
-            ) : (
-              <Send className="h-3.5 w-3.5" />
-            )}
-            {previewSent ? 'Preview sent!' : `Send Preview${settings.recruiter_email ? ` to ${settings.recruiter_email}` : ''}`}
-          </button>
+        <div className="border-t border-slate-100 px-6 py-4 space-y-2.5 shrink-0">
+          {/* #10: clear success/error result from the last preview send */}
+          {previewResult && (
+            <div className={`flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-medium ${
+              previewResult.ok
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-red-200 bg-red-50 text-red-600'
+            }`}>
+              {previewResult.ok
+                ? <CheckCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                : <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />}
+              <span>{previewResult.message}</span>
+            </div>
+          )}
 
-          {/* Right: Cancel + Save */}
-          <div className="flex gap-3">
-            <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-              Cancel
-            </button>
+          <div className="flex items-center justify-between">
+            {/* Left: Send Preview */}
             <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 rounded-xl bg-[#221b14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors"
+              type="button"
+              onClick={sendPreview}
+              disabled={previewing || !subject.trim() || !body.trim()}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
             >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isEdit ? 'Update Stage' : 'Add Stage'}
+              {previewing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              {previewing ? 'Sending…' : `Send Preview${settings.recruiter_email ? ` to ${settings.recruiter_email}` : ''}`}
             </button>
+
+            {/* Right: Cancel + Save */}
+            <div className="flex gap-3">
+              <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-2 rounded-xl bg-[#221b14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isEdit ? 'Update Stage' : 'Add Stage'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

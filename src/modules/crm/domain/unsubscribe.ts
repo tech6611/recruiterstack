@@ -5,10 +5,16 @@ import { logger } from '@/lib/logger'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DB = SupabaseClient<any>
 
-// The canonical tag we stamp when someone unsubscribes. It's one of the
-// DO_NOT_CONTACT_TAGS the bulk-enrollment filter already excludes, so honouring
-// an unsubscribe "just works" for every future send.
-export const UNSUBSCRIBE_TAG = 'do-not-contact'
+// The canonical tag we stamp when someone unsubscribes. This is a SOFT block:
+// it stops cold-outreach sequences (bulk enrollment excludes it, and any in-flight
+// sequence send is halted) but — unlike a hard 'do-not-contact' — it does NOT mean
+// "never touch this person". If they were an inbound lead you can still reply 1:1.
+export const UNSUBSCRIBE_TAG = 'candidate-unsubscribe'
+
+// Tags that suppress a candidate from cold-outreach sequences: the hard
+// do-not-contact family plus the soft unsubscribe tag. Used both by the bulk
+// enrollment exclusion and by the per-send compliance guard.
+export const SEQUENCE_SUPPRESS_TAGS = ['do-not-contact', 'do_not_contact', 'dnc', UNSUBSCRIBE_TAG]
 
 // ── Stateless token ───────────────────────────────────────────────────────────
 // We don't store a per-email token. Instead we encrypt {org, candidate} with the
@@ -53,21 +59,25 @@ export function unsubscribeFooterHtml(url: string): string {
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-/** True if the candidate carries any do-not-contact tag. */
-export async function isDoNotContact(db: DB, orgId: string, candidateId: string): Promise<boolean> {
+/**
+ * True if the candidate is suppressed from cold-outreach sequences — either a hard
+ * do-not-contact tag or the soft candidate-unsubscribe tag. Used as the per-send
+ * compliance guard so an unsubscribe mid-sequence halts remaining stages.
+ */
+export async function isSuppressedFromSequences(db: DB, orgId: string, candidateId: string): Promise<boolean> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data } = await (db as any).from('candidate_tags')
     .select('candidate_id')
     .eq('org_id', orgId)
     .eq('candidate_id', candidateId)
-    .in('tag', ['do-not-contact', 'do_not_contact', 'dnc'])
+    .in('tag', SEQUENCE_SUPPRESS_TAGS)
     .limit(1)
   return (data?.length ?? 0) > 0
 }
 
 /**
- * Record an unsubscribe: stamp the do-not-contact tag (idempotent) and stop every
- * still-active enrollment for this candidate. Safe to call more than once.
+ * Record an unsubscribe: stamp the candidate-unsubscribe tag (idempotent) and stop
+ * every still-active enrollment for this candidate. Safe to call more than once.
  */
 export async function unsubscribeCandidate(db: DB, orgId: string, candidateId: string): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

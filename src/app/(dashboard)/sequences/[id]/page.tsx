@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
-  ArrowLeft, Loader2, Plus, Trash2, Pencil, X,
+  ArrowLeft, Loader2, Plus, Trash2, Pencil, X, Copy,
   ArrowDown, Play, Pause, Mail, Users, TrendingUp,
   User, Clock,
 } from 'lucide-react'
 import type { Sequence, SequenceStage, SequenceEnrollment, SequenceStatus } from '@/lib/types/database'
+import { formatStageDelay } from '@/lib/sequences/format'
 import SequenceStageEditor from '@/components/sequences/SequenceStageEditor'
 import SequenceAnalytics from '@/components/sequences/SequenceAnalytics'
 import SequenceAutomations from '@/components/sequences/SequenceAutomations'
@@ -19,16 +20,18 @@ import BulkEnrollPanel from '@/components/sequences/BulkEnrollPanel'
 const STATUS_BADGE: Record<SequenceStatus, { label: string; cls: string }> = {
   draft:    { label: 'Draft',    cls: 'bg-slate-100 text-slate-600 border-slate-200' },
   active:   { label: 'Active',   cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  paused:   { label: 'Paused',   cls: 'bg-amber-50 text-amber-700 border-amber-200' },
   archived: { label: 'Archived', cls: 'bg-red-50 text-red-600 border-red-200' },
 }
 
 const ENROLL_STATUS_CLS: Record<string, string> = {
-  active:    'bg-slate-50 text-slate-700',
-  completed: 'bg-slate-100 text-slate-600',
-  replied:   'bg-emerald-50 text-emerald-700',
-  bounced:   'bg-red-50 text-red-600',
-  paused:    'bg-amber-50 text-amber-700',
-  cancelled: 'bg-slate-100 text-slate-500',
+  active:       'bg-slate-50 text-slate-700',
+  completed:    'bg-slate-100 text-slate-600',
+  replied:      'bg-emerald-50 text-emerald-700',
+  bounced:      'bg-red-50 text-red-600',
+  paused:       'bg-amber-50 text-amber-700',
+  cancelled:    'bg-slate-100 text-slate-500',
+  unsubscribed: 'bg-orange-50 text-orange-700',
 }
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -123,13 +126,26 @@ export default function SequenceDetailPage() {
 
   const toggleStatus = async () => {
     if (!seq) return
-    const newStatus: SequenceStatus = seq.status === 'active' ? 'draft' : 'active'
+    // Deactivating an active sequence marks it 'paused' (was running, now stopped),
+    // which reads more clearly than reverting to 'draft'.
+    const newStatus: SequenceStatus = seq.status === 'active' ? 'paused' : 'active'
     await fetch(`/api/sequences/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     })
     loadSequence()
+  }
+
+  const [cloning, setCloning] = useState(false)
+  const cloneSequence = async () => {
+    setCloning(true)
+    const res = await fetch(`/api/sequences/${id}/clone`, { method: 'POST' })
+    setCloning(false)
+    if (res.ok) {
+      const json = await res.json()
+      if (json.data?.id) router.push(`/sequences/${json.data.id}`)
+    }
   }
 
   const deleteStage = async (stageId: string) => {
@@ -216,8 +232,11 @@ export default function SequenceDetailPage() {
           ) : (
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-slate-900 truncate">{seq.name}</h1>
-              <button onClick={() => setEditingName(true)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setEditingName(true)} title="Rename" className="text-slate-400 hover:text-slate-600">
                 <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button onClick={cloneSequence} disabled={cloning} title="Clone sequence" className="text-slate-400 hover:text-slate-600 disabled:opacity-50">
+                {cloning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
               <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
                 {badge.label}
@@ -314,7 +333,7 @@ export default function SequenceDetailPage() {
                         <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {stage.delay_days === 0 ? 'Immediate' : `+${stage.delay_days} ${stage.delay_business_days ? 'business ' : ''}day${stage.delay_days > 1 ? 's' : ''}`}
+                            {formatStageDelay({ delayDays: stage.delay_days, delayMinutes: stage.delay_minutes, businessDays: stage.delay_business_days })}
                             {cumulativeDays > 0 && ` (Day ${cumulativeDays})`}
                           </span>
                           {stage.send_at_time && (

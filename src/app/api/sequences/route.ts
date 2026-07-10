@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 import { listSequences } from '@/modules/crm/domain/sequences'
+import { rangeToSince } from '@/lib/sequences/range'
 
-// GET /api/sequences — list all sequences for the org.
-export const GET = withCapability('recruiting:view', async (_req, orgId, supabase) => {
+// GET /api/sequences?range=7d|30d|90d|all — list all sequences for the org. The
+// funnel counts on each row are scoped to the window (default 30d).
+export const GET = withCapability('recruiting:view', async (req, orgId, supabase) => {
   try {
-    const data = await listSequences(supabase, orgId)
+    const range = new URL(req.url).searchParams.get('range')
+    const data = await listSequences(supabase, orgId, rangeToSince(range))
     return NextResponse.json({ data })
   } catch (err) {
     return NextResponse.json(

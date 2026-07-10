@@ -9,6 +9,48 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-10
+
+### Added
+- **Sequences: time filter + separate Download on the list and Analytics.** The
+  Sequences list and each sequence's Analytics tab now have a dedicated "Show
+  activity in" time filter (Last 7/30/90 days · All time), split out from the
+  Download control. The on-screen funnel numbers, the analytics figures, and the
+  CSV export all rescope to the chosen window using one shared helper
+  (`lib/sequences/range.ts`), so the three always agree.
+- **Sequences: real "Paused" status.** Pausing a sequence now sets a genuine
+  `paused` status (was silently reusing `draft`) with its own amber badge, so a
+  paused-then-resumable sequence reads differently from a never-launched draft.
+  Safe with the sender: the send path gates on the enrollment's status, not the
+  parent sequence, so `paused` behaves like `draft` for new sends.
+- **Sequences: Clone button on the sequence page.** A small clone icon sits next
+  to the edit pencil to duplicate a sequence and its stages.
+- **Sequences: filter Active/Archived panes.** Each pane has a filter for state
+  (active/draft/paused) and for performance (e.g. reply rate ≥ X%, opened ≥ N).
+- **Sequences: save & reuse email templates in the stage editor.** "Save" stores
+  the current subject/body as a named template; "Templates" loads any saved one.
+  Wired to the existing `/api/email-templates` CRUD.
+- **Sequences: AI Draft now uses real Gemini.** The five AI Draft styles call a
+  new `/api/sequences/ai-draft` endpoint that generates a personalized template
+  (with merge tokens left in place) instead of returning hardcoded copy.
+- **Sequences: honest "expected landing" preview for every timing config.** The
+  stage editor shows the real scheduled send time for minute/hour/day/business-day
+  delays (was day-only), computed with the same function the sender uses, and
+  warns when the business-hours guardrail (Mon–Fri 8am–8pm IST) pushes a send to
+  the next open window.
+- **Sequences: clearer Send Preview result + placeholder fallbacks.** Send
+  Preview now shows an explicit success or error banner (and calls out a missing
+  SendGrid setup by name). Blank merge fields now fall back to natural defaults
+  (e.g. "your company") via a shared `lib/sequences/tokens.ts` used on the send
+  path, and the editor lists which fallbacks apply to the current draft.
+
+### Changed
+- **Sequences: stage timing label reflects sub-day delays.** A 2-minute step now
+  reads "+2 min" instead of "Immediate" (via `lib/sequences/format.ts`).
+- **Sequences: unsubscribe is a soft block.** The suppression tag was renamed to
+  `candidate-unsubscribe` and now blocks only cold sequence outreach (inbound 1:1
+  replies still allowed); unsubscribed enrollments get their own badge.
+
 ## 2026-07-09
 
 ### Added

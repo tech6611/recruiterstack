@@ -1,8 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-// Tags that mean "never contact" — candidates carrying any of these are excluded
-// from bulk enrollment regardless of other filters.
+// Tags that mean "never contact" (hard block) — candidates carrying any of these
+// are excluded from bulk enrollment regardless of other filters.
 export const DO_NOT_CONTACT_TAGS = ['do-not-contact', 'do_not_contact', 'dnc']
+
+// Tags that suppress a candidate from cold-outreach bulk enrollment: the hard
+// do-not-contact family plus the soft 'candidate-unsubscribe' tag. Unsubscribing
+// only blocks cold outreach — 1:1 replies to inbound leads remain allowed.
+export const COLD_OUTREACH_EXCLUDE_TAGS = [...DO_NOT_CONTACT_TAGS, 'candidate-unsubscribe']
 
 export const APPLICATION_STATUSES = ['active', 'rejected', 'withdrawn', 'hired'] as const
 
@@ -119,7 +124,7 @@ export async function resolveFilteredCandidateIds(db: DB, orgId: string, f: Cand
   if (f.exclude_do_not_contact !== false) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await (db as any).from('candidate_tags')
-      .select('candidate_id').eq('org_id', orgId).in('tag', DO_NOT_CONTACT_TAGS).limit(ROW_CAP)
+      .select('candidate_id').eq('org_id', orgId).in('tag', COLD_OUTREACH_EXCLUDE_TAGS).limit(ROW_CAP)
     for (const r of (data ?? [])) excludeSet.add(r.candidate_id)
   }
 

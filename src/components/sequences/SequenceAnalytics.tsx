@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, TrendingUp, Download } from 'lucide-react'
+import { Loader2, TrendingUp, Download, Clock, ChevronDown, Check } from 'lucide-react'
+import { RANGE_OPTIONS } from '@/lib/sequences/range'
 import type { SequenceAnalytics as AnalyticsData } from '@/lib/types/database'
 
 interface Props {
@@ -53,15 +54,21 @@ function downloadCsv(data: AnalyticsData): void {
 export default function SequenceAnalytics({ sequenceId }: Props) {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
+  // Analytics default to all-time; the filter narrows to a window.
+  const [range, setRange] = useState<string>('all')
+  const [rangeMenuOpen, setRangeMenuOpen] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/sequences/${sequenceId}/analytics`)
+    setLoading(true)
+    fetch(`/api/sequences/${sequenceId}/analytics?range=${range}`)
       .then(r => r.json())
       .then(json => { setData(json.data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [sequenceId])
+  }, [sequenceId, range])
 
-  if (loading) {
+  // Only block the whole panel on the first load; keep the filter/header visible
+  // while re-fetching a new window so the dropdown doesn't flicker away.
+  if (loading && !data) {
     return (
       <div className="flex items-center gap-2 py-12 justify-center text-slate-400">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading analytics...
@@ -77,16 +84,48 @@ export default function SequenceAnalytics({ sequenceId }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Header + export */}
+      {/* Header: time filter (left of Download) + export */}
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-slate-700">Performance</p>
-        <button
-          type="button"
-          onClick={() => downloadCsv(data)}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-        >
-          <Download className="h-3.5 w-3.5" /> Download CSV
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Time filter — scopes the numbers below to a window. */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setRangeMenuOpen(o => !o)}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />}
+              {RANGE_OPTIONS.find(o => o.value === range)?.label ?? 'All time'}
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            {rangeMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setRangeMenuOpen(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                  <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Show activity in</p>
+                  {RANGE_OPTIONS.map(o => (
+                    <button
+                      key={o.value}
+                      onClick={() => { setRange(o.value); setRangeMenuOpen(false) }}
+                      className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-slate-600 hover:bg-slate-50"
+                    >
+                      {o.label}
+                      {range === o.value && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => downloadCsv(data)}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" /> Download CSV
+          </button>
+        </div>
       </div>
 
       {/* Overview cards */}

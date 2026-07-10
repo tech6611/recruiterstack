@@ -1986,7 +1986,10 @@ export type Database = {
 
 // ── Email Sequences ─────────────────────────────────────────────────────────
 
-export type SequenceStatus = 'draft' | 'active' | 'archived'
+// 'paused' = was active, then stopped by the user (distinct from 'draft', which
+// means "still being built / never activated"). Both block new enrollment; only
+// 'active' sends. Stored as a plain varchar, so no migration is required.
+export type SequenceStatus = 'draft' | 'active' | 'paused' | 'archived'
 
 export type EnrollmentStatus =
   | 'active'

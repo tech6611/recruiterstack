@@ -25,7 +25,8 @@ import {
 } from '@/modules/ats/domain/applications'
 import { getRoleMatchingInputs } from '@/modules/ats/domain/role-profiles'
 import { getApplicationJobTokens } from '@/modules/ats/domain/job-pipelines'
-import { isDoNotContact, unsubscribeUrl, unsubscribeFooterHtml } from '@/modules/crm/domain/unsubscribe'
+import { isSuppressedFromSequences, unsubscribeUrl, unsubscribeFooterHtml } from '@/modules/crm/domain/unsubscribe'
+import { applyTokens } from '@/lib/sequences/tokens'
 
 // ── Autopilot ─────────────────────────────────────────────────────────────────
 
@@ -256,7 +257,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
 
   // Compliance guard: if the candidate unsubscribed (or was tagged do-not-contact)
   // since enrolling, stop here and mark the enrollment so no further stages fire.
-  if (await isDoNotContact(supabase, job.org_id, enrollment.candidate_id)) {
+  if (await isSuppressedFromSequences(supabase, job.org_id, enrollment.candidate_id)) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase.from('sequence_enrollments') as any)
       .update({ status: 'unsubscribed', completed_at: new Date().toISOString() })
@@ -377,30 +378,23 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     }
   }
 
-  // Token replacement
+  // Token replacement. applyTokens fills each {{token}} per candidate, substitutes
+  // a natural fallback ("your company") when a value is missing, and blanks any
+  // unrecognised {{placeholder}} so recipients never see raw tokens.
   const firstName = candidate.name?.split(' ')[0] ?? ''
-  const tokens: Record<string, string> = {
-    '{{candidate_first_name}}': firstName,
-    '{{candidate_name}}': candidate.name ?? '',
-    '{{candidate_title}}': candidate.current_title ?? '',
-    '{{candidate_company}}': candidate.current_company ?? '',
-    '{{candidate_location}}': candidate.location ?? '',
-    '{{job_title}}': jobTitle,
-    '{{company_name}}': companyName,
-    '{{recruiter_name}}': recruiterName,
+  const tokenValues: Record<string, string> = {
+    candidate_first_name: firstName,
+    candidate_name: candidate.name ?? '',
+    candidate_title: candidate.current_title ?? '',
+    candidate_company: candidate.current_company ?? '',
+    candidate_location: candidate.location ?? '',
+    job_title: jobTitle,
+    company_name: companyName,
+    recruiter_name: recruiterName,
   }
 
-  let subject = stage.subject ?? ''
-  let body = stage.body ?? ''
-  for (const [token, value] of Object.entries(tokens)) {
-    subject = subject.replaceAll(token, value)
-    body = body.replaceAll(token, value)
-  }
-  // Safety net: blank out any leftover {{placeholder}} we don't recognise or
-  // couldn't fill (e.g. missing data), so recipients never see raw {{tokens}}.
-  const leftoverToken = /\{\{\s*[\w.]+\s*\}\}/g
-  subject = subject.replace(leftoverToken, '')
-  body = body.replace(leftoverToken, '')
+  let subject = applyTokens(stage.subject ?? '', tokenValues)
+  let body = applyTokens(stage.body ?? '', tokenValues)
 
   // Append a one-click unsubscribe footer so every outbound sequence email is
   // compliant. The link carries an encrypted {org, candidate} token.
