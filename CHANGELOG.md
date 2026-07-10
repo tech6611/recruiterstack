@@ -11,6 +11,17 @@ entries on top.
 
 ## 2026-07-10
 
+### Fixed
+- **Apply-page resume autofill: recover email/phone when the PDF header is
+  extracted garbled.** Some CVs have their contact block spaced apart by the PDF
+  text extractor (`wareesha . sn @ gmail . com`), which made the safety layer
+  drop the AI's correct email and pick an education line (`8.96 (2014-2018)`) as
+  the phone. Email grounding now compares on alphanumerics only, the phone
+  matcher rejects year ranges and prefers `+`-prefixed numbers, and a
+  digit-grounded AI phone wins over a weak regex fragment
+  (`lib/apply/resume-autofill.ts`). Hallucination protection is unchanged —
+  values whose characters/digits aren't in the document are still dropped.
+
 ### Added
 - **Sequences: time filter + separate Download on the list and Analytics.** The
   Sequences list and each sequence's Analytics tab now have a dedicated "Show

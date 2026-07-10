@@ -82,17 +82,24 @@ export function extractContacts(text: string): {
   return { email, phone: pickPhone(text), linkedin_url }
 }
 
-/** Choose the most phone-like match: 8–15 digits, preferring a longer one. */
+/**
+ * Choose the most phone-like match: 8–15 digits, rejecting year ranges (an
+ * education line like "2014-2018" otherwise looks like a phone) and preferring
+ * an international "+"-prefixed number over a bare digit run.
+ */
 function pickPhone(text: string): string | null {
   const candidates = text.match(PHONE_RE) ?? []
   let best: string | null = null
-  let bestDigits = 0
+  let bestScore = -Infinity
   for (const raw of candidates) {
     const digits = raw.replace(/\D/g, '').length
     if (digits < 8 || digits > 15) continue
-    if (digits > bestDigits) {
+    // A "2014-2018" style year range is an education/employment date, not a phone.
+    if (/\b(?:19|20)\d\d\s*[-–]\s*(?:19|20)\d\d\b/.test(raw)) continue
+    const score = digits + (raw.trim().startsWith('+') ? 20 : 0)
+    if (score > bestScore) {
       best = raw.trim()
-      bestDigits = digits
+      bestScore = score
     }
   }
   return best
@@ -157,7 +164,10 @@ export function buildAutofill(raw: RawParsedResume, sourceText: string): Autofil
   const groundEmail = (v: unknown): string | null => {
     const s = cleanString(v)?.toLowerCase() ?? null
     if (!s) return null
-    if (!grounded || rawLower.includes(s)) return s
+    // Compare on alphanumerics only, so a header the text-extractor spaced out
+    // ("wareesha . sn @ gmail . com") still matches the AI's clean read. An
+    // invented email still fails — its letters won't appear in the document.
+    if (!grounded || normText.includes(normalize(s))) return s
     dropped.push('email')
     return null
   }
@@ -168,11 +178,15 @@ export function buildAutofill(raw: RawParsedResume, sourceText: string): Autofil
     dropped.push('linkedin_url')
     return null
   }
-  const groundPhone = (v: unknown): string | null => {
+  // The AI's phone is preferred over the regex fragment when its digits genuinely
+  // appear in the resume — it survives header garbling that breaks the regex,
+  // while an invented number (digits not in the doc) is still dropped.
+  const groundAiPhone = (v: unknown): string | null => {
     const s = cleanString(v)
     if (!s) return null
     const d = s.replace(/\D/g, '')
-    if (!grounded || (d.length >= 8 && digitsText.includes(d))) return s
+    if (d.length < 8 || d.length > 15) return null
+    if (!grounded || digitsText.includes(d)) return s
     dropped.push('phone')
     return null
   }
@@ -182,7 +196,7 @@ export function buildAutofill(raw: RawParsedResume, sourceText: string): Autofil
   const candidate: AutofillCandidate = {
     name:         groundStr('name', raw.name),
     email:        regex.email ?? groundEmail(raw.email),
-    phone:        regex.phone ?? groundPhone(raw.phone),
+    phone:        groundAiPhone(raw.phone) ?? regex.phone,
     linkedin_url: regex.linkedin_url ?? groundLinkedin(raw.linkedin_url),
     current_title: groundStr('current_title', raw.current_title),
     location:      groundStr('location', raw.location),
@@ -198,7 +212,11 @@ export function buildAutofill(raw: RawParsedResume, sourceText: string): Autofil
     return Array.isArray(v) ? v.length > 0 : v != null
   })
 
-  return { candidate, meta: { filled, dropped, grounded } }
+  // A field the AI failed but a deterministic fallback then filled isn't dropped.
+  const filledSet = new Set<string>(filled)
+  const finalDropped = dropped.filter(f => !filledSet.has(f))
+
+  return { candidate, meta: { filled, dropped: finalDropped, grounded } }
 }
 
 function groundSkills(v: unknown, normText: string, grounded: boolean): string[] {

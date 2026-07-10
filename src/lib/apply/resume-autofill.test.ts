@@ -33,6 +33,15 @@ describe('extractContacts', () => {
     expect(extractContacts('order 12345 placed in 2021').phone).toBeNull()
     expect(extractContacts('ref 1234567890123456789').phone).toBeNull()
   })
+
+  it('does not mistake an education year range for a phone number', () => {
+    expect(extractContacts('B.Tech, CGPA 8.96 (2014-2018)').phone).toBeNull()
+  })
+
+  it('prefers an international +-prefixed number over a bare digit run', () => {
+    const c = extractContacts('emp id 4455667788 · mobile +91 9140523655')
+    expect(c.phone?.replace(/\D/g, '')).toBe('919140523655')
+  })
 })
 
 describe('isGrounded', () => {
@@ -101,6 +110,48 @@ describe('buildAutofill', () => {
     expect(candidate.current_title).toBe('CTO')
     expect(meta.grounded).toBe(false)
     expect(meta.dropped).toEqual([])
+  })
+
+  // Regression: a PDF whose contact header was extracted garbled (characters
+  // spaced apart, "@" split off) — the AI vision read is clean, so its values
+  // must survive grounding, and the GPA/year line must not become the phone.
+  it('recovers contact fields when the extracted text is garbled', () => {
+    const GARBLED = `
+Wareesha Nazeer
+B.Tech (Computer Science and Engineering)
+Contact No : + 9 1  9 1 4 0 5 2 3 6 5 5
+E-mail : wareesha . sn @ gmail . com
+Bengaluru
+Education CGPA 8.96 (2014-2018)
+`
+    const raw = {
+      name: 'Wareesha Nazeer',
+      email: 'wareesha.sn@gmail.com',
+      phone: '+91 9140523655',
+    }
+    const { candidate, meta } = buildAutofill(raw, GARBLED)
+    expect(candidate.email).toBe('wareesha.sn@gmail.com')
+    expect(candidate.phone?.replace(/\D/g, '')).toBe('919140523655')
+    expect(candidate.name).toBe('Wareesha Nazeer')
+    expect(meta.dropped).toEqual([])
+  })
+
+  it('still drops a hallucinated email whose text is not in the resume', () => {
+    const { candidate, meta } = buildAutofill(
+      { email: 'invented.person@nowhere.com' },
+      'Some resume text with no email address in it at all.',
+    )
+    expect(candidate.email).toBeNull()
+    expect(meta.dropped).toContain('email')
+  })
+
+  it('still drops a hallucinated phone whose digits are not in the resume', () => {
+    const { candidate, meta } = buildAutofill(
+      { phone: '+1 555 000 1234' },
+      'Resume text mentioning no phone number whatsoever.',
+    )
+    expect(candidate.phone).toBeNull()
+    expect(meta.dropped).toContain('phone')
   })
 
   it('treats "null"/"n/a" strings as empty', () => {
