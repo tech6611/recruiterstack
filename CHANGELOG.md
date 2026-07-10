@@ -43,6 +43,15 @@ entries on top.
   SendGrid setup by name). Blank merge fields now fall back to natural defaults
   (e.g. "your company") via a shared `lib/sequences/tokens.ts` used on the send
   path, and the editor lists which fallbacks apply to the current draft.
+- **Sequences: custom date range in every time filter.** The list panes and each
+  sequence's Analytics tab now offer "Custom range…" with two date pickers (From/To),
+  alongside the 7/30/90-day and All-time presets. Backed by `resolveWindow`/`inWindow`
+  in `lib/sequences/range.ts` and threaded through the sequences/export/analytics APIs.
+- **Sequences: per-pane time window + Download, as header icons.** The Time and
+  Download controls moved out of the page header and into each pane's header (Active
+  and Archived) as compact icon buttons with hover tooltips, right before Filter. Each
+  pane now keeps its own window, so you can view Active over the last 30 days while
+  browsing Archived all-time. Download exports exactly that pane's rows, already scoped.
 
 ### Changed
 - **Sequences: stage timing label reflects sub-day delays.** A 2-minute step now
@@ -50,6 +59,16 @@ entries on top.
 - **Sequences: unsubscribe is a soft block.** The suppression tag was renamed to
   `candidate-unsubscribe` and now blocks only cold sequence outreach (inbound 1:1
   replies still allowed); unsubscribed enrollments get their own badge.
+
+### Fixed
+- **Sequences: pane filter dropdowns no longer clipped/hidden.** The pane container
+  dropped its `overflow-hidden`, so the Time/Download/Filter popovers open fully
+  instead of being cut off — and a raised z-index keeps an open popover above the
+  Archived pane below it (previously it could be blocked when both panes were folded).
+- **Sequences: AI Draft failures are now visible.** A failed or empty AI Draft shows
+  an inline red notice right under the AI Draft button (and a green confirmation on
+  success), instead of a silent "buffered but nothing rendered" — the old error
+  surfaced far down the panel and was easy to miss.
 
 ## 2026-07-09
 

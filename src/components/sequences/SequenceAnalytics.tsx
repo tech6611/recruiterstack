@@ -54,17 +54,27 @@ function downloadCsv(data: AnalyticsData): void {
 export default function SequenceAnalytics({ sequenceId }: Props) {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
-  // Analytics default to all-time; the filter narrows to a window.
+  // Analytics default to all-time; the filter narrows to a window. `range === 'custom'`
+  // uses the two date pickers below (start/end are YYYY-MM-DD).
   const [range, setRange] = useState<string>('all')
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
   const [rangeMenuOpen, setRangeMenuOpen] = useState(false)
+  const [showCustom, setShowCustom] = useState(false)
 
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/sequences/${sequenceId}/analytics?range=${range}`)
+    const q = new URLSearchParams({ range })
+    if (range === 'custom') { if (start) q.set('start', start); if (end) q.set('end', end) }
+    fetch(`/api/sequences/${sequenceId}/analytics?${q.toString()}`)
       .then(r => r.json())
       .then(json => { setData(json.data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [sequenceId, range])
+  }, [sequenceId, range, start, end])
+
+  const rangeLabel = range === 'custom'
+    ? (start && end ? `${start} → ${end}` : start ? `From ${start}` : end ? `Until ${end}` : 'Custom range')
+    : (RANGE_OPTIONS.find(o => o.value === range)?.label ?? 'All time')
 
   // Only block the whole panel on the first load; keep the filter/header visible
   // while re-fetching a new window so the dropdown doesn't flicker away.
@@ -96,24 +106,50 @@ export default function SequenceAnalytics({ sequenceId }: Props) {
               className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
             >
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />}
-              {RANGE_OPTIONS.find(o => o.value === range)?.label ?? 'All time'}
+              {rangeLabel}
               <ChevronDown className="h-3 w-3" />
             </button>
             {rangeMenuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setRangeMenuOpen(false)} />
-                <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                <div className="absolute right-0 z-20 mt-1 w-52 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
                   <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Show activity in</p>
                   {RANGE_OPTIONS.map(o => (
                     <button
                       key={o.value}
-                      onClick={() => { setRange(o.value); setRangeMenuOpen(false) }}
+                      onClick={() => { setRange(o.value); setShowCustom(false); setRangeMenuOpen(false) }}
                       className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-slate-600 hover:bg-slate-50"
                     >
                       {o.label}
                       {range === o.value && <Check className="h-3.5 w-3.5 text-emerald-600" />}
                     </button>
                   ))}
+                  <button
+                    onClick={() => setShowCustom(s => !s)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-slate-600 hover:bg-slate-50"
+                  >
+                    Custom range…
+                    {range === 'custom' && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                  </button>
+                  {showCustom && (
+                    <div className="border-t border-slate-100 px-3 py-2.5 space-y-2">
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        From
+                        <input type="date" value={start} max={end || undefined} onChange={e => setStart(e.target.value)}
+                          className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:border-slate-400 focus:outline-none" />
+                      </label>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        To
+                        <input type="date" value={end} min={start || undefined} onChange={e => setEnd(e.target.value)}
+                          className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:border-slate-400 focus:outline-none" />
+                      </label>
+                      <button
+                        onClick={() => { setRange('custom'); setRangeMenuOpen(false) }}
+                        disabled={!start && !end}
+                        className="w-full rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b] disabled:opacity-40"
+                      >Apply</button>
+                    </div>
+                  )}
                 </div>
               </>
             )}

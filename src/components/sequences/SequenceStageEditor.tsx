@@ -132,6 +132,9 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   // AI generation
   const [aiOpen, setAiOpen]               = useState(false)
   const [generating, setGenerating]       = useState(false)
+  // An inline notice shown right under the AI Draft button (not the far-away form
+  // error) so a failed generation can't look like "nothing happened" (#6/#1).
+  const [aiNotice, setAiNotice]           = useState<{ ok: boolean; message: string } | null>(null)
   const aiRef                             = useRef<HTMLDivElement>(null)
 
   // Saved templates (#7)
@@ -190,7 +193,9 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
     setGenerating(true)
     setAiOpen(false)
     setError('')
+    setAiNotice(null)
 
+    const label = AI_TEMPLATES.find(t => t.id === templateId)?.name ?? 'draft'
     try {
       const res = await fetch('/api/sequences/ai-draft', {
         method: 'POST',
@@ -202,16 +207,17 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
           recruiter_name: settings.recruiter_name || undefined,
         }),
       })
-      const json = await res.json()
-      if (!res.ok) {
-        setError(json.error ?? 'AI draft failed. Please try again.')
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.data?.subject || !json.data?.body) {
+        setAiNotice({ ok: false, message: json.error ?? 'The AI draft came back empty. Please try again.' })
         return
       }
       setSubject(json.data.subject)
       setBody(json.data.body)
       setEditorKey(k => k + 1)
+      setAiNotice({ ok: true, message: `Filled in a ${label} draft — edit anything you like.` })
     } catch {
-      setError('Could not reach the AI service. Please try again.')
+      setAiNotice({ ok: false, message: 'Could not reach the AI service. Please check your connection and try again.' })
     } finally {
       setGenerating(false)
     }
@@ -673,6 +679,18 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
             </div>
             {tplNotice && (
               <p className="mb-1.5 text-[11px] font-medium text-slate-500">{tplNotice}</p>
+            )}
+            {aiNotice && (
+              <div className={`mb-1.5 flex items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium ${
+                aiNotice.ok
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-red-200 bg-red-50 text-red-600'
+              }`}>
+                {aiNotice.ok
+                  ? <Wand2 className="mt-px h-3 w-3 shrink-0" />
+                  : <AlertTriangle className="mt-px h-3 w-3 shrink-0" />}
+                <span>{aiNotice.message}</span>
+              </div>
             )}
 
             <input

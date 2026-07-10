@@ -82,30 +82,66 @@ const PANE_TINT: { active: PaneTone; archived: PaneTone } = {
   archived: { bar: 'bg-[#eae6dd] hover:bg-[#e0dbce]', title: 'text-[#4f483d]', chevron: 'text-[#9a8f7d]', badge: 'text-[#4f483d]' },
 }
 
+// ── Time window (per pane) ────────────────────────────────────────────────────
+// A pane's chosen window: a preset key ('7d'|'30d'|'90d'|'all') OR 'custom' with
+// two YYYY-MM-DD dates. Both the fetch (query string) and the label read from here.
+type RangeValue = { range: string; start: string; end: string }
+
+function rangeQuery(v: RangeValue): string {
+  const p = new URLSearchParams({ range: v.range })
+  if (v.range === 'custom') {
+    if (v.start) p.set('start', v.start)
+    if (v.end) p.set('end', v.end)
+  }
+  return p.toString()
+}
+
+function rangeLabel(v: RangeValue): string {
+  if (v.range === 'custom') {
+    if (v.start && v.end) return `${v.start} → ${v.end}`
+    if (v.start) return `From ${v.start}`
+    if (v.end) return `Until ${v.end}`
+    return 'Custom range'
+  }
+  return RANGE_OPTIONS.find(o => o.value === v.range)?.label ?? 'Last 30 days'
+}
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function SequencesPage() {
   const router = useRouter()
   const { orgId } = useAuth()
-  const [sequences, setSequences] = useState<Sequence[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
 
-  // Time window for the on-screen funnel numbers (separate from the Download menu).
-  const [range, setRange] = useState<string>(DEFAULT_RANGE)
-  const [rangeMenuOpen, setRangeMenuOpen] = useState(false)
+  // Each pane keeps its OWN time window (#5): the Active pane defaults to the last
+  // 30 days, the Archived pane to all-time. Because the sequence list is the same
+  // either way (windowing only rescopes the funnel counts, not which rows appear),
+  // we fetch the full list twice — once per window — and each pane reads its copy.
+  const [activeRange, setActiveRange]     = useState<RangeValue>({ range: DEFAULT_RANGE, start: '', end: '' })
+  const [archivedRange, setArchivedRange] = useState<RangeValue>({ range: 'all', start: '', end: '' })
+  const [activeData, setActiveData]       = useState<Sequence[]>([])
+  const [archivedData, setArchivedData]   = useState<Sequence[]>([])
 
-  const load = useCallback(async (r: string) => {
-    setLoading(true)
-    const res = await fetch(`/api/sequences?range=${r}`)
-    if (res.ok) {
-      const json = await res.json()
-      setSequences(json.data ?? [])
-    }
-    setLoading(false)
+  const loadActive = useCallback(async (v: RangeValue) => {
+    const res = await fetch(`/api/sequences?${rangeQuery(v)}`)
+    if (res.ok) setActiveData((await res.json()).data ?? [])
+  }, [])
+  const loadArchived = useCallback(async (v: RangeValue) => {
+    const res = await fetch(`/api/sequences?${rangeQuery(v)}`)
+    if (res.ok) setArchivedData((await res.json()).data ?? [])
   }, [])
 
-  useEffect(() => { if (orgId) load(range) }, [load, orgId, range])
+  // Refresh both panes at once — used after any write (status change, clone, bulk).
+  const reload = useCallback(async () => {
+    await Promise.all([loadActive(activeRange), loadArchived(archivedRange)])
+  }, [loadActive, loadArchived, activeRange, archivedRange])
+
+  useEffect(() => { if (orgId) loadActive(activeRange) }, [loadActive, orgId, activeRange])
+  useEffect(() => {
+    if (!orgId) return
+    loadArchived(archivedRange).finally(() => setLoading(false))
+  }, [loadArchived, orgId, archivedRange])
 
   const handleCreate = async () => {
     setCreating(true)
@@ -132,7 +168,7 @@ export default function SequencesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     })
-    if (res.ok) load(range)
+    if (res.ok) reload()
   }
 
   // Duplicate a sequence — server copies it (and its stages) into a fresh draft,
@@ -142,7 +178,7 @@ export default function SequencesPage() {
     setDuplicatingId(id)
     const res = await fetch(`/api/sequences/${id}/clone`, { method: 'POST' })
     setDuplicatingId(null)
-    if (res.ok) load(range)
+    if (res.ok) reload()
   }
 
   // ── Bulk selection ────────────────────────────────────────────────────────
@@ -174,7 +210,7 @@ export default function SequencesPage() {
     ))
     setBulkBusy(false)
     clearSelection()
-    load(range)
+    reload()
   }
 
   const bulkClone = async () => {
@@ -185,45 +221,18 @@ export default function SequencesPage() {
     ))
     setBulkBusy(false)
     clearSelection()
-    load(range)
-  }
-
-  // ── Download (CSV) ─────────────────────────────────────────────────────────
-  const [exportMenuOpen, setExportMenuOpen] = useState(false)
-  const [exporting, setExporting] = useState(false)
-
-  const handleExport = async (exportRange: string) => {
-    setExportMenuOpen(false)
-    setExporting(true)
-    try {
-      const res = await fetch(`/api/sequences/export?range=${exportRange}`)
-      if (!res.ok) return
-      const json = await res.json()
-      const rows = (json.data ?? []) as Array<{
-        name: string; status: string; stage_count: number; enrollment_count: number
-        sent_count: number; open_count: number; click_count: number
-        reply_count: number; reply_rate: number; created_at: string
-      }>
-      const header = ['Name', 'Status', 'Stages', 'Enrolled', 'Sent', 'Opened', 'Clicked', 'Replied', 'Reply rate', 'Created']
-      const body = rows.map(r => [
-        r.name, r.status, r.stage_count, r.enrollment_count, r.sent_count,
-        r.open_count, r.click_count, r.reply_count, `${r.reply_rate}%`,
-        r.created_at?.slice(0, 10) ?? '',
-      ])
-      downloadCsv(`sequences-${exportRange}-${todayStamp()}.csv`, [header, ...body])
-    } finally {
-      setExporting(false)
-    }
+    reload()
   }
 
   // ── Per-pane filters (#5) ──────────────────────────────────────────────────
   const [activeFilter, setActiveFilter]     = useState<PaneFilter>(EMPTY_FILTER)
   const [archivedFilter, setArchivedFilter] = useState<PaneFilter>(EMPTY_FILTER)
 
-  // Two buckets: everything not archived (active + draft + paused) vs archived,
-  // then narrowed by each pane's own state/performance filter.
-  const activeSeqs   = sequences.filter(s => s.status !== 'archived' && matchesFilter(s, activeFilter))
-  const archivedSeqs = sequences.filter(s => s.status === 'archived' && matchesFilter(s, archivedFilter))
+  // Two buckets — non-archived (active + draft + paused) vs archived — each read
+  // from its own windowed fetch and then narrowed by its own state/perf filter.
+  const activeSeqs   = activeData.filter(s => s.status !== 'archived' && matchesFilter(s, activeFilter))
+  const archivedSeqs = archivedData.filter(s => s.status === 'archived' && matchesFilter(s, archivedFilter))
+  const hasAny = activeData.length > 0 || archivedData.length > 0
 
   // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -251,68 +260,8 @@ export default function SequencesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Time filter — rescopes the on-screen funnel numbers to a window. This
-              is a separate control from Download (which exports a CSV). */}
-          <div className="relative">
-            <button
-              onClick={() => setRangeMenuOpen(o => !o)}
-              disabled={sequences.length === 0}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
-            >
-              <Clock className="h-4 w-4" />
-              {RANGE_OPTIONS.find(o => o.value === range)?.label ?? 'Last 30 days'}
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-            {rangeMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setRangeMenuOpen(false)} />
-                <div className="absolute right-0 z-20 mt-1 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                  <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Show activity in</p>
-                  {RANGE_OPTIONS.map(o => (
-                    <button
-                      key={o.value}
-                      onClick={() => { setRange(o.value); setRangeMenuOpen(false) }}
-                      className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
-                    >
-                      {o.label}
-                      {range === o.value && <Check className="h-3.5 w-3.5 text-emerald-600" />}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Download menu — export the sequence funnel as a CSV, scoped to a
-              time window (activity within the window). */}
-          <div className="relative">
-            <button
-              onClick={() => setExportMenuOpen(o => !o)}
-              disabled={exporting || sequences.length === 0}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
-            >
-              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              Download
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-            {exportMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
-                <div className="absolute right-0 z-20 mt-1 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                  <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Export as CSV</p>
-                  {RANGE_OPTIONS.map(r => (
-                    <button
-                      key={r.value}
-                      onClick={() => handleExport(r.value)}
-                      className="block w-full px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          {/* Time and Download now live inside each pane header (as icons), so a
+              window/export applies to just that pane. Only "New Sequence" stays here. */}
           <button
             onClick={handleCreate}
             disabled={creating}
@@ -325,7 +274,7 @@ export default function SequencesPage() {
       </div>
 
       {/* Empty state */}
-      {sequences.length === 0 && (
+      {!hasAny && (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 mb-4">
             <Mail className="h-7 w-7 text-slate-500" />
@@ -375,7 +324,7 @@ export default function SequencesPage() {
       )}
 
       {/* Sequence list — grouped into foldable Active / Archived panes */}
-      {sequences.length > 0 && (
+      {hasAny && (
         <div className="space-y-4">
           <SequencePane
             title="Active"
@@ -389,6 +338,10 @@ export default function SequencesPage() {
             filter={activeFilter}
             onFilterChange={setActiveFilter}
             stateOptions={['active', 'draft', 'paused']}
+            rangeValue={activeRange}
+            onRangeChange={setActiveRange}
+            downloadSeqs={activeSeqs}
+            downloadName="active"
           >
             {activeSeqs.map(seq => (
               <SequenceRow key={seq.id} seq={seq} selected={selected.has(seq.id)} onToggleSelect={() => toggleOne(seq.id)} onOpen={() => router.push(`/sequences/${seq.id}`)} onStatus={handleStatusChange} onDuplicate={handleDuplicate} duplicating={duplicatingId === seq.id} />
@@ -407,6 +360,10 @@ export default function SequencesPage() {
             filter={archivedFilter}
             onFilterChange={setArchivedFilter}
             stateOptions={[]}
+            rangeValue={archivedRange}
+            onRangeChange={setArchivedRange}
+            downloadSeqs={archivedSeqs}
+            downloadName="archived"
           >
             {archivedSeqs.map(seq => (
               <SequenceRow key={seq.id} seq={seq} selected={selected.has(seq.id)} onToggleSelect={() => toggleOne(seq.id)} onOpen={() => router.push(`/sequences/${seq.id}`)} onStatus={handleStatusChange} onDuplicate={handleDuplicate} duplicating={duplicatingId === seq.id} />
@@ -465,8 +422,8 @@ function SequenceFilterPopover({
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-40 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
             {stateOptions.length > 0 && (
               <div className="mb-3">
                 <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">State</p>
@@ -548,7 +505,8 @@ function SequenceFilterPopover({
 // rows. Rendered twice — Active and Archived.
 function SequencePane({
   title, tone, count, defaultOpen, emptyText, selectableIds, selected, onToggleAll,
-  filter, onFilterChange, stateOptions, children,
+  filter, onFilterChange, stateOptions, rangeValue, onRangeChange, downloadSeqs,
+  downloadName, children,
 }: {
   title: string
   tone: PaneTone
@@ -561,14 +519,21 @@ function SequencePane({
   filter: PaneFilter
   onFilterChange: (f: PaneFilter) => void
   stateOptions: SequenceStatus[]
+  rangeValue: RangeValue
+  onRangeChange: (v: RangeValue) => void
+  downloadSeqs: Sequence[]
+  downloadName: string
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
   const allSelected  = selectableIds.length > 0 && selectableIds.every(id => selected.has(id))
   const someSelected = selectableIds.some(id => selected.has(id))
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200">
-      <div className={cn('flex w-full items-center gap-2 px-4 py-3 transition-colors', tone.bar)}>
+    // No overflow-hidden on the container — it used to clip the Time/Download/Filter
+    // dropdowns (and hide them behind the pane below). Rounded corners come from the
+    // header/body themselves instead.
+    <div className="rounded-2xl border border-slate-200">
+      <div className={cn('flex w-full items-center gap-2 rounded-t-2xl px-4 py-3 transition-colors', !open && 'rounded-b-2xl', tone.bar)}>
         <input
           type="checkbox"
           checked={allSelected}
@@ -591,17 +556,128 @@ function SequencePane({
             {count}
           </span>
         </button>
+        {/* Per-pane Time + Download + Filter — all icon buttons with hover tooltips. */}
+        <TimeRangeControl value={rangeValue} onChange={onRangeChange} tone={tone} />
+        <DownloadControl seqs={downloadSeqs} name={downloadName} tone={tone} />
         <SequenceFilterPopover filter={filter} onChange={onFilterChange} stateOptions={stateOptions} tone={tone} />
       </div>
 
       {open && (
-        <div className="space-y-2 border-t border-slate-100 bg-slate-50/50 p-2">
+        <div className="space-y-2 rounded-b-2xl border-t border-slate-100 bg-slate-50/50 p-2">
           {count === 0
             ? <p className="py-8 text-center text-sm text-slate-400">{emptyText}</p>
             : children}
         </div>
       )}
     </div>
+  )
+}
+
+// ── Per-pane Time control (#4, #5) ─────────────────────────────────────────────
+// An icon button (with a hover tooltip showing the current window) that opens a
+// dropdown of presets plus a "Custom range…" option with two date pickers.
+function TimeRangeControl({
+  value, onChange, tone,
+}: {
+  value: RangeValue
+  onChange: (v: RangeValue) => void
+  tone: PaneTone
+}) {
+  const [open, setOpen] = useState(false)
+  const [showCustom, setShowCustom] = useState(value.range === 'custom')
+  const [start, setStart] = useState(value.start)
+  const [end, setEnd] = useState(value.end)
+
+  const pickPreset = (r: string) => { onChange({ range: r, start: '', end: '' }); setShowCustom(false); setOpen(false) }
+  const applyCustom = () => { onChange({ range: 'custom', start, end }); setOpen(false) }
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        title={`Time window: ${rangeLabel(value)}`}
+        className={cn('flex items-center gap-1 rounded-lg bg-white/70 px-2 py-1 text-xs font-semibold hover:bg-white transition-colors', tone.badge)}
+      >
+        <Clock className="h-3.5 w-3.5" />
+        {value.range !== DEFAULT_RANGE && <span className="h-1.5 w-1.5 rounded-full bg-[#221b14]" />}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-40 mt-1 w-56 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+            <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Show activity in</p>
+            {RANGE_OPTIONS.map(o => (
+              <button
+                key={o.value}
+                onClick={() => pickPreset(o.value)}
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
+              >
+                {o.label}
+                {value.range === o.value && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowCustom(s => !s)}
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
+            >
+              Custom range…
+              {value.range === 'custom' && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+            </button>
+            {showCustom && (
+              <div className="border-t border-slate-100 px-3 py-2.5 space-y-2">
+                <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  From
+                  <input type="date" value={start} max={end || undefined} onChange={e => setStart(e.target.value)}
+                    className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:border-slate-400 focus:outline-none" />
+                </label>
+                <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  To
+                  <input type="date" value={end} min={start || undefined} onChange={e => setEnd(e.target.value)}
+                    className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 focus:border-slate-400 focus:outline-none" />
+                </label>
+                <button
+                  onClick={applyCustom}
+                  disabled={!start && !end}
+                  className="w-full rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b] disabled:opacity-40"
+                >Apply</button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Per-pane Download control (#5) ─────────────────────────────────────────────
+// One-click CSV of exactly the rows shown in this pane. The numbers are already
+// scoped to the pane's window, so there's nothing more to pick.
+function DownloadControl({ seqs, name, tone }: { seqs: Sequence[]; name: string; tone: PaneTone }) {
+  const handleDownload = () => {
+    const header = ['Name', 'Status', 'Stages', 'Enrolled', 'Sent', 'Opened', 'Clicked', 'Replied', 'Reply rate', 'Created']
+    const body = seqs.map(s => {
+      const enrolled = s.enrollment_count ?? 0
+      const replied  = s.reply_count ?? 0
+      const replyRate = enrolled > 0 ? Math.round((replied / enrolled) * 100) : 0
+      return [
+        s.name, s.status, s.stage_count ?? 0, enrolled, s.sent_count ?? 0,
+        s.open_count ?? 0, s.click_count ?? 0, replied, `${replyRate}%`,
+        s.created_at?.slice(0, 10) ?? '',
+      ]
+    })
+    downloadCsv(`sequences-${name}-${todayStamp()}.csv`, [header, ...body])
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleDownload}
+      disabled={seqs.length === 0}
+      title="Download this pane as CSV"
+      className={cn('flex items-center rounded-lg bg-white/70 px-2 py-1 text-xs font-semibold hover:bg-white transition-colors disabled:opacity-40', tone.badge)}
+    >
+      <Download className="h-3.5 w-3.5" />
+    </button>
   )
 }
 

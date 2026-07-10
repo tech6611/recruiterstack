@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 import { listSequences } from '@/modules/crm/domain/sequences'
-import { rangeToSince } from '@/lib/sequences/range'
+import { resolveWindow } from '@/lib/sequences/range'
 
-// GET /api/sequences?range=7d|30d|90d|all — list all sequences for the org. The
-// funnel counts on each row are scoped to the window (default 30d).
+// GET /api/sequences?range=7d|30d|90d|all|custom&start=&end= — list all sequences
+// for the org. The funnel counts on each row are scoped to the window (default
+// 30d). `range=custom` uses the start/end YYYY-MM-DD dates.
 export const GET = withCapability('recruiting:view', async (req, orgId, supabase) => {
   try {
-    const range = new URL(req.url).searchParams.get('range')
-    const data = await listSequences(supabase, orgId, rangeToSince(range))
+    const params = new URL(req.url).searchParams
+    const window = resolveWindow(params.get('range'), params.get('start'), params.get('end'))
+    const data = await listSequences(supabase, orgId, window)
     return NextResponse.json({ data })
   } catch (err) {
     return NextResponse.json(

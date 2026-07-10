@@ -1,7 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
+import { inWindow, type TimeWindow } from '@/lib/sequences/range'
 
 type Supabase = SupabaseClient<Database>
+
+const ALL_TIME: TimeWindow = { since: null, until: null }
 
 // Read shapes — match the legacy API responses exactly so the route refactor is
 // purely mechanical. Write paths still live in the routes for v1 (the
@@ -109,12 +112,11 @@ export interface SequenceAnalytics {
 export async function listSequences(
   supabase: Supabase,
   orgId: string,
-  since: Date | null = null,
+  window: TimeWindow = ALL_TIME,
 ): Promise<SequenceSummary[]> {
-  // When `since` is set, the funnel counts (enrolled/sent/opened/clicked/replied)
-  // are scoped to activity within the window — same rule as the CSV export so the
-  // on-screen numbers and the download agree. `since = null` = all-time.
-  const sinceIso = since ? since.toISOString() : null
+  // The funnel counts (enrolled/sent/opened/clicked/replied) are scoped to activity
+  // within `window` — same rule as the CSV export so the on-screen numbers and the
+  // download agree. An all-time window (both bounds null) counts everything.
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: sequences, error } = await (supabase.from('sequences') as any)
@@ -143,7 +145,7 @@ export async function listSequences(
     seqOfEnrollment.set(e.id, e.sequence_id)
     const entry = byId.get(e.sequence_id) ?? { total: 0, replied: 0, sent: 0, opened: 0, clicked: 0 }
     // Enrolled + replied are scoped by when the candidate was enrolled.
-    if (!sinceIso || (e.started_at ?? '') >= sinceIso) {
+    if (inWindow(e.started_at, window)) {
       entry.total++
       if (e.status === 'replied') entry.replied++
     }
@@ -164,7 +166,7 @@ export async function listSequences(
 
   const NOT_SENT = ['queued', 'failed', 'skipped']
   for (const em of (emails ?? []) as Array<{ enrollment_id: string; status: string; sent_at: string | null }>) {
-    if (sinceIso && (em.sent_at ?? '') < sinceIso) continue
+    if (!inWindow(em.sent_at, window)) continue
     const seqId = seqOfEnrollment.get(em.enrollment_id)
     if (!seqId) continue
     const entry = byId.get(seqId)
@@ -215,10 +217,8 @@ export interface SequenceExportRow {
 export async function listSequencesForExport(
   supabase: Supabase,
   orgId: string,
-  since: Date | null,
+  window: TimeWindow = ALL_TIME,
 ): Promise<SequenceExportRow[]> {
-  const sinceIso = since ? since.toISOString() : null
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: sequences, error } = await (supabase.from('sequences') as any)
     .select('*, sequence_stages(id)')
@@ -246,7 +246,7 @@ export async function listSequencesForExport(
     seqOfEnrollment.set(e.id, e.sequence_id)
     const entry = byId.get(e.sequence_id) ?? { enrolled: 0, sent: 0, opened: 0, clicked: 0, replied: 0 }
     // Enrolled is scoped by when the candidate was enrolled.
-    if (!sinceIso || (e.started_at ?? '') >= sinceIso) entry.enrolled++
+    if (inWindow(e.started_at, window)) entry.enrolled++
     byId.set(e.sequence_id, entry)
   }
 
@@ -263,7 +263,7 @@ export async function listSequencesForExport(
   // as sent. Each email is scoped by its send time.
   const NOT_SENT = ['queued', 'failed', 'skipped']
   for (const em of (emails ?? []) as Array<{ enrollment_id: string; status: string; sent_at: string | null }>) {
-    if (sinceIso && (em.sent_at ?? '') < sinceIso) continue
+    if (!inWindow(em.sent_at, window)) continue
     const seqId = seqOfEnrollment.get(em.enrollment_id)
     if (!seqId) continue
     const entry = byId.get(seqId)
@@ -373,12 +373,11 @@ export async function getSequenceAnalytics(
   supabase: Supabase,
   orgId: string,
   sequenceId: string,
-  since: Date | null = null,
+  window: TimeWindow = ALL_TIME,
 ): Promise<SequenceAnalytics | null> {
-  // When `since` is set, enrollments are scoped by started_at and emails by
-  // sent_at, so every number reflects activity within the window. `since = null`
-  // = all-time (the historical default).
-  const sinceIso = since ? since.toISOString() : null
+  // Enrollments are scoped by started_at and emails by sent_at, so every number
+  // reflects activity within the window. An all-time window (both bounds null) =
+  // the historical default.
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: seq } = await (supabase.from('sequences') as any)
@@ -401,9 +400,7 @@ export async function getSequenceAnalytics(
 
   const allEnrollments = (enrollmentsRes.data ?? []) as Array<{ id: string; status: string; started_at: string | null }>
   // Enrollment-based metrics (statuses, replies) are scoped by enrollment date.
-  const enrollments = sinceIso
-    ? allEnrollments.filter(e => (e.started_at ?? '') >= sinceIso)
-    : allEnrollments
+  const enrollments = allEnrollments.filter(e => inWindow(e.started_at, window))
   const stages      = (stagesRes.data ?? [])      as Array<{ id: string; order_index: number; subject: string; delay_days: number }>
 
   // Email funnel is scoped by sent_at (not by the enrollment window) so an email
@@ -417,7 +414,7 @@ export async function getSequenceAnalytics(
         .select('enrollment_id, stage_id, status, open_count, click_count, sent_at')
         .in('enrollment_id', allEnrollmentIds)
   const emails = ((emailsRaw ?? []) as Array<{ enrollment_id: string; stage_id: string; status: string; sent_at: string | null }>)
-    .filter(em => !sinceIso || (em.sent_at ?? '') >= sinceIso)
+    .filter(em => inWindow(em.sent_at, window))
 
   const enrollmentStatuses: Record<string, number> = {}
   for (const e of enrollments) {
