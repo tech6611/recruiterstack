@@ -136,6 +136,39 @@ Education CGPA 8.96 (2014-2018)
     expect(meta.dropped).toEqual([])
   })
 
+  // Regression: the real failing CV rendered its contact header as an image, so
+  // unpdf extracted the body but NOT the email/phone. The PDF vision model read
+  // them correctly. With aiSawDocument=true, well-formed contact fields must be
+  // trusted even though they're absent from the extracted text.
+  it('trusts vision-read contacts absent from the extracted text (PDF path)', () => {
+    const BODY_ONLY = `
+Wareesha Nazeer
+B.Tech (Computer Science and Engineering)
+Professional Experience
+Senior Software Engineer, Backend (Nykaa) (August 2024 – May 2025)
+Education CGPA 8.96 (2014-2018)
+`
+    const raw = {
+      name: 'Wareesha Nazeer',
+      email: 'wareesha.sn@gmail.com',
+      phone: '+91 9140523655',
+    }
+    const { candidate, meta } = buildAutofill(raw, BODY_ONLY, true)
+    expect(candidate.email).toBe('wareesha.sn@gmail.com')
+    expect(candidate.phone?.replace(/\D/g, '')).toBe('919140523655')
+    expect(candidate.name).toBe('Wareesha Nazeer')
+    expect(meta.dropped).toEqual([])
+  })
+
+  it('rejects a malformed vision-read email even on the PDF path', () => {
+    const { candidate } = buildAutofill(
+      { email: 'not-an-email' },
+      'Body text without contacts.',
+      true,
+    )
+    expect(candidate.email).toBeNull()
+  })
+
   it('still drops a hallucinated email whose text is not in the resume', () => {
     const { candidate, meta } = buildAutofill(
       { email: 'invented.person@nowhere.com' },

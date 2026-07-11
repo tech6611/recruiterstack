@@ -57,6 +57,9 @@ export interface AutofillResult {
 // ── Deterministic contact extraction ─────────────────────────────────────────
 
 const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i
+// A whole-string email, for validating the AI's value (not searching within text).
+const EMAIL_FULL_RE = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i
+const YEAR_RANGE_RE = /\b(?:19|20)\d\d\s*[-–]\s*(?:19|20)\d\d\b/
 // LinkedIn profile URLs — /in/ (personal) or /pub/ (legacy). Scheme optional.
 const LINKEDIN_RE = /(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin\.com\/(?:in|pub)\/[a-z0-9\-_%]+\/?/i
 // A run of 8–20 characters that looks like a phone number: an optional leading
@@ -95,7 +98,7 @@ function pickPhone(text: string): string | null {
     const digits = raw.replace(/\D/g, '').length
     if (digits < 8 || digits > 15) continue
     // A "2014-2018" style year range is an education/employment date, not a phone.
-    if (/\b(?:19|20)\d\d\s*[-–]\s*(?:19|20)\d\d\b/.test(raw)) continue
+    if (YEAR_RANGE_RE.test(raw)) continue
     const score = digits + (raw.trim().startsWith('+') ? 20 : 0)
     if (score > bestScore) {
       best = raw.trim()
@@ -138,8 +141,19 @@ function cleanString(v: unknown): string | null {
  * Combine deterministic extraction with grounded AI output into the final
  * candidate. `raw` is the AI's parsed object; `sourceText` is the resume text
  * we extracted server-side (may be empty if extraction failed).
+ *
+ * `aiSawDocument` is true when the AI read the original file directly (PDF
+ * vision) rather than only our extracted text. In that case a well-formed
+ * contact field is trusted even if our text extractor missed it — some PDFs
+ * render the contact header as an image or an undecodable font, so unpdf yields
+ * no email/phone at all while the vision model reads them perfectly. Grounding
+ * those against the incomplete text would wrongly drop the correct values.
  */
-export function buildAutofill(raw: RawParsedResume, sourceText: string): AutofillResult {
+export function buildAutofill(
+  raw: RawParsedResume,
+  sourceText: string,
+  aiSawDocument = false,
+): AutofillResult {
   const grounded = sourceText.trim().length > 0
   const normText = normalize(sourceText)
   const rawLower = sourceText.toLowerCase()
@@ -168,6 +182,9 @@ export function buildAutofill(raw: RawParsedResume, sourceText: string): Autofil
     // ("wareesha . sn @ gmail . com") still matches the AI's clean read. An
     // invented email still fails — its letters won't appear in the document.
     if (!grounded || normText.includes(normalize(s))) return s
+    // Vision read of the original file: trust a well-formed email the text
+    // extractor never captured (imaged/undecodable contact header).
+    if (aiSawDocument && EMAIL_FULL_RE.test(s)) return s
     dropped.push('email')
     return null
   }
@@ -175,6 +192,7 @@ export function buildAutofill(raw: RawParsedResume, sourceText: string): Autofil
     const s = cleanString(v)
     if (!s) return null
     if (!grounded || rawLower.includes(s.toLowerCase().replace(/^https?:\/\//, ''))) return s
+    if (aiSawDocument && LINKEDIN_RE.test(s)) return s
     dropped.push('linkedin_url')
     return null
   }
@@ -186,7 +204,10 @@ export function buildAutofill(raw: RawParsedResume, sourceText: string): Autofil
     if (!s) return null
     const d = s.replace(/\D/g, '')
     if (d.length < 8 || d.length > 15) return null
+    if (YEAR_RANGE_RE.test(s)) return null
     if (!grounded || digitsText.includes(d)) return s
+    // Vision read: trust a phone-shaped value the text extractor never captured.
+    if (aiSawDocument) return s
     dropped.push('phone')
     return null
   }

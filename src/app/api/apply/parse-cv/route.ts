@@ -119,8 +119,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Could not read this resume.' }, { status: 422 })
   }
 
-  // Grounding + deterministic-contact merge happens here.
-  const result = buildAutofill(raw, sourceText)
+  // Grounding + deterministic-contact merge happens here. On the PDF path the
+  // model reads the file directly (vision), so contact fields it extracts are
+  // trusted even when unpdf missed an imaged/undecodable contact header.
+  const result = buildAutofill(raw, sourceText, file.type === PDF)
   return NextResponse.json(result)
 }
 
