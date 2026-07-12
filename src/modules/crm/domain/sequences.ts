@@ -55,6 +55,7 @@ export interface SequenceDetail {
   name:             string
   description:      string | null
   status:           string
+  send_first_immediately: boolean
   created_by:       string | null
   created_at:       string
   updated_at:       string
@@ -185,6 +186,7 @@ export async function listSequences(
       name:             r.name as string,
       description:      (r.description as string | null) ?? null,
       status:           r.status as string,
+      send_first_immediately: (r.send_first_immediately as boolean) ?? false,
       created_by:       (r.created_by as string | null) ?? null,
       created_at:       r.created_at as string,
       updated_at:       r.updated_at as string,
@@ -332,6 +334,7 @@ export async function getSequence(
     name:             row.name as string,
     description:      (row.description as string | null) ?? null,
     status:           row.status as string,
+    send_first_immediately: (row.send_first_immediately as boolean) ?? false,
     created_by:       (row.created_by as string | null) ?? null,
     created_at:       row.created_at as string,
     updated_at:       row.updated_at as string,
