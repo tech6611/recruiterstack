@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   X, Loader2, User, Clock, MessageSquare, Globe,
-  Wand2, ChevronDown, Send, CheckCircle, AlertTriangle, BookmarkPlus, FileText,
+  Wand2, ChevronDown, Send, CheckCircle, AlertTriangle, BookmarkPlus, FileText, Zap,
 } from 'lucide-react'
 import type { SequenceStage, SequenceChannel, StageCondition } from '@/lib/types/database'
 import { toDelayFields, fromDelayFields, computeStageDelaySeconds, DEFAULT_SEND_WINDOW, type DelayUnit } from '@/lib/sequences/schedule'
@@ -93,13 +93,14 @@ interface Props {
   stage?: SequenceStage | null   // null = create mode
   stageCount: number             // for default order_index
   isFirstStage?: boolean         // stage 1 can't have conditions
+  sendFirstImmediately?: boolean // sequence sends its first email instantly
   onClose: () => void
   onSaved: () => void
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function SequenceStageEditor({ sequenceId, stage, stageCount, isFirstStage = false, onClose, onSaved }: Props) {
+export default function SequenceStageEditor({ sequenceId, stage, stageCount, isFirstStage = false, sendFirstImmediately = false, onClose, onSaved }: Props) {
   const isEdit = !!stage
   const { settings } = useSettings()
 
@@ -171,8 +172,12 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
       delay_days, delay_minutes, delay_business_days,
     }
     const now = new Date()
-    const clampedSeconds = computeStageDelaySeconds(timing, now, false, DEFAULT_SEND_WINDOW)
-    const rawSeconds     = computeStageDelaySeconds(timing, now, false, null)
+    // The first stage of a send-first-immediately sequence skips the business-hours
+    // window entirely, so preview it the way the sender actually schedules it.
+    const isInstantFirst = isFirstStage && sendFirstImmediately
+    const previewWindow = isInstantFirst ? null : DEFAULT_SEND_WINDOW
+    const clampedSeconds = computeStageDelaySeconds(timing, now, isInstantFirst, previewWindow)
+    const rawSeconds     = computeStageDelaySeconds(timing, now, isInstantFirst, null)
     const clamped = clampedSeconds !== rawSeconds
     const displayTz = isDayUnit ? sendTz : DEFAULT_SEND_WINDOW.timezone
     const target = new Date(now.getTime() + clampedSeconds * 1000)
@@ -180,7 +185,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
       timeZone: displayTz, weekday: 'short', month: 'short', day: 'numeric',
       hour: 'numeric', minute: '2-digit',
     })
-    return { when: `${when} ${TZ_LABELS[displayTz] ?? displayTz}`, clamped }
+    return { when: `${when} ${TZ_LABELS[displayTz] ?? displayTz}`, clamped, instant: isInstantFirst }
   })()
 
   // Which personalization tags appear in the current draft — drives the #9
@@ -513,9 +518,18 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
             </div>
             <div className="space-y-1">
               <p className="text-[11px] text-slate-500">
-                {isDayUnit ? 'Lands' : 'If the previous step finished now, this lands'}:{' '}
-                <span className="font-medium text-slate-700">{schedulePreview.when}</span>
+                {schedulePreview.instant ? 'Sends as soon as a candidate is added' : (isDayUnit ? 'Lands' : 'If the previous step finished now, this lands')}:{' '}
+                <span className="font-medium text-slate-700">{schedulePreview.instant ? 'Immediately' : schedulePreview.when}</span>
               </p>
+              {schedulePreview.instant && (
+                <p className="flex items-start gap-1 text-[11px] text-sky-600">
+                  <Zap className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span>
+                    This sequence sends its first email instantly, so this step skips the
+                    business-hours window. Later steps still wait for send hours.
+                  </span>
+                </p>
+              )}
               {schedulePreview.clamped && (
                 <p className="flex items-start gap-1 text-[11px] text-amber-600">
                   <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />

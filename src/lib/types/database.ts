@@ -2014,6 +2014,7 @@ export interface Sequence {
   name: string
   description: string | null
   status: SequenceStatus
+  send_first_immediately?: boolean
   created_by: string | null
   created_at: string
   updated_at: string

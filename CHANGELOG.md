@@ -11,6 +11,24 @@ entries on top.
 
 ## 2026-07-10
 
+### Added
+- **Sequences: send the first email instantly (bypass send hours).** A new
+  per-sequence toggle — "First email sends: Immediately / Within send hours" —
+  lets a sequence's *first* email fire the moment a candidate is enrolled, even
+  at 3am on a weekend, so time-sensitive messages (e.g. an application
+  confirmation) arrive right away. Follow-up emails still respect the business-
+  hours window (Mon–Fri, 8am–8pm IST). A "Sends instantly" badge marks flagged
+  sequences on both the list and the detail page; the stage editor's schedule
+  preview and the auto-enroll ("When someone applies") hint reflect the instant
+  first send. Engine change is caller-only: `enroll.ts` passes no send-window for
+  the first stage of a flagged sequence (`modules/crm/domain/enroll.ts`,
+  `api/sequences/[id]`, `SequenceStageEditor`, `SequenceAutomations`).
+
+### Schema
+- **`083_sequence_send_first_immediately`** — adds
+  `sequences.send_first_immediately boolean NOT NULL DEFAULT false`. Additive and
+  reversible; default false preserves today's always-windowed behaviour.
+
 ### Fixed
 - **Apply-page resume autofill: recover email/phone the PDF text extractor
   can't see.** Some CVs render the contact header as an image or an undecodable

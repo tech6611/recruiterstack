@@ -35,7 +35,7 @@ export async function enrollCandidate(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: seq } = await (supabase.from('sequences') as any)
-    .select('id, status').eq('id', sequenceId).eq('org_id', orgId).single()
+    .select('id, status, send_first_immediately').eq('id', sequenceId).eq('org_id', orgId).single()
   if (!seq) return { enrolled: false, reason: 'sequence_not_found' }
   if (seq.status !== 'active') return { enrolled: false, reason: 'sequence_not_active' }
 
@@ -75,13 +75,17 @@ export async function enrollCandidate(
   }
 
   // Schedule only the first stage; the handler chains the rest from the live list.
+  // When the sequence is flagged send-first-immediately, skip the business-hours
+  // window on the FIRST stage only (passing no window) so it fires right away —
+  // e.g. an application confirmation. Follow-ups stay windowed (job-handlers.ts).
   if (firstStage) {
+    const firstWindow = seq.send_first_immediately ? null : DEFAULT_SEND_WINDOW
     try {
       await enqueue({
         orgId,
         jobType: 'sequence_email',
         payload: { enrollmentId, sequenceId },
-        delaySeconds: computeStageDelaySeconds(firstStage, new Date(), true, DEFAULT_SEND_WINDOW),
+        delaySeconds: computeStageDelaySeconds(firstStage, new Date(), true, firstWindow),
       })
     } catch (err) {
       logger.error('Failed to enqueue first sequence email', err, { enrollmentId, sequenceId })

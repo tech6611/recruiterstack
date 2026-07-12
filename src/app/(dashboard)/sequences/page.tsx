@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Plus, Mail, Loader2,
   Play, Pause, Archive, ChevronRight, ChevronDown, Copy, X, Download,
-  Filter, Check, Clock, Trash2,
+  Filter, Check, Clock, Trash2, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { downloadCsv, todayStamp } from '@/lib/api/csv-export'
@@ -737,6 +737,11 @@ function SequenceRow({
           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
             {badge.label}
           </span>
+          {seq.send_first_immediately && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
+              <Zap className="h-2.5 w-2.5" /> Sends instantly
+            </span>
+          )}
         </div>
         {seq.description && (
           <p className="text-xs text-slate-400 mt-0.5 truncate">{seq.description}</p>

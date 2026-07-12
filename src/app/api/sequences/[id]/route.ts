@@ -16,12 +16,12 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
   }
 })
 
-// PATCH /api/sequences/[id] — update sequence (name, status, description)
+// PATCH /api/sequences/[id] — update sequence (name, status, description, send_first_immediately)
 export const PATCH = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
   let body: Record<string, unknown>
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
-  const allowed = ['name', 'status', 'description']
+  const allowed = ['name', 'status', 'description', 'send_first_immediately']
   const update: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) update[key] = body[key]

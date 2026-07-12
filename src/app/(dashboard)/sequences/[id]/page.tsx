@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, Loader2, Plus, Trash2, Pencil, X, Copy,
   ArrowDown, Play, Pause, Mail, Users, TrendingUp,
-  User, Clock,
+  User, Clock, Zap,
 } from 'lucide-react'
 import type { Sequence, SequenceStage, SequenceEnrollment, SequenceStatus } from '@/lib/types/database'
 import { formatStageDelay } from '@/lib/sequences/format'
@@ -137,6 +137,16 @@ export default function SequenceDetailPage() {
     loadSequence()
   }
 
+  const toggleInstantFirst = async () => {
+    if (!seq) return
+    await fetch(`/api/sequences/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ send_first_immediately: !seq.send_first_immediately }),
+    })
+    loadSequence()
+  }
+
   const [cloning, setCloning] = useState(false)
   const cloneSequence = async () => {
     setCloning(true)
@@ -241,9 +251,41 @@ export default function SequenceDetailPage() {
               <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
                 {badge.label}
               </span>
+              {seq.send_first_immediately && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
+                  <Zap className="h-2.5 w-2.5" /> Sends instantly
+                </span>
+              )}
             </div>
           )}
           {seq.description && <p className="text-sm text-slate-400 mt-0.5">{seq.description}</p>}
+
+          {/* First-email timing: bypass the send window on the first email so
+              time-sensitive messages (e.g. an application confirmation) arrive
+              right away. Follow-ups always stay within send hours. */}
+          <div className="mt-3 flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 max-w-md">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!!seq.send_first_immediately}
+              onClick={toggleInstantFirst}
+              className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                seq.send_first_immediately ? 'bg-sky-500' : 'bg-slate-200'
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                seq.send_first_immediately ? 'translate-x-4' : 'translate-x-0.5'
+              }`} />
+            </button>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-slate-700">First email sends: {seq.send_first_immediately ? 'Immediately' : 'Within send hours'}</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                {seq.send_first_immediately
+                  ? 'The first email goes out as soon as a candidate is added, even outside working hours. Later emails still wait for send hours (Mon–Fri, 8am–8pm).'
+                  : 'Every email, including the first, waits for send hours (Mon–Fri, 8am–8pm). Turn on to send the first email right away.'}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -488,6 +530,7 @@ export default function SequenceDetailPage() {
           stage={editingStage}
           stageCount={stages.length}
           isFirstStage={editingStage ? editingStage.order_index === 1 : stages.length === 0}
+          sendFirstImmediately={seq.send_first_immediately}
           onClose={() => { setEditorOpen(false); setEditingStage(null) }}
           onSaved={loadSequence}
         />
@@ -519,7 +562,7 @@ export default function SequenceDetailPage() {
               <BulkEnrollPanel sequenceId={id} active={seq.status === 'active'} onPreviewChange={handlePreview} onEnrolled={() => { loadEnrollments(); loadSequence() }} />
             )}
             {activeTool === 'automation' && (
-              <SequenceAutomations sequenceId={id} active={seq.status === 'active'} />
+              <SequenceAutomations sequenceId={id} active={seq.status === 'active'} sendFirstImmediately={seq.send_first_immediately} />
             )}
           </div>
         </div>
