@@ -9,6 +9,42 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-12
+
+### Fixed
+- **Cancelled interviews no longer linger on the interviewer's calendar.** The
+  real Google/Teams/Zoom event is created on one host's calendar, but which host
+  wasn't recorded and the resolver's pick can drift over time (e.g. a panelist
+  connects their own Google after the org account created the event), so
+  cancellation was deleting from the wrong calendar, getting a harmless 404, and
+  treating it as success while the event survived. Cancellation now deletes the
+  event from *every* calendar we can authenticate as (`resolveAllHosts` +
+  shotgun delete in `lib/integrations/cancel-event.ts`), so the calendar that
+  actually holds it is always hit. Also wired the copilot "mark interview
+  cancelled" path (`update_interview_status`) to run the same calendar cleanup +
+  notifications — previously it only changed the status. Shared logic extracted
+  to `lib/interviews/cancel.ts`.
+- **Candidate page no longer shows "Unknown Role" for canonical jobs.** The
+  applications query on `/api/candidates/[id]` only joined the legacy
+  `hiring_requests` table, so applications created against a canonical `jobs`
+  pipeline (`hiring_request_id` null) had no title. It now also embeds `jobs`
+  and folds the canonical title/department onto each application; the "View →"
+  link falls back to `job_id`.
+
+### Added
+- **Per-interviewer daily interview load (min/max per day).** Interviewers set a
+  minimum and maximum interviews-per-day on their own no-login availability page
+  (`/interviewer/[token]`). The **maximum is enforced**: the self-schedule
+  availability engine hides *all* slots on a day once the interviewer already has
+  that many scheduled interviews (for a panel, one maxed-out member blocks the
+  day). The **minimum is a display-only target** shared with the recruiter —
+  hiding slots can't force interviews to exist.
+
+### Schema
+- **`084_interviewer_load_limits`** — adds nullable `min_per_day` /
+  `max_per_day INTEGER` to `interviewer_preferences`. Additive and reversible;
+  NULL means "no limit / not set". **Needs to be applied to the database.**
+
 ## 2026-07-10
 
 ### Added

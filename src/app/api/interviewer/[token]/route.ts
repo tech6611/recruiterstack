@@ -22,12 +22,14 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
 
   return NextResponse.json({
     data: {
-      email:    pref.email,
-      name:     pref.name,
-      timezone: pref.timezone,
+      email:     pref.email,
+      name:      pref.name,
+      timezone:  pref.timezone,
       // Empty windows → show the default so the HM starts from a sensible grid.
-      windows:  pref.windows.length ? pref.windows : DEFAULT_WINDOWS,
-      note:     pref.note,
+      windows:   pref.windows.length ? pref.windows : DEFAULT_WINDOWS,
+      note:      pref.note,
+      minPerDay: pref.minPerDay,
+      maxPerDay: pref.maxPerDay,
     },
   })
 }
@@ -43,7 +45,10 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 })
   }
 
-  let body: { timezone?: string; windows?: unknown; note?: string | null }
+  let body: {
+    timezone?: string; windows?: unknown; note?: string | null
+    minPerDay?: unknown; maxPerDay?: unknown
+  }
   try {
     body = await req.json()
   } catch {
@@ -62,12 +67,38 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
 
   const note = typeof body.note === 'string' ? body.note.slice(0, 2000) : null
 
-  const ok = await saveInterviewerPreferenceByToken(supabase, params.token, { timezone, windows, note })
+  // Daily load limits: non-negative whole numbers (0–20), or null for "no limit".
+  const minPerDay = sanitizeCount(body.minPerDay)
+  const maxPerDay = sanitizeCount(body.maxPerDay)
+  if (minPerDay === INVALID || maxPerDay === INVALID) {
+    return NextResponse.json({ error: 'Interviews-per-day must be a whole number between 0 and 20.' }, { status: 400 })
+  }
+  if (minPerDay !== null && maxPerDay !== null && minPerDay > maxPerDay) {
+    return NextResponse.json({ error: 'Minimum interviews per day can’t be more than the maximum.' }, { status: 400 })
+  }
+
+  const ok = await saveInterviewerPreferenceByToken(supabase, params.token, {
+    timezone, windows, note, minPerDay, maxPerDay,
+  })
   if (!ok) {
     return NextResponse.json({ error: 'Failed to save. Please try again.' }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })
+}
+
+// Sentinel distinguishing "invalid input" from a legitimate null (no limit set).
+const INVALID = Symbol('invalid-count')
+
+/**
+ * Normalize a per-day count: null/'' → null (no limit); a whole number in
+ * 0–20 → that number; anything else → INVALID.
+ */
+function sanitizeCount(raw: unknown): number | null | typeof INVALID {
+  if (raw === null || raw === undefined || raw === '') return null
+  const n = typeof raw === 'string' ? Number(raw) : raw
+  if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 20) return INVALID
+  return n
 }
 
 /**

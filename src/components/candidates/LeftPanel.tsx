@@ -277,7 +277,7 @@ export default React.memo(function LeftPanel({
                         )}
                       </div>
                       <a
-                        href={`/jobs/${app.hiring_request_id}`}
+                        href={`/jobs/${app.hiring_request_id ?? app.job_id}`}
                         className="text-[10px] text-emerald-600 hover:text-emerald-800 shrink-0"
                       >
                         View →

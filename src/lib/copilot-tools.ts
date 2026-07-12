@@ -81,6 +81,7 @@ import {
   createSelfScheduleInterview,
 } from '@/modules/ats/domain/interviews'
 import { ensureInterviewerPreferenceLink } from '@/modules/ats/domain/interviewer-preferences'
+import { runInterviewCancellationSideEffects } from '@/lib/interviews/cancel'
 import {
   createOfferRow,
   updateOfferRow,
@@ -2924,6 +2925,13 @@ async function updateInterviewStatus(
       metadata: { interview_id },
       created_by: orgId,
     } as never)
+  }
+
+  // Cancelling here must clean up the real calendar event + notify attendees,
+  // exactly like the REST cancel path — otherwise the meeting lingers on the
+  // interviewer's calendar.
+  if (status === 'cancelled') {
+    await runInterviewCancellationSideEffects(supabase, orgId, interview_id)
   }
 
   return `Interview status updated to "${status}".`

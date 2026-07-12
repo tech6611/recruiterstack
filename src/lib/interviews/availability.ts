@@ -57,6 +57,20 @@ function weekdayOf(y: number, m0: number, d: number): number {
   return new Date(Date.UTC(y, m0, d)).getUTCDay()
 }
 
+/** Stable key for a calendar date, used to bucket per-day interview counts. */
+export function dateKey(y: number, m0: number, d: number): string {
+  return `${y}-${m0}-${d}`
+}
+
+/** The `dateKey` of a UTC instant as it falls on the calendar in `tz`. */
+export function dateKeyInTz(tz: string, utcMs: number): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(utcMs))
+  const get = (t: string) => parseInt(parts.find(p => p.type === t)!.value)
+  return dateKey(get('year'), get('month') - 1, get('day'))
+}
+
 /** The next `count` business days (Mon–Fri) as calendar dates in `refTz`, today inclusive. */
 export function nextBusinessDays(refTz: string, count: number, nowMs: number): { y: number; m0: number; d: number }[] {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -131,6 +145,10 @@ export interface InterviewerAvailability {
   timezone: string
   windows:  AvailabilityWindow[]
   busy:     Interval[]
+  /** Hard daily cap. null/undefined = no limit. */
+  maxPerDay?: number | null
+  /** Existing scheduled-interview counts, keyed by `dateKey`. */
+  scheduledByDate?: Record<string, number>
 }
 
 /**
@@ -152,8 +170,13 @@ export function computeSlots(
   const slots: Interval[] = []
   for (const date of businessDates) {
     const wd = weekdayOf(date.y, date.m0, date.d)
+    const dk = dateKey(date.y, date.m0, date.d)
 
     const perInterviewer: Interval[][] = interviewers.map(iv => {
+      // Already at their daily cap for this date → offer nothing (for a panel,
+      // one interviewer being maxed out blocks the whole day, which is correct —
+      // the interview can't be added to an over-booked person).
+      if (iv.maxPerDay != null && (iv.scheduledByDate?.[dk] ?? 0) >= iv.maxPerDay) return []
       const windows = iv.windows.filter(w => w.day === wd)
       if (windows.length === 0) return []
       const avail = windows.map(w => ({
@@ -223,11 +246,21 @@ export async function computeOpenSlots(opts: ComputeOpenSlotsOptions): Promise<{
     new Date(nowMs).toISOString(), new Date(rangeEndMs).toISOString(),
   )
 
+  // Count each interviewer's already-scheduled interviews per day so the
+  // per-day cap (interviewer_preferences.max_per_day) can be enforced. Buckets
+  // by the reference-tz calendar date, matching how business dates are keyed.
+  const scheduledByEmail = await countScheduledPerDay(
+    opts.supabase, opts.orgId, emails, refTz,
+    new Date(nowMs).toISOString(), new Date(rangeEndMs).toISOString(),
+  )
+
   const interviewers: InterviewerAvailability[] = emails.map(email => ({
     email,
     timezone: prefs[email]?.timezone || DEFAULT_TIMEZONE,
     windows:  prefs[email]?.windows?.length ? prefs[email].windows : DEFAULT_WINDOWS,
     busy:     (busy[email] ?? []).map(b => ({ start: new Date(b.start).getTime(), end: new Date(b.end).getTime() })),
+    maxPerDay:       prefs[email]?.maxPerDay ?? null,
+    scheduledByDate: scheduledByEmail[email] ?? {},
   }))
 
   const slots = computeSlots(
@@ -244,4 +277,47 @@ export async function computeOpenSlots(opts: ComputeOpenSlotsOptions): Promise<{
     interviewerCount: emails.length,
     calendarChecked: calendarConnected,
   }
+}
+
+/**
+ * For a set of interviewer emails, count how many `scheduled` interviews each
+ * already has on each calendar day (in `refTz`) within [startIso, endIso).
+ * Interviewers are matched on both interviews.interviewer_email and any
+ * panel[].email. Returns { email → { dateKey → count } }.
+ */
+async function countScheduledPerDay(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
+  orgId: string,
+  emails: string[],
+  refTz: string,
+  startIso: string,
+  endIso: string,
+): Promise<Record<string, Record<string, number>>> {
+  const wanted = new Set(emails)
+  const out: Record<string, Record<string, number>> = {}
+
+  const { data } = await supabase
+    .from('interviews')
+    .select('interviewer_email, panel, scheduled_at')
+    .eq('org_id', orgId)
+    .eq('status', 'scheduled')
+    .gte('scheduled_at', startIso)
+    .lt('scheduled_at', endIso)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const row of (data ?? []) as any[]) {
+    if (!row.scheduled_at) continue
+    const rowEmails = new Set<string>()
+    if (row.interviewer_email) rowEmails.add(String(row.interviewer_email).trim().toLowerCase())
+    if (Array.isArray(row.panel)) {
+      for (const m of row.panel) if (m?.email) rowEmails.add(String(m.email).trim().toLowerCase())
+    }
+    const dk = dateKeyInTz(refTz, new Date(row.scheduled_at).getTime())
+    for (const em of Array.from(rowEmails)) {
+      if (!wanted.has(em)) continue
+      ;(out[em] ??= {})[dk] = (out[em][dk] ?? 0) + 1
+    }
+  }
+  return out
 }

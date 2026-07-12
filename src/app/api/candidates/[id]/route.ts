@@ -10,7 +10,10 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
     supabase.from('candidates').select('*').eq('id', id).eq('org_id', orgId).single(),
     supabase
       .from('applications')
-      .select('*, pipeline_stages(name, color), hiring_requests(id, position_title, department, ticket_number, hiring_manager_name, hiring_manager_email)')
+      // Legacy apps carry the title on hiring_requests; canonical apps (migration
+      // 064/067) leave hiring_request_id null and point at a canonical job instead,
+      // so we also embed jobs → and normalize both onto `hiring_requests` below.
+      .select('*, pipeline_stages(name, color), hiring_requests(id, position_title, department, ticket_number, hiring_manager_name, hiring_manager_email), job:jobs(id, position_title:title, department:departments(name))')
       .eq('candidate_id', id)
       .eq('org_id', orgId)
       .order('applied_at', { ascending: false }),
@@ -41,8 +44,26 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
     return NextResponse.json({ error: candRes.error.message }, { status })
   }
 
+  // Normalize job info: canonical apps (hiring_request_id null) carry their title
+  // on the embedded `job`. Fold it onto `hiring_requests` so every consumer of
+  // `app.hiring_requests?.position_title` shows the real title, not "Unknown Role".
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applications = (appsRes.data ?? []).map((a: any) => {
+    if (!a.hiring_requests && a.job) {
+      a.hiring_requests = {
+        id:                   a.job.id,
+        position_title:       a.job.position_title ?? null,
+        department:           a.job.department?.name ?? null,
+        ticket_number:        null,
+        hiring_manager_name:  null,
+        hiring_manager_email: null,
+      }
+    }
+    return a
+  })
+
   // Fetch events for all applications
-  const appIds = (appsRes.data ?? []).map((a: { id: string }) => a.id)
+  const appIds = applications.map((a: { id: string }) => a.id)
   const { data: events } = appIds.length
     ? await supabase
         .from('application_events')
@@ -54,7 +75,7 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
   return NextResponse.json({
     data: {
       ...candRes.data,
-      applications: appsRes.data ?? [],
+      applications,
       events:       events        ?? [],
       tags:         tagsRes.data  ?? [],
       tasks:        tasksRes.data ?? [],

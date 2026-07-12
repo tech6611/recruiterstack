@@ -51,6 +51,8 @@ export default function InterviewerPreferencesPage() {
   const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [tzOptions, setTzOptions] = useState<string[]>(COMMON_TIMEZONES)
   const [note, setNote]         = useState('')
+  const [minPerDay, setMinPerDay] = useState('')   // '' = no limit
+  const [maxPerDay, setMaxPerDay] = useState('')   // '' = no limit
   const [days, setDays]         = useState<Record<number, DayState>>(
     Object.fromEntries(DAYS.map(d => [d.idx, { ...DEFAULT_DAY }])),
   )
@@ -77,6 +79,8 @@ export default function InterviewerPreferencesPage() {
         setTzOptions(Array.from(new Set([tz, browserTz, ...COMMON_TIMEZONES].filter(Boolean))))
 
         setNote(data.note || '')
+        setMinPerDay(data.minPerDay != null ? String(data.minPerDay) : '')
+        setMaxPerDay(data.maxPerDay != null ? String(data.maxPerDay) : '')
 
         // Map returned windows onto per-day rows (first window per day wins).
         const next = Object.fromEntries(DAYS.map(d => [d.idx, { ...DEFAULT_DAY }])) as Record<number, DayState>
@@ -121,12 +125,29 @@ export default function InterviewerPreferencesPage() {
       return
     }
 
+    // Daily load limits: blank = no limit; otherwise a whole number, min ≤ max.
+    const minVal = minPerDay.trim() === '' ? null : Number(minPerDay)
+    const maxVal = maxPerDay.trim() === '' ? null : Number(maxPerDay)
+    for (const [label, v] of [['Minimum', minVal], ['Maximum', maxVal]] as const) {
+      if (v !== null && (!Number.isInteger(v) || v < 0 || v > 20)) {
+        setError(`${label} interviews per day must be a whole number between 0 and 20.`)
+        return
+      }
+    }
+    if (minVal !== null && maxVal !== null && minVal > maxVal) {
+      setError('Minimum interviews per day can’t be more than the maximum.')
+      return
+    }
+
     setSaving(true)
     try {
       const res = await fetch(`/api/interviewer/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timezone, windows, note: note.trim() || null }),
+        body: JSON.stringify({
+          timezone, windows, note: note.trim() || null,
+          minPerDay: minVal, maxPerDay: maxVal,
+        }),
       })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
@@ -242,6 +263,41 @@ export default function InterviewerPreferencesPage() {
                 )
               })}
             </div>
+          </div>
+
+          {/* Daily interview load */}
+          <div>
+            <label className={labelCls}>Interviews per day <span className="font-normal text-slate-400">(optional)</span></label>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <span className="text-xs text-slate-500">Minimum</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={minPerDay}
+                  onChange={e => { setMinPerDay(e.target.value); setSaved(false) }}
+                  placeholder="No min"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400"
+                />
+              </div>
+              <div className="flex-1">
+                <span className="text-xs text-slate-500">Maximum</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={maxPerDay}
+                  onChange={e => { setMaxPerDay(e.target.value); setSaved(false) }}
+                  placeholder="No max"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-400"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Once you already have your <span className="font-medium">maximum</span> interviews booked on a day,
+              candidates won&rsquo;t be offered any more slots that day. The minimum is a target shared with the recruiter.
+            </p>
           </div>
 
           {/* Free-text note */}

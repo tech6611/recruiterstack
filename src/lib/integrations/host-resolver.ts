@@ -202,3 +202,65 @@ export async function resolveHost(
 
   throw new HostTokenUnavailableError(provider)
 }
+
+/**
+ * Like resolveHost, but returns EVERY host whose token we can obtain — each
+ * panelist's per-user calendar (in panel order) plus the legacy org-level
+ * account — deduped by connected calendar. Used by cancellation: the event was
+ * created on exactly one of these calendars, but we don't persist which, and the
+ * host that resolves first can drift over time (e.g. a panelist connects their
+ * own Google after the org account created the event). Deleting the event id
+ * from every candidate calendar reliably removes it — a delete against a calendar
+ * that doesn't hold it simply 404s and is harmless.
+ *
+ * Never throws — returns [] when no token source is available.
+ */
+export async function resolveAllHosts(
+  provider: ResolvableProvider,
+  panelEmails: string[],
+  orgId: string,
+): Promise<ResolvedHost[]> {
+  const hosts: ResolvedHost[] = []
+  const seen = new Set<string>()
+  const add = (h: ResolvedHost) => {
+    // Dedupe by the calendar we'd actually hit (connected email), else user id.
+    const key = (h.connected_email?.toLowerCase() || h.host_user_id || '').trim()
+    if (key) {
+      if (seen.has(key)) return
+      seen.add(key)
+    }
+    hosts.push(h)
+  }
+
+  // Map panel emails → user_ids in panel order (same as resolveHost).
+  const emails = panelEmails.map(e => e.trim().toLowerCase()).filter(Boolean)
+  const userIdsInOrder: string[] = []
+  if (emails.length > 0) {
+    const supabase = createAdminClient()
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, email')
+      .in('email', emails)
+
+    if (users) {
+      const emailToId = new Map<string, string>()
+      for (const u of users as Array<{ id: string; email: string }>) {
+        emailToId.set(u.email.toLowerCase(), u.id)
+      }
+      for (const e of emails) {
+        const id = emailToId.get(e)
+        if (id) userIdsInOrder.push(id)
+      }
+    }
+  }
+
+  for (const userId of userIdsInOrder) {
+    const hit = await tryPerUser(provider, userId)
+    if (hit) add({ ...hit, via: 'user_integrations' })
+  }
+
+  const legacy = await tryOrgLegacy(provider, orgId)
+  if (legacy) add({ ...legacy, via: 'org_settings' })
+
+  return hosts
+}

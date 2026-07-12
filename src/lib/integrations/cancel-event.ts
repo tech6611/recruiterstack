@@ -12,7 +12,7 @@
  * best-effort side effect and must not let a failure here break their flow.
  */
 
-import { resolveHost, type ResolvableProvider } from '@/lib/integrations/host-resolver'
+import { resolveAllHosts, type ResolvableProvider } from '@/lib/integrations/host-resolver'
 import { logger } from '@/lib/logger'
 
 // interviews.meeting_platform → host-resolver provider key
@@ -34,6 +34,55 @@ export interface CancelEventOptions {
   notifyAttendees?: boolean
 }
 
+type DeleteOutcome = 'deleted' | 'gone' | 'failed'
+
+/** Delete the event/meeting from ONE host's calendar. */
+async function deleteFromHost(
+  provider: ResolvableProvider,
+  accessToken: string,
+  calendarEventId: string,
+  notifyAttendees: boolean,
+): Promise<DeleteOutcome> {
+  const auth = { Authorization: `Bearer ${accessToken}` }
+  try {
+    if (provider === 'google') {
+      const sendUpdates = notifyAttendees ? 'all' : 'none'
+      const res = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events/${calendarEventId}?sendUpdates=${sendUpdates}`,
+        { method: 'DELETE', headers: auth },
+      )
+      if (res.ok) return 'deleted'
+      if (res.status === 404 || res.status === 410) return 'gone'  // not on this calendar
+      logger.warn('[cancel-event] google delete failed', { status: res.status })
+      return 'failed'
+    }
+
+    if (provider === 'microsoft') {
+      const res = await fetch(
+        `https://graph.microsoft.com/v1.0/me/events/${calendarEventId}`,
+        { method: 'DELETE', headers: auth },
+      )
+      if (res.ok) return 'deleted'
+      if (res.status === 404 || res.status === 410) return 'gone'
+      logger.warn('[cancel-event] microsoft delete failed', { status: res.status })
+      return 'failed'
+    }
+
+    // zoom
+    const res = await fetch(
+      `https://api.zoom.us/v2/meetings/${calendarEventId}`,
+      { method: 'DELETE', headers: auth },
+    )
+    if (res.ok) return 'deleted'
+    if (res.status === 404) return 'gone'
+    logger.warn('[cancel-event] zoom delete failed', { status: res.status })
+    return 'failed'
+  } catch (e) {
+    logger.error('[cancel-event] delete request errored', e)
+    return 'failed'
+  }
+}
+
 export async function cancelCalendarEvent(opts: CancelEventOptions): Promise<boolean> {
   const { meetingPlatform, calendarEventId, panelEmails, orgId, notifyAttendees = true } = opts
 
@@ -43,49 +92,25 @@ export async function cancelCalendarEvent(opts: CancelEventOptions): Promise<boo
   const provider = PLATFORM_TO_PROVIDER[meetingPlatform]
   if (!provider) return false
 
-  try {
-    const host = await resolveHost(provider, panelEmails, orgId)
-    const auth = { Authorization: `Bearer ${host.access_token}` }
-
-    if (provider === 'google') {
-      const sendUpdates = notifyAttendees ? 'all' : 'none'
-      const res = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events/${calendarEventId}?sendUpdates=${sendUpdates}`,
-        { method: 'DELETE', headers: auth },
-      )
-      // 404/410 → event already gone; treat as success.
-      if (!res.ok && res.status !== 404 && res.status !== 410) {
-        logger.warn('[cancel-event] google delete failed', { status: res.status })
-        return false
-      }
-      return true
-    }
-
-    if (provider === 'microsoft') {
-      const res = await fetch(
-        `https://graph.microsoft.com/v1.0/me/events/${calendarEventId}`,
-        { method: 'DELETE', headers: auth },
-      )
-      if (!res.ok && res.status !== 404 && res.status !== 410) {
-        logger.warn('[cancel-event] microsoft delete failed', { status: res.status })
-        return false
-      }
-      return true
-    }
-
-    // zoom
-    const res = await fetch(
-      `https://api.zoom.us/v2/meetings/${calendarEventId}`,
-      { method: 'DELETE', headers: auth },
-    )
-    if (!res.ok && res.status !== 404) {
-      logger.warn('[cancel-event] zoom delete failed', { status: res.status })
-      return false
-    }
-    return true
-  } catch (e) {
-    // HostTokenUnavailableError or a network error — log and give up quietly.
-    logger.error('[cancel-event] could not cancel calendar event', e)
+  // The event lives on exactly one calendar, but we don't persist which host
+  // created it and the resolver's first choice can drift. So try deleting from
+  // every host we can authenticate as; a 404 against a calendar that doesn't
+  // hold the event is harmless.
+  const hosts = await resolveAllHosts(provider, panelEmails, orgId)
+  if (hosts.length === 0) {
+    logger.warn('[cancel-event] no host token available; cannot cancel calendar event', { provider, orgId })
     return false
   }
+
+  let anyDeleted = false
+  let anyGone = false
+  for (const host of hosts) {
+    const outcome = await deleteFromHost(provider, host.access_token, calendarEventId, notifyAttendees)
+    if (outcome === 'deleted') anyDeleted = true
+    if (outcome === 'gone')    anyGone = true
+  }
+
+  // Success if we actually removed it, or every reachable calendar reports it's
+  // already absent. Only a hard failure on every host (and no delete) is a miss.
+  return anyDeleted || anyGone
 }

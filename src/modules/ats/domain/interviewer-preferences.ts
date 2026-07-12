@@ -31,6 +31,10 @@ export interface InterviewerPreference {
   timezone: string
   windows:  AvailabilityWindow[]
   note:     string | null
+  /** Soft daily target (display only). null = not set. */
+  minPerDay: number | null
+  /** Hard daily cap — the availability engine won't offer slots past it. null = no limit. */
+  maxPerDay: number | null
 }
 
 export const DEFAULT_TIMEZONE = 'Asia/Kolkata'
@@ -104,33 +108,43 @@ export async function getInterviewerPreferenceByToken(
   token: string,
 ): Promise<InterviewerPreferenceByToken | null> {
   const { data } = await table(supabase)
-    .select('org_id, email, name, timezone, windows, note')
+    .select('org_id, email, name, timezone, windows, note, min_per_day, max_per_day')
     .eq('edit_token', token)
     .maybeSingle()
 
   if (!data) return null
   return {
-    orgId:    data.org_id,
-    email:    data.email,
-    name:     data.name ?? null,
-    timezone: data.timezone ?? DEFAULT_TIMEZONE,
-    windows:  Array.isArray(data.windows) ? (data.windows as AvailabilityWindow[]) : [],
-    note:     data.note ?? null,
+    orgId:     data.org_id,
+    email:     data.email,
+    name:      data.name ?? null,
+    timezone:  data.timezone ?? DEFAULT_TIMEZONE,
+    windows:   Array.isArray(data.windows) ? (data.windows as AvailabilityWindow[]) : [],
+    note:      data.note ?? null,
+    minPerDay: typeof data.min_per_day === 'number' ? data.min_per_day : null,
+    maxPerDay: typeof data.max_per_day === 'number' ? data.max_per_day : null,
   }
 }
 
-/** Save an interviewer's windows/timezone/note via their public edit token. */
+/** Save an interviewer's windows/timezone/note/load limits via their public edit token. */
 export async function saveInterviewerPreferenceByToken(
   supabase: SupabaseClient,
   token: string,
-  fields: { timezone: string; windows: AvailabilityWindow[]; note: string | null },
+  fields: {
+    timezone: string
+    windows: AvailabilityWindow[]
+    note: string | null
+    minPerDay: number | null
+    maxPerDay: number | null
+  },
 ): Promise<boolean> {
   const { error } = await table(supabase)
     .update({
-      timezone:   fields.timezone,
-      windows:    fields.windows,
-      note:       fields.note,
-      updated_at: new Date().toISOString(),
+      timezone:    fields.timezone,
+      windows:     fields.windows,
+      note:        fields.note,
+      min_per_day: fields.minPerDay,
+      max_per_day: fields.maxPerDay,
+      updated_at:  new Date().toISOString(),
     })
     .eq('edit_token', token)
   return !error
@@ -154,17 +168,19 @@ export async function getInterviewerPreferences(
     const windows = row?.windows && row.windows.length ? row.windows : DEFAULT_WINDOWS
     return {
       email,
-      name:     row?.name ?? null,
-      timezone: row?.timezone || DEFAULT_TIMEZONE,
+      name:      row?.name ?? null,
+      timezone:  row?.timezone || DEFAULT_TIMEZONE,
       windows,
-      note:     row?.note ?? null,
+      note:      row?.note ?? null,
+      minPerDay: row?.minPerDay ?? null,
+      maxPerDay: row?.maxPerDay ?? null,
     }
   }
 
   if (wanted.length === 0) return out
 
   const { data } = await table(supabase)
-    .select('email, name, timezone, windows, note')
+    .select('email, name, timezone, windows, note, min_per_day, max_per_day')
     .eq('org_id', orgId)
     .in('email', wanted)
 
@@ -173,7 +189,12 @@ export async function getInterviewerPreferences(
   for (const em of wanted) {
     const r = byEmail.get(em)
     out[em] = withDefault(em, r
-      ? { name: r.name, timezone: r.timezone, windows: Array.isArray(r.windows) ? r.windows : [], note: r.note }
+      ? {
+          name: r.name, timezone: r.timezone,
+          windows: Array.isArray(r.windows) ? r.windows : [], note: r.note,
+          minPerDay: typeof r.min_per_day === 'number' ? r.min_per_day : null,
+          maxPerDay: typeof r.max_per_day === 'number' ? r.max_per_day : null,
+        }
       : undefined)
   }
   return out

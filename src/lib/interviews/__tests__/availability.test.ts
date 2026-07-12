@@ -6,6 +6,7 @@ import {
   subtractIntervals,
   intersectMany,
   computeSlots,
+  dateKey,
   type InterviewerAvailability,
 } from '../availability'
 
@@ -129,5 +130,24 @@ describe('computeSlots', () => {
     const slots = computeSlots([interviewer()], [date], H, 30 * MIN, 0)
     const mins = new Set(slots.map(s => new Date(s.start).getUTCMinutes()))
     expect(Array.from(mins).sort((a, b) => a - b)).toEqual([0, 30])
+  })
+
+  it('offers no slots on a day the interviewer is already at their daily max', () => {
+    const dk = dateKey(date.y, date.m0, date.d)
+    const maxed = interviewer({ maxPerDay: 2, scheduledByDate: { [dk]: 2 } })
+    expect(computeSlots([maxed], [date], H, H, 0)).toHaveLength(0)
+  })
+
+  it('still offers slots when below the daily max', () => {
+    const dk = dateKey(date.y, date.m0, date.d)
+    const under = interviewer({ maxPerDay: 3, scheduledByDate: { [dk]: 1 } })
+    expect(computeSlots([under], [date], H, H, 0)).toHaveLength(9)
+  })
+
+  it('one maxed-out panelist blocks the whole day for the panel', () => {
+    const dk = dateKey(date.y, date.m0, date.d)
+    const free   = interviewer()
+    const capped = interviewer({ email: 'b@x.com', maxPerDay: 1, scheduledByDate: { [dk]: 1 } })
+    expect(computeSlots([free, capped], [date], H, H, 0)).toHaveLength(0)
   })
 })
