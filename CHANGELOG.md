@@ -20,7 +20,11 @@ entries on top.
   treating it as success while the event survived. Cancellation now deletes the
   event from *every* calendar we can authenticate as (`resolveAllHosts` +
   shotgun delete in `lib/integrations/cancel-event.ts`), so the calendar that
-  actually holds it is always hit. Also wired the copilot "mark interview
+  actually holds it is always hit. Attendees get the native "meeting cancelled"
+  notice and the event is removed from both the interviewer's and candidate's
+  calendars — Google via `sendUpdates=all`, Outlook/Teams via the Graph `cancel`
+  action (a plain delete could drop the event without notifying). Also wired the
+  copilot "mark interview
   cancelled" path (`update_interview_status`) to run the same calendar cleanup +
   notifications — previously it only changed the status. Shared logic extracted
   to `lib/interviews/cancel.ts`.

@@ -58,6 +58,22 @@ async function deleteFromHost(
     }
 
     if (provider === 'microsoft') {
+      // The `cancel` action is Outlook's equivalent of Google's sendUpdates=all:
+      // it emails attendees the organizer's "meeting cancelled" message and then
+      // removes the event. A plain DELETE can drop the event without notifying.
+      if (notifyAttendees) {
+        const res = await fetch(
+          `https://graph.microsoft.com/v1.0/me/events/${calendarEventId}/cancel`,
+          {
+            method: 'POST',
+            headers: { ...auth, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comment: 'This interview has been cancelled.' }),
+          },
+        )
+        if (res.ok) return 'deleted'                                  // 202 Accepted
+        if (res.status === 404 || res.status === 410) return 'gone'   // not in this mailbox
+        // Non-organizer mailbox or older API — fall through to a plain delete.
+      }
       const res = await fetch(
         `https://graph.microsoft.com/v1.0/me/events/${calendarEventId}`,
         { method: 'DELETE', headers: auth },

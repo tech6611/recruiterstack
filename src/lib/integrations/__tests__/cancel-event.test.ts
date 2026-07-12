@@ -92,13 +92,24 @@ describe('cancelCalendarEvent', () => {
     expect(url).toContain('sendUpdates=none')
   })
 
-  it('deletes a Teams event via the Graph API', async () => {
+  it('cancels a Teams event via the Graph cancel action (notifies attendees)', async () => {
     await cancelCalendarEvent({
       meetingPlatform: 'ms_teams', calendarEventId: 'graph-evt', panelEmails: [], orgId: 'org-1',
     })
     expect(mockedResolveAllHosts).toHaveBeenCalledWith('microsoft', [], 'org-1')
-    const [url] = (global.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(url).toContain('graph.microsoft.com/v1.0/me/events/graph-evt')
+    const [url, init] = (global.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(url).toContain('graph.microsoft.com/v1.0/me/events/graph-evt/cancel')
+    expect(init.method).toBe('POST')
+  })
+
+  it('falls back to a plain Graph delete when not notifying (e.g. reschedule cleanup)', async () => {
+    await cancelCalendarEvent({
+      meetingPlatform: 'ms_teams', calendarEventId: 'graph-evt', panelEmails: [], orgId: 'org-1',
+      notifyAttendees: false,
+    })
+    const [url, init] = (global.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(url).toBe('https://graph.microsoft.com/v1.0/me/events/graph-evt')
+    expect(init.method).toBe('DELETE')
   })
 
   it('deletes a Zoom meeting via the Zoom API', async () => {
