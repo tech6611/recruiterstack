@@ -522,7 +522,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 <span className="font-medium text-slate-700">{schedulePreview.instant ? 'Immediately' : schedulePreview.when}</span>
               </p>
               {schedulePreview.instant && (
-                <p className="flex items-start gap-1 text-[11px] text-sky-600">
+                <p className="flex items-start gap-1 text-[11px] text-emerald-600">
                   <Zap className="h-3 w-3 mt-0.5 shrink-0" />
                   <span>
                     This sequence sends its first email instantly, so this step skips the

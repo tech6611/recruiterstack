@@ -285,9 +285,9 @@ export default function SequenceAutomations({ sequenceId, active, sendFirstImmed
       </p>
 
       {sendFirstImmediately && (
-        <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-          <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-600" />
-          <p className="text-[11px] text-sky-700">
+        <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+          <p className="text-[11px] text-emerald-700">
             This sequence sends its first email instantly. Pair it with the
             <span className="font-semibold"> &ldquo;When someone applies&rdquo; </span>
             trigger so a candidate gets your first email the moment they apply — even

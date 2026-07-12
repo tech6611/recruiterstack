@@ -738,7 +738,7 @@ function SequenceRow({
             {badge.label}
           </span>
           {seq.send_first_immediately && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
               <Zap className="h-2.5 w-2.5" /> Sends instantly
             </span>
           )}

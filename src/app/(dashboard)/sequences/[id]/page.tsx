@@ -252,7 +252,7 @@ export default function SequenceDetailPage() {
                 {badge.label}
               </span>
               {seq.send_first_immediately && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                   <Zap className="h-2.5 w-2.5" /> Sends instantly
                 </span>
               )}
@@ -270,7 +270,7 @@ export default function SequenceDetailPage() {
               aria-checked={!!seq.send_first_immediately}
               onClick={toggleInstantFirst}
               className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                seq.send_first_immediately ? 'bg-sky-500' : 'bg-slate-200'
+                seq.send_first_immediately ? 'bg-emerald-500' : 'bg-slate-200'
               }`}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
