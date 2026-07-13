@@ -8,7 +8,10 @@ interface VoiceCallModalProps {
   candidateName: string
   candidatePhone: string | null
   applicationId: string
-  hiringRequestId: string
+  // One of these anchors the call to the job. Canonical apps set jobId; legacy
+  // apps set hiringRequestId.
+  hiringRequestId: string | null
+  jobId: string | null
   positionTitle: string
   onClose: () => void
 }
@@ -19,6 +22,7 @@ export default function VoiceCallModal({
   candidatePhone,
   applicationId,
   hiringRequestId,
+  jobId,
   positionTitle,
   onClose,
 }: VoiceCallModalProps) {
@@ -40,7 +44,8 @@ export default function VoiceCallModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           candidate_id: candidateId,
-          hiring_request_id: hiringRequestId,
+          job_id: jobId ?? undefined,
+          hiring_request_id: hiringRequestId ?? undefined,
           application_id: applicationId,
           phone_number: phone.trim(),
           agent_type: 'phone_screen',

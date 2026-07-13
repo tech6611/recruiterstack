@@ -79,6 +79,7 @@ export default function CandidateModals() {
           candidatePhone={candidate.phone}
           applicationId={activeApps[0].id}
           hiringRequestId={activeApps[0].hiring_request_id}
+          jobId={activeApps[0].job_id}
           positionTitle={activeApps[0].hiring_requests?.position_title ?? 'Open Role'}
           onClose={ctx.closeVoiceCallModal}
         />
