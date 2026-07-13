@@ -22,6 +22,10 @@ export const SEQUENCE_TOKENS: TokenMeta[] = [
   { token: '{{job_title}}',            key: 'job_title',            label: 'Job Title',       fallback: 'this role' },
   { token: '{{company_name}}',         key: 'company_name',         label: 'Hiring Company',  fallback: 'our company' },
   { token: '{{recruiter_name}}',       key: 'recruiter_name',       label: 'Recruiter',       fallback: 'the hiring team' },
+  // Resolved per candidate at send-time to a personal /schedule link for their
+  // hiring manager. When the HM (or their availability) can't be resolved, the
+  // fallback reads as a natural sentence instead of a dead link.
+  { token: '{{hiring_manager_calendar}}', key: 'hiring_manager_calendar', label: 'Hiring Manager Calendar', fallback: 'the hiring team will reach out to schedule a time' },
 ]
 
 const FALLBACK_BY_KEY: Record<string, string> = Object.fromEntries(

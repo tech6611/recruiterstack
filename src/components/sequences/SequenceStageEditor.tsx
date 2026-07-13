@@ -23,6 +23,7 @@ const TOKENS = [
   { token: '{{job_title}}',            label: 'Job Title' },
   { token: '{{company_name}}',         label: 'Hiring Company' },
   { token: '{{recruiter_name}}',       label: 'Recruiter' },
+  { token: '{{hiring_manager_calendar}}', label: 'HM Calendar Link' },
 ]
 
 const CHANNELS: { value: SequenceChannel; label: string; icon: string; soon?: boolean }[] = [
@@ -299,6 +300,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
       recruiter_name: settings.recruiter_name || 'Recruiter',
       recruiter_title: settings.recruiter_title || '',
       department: 'Engineering',
+      hiring_manager_calendar: 'https://recruiterstack.in/schedule/preview-link',
     }
 
     const renderedSubject = subject.replace(/\{\{(\w+)\}\}/g, (_, key) => sampleContext[key] || `[${key}]`)

@@ -1640,3 +1640,100 @@ export async function getApplicationJobTokens(
 
   return null
 }
+
+// ── Hiring-manager resolution (sequence HM calendar link) ────────────────────
+// For an application's canonical job, find the hiring manager to book against.
+// Two canonical paths, in order:
+//   1) jobs.hiring_team_id → hiring_team_members(role='hiring_manager') → users
+//   2) the opening linked to that job (job_openings) → openings.hiring_manager_id → users
+// Returns the HM's { email, name }, or null when none is resolvable (no job, no
+// team/HM assigned) — the caller then uses the token's natural-language fallback.
+// canonical columns aren't in the generated types yet; cast the client as above.
+
+export interface ResolvedHiringManager {
+  email: string
+  name: string
+}
+
+export async function resolveApplicationHiringManager(
+  supabase: Supabase,
+  orgId: string,
+  applicationId: string,
+): Promise<ResolvedHiringManager | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+
+  const { data: app } = await sb
+    .from('applications')
+    .select('job_id')
+    .eq('id', applicationId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  const jobId = (app as { job_id: string | null } | null)?.job_id
+  if (!jobId) return null
+
+  const { data: job } = await sb
+    .from('jobs')
+    .select('hiring_team_id, custom_fields')
+    .eq('id', jobId)
+    .maybeSingle()
+  const jobRow = job as { hiring_team_id: string | null; custom_fields: Record<string, unknown> | null } | null
+
+  // Path 0: the hiring manager the recruiter set on the job itself
+  // (custom_fields.hiring_manager_email). This is the primary, most-populated
+  // source and matches the Django prod sender — keep both in sync.
+  const cf = jobRow?.custom_fields ?? {}
+  const cfEmail = typeof cf.hiring_manager_email === 'string' ? cf.hiring_manager_email.trim() : ''
+  if (cfEmail) {
+    const cfName = typeof cf.hiring_manager_name === 'string' ? cf.hiring_manager_name.trim() : ''
+    return { email: cfEmail, name: cfName || cfEmail }
+  }
+
+  const teamId = jobRow?.hiring_team_id
+
+  // Path 1: the job's hiring team.
+  if (teamId) {
+    const { data: members } = await sb
+      .from('hiring_team_members')
+      .select('user_id')
+      .eq('hiring_team_id', teamId)
+      .eq('role', 'hiring_manager')
+      .limit(1)
+    const userId = (members as { user_id: string }[] | null)?.[0]?.user_id
+    const hm = userId ? await loadUserContact(sb, userId) : null
+    if (hm) return hm
+  }
+
+  // Path 2: the opening this job belongs to.
+  const { data: link } = await sb
+    .from('job_openings')
+    .select('opening_id')
+    .eq('job_id', jobId)
+    .order('linked_at', { ascending: true })
+    .limit(1)
+  const openingId = (link as { opening_id: string }[] | null)?.[0]?.opening_id
+  if (openingId) {
+    const { data: opening } = await sb
+      .from('openings')
+      .select('hiring_manager_id')
+      .eq('id', openingId)
+      .maybeSingle()
+    const hmId = (opening as { hiring_manager_id: string | null } | null)?.hiring_manager_id
+    const hm = hmId ? await loadUserContact(sb, hmId) : null
+    if (hm) return hm
+  }
+
+  return null
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadUserContact(sb: any, userId: string): Promise<ResolvedHiringManager | null> {
+  const { data: user } = await sb
+    .from('users')
+    .select('email, full_name')
+    .eq('id', userId)
+    .maybeSingle()
+  const u = user as { email: string | null; full_name: string | null } | null
+  if (!u?.email) return null
+  return { email: u.email, name: u.full_name?.trim() || u.email }
+}
