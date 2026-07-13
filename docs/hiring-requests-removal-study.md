@@ -148,13 +148,16 @@ cleanup + table drop**, not a data/write migration.
 - [x] **Gating question answered (2026-07-13)** — legacy write paths DEAD;
   `hiring_requests` table EMPTY (0 rows); 100% of live data canonical. No data
   or write migration needed.
-- [~] Batch 2 — remaining read-for-display. **Inbox DONE** (`recruiterstack`
-  `c6adf9d`): Next.js `api/inbox` (served by Next.js, not the shadowed Django
-  `InboxView`) — added canonical `jobs` embed + folded onto `job`, and fixed a
-  pre-existing `candidates.full_name` column bug that had left the whole inbox
-  empty. Verified live (0 → 10 activity items with titles). Remaining: Django
-  notification emails (`views_applications.py`, `views_application_email.py`),
-  `analytics/views.py`, `ai/copilot_tools.py` read tools; Next.js
-  `applications/[id]` (+ `email-draft`), `job-handlers.ts` embeds.
+- [x] Batch 2 — read-for-display, on the LIVE serving code only:
+  - Inbox (`recruiterstack` `c6adf9d`) — canonical embed + fixed a
+    pre-existing `candidates.full_name` bug that had left it empty. 0→10 verified.
+  - Django app-detail Slack + email-draft (`recruiterstack-api` `46dc50a`) —
+    shared `resolve_job_context` (legacy `hiring_requests` else canonical `jobs`).
+  - Next.js candidate-summary + interview-reminder (`recruiterstack` `29f35ec`)
+    — canonical embeds in `job-handlers.ts` / `listApplicationsForCandidateSummary`.
+  - **Shadowed/dead (no fix — belongs to batch 3 delete):** Django `analytics/views.py`
+    & `ai/copilot_tools.py` reads (both shadowed — `/api/analytics` and `/api/copilot`
+    are canonical Next.js static routes); Next.js `applications/[id]` (+ `email-draft`)
+    & `ai-summary` (dynamic → served by Django, already fixed there).
 - [ ] Batch 3 — delete dead legacy code + relax validators.
 - [ ] Batch 4 — drop FKs/columns + `DROP TABLE hiring_requests` + remove model/type.
