@@ -5,6 +5,9 @@ import { withCapability } from '@/lib/api/helpers'
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase) => {
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
+  // Legacy apps carry job context on hiring_requests; canonical apps on jobs.
+  // Embed both and fold the canonical job onto `job` below so the feed shows the
+  // real title/department (the legacy table is empty post-migration).
   const [eventsRes, staleRes] = await Promise.all([
     // Recent 50 events with application → candidate + job context
     supabase
@@ -13,8 +16,9 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
         id, event_type, from_stage, to_stage, note, created_by, created_at,
         application:applications(
           id, status,
-          candidate:candidates(id, full_name, email),
-          job:hiring_requests(id, position_title, department)
+          candidate:candidates(id, full_name:name, email),
+          job:hiring_requests(id, position_title, department),
+          canonical_job:jobs(id, position_title:title, department:departments(name))
         )
       `)
       .eq('org_id', orgId)
@@ -26,8 +30,9 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
       .from('applications')
       .select(`
         id, status, applied_at, stage_id,
-        candidate:candidates(id, full_name, email),
+        candidate:candidates(id, full_name:name, email),
         job:hiring_requests(id, position_title, department),
+        canonical_job:jobs(id, position_title:title, department:departments(name)),
         stage:pipeline_stages(name, color)
       `)
       .eq('org_id', orgId)
@@ -39,8 +44,24 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
 
   return NextResponse.json({
     data: {
-      activity:        eventsRes.data  ?? [],
-      needs_attention: staleRes.data   ?? [],
+      activity:        (eventsRes.data ?? []).map(e => { foldCanonicalJob((e as { application?: unknown }).application); return e }),
+      needs_attention: (staleRes.data  ?? []).map(r => { foldCanonicalJob(r); return r }),
     },
   })
 })
+
+/** Fold a canonical jobs embed (`canonical_job`) onto the legacy `job` shape the
+ *  inbox UI reads, when there's no legacy hiring_requests row. Mutates in place. */
+function foldCanonicalJob(holder: unknown): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const h = holder as any
+  if (!h || typeof h !== 'object') return
+  if (!h.job && h.canonical_job) {
+    h.job = {
+      id:             h.canonical_job.id,
+      position_title: h.canonical_job.position_title ?? null,
+      department:     h.canonical_job.department?.name ?? null,
+    }
+  }
+  delete h.canonical_job
+}
