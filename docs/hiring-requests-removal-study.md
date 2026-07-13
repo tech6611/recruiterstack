@@ -159,5 +159,24 @@ cleanup + table drop**, not a data/write migration.
     & `ai/copilot_tools.py` reads (both shadowed — `/api/analytics` and `/api/copilot`
     are canonical Next.js static routes); Next.js `applications/[id]` (+ `email-draft`)
     & `ai-summary` (dynamic → served by Django, already fixed there).
-- [ ] Batch 3 — delete dead legacy code + relax validators.
-- [ ] Batch 4 — drop FKs/columns + `DROP TABLE hiring_requests` + remove model/type.
+- [~] Batch 3 — dead-code deletion + validators.
+  - **Done (`recruiterstack` `f0b0007`):** deleted `validations/hiring-requests.ts`
+    (+ test, zero importers) and `fetchLegacyAnalyticsInputs` (never called).
+  - **`getLegacyJobTokens`** — NOT dead; still a live fallback in
+    `getApplicationJobTokens`. Harmless vs the empty table; leave until batch 4.
+  - **BLOCKER FOUND — offers write path is broken for canonical candidates.**
+    The `offers` table has **no `job_id`/`opening_id` column** — offers can only
+    anchor on `hiring_request_id` (NOT NULL, FK → `hiring_requests`), which is
+    null for every canonical app. `offerInsertSchema` also *requires* it. So an
+    offer cannot be created for anyone now (all candidates are canonical). This
+    needs its own migration: add `offers.job_id` (+ opening_id?), drop/relax the
+    legacy FK + NOT NULL, make the validator accept `job_id`, update the offers
+    POST (Next.js `api/offers` + Django `OfferListCreateView`) to write it.
+    `applications` POST (`applicationInsertSchema`) has a milder version of the
+    same (requires `hiring_request_id`; the apply flow bypasses it via
+    `createApplication({jobId})`, but the "Add to Job" path may mis-store the
+    canonical job id in the legacy column).
+- [ ] Batch 3b — offers/applications write-path migration (schema + code). NEW.
+- [ ] Batch 4 — final live-reads audit (voice, sequences, autopilot), then drop
+  FKs/columns + `DROP TABLE hiring_requests` + remove model/type + delete the
+  shadowed Django legacy views.
