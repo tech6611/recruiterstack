@@ -148,6 +148,13 @@ cleanup + table drop**, not a data/write migration.
 - [x] **Gating question answered (2026-07-13)** — legacy write paths DEAD;
   `hiring_requests` table EMPTY (0 rows); 100% of live data canonical. No data
   or write migration needed.
-- [ ] Batch 2 — remaining read-for-display (start with Django `inbox` INNER JOIN).
+- [~] Batch 2 — remaining read-for-display. **Inbox DONE** (`recruiterstack`
+  `c6adf9d`): Next.js `api/inbox` (served by Next.js, not the shadowed Django
+  `InboxView`) — added canonical `jobs` embed + folded onto `job`, and fixed a
+  pre-existing `candidates.full_name` column bug that had left the whole inbox
+  empty. Verified live (0 → 10 activity items with titles). Remaining: Django
+  notification emails (`views_applications.py`, `views_application_email.py`),
+  `analytics/views.py`, `ai/copilot_tools.py` read tools; Next.js
+  `applications/[id]` (+ `email-draft`), `job-handlers.ts` embeds.
 - [ ] Batch 3 — delete dead legacy code + relax validators.
 - [ ] Batch 4 — drop FKs/columns + `DROP TABLE hiring_requests` + remove model/type.
