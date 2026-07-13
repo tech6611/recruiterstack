@@ -17,6 +17,14 @@ const compNumOrNull = z.preprocess(
   z.number().min(0).nullable(),
 )
 
+// Trimmed email that coerces blank → null but rejects a malformed address. The
+// "required" gate lives at submit-for-approval (like justification), so the base
+// column stays nullable and existing drafts aren't invalidated.
+const emailOrNull = z.preprocess(
+  v => (typeof v === 'string' && v.trim() === '') || v === undefined ? null : v,
+  z.string().trim().email('Enter a valid email').nullable(),
+)
+
 // Shared field shape — build base object first so both create (with refine)
 // and update (partial) share a single source of truth.
 const openingBase = z.object({
@@ -30,7 +38,9 @@ const openingBase = z.object({
   comp_band_id:      uuidOrNull.optional().default(null),
   out_of_band:       z.boolean().optional().default(false),
   target_start_date: dateIsoOrNull.optional().default(null),
-  hiring_manager_id: uuidOrNull.optional().default(null),
+  hiring_manager_id:    uuidOrNull.optional().default(null),
+  hiring_manager_name:  z.string().trim().max(200).optional().nullable(),
+  hiring_manager_email: emailOrNull.optional().default(null),
   recruiter_id:      uuidOrNull.optional().default(null),
   justification:     z.string().trim().max(5000).optional().nullable(),
   external_id:       z.string().trim().max(200).optional().nullable(),

@@ -36,7 +36,7 @@ describe('POST /api/openings/:id/submit', () => {
     // Long enough justification to pass the length gate.
     const longJustification = 'A'.repeat(60)
     mock.results.set('openings', {
-      data: { id: 'op-1', status: 'draft', justification: longJustification, custom_fields: {} },
+      data: { id: 'op-1', status: 'draft', justification: longJustification, hiring_manager_email: 'hm@company.com', custom_fields: {} },
       error: null,
     })
     // Custom field defs query returns one required field.
@@ -50,6 +50,18 @@ describe('POST /api/openings/:id/submit', () => {
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/Seniority/)
+  })
+
+  it('rejects when the hiring manager email is missing', async () => {
+    mock.results.set('openings', {
+      data: { id: 'op-1', status: 'draft', justification: 'A'.repeat(60), hiring_manager_email: null, custom_fields: {} },
+      error: null,
+    })
+    const req = createMockRequest('POST', 'http://localhost:3000/api/openings/op-1/submit')
+    const res = await SUBMIT(req, { params: { id: 'op-1' } })
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/hiring manager's email/)
   })
 
   it('returns 409 when status is not draft', async () => {

@@ -171,6 +171,8 @@ export interface Opening {
   out_of_band: boolean
   target_start_date: string | null            // DATE as YYYY-MM-DD
   hiring_manager_id: string | null
+  hiring_manager_name: string | null           // free-typed HM contact (flows to job)
+  hiring_manager_email: string | null          // free-typed HM contact (flows to job)
   recruiter_id: string | null
   justification: string | null
   status: OpeningStatus
@@ -184,6 +186,7 @@ export interface Opening {
 export interface OpeningInsert extends Omit<Opening,
   'id' | 'created_at' | 'updated_at' | 'external_id' | 'department_id' | 'location_id' |
   'comp_min' | 'comp_max' | 'comp_band_id' | 'target_start_date' | 'hiring_manager_id' |
+  'hiring_manager_name' | 'hiring_manager_email' |
   'recruiter_id' | 'justification' | 'approval_id' | 'out_of_band' | 'custom_fields' |
   'comp_currency' | 'employment_type' | 'status'> {
   id?: string
@@ -195,6 +198,8 @@ export interface OpeningInsert extends Omit<Opening,
   comp_band_id?: string | null
   target_start_date?: string | null
   hiring_manager_id?: string | null
+  hiring_manager_name?: string | null
+  hiring_manager_email?: string | null
   recruiter_id?: string | null
   justification?: string | null
   approval_id?: string | null

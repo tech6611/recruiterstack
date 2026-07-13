@@ -40,7 +40,8 @@ export async function GET(req: NextRequest) {
     .select(
       'id, title, status, employment_type, target_start_date, out_of_band, ' +
       'comp_min, comp_max, comp_currency, ' +
-      'department_id, location_id, hiring_manager_id, recruiter_id, ' +
+      'department_id, location_id, hiring_manager_id, ' +
+      'hiring_manager_name, hiring_manager_email, recruiter_id, ' +
       'created_at, updated_at',
       { count: 'exact' },
     )
@@ -108,7 +109,9 @@ export async function POST(req: NextRequest) {
       comp_band_id:      body.comp_band_id ?? null,
       out_of_band:       outOfBand,
       target_start_date: body.target_start_date,
-      hiring_manager_id: body.hiring_manager_id ?? null,
+      hiring_manager_id:    body.hiring_manager_id ?? null,
+      hiring_manager_name:  body.hiring_manager_name ?? null,
+      hiring_manager_email: body.hiring_manager_email ?? null,
       recruiter_id:      body.recruiter_id ?? userId,          // default: current user
       justification:     body.justification ?? null,
       external_id:       body.external_id ?? null,

@@ -98,6 +98,20 @@ export const OPENING_FIELDS = [
     },
   },
   {
+    key: 'hiring_manager_name',
+    column: 'hiring_manager_name',
+    inputKey: 'hiringManagerName',
+    description: "Hiring manager's name — free-typed contact that flows down to the job (need not be an org member)",
+    type: 'string',
+  },
+  {
+    key: 'hiring_manager_email',
+    column: 'hiring_manager_email',
+    inputKey: 'hiringManagerEmail',
+    description: "Hiring manager's email — free-typed contact that flows to the job and powers the interview booking link; required before the requisition can be submitted for approval",
+    type: 'string',
+  },
+  {
     key: 'employment_type',
     column: 'employment_type',
     inputKey: 'employmentType',

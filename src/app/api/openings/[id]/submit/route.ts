@@ -42,6 +42,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       { status: 400 },
     )
   }
+  // The hiring manager's email is mandatory: it flows down to the job and powers
+  // the {{hiring_manager_calendar}} booking link in sequence emails.
+  if (!opening.hiring_manager_email || opening.hiring_manager_email.trim() === '') {
+    return NextResponse.json(
+      { error: "The hiring manager's email is required before submitting." },
+      { status: 400 },
+    )
+  }
 
   // Required custom fields must be present.
   const { data: defsRaw } = await supabase

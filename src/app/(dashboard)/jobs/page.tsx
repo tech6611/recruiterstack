@@ -99,6 +99,7 @@ interface FromOpening {
   comp_max:          string
   target_start_date: string
   hm_name:           string
+  hm_email:          string
 }
 
 
@@ -204,7 +205,7 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
   const [positionTitle, setPositionTitle] = useState(fromOpening?.title ?? '')
   const [department, setDepartment] = useState(fromOpening?.department ?? '')
   const [hmName, setHmName] = useState(fromOpening?.hm_name ?? '')
-  const [hmEmail, setHmEmail] = useState('')
+  const [hmEmail, setHmEmail] = useState(fromOpening?.hm_email ?? '')
   const [hmSlack, setHmSlack] = useState('')
   const [level, setLevel] = useState('')
   const [workModel, setWorkModel] = useState('')
@@ -798,7 +799,8 @@ function RequisitionChooser({ onPick }: { onPick: (o: FromOpening) => void }) {
     comp_min:          o.comp_min != null ? String(o.comp_min) : '',
     comp_max:          o.comp_max != null ? String(o.comp_max) : '',
     target_start_date: o.target_start_date ?? '',
-    hm_name:           '',
+    hm_name:           o.hiring_manager_name  ?? '',
+    hm_email:          o.hiring_manager_email ?? '',
   })
 
   return (
@@ -1162,6 +1164,7 @@ export default function JobsPage() {
           comp_max:          params.get('comp_max')          ?? '',
           target_start_date: params.get('target_start_date') ?? '',
           hm_name:           params.get('hm_name')           ?? '',
+          hm_email:          params.get('hm_email')          ?? '',
         })
       }
       setShowDrawer(true)

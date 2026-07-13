@@ -127,14 +127,19 @@ export async function POST(req: NextRequest) {
 
   const { data: linkedOpening } = await supabase
     .from('openings')
-    .select('id, status')
+    .select('id, status, hiring_manager_name, hiring_manager_email')
     .eq('id', body.link_opening_id)
     .eq('org_id', orgId)
     .maybeSingle()
   if (!linkedOpening) {
     return NextResponse.json({ error: 'Requisition not found.' }, { status: 404 })
   }
-  if ((linkedOpening as { status: string }).status !== 'approved') {
+  const opening = linkedOpening as {
+    status: string
+    hiring_manager_name: string | null
+    hiring_manager_email: string | null
+  }
+  if (opening.status !== 'approved') {
     return NextResponse.json(
       { error: 'That requisition is not approved yet. A job can only be created from an approved requisition.' },
       { status: 422 },
@@ -142,6 +147,18 @@ export async function POST(req: NextRequest) {
   }
 
   const departmentId = await findOrCreateDepartment(supabase, orgId, body.department)
+
+  // Flow the hiring manager down from the approved requisition onto the job's
+  // top-level custom_fields — this is the single place the {{hiring_manager_calendar}}
+  // token reads from. A user-edited value in the intake payload (hm_name/hm_email)
+  // wins over the requisition's default so "same HM by default, editable" holds.
+  const intake = body.intake as Record<string, unknown>
+  const hmName  = (typeof intake.hm_name  === 'string' && intake.hm_name.trim())  || opening.hiring_manager_name  || null
+  const hmEmail = (typeof intake.hm_email === 'string' && intake.hm_email.trim()) || opening.hiring_manager_email || null
+  const customFields: Record<string, unknown> = {}
+  if (Object.keys(body.intake).length > 0) customFields.intake = body.intake
+  if (hmName)  customFields.hiring_manager_name  = hmName
+  if (hmEmail) customFields.hiring_manager_email = hmEmail
 
   const { data: job, error } = await supabase
     .from('jobs')
@@ -151,7 +168,7 @@ export async function POST(req: NextRequest) {
       department_id:   departmentId,
       description:     body.description || null,
       confidentiality: body.confidentiality,
-      custom_fields:   Object.keys(body.intake).length > 0 ? { intake: body.intake } : {},
+      custom_fields:   customFields,
       status:          'draft',
       created_by:      userId,
     })

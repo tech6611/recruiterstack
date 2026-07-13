@@ -63,6 +63,8 @@ export interface CreateOpeningInput {
   departmentId?: string | null
   locationId?: string | null
   hiringManagerId?: string | null
+  hiringManagerName?: string | null
+  hiringManagerEmail?: string | null
   employmentType?: 'full_time' | 'part_time' | 'contract' | 'intern' | 'temp'
   compMin?: number | null
   compMax?: number | null
@@ -88,7 +90,9 @@ export async function createOpening(
       title:             input.title,
       department_id:     input.departmentId ?? null,
       location_id:       input.locationId ?? null,
-      hiring_manager_id: input.hiringManagerId ?? null,
+      hiring_manager_id:    input.hiringManagerId ?? null,
+      hiring_manager_name:  input.hiringManagerName ?? null,
+      hiring_manager_email: input.hiringManagerEmail ?? null,
       employment_type:   input.employmentType ?? 'full_time',
       comp_min:          input.compMin ?? null,
       comp_max:          input.compMax ?? null,

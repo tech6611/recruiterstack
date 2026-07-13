@@ -12,6 +12,16 @@ entries on top.
 ## 2026-07-13
 
 ### Added
+- **Hiring manager now flows from requisition → job.** A requisition (opening)
+  gains a free-typed hiring-manager **name** and **email** (email is mandatory
+  before the requisition can be submitted for approval). When a job is created
+  from an approved requisition, those values flow down onto the job's
+  `custom_fields.hiring_manager_name/email` as the default — pre-filled and
+  editable in the New Job drawer, so it's "same HM by default, change if you
+  want." The existing hiring-manager *dropdown* is unchanged and still drives
+  approval routing; it's now labelled "Hiring manager (approver)" to distinguish
+  it from the contact fields. Copilot-created requisitions can set the same two
+  fields.
 - **"AI usage & cost" admin page** (`/admin/ai-usage`, in the Admin nav section,
   gated by `settings:edit`). Reads the `ai_usage` ledger for the current org and
   shows: KPI tiles (estimated cost, calls, input/output tokens), a daily-cost
@@ -35,6 +45,21 @@ entries on top.
   model, input/output tokens, estimated_cost_usd, created_at) with per-org and
   per-user time indexes. Additive and reversible. **Must be applied to Supabase**
   before rows will persist; until then `trackUsage` logs a warning and continues.
+
+### Changed
+- **`{{hiring_manager_calendar}}` now resolves the HM from the job only.** The
+  sequence booking-link token used to fall back through three sources (the job's
+  `custom_fields`, then the job's hiring team, then the linked requisition's
+  approver). Now that the HM flows onto the job at creation time, the resolver
+  reads *only* `jobs.custom_fields.hiring_manager_email/name` — a single, editable
+  source of truth that matches the Django production sender. No job HM set → the
+  token uses its natural-language fallback as before.
+
+### Schema
+- **`088_opening_hiring_manager_contact.sql`** — adds `hiring_manager_name` and
+  `hiring_manager_email` (both nullable) to `openings`. Additive and reversible;
+  the mandatory-email rule is enforced at the UI and the submit gate, not in the
+  DB, so existing drafts stay valid. **Must be applied to Supabase.**
 
 ### Changed
 - **Retired the Claude naming now that the app runs entirely on Gemini.** Call

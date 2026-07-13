@@ -77,7 +77,9 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
         comp_max:          form.comp_max ? Number(form.comp_max) : null,
         comp_currency:     form.comp_currency,
         target_start_date: form.target_start_date || null,
-        hiring_manager_id: form.hiring_manager_id || null,
+        hiring_manager_id:    form.hiring_manager_id || null,
+        hiring_manager_name:  form.hiring_manager_name.trim() || null,
+        hiring_manager_email: form.hiring_manager_email.trim() || null,
         recruiter_id:      form.recruiter_id || null,
         justification:     form.justification.trim() || null,
       }),
@@ -144,8 +146,11 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
     if (opening.comp_min != null) params.set('comp_min', String(opening.comp_min))
     if (opening.comp_max != null) params.set('comp_max', String(opening.comp_max))
     if (opening.target_start_date) params.set('target_start_date', opening.target_start_date)
-    const hmName = hm?.full_name ?? hm?.email
+    // Prefer the free-typed HM contact (name + email) that flows to the job and
+    // powers the calendar link; fall back to the approver user's name.
+    const hmName = opening.hiring_manager_name ?? hm?.full_name ?? hm?.email
     if (hmName) params.set('hm_name', hmName)
+    if (opening.hiring_manager_email) params.set('hm_email', opening.hiring_manager_email)
     router.push(`/jobs?${params.toString()}`)
   }
 
@@ -241,8 +246,10 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
                       : '—'}
                   </DetailRow>
                   <DetailRow label="Comp band">{band?.name ?? '—'}</DetailRow>
-                  <DetailRow label="Hiring manager">{hm?.full_name ?? hm?.email ?? '—'}</DetailRow>
+                  <DetailRow label="Hiring manager (approver)">{hm?.full_name ?? hm?.email ?? '—'}</DetailRow>
                   <DetailRow label="Recruiter">{recruiter?.full_name ?? recruiter?.email ?? '—'}</DetailRow>
+                  <DetailRow label="HM name">{opening.hiring_manager_name ?? '—'}</DetailRow>
+                  <DetailRow label="HM email">{opening.hiring_manager_email ?? '—'}</DetailRow>
                 </dl>
               ) : (
                 <EditForm
@@ -329,6 +336,8 @@ interface EditFormState {
   comp_currency:     string
   target_start_date: string
   hiring_manager_id: string
+  hiring_manager_name:  string
+  hiring_manager_email: string
   recruiter_id:      string
   justification:     string
 }
@@ -345,6 +354,8 @@ function initFormFromOpening(o: Opening): EditFormState {
     comp_currency:     o.comp_currency,
     target_start_date: o.target_start_date ?? '',
     hiring_manager_id: o.hiring_manager_id ?? '',
+    hiring_manager_name:  o.hiring_manager_name  ?? '',
+    hiring_manager_email: o.hiring_manager_email ?? '',
     recruiter_id:      o.recruiter_id      ?? '',
     justification:     o.justification     ?? '',
   }
@@ -385,11 +396,12 @@ function EditForm({ form, setForm, departments, locations, compBands, users }: E
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label>Hiring manager</Label>
+          <Label>Hiring manager (approver)</Label>
           <Select value={form.hiring_manager_id} onChange={e => setForm(f => ({ ...f, hiring_manager_id: e.target.value }))}>
             <option value="">—</option>
             {users.map(u => <option key={u.id} value={u.id}>{u.full_name ?? u.email}</option>)}
           </Select>
+          <p className="text-[11px] text-slate-400">Used for approval routing. Optional.</p>
         </div>
         <div className="space-y-1.5">
           <Label>Recruiter</Label>
@@ -397,6 +409,26 @@ function EditForm({ form, setForm, departments, locations, compBands, users }: E
             <option value="">—</option>
             {users.map(u => <option key={u.id} value={u.id}>{u.full_name ?? u.email}</option>)}
           </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label>Hiring manager name</Label>
+          <Input
+            placeholder="Priya Sharma"
+            value={form.hiring_manager_name}
+            onChange={e => setForm(f => ({ ...f, hiring_manager_name: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Hiring manager email</Label>
+          <Input
+            type="email"
+            placeholder="priya@company.com"
+            value={form.hiring_manager_email}
+            onChange={e => setForm(f => ({ ...f, hiring_manager_email: e.target.value }))}
+          />
+          <p className="text-[11px] text-slate-400">Flows to the job. Powers the calendar booking link in sequence emails.</p>
         </div>
       </div>
       <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">

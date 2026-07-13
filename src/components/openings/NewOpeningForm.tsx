@@ -34,7 +34,9 @@ interface FormState {
   comp_max:          string
   comp_currency:     string
   target_start_date: string
-  hiring_manager_id: string
+  hiring_manager_id:    string
+  hiring_manager_name:  string
+  hiring_manager_email: string
   recruiter_id:      string
   justification:     string
 }
@@ -44,7 +46,8 @@ const EMPTY: FormState = {
   employment_type: 'full_time',
   comp_band_id: '', comp_min: '', comp_max: '', comp_currency: 'USD',
   target_start_date: '',
-  hiring_manager_id: '', recruiter_id: '',
+  hiring_manager_id: '', hiring_manager_name: '', hiring_manager_email: '',
+  recruiter_id: '',
   justification: '',
 }
 
@@ -101,6 +104,19 @@ export function NewOpeningForm() {
       toast.error('Department is required')
       return
     }
+    if (!form.hiring_manager_name.trim()) {
+      toast.error('Hiring manager name is required')
+      return
+    }
+    const hmEmail = form.hiring_manager_email.trim()
+    if (!hmEmail) {
+      toast.error("Hiring manager's email is required")
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(hmEmail)) {
+      toast.error('Enter a valid hiring manager email')
+      return
+    }
     setSaving(true)
     const payload: Partial<OpeningInsert> = {
       title:             form.title.trim(),
@@ -112,7 +128,9 @@ export function NewOpeningForm() {
       comp_max:          form.comp_max ? Number(form.comp_max) : null,
       comp_currency:     form.comp_currency,
       target_start_date: form.target_start_date || null,
-      hiring_manager_id: form.hiring_manager_id || null,
+      hiring_manager_id:    form.hiring_manager_id || null,
+      hiring_manager_name:  form.hiring_manager_name.trim() || null,
+      hiring_manager_email: form.hiring_manager_email.trim() || null,
       recruiter_id:      form.recruiter_id || null,
       justification:     form.justification.trim() || null,
       custom_fields:     customValues,
@@ -179,13 +197,14 @@ export function NewOpeningForm() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Hiring manager</Label>
+              <Label>Hiring manager (approver)</Label>
               <Select value={form.hiring_manager_id} onChange={e => setForm(f => ({ ...f, hiring_manager_id: e.target.value }))}>
                 <option value="">—</option>
                 {members.map(m => (
                   <option key={m.id} value={m.users?.id ?? ''}>{m.users?.full_name ?? m.users?.email ?? 'Unknown'}</option>
                 ))}
               </Select>
+              <p className="text-[11px] text-slate-400">Used for approval routing. Optional.</p>
             </div>
             <div className="space-y-1.5">
               <Label>Recruiter</Label>
@@ -195,6 +214,29 @@ export function NewOpeningForm() {
                   <option key={m.id} value={m.users?.id ?? ''}>{m.users?.full_name ?? m.users?.email ?? 'Unknown'}</option>
                 ))}
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="hm-name">Hiring manager name <span className="text-red-500">*</span></Label>
+              <Input
+                id="hm-name"
+                placeholder="Priya Sharma"
+                value={form.hiring_manager_name}
+                onChange={e => setForm(f => ({ ...f, hiring_manager_name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="hm-email">Hiring manager email <span className="text-red-500">*</span></Label>
+              <Input
+                id="hm-email"
+                type="email"
+                placeholder="priya@company.com"
+                value={form.hiring_manager_email}
+                onChange={e => setForm(f => ({ ...f, hiring_manager_email: e.target.value }))}
+              />
+              <p className="text-[11px] text-slate-400">Flows to the job. Powers the calendar booking link in sequence emails.</p>
             </div>
           </div>
 
