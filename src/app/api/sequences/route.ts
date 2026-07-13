@@ -23,14 +23,17 @@ export const GET = withCapability('recruiting:view', async (req, orgId, supabase
 // POST /api/sequences — create a new sequence. (Writes still live in the route
 // for v1 — domain extraction was reads-only to keep the migration mechanical.)
 export const POST = withCapability('recruiting:edit', async (req, orgId, supabase) => {
-  let body: { name?: string; stages?: { order_index: number; delay_days: number; subject: string; body: string }[] }
+  let body: { name?: string; kind?: string; stages?: { order_index: number; delay_days: number; subject: string; body: string }[] }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
 
   const name = body.name?.trim() || 'Untitled Sequence'
+  // 'drip' (default) respects business hours on every stage; 'event' fires every
+  // stage instantly for transactional notifications. Set at creation time.
+  const kind = body.kind === 'event' ? 'event' : 'drip'
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: seq, error: seqErr } = await (supabase.from('sequences') as any)
-    .insert({ org_id: orgId, name, status: 'draft' })
+    .insert({ org_id: orgId, name, status: 'draft', kind })
     .select()
     .single()
 

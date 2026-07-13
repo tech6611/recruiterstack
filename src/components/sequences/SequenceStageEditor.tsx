@@ -93,14 +93,14 @@ interface Props {
   stage?: SequenceStage | null   // null = create mode
   stageCount: number             // for default order_index
   isFirstStage?: boolean         // stage 1 can't have conditions
-  sendFirstImmediately?: boolean // sequence sends its first email instantly
+  sequenceKind?: 'drip' | 'event' // 'event' sends EVERY stage instantly
   onClose: () => void
   onSaved: () => void
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
 
-export default function SequenceStageEditor({ sequenceId, stage, stageCount, isFirstStage = false, sendFirstImmediately = false, onClose, onSaved }: Props) {
+export default function SequenceStageEditor({ sequenceId, stage, stageCount, isFirstStage = false, sequenceKind = 'drip', onClose, onSaved }: Props) {
   const isEdit = !!stage
   const { settings } = useSettings()
 
@@ -172,20 +172,22 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
       delay_days, delay_minutes, delay_business_days,
     }
     const now = new Date()
-    // The first stage of a send-first-immediately sequence skips the business-hours
-    // window entirely, so preview it the way the sender actually schedules it.
-    const isInstantFirst = isFirstStage && sendFirstImmediately
-    const previewWindow = isInstantFirst ? null : DEFAULT_SEND_WINDOW
-    const clampedSeconds = computeStageDelaySeconds(timing, now, isInstantFirst, previewWindow)
-    const rawSeconds     = computeStageDelaySeconds(timing, now, isInstantFirst, null)
+    // 'event' sequences skip the business-hours window on EVERY stage, so preview
+    // them the way the sender actually schedules them (no clamp).
+    const bypassesWindow = sequenceKind === 'event'
+    const previewWindow = bypassesWindow ? null : DEFAULT_SEND_WINDOW
+    const clampedSeconds = computeStageDelaySeconds(timing, now, isFirstStage, previewWindow)
+    const rawSeconds     = computeStageDelaySeconds(timing, now, isFirstStage, null)
     const clamped = clampedSeconds !== rawSeconds
+    // "Instant" copy only when the stage truly fires with no wait (zero delay).
+    const instant = bypassesWindow && clampedSeconds === 0
     const displayTz = isDayUnit ? sendTz : DEFAULT_SEND_WINDOW.timezone
     const target = new Date(now.getTime() + clampedSeconds * 1000)
     const when = target.toLocaleString('en-US', {
       timeZone: displayTz, weekday: 'short', month: 'short', day: 'numeric',
       hour: 'numeric', minute: '2-digit',
     })
-    return { when: `${when} ${TZ_LABELS[displayTz] ?? displayTz}`, clamped, instant: isInstantFirst }
+    return { when: `${when} ${TZ_LABELS[displayTz] ?? displayTz}`, clamped, instant, bypassesWindow }
   })()
 
   // Which personalization tags appear in the current draft — drives the #9
@@ -518,15 +520,15 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
             </div>
             <div className="space-y-1">
               <p className="text-[11px] text-slate-500">
-                {schedulePreview.instant ? 'Sends as soon as a candidate is added' : (isDayUnit ? 'Lands' : 'If the previous step finished now, this lands')}:{' '}
+                {schedulePreview.instant ? 'Sends' : (isDayUnit ? 'Lands' : 'If the previous step finished now, this lands')}:{' '}
                 <span className="font-medium text-slate-700">{schedulePreview.instant ? 'Immediately' : schedulePreview.when}</span>
               </p>
-              {schedulePreview.instant && (
+              {schedulePreview.bypassesWindow && (
                 <p className="flex items-start gap-1 text-[11px] text-emerald-600">
                   <Zap className="h-3 w-3 mt-0.5 shrink-0" />
                   <span>
-                    This sequence sends its first email instantly, so this step skips the
-                    business-hours window. Later steps still wait for send hours.
+                    This is an event notification, so every step fires as soon as it&apos;s due —
+                    off-hours included — skipping the business-hours window.
                   </span>
                 </p>
               )}

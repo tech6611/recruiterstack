@@ -218,7 +218,7 @@ function RuleRow({
  * application moves to a named stage, etc.). Existing rules can be expanded and
  * edited in place.
  */
-export default function SequenceAutomations({ sequenceId, active, sendFirstImmediately = false }: { sequenceId: string; active: boolean; sendFirstImmediately?: boolean }) {
+export default function SequenceAutomations({ sequenceId, active, sequenceKind = 'drip' }: { sequenceId: string; active: boolean; sequenceKind?: 'drip' | 'event' }) {
   const [rules, setRules] = useState<Rule[]>([])
   const [options, setOptions] = useState<Options>({ tags: [], stages: [] })
   const [loading, setLoading] = useState(true)
@@ -284,14 +284,14 @@ export default function SequenceAutomations({ sequenceId, active, sendFirstImmed
         Auto-enroll candidates into this sequence when an event happens — no manual adding.
       </p>
 
-      {sendFirstImmediately && (
+      {sequenceKind === 'event' && (
         <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
           <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
           <p className="text-[11px] text-emerald-700">
-            This sequence sends its first email instantly. Pair it with the
-            <span className="font-semibold"> &ldquo;When someone applies&rdquo; </span>
-            trigger so a candidate gets your first email the moment they apply — even
-            outside working hours.
+            This is an event notification — every email fires the moment it&apos;s due, even
+            outside working hours. Pair it with a trigger like
+            <span className="font-semibold"> &ldquo;When stage changes&rdquo; </span>
+            so candidates get notified the instant something happens.
           </p>
         </div>
       )}

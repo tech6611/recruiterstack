@@ -9,6 +9,35 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-13
+
+### Changed
+- **Sequences now have a type — Drip campaign vs Event notification — chosen at
+  creation.** This replaces the per-sequence "send first email immediately"
+  toggle, which only ever affected the first email. A **Drip campaign** respects
+  the business-hours send window (Mon–Fri, 8am–8pm IST) on *every* stage, for
+  outreach and nurture. An **Event notification** bypasses the window on *every*
+  stage, so each email fires the moment it's due — off-hours included — built for
+  stage-move alerts and confirmations (e.g. application → interview → hired).
+  Clicking **New Sequence** now opens a two-card chooser; the type is fixed once
+  set. The scheduling engine keys off the type in both places it schedules stages
+  (`enroll.ts` for the first stage, `job-handlers.ts` for follow-ups). Detail and
+  list pages show an **Event** badge and a read-only explainer instead of the old
+  toggle.
+
+### Removed
+- **First-email "send instantly" toggle.** Superseded by the sequence type above.
+  Behaviour is now driven entirely by whether a sequence is a Drip campaign or an
+  Event notification. (The `send_first_immediately` DB column is retained for
+  deploy safety but is no longer read; existing sequences that had it on were
+  migrated to `kind = 'event'`.)
+
+### Schema
+- `085_sequence_kind.sql` — adds `sequences.kind` (`'drip'` default | `'event'`,
+  CHECK-constrained). Backfills `kind = 'event'` for any sequence that had
+  `send_first_immediately = true`. Additive and reversible; the old column is left
+  in place.
+
 ## 2026-07-12
 
 ### Fixed

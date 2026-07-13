@@ -24,6 +24,9 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
       name:        `${source.name} (Copy)`,
       description: source.description ?? null,
       status:      'draft',
+      // Preserve the drip/event type so a cloned event sequence still fires
+      // instantly rather than silently reverting to windowed drip sends.
+      kind:        source.kind === 'event' ? 'event' : 'drip',
     })
     .select()
     .single()

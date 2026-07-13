@@ -137,16 +137,6 @@ export default function SequenceDetailPage() {
     loadSequence()
   }
 
-  const toggleInstantFirst = async () => {
-    if (!seq) return
-    await fetch(`/api/sequences/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ send_first_immediately: !seq.send_first_immediately }),
-    })
-    loadSequence()
-  }
-
   const [cloning, setCloning] = useState(false)
   const cloneSequence = async () => {
     setCloning(true)
@@ -251,40 +241,40 @@ export default function SequenceDetailPage() {
               <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
                 {badge.label}
               </span>
-              {seq.send_first_immediately && (
+              {seq.kind === 'event' && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                  <Zap className="h-2.5 w-2.5" /> Sends instantly
+                  <Zap className="h-2.5 w-2.5" /> Event
                 </span>
               )}
             </div>
           )}
           {seq.description && <p className="text-sm text-slate-400 mt-0.5">{seq.description}</p>}
 
-          {/* First-email timing: bypass the send window on the first email so
-              time-sensitive messages (e.g. an application confirmation) arrive
-              right away. Follow-ups always stay within send hours. */}
+          {/* Sending behaviour is fixed by the sequence type chosen at creation:
+              'event' fires every email instantly (off-hours included); 'drip'
+              clamps every email to the send window (Mon–Fri, 8am–8pm IST). */}
           <div className="mt-3 flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 max-w-md">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={!!seq.send_first_immediately}
-              onClick={toggleInstantFirst}
-              className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                seq.send_first_immediately ? 'bg-emerald-500' : 'bg-slate-200'
-              }`}
-            >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                seq.send_first_immediately ? 'translate-x-4' : 'translate-x-0.5'
-              }`} />
-            </button>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-700">First email sends: {seq.send_first_immediately ? 'Immediately' : 'Within send hours'}</p>
-              <p className="mt-0.5 text-[11px] text-slate-400">
-                {seq.send_first_immediately
-                  ? 'The first email goes out as soon as a candidate is added, even outside working hours. Later emails still wait for send hours (Mon–Fri, 8am–8pm).'
-                  : 'Every email, including the first, waits for send hours (Mon–Fri, 8am–8pm). Turn on to send the first email right away.'}
-              </p>
-            </div>
+            {seq.kind === 'event' ? (
+              <>
+                <Zap className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-700">Event notification — sends instantly</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">
+                    Every email in this sequence fires the moment it&apos;s due, even outside working hours — built for stage-move alerts and confirmations.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-700">Drip campaign — respects send hours</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">
+                    Every email waits for your send window (Mon–Fri, 8am–8pm IST) so nothing lands at odd hours.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -530,7 +520,7 @@ export default function SequenceDetailPage() {
           stage={editingStage}
           stageCount={stages.length}
           isFirstStage={editingStage ? editingStage.order_index === 1 : stages.length === 0}
-          sendFirstImmediately={seq.send_first_immediately}
+          sequenceKind={seq.kind ?? 'drip'}
           onClose={() => { setEditorOpen(false); setEditingStage(null) }}
           onSaved={loadSequence}
         />
@@ -562,7 +552,7 @@ export default function SequenceDetailPage() {
               <BulkEnrollPanel sequenceId={id} active={seq.status === 'active'} onPreviewChange={handlePreview} onEnrolled={() => { loadEnrollments(); loadSequence() }} />
             )}
             {activeTool === 'automation' && (
-              <SequenceAutomations sequenceId={id} active={seq.status === 'active'} sendFirstImmediately={seq.send_first_immediately} />
+              <SequenceAutomations sequenceId={id} active={seq.status === 'active'} sequenceKind={seq.kind ?? 'drip'} />
             )}
           </div>
         </div>

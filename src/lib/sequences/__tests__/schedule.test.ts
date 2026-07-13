@@ -117,25 +117,31 @@ describe('computeStageDelaySeconds — with send window', () => {
   })
 })
 
-// send_first_immediately: the enroll path passes NO window for the first stage of
-// a flagged sequence (so it fires instantly, even off-hours), but keeps the window
-// for a normal sequence. This encodes the two branches of enroll.ts.
-describe('computeStageDelaySeconds — send-first-immediately first stage', () => {
+// Sequence kind (drip vs event): 'event' sequences pass NO window on EVERY stage
+// (enroll.ts for the first, job-handlers.ts for follow-ups), so each email fires
+// as soon as it's due — off-hours included. 'drip' sequences keep the window on
+// every stage. This encodes the window branch each caller picks by kind.
+describe('computeStageDelaySeconds — drip vs event window handling', () => {
   const w = DEFAULT_SEND_WINDOW
-  const sat3am = new Date('2026-07-11T21:30:00.000Z') // Sun 03:00 IST — deep off-hours weekend
+  const sun3am = new Date('2026-07-11T21:30:00.000Z') // Sun 03:00 IST — deep off-hours weekend
 
-  it('fires the first email instantly when the window is skipped', () => {
-    expect(computeStageDelaySeconds({}, sat3am, true, null)).toBe(0)
+  it('event: first stage fires instantly when the window is skipped', () => {
+    expect(computeStageDelaySeconds({}, sun3am, true, null)).toBe(0)
   })
 
-  it('holds the first email to the next window when NOT flagged', () => {
-    // Sun 03:00 IST → next open is Mon 08:00 IST. Just assert it is deferred, not instant.
-    expect(computeStageDelaySeconds({}, sat3am, true, w)).toBeGreaterThan(0)
+  it('event: a follow-up with no delay fires off-hours too (window skipped)', () => {
+    // isFirst=false keeps the 60s floor, but with no window it is NOT deferred to
+    // the next business day — the mark of an event sequence's follow-up.
+    expect(computeStageDelaySeconds({}, sun3am, false, null)).toBeLessThanOrEqual(60)
   })
 
-  it('does not affect follow-up stages — they stay windowed', () => {
-    // A follow-up (isFirst=false) always keeps the window regardless of the flag.
-    expect(computeStageDelaySeconds({}, sat3am, false, w)).toBeGreaterThan(0)
+  it('drip: first stage is held to the next window (off-hours weekend)', () => {
+    // Sun 03:00 IST → next open is Mon 08:00 IST. Deferred, not instant.
+    expect(computeStageDelaySeconds({}, sun3am, true, w)).toBeGreaterThan(0)
+  })
+
+  it('drip: follow-up stages stay windowed', () => {
+    expect(computeStageDelaySeconds({}, sun3am, false, w)).toBeGreaterThan(0)
   })
 })
 

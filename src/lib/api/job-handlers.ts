@@ -279,6 +279,12 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: liveStages } = await (supabase.from('sequence_stages') as any)
     .select('*').eq('sequence_id', sequenceId).order('order_index', { ascending: true })
+  // 'event' sequences (transactional notifications) bypass the business-hours
+  // window on EVERY stage, so follow-ups scheduled below skip the clamp too.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: seqRow } = await (supabase.from('sequences') as any)
+    .select('kind').eq('id', sequenceId).eq('org_id', job.org_id).single()
+  const sequenceWindow = seqRow?.kind === 'event' ? null : DEFAULT_SEND_WINDOW
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: emailRows } = await (supabase.from('sequence_emails') as any)
     .select('stage_id, status, open_count, click_count').eq('enrollment_id', enrollmentId)
@@ -475,7 +481,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
         orgId: job.org_id,
         jobType: 'sequence_email',
         payload: { enrollmentId, sequenceId },
-        delaySeconds: computeStageDelaySeconds(followingStage, new Date(), false, DEFAULT_SEND_WINDOW),
+        delaySeconds: computeStageDelaySeconds(followingStage, new Date(), false, sequenceWindow),
       })
     } catch (err) {
       logger.error('Failed to schedule next sequence stage', err, { enrollmentId, sequenceId })

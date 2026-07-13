@@ -2009,12 +2009,17 @@ export type SequenceEmailStatus =
   | 'bounced'
   | 'failed'
 
+// 'drip' respects the business-hours send window on every stage (outreach /
+// nurture). 'event' fires every stage instantly, bypassing the window
+// (transactional notifications — e.g. stage-move confirmations).
+export type SequenceKind = 'drip' | 'event'
+
 export interface Sequence {
   id: string
   name: string
   description: string | null
   status: SequenceStatus
-  send_first_immediately?: boolean
+  kind?: SequenceKind
   created_by: string | null
   created_at: string
   updated_at: string

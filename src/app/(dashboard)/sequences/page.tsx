@@ -143,23 +143,28 @@ export default function SequencesPage() {
     loadArchived(archivedRange).finally(() => setLoading(false))
   }, [loadArchived, orgId, archivedRange])
 
-  const handleCreate = async () => {
+  // The New Sequence button opens a type chooser first. 'drip' respects business
+  // hours on every stage (outreach); 'event' fires every stage instantly
+  // (transactional notifications). The choice is locked in at creation.
+  const [chooserOpen, setChooserOpen] = useState(false)
+
+  const handleCreate = async (kind: 'drip' | 'event') => {
     setCreating(true)
+    const firstStage = kind === 'event'
+      ? { order_index: 1, delay_days: 0, subject: 'Hi {{candidate_first_name}}', body: '<p>Write the notification that should go out the moment this fires.</p>' }
+      : { order_index: 1, delay_days: 0, subject: 'Hi {{candidate_first_name}}', body: '<p>Write your first outreach email here.</p>' }
     const res = await fetch('/api/sequences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'Untitled Sequence',
-        stages: [
-          { order_index: 1, delay_days: 0, subject: 'Hi {{candidate_first_name}}', body: '<p>Write your first outreach email here.</p>' },
-        ],
-      }),
+      body: JSON.stringify({ name: 'Untitled Sequence', kind, stages: [firstStage] }),
     })
     if (res.ok) {
       const json = await res.json()
       router.push(`/sequences/${json.data.id}`)
+    } else {
+      setCreating(false)
+      setChooserOpen(false)
     }
-    setCreating(false)
   }
 
   const handleStatusChange = async (id: string, status: SequenceStatus) => {
@@ -263,7 +268,7 @@ export default function SequencesPage() {
           {/* Time and Download now live inside each pane header (as icons), so a
               window/export applies to just that pane. Only "New Sequence" stays here. */}
           <button
-            onClick={handleCreate}
+            onClick={() => setChooserOpen(true)}
             disabled={creating}
             className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] disabled:opacity-60 transition-colors"
           >
@@ -272,6 +277,67 @@ export default function SequencesPage() {
           </button>
         </div>
       </div>
+
+      {/* New Sequence type chooser — pick drip vs event before creating */}
+      {chooserOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          onClick={() => { if (!creating) setChooserOpen(false) }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="mb-1 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">New sequence</h2>
+              <button
+                onClick={() => { if (!creating) setChooserOpen(false) }}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mb-5 text-sm text-slate-400">
+              Pick how this sequence should send. You can&apos;t change the type later.
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {/* Drip */}
+              <button
+                onClick={() => handleCreate('drip')}
+                disabled={creating}
+                className="group flex flex-col items-start rounded-xl border border-slate-200 p-4 text-left transition-colors hover:border-slate-900 hover:bg-slate-50 disabled:opacity-60"
+              >
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 group-hover:bg-slate-900 group-hover:text-white">
+                  <Clock className="h-4 w-4" />
+                </div>
+                <div className="text-sm font-semibold text-slate-900">Drip campaign</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                  Outreach and nurture. Every email respects your send window (Mon–Fri, 8am–8pm IST) so nothing lands at odd hours.
+                </p>
+              </button>
+              {/* Event */}
+              <button
+                onClick={() => handleCreate('event')}
+                disabled={creating}
+                className="group flex flex-col items-start rounded-xl border border-slate-200 p-4 text-left transition-colors hover:border-emerald-500 hover:bg-emerald-50 disabled:opacity-60"
+              >
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white">
+                  <Zap className="h-4 w-4" />
+                </div>
+                <div className="text-sm font-semibold text-slate-900">Event notification</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                  Transactional alerts. Every email fires the moment it&apos;s due — off-hours included — for stage moves and confirmations.
+                </p>
+              </button>
+            </div>
+            {creating && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-400">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Creating…
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Empty state */}
       {!hasAny && (
@@ -284,7 +350,7 @@ export default function SequencesPage() {
             Create your first email sequence to automate candidate outreach with multi-stage drip campaigns.
           </p>
           <button
-            onClick={handleCreate}
+            onClick={() => setChooserOpen(true)}
             disabled={creating}
             className="flex items-center gap-2 rounded-xl bg-[#221b14] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors"
           >
@@ -737,9 +803,9 @@ function SequenceRow({
           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
             {badge.label}
           </span>
-          {seq.send_first_immediately && (
+          {seq.kind === 'event' && (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-              <Zap className="h-2.5 w-2.5" /> Sends instantly
+              <Zap className="h-2.5 w-2.5" /> Event
             </span>
           )}
         </div>
