@@ -36,6 +36,8 @@ const isPublic = createRouteMatcher([
   '/api/interviewer(.*)',
   '/api/parse-document(.*)',
   '/api/resume/parse(.*)',
+  // No-login email-approval links (token-authenticated in the route itself).
+  '/api/approvals/act(.*)',
 ])
 
 // Routes that bypass Clerk entirely (auth handled by the route itself)

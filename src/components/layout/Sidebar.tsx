@@ -55,6 +55,9 @@ const NAV_SECTIONS: NavSection[] = [
     icon:    LayoutDashboard,
     href:    '/dashboard',
     items:   [],
+    // The dashboard is an org-wide roll-up; hiring managers (who lack
+    // recruiting:view) are scoped to their own reqs and don't see it.
+    cap:     'recruiting:view',
   },
   {
     section: 'Recruiting',
@@ -63,7 +66,9 @@ const NAV_SECTIONS: NavSection[] = [
       // Requisitions (the approved-headcount object) get their own nav home so
       // they're discoverable, not buried behind a Jobs-header button. They sit
       // right above Jobs because a requisition is upstream of a job pipeline.
-      { href: '/openings',   label: 'Requisitions', icon: ClipboardList, cap: 'recruiting:view' },
+      // openings:view (not recruiting:view) so scoped hiring managers can reach
+      // their own requisitions; the /openings routes row-scope to their reqs.
+      { href: '/openings',   label: 'Requisitions', icon: ClipboardList, cap: 'openings:view' },
       { href: '/jobs',       label: 'Jobs',       icon: Briefcase,     cap: 'recruiting:view' },
       { href: '/candidates', label: 'Candidates', icon: Users,         cap: 'recruiting:view' },
       { href: '/sourcing',   label: 'Sourcing',   icon: Search,        cap: 'recruiting:view' },

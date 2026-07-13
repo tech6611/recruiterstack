@@ -14,7 +14,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   const { orgId, userId } = authResult
 
   const supabase = createAdminClient()
-  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'openings:view')
+  const scope = await getViewerScope(supabase, orgId, userId)
+  const denied = assertCapability(scope, 'openings:view')
   if (denied) return denied
 
   const { data, error } = await supabase
@@ -25,6 +26,16 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     .single()
 
   if (error) return handleSupabaseError(error)
+
+  // A hiring manager may only open their own requisition. Return 404 (not 403)
+  // for anything else so we don't reveal that the requisition exists.
+  if (scope.isHiringManager) {
+    const o = data as { hiring_manager_id: string | null; recruiter_id: string | null } | null
+    if (o && o.hiring_manager_id !== userId && o.recruiter_id !== userId) {
+      return NextResponse.json({ error: 'Opening not found' }, { status: 404 })
+    }
+  }
+
   return NextResponse.json({ data })
 }
 

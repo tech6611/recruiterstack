@@ -1,12 +1,37 @@
+import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getOrgId } from '@/lib/auth'
+import { getOrgId, resolveUserIdFromClerk } from '@/lib/auth'
+import { getViewerScope } from '@/lib/rbac'
 import { cached, cacheKey } from '@/lib/api/cache'
 import { checkAuthRateLimit } from '@/lib/api/rate-limit'
 import { fetchCanonicalDashboardInputs } from '@/modules/ats/domain/reporting'
 import type { CandidateStatus, StageColor } from '@/lib/types/database'
 
 const INTERVIEW_KEYWORDS = ['interview', 'screen', 'technical', 'phone', 'video', 'onsite', 'call']
+
+const ALL_STATUSES: CandidateStatus[] = [
+  'active', 'interviewing', 'offer_extended', 'hired', 'inactive', 'rejected',
+]
+
+// Zeroed payload — returned to no-org users and to hiring managers (who must not
+// see org-wide candidate/job data). Same shape as a real response so the
+// dashboard page renders an empty state instead of erroring.
+function emptyDashboard() {
+  return {
+    stats: {
+      open_jobs: 0, total_jobs: 0, active_candidates: 0,
+      interviewing: 0, hired_total: 0, pending_offers: 0,
+      interviews_to_schedule: 0, overdue_followups_count: 0,
+    },
+    top_jobs:            [],
+    recent_activity:     [],
+    candidate_breakdown: ALL_STATUSES.map(status => ({ status, count: 0 })),
+    upcoming_interviews: [],
+    tasks:               { pending_approvals: [], feedback_needed: [], overdue_followups: [] },
+    application_review:  [],
+  }
+}
 
 export async function GET() {
   const orgId = await getOrgId()
@@ -16,24 +41,26 @@ export async function GET() {
     if (rateLimited) return rateLimited
   }
 
-  const ALL_STATUSES: CandidateStatus[] = [
-    'active', 'interviewing', 'offer_extended', 'hired', 'inactive', 'rejected',
-  ]
-
   if (!orgId) {
-    return NextResponse.json({
-      stats: {
-        open_jobs: 0, total_jobs: 0, active_candidates: 0,
-        interviewing: 0, hired_total: 0, pending_offers: 0,
-        interviews_to_schedule: 0, overdue_followups_count: 0,
-      },
-      top_jobs:            [],
-      recent_activity:     [],
-      candidate_breakdown: ALL_STATUSES.map(status => ({ status, count: 0 })),
-      upcoming_interviews: [],
-      tasks:               { pending_approvals: [], feedback_needed: [], overdue_followups: [] },
-      application_review:  [],
-    })
+    return NextResponse.json(emptyDashboard())
+  }
+
+  // Hiring managers are scoped to their own requisitions/approvals only — the
+  // org-wide dashboard would leak every team's candidates and jobs, so serve
+  // them the same empty payload. (They also don't see Dashboard in the nav.)
+  const { userId: clerkUserId } = auth()
+  if (clerkUserId) {
+    try {
+      const supabase = createAdminClient()
+      const userId = await resolveUserIdFromClerk(clerkUserId)
+      const scope = await getViewerScope(supabase, orgId, userId)
+      if (scope.isHiringManager) {
+        return NextResponse.json(emptyDashboard())
+      }
+    } catch {
+      // User not yet synced — fall through; the org-scoped data below is still
+      // org-gated, and a brand-new user has no HM role anyway.
+    }
   }
 
   const dashboardData = await cached(cacheKey(orgId, 'dashboard'), 60, async () => {

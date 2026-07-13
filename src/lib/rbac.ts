@@ -24,7 +24,10 @@ import { getInviteRbacRole } from '@/lib/clerk/invites'
 type Supabase = SupabaseClient<Database>
 
 export interface ViewerScope {
+  userId:       string          // the calling user's id (for row-level self-scoping)
+  role:         string | null   // org_members.role, if an active member
   isAdmin:      boolean
+  isHiringManager: boolean      // org_members.role = 'hiring_manager' — sees only their own reqs/jobs/candidates
   isOwner:      boolean         // an RBAC Owner role — grants every capability
   capabilities: Set<Capability> // effective per-member capabilities (RBAC Slice 1)
   employeeId:   string | null   // the viewer's own employee_profile id, if bridged
@@ -69,8 +72,13 @@ export async function getViewerScope(
 
   const { capabilities, isOwner } = await resolveMemberPermissions(supabase, orgId, userId)
 
+  const activeRole = memberRow?.is_active === true ? (memberRow?.role ?? null) : null
+
   return {
-    isAdmin:    memberRow?.is_active === true && memberRow?.role === 'admin',
+    userId,
+    role:       activeRole,
+    isAdmin:    activeRole === 'admin',
+    isHiringManager: activeRole === 'hiring_manager',
     isOwner,
     capabilities,
     employeeId,
@@ -207,8 +215,8 @@ export function assertOwner(scope: ViewerScope): NextResponse | null {
 /**
  * Ensure a member has at least their default RBAC role assignment, so new
  * members (created after the migration backfill) aren't locked out once
- * enforcement is on. admin → Owner, everyone else → Recruiter. Idempotent.
- * Call from every org_members creation path.
+ * enforcement is on. admin → Owner, hiring_manager → Hiring Manager, everyone
+ * else → Recruiter. Idempotent. Call from every org_members creation path.
  */
 export async function ensureDefaultMemberRole(
   supabase: Supabase,
@@ -255,7 +263,11 @@ export async function ensureDefaultMemberRole(
     .eq('org_id', orgId)
     .eq('user_id', userId)
     .maybeSingle()
-  const roleName = (member as { role?: string } | null)?.role === 'admin' ? 'Owner' : 'Recruiter'
+  const memberRole = (member as { role?: string } | null)?.role
+  const roleName =
+    memberRole === 'admin' ? 'Owner'
+    : memberRole === 'hiring_manager' ? 'Hiring Manager'
+    : 'Recruiter'
 
   const { data: role } = await sb
     .from('rbac_roles')

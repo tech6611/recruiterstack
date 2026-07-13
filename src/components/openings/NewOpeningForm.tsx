@@ -60,6 +60,30 @@ export function NewOpeningForm() {
   const [defs, setDefs]       = useState<CustomFieldDefinition[]>([])
   const [customValues, setCustomValues] = useState<Record<string, unknown>>({})
   const [saving, setSaving]   = useState(false)
+  // Approver picker mode: pick a teammate ('member') or invite someone new by
+  // email ('invite'). Drives whether the name/email fields are auto-filled +
+  // locked (member) or free-entry (invite).
+  const [hmMode, setHmMode]   = useState<'member' | 'invite'>('invite')
+
+  // When picking a teammate, stamp their user_id + copy name/email off the
+  // member so the required fields pass and still flow down to the job. When
+  // inviting, clear the id (the POST route provisions a seat from the email)
+  // and blank the fields for fresh entry.
+  function onPickHiringManager(value: string) {
+    if (value === '__invite__') {
+      setHmMode('invite')
+      setForm(f => ({ ...f, hiring_manager_id: '', hiring_manager_name: '', hiring_manager_email: '' }))
+      return
+    }
+    const member = members.find(m => m.users?.id === value)
+    setHmMode('member')
+    setForm(f => ({
+      ...f,
+      hiring_manager_id:    value,
+      hiring_manager_name:  member?.users?.full_name ?? f.hiring_manager_name,
+      hiring_manager_email: member?.users?.email ?? f.hiring_manager_email,
+    }))
+  }
 
   useEffect(() => {
     fetch('/api/locations').then(r => r.json()).then(({ data }) => setLocs(data ?? []))
@@ -197,14 +221,21 @@ export function NewOpeningForm() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Hiring manager (approver)</Label>
-              <Select value={form.hiring_manager_id} onChange={e => setForm(f => ({ ...f, hiring_manager_id: e.target.value }))}>
-                <option value="">—</option>
+              <Label>Hiring manager (approver) <span className="text-red-500">*</span></Label>
+              <Select
+                value={hmMode === 'member' ? form.hiring_manager_id : '__invite__'}
+                onChange={e => onPickHiringManager(e.target.value)}
+              >
                 {members.map(m => (
                   <option key={m.id} value={m.users?.id ?? ''}>{m.users?.full_name ?? m.users?.email ?? 'Unknown'}</option>
                 ))}
+                <option value="__invite__">➕ Invite someone by email…</option>
               </Select>
-              <p className="text-[11px] text-slate-400">Used for approval routing. Optional.</p>
+              <p className="text-[11px] text-slate-400">
+                {hmMode === 'member'
+                  ? 'This teammate approves the requisition.'
+                  : 'Not on your team yet — they get a free approver seat and an email invite.'}
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Recruiter</Label>
@@ -224,6 +255,7 @@ export function NewOpeningForm() {
                 id="hm-name"
                 placeholder="Priya Sharma"
                 value={form.hiring_manager_name}
+                disabled={hmMode === 'member'}
                 onChange={e => setForm(f => ({ ...f, hiring_manager_name: e.target.value }))}
               />
             </div>
@@ -234,9 +266,14 @@ export function NewOpeningForm() {
                 type="email"
                 placeholder="priya@company.com"
                 value={form.hiring_manager_email}
+                disabled={hmMode === 'member'}
                 onChange={e => setForm(f => ({ ...f, hiring_manager_email: e.target.value }))}
               />
-              <p className="text-[11px] text-slate-400">Flows to the job. Powers the calendar booking link in sequence emails.</p>
+              <p className="text-[11px] text-slate-400">
+                {hmMode === 'member'
+                  ? 'Filled from the teammate you picked. Flows to the job + calendar booking link.'
+                  : 'Flows to the job. Powers the calendar booking link in sequence emails.'}
+              </p>
             </div>
           </div>
 

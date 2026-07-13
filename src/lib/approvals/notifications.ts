@@ -149,6 +149,9 @@ export async function notifyStepActivated(input: {
   targetType:    ApprovalTargetType
   targetId:      string
   dueAt:         string | null
+  // Per-approver one-time email-approval tokens (user_id → token). When present,
+  // the approver's email carries no-login Approve/Reject buttons.
+  tokens?:       Record<string, string>
 }): Promise<void> {
   try {
     const [approvers, requester, slackOn] = await Promise.all([
@@ -165,6 +168,7 @@ export async function notifyStepActivated(input: {
         approverName: a.full_name ?? a.email, requesterName,
         stepName: input.stepName, approvalId: input.approvalId, stepId: input.stepId,
         dueAt: input.dueAt,
+        token: input.tokens?.[a.id] ?? null,
       })
       await sendEmail({ to: a.email, subject: tpl.subject, html: tpl.html })
       if (slackOn) {

@@ -12,6 +12,7 @@ import { evaluateCondition } from './condition'
 import { writeAudit } from './audit'
 import { captureApprovedSubstance } from '@/lib/jobs/substance'
 import { notifyStepActivated, notifyStepDecided, notifyApprovalCompleted } from './notifications'
+import { mintStepTokens } from './tokens'
 import { enqueue } from '@/lib/api/job-queue'
 import { emitWebhook } from '@/lib/webhooks/emit'
 import { logger } from '@/lib/logger'
@@ -260,6 +261,18 @@ async function activateNextStep(approvalId: string, requesterId: string): Promis
         parallel_group_id: step.parallel_group_id ?? null,
       },
     })
+    // Mint one-time email-approval tokens per approver so the notification can
+    // drop a no-login Approve/Reject link into each inbox. Best-effort: a mint
+    // failure must not block activation — the login-gated inbox still works.
+    const tokens = await mintStepTokens(supabase, {
+      orgId: approval.org_id,
+      approvalId,
+      stepId: step.id,
+      userIds: approvers.map(a => a.user_id),
+    }).catch(e => {
+      logger.error('[engine] mint step tokens', e)
+      return {} as Record<string, string>
+    })
     notifyStepActivated({
       orgId: approval.org_id,
       approvalId, stepId: step.id, stepName: cs.name,
@@ -267,6 +280,7 @@ async function activateNextStep(approvalId: string, requesterId: string): Promis
       requesterId,
       targetType: approval.target_type, targetId: approval.target_id,
       dueAt: due,
+      tokens,
     }).catch(e => logger.error('[engine] notify step_activated', e))
 
     // Enqueue an SLA check that fires at due_at if a deadline is set.
@@ -509,6 +523,11 @@ async function applyApprovedToTarget(targetType: ApprovalTargetType, targetId: s
     // Re-baseline the approved snapshot to the content that was just signed off,
     // so later edits are diffed against this (formatting-blind) baseline.
     await captureApprovedSubstance(supabase, targetId)
+  } else if (targetType === 'offer') {
+    await supabase
+      .from('offers')
+      .update({ status: 'approved', approved_at: new Date().toISOString() })
+      .eq('id', targetId)
   }
 }
 async function fetchRequester(approvalId: string): Promise<string> {
@@ -523,6 +542,8 @@ async function applyRejectedToTarget(targetType: ApprovalTargetType, targetId: s
     await supabase.from('openings').update({ status: 'draft', approval_id: null }).eq('id', targetId)
   } else if (targetType === 'job') {
     await supabase.from('jobs').update({ status: 'draft', approval_id: null }).eq('id', targetId)
+  } else if (targetType === 'offer') {
+    await supabase.from('offers').update({ status: 'draft', approval_id: null }).eq('id', targetId)
   }
 }
 async function applyDraftToTarget(targetType: ApprovalTargetType, targetId: string): Promise<void> {
@@ -531,5 +552,7 @@ async function applyDraftToTarget(targetType: ApprovalTargetType, targetId: stri
     await supabase.from('openings').update({ status: 'draft', approval_id: null }).eq('id', targetId)
   } else if (targetType === 'job') {
     await supabase.from('jobs').update({ status: 'draft', approval_id: null }).eq('id', targetId)
+  } else if (targetType === 'offer') {
+    await supabase.from('offers').update({ status: 'draft', approval_id: null }).eq('id', targetId)
   }
 }

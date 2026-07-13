@@ -50,11 +50,26 @@ export interface ApprovalRequestedCtx extends BaseCtx {
   approvalId:     string
   stepId:         string
   dueAt?:         string | null
+  // One-time email-approval token bound to this approver. When present, the
+  // email carries no-login Approve/Reject buttons (they land on a confirm page
+  // that records the decision). Falls back to the login-gated inbox when absent.
+  token?:         string | null
 }
 
 export function renderApprovalRequested(ctx: ApprovalRequestedCtx): { subject: string; html: string } {
-  const link = `${ctx.appUrl}/approvals/inbox`
+  const inbox = `${ctx.appUrl}/approvals/inbox`
   const due = ctx.dueAt ? `<p style="font-size:13px;color:#92400e;margin:0 0 16px;">⏰ Due ${new Date(ctx.dueAt).toLocaleString()}</p>` : ''
+  // Email clients (and scanners) fire GET on links, so these point at a confirm
+  // page — the actual state change happens on the POST from that page, never here.
+  const actBase = ctx.token ? `${ctx.appUrl}/api/approvals/act/${ctx.token}` : null
+  const actions = actBase
+    ? `<div>
+         ${BTN(`${actBase}?decision=approved`, 'Approve')}
+         &nbsp;&nbsp;
+         ${BTN(`${actBase}?decision=rejected`, 'Reject', '#ef4444')}
+       </div>
+       <p style="font-size:12px;color:#94a3b8;margin:16px 0 0;">Or <a href="${inbox}" style="color:#64748b;">open the approvals inbox</a>.</p>`
+    : `<div>${BTN(inbox, 'Open inbox')}</div>`
   const html = SHELL(`
     <h2 style="margin:0 0 16px;font-size:18px;">Approval requested</h2>
     <p>Hi ${ctx.approverName},</p>
@@ -62,7 +77,7 @@ export function renderApprovalRequested(ctx: ApprovalRequestedCtx): { subject: s
     <p style="font-size:15px;font-weight:600;margin:0 0 8px;">${escapeHtml(ctx.targetTitle)}</p>
     <p style="font-size:13px;color:#64748b;margin:0 0 24px;">Step: ${escapeHtml(ctx.stepName)}</p>
     ${due}
-    <div>${BTN(link, 'Open inbox')}</div>
+    ${actions}
   `, 'You received this because you are listed as an approver. Manage notifications in Settings.')
   return { subject: `Approval needed: ${ctx.targetTitle}`, html }
 }

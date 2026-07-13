@@ -52,6 +52,38 @@ export async function syncUserFromClerk(clerkUser: ClerkUserPayload): Promise<st
 
   const full_name = [clerkUser.first_name, clerkUser.last_name].filter(Boolean).join(' ') || null
 
+  // Reclaim a pending row provisioned before this user had a Clerk login
+  // (hiring-manager seats: users.clerk_user_id IS NULL, matched by email —
+  // migration 090). Backfilling clerk_user_id onto that same row keeps the id
+  // stable, so historical approvals that reference it aren't orphaned. Without
+  // this, the upsert below would insert a *duplicate* users row.
+  const { data: pending } = await supabase
+    .from('users')
+    .select('id')
+    .is('clerk_user_id', null)
+    .ilike('email', primaryEmail.email_address)
+    .maybeSingle()
+
+  if (pending) {
+    const pendingId = (pending as { id: string }).id
+    const { error: claimErr } = await supabase
+      .from('users')
+      .update({
+        clerk_user_id: clerkUser.id,
+        email: primaryEmail.email_address,
+        first_name: clerkUser.first_name,
+        last_name: clerkUser.last_name,
+        full_name,
+        avatar_url: clerkUser.image_url,
+      })
+      .eq('id', pendingId)
+    if (claimErr) {
+      logger.error('Failed to claim pending user from Clerk', claimErr, { clerkUserId: clerkUser.id })
+      throw claimErr
+    }
+    return pendingId
+  }
+
   const { data, error } = await supabase
     .from('users')
     .upsert(

@@ -4,6 +4,7 @@ import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { openingCreateSchema } from '@/lib/validations/openings'
+import { provisionHiringManagerSeat } from '@/modules/core/domain/team'
 import type { Opening } from '@/lib/types/requisitions'
 
 type StatusFilter = Opening['status']
@@ -20,7 +21,8 @@ export async function GET(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult
   const { orgId, userId } = authResult
 
-  const denied = assertCapability(await getViewerScope(createAdminClient(), orgId, userId), 'openings:view')
+  const scope = await getViewerScope(createAdminClient(), orgId, userId)
+  const denied = assertCapability(scope, 'openings:view')
   if (denied) return denied
 
   const { searchParams } = req.nextUrl
@@ -54,6 +56,13 @@ export async function GET(req: NextRequest) {
   if (locationId)      q = q.eq('location_id', locationId)
   if (hiringManagerId) q = q.eq('hiring_manager_id', hiringManagerId)
   if (recruiterId)     q = q.eq('recruiter_id', recruiterId)
+
+  // Hiring managers see only their own requisitions: ones they're the hiring
+  // manager for, or (rare) the named recruiter on. `openings:view` alone would
+  // otherwise return every requisition in the org.
+  if (scope.isHiringManager) {
+    q = q.or(`hiring_manager_id.eq.${userId},recruiter_id.eq.${userId}`)
+  }
 
   const { data, error, count } = await q
   if (error) return handleSupabaseError(error)
@@ -95,6 +104,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Invite-on-assignment: if a hiring manager was named by email (not an
+  // existing member), provision a free hiring-manager seat now so the picked
+  // approver has a real user_id by the time the opening is submitted for
+  // approval. Idempotent; reuses an existing member/user when present.
+  let hiringManagerId = body.hiring_manager_id ?? null
+  if (!hiringManagerId && body.hiring_manager_email) {
+    const seat = await provisionHiringManagerSeat(supabase, {
+      orgId,
+      email: body.hiring_manager_email,
+      name:  body.hiring_manager_name ?? null,
+      invitedByUserId: userId,
+    })
+    hiringManagerId = seat.userId
+  }
+
   const { data, error } = await supabase
     .from('openings')
     .insert({
@@ -109,7 +133,7 @@ export async function POST(req: NextRequest) {
       comp_band_id:      body.comp_band_id ?? null,
       out_of_band:       outOfBand,
       target_start_date: body.target_start_date,
-      hiring_manager_id:    body.hiring_manager_id ?? null,
+      hiring_manager_id:    hiringManagerId,
       hiring_manager_name:  body.hiring_manager_name ?? null,
       hiring_manager_email: body.hiring_manager_email ?? null,
       recruiter_id:      body.recruiter_id ?? userId,          // default: current user

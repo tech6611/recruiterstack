@@ -12,6 +12,73 @@ entries on top.
 ## 2026-07-13
 
 ### Added
+- **Offers can now go through the approval engine.** New `POST /api/offers/[id]/submit`
+  moves a draft offer to `pending_approval` against the org's "Offer" approval chain
+  (configurable in Settings → Approval chains, which already listed Offer as a target).
+  Approvers decide from the inbox or an email link; the engine keeps the offer's status
+  in sync (approved on sign-off, back to draft on reject/cancel). Offers were previously
+  never connected to the engine.
+- **Per-pane Filter button on the Requisitions, Jobs, and Candidates lists.** Each
+  Active/Past pane now has a funnel button (next to Search/Time/Download) that opens
+  a popover of "field is value" conditions covering every column — shown or not.
+  Conditions on the same field are OR'd, across fields AND'd. New shared pieces in
+  `src/components/panes/pane-controls.tsx`: `PaneFilterControl`, `rowMatchesFilters`,
+  `FilterFieldDef`, `FilterCondition`.
+- **Invite-on-assignment for hiring managers.** Naming a hiring manager by email on a
+  new requisition now provisions a free hiring-manager seat on the spot (reusing an
+  existing member/user if there is one) and fires a best-effort Clerk invite, so the
+  picked approver has a real account by the time the requisition goes for approval.
+  When they later sign in, their pending record is claimed in place
+  (`syncUserFromClerk`) rather than duplicated, so their approval history stays intact.
+
+### Changed
+- **Hiring managers are scoped to their own requisitions and approvals.** A hiring
+  manager now sees only requisitions they own (hiring manager or recruiter on) in the
+  `/openings` list and detail; opening someone else's returns 404. The approvals inbox,
+  history, and detail already filter to their own approvals. They're blocked from the
+  org-wide dashboard, candidate/job lists, settings, and analytics by capability. Nav:
+  Requisitions is reachable via `openings:view`; Dashboard is hidden from them.
+- **Filtering consolidated into the per-pane Filter button.** Requisitions' page-level
+  Department/Location dropdowns and Candidates' page-level Status dropdown were folded
+  into their panes' Filter popover (Requisitions filters on Title/Status/Department/
+  Location; Candidates on Name/Title/Status/Location/Email). Jobs' click-the-column-
+  header filters and filter-chip bar were replaced by the same Filter button on each
+  pane, reusing the existing filtering engine under the hood; the column customiser
+  and drag-to-reorder are unchanged.
+
+### Schema
+- **`offers.approval_id` (migration `093`).** Nullable FK to `approvals`, letting a
+  submitted offer link to its in-flight approval (mirrors `openings`/`jobs`). Cleared
+  back to NULL when the offer is rejected, cancelled, or still a draft.
+- **"Hiring Manager" system role (migration `092`).** Seeds a minimal, approve-focused
+  RBAC role per org (view + approve their own requisitions/jobs/offers; no settings,
+  analytics, or edit). Provisioned hiring-manager seats are assigned it automatically
+  (`ensureDefaultMemberRole`: admin→Owner, hiring_manager→Hiring Manager, else Recruiter).
+- **Approval email-link access tokens (migration `091`).** New
+  `approval_step_access_tokens` table — a 256-bit random secret bound to one
+  (approval, step, approver) triple, with a 7-day expiry and one-time-use stamp.
+  Backs no-login Approve/Reject from an email button.
+- **Hiring-manager free seats + pending users (migration `090`).** Groundwork for
+  making hiring managers first-class approvers. `users.clerk_user_id` is now
+  nullable — a row with it NULL is a "pending" user we provision the moment a
+  hiring manager is named as an approver (before they have a login). Adds
+  `users.provisioned_via` (`'approver_invite'`) and `org_members.is_free_seat`
+  (billing carve-out — HM seats never count against paid recruiter seats), plus a
+  partial index for fast pending-user lookup by email.
+
+### Added
+- **Approve/Reject an approval straight from the email — no login.** Approval
+  request emails now carry **Approve** and **Reject** buttons. Each button opens
+  a confirm page (Reject asks for a ≥20-char reason) that records the decision as
+  the approver, via a one-time tokenized link (`/api/approvals/act/[token]`).
+  Links are single-use, expire after 7 days, and are rate-limited; the login-gated
+  approvals inbox still works as before. Groundwork for letting hiring managers
+  act on requisitions without a platform seat.
+- **`provisionHiringManagerSeat` team facade (`src/modules/core/domain/team.ts`).**
+  Idempotently mints a real `users` + free `org_members` seat (role
+  `hiring_manager`) for an emailed hiring manager, so the approval engine always
+  has a concrete `user_id` to target, and fires a best-effort Clerk invitation so
+  they can claim a login later. Reuses an existing member/user when present.
 - **Candidate phone-screen self-scheduling (`{{phone_screen_scheduler}}` token).**
   A new sequence-email merge token — insert "Phone Screen Slots" from the stage
   editor — renders a per-candidate link. The candidate opens a public page
