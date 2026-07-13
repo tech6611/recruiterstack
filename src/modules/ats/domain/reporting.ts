@@ -3,53 +3,14 @@ import type { Database, ScreeningAnswer } from '@/lib/types/database'
 
 type Supabase = SupabaseClient<Database>
 
-export async function fetchLegacyAnalyticsInputs(
-  supabase: Supabase,
-  orgId: string,
-) {
-  const [jobsRes, appsRes, stagesRes, candsRes] = await Promise.all([
-    supabase
-      .from('hiring_requests')
-      .select('id, position_title, department, status')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('applications')
-      .select('id, status, source, stage_id, applied_at, hiring_request_id, candidate_id')
-      .eq('org_id', orgId),
-    supabase
-      .from('pipeline_stages')
-      .select('id, name, color, order_index, hiring_request_id')
-      .eq('org_id', orgId)
-      .order('order_index'),
-    supabase
-      .from('candidates')
-      .select('id, status')
-      .eq('org_id', orgId),
-  ])
-
-  if (jobsRes.error) throw jobsRes.error
-  if (appsRes.error) throw appsRes.error
-  if (stagesRes.error) throw stagesRes.error
-  if (candsRes.error) throw candsRes.error
-
-  return {
-    jobs: jobsRes.data ?? [],
-    apps: appsRes.data ?? [],
-    stages: stagesRes.data ?? [],
-    candidates: candsRes.data ?? [],
-  }
-}
-
 // ── Canonical analytics inputs (Phase 3 / C5) ────────────────────────────────
-// Mirror of fetchLegacyAnalyticsInputs reading the canonical spine: `jobs`
-// (status enum: draft|pending_approval|approved|open|closed|archived),
-// applications keyed on job_id, and pipeline_stages keyed on job_id (migrations
-// 066/068). The returned shape is IDENTICAL to fetchLegacyAnalyticsInputs —
-// jobs expose `position_title`/`department`, and apps/stages expose a
-// `hiring_request_id` field carrying the canonical job_id — so the analytics
-// route's funnel/source/velocity logic is unchanged; canonical data simply backs
-// it. The client is cast to `any` for not-yet-typed canonical columns (job_id),
+// Analytics inputs from the canonical spine: `jobs` (status enum:
+// draft|pending_approval|approved|open|closed|archived), applications keyed on
+// job_id, and pipeline_stages keyed on job_id (migrations 066/068). Jobs expose
+// `position_title`/`department`, and apps/stages expose a `hiring_request_id`
+// field carrying the canonical job_id — so the analytics route's
+// funnel/source/velocity logic is unchanged; canonical data simply backs it. The
+// client is cast to `any` for not-yet-typed canonical columns (job_id),
 // as in job-pipelines.ts / rbac.ts.
 export async function fetchCanonicalAnalyticsInputs(
   supabase: Supabase,
