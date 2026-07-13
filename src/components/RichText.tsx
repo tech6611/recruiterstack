@@ -44,6 +44,17 @@ const RICH_TEXT_CLASS = cn(
   '[&_a]:text-emerald-600 [&_a]:underline',
 )
 
+// The editor (Tiptap/ProseMirror) shows a line break at the *end* of a block as
+// a visible blank line — that's how the author sees paragraph gaps while typing.
+// But browsers discard a forced break sitting at the very end of a block, so the
+// read-only page collapses that blank line and paragraphs glue together. Append a
+// zero-width space right after any trailing break (a <br> immediately before a
+// closing tag) so the empty line keeps its height and renders exactly like the
+// editor. Only trailing breaks are touched; mid-text breaks are left as-is.
+function revealTrailingBreaks(html: string): string {
+  return html.replace(/<br\s*\/?>(?=\s*<\/)/gi, '<br>\u200B')
+}
+
 export function RichText({ html, className }: { html: string | null | undefined; className?: string }) {
   if (!html || !html.trim()) return null
 
@@ -52,7 +63,7 @@ export function RichText({ html, className }: { html: string | null | undefined;
     return <div className={cn('text-sm text-slate-700 leading-relaxed whitespace-pre-line', className)}>{html}</div>
   }
 
-  const clean = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } })
+  const clean = revealTrailingBreaks(DOMPurify.sanitize(html, { USE_PROFILES: { html: true } }))
   return (
     <div
       className={cn(RICH_TEXT_CLASS, className)}

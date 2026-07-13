@@ -12,6 +12,12 @@ entries on top.
 ## 2026-07-13
 
 ### Fixed
+- **Rich-text paragraph breaks now render identically on candidate-facing pages.**
+  A line break at the end of a paragraph (which the editor shows as a blank line)
+  was being collapsed by the browser on the apply/careers/detail views, gluing
+  paragraphs together. `RichText` now preserves those trailing breaks with a
+  zero-width space so the read-only view matches the editor exactly
+  (`src/components/RichText.tsx`, test in `src/components/__tests__/RichText.test.tsx`).
 - **"Hiring team member → recruiter" approval steps no longer resolve to zero
   approvers before a job exists.** When a requisition has no linked job yet, that
   approver type now falls back to the requisition's own `recruiter_id`, mirroring
