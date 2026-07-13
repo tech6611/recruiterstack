@@ -22,6 +22,7 @@ const isPublic = createRouteMatcher([
   '/intake/(.*)',
   '/careers/(.*)',
   '/schedule/(.*)',
+  '/phone-screen/(.*)',
   '/interviewer/(.*)',
   '/unsubscribe/(.*)',
   // Public APIs
@@ -31,6 +32,7 @@ const isPublic = createRouteMatcher([
   '/api/apply(.*)',
   '/api/intake(.*)',
   '/api/schedule(.*)',
+  '/api/phone-screen(.*)',
   '/api/interviewer(.*)',
   '/api/parse-document(.*)',
   '/api/resume/parse(.*)',

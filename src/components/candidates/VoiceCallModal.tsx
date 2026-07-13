@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { Phone, Loader2, X, PhoneCall, CheckCircle, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Phone, Loader2, X, PhoneCall, CheckCircle, AlertCircle, CalendarClock } from 'lucide-react'
+
+interface PreferredSlot { start: string; end: string }
 
 interface VoiceCallModalProps {
   candidateId: string
@@ -30,6 +32,40 @@ export default function VoiceCallModal({
   const [calling, setCalling] = useState(false)
   const [result, setResult] = useState<'success' | 'error' | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [prefSlots, setPrefSlots] = useState<PreferredSlot[]>([])
+  const [prefTz, setPrefTz] = useState<string | null>(null)
+
+  // Pull any time windows the candidate submitted via the phone-screen link, so
+  // the recruiter can see when they're free right where they launch the call.
+  useEffect(() => {
+    let alive = true
+    fetch(`/api/applications/${applicationId}/phone-screen`)
+      .then(r => r.json())
+      .then(d => {
+        if (!alive || !d?.submitted) return
+        setPrefSlots(Array.isArray(d.slots) ? d.slots : [])
+        setPrefTz(d.timezone ?? null)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [applicationId])
+
+  // Group the candidate's preferred windows by day, shown in the timezone they
+  // submitted from (falling back to the recruiter's local zone).
+  const prefGroups = useMemo(() => {
+    if (prefSlots.length === 0) return []
+    const tz = prefTz ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+    const dayFmt  = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric' })
+    const timeFmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' })
+    const map = new Map<string, { label: string; times: string[] }>()
+    for (const s of prefSlots) {
+      const d = new Date(s.start)
+      const key = dayFmt.format(d)
+      if (!map.has(key)) map.set(key, { label: key, times: [] })
+      map.get(key)!.times.push(timeFmt.format(d))
+    }
+    return Array.from(map.values())
+  }, [prefSlots, prefTz])
 
   const handleCall = async () => {
     if (!phone.trim()) return
@@ -131,6 +167,27 @@ export default function VoiceCallModal({
                   summary, and AI score when it&apos;s done.
                 </p>
               </div>
+
+              {/* Candidate's submitted phone-screen availability, if any */}
+              {prefGroups.length > 0 && (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-3.5 py-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <CalendarClock className="h-3.5 w-3.5 text-emerald-600" />
+                    <p className="text-xs font-semibold text-emerald-800">
+                      Candidate&apos;s preferred call times
+                      {prefTz ? <span className="font-normal text-emerald-600"> ({prefTz.replace(/_/g, ' ')})</span> : null}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    {prefGroups.map(g => (
+                      <div key={g.label} className="flex gap-2 text-xs">
+                        <span className="font-medium text-emerald-900 shrink-0 w-24">{g.label}</span>
+                        <span className="text-emerald-700">{g.times.join(', ')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Phone number input */}
               <div>

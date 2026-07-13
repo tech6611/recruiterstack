@@ -26,6 +26,11 @@ export const SEQUENCE_TOKENS: TokenMeta[] = [
   // hiring manager. When the HM (or their availability) can't be resolved, the
   // fallback reads as a natural sentence instead of a dead link.
   { token: '{{hiring_manager_calendar}}', key: 'hiring_manager_calendar', label: 'Hiring Manager Calendar', fallback: 'the hiring team will reach out to schedule a time' },
+  // Resolved per candidate at send-time to a personal /phone-screen link where
+  // the candidate ticks the time windows they're comfortable being called in for
+  // an AI phone screen. No calendar check — an AI places the call. Falls back to a
+  // natural sentence when the candidacy can't be resolved.
+  { token: '{{phone_screen_scheduler}}', key: 'phone_screen_scheduler', label: 'Phone Screen Slots', fallback: "we'll reach out to arrange a quick phone screen" },
 ]
 
 const FALLBACK_BY_KEY: Record<string, string> = Object.fromEntries(

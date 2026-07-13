@@ -24,6 +24,7 @@ const TOKENS = [
   { token: '{{company_name}}',         label: 'Hiring Company' },
   { token: '{{recruiter_name}}',       label: 'Recruiter' },
   { token: '{{hiring_manager_calendar}}', label: 'HM Calendar Link' },
+  { token: '{{phone_screen_scheduler}}', label: 'Phone Screen Slots' },
 ]
 
 const CHANNELS: { value: SequenceChannel; label: string; icon: string; soon?: boolean }[] = [

@@ -296,6 +296,67 @@ async function mintHiringManagerBookingUrl(
   return `${appUrl}/schedule/${token}`
 }
 
+// Resolve the {{phone_screen_scheduler}} token to a personal /phone-screen URL
+// for this candidate. Unlike the HM calendar link, there is NO calendar to check:
+// an AI places the call, so the candidate simply picks the windows they're
+// comfortable being called in. We find-or-create a pending phone_screen_requests
+// row for this candidacy and hand the candidate its token. Returns null when the
+// app URL isn't configured, so applyTokens uses the token's natural-language
+// fallback instead of a dead link.
+//
+// Idempotent: a re-send/retry reuses the candidacy's existing pending request
+// rather than piling up rows.
+async function mintPhoneScreenSchedulerUrl(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  orgId: string,
+  applicationId: string,
+  candidateId: string,
+): Promise<string | null> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) return null
+
+  const now = Date.now()
+
+  // Reuse an existing unexpired request for this candidacy if present.
+  const { data: existing } = await supabase
+    .from('phone_screen_requests')
+    .select('token, expires_at')
+    .eq('org_id', orgId)
+    .eq('application_id', applicationId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+  const prior = (existing as { token: string; expires_at: string }[] | null)?.[0]
+  if (prior && new Date(prior.expires_at) > new Date(now)) {
+    return `${appUrl}/phone-screen/${prior.token}`
+  }
+
+  // Anchor to the canonical job when we can (nice-to-have context; not required).
+  const { data: app } = await supabase
+    .from('applications')
+    .select('job_id')
+    .eq('id', applicationId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  const jobId = (app as { job_id: string | null } | null)?.job_id ?? null
+
+  const token = randomBytes(20).toString('hex')
+  const { error } = await supabase.from('phone_screen_requests').insert({
+    org_id:         orgId,
+    application_id: applicationId,
+    candidate_id:   candidateId,
+    job_id:         jobId,
+    token,
+    status:         'pending',
+    expires_at:     new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  })
+  if (error) {
+    logger.error('[sequence_email] failed to mint phone-screen link', error)
+    return null
+  }
+  return `${appUrl}/phone-screen/${token}`
+}
+
 registerHandler('sequence_email', async (job: QueuedJob) => {
   const { enrollmentId, sequenceId } = job.payload as {
     enrollmentId: string; sequenceId: string
@@ -477,6 +538,16 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
       supabase, job.org_id, enrollment.application_id, enrollment.candidate_id,
     )
     if (bookingUrl) tokenValues.hiring_manager_calendar = bookingUrl
+  }
+
+  // Same treatment for the phone-screen slot-picker link: only mint when a stage
+  // actually uses the token, so we don't create requests for the common case.
+  const usesPhoneScreen = `${stage.subject ?? ''} ${stage.body ?? ''}`.includes('{{phone_screen_scheduler}}')
+  if (usesPhoneScreen && enrollment.application_id) {
+    const phoneScreenUrl = await mintPhoneScreenSchedulerUrl(
+      supabase, job.org_id, enrollment.application_id, enrollment.candidate_id,
+    )
+    if (phoneScreenUrl) tokenValues.phone_screen_scheduler = phoneScreenUrl
   }
 
   let subject = applyTokens(stage.subject ?? '', tokenValues)

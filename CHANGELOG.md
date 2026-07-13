@@ -12,6 +12,18 @@ entries on top.
 ## 2026-07-13
 
 ### Added
+- **Candidate phone-screen self-scheduling (`{{phone_screen_scheduler}}` token).**
+  A new sequence-email merge token — insert "Phone Screen Slots" from the stage
+  editor — renders a per-candidate link. The candidate opens a public page
+  (`/phone-screen/[token]`, no login) and ticks whichever upcoming business-hours
+  windows they're comfortable being called in. Unlike the HM calendar link there's
+  **no calendar/free-busy check** — an AI places the call, so they just tell us
+  when they're free. Their picks are stored against the application, and surface
+  inside the existing "AI Phone Screen" modal so the recruiter sees the preferred
+  windows (in the candidate's timezone) right where they launch the call.
+  Recruiter-triggered for now: seeing the windows, the recruiter clicks to start
+  the call. The link is idempotent (re-sends reuse the same request) and expires
+  after 30 days.
 - **Hiring manager now flows from requisition → job.** A requisition (opening)
   gains a free-typed hiring-manager **name** and **email** (email is mandatory
   before the requisition can be submitted for approval). When a job is created
