@@ -1,16 +1,16 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Plus, Clock, CheckCircle, Send, Archive, FileText, Briefcase, ChevronDown, ChevronRight } from 'lucide-react'
-import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
 import { type StatTone } from '@/lib/ui/stat-tones'
 import { StatCards } from '@/components/ui/stat-cards'
 import { cn } from '@/lib/utils'
 import {
-  PaneSearchInput, TimeRangeControl, PaneDownloadButton,
-  ALL_RANGE_VALUE, withinRange, todayStamp, type RangeValue,
+  PaneSearchInput, TimeRangeControl, PaneDownloadButton, PaneFilterControl,
+  ALL_RANGE_VALUE, withinRange, rowMatchesFilters, todayStamp,
+  type RangeValue, type FilterFieldDef, type FilterCondition,
 } from '@/components/panes/pane-controls'
 import type { Opening, Department, Location as LocationRow } from '@/lib/types/requisitions'
 
@@ -67,6 +67,7 @@ const PANE_TINT: { active: PaneTone; past: PaneTone } = {
 function OpeningsBlock({
   title, tint, accent, rows, total, deptById, locById, emptyText,
   query, onQueryChange, range, onRangeChange, downloadName,
+  filterFields, filters, onFiltersChange,
 }: {
   title:     string
   tint:      PaneTone
@@ -81,6 +82,9 @@ function OpeningsBlock({
   range:         RangeValue
   onRangeChange: (v: RangeValue) => void
   downloadName:  string
+  filterFields:  FilterFieldDef[]
+  filters:       FilterCondition[]
+  onFiltersChange: (c: FilterCondition[]) => void
 }) {
   const [open, setOpen] = useState(true)
 
@@ -126,6 +130,7 @@ function OpeningsBlock({
         />
         <TimeRangeControl value={range} onChange={onRangeChange} badgeClass={accent} />
         <PaneDownloadButton filename={`requisitions-${downloadName}-${todayStamp()}.csv`} rows={csvRows} badgeClass={accent} />
+        <PaneFilterControl fields={filterFields} conditions={filters} onChange={c => { onFiltersChange(c); if (c.length) setOpen(true) }} badgeClass={accent} />
       </div>
 
       {open && (
@@ -200,14 +205,13 @@ export default function OpeningsListPage() {
   const [depts,  setDepts]  = useState<Department[]>([])
   const [locs,   setLocs]   = useState<LocationRow[]>([])
 
-  // ── Shared refine filters (dept / location drive BOTH blocks) ─────────────
-  const [deptId, setDeptId] = useState('')
-  const [locId,  setLocId]  = useState('')
-  // ── Per-pane search + time window (each pane filters independently) ───────
+  // ── Per-pane search + time window + filters (each pane filters independently) ─
   const [activeQuery, setActiveQuery] = useState('')
   const [pastQuery,   setPastQuery]   = useState('')
   const [activeRange, setActiveRange] = useState<RangeValue>(ALL_RANGE_VALUE)
   const [pastRange,   setPastRange]   = useState<RangeValue>(ALL_RANGE_VALUE)
+  const [activeFilters, setActiveFilters] = useState<FilterCondition[]>([])
+  const [pastFilters,   setPastFilters]   = useState<FilterCondition[]>([])
 
   useEffect(() => {
     fetch('/api/departments').then(r => r.json()).then(({ data }) => setDepts(data ?? []))
@@ -228,29 +232,46 @@ export default function OpeningsListPage() {
   const active = useMemo(() => items.filter(o => ACTIVE_STATUSES.includes(o.status)), [items])
   const past   = useMemo(() => items.filter(o => PAST_STATUSES.includes(o.status)),   [items])
 
-  // Filter a block by its own search text + time window, plus the shared
-  // dept/location dropdowns. Search matches title + department + location name;
-  // the time window applies to created_at.
-  const makeFilter = useMemo(() => {
-    return (list: Opening[], query: string, range: RangeValue) => {
-      const needle = query.trim().toLowerCase()
-      return list.filter(o => {
-        if (deptId && o.department_id !== deptId) return false
-        if (locId  && o.location_id   !== locId)  return false
-        if (needle) {
-          const deptName = o.department_id ? (deptById.get(o.department_id)?.name ?? '') : ''
-          const locName  = o.location_id   ? (locById.get(o.location_id)?.name  ?? '') : ''
-          const hay = `${o.title} ${deptName} ${locName}`.toLowerCase()
-          if (!hay.includes(needle)) return false
-        }
-        if (!withinRange(o.created_at, range)) return false
-        return true
-      })
-    }
-  }, [deptId, locId, deptById, locById])
+  // Fields the per-pane Filter popover can filter on — every column, whether or
+  // not it's shown. Department/Location options come from the loaded lists.
+  const filterFields = useMemo<FilterFieldDef[]>(() => [
+    { key: 'title',      label: 'Title',      type: 'text' },
+    { key: 'status',     label: 'Status',     type: 'select', options: (Object.keys(STATUS_CONFIG) as Opening['status'][]).map(s => ({ value: s, label: STATUS_CONFIG[s].label })) },
+    { key: 'department', label: 'Department', type: 'select', options: depts.map(d => ({ value: d.name, label: d.name })) },
+    { key: 'location',   label: 'Location',   type: 'select', options: locs.map(l => ({ value: l.name, label: l.name })) },
+  ], [depts, locs])
 
-  const activeRows = useMemo(() => makeFilter(active, activeQuery, activeRange), [makeFilter, active, activeQuery, activeRange])
-  const pastRows   = useMemo(() => makeFilter(past,   pastQuery,   pastRange),   [makeFilter, past,   pastQuery,   pastRange])
+  // A requisition's value for a given filter field (used by rowMatchesFilters).
+  const fieldValue = useCallback((o: Opening, key: string): string => {
+    switch (key) {
+      case 'title':      return o.title ?? ''
+      case 'status':     return o.status ?? ''
+      case 'department': return o.department_id ? (deptById.get(o.department_id)?.name ?? '') : ''
+      case 'location':   return o.location_id   ? (locById.get(o.location_id)?.name  ?? '') : ''
+      default:           return ''
+    }
+  }, [deptById, locById])
+
+  // Filter a block by its own search text + time window + filter conditions.
+  // Search matches title + department + location name; the time window applies to
+  // created_at; the Filter popover conditions apply to any field.
+  const makeFilter = useCallback((list: Opening[], query: string, range: RangeValue, filters: FilterCondition[]) => {
+    const needle = query.trim().toLowerCase()
+    return list.filter(o => {
+      if (needle) {
+        const deptName = o.department_id ? (deptById.get(o.department_id)?.name ?? '') : ''
+        const locName  = o.location_id   ? (locById.get(o.location_id)?.name  ?? '') : ''
+        const hay = `${o.title} ${deptName} ${locName}`.toLowerCase()
+        if (!hay.includes(needle)) return false
+      }
+      if (!withinRange(o.created_at, range)) return false
+      if (!rowMatchesFilters(filters, filterFields, key => fieldValue(o, key))) return false
+      return true
+    })
+  }, [deptById, locById, filterFields, fieldValue])
+
+  const activeRows = useMemo(() => makeFilter(active, activeQuery, activeRange, activeFilters), [makeFilter, active, activeQuery, activeRange, activeFilters])
+  const pastRows   = useMemo(() => makeFilter(past,   pastQuery,   pastRange,   pastFilters),   [makeFilter, past,   pastQuery,   pastRange,   pastFilters])
 
   // Stat-card values (static overview over all items).
   const counts = useMemo(() => {
@@ -300,19 +321,8 @@ export default function OpeningsListPage() {
         />
       )}
 
-      {/* ── Shared department / location filter bar (drives both blocks) ─── */}
-      {loaded && (
-        <div className="flex flex-wrap gap-2">
-          <Select value={deptId} onChange={e => setDeptId(e.target.value)} className="w-44 bg-white">
-            <option value="">All departments</option>
-            {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </Select>
-          <Select value={locId} onChange={e => setLocId(e.target.value)} className="w-44 bg-white">
-            <option value="">All locations</option>
-            {locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </Select>
-        </div>
-      )}
+      {/* Department & Location filtering now lives in each pane's Filter popover
+          (alongside Status and Title), so there's one place to filter. */}
 
       {/* ── Active + Past blocks ────────────────────────────────────────── */}
       {!loaded ? (
@@ -352,6 +362,9 @@ export default function OpeningsListPage() {
             range={activeRange}
             onRangeChange={setActiveRange}
             downloadName="active"
+            filterFields={filterFields}
+            filters={activeFilters}
+            onFiltersChange={setActiveFilters}
           />
           <OpeningsBlock
             title="Past"
@@ -367,6 +380,9 @@ export default function OpeningsListPage() {
             range={pastRange}
             onRangeChange={setPastRange}
             downloadName="past"
+            filterFields={filterFields}
+            filters={pastFilters}
+            onFiltersChange={setPastFilters}
           />
         </div>
       )}

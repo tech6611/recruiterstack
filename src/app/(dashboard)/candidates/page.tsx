@@ -11,10 +11,10 @@ import {
 } from 'lucide-react'
 import type { CandidateStatus, CandidateListItem } from '@/lib/types/database'
 import { inputCls, labelCls } from '@/lib/ui/styles'
-import { trackEvent } from '@/lib/analytics'
 import {
-  PaneSearchInput, TimeRangeControl, PaneDownloadButton,
-  ALL_RANGE_VALUE, withinRange, todayStamp, type RangeValue,
+  PaneSearchInput, TimeRangeControl, PaneDownloadButton, PaneFilterControl,
+  ALL_RANGE_VALUE, withinRange, rowMatchesFilters, todayStamp,
+  type RangeValue, type FilterFieldDef, type FilterCondition,
 } from '@/components/panes/pane-controls'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -424,6 +424,7 @@ const PANE_TINT: { active: PaneTone; past: PaneTone } = {
 function CandidatesBlock({
   title, tint, accent, rows, total, page, onPageChange, sortKey, sortDir, onSort, emptyText,
   query, onQueryChange, range, onRangeChange, downloadName,
+  filterFields, filters, onFiltersChange,
 }: {
   title:        string
   tint:         PaneTone
@@ -441,6 +442,9 @@ function CandidatesBlock({
   range:         RangeValue
   onRangeChange: (v: RangeValue) => void
   downloadName:  string
+  filterFields:  FilterFieldDef[]
+  filters:       FilterCondition[]
+  onFiltersChange: (c: FilterCondition[]) => void
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(true)
@@ -495,6 +499,7 @@ function CandidatesBlock({
         />
         <TimeRangeControl value={range} onChange={onRangeChange} badgeClass={accent} />
         <PaneDownloadButton filename={`candidates-${downloadName}-${todayStamp()}.csv`} rows={csvRows} badgeClass={accent} />
+        <PaneFilterControl fields={filterFields} conditions={filters} onChange={c => { onFiltersChange(c); if (c.length) setOpen(true) }} badgeClass={accent} />
       </div>
 
       {open && (
@@ -621,16 +626,17 @@ export default function CandidatesPage() {
   // ── List state ─────────────────────────────────────────────────────────────
   const [candidates, setCandidates] = useState<CandidateListItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [filterStatus, setFilterStatus] = useState<CandidateStatus | 'all'>('all')
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [activePage, setActivePage] = useState(1)
   const [pastPage,   setPastPage]   = useState(1)
-  // Per-pane search + time window (each pane filters independently, like Sequences).
+  // Per-pane search + time window + filters (each pane filters independently).
   const [activeQuery, setActiveQuery] = useState('')
   const [pastQuery,   setPastQuery]   = useState('')
   const [activeRange, setActiveRange] = useState<RangeValue>(ALL_RANGE_VALUE)
   const [pastRange,   setPastRange]   = useState<RangeValue>(ALL_RANGE_VALUE)
+  const [activeFilters, setActiveFilters] = useState<FilterCondition[]>([])
+  const [pastFilters,   setPastFilters]   = useState<FilterCondition[]>([])
 
   // ── Drawer state ───────────────────────────────────────────────────────────
   const [showDrawer, setShowDrawer] = useState(false)
@@ -658,22 +664,42 @@ export default function CandidatesPage() {
     else { setSortKey(key); setSortDir('asc') }
   }
 
-  // Reset a pane to page 1 whenever its own search / window (or shared status /
-  // sort) changes.
-  useEffect(() => { setActivePage(1) }, [activeQuery, activeRange, filterStatus, sortKey, sortDir])
-  useEffect(() => { setPastPage(1)   }, [pastQuery,   pastRange,   filterStatus, sortKey, sortDir])
+  // Reset a pane to page 1 whenever its own search / window / filters (or shared
+  // sort) change.
+  useEffect(() => { setActivePage(1) }, [activeQuery, activeRange, activeFilters, sortKey, sortDir])
+  useEffect(() => { setPastPage(1)   }, [pastQuery,   pastRange,   pastFilters,   sortKey, sortDir])
 
   // ── Derived ────────────────────────────────────────────────────────────────
   // The two status groups (unfiltered) drive the pane count badges.
   const activeGroup = useMemo(() => candidates.filter(c => ACTIVE_CANDIDATE_STATUSES.includes(c.status)), [candidates])
   const pastGroup   = useMemo(() => candidates.filter(c => PAST_CANDIDATE_STATUSES.includes(c.status)),   [candidates])
 
-  // Filter one pane by its own search text + time window, plus the shared status
-  // dropdown, then sort. Search matches name / email / title / location; the
-  // window applies to created_at.
-  const filterPane = useCallback((group: CandidateListItem[], query: string, range: RangeValue) => {
+  // Fields the per-pane Filter popover can filter on — every column, shown or not.
+  const filterFields = useMemo<FilterFieldDef[]>(() => [
+    { key: 'name',          label: 'Name',          type: 'text' },
+    { key: 'current_title', label: 'Current Title', type: 'text' },
+    { key: 'status',        label: 'Status',        type: 'select', options: (Object.keys(STATUS_CONFIG) as CandidateStatus[]).map(s => ({ value: s, label: STATUS_CONFIG[s].label })) },
+    { key: 'location',      label: 'Location',      type: 'text' },
+    { key: 'email',         label: 'Email',         type: 'text' },
+  ], [])
+
+  // A candidate's value for a given filter field (used by rowMatchesFilters).
+  const fieldValue = useCallback((c: CandidateListItem, key: string): string => {
+    switch (key) {
+      case 'name':          return c.name ?? ''
+      case 'current_title': return c.current_title ?? ''
+      case 'status':        return c.status ?? ''
+      case 'location':      return c.location ?? ''
+      case 'email':         return c.email ?? ''
+      default:              return ''
+    }
+  }, [])
+
+  // Filter one pane by its own search text + time window + filter conditions,
+  // then sort. Search matches name / email / title / location; the window applies
+  // to created_at; the Filter popover conditions apply to any field.
+  const filterPane = useCallback((group: CandidateListItem[], query: string, range: RangeValue, filters: FilterCondition[]) => {
     let result = group
-    if (filterStatus !== 'all') result = result.filter(c => c.status === filterStatus)
     const q = query.trim().toLowerCase()
     if (q) {
       result = result.filter(c =>
@@ -684,6 +710,7 @@ export default function CandidatesPage() {
       )
     }
     result = result.filter(c => withinRange(c.created_at, range))
+    result = result.filter(c => rowMatchesFilters(filters, filterFields, key => fieldValue(c, key)))
     return [...result].sort((a, b) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vA = String((a as any)[sortKey] ?? '')
@@ -692,10 +719,10 @@ export default function CandidatesPage() {
       const cmp = vA.localeCompare(vB, undefined, { numeric: true })
       return sortDir === 'asc' ? cmp : -cmp
     })
-  }, [filterStatus, sortKey, sortDir])
+  }, [sortKey, sortDir, filterFields, fieldValue])
 
-  const activeRows = useMemo(() => filterPane(activeGroup, activeQuery, activeRange), [filterPane, activeGroup, activeQuery, activeRange])
-  const pastRows   = useMemo(() => filterPane(pastGroup,   pastQuery,   pastRange),   [filterPane, pastGroup,   pastQuery,   pastRange])
+  const activeRows = useMemo(() => filterPane(activeGroup, activeQuery, activeRange, activeFilters), [filterPane, activeGroup, activeQuery, activeRange, activeFilters])
+  const pastRows   = useMemo(() => filterPane(pastGroup,   pastQuery,   pastRange,   pastFilters),   [filterPane, pastGroup,   pastQuery,   pastRange,   pastFilters])
 
   // ── Drawer helpers ─────────────────────────────────────────────────────────
   const closeDrawer = () => {
@@ -783,37 +810,8 @@ export default function CandidatesPage() {
       {/* Hiring Funnel — an at-a-glance overview of the whole talent pool. */}
       <PipelineFunnel candidates={candidates} />
 
-      {/* Status refine (applies to both panes) + clear. Per-pane search / time /
-          download live on each pane's toolbar below. */}
-      <div className="flex items-center gap-3">
-        <select
-          value={filterStatus}
-          onChange={e => {
-            const val = e.target.value as CandidateStatus | 'all'
-            setFilterStatus(val)
-            if (val !== 'all') trackEvent('candidates_filtered', { filter_type: val })
-          }}
-          className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
-        >
-          <option value="all">All statuses</option>
-          {(Object.keys(STATUS_CONFIG) as CandidateStatus[]).map(s => (
-            <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
-          ))}
-        </select>
-
-        {(filterStatus !== 'all' || activeQuery || pastQuery || activeRange.range !== 'all' || pastRange.range !== 'all') && (
-          <button
-            onClick={() => {
-              setFilterStatus('all')
-              setActiveQuery(''); setPastQuery('')
-              setActiveRange(ALL_RANGE_VALUE); setPastRange(ALL_RANGE_VALUE)
-            }}
-            className="shrink-0 whitespace-nowrap text-xs text-slate-500 hover:text-slate-800 transition-colors"
-          >
-            Clear filters
-          </button>
-        )}
-      </div>
+      {/* Status filtering now lives in each pane's Filter popover (alongside Name,
+          Title, Location, Email), so there's one place to filter. */}
 
       {/* Table */}
       {loading ? (
@@ -864,6 +862,9 @@ export default function CandidatesPage() {
             range={activeRange}
             onRangeChange={setActiveRange}
             downloadName="active"
+            filterFields={filterFields}
+            filters={activeFilters}
+            onFiltersChange={setActiveFilters}
           />
           <CandidatesBlock
             title="Past"
@@ -882,6 +883,9 @@ export default function CandidatesPage() {
             range={pastRange}
             onRangeChange={setPastRange}
             downloadName="past"
+            filterFields={filterFields}
+            filters={pastFilters}
+            onFiltersChange={setPastFilters}
           />
         </div>
       )}

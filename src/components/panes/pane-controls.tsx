@@ -16,7 +16,7 @@
  */
 
 import { useState } from 'react'
-import { Search, X, Clock, Check, Download } from 'lucide-react'
+import { Search, X, Clock, Check, Download, Filter, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   RANGE_OPTIONS,
@@ -186,6 +186,169 @@ export function PaneDownloadButton({
     >
       <Download className="h-3.5 w-3.5" />
     </button>
+  )
+}
+
+// ── Per-pane Filter control ───────────────────────────────────────────────────
+// A funnel button that opens a popover of "field is value" conditions. Each page
+// supplies the list of filterable fields (every column, shown or not); the page
+// itself applies `rowMatchesFilters` to its rows. Conditions on the SAME field
+// are OR'd (match any); conditions across different fields are AND'd.
+
+export type FilterFieldDef = {
+  key: string
+  label: string
+  type: 'select' | 'text'
+  options?: { value: string; label: string }[]   // required for type 'select'
+}
+
+export type FilterCondition = { field: string; value: string }
+
+/**
+ * True when a row satisfies every active filter. `getValue(fieldKey)` returns the
+ * row's value for that field as a string (the caller closes over the row). Blank
+ * conditions are ignored. Select fields match on exact (case-insensitive) equality;
+ * text fields match on substring.
+ */
+export function rowMatchesFilters(
+  conditions: FilterCondition[],
+  fields: FilterFieldDef[],
+  getValue: (fieldKey: string) => string,
+): boolean {
+  if (!conditions.length) return true
+  const byField = new Map<string, string[]>()
+  for (const c of conditions) {
+    if (!c.value) continue
+    const arr = byField.get(c.field) ?? []
+    arr.push(c.value)
+    byField.set(c.field, arr)
+  }
+  for (const [field, values] of Array.from(byField.entries())) {
+    const def = fields.find(f => f.key === field)
+    if (!def) continue
+    const rowVal = (getValue(field) ?? '').toLowerCase()
+    const ok = values.some((v: string) =>
+      def.type === 'text' ? rowVal.includes(v.toLowerCase()) : rowVal === v.toLowerCase()
+    )
+    if (!ok) return false
+  }
+  return true
+}
+
+/** Count of conditions that actually constrain the data (have a value). */
+export function activeFilterCount(conditions: FilterCondition[]): number {
+  return conditions.filter(c => c.value).length
+}
+
+export function PaneFilterControl({
+  fields, conditions, onChange, badgeClass = 'text-slate-600',
+}: {
+  fields: FilterFieldDef[]
+  conditions: FilterCondition[]
+  onChange: (c: FilterCondition[]) => void
+  badgeClass?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<FilterCondition[]>(conditions)
+  const activeCount = activeFilterCount(conditions)
+
+  const openPopover = () => { setDraft(conditions.length ? conditions : [{ field: fields[0]?.key ?? '', value: '' }]); setOpen(true) }
+  const addCondition = () => setDraft(d => [...d, { field: fields[0]?.key ?? '', value: '' }])
+  const updateCondition = (i: number, patch: Partial<FilterCondition>) =>
+    setDraft(d => d.map((c, idx) => (idx === i ? { ...c, ...patch } : c)))
+  const removeCondition = (i: number) => setDraft(d => d.filter((_, idx) => idx !== i))
+  const apply = () => { onChange(draft.filter(c => c.value)); setOpen(false) }
+  const clear = () => { setDraft([]); onChange([]); setOpen(false) }
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => (open ? setOpen(false) : openPopover())}
+        title={activeCount > 0 ? `${activeCount} filter${activeCount !== 1 ? 's' : ''} applied` : 'Filter'}
+        className={cn('flex items-center gap-1 rounded-lg bg-white/70 px-2 py-1 text-xs font-semibold hover:bg-white transition-colors', badgeClass)}
+      >
+        <Filter className="h-3.5 w-3.5" />
+        {activeCount > 0 && (
+          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#221b14] px-1 text-[10px] font-semibold text-white">
+            {activeCount}
+          </span>
+        )}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-40 mt-1 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+            <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Filter</p>
+            {draft.length === 0 && (
+              <p className="px-1 pb-2 text-xs text-slate-400">No conditions — the pane shows everything.</p>
+            )}
+            <div className="space-y-2">
+              {draft.map((c, i) => {
+                const def = fields.find(f => f.key === c.field) ?? fields[0]
+                return (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <select
+                      value={c.field}
+                      onChange={e => updateCondition(i, { field: e.target.value, value: '' })}
+                      className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 focus:border-slate-400 focus:outline-none"
+                    >
+                      {fields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                    </select>
+                    <span className="shrink-0 text-[10px] font-medium uppercase text-slate-400">is</span>
+                    {def?.type === 'select' ? (
+                      <select
+                        value={c.value}
+                        onChange={e => updateCondition(i, { value: e.target.value })}
+                        className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 focus:border-slate-400 focus:outline-none"
+                      >
+                        <option value="">Any</option>
+                        {def.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={c.value}
+                        onChange={e => updateCondition(i, { value: e.target.value })}
+                        placeholder="contains…"
+                        className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeCondition(i)}
+                      title="Remove condition"
+                      className="shrink-0 text-slate-300 hover:text-red-500"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={addCondition}
+              className="mt-2 flex items-center gap-1 rounded-lg px-1 py-1 text-xs font-medium text-slate-500 hover:text-slate-800"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add condition
+            </button>
+            <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
+              <button type="button" onClick={clear} className="text-xs font-medium text-slate-500 hover:text-red-500">
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={apply}
+                className="rounded-lg bg-[#221b14] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#33271b]"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 

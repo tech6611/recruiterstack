@@ -18,8 +18,9 @@ import { inputCls, labelCls } from '@/lib/ui/styles'
 import { StatCards } from '@/components/ui/stat-cards'
 import { trackEvent } from '@/lib/analytics'
 import {
-  PaneSearchInput, TimeRangeControl, PaneDownloadButton,
-  ALL_RANGE_VALUE, withinRange, todayStamp, type RangeValue,
+  PaneSearchInput, TimeRangeControl, PaneDownloadButton, PaneFilterControl,
+  ALL_RANGE_VALUE, withinRange, rowMatchesFilters, todayStamp,
+  type RangeValue, type FilterFieldDef, type FilterCondition,
 } from '@/components/panes/pane-controls'
 
 // Convert plain text (e.g. extracted from an imported PDF/TXT) into simple HTML
@@ -953,6 +954,29 @@ function PastJobsBlock({ jobs }: { jobs: JobListItem[] }) {
   const [open, setOpen] = useState(true)
   const [query, setQuery] = useState('')
   const [range, setRange] = useState<RangeValue>(ALL_RANGE_VALUE)
+  const [filters, setFilters] = useState<FilterCondition[]>([])
+
+  // Fields the Filter popover offers, with Status options drawn from this pane's jobs.
+  const filterFields = useMemo<FilterFieldDef[]>(() => {
+    const statuses = Array.from(new Set(jobs.map(j => j.status as string)))
+      .map(s => ({ value: s, label: statusBadge({ status: s } as JobListItem).label }))
+    return [
+      { key: 'position', label: 'Position',       type: 'text' },
+      { key: 'manager',  label: 'Hiring Manager', type: 'text' },
+      { key: 'status',   label: 'Status',         type: 'select', options: statuses },
+      { key: 'location', label: 'Location',       type: 'text' },
+    ]
+  }, [jobs])
+
+  const fieldValue = (j: JobListItem, key: string): string => {
+    switch (key) {
+      case 'position': return j.position_title ?? ''
+      case 'manager':  return j.hiring_manager_name ?? ''
+      case 'status':   return (j.status as string) ?? ''
+      case 'location': return j.location ?? ''
+      default:         return ''
+    }
+  }
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -965,9 +989,10 @@ function PastJobsBlock({ jobs }: { jobs: JobListItem[] }) {
         (j.location ?? '').toLowerCase().includes(needle)
       )) return false
       if (!withinRange(j.created_at, range)) return false
+      if (!rowMatchesFilters(filters, filterFields, key => fieldValue(j, key))) return false
       return true
     })
-  }, [jobs, query, range])
+  }, [jobs, query, range, filters, filterFields])
 
   const csvRows = useMemo(() => {
     const header = ['Position', 'Status', 'Hiring manager', 'Location', 'Created']
@@ -1000,6 +1025,7 @@ function PastJobsBlock({ jobs }: { jobs: JobListItem[] }) {
         />
         <TimeRangeControl value={range} onChange={setRange} badgeClass="text-[#4f483d]" />
         <PaneDownloadButton filename={`jobs-past-${todayStamp()}.csv`} rows={csvRows} badgeClass="text-[#4f483d]" />
+        <PaneFilterControl fields={filterFields} conditions={filters} onChange={c => { setFilters(c); if (c.length) setOpen(true) }} badgeClass="text-[#4f483d]" />
       </div>
 
       {open && (
@@ -1146,9 +1172,9 @@ export default function JobsPage() {
   const [activeOpen, setActiveOpen] = useState(true)
 
   // ── Column filters (checkbox-based, one dropdown at a time) ───────────────
-  const [colFilters,     setColFilters]     = useState<Record<string, string[]>>({})
-  const [colDropdown,    setColDropdown]    = useState<{ colId: string; top: number; left: number } | null>(null)
-  const [colFilterSearch, setColFilterSearch] = useState('')
+  // Active-pane filter conditions live in colFilters (field → selected values),
+  // shared by the Filter popover and the filtering engine below.
+  const [colFilters, setColFilters] = useState<Record<string, string[]>>({})
 
   // ── UI ────────────────────────────────────────────────────────────────────
   const [showDrawer, setShowDrawer] = useState(false)
@@ -1368,26 +1394,29 @@ export default function JobsPage() {
     return [header, ...body]
   }, [displayedJobs])
 
-  // ── Derived filter state ───────────────────────────────────────────────────
-  // Column filters live on the Active table; per-pane search/time have their own
-  // controls, so the chip bar below only reflects column filters + manual order.
-  const hasColFilters = Object.values(colFilters).some(v => v.length > 0)
-  const hasAnyFilter  = hasColFilters
+  // ── Active-pane Filter popover (drives colFilters) ─────────────────────────
+  // Fields the Filter popover offers — every column, shown or not. Req # is a
+  // free-text "contains"; the rest pick from the values present in the data.
+  const jobFilterFields = useMemo<FilterFieldDef[]>(() => [
+    { key: 'ticket',     label: 'Req #',          type: 'text' },
+    { key: 'position',   label: 'Position',       type: 'select', options: colFilterOptions.position ?? [] },
+    { key: 'manager',    label: 'Hiring Manager', type: 'select', options: colFilterOptions.manager ?? [] },
+    { key: 'status',     label: 'Status',         type: 'select', options: colFilterOptions.status ?? [] },
+    { key: 'department', label: 'Department',     type: 'select', options: colFilterOptions.department ?? [] },
+    { key: 'location',   label: 'Location',       type: 'select', options: colFilterOptions.location ?? [] },
+    { key: 'level',      label: 'Level',          type: 'select', options: colFilterOptions.level ?? [] },
+  ], [colFilterOptions])
 
-  // ── Col filter toggle ──────────────────────────────────────────────────────
-  const toggleColFilter = (colId: string, value: string) => {
-    setColFilters(prev => {
-      const current = prev[colId] ?? []
-      const next    = current.includes(value) ? current.filter(v => v !== value) : [...current, value]
-      if (!next.length) { const cp = { ...prev }; delete cp[colId]; return cp }
-      return { ...prev, [colId]: next }
-    })
-  }
-  const clearColFilter = (colId: string) =>
-    setColFilters(p => { const cp = { ...p }; delete cp[colId]; return cp })
-  const selectAllInCol = (colId: string) => {
-    const opts = colFilterOptions[colId as ColId] ?? []
-    if (opts.length > 0) setColFilters(p => ({ ...p, [colId]: opts.map(o => o.value) }))
+  // Bridge the generic "conditions" list to colFilters (field → values): each
+  // condition's value joins its field's list; the existing engine does the rest.
+  const activeConditions = useMemo<FilterCondition[]>(
+    () => Object.entries(colFilters).flatMap(([field, vals]) => vals.map(v => ({ field, value: v }))),
+    [colFilters],
+  )
+  const applyActiveConditions = (conds: FilterCondition[]) => {
+    const cf: Record<string, string[]> = {}
+    for (const c of conds) { if (c.value) (cf[c.field] ??= []).push(c.value) }
+    setColFilters(cf)
   }
 
   // ── Shared th styles ───────────────────────────────────────────────────────
@@ -1395,9 +1424,10 @@ export default function JobsPage() {
   const thLbl  = 'text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap'
 
   // ─── Render a column header cell ───────────────────────────────────────────
+  // Filtering now lives in the pane's Filter button, so headers carry only the
+  // sort trigger + drag-to-reorder.
   const renderColHeader = (col: ColDef) => {
     const isFixed = col.id === 'actions' // fixed position columns
-    const activeFilter = (colFilters[col.id]?.length ?? 0) > 0
 
     return (
       <th
@@ -1425,31 +1455,6 @@ export default function JobsPage() {
             </button>
           ) : (
             <span className={thLbl}>{col.label}</span>
-          )}
-
-          {/* Filter dropdown trigger (if filterable) */}
-          {col.filterable && (col.filterType === 'text' || (colFilterOptions[col.id]?.length ?? 0) > 0) && (
-            <button
-              onClick={e => {
-                e.stopPropagation()
-                const rect = e.currentTarget.getBoundingClientRect()
-                setColFilterSearch('')
-                setColDropdown(prev =>
-                  prev?.colId === col.id ? null : { colId: col.id, top: rect.bottom + 4, left: rect.left }
-                )
-              }}
-              className={`flex items-center gap-0.5 rounded px-1 py-0.5 transition-colors shrink-0 ${
-                activeFilter
-                  ? 'bg-slate-50 text-emerald-600 ring-1 ring-emerald-200'
-                  : colDropdown?.colId === col.id
-                  ? 'bg-slate-100 text-slate-600'
-                  : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
-              }`}
-              title={`Filter by ${col.label}`}
-            >
-              <ChevronDown className={`h-3 w-3 transition-transform ${colDropdown?.colId === col.id ? 'rotate-180' : ''}`} />
-              {activeFilter && <span className="text-[10px] font-semibold">{colFilters[col.id]!.length}</span>}
-            </button>
           )}
         </div>
       </th>
@@ -1598,37 +1603,12 @@ export default function JobsPage() {
         />
       )}
 
-      {/* ── Filter bar ──────────────────────────────────────────────────── */}
-      {(hasAnyFilter || manualOrder) && (
+      {/* ── Manual row-order reset (filters now live in the pane's Filter button) ── */}
+      {manualOrder && (
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Active filter chips */}
-          {Object.entries(colFilters).map(([colId, values]) => {
-            if (!values.length) return null
-            const colDef = ALL_COL_DEFS.find(c => c.id === colId)
-            const singleLabel = colId === 'status' ? (STATUS_CONFIG[values[0]]?.label ?? values[0]) : values[0]
-            const displayLabel = values.length === 1 ? singleLabel : `${values.length} selected`
-            return (
-              <span key={colId} className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-xs text-slate-700 font-medium">
-                <span className="text-slate-400">{colDef?.label}:</span> {displayLabel}
-                <button onClick={() => clearColFilter(colId)} className="ml-0.5 hover:text-emerald-900">
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )
-          })}
-          {hasAnyFilter && (
-            <button
-              onClick={() => setColFilters({})}
-              className="text-xs text-slate-500 hover:text-slate-800 transition-colors"
-            >
-              Clear all
-            </button>
-          )}
-          {manualOrder && (
-            <button onClick={() => setManualOrder(null)} className="text-xs text-slate-500 hover:text-emerald-700 transition-colors">
-              Reset row order
-            </button>
-          )}
+          <button onClick={() => setManualOrder(null)} className="text-xs text-slate-500 hover:text-emerald-700 transition-colors">
+            Reset row order
+          </button>
         </div>
       )}
 
@@ -1683,6 +1663,7 @@ export default function JobsPage() {
             />
             <TimeRangeControl value={activeRange} onChange={setActiveRange} badgeClass="text-[#0c4634]" />
             <PaneDownloadButton filename={`jobs-active-${todayStamp()}.csv`} rows={activeCsvRows} badgeClass="text-[#0c4634]" />
+            <PaneFilterControl fields={jobFilterFields} conditions={activeConditions} onChange={c => { applyActiveConditions(c); if (c.length) setActiveOpen(true) }} badgeClass="text-[#0c4634]" />
           </div>
 
           {activeOpen && (
@@ -1784,117 +1765,6 @@ export default function JobsPage() {
         </div>
       )}
 
-      {/* ── Column filter dropdown (fixed-positioned) ───────────────────── */}
-      {colDropdown && (() => {
-        const colDef     = ALL_COL_DEFS.find(c => c.id === colDropdown.colId)
-        const isText     = colDef?.filterType === 'text'
-        const opts       = colFilterOptions[colDropdown.colId as ColId] ?? []
-        const selCount   = colFilters[colDropdown.colId]?.length ?? 0
-        const allSel     = opts.length > 0 && selCount === opts.length
-        const visOpts    = opts.filter(o => o.label.toLowerCase().includes(colFilterSearch.toLowerCase()))
-        return (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => { setColDropdown(null); setColFilterSearch('') }} />
-            <div
-              className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-xl flex flex-col"
-              style={{ top: colDropdown.top, left: colDropdown.left, width: 240, maxHeight: 360 }}
-            >
-              {isText ? (
-                /* ── Text search filter (for Req #) ─────────────────── */
-                <div className="p-3 space-y-2">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Search {colDef?.label}</p>
-                  <input
-                    value={colFilters[colDropdown.colId]?.[0] ?? ''}
-                    onChange={e => {
-                      const v = e.target.value
-                      if (v) setColFilters(p => ({ ...p, [colDropdown.colId]: [v] }))
-                      else clearColFilter(colDropdown.colId)
-                    }}
-                    placeholder="e.g. RS-001…"
-                    autoFocus
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100 transition"
-                  />
-                  {selCount > 0 && (
-                    <button onClick={() => clearColFilter(colDropdown.colId)} className="text-xs text-red-500 hover:text-red-700 transition-colors">
-                      Clear
-                    </button>
-                  )}
-                </div>
-              ) : (
-                /* ── Checkbox filter ────────────────────────────────── */
-                <>
-                  {/* Search input */}
-                  <div className="px-3 pt-2.5 pb-2 border-b border-slate-100">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
-                      <input
-                        value={colFilterSearch}
-                        onChange={e => setColFilterSearch(e.target.value)}
-                        placeholder="Search…"
-                        autoFocus
-                        className="w-full pl-6 pr-2 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100 transition"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Select all */}
-                  {opts.length > 0 && (
-                    <label className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 hover:bg-slate-50 cursor-pointer shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={allSel}
-                        onChange={() => allSel ? clearColFilter(colDropdown.colId) : selectAllInCol(colDropdown.colId)}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600"
-                      />
-                      <span className="text-xs font-semibold text-slate-600">{allSel ? 'Deselect all' : 'Select all'}</span>
-                      {selCount > 0 && !allSel && (
-                        <span className="text-xs text-slate-400 ml-auto">{selCount}/{opts.length}</span>
-                      )}
-                    </label>
-                  )}
-
-                  {/* Options list */}
-                  <div className="overflow-y-auto flex-1 p-1.5 space-y-0.5">
-                    {visOpts.map(opt => {
-                      const selected = colFilters[colDropdown.colId]?.includes(opt.value) ?? false
-                      return (
-                        <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => toggleColFilter(colDropdown.colId, opt.value)}
-                            className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600"
-                          />
-                          {colDropdown.colId === 'status' ? (
-                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_CONFIG[opt.value]?.color ?? ''}`}>
-                              {STATUS_CONFIG[opt.value]?.icon}{opt.label}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-700 truncate">{opt.label}</span>
-                          )}
-                        </label>
-                      )
-                    })}
-                    {visOpts.length === 0 && (
-                      <p className="px-2 py-3 text-xs text-slate-400 text-center">No options match</p>
-                    )}
-                  </div>
-
-                  {/* Clear footer */}
-                  {selCount > 0 && (
-                    <div className="px-3 py-2 border-t border-slate-100 flex items-center justify-between shrink-0">
-                      <span className="text-xs text-slate-400">{selCount} selected</span>
-                      <button onClick={() => clearColFilter(colDropdown.colId)} className="text-xs text-red-500 hover:text-red-700 transition-colors">
-                        Clear
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </>
-        )
-      })()}
 
       {/* ── Column picker dropdown (fixed-positioned) ───────────────────── */}
       {showColPicker && (
