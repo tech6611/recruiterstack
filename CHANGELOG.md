@@ -145,6 +145,13 @@ entries on top.
   `send_first_immediately = true`. Additive and reversible; the old column is left
   in place.
 
+### Fixed
+- **Intake Slack alert now respects the per-org channel.** The "intake submitted /
+  JD ready" alert was the only channel notification still posting to the global
+  `SLACK_WEBHOOK_URL` env var instead of the org's configured webhook, so it
+  ignored the channel set in Settings. It now routes through `notifySlack(org, …)`
+  like every other alert (apply, stage change, hire/reject, interviews).
+
 ## 2026-07-12
 
 ### Fixed

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { notifySlack } from '@/lib/notifications'
 import sgMail from '@sendgrid/mail'
 import { checkRateLimit } from '@/lib/api/rate-limit'
 import {
@@ -99,21 +100,12 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   const dashboardUrl = `${appUrl}/jobs`
   const statusUrl = `${appUrl}/intake/${params.token}/status`
 
-  // Slack: notify recruiter channel
-  const slackWebhook = process.env.SLACK_WEBHOOK_URL
-  if (slackWebhook) {
-    try {
-      await fetch(slackWebhook, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: `✅ *${hiringManagerName}* has submitted the intake for *${positionTitle}* — JD is ready for review!\n→ Dashboard: ${dashboardUrl}`,
-        }),
-      })
-    } catch (e) {
-      console.error('Slack recruiter notification failed:', e)
-    }
-  }
+  // Slack: notify the recruiter channel configured for this org (per-org webhook,
+  // consistent with every other channel alert — see lib/notifications.ts).
+  await notifySlack(
+    job.org_id,
+    `✅ *${hiringManagerName}* has submitted the intake for *${positionTitle}* — JD is ready for review!\n→ Dashboard: ${dashboardUrl}`
+  )
 
   // Email: notify recruiter if RECRUITER_EMAIL is set
   const recruiterEmail = process.env.RECRUITER_EMAIL
