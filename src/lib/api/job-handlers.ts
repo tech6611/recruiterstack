@@ -89,8 +89,13 @@ registerHandler('ai_summary', async (job: QueuedJob) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const appSummaries = apps.map((a: any) => {
     const stage = a.pipeline_stages?.name ?? 'Unknown'
-    const jb = a.hiring_requests
-    return `- ${jb?.position_title ?? 'Unknown role'}${jb?.department ? ` (${jb.department})` : ''}: ${a.status} / stage: ${stage}${a.ai_score !== null ? ` / AI score: ${a.ai_score}/100` : ''}`
+    // Legacy apps carry the title on hiring_requests; canonical apps on the
+    // aliased canonical_job (jobs). department is a string on the former, a
+    // { name } object on the latter.
+    const jb = a.hiring_requests ?? a.canonical_job
+    const title = jb?.position_title ?? 'Unknown role'
+    const dept  = typeof jb?.department === 'string' ? jb.department : (jb?.department?.name ?? null)
+    return `- ${title}${dept ? ` (${dept})` : ''}: ${a.status} / stage: ${stage}${a.ai_score !== null ? ` / AI score: ${a.ai_score}/100` : ''}`
   }).join('\n')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -521,7 +526,7 @@ registerHandler('interview_reminder', async (job: QueuedJob) => {
   const supabase = createAdminClient()
   const { data: iv } = await supabase
     .from('interviews')
-    .select('*, candidate:candidates(name, email), hiring_request:hiring_requests(position_title)')
+    .select('*, candidate:candidates(name, email), hiring_request:hiring_requests(position_title), application:applications(job:jobs(position_title:title))')
     .eq('id', interviewId)
     .eq('org_id', job.org_id)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -541,7 +546,7 @@ registerHandler('interview_reminder', async (job: QueuedJob) => {
     candidateEmail:   iv.candidate?.email ?? '',
     interviewerName:  iv.interviewer_name ?? 'Interviewer',
     interviewerEmail: iv.interviewer_email ?? null,
-    positionTitle:    iv.hiring_request?.position_title ?? 'Position',
+    positionTitle:    iv.hiring_request?.position_title ?? iv.application?.job?.position_title ?? 'Position',
     scheduledAt:      iv.scheduled_at,
     durationMinutes:  iv.duration_minutes ?? 60,
     timezone:         timezone ?? null,
