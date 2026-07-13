@@ -116,7 +116,11 @@ POST, `jobs/[id]/score`, `lib/interviews/cancel.ts` (nullable, tolerant).
 
 - [x] **Candidate "Unknown Role"** — Django candidate detail + AI summary now
   resolve canonical titles (`recruiterstack-api@7ec5893`, deployed & verified live).
-- [ ] Batch 1 — interview/offer title display (Django).
+- [x] Batch 1 — interview/offer title display. Django detail handlers
+  (`interviews/views.py`, `c0a93d5`) **and** the Next.js *list* handlers
+  (`api/interviews`, `api/offers` — static routes served by Next.js, not Django).
+  Lesson: static Next.js routes win over the Django rewrite, so each endpoint's
+  fix lives in whichever repo actually serves it (static→Next.js, dynamic→Django).
 - [ ] Batch 2 — remaining Django read-for-display.
 - [ ] §2 answered — legacy apply/intake/create reachability.
 - [ ] Batch 3 — write paths.
