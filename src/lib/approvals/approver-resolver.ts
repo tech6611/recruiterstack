@@ -146,6 +146,18 @@ async function rawApproverIds(
           const hmId = (opening as { hiring_manager_id: string | null } | null)?.hiring_manager_id
           return hmId ? [hmId] : []
         }
+        // No linked job yet → fall back to the requisition's own recruiter,
+        // mirroring the hiring_manager fallback above. Lets a "hiring team
+        // member → recruiter" step resolve before any job is created.
+        if (teamRole === 'recruiter') {
+          const { data: opening } = await supabase
+            .from('openings')
+            .select('recruiter_id')
+            .eq('id', ctx.targetId)
+            .maybeSingle()
+          const recId = (opening as { recruiter_id: string | null } | null)?.recruiter_id
+          return recId ? [recId] : []
+        }
         return []
       }
 

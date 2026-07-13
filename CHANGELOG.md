@@ -11,6 +11,14 @@ entries on top.
 
 ## 2026-07-13
 
+### Fixed
+- **"Hiring team member → recruiter" approval steps no longer resolve to zero
+  approvers before a job exists.** When a requisition has no linked job yet, that
+  approver type now falls back to the requisition's own `recruiter_id`, mirroring
+  the existing `hiring_manager` fallback to `openings.hiring_manager_id`
+  (`src/lib/approvals/approver-resolver.ts`). Previously such a step activated
+  empty and the approval stalled.
+
 ### Added
 - **Offers can now go through the approval engine.** New `POST /api/offers/[id]/submit`
   moves a draft offer to `pending_approval` against the org's "Offer" approval chain
