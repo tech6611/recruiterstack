@@ -185,24 +185,39 @@ cleanup + table drop**, not a data/write migration.
     `sequences/tasks.py`, `ai/autopilot.py`, `copilot_tools.py`, `analytics/views.py`,
     `views_agent.py`, `views_hiring_requests.py`, `public/views.py` are all
     shadowed by canonical Next.js routes or untriggered → dead.
-  - **VOICE is the one blocker.** `voice/views.py` + `voice/tasks.py` are
-    **Django-served (no Next.js shadow) = live code**, fully coupled to
-    `hiring_requests` (create + read via `HiringRequest.objects`, `voice_calls`/
-    `voice_agents.hiring_request_id` FKs, **no canonical path**). BUT usage = **0**
-    (`voice_calls` 0 rows, `voice_agents` 0 rows) → dormant. Must migrate or retire
-    voice off `hiring_requests` before the drop, else voice errors if ever used.
+  - **VOICE was the one blocker — now MIGRATED (batch 3c).** Added canonical
+    `job_id` to `voice_calls`/`voice_agents` (migration 085), and routed
+    create/list/detail/scoring through `resolve_job_context` (job_id canonical,
+    hiring_request_id legacy). `recruiterstack` `f425a11` (frontend + migration),
+    `recruiterstack-api` `5983014` (models/serializers/views/tasks). Voice no
+    longer reads `hiring_requests`. Verified: voice endpoint healthy post-deploy
+    (call creation not driven — it dials a real number). **No live code reads
+    `hiring_requests` anymore.**
   - `hiring_requests` table = **0 rows** (empty, re-confirmed).
-- [ ] Batch 4 — clear voice, then drop. **Drop migration (ready once voice is
-  handled):** drop the 6 FKs to `hiring_requests`, then the table:
+- [ ] Batch 4 — DROP the table. Voice cleared → **no live code reads
+  `hiring_requests`** (all remaining readers are shadowed/dead). Table is empty.
+  **Drop migration (name-independent — dynamically drops every FK referencing
+  `hiring_requests`, then the table):**
   ```sql
-  ALTER TABLE pipeline_stages DROP CONSTRAINT IF EXISTS pipeline_stages_hiring_request_id_fkey;
-  ALTER TABLE applications    DROP CONSTRAINT IF EXISTS applications_hiring_request_id_fkey;
-  ALTER TABLE interviews      DROP CONSTRAINT IF EXISTS interviews_hiring_request_id_fkey;
-  ALTER TABLE offers          DROP CONSTRAINT IF EXISTS offers_hiring_request_id_fkey;
-  ALTER TABLE voice_calls     DROP CONSTRAINT IF EXISTS voice_calls_hiring_request_id_fkey;
-  ALTER TABLE voice_agents    DROP CONSTRAINT IF EXISTS voice_agents_hiring_request_id_fkey;
+  DO $$
+  DECLARE r RECORD;
+  BEGIN
+    FOR r IN
+      SELECT conrelid::regclass AS tbl, conname
+      FROM pg_constraint
+      WHERE confrelid = 'hiring_requests'::regclass AND contype = 'f'
+    LOOP
+      EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.tbl, r.conname);
+    END LOOP;
+  END $$;
   DROP TABLE IF EXISTS hiring_requests;
   ```
-  Then remove Django `HiringRequest` model + the `HiringRequest` TS type, and
-  delete the shadowed Django legacy views. (Verify constraint names against the
-  live DB first — `pg_constraint` — they may differ from the defaults above.)
+  **KEEP the Django `HiringRequest` model class + the TS `HiringRequest` type** —
+  removing them would break imports across ~7 Django modules + ~25 TS files (all
+  dead/shadowed or type-only). The shadowed Django code that queries the model
+  would only error if ever reached (it isn't). Residual risk: if any "dead" path
+  is actually live, it errors post-drop instead of returning empty — but the
+  audit + all-canonical data make that unlikely; and the table is empty, so
+  re-creating it from migrations 003/013/024 fully reverts if needed.
+- [ ] Batch 5 (optional cleanup, later) — untangle imports, then delete the
+  shadowed Django legacy views + the `HiringRequest` model/type/`getLegacyJobTokens`.
