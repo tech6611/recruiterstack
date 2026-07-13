@@ -176,7 +176,33 @@ cleanup + table drop**, not a data/write migration.
     same (requires `hiring_request_id`; the apply flow bypasses it via
     `createApplication({jobId})`, but the "Add to Job" path may mis-store the
     canonical job id in the legacy column).
-- [ ] Batch 3b — offers/applications write-path migration (schema + code). NEW.
-- [ ] Batch 4 — final live-reads audit (voice, sequences, autopilot), then drop
-  FKs/columns + `DROP TABLE hiring_requests` + remove model/type + delete the
-  shadowed Django legacy views.
+- [x] Batch 3b — offers write path (`recruiterstack` `ccbb738`, `recruiterstack-api`
+  `da6a781`). Code-only (col already nullable since 067): drawer sends null not '',
+  `offerInsertSchema` + `Offer` type nullable, Django POST no longer requires it.
+  No offers.job_id column needed — offers link via application + stored title.
+- [x] Batch 4 audit DONE — remaining live-reads:
+  - **Everything migrated (batch 1–3) or dead/shadowed, EXCEPT `voice`.** Django
+    `sequences/tasks.py`, `ai/autopilot.py`, `copilot_tools.py`, `analytics/views.py`,
+    `views_agent.py`, `views_hiring_requests.py`, `public/views.py` are all
+    shadowed by canonical Next.js routes or untriggered → dead.
+  - **VOICE is the one blocker.** `voice/views.py` + `voice/tasks.py` are
+    **Django-served (no Next.js shadow) = live code**, fully coupled to
+    `hiring_requests` (create + read via `HiringRequest.objects`, `voice_calls`/
+    `voice_agents.hiring_request_id` FKs, **no canonical path**). BUT usage = **0**
+    (`voice_calls` 0 rows, `voice_agents` 0 rows) → dormant. Must migrate or retire
+    voice off `hiring_requests` before the drop, else voice errors if ever used.
+  - `hiring_requests` table = **0 rows** (empty, re-confirmed).
+- [ ] Batch 4 — clear voice, then drop. **Drop migration (ready once voice is
+  handled):** drop the 6 FKs to `hiring_requests`, then the table:
+  ```sql
+  ALTER TABLE pipeline_stages DROP CONSTRAINT IF EXISTS pipeline_stages_hiring_request_id_fkey;
+  ALTER TABLE applications    DROP CONSTRAINT IF EXISTS applications_hiring_request_id_fkey;
+  ALTER TABLE interviews      DROP CONSTRAINT IF EXISTS interviews_hiring_request_id_fkey;
+  ALTER TABLE offers          DROP CONSTRAINT IF EXISTS offers_hiring_request_id_fkey;
+  ALTER TABLE voice_calls     DROP CONSTRAINT IF EXISTS voice_calls_hiring_request_id_fkey;
+  ALTER TABLE voice_agents    DROP CONSTRAINT IF EXISTS voice_agents_hiring_request_id_fkey;
+  DROP TABLE IF EXISTS hiring_requests;
+  ```
+  Then remove Django `HiringRequest` model + the `HiringRequest` TS type, and
+  delete the shadowed Django legacy views. (Verify constraint names against the
+  live DB first — `pg_constraint` — they may differ from the defaults above.)
