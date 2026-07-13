@@ -12,6 +12,13 @@ entries on top.
 ## 2026-07-13
 
 ### Added
+- **"AI usage & cost" admin page** (`/admin/ai-usage`, in the Admin nav section,
+  gated by `settings:edit`). Reads the `ai_usage` ledger for the current org and
+  shows: KPI tiles (estimated cost, calls, input/output tokens), a daily-cost
+  trend chart (Recharts), and cost-by-feature / cost-by-employee / cost-by-model
+  breakdowns, with a 7/30/90-day range switch. Strictly org-scoped — admins only
+  ever see their own workspace. Backed by `GET /api/ai-usage?days=`, which
+  aggregates in JS (paginated, capped) and resolves employee names from `users`.
 - **Per-call AI cost logging (`ai_usage`).** Every Gemini call now writes one row
   recording tokens in/out, estimated USD cost, which feature made the call, and
   *who* triggered it (org = client, user = employee, both nullable for public
@@ -62,8 +69,12 @@ entries on top.
   unbooked link rather than piling up interview rows. When the HM (or their
   availability) can't be resolved, the token falls back to a natural sentence
   ("the hiring team will reach out to schedule a time") instead of a dead link.
-  (Note: production sequence sends run through the Django backend, which needs the
-  same send-time resolution to mint these links in prod.)
+  The live production sender is the Next.js `job_queue` path (enrollment enqueues
+  a `sequence_email` job that the prod pinger drains via `/api/queue/process`),
+  so this Next.js code is what mints the links in prod. The Django sender
+  (`sequences/tasks.py`) carries a mirrored implementation for parity, but it is
+  currently dormant — it only runs if Django is made the active sender (a Celery
+  beat + worker with `REDIS_URL`), which prod does not launch today.
 
 ### Schema
 - **`087_enrollment_rule_filters.sql`** — adds a `filters` JSONB column to
