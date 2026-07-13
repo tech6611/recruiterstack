@@ -17,6 +17,10 @@ import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEdi
 import { inputCls, labelCls } from '@/lib/ui/styles'
 import { StatCards } from '@/components/ui/stat-cards'
 import { trackEvent } from '@/lib/analytics'
+import {
+  PaneSearchInput, TimeRangeControl, PaneDownloadButton,
+  ALL_RANGE_VALUE, withinRange, todayStamp, type RangeValue,
+} from '@/components/panes/pane-controls'
 
 // Convert plain text (e.g. extracted from an imported PDF/TXT) into simple HTML
 // so it can be inserted into a Tiptap rich-text editor with line breaks intact.
@@ -940,44 +944,66 @@ const PANE_TINT: { active: PaneTone; past: PaneTone } = {
 }
 
 /**
- * The "Past" block: a foldable list of closed/archived jobs. It shares the page's
- * single global search (passed in via `search`) rather than owning its own search
- * bar. The Active block keeps the full-featured table (drag, column config,
- * filters) above it.
+ * The "Past" block: a foldable list of closed/archived jobs. It owns its own
+ * Search + Time + Download toolbar (same controls as the Sequences panes). The
+ * Active block above keeps the full-featured table (drag, column config, filters).
  */
-function PastJobsBlock({ jobs, search }: { jobs: JobListItem[]; search: string }) {
+function PastJobsBlock({ jobs }: { jobs: JobListItem[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(true)
+  const [query, setQuery] = useState('')
+  const [range, setRange] = useState<RangeValue>(ALL_RANGE_VALUE)
 
   const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase()
-    if (!needle) return jobs
-    return jobs.filter(j =>
-      j.position_title.toLowerCase().includes(needle) ||
-      (j.department ?? '').toLowerCase().includes(needle) ||
-      (j.hiring_manager_name ?? '').toLowerCase().includes(needle) ||
-      (j.ticket_number ?? '').toLowerCase().includes(needle) ||
-      (j.location ?? '').toLowerCase().includes(needle),
-    )
-  }, [jobs, search])
+    const needle = query.trim().toLowerCase()
+    return jobs.filter(j => {
+      if (needle && !(
+        j.position_title.toLowerCase().includes(needle) ||
+        (j.department ?? '').toLowerCase().includes(needle) ||
+        (j.hiring_manager_name ?? '').toLowerCase().includes(needle) ||
+        (j.ticket_number ?? '').toLowerCase().includes(needle) ||
+        (j.location ?? '').toLowerCase().includes(needle)
+      )) return false
+      if (!withinRange(j.created_at, range)) return false
+      return true
+    })
+  }, [jobs, query, range])
+
+  const csvRows = useMemo(() => {
+    const header = ['Position', 'Status', 'Hiring manager', 'Location', 'Created']
+    const body = filtered.map(j => [
+      j.position_title, statusBadge(j).label, j.hiring_manager_name || '',
+      j.location || '', j.created_at?.slice(0, 10) ?? '',
+    ])
+    return [header, ...body]
+  }, [filtered])
 
   return (
-    <div className="rounded-2xl border border-slate-300 bg-white shadow-sm" style={{ overflow: 'clip' }}>
-      {/* Foldable pane header — the coloured "fixed block". Click to collapse/expand. */}
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className={`flex w-full items-center gap-2 px-4 py-3 text-left transition-colors ${PANE_TINT.past.bar}`}
-      >
-        {open
-          ? <ChevronDown className={`h-4 w-4 shrink-0 ${PANE_TINT.past.chevron}`} />
-          : <ChevronRight className={`h-4 w-4 shrink-0 ${PANE_TINT.past.chevron}`} />}
-        <span className={`text-sm font-semibold uppercase tracking-wide ${PANE_TINT.past.title}`}>Past</span>
-        <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#4f483d]">{jobs.length}</span>
-      </button>
+    <div className="rounded-2xl border border-slate-300 bg-white shadow-sm">
+      {/* Foldable pane header — the coloured "fixed block" with its own toolbar. */}
+      <div className={`flex w-full items-center gap-2 rounded-t-2xl px-4 py-3 transition-colors ${!open ? 'rounded-b-2xl ' : ''}${PANE_TINT.past.bar}`}>
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex flex-1 items-center gap-2 text-left"
+        >
+          {open
+            ? <ChevronDown className={`h-4 w-4 shrink-0 ${PANE_TINT.past.chevron}`} />
+            : <ChevronRight className={`h-4 w-4 shrink-0 ${PANE_TINT.past.chevron}`} />}
+          <span className={`text-sm font-semibold uppercase tracking-wide ${PANE_TINT.past.title}`}>Past</span>
+          <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#4f483d]">{jobs.length}</span>
+        </button>
+        <PaneSearchInput
+          query={query}
+          onQueryChange={q => { setQuery(q); if (q) setOpen(true) }}
+          placeholder="Search by name…"
+        />
+        <TimeRangeControl value={range} onChange={setRange} badgeClass="text-[#4f483d]" />
+        <PaneDownloadButton filename={`jobs-past-${todayStamp()}.csv`} rows={csvRows} badgeClass="text-[#4f483d]" />
+      </div>
 
       {open && (
-        <div className="border-t border-slate-100">
+        <div className="overflow-hidden rounded-b-2xl border-t border-slate-100">
         {filtered.length === 0 ? (
           <div className="py-12 text-center">
             <Briefcase className="h-9 w-9 text-slate-200 mx-auto mb-2" />
@@ -1037,7 +1063,6 @@ function PastJobsBlock({ jobs, search }: { jobs: JobListItem[]; search: string }
 }
 
 type SortKey = 'ticket_number' | 'position_title' | 'hiring_manager_name' | 'status' | 'created_at'
-type TimeFilter = '7d' | '30d' | '3m' | 'all' | 'custom'
 type ColId = 'ticket' | 'position' | 'pipeline' | 'manager' | 'status' | 'created' | 'actions'
            | 'department' | 'location' | 'level' | 'headcount'
 
@@ -1067,14 +1092,6 @@ const ALL_COL_DEFS: ColDef[] = [
 
 const DEFAULT_VISIBLE_COLS: ColId[] = ALL_COL_DEFS.filter(c => c.defaultVisible).map(c => c.id)
 const LS_COLS = 'rs_jobs_cols'
-
-const TIME_OPTS: { value: TimeFilter; label: string }[] = [
-  { value: '7d',     label: 'Last 7 days'   },
-  { value: '30d',    label: 'Last 30 days'  },
-  { value: '3m',     label: 'Last 3 months' },
-  { value: 'all',    label: 'All time'      },
-  { value: 'custom', label: 'Custom range'  },
-]
 
 const STAGE_DOT: Record<StageColor, string> = {
   slate: 'bg-slate-400', blue: 'bg-slate-500', violet: 'bg-slate-500',
@@ -1121,17 +1138,12 @@ export default function JobsPage() {
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
-  // ── Global search ─────────────────────────────────────────────────────────
-  const [jobSearch, setJobSearch] = useState('')
+  // ── Active pane: its own search + time window (Sequences-style per-pane) ──
+  const [activeQuery, setActiveQuery] = useState('')
+  const [activeRange, setActiveRange] = useState<RangeValue>(ALL_RANGE_VALUE)
 
   // Foldable "Active" pane (the Past pane manages its own open state internally).
   const [activeOpen, setActiveOpen] = useState(true)
-
-  // ── Time filter ───────────────────────────────────────────────────────────
-  const [timeFilter, setTimeFilter]   = useState<TimeFilter>('all')
-  const [customFrom,  setCustomFrom]  = useState('')
-  const [customTo,    setCustomTo]    = useState('')
-  const [showTimePicker, setShowTimePicker] = useState(false)
 
   // ── Column filters (checkbox-based, one dropdown at a time) ───────────────
   const [colFilters,     setColFilters]     = useState<Record<string, string[]>>({})
@@ -1304,9 +1316,9 @@ export default function JobsPage() {
   const filtered = useMemo(() => {
     let result = [...activeJobs]
 
-    // Global text search
-    if (jobSearch.trim()) {
-      const q = jobSearch.trim().toLowerCase()
+    // Per-pane text search (Active pane's own box)
+    if (activeQuery.trim()) {
+      const q = activeQuery.trim().toLowerCase()
       result = result.filter(j =>
         j.position_title.toLowerCase().includes(q) ||
         (j.department ?? '').toLowerCase().includes(q) ||
@@ -1316,16 +1328,8 @@ export default function JobsPage() {
       )
     }
 
-    if (timeFilter !== 'all') {
-      if (timeFilter === 'custom') {
-        if (customFrom) result = result.filter(j => new Date(j.created_at) >= new Date(customFrom))
-        if (customTo)   result = result.filter(j => new Date(j.created_at) <= new Date(customTo + 'T23:59:59'))
-      } else {
-        const now = Date.now()
-        const ms  = timeFilter === '7d' ? 7 * 86_400_000 : timeFilter === '30d' ? 30 * 86_400_000 : 91 * 86_400_000
-        result = result.filter(j => now - new Date(j.created_at).getTime() <= ms)
-      }
-    }
+    // Per-pane time window (Active pane's own picker), applied to created_at.
+    result = result.filter(j => withinRange(j.created_at, activeRange))
 
     if (colFilters.status?.length)     result = result.filter(j => colFilters.status!.includes(j.status))
     if (colFilters.position?.length)   result = result.filter(j => colFilters.position!.includes(j.position_title))
@@ -1343,9 +1347,9 @@ export default function JobsPage() {
       return (sortDir === 'asc' ? 1 : -1) * vA.localeCompare(vB, undefined, { numeric: true })
     })
     return result
-  }, [activeJobs, jobSearch, timeFilter, customFrom, customTo, colFilters, sortKey, sortDir])
+  }, [activeJobs, activeQuery, activeRange, colFilters, sortKey, sortDir])
 
-  useEffect(() => { setManualOrder(null) }, [colFilters, jobSearch, timeFilter, customFrom, customTo, sortKey, sortDir])
+  useEffect(() => { setManualOrder(null) }, [colFilters, activeQuery, activeRange, sortKey, sortDir])
 
   const displayedJobs = useMemo(() => {
     if (!manualOrder) return filtered
@@ -1353,12 +1357,22 @@ export default function JobsPage() {
     return manualOrder.filter(id => map.has(id)).map(id => map.get(id)!)
   }, [filtered, manualOrder])
 
-  // ── Derived filter state ───────────────────────────────────────────────────
-  const hasColFilters = Object.values(colFilters).some(v => v.length > 0)
-  const hasAnyFilter  = hasColFilters || timeFilter !== 'all' || !!jobSearch.trim()
+  // CSV grid for the Active pane's Download button — the rows currently shown.
+  const activeCsvRows = useMemo(() => {
+    const header = ['Req #', 'Position', 'Hiring Manager', 'Status', 'Department', 'Location', 'Level', 'Created']
+    const body = displayedJobs.map(j => [
+      j.ticket_number ?? '', j.position_title, j.hiring_manager_name || '',
+      statusBadge(j).label, j.department ?? '', j.location ?? '', j.level ?? '',
+      j.created_at?.slice(0, 10) ?? '',
+    ])
+    return [header, ...body]
+  }, [displayedJobs])
 
-  const timeLabel = timeFilter === '7d' ? 'Last 7 days' : timeFilter === '30d' ? 'Last 30 days'
-    : timeFilter === '3m' ? 'Last 3 months' : timeFilter === 'custom' ? 'Custom range' : 'All time'
+  // ── Derived filter state ───────────────────────────────────────────────────
+  // Column filters live on the Active table; per-pane search/time have their own
+  // controls, so the chip bar below only reflects column filters + manual order.
+  const hasColFilters = Object.values(colFilters).some(v => v.length > 0)
+  const hasAnyFilter  = hasColFilters
 
   // ── Col filter toggle ──────────────────────────────────────────────────────
   const toggleColFilter = (colId: string, value: string) => {
@@ -1535,85 +1549,8 @@ export default function JobsPage() {
           <p className="text-sm text-slate-500 mt-0.5">Manage open roles and candidate pipelines</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Global search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={jobSearch}
-              onChange={e => setJobSearch(e.target.value)}
-              placeholder="Search jobs…"
-              className={`h-9 w-52 rounded-xl border pl-8 pr-8 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
-                jobSearch
-                  ? 'border-slate-300 bg-slate-50 text-slate-800'
-                  : 'border-slate-200 bg-white text-slate-700 placeholder-slate-400'
-              }`}
-            />
-            {jobSearch && (
-              <button
-                onClick={() => setJobSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Time filter icon + dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowTimePicker(p => !p)}
-              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
-                timeFilter !== 'all'
-                  ? 'border-slate-300 bg-slate-50 text-slate-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
-              }`}
-              title="Time filter"
-            >
-              <CalendarDays className="h-4 w-4" />
-              {timeFilter !== 'all' && <span className="text-xs">{timeLabel}</span>}
-            </button>
-            {showTimePicker && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
-                <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 w-52">
-                  {TIME_OPTS.map(opt => (
-                    <button
-                      key={opt.value}
-                      onClick={() => {
-                        setTimeFilter(opt.value)
-                        if (opt.value !== 'custom') setShowTimePicker(false)
-                      }}
-                      className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                        timeFilter === opt.value ? 'bg-slate-50 text-slate-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {opt.label}
-                      {timeFilter === opt.value && <Check className="h-3 w-3 ml-auto shrink-0" />}
-                    </button>
-                  ))}
-                  {timeFilter === 'custom' && (
-                    <div className="px-2 pt-2 pb-1 border-t border-slate-100 mt-1 space-y-2">
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
-                        <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
-                        <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
-                      </div>
-                      <button onClick={() => setShowTimePicker(false)}
-                        className="w-full text-xs bg-[#221b14] text-white rounded-lg py-1.5 hover:bg-[#33271b] transition-colors font-semibold">
-                        Apply
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+          {/* Search + time now live on each pane's toolbar (Active table header
+              and PastJobsBlock). Only the table's column picker stays up here. */}
 
           {/* Customize columns */}
           <button
@@ -1679,17 +1616,9 @@ export default function JobsPage() {
               </span>
             )
           })}
-          {timeFilter !== 'all' && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-xs text-slate-700 font-medium">
-              <CalendarDays className="h-3 w-3" /> {timeLabel}
-              <button onClick={() => setTimeFilter('all')} className="ml-0.5 hover:text-emerald-900">
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          )}
           {hasAnyFilter && (
             <button
-              onClick={() => { setColFilters({}); setTimeFilter('all'); setCustomFrom(''); setCustomTo('') }}
+              onClick={() => setColFilters({})}
               className="text-xs text-slate-500 hover:text-slate-800 transition-colors"
             >
               Clear all
@@ -1733,22 +1662,31 @@ export default function JobsPage() {
       ) : (
         <div className="space-y-6">
         {/* ── Active block (the full-featured, foldable table) ────────────── */}
-        <div className="rounded-2xl border border-slate-300 bg-white shadow-sm" style={{ overflow: 'clip' }}>
-          {/* Foldable pane header — the coloured "fixed block". Click to collapse/expand. */}
-          <button
-            type="button"
-            onClick={() => setActiveOpen(o => !o)}
-            className={`flex w-full items-center gap-2 px-4 py-3 text-left transition-colors ${PANE_TINT.active.bar}`}
-          >
-            {activeOpen
-              ? <ChevronDown className={`h-4 w-4 shrink-0 ${PANE_TINT.active.chevron}`} />
-              : <ChevronRight className={`h-4 w-4 shrink-0 ${PANE_TINT.active.chevron}`} />}
-            <span className={`text-sm font-semibold uppercase tracking-wide ${PANE_TINT.active.title}`}>Active</span>
-            <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#0c4634]">{activeJobs.length}</span>
-          </button>
+        <div className="rounded-2xl border border-slate-300 bg-white shadow-sm">
+          {/* Foldable pane header — the coloured "fixed block" with its own toolbar. */}
+          <div className={`flex w-full items-center gap-2 rounded-t-2xl px-4 py-3 transition-colors ${!activeOpen ? 'rounded-b-2xl ' : ''}${PANE_TINT.active.bar}`}>
+            <button
+              type="button"
+              onClick={() => setActiveOpen(o => !o)}
+              className="flex flex-1 items-center gap-2 text-left"
+            >
+              {activeOpen
+                ? <ChevronDown className={`h-4 w-4 shrink-0 ${PANE_TINT.active.chevron}`} />
+                : <ChevronRight className={`h-4 w-4 shrink-0 ${PANE_TINT.active.chevron}`} />}
+              <span className={`text-sm font-semibold uppercase tracking-wide ${PANE_TINT.active.title}`}>Active</span>
+              <span className="inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#0c4634]">{activeJobs.length}</span>
+            </button>
+            <PaneSearchInput
+              query={activeQuery}
+              onQueryChange={q => { setActiveQuery(q); if (q) setActiveOpen(true) }}
+              placeholder="Search by name…"
+            />
+            <TimeRangeControl value={activeRange} onChange={setActiveRange} badgeClass="text-[#0c4634]" />
+            <PaneDownloadButton filename={`jobs-active-${todayStamp()}.csv`} rows={activeCsvRows} badgeClass="text-[#0c4634]" />
+          </div>
 
           {activeOpen && (
-          <div className="border-t border-slate-100">
+          <div className="overflow-hidden rounded-b-2xl border-t border-slate-100">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -1803,8 +1741,8 @@ export default function JobsPage() {
           )}
         </div>
 
-        {/* ── Past block (closed/archived jobs, shares the global search) ── */}
-        <PastJobsBlock jobs={pastJobs} search={jobSearch} />
+        {/* ── Past block (closed/archived jobs — its own search/time/download) ── */}
+        <PastJobsBlock jobs={pastJobs} />
         </div>
       )}
 

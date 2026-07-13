@@ -152,6 +152,27 @@ entries on top.
   ignored the channel set in Settings. It now routes through `notifySlack(org, …)`
   like every other alert (apply, stage change, hire/reject, interviews).
 
+### Added
+- **Per-pane Search + Time + Download toolbars on the Requisitions, Jobs, and
+  Candidates lists** — matching the Sequences page. Each Active/Past pane now owns
+  its own name search, time-window picker (Last 7/30/90 days · All · custom range,
+  on `created_at`), and one-click CSV download of exactly the rows it's showing.
+  New shared component `src/components/panes/pane-controls.tsx` (`PaneSearchInput`,
+  `TimeRangeControl`, `PaneDownloadButton`, `withinRange`) built from the Sequences
+  inline controls, reusing `lib/sequences/range.ts` presets and `lib/api/csv-export`.
+
+### Changed
+- **Requisitions / Jobs / Candidates search + time filter moved from the page
+  header into each pane.** Previously one page-level toolbar filtered both panes
+  together; now the Active and Past panes filter independently (both default to
+  All-time, so nothing is hidden by default). Requisitions keeps its department/
+  location dropdowns and Jobs keeps its column customiser + column filters at the
+  page level; Candidates' Hiring Funnel is now an all-pool overview rather than
+  time-scoped. Jobs and Requisitions gained CSV export for the first time;
+  Candidates' page-level server-side Export CSV button was replaced by the per-pane
+  client-side download (the `/api/export/candidates` route is left in place, now
+  unused by the UI).
+
 ## 2026-07-12
 
 ### Fixed

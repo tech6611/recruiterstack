@@ -4,14 +4,18 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import {
-  Plus, Search, X, Users, Loader2, Download, Clock,
+  Plus, X, Users, Loader2, Clock,
   UserCheck, UserMinus, MessageSquare, FileCheck, CheckCircle, XCircle,
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight,
-  GripVertical, Pencil, CalendarDays, Check,
+  GripVertical, Pencil,
 } from 'lucide-react'
 import type { CandidateStatus, CandidateListItem } from '@/lib/types/database'
 import { inputCls, labelCls } from '@/lib/ui/styles'
 import { trackEvent } from '@/lib/analytics'
+import {
+  PaneSearchInput, TimeRangeControl, PaneDownloadButton,
+  ALL_RANGE_VALUE, withinRange, todayStamp, type RangeValue,
+} from '@/components/panes/pane-controls'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -26,16 +30,6 @@ const STATUS_CONFIG: Record<CandidateStatus, { label: string; color: string; ico
   hired:          { label: 'Hired',          color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: <CheckCircle className="h-3 w-3" /> },
   rejected:       { label: 'Rejected',       color: 'bg-red-50 text-red-700 border-red-200',             icon: <XCircle className="h-3 w-3" /> },
 }
-
-// Time filter (mirrors the Jobs page) — filters the list by candidate created_at.
-type TimeFilter = '7d' | '30d' | '3m' | 'all' | 'custom'
-const TIME_OPTS: { value: TimeFilter; label: string }[] = [
-  { value: 'all',    label: 'All time' },
-  { value: '7d',     label: 'Last 7 days' },
-  { value: '30d',    label: 'Last 30 days' },
-  { value: '3m',     label: 'Last 3 months' },
-  { value: 'custom', label: 'Custom range' },
-]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pipeline Funnel — stage definitions + count aggregation (by candidate status)
@@ -429,6 +423,7 @@ const PANE_TINT: { active: PaneTone; past: PaneTone } = {
 
 function CandidatesBlock({
   title, tint, accent, rows, total, page, onPageChange, sortKey, sortDir, onSort, emptyText,
+  query, onQueryChange, range, onRangeChange, downloadName,
 }: {
   title:        string
   tint:         PaneTone
@@ -441,6 +436,11 @@ function CandidatesBlock({
   sortDir:      'asc' | 'desc'
   onSort:       (key: SortKey) => void
   emptyText:    string
+  query:        string
+  onQueryChange: (q: string) => void
+  range:         RangeValue
+  onRangeChange: (v: RangeValue) => void
+  downloadName:  string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(true)
@@ -448,6 +448,18 @@ function CandidatesBlock({
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
   const paginated  = rows.slice((safePage - 1) * PAGE_SIZE, (safePage - 1) * PAGE_SIZE + PAGE_SIZE)
+
+  // CSV grid for this pane's Download button — every matching row (all pages),
+  // not just the page on screen.
+  const csvRows = useMemo(() => {
+    const header = ['Name', 'Email', 'Current Title', 'Location', 'Status', 'Active Jobs', 'Added']
+    const body = rows.map(c => [
+      c.name, c.email, c.current_title ?? '', c.location ?? '',
+      STATUS_CONFIG[c.status].label, c.active_applications_count,
+      c.created_at?.slice(0, 10) ?? '',
+    ])
+    return [header, ...body]
+  }, [rows])
 
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ChevronsUpDown className="h-3 w-3 text-slate-300 ml-1" />
@@ -459,24 +471,34 @@ function CandidatesBlock({
   const thCls = 'px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide select-none cursor-pointer hover:text-slate-800 transition-colors'
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-      {/* Foldable pane header — the coloured "fixed block". Click to collapse/expand. */}
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className={`flex w-full items-center gap-2 px-4 py-3 text-left transition-colors ${tint.bar}`}
-      >
-        {open
-          ? <ChevronDown className={`h-4 w-4 shrink-0 ${tint.chevron}`} />
-          : <ChevronRight className={`h-4 w-4 shrink-0 ${tint.chevron}`} />}
-        <span className={`text-sm font-semibold uppercase tracking-wide ${tint.title}`}>{title}</span>
-        <span className={`inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold ${accent}`}>
-          {total}
-        </span>
-      </button>
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {/* Foldable pane header — the coloured "fixed block" with its own toolbar. */}
+      <div className={`flex w-full items-center gap-2 rounded-t-2xl px-4 py-3 transition-colors ${!open ? 'rounded-b-2xl ' : ''}${tint.bar}`}>
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex flex-1 items-center gap-2 text-left"
+        >
+          {open
+            ? <ChevronDown className={`h-4 w-4 shrink-0 ${tint.chevron}`} />
+            : <ChevronRight className={`h-4 w-4 shrink-0 ${tint.chevron}`} />}
+          <span className={`text-sm font-semibold uppercase tracking-wide ${tint.title}`}>{title}</span>
+          <span className={`inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold ${accent}`}>
+            {total}
+          </span>
+        </button>
+        {/* Per-pane Search + Time + Download — same controls as the Sequences panes. */}
+        <PaneSearchInput
+          query={query}
+          onQueryChange={q => { onQueryChange(q); if (q) setOpen(true) }}
+          placeholder="Search by name…"
+        />
+        <TimeRangeControl value={range} onChange={onRangeChange} badgeClass={accent} />
+        <PaneDownloadButton filename={`candidates-${downloadName}-${todayStamp()}.csv`} rows={csvRows} badgeClass={accent} />
+      </div>
 
       {open && (
-        <div className="border-t border-slate-100">
+        <div className="overflow-hidden rounded-b-2xl border-t border-slate-100">
         {rows.length === 0 ? (
           <div className="py-12 text-center">
             <Users className="h-9 w-9 text-slate-200 mx-auto mb-2" />
@@ -599,16 +621,16 @@ export default function CandidatesPage() {
   // ── List state ─────────────────────────────────────────────────────────────
   const [candidates, setCandidates] = useState<CandidateListItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<CandidateStatus | 'all'>('all')
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [activePage, setActivePage] = useState(1)
   const [pastPage,   setPastPage]   = useState(1)
-  const [timeFilter, setTimeFilter]       = useState<TimeFilter>('all')
-  const [showTimePicker, setShowTimePicker] = useState(false)
-  const [customFrom, setCustomFrom]       = useState('')
-  const [customTo, setCustomTo]           = useState('')
+  // Per-pane search + time window (each pane filters independently, like Sequences).
+  const [activeQuery, setActiveQuery] = useState('')
+  const [pastQuery,   setPastQuery]   = useState('')
+  const [activeRange, setActiveRange] = useState<RangeValue>(ALL_RANGE_VALUE)
+  const [pastRange,   setPastRange]   = useState<RangeValue>(ALL_RANGE_VALUE)
 
   // ── Drawer state ───────────────────────────────────────────────────────────
   const [showDrawer, setShowDrawer] = useState(false)
@@ -636,34 +658,24 @@ export default function CandidatesPage() {
     else { setSortKey(key); setSortDir('asc') }
   }
 
-  // Reset both panes to page 1 whenever any filter or sort changes.
-  useEffect(() => {
-    setActivePage(1); setPastPage(1)
-  }, [search, filterStatus, timeFilter, customFrom, customTo, sortKey, sortDir])
+  // Reset a pane to page 1 whenever its own search / window (or shared status /
+  // sort) changes.
+  useEffect(() => { setActivePage(1) }, [activeQuery, activeRange, filterStatus, sortKey, sortDir])
+  useEffect(() => { setPastPage(1)   }, [pastQuery,   pastRange,   filterStatus, sortKey, sortDir])
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  // Time filter is the page-level scope: it narrows the candidate set that BOTH the
-  // hiring funnel and the list below draw from (search + status only refine the list).
-  const timeScoped = useMemo(() => {
-    if (timeFilter === 'all') return candidates
-    if (timeFilter === 'custom') {
-      let result = candidates
-      if (customFrom) result = result.filter(c => new Date(c.created_at) >= new Date(customFrom))
-      if (customTo)   result = result.filter(c => new Date(c.created_at) <= new Date(customTo + 'T23:59:59'))
-      return result
-    }
-    const now = Date.now()
-    const ms  = timeFilter === '7d' ? 7 * 86_400_000 : timeFilter === '30d' ? 30 * 86_400_000 : 91 * 86_400_000
-    return candidates.filter(c => now - new Date(c.created_at).getTime() <= ms)
-  }, [candidates, timeFilter, customFrom, customTo])
+  // The two status groups (unfiltered) drive the pane count badges.
+  const activeGroup = useMemo(() => candidates.filter(c => ACTIVE_CANDIDATE_STATUSES.includes(c.status)), [candidates])
+  const pastGroup   = useMemo(() => candidates.filter(c => PAST_CANDIDATE_STATUSES.includes(c.status)),   [candidates])
 
-  // Search + status refinement + sort, shared by both panes. Splitting into
-  // Active/Past happens after, so both panes reflect the same search/sort.
-  const refined = useMemo(() => {
-    let result = [...timeScoped]
+  // Filter one pane by its own search text + time window, plus the shared status
+  // dropdown, then sort. Search matches name / email / title / location; the
+  // window applies to created_at.
+  const filterPane = useCallback((group: CandidateListItem[], query: string, range: RangeValue) => {
+    let result = group
     if (filterStatus !== 'all') result = result.filter(c => c.status === filterStatus)
-    if (search.trim()) {
-      const q = search.toLowerCase()
+    const q = query.trim().toLowerCase()
+    if (q) {
       result = result.filter(c =>
         c.name.toLowerCase().includes(q) ||
         c.email.toLowerCase().includes(q) ||
@@ -671,7 +683,8 @@ export default function CandidatesPage() {
         (c.location ?? '').toLowerCase().includes(q)
       )
     }
-    result.sort((a, b) => {
+    result = result.filter(c => withinRange(c.created_at, range))
+    return [...result].sort((a, b) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vA = String((a as any)[sortKey] ?? '')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -679,20 +692,10 @@ export default function CandidatesPage() {
       const cmp = vA.localeCompare(vB, undefined, { numeric: true })
       return sortDir === 'asc' ? cmp : -cmp
     })
-    return result
-  }, [timeScoped, filterStatus, search, sortKey, sortDir])
+  }, [filterStatus, sortKey, sortDir])
 
-  // Split the refined set into the two panes.
-  const activeRows = useMemo(() => refined.filter(c => ACTIVE_CANDIDATE_STATUSES.includes(c.status)), [refined])
-  const pastRows   = useMemo(() => refined.filter(c => PAST_CANDIDATE_STATUSES.includes(c.status)),   [refined])
-
-  // Pane count badges: full (time-scoped) counts per group, so they line up with
-  // the Hiring Funnel above rather than shrinking as you type in the search box.
-  const activeTotal = useMemo(() => timeScoped.filter(c => ACTIVE_CANDIDATE_STATUSES.includes(c.status)).length, [timeScoped])
-  const pastTotal   = useMemo(() => timeScoped.filter(c => PAST_CANDIDATE_STATUSES.includes(c.status)).length,   [timeScoped])
-
-  const timeLabel = timeFilter === '7d' ? 'Last 7 days' : timeFilter === '30d' ? 'Last 30 days'
-    : timeFilter === '3m' ? 'Last 3 months' : timeFilter === 'custom' ? 'Custom range' : 'All time'
+  const activeRows = useMemo(() => filterPane(activeGroup, activeQuery, activeRange), [filterPane, activeGroup, activeQuery, activeRange])
+  const pastRows   = useMemo(() => filterPane(pastGroup,   pastQuery,   pastRange),   [filterPane, pastGroup,   pastQuery,   pastRange])
 
   // ── Drawer helpers ─────────────────────────────────────────────────────────
   const closeDrawer = () => {
@@ -766,96 +769,7 @@ export default function CandidatesPage() {
           <p className="text-sm text-slate-500 mt-0.5">Your talent pool across all roles</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Global search — filters both the Active and Past panes */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-            <input
-              value={search}
-              onChange={e => {
-                setSearch(e.target.value)
-                if (e.target.value.length > 2) trackEvent('candidates_searched', { query_length: e.target.value.length })
-              }}
-              placeholder="Search name, email, title…"
-              className={`h-10 w-56 rounded-xl border pl-8 pr-8 text-sm outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition ${
-                search
-                  ? 'border-slate-300 bg-slate-50 text-slate-800'
-                  : 'border-slate-200 bg-white text-slate-700 placeholder-slate-400'
-              }`}
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                <X className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600" />
-              </button>
-            )}
-          </div>
-          {/* Time filter — scopes the whole page (funnel + list) */}
-          <div className="relative">
-            <button
-              onClick={() => setShowTimePicker(p => !p)}
-              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
-                timeFilter !== 'all'
-                  ? 'border-slate-300 bg-slate-50 text-slate-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
-              }`}
-              title="Time filter"
-            >
-              <CalendarDays className="h-4 w-4" />
-              <span className="text-xs">{timeFilter !== 'all' ? timeLabel : 'All time'}</span>
-            </button>
-            {showTimePicker && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
-                <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 w-52">
-                  {TIME_OPTS.map(opt => (
-                    <button
-                      key={opt.value}
-                      onClick={() => {
-                        setTimeFilter(opt.value)
-                        if (opt.value !== 'custom') setShowTimePicker(false)
-                      }}
-                      className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                        timeFilter === opt.value ? 'bg-slate-50 text-slate-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {opt.label}
-                      {timeFilter === opt.value && <Check className="h-3 w-3 ml-auto shrink-0" />}
-                    </button>
-                  ))}
-                  {timeFilter === 'custom' && (
-                    <div className="px-2 pt-2 pb-1 border-t border-slate-100 mt-1 space-y-2">
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
-                        <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
-                        <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
-                      </div>
-                      <button onClick={() => setShowTimePicker(false)}
-                        className="w-full text-xs bg-[#221b14] text-white rounded-lg py-1.5 hover:bg-[#33271b] transition-colors font-semibold">
-                        Apply
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          <button
-            onClick={() => {
-              const params = new URLSearchParams()
-              if (filterStatus !== 'all') params.set('status', filterStatus)
-              if (search.trim()) params.set('search', search.trim())
-              const qs = params.toString()
-              window.location.href = `/api/export/candidates${qs ? `?${qs}` : ''}`
-            }}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </button>
+          {/* Search / time / download now live on each pane's toolbar (CandidatesBlock). */}
           <button
             onClick={() => setShowDrawer(true)}
             className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm"
@@ -866,10 +780,11 @@ export default function CandidatesPage() {
         </div>
       </div>
 
-      {/* Hiring Funnel — scoped to the selected time range (header time filter) */}
-      <PipelineFunnel candidates={timeScoped} />
+      {/* Hiring Funnel — an at-a-glance overview of the whole talent pool. */}
+      <PipelineFunnel candidates={candidates} />
 
-      {/* Filters — status refine + clear. Search and time filter live in the header. */}
+      {/* Status refine (applies to both panes) + clear. Per-pane search / time /
+          download live on each pane's toolbar below. */}
       <div className="flex items-center gap-3">
         <select
           value={filterStatus}
@@ -886,9 +801,13 @@ export default function CandidatesPage() {
           ))}
         </select>
 
-        {(filterStatus !== 'all' || search || timeFilter !== 'all') && (
+        {(filterStatus !== 'all' || activeQuery || pastQuery || activeRange.range !== 'all' || pastRange.range !== 'all') && (
           <button
-            onClick={() => { setFilterStatus('all'); setSearch(''); setTimeFilter('all'); setCustomFrom(''); setCustomTo('') }}
+            onClick={() => {
+              setFilterStatus('all')
+              setActiveQuery(''); setPastQuery('')
+              setActiveRange(ALL_RANGE_VALUE); setPastRange(ALL_RANGE_VALUE)
+            }}
             className="shrink-0 whitespace-nowrap text-xs text-slate-500 hover:text-slate-800 transition-colors"
           >
             Clear filters
@@ -933,26 +852,36 @@ export default function CandidatesPage() {
             tint={PANE_TINT.active}
             accent="text-[#0c4634]"
             rows={activeRows}
-            total={activeTotal}
+            total={activeGroup.length}
             page={activePage}
             onPageChange={setActivePage}
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={toggleSort}
             emptyText="No active candidates"
+            query={activeQuery}
+            onQueryChange={setActiveQuery}
+            range={activeRange}
+            onRangeChange={setActiveRange}
+            downloadName="active"
           />
           <CandidatesBlock
             title="Past"
             tint={PANE_TINT.past}
             accent="text-[#4f483d]"
             rows={pastRows}
-            total={pastTotal}
+            total={pastGroup.length}
             page={pastPage}
             onPageChange={setPastPage}
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={toggleSort}
             emptyText="No past candidates yet"
+            query={pastQuery}
+            onQueryChange={setPastQuery}
+            range={pastRange}
+            onRangeChange={setPastRange}
+            downloadName="past"
           />
         </div>
       )}

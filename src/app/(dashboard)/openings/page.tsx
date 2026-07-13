@@ -2,12 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Search, Clock, CheckCircle, Send, Archive, FileText, Briefcase, CalendarDays, Check, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Clock, CheckCircle, Send, Archive, FileText, Briefcase, ChevronDown, ChevronRight } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
 import { type StatTone } from '@/lib/ui/stat-tones'
 import { StatCards } from '@/components/ui/stat-cards'
 import { cn } from '@/lib/utils'
+import {
+  PaneSearchInput, TimeRangeControl, PaneDownloadButton,
+  ALL_RANGE_VALUE, withinRange, todayStamp, type RangeValue,
+} from '@/components/panes/pane-controls'
 import type { Opening, Department, Location as LocationRow } from '@/lib/types/requisitions'
 
 // Per-status badge config — mirrors the Jobs page (src/app/(dashboard)/jobs/page.tsx
@@ -27,17 +31,6 @@ const STATUS_CONFIG: Record<Opening['status'], { label: string; color: string; i
 // the funnel lives in the Active block; anything terminal lives in Past.
 const ACTIVE_STATUSES: Opening['status'][] = ['draft', 'pending_approval', 'approved', 'open']
 const PAST_STATUSES:   Opening['status'][] = ['filled', 'closed', 'archived']
-
-// Time filter presets — mirrors the Jobs page so both list pages share the same
-// created_at date scoping (Last 7 days / 30 days / 3 months / All / Custom range).
-type TimeFilter = '7d' | '30d' | '3m' | 'all' | 'custom'
-const TIME_OPTS: { value: TimeFilter; label: string }[] = [
-  { value: '7d',     label: 'Last 7 days'   },
-  { value: '30d',    label: 'Last 30 days'  },
-  { value: '3m',     label: 'Last 3 months' },
-  { value: 'all',    label: 'All time'      },
-  { value: 'custom', label: 'Custom range'  },
-]
 
 // The five summary stat-cards (Total / Awaiting Approval / Approved / Open /
 // Closed). A static at-a-glance overview — the Active/Past split below does the
@@ -73,36 +66,70 @@ const PANE_TINT: { active: PaneTone; past: PaneTone } = {
  */
 function OpeningsBlock({
   title, tint, accent, rows, total, deptById, locById, emptyText,
+  query, onQueryChange, range, onRangeChange, downloadName,
 }: {
   title:     string
   tint:      PaneTone
-  accent:    string          // tailwind text colour for the count badge
+  accent:    string          // tailwind text colour for the count badge + controls
   rows:      Opening[]
   total:     number
   deptById:  Map<string, Department>
   locById:   Map<string, LocationRow>
   emptyText: string
+  query:        string
+  onQueryChange: (q: string) => void
+  range:         RangeValue
+  onRangeChange: (v: RangeValue) => void
+  downloadName:  string
 }) {
   const [open, setOpen] = useState(true)
+
+  // CSV grid for this pane's Download button — exactly the rows on screen.
+  const csvRows = useMemo(() => {
+    const header = ['Title', 'Status', 'Department', 'Location', 'Comp', 'Target start', 'Created']
+    const body = rows.map(o => {
+      const dept = o.department_id ? deptById.get(o.department_id) : null
+      const loc  = o.location_id   ? locById.get(o.location_id)    : null
+      const comp = o.comp_min !== null && o.comp_max !== null
+        ? `${o.comp_currency} ${Number(o.comp_min).toLocaleString()}–${Number(o.comp_max).toLocaleString()}`
+        : ''
+      return [
+        o.title, STATUS_CONFIG[o.status].label, dept?.name ?? '', loc?.name ?? '',
+        comp, o.target_start_date ?? '', o.created_at?.slice(0, 10) ?? '',
+      ]
+    })
+    return [header, ...body]
+  }, [rows, deptById, locById])
+
   return (
-    <Card className="overflow-clip border-slate-300 shadow-sm">
-      {/* Foldable pane header — the coloured "fixed block". Click to collapse/expand. */}
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className={cn('flex w-full items-center gap-2 px-4 py-3 text-left transition-colors', tint.bar)}
-      >
-        {open
-          ? <ChevronDown className={cn('h-4 w-4 shrink-0', tint.chevron)} />
-          : <ChevronRight className={cn('h-4 w-4 shrink-0', tint.chevron)} />}
-        <span className={cn('text-sm font-semibold uppercase tracking-wide', tint.title)}>{title}</span>
-        <span className={cn('inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold', accent)}>
-          {total}
-        </span>
-      </button>
+    <div className="rounded-2xl border border-slate-300 bg-white shadow-sm">
+      {/* Foldable pane header — the coloured "fixed block" with its own toolbar. */}
+      <div className={cn('flex w-full items-center gap-2 rounded-t-2xl px-4 py-3 transition-colors', !open && 'rounded-b-2xl', tint.bar)}>
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex flex-1 items-center gap-2 text-left"
+        >
+          {open
+            ? <ChevronDown className={cn('h-4 w-4 shrink-0', tint.chevron)} />
+            : <ChevronRight className={cn('h-4 w-4 shrink-0', tint.chevron)} />}
+          <span className={cn('text-sm font-semibold uppercase tracking-wide', tint.title)}>{title}</span>
+          <span className={cn('inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold', accent)}>
+            {total}
+          </span>
+        </button>
+        {/* Per-pane Search + Time + Download — same controls as the Sequences panes. */}
+        <PaneSearchInput
+          query={query}
+          onQueryChange={q => { onQueryChange(q); if (q) setOpen(true) }}
+          placeholder="Search by name…"
+        />
+        <TimeRangeControl value={range} onChange={onRangeChange} badgeClass={accent} />
+        <PaneDownloadButton filename={`requisitions-${downloadName}-${todayStamp()}.csv`} rows={csvRows} badgeClass={accent} />
+      </div>
 
       {open && (
-        <div className="border-t border-slate-100">
+        <div className="overflow-hidden rounded-b-2xl border-t border-slate-100">
         {rows.length === 0 ? (
           <div className="py-12 text-center">
             <Briefcase className="h-9 w-9 text-slate-200 mx-auto mb-2" />
@@ -163,7 +190,7 @@ function OpeningsBlock({
         )}
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -173,14 +200,14 @@ export default function OpeningsListPage() {
   const [depts,  setDepts]  = useState<Department[]>([])
   const [locs,   setLocs]   = useState<LocationRow[]>([])
 
-  // ── Shared filter state (drives BOTH the Active and Past blocks) ──────────
-  const [q,      setQ]      = useState('')
+  // ── Shared refine filters (dept / location drive BOTH blocks) ─────────────
   const [deptId, setDeptId] = useState('')
   const [locId,  setLocId]  = useState('')
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all')
-  const [customFrom,  setCustomFrom]  = useState('')
-  const [customTo,    setCustomTo]    = useState('')
-  const [showTimePicker, setShowTimePicker] = useState(false)
+  // ── Per-pane search + time window (each pane filters independently) ───────
+  const [activeQuery, setActiveQuery] = useState('')
+  const [pastQuery,   setPastQuery]   = useState('')
+  const [activeRange, setActiveRange] = useState<RangeValue>(ALL_RANGE_VALUE)
+  const [pastRange,   setPastRange]   = useState<RangeValue>(ALL_RANGE_VALUE)
 
   useEffect(() => {
     fetch('/api/departments').then(r => r.json()).then(({ data }) => setDepts(data ?? []))
@@ -201,39 +228,29 @@ export default function OpeningsListPage() {
   const active = useMemo(() => items.filter(o => ACTIVE_STATUSES.includes(o.status)), [items])
   const past   = useMemo(() => items.filter(o => PAST_STATUSES.includes(o.status)),   [items])
 
-  // One shared filter applied to whichever block we're rendering. Search matches
-  // title + department name + location name; dept/location dropdowns and the time
-  // filter (on created_at) narrow further — identical scoping for both blocks.
-  const applyFilters = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    const now = Date.now()
-    return (list: Opening[]) => list.filter(o => {
-      if (deptId && o.department_id !== deptId) return false
-      if (locId  && o.location_id   !== locId)  return false
-      if (needle) {
-        const deptName = o.department_id ? (deptById.get(o.department_id)?.name ?? '') : ''
-        const locName  = o.location_id   ? (locById.get(o.location_id)?.name  ?? '') : ''
-        const hay = `${o.title} ${deptName} ${locName}`.toLowerCase()
-        if (!hay.includes(needle)) return false
-      }
-      if (timeFilter !== 'all') {
-        if (timeFilter === 'custom') {
-          if (customFrom && new Date(o.created_at) < new Date(customFrom)) return false
-          if (customTo   && new Date(o.created_at) > new Date(customTo + 'T23:59:59')) return false
-        } else {
-          const ms = timeFilter === '7d' ? 7 * 86_400_000 : timeFilter === '30d' ? 30 * 86_400_000 : 91 * 86_400_000
-          if (now - new Date(o.created_at).getTime() > ms) return false
+  // Filter a block by its own search text + time window, plus the shared
+  // dept/location dropdowns. Search matches title + department + location name;
+  // the time window applies to created_at.
+  const makeFilter = useMemo(() => {
+    return (list: Opening[], query: string, range: RangeValue) => {
+      const needle = query.trim().toLowerCase()
+      return list.filter(o => {
+        if (deptId && o.department_id !== deptId) return false
+        if (locId  && o.location_id   !== locId)  return false
+        if (needle) {
+          const deptName = o.department_id ? (deptById.get(o.department_id)?.name ?? '') : ''
+          const locName  = o.location_id   ? (locById.get(o.location_id)?.name  ?? '') : ''
+          const hay = `${o.title} ${deptName} ${locName}`.toLowerCase()
+          if (!hay.includes(needle)) return false
         }
-      }
-      return true
-    })
-  }, [q, deptId, locId, timeFilter, customFrom, customTo, deptById, locById])
+        if (!withinRange(o.created_at, range)) return false
+        return true
+      })
+    }
+  }, [deptId, locId, deptById, locById])
 
-  const activeRows = useMemo(() => applyFilters(active), [applyFilters, active])
-  const pastRows   = useMemo(() => applyFilters(past),   [applyFilters, past])
-
-  const timeLabel = timeFilter === '7d' ? 'Last 7 days' : timeFilter === '30d' ? 'Last 30 days'
-    : timeFilter === '3m' ? 'Last 3 months' : timeFilter === 'custom' ? 'Custom range' : 'All time'
+  const activeRows = useMemo(() => makeFilter(active, activeQuery, activeRange), [makeFilter, active, activeQuery, activeRange])
+  const pastRows   = useMemo(() => makeFilter(past,   pastQuery,   pastRange),   [makeFilter, past,   pastQuery,   pastRange])
 
   // Stat-card values (static overview over all items).
   const counts = useMemo(() => {
@@ -254,86 +271,7 @@ export default function OpeningsListPage() {
           <p className="text-sm text-slate-500 mt-0.5">Approved headcount for your team</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Global search (filters both Active and Past) */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              placeholder="Search requisitions…"
-              className={`h-9 w-52 rounded-xl border pl-8 pr-8 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
-                q
-                  ? 'border-slate-300 bg-slate-50 text-slate-800'
-                  : 'border-slate-200 bg-white text-slate-700 placeholder-slate-400'
-              }`}
-            />
-            {q && (
-              <button
-                onClick={() => setQ('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Time filter icon + dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowTimePicker(p => !p)}
-              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
-                timeFilter !== 'all'
-                  ? 'border-slate-300 bg-slate-50 text-slate-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800'
-              }`}
-              title="Time filter"
-            >
-              <CalendarDays className="h-4 w-4" />
-              {timeFilter !== 'all' && <span className="text-xs">{timeLabel}</span>}
-            </button>
-            {showTimePicker && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowTimePicker(false)} />
-                <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 w-52">
-                  {TIME_OPTS.map(opt => (
-                    <button
-                      key={opt.value}
-                      onClick={() => {
-                        setTimeFilter(opt.value)
-                        if (opt.value !== 'custom') setShowTimePicker(false)
-                      }}
-                      className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                        timeFilter === opt.value ? 'bg-slate-50 text-slate-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {opt.label}
-                      {timeFilter === opt.value && <Check className="h-3 w-3 ml-auto shrink-0" />}
-                    </button>
-                  ))}
-                  {timeFilter === 'custom' && (
-                    <div className="px-2 pt-2 pb-1 border-t border-slate-100 mt-1 space-y-2">
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
-                        <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
-                        <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                          className="w-full text-xs rounded-lg border border-slate-200 px-2 py-1.5 outline-none focus:border-emerald-400 transition" />
-                      </div>
-                      <button onClick={() => setShowTimePicker(false)}
-                        className="w-full text-xs bg-[#221b14] text-white rounded-lg py-1.5 hover:bg-[#33271b] transition-colors font-semibold">
-                        Apply
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
+          {/* Search + time now live on each pane's toolbar (see OpeningsBlock). */}
           <Link
             href="/openings/new"
             className="inline-flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors shadow-sm"
@@ -409,6 +347,11 @@ export default function OpeningsListPage() {
             deptById={deptById}
             locById={locById}
             emptyText="No active requisitions"
+            query={activeQuery}
+            onQueryChange={setActiveQuery}
+            range={activeRange}
+            onRangeChange={setActiveRange}
+            downloadName="active"
           />
           <OpeningsBlock
             title="Past"
@@ -419,6 +362,11 @@ export default function OpeningsListPage() {
             deptById={deptById}
             locById={locById}
             emptyText="No past requisitions yet"
+            query={pastQuery}
+            onQueryChange={setPastQuery}
+            range={pastRange}
+            onRangeChange={setPastRange}
+            downloadName="past"
           />
         </div>
       )}
