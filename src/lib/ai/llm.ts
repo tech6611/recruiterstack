@@ -2,31 +2,22 @@
  * Central LLM client for RecruiterStack (Next.js side).
  *
  * Mirrors the Django `ai/llm.py` wrapper: every AI call routes through here so
- * the provider can be swapped in one place. We migrated from Anthropic (Claude)
- * to Google (Gemini); call sites still pass the old Claude model names and we
- * translate them here, so a rollback only touches this file.
+ * the provider lives in one place. Call sites pass a Gemini model id
+ * (e.g. "gemini-2.5-pro" for quality, "gemini-2.5-flash" for speed/cost), which
+ * this module hands straight to the Google GenAI SDK.
  *
  * Note: in production the Next.js `/api/*` AI routes are proxied to the Django
- * backend (see next.config.mjs), so this module is primarily the local-dev
- * path. It is kept fully migrated so running without the proxy never silently
- * falls back to Claude.
+ * backend (see next.config.mjs), so this module is primarily the local-dev path.
  */
 import { GoogleGenAI, type Content, type Part, type GenerateContentConfig } from '@google/genai'
 
-// Map the old Claude tiers to their Gemini equivalents. Call sites still pass
-// the Claude name (e.g. "claude-sonnet-4-6"); we translate here so swapping a
-// tier is a one-line change in this table.
-const MODEL_MAP: Record<string, string> = {
-  'claude-opus-4-6': 'gemini-2.5-pro',
-  'claude-sonnet-4-6': 'gemini-2.5-pro',
-  'claude-haiku-4-5-20251001': 'gemini-2.5-flash',
-}
-
 const DEFAULT_MODEL = 'gemini-2.5-flash'
 
+// Call sites pass a Gemini model id directly. Anything unrecognised falls back
+// to the default flash tier rather than erroring.
 export function resolveModel(model: string): string {
   if (model.startsWith('gemini-')) return model
-  return MODEL_MAP[model] ?? DEFAULT_MODEL
+  return DEFAULT_MODEL
 }
 
 /**
@@ -45,7 +36,7 @@ export function jsonModeConfig(resolvedModel: string): Record<string, unknown> {
   return cfg
 }
 
-/** Token usage in the Anthropic-compatible shape `trackUsage` expects. */
+/** Token usage in the shape `trackUsage` expects. */
 export interface Usage {
   input_tokens: number
   output_tokens: number
@@ -154,10 +145,11 @@ export async function generateFromPdf(
 
 // ── Tool-calling / streaming copilot support ──────────────────────────────────
 //
-// Claude and Gemini differ in tool-schema shape and streaming. These helpers
-// hide the differences so the copilot route stays readable.
+// The tool-schema and streaming shapes are provider-specific; these helpers
+// keep that detail out of the copilot route. Tools are authored in a generic
+// JSON-schema shape (`ToolSchema`) and converted to Gemini's format below.
 
-export type ClaudeTool = {
+export type ToolSchema = {
   name: string
   description?: string
   input_schema?: Record<string, unknown>
@@ -195,8 +187,8 @@ function toGeminiSchema(schema: Record<string, unknown> | undefined): Record<str
   return out
 }
 
-/** Convert Claude tool defs into a Gemini tool (functionDeclarations array). */
-export function claudeToolsToGemini(tools: ClaudeTool[]) {
+/** Convert generic tool defs into a Gemini tool (functionDeclarations array). */
+export function toolsToGemini(tools: ToolSchema[]) {
   return {
     functionDeclarations: tools.map((t) => ({
       name: t.name,
@@ -225,13 +217,13 @@ export function messagesToContents(messages: ChatMessage[]): Content[] {
  *  automatic function calling — every call site drives the tool loop itself. */
 export function copilotConfig(opts: {
   system: string
-  tools: ClaudeTool[]
+  tools: ToolSchema[]
   maxTokens?: number
 }): GenerateContentConfig {
   return {
     maxOutputTokens: opts.maxTokens ?? 4096,
     systemInstruction: opts.system,
-    tools: [claudeToolsToGemini(opts.tools)],
+    tools: [toolsToGemini(opts.tools)],
     automaticFunctionCalling: { disable: true },
   }
 }
@@ -251,7 +243,7 @@ export function functionResultsContent(
 export interface ToolLoopOptions {
   model: string
   system: string
-  tools: ClaudeTool[]
+  tools: ToolSchema[]
   /** The natural-language task to run. */
   task: string
   maxTokens?: number
@@ -260,13 +252,21 @@ export interface ToolLoopOptions {
   executeTool: (name: string, args: Record<string, unknown>) => Promise<string>
 }
 
+/** Final text plus accumulated token usage across every iteration of the loop. */
+export interface ToolLoopResult {
+  text: string
+  usage: Usage
+  /** The resolved Gemini model, for accurate cost logging. */
+  model: string
+}
+
 /**
  * Non-streaming tool loop. Runs the model with the given tools + system prompt,
  * executes any function calls via `executeTool`, feeds results back, and returns
- * the model's final text. Mirrors the Anthropic tool-use loop the sub-agents
- * used to run inline.
+ * the model's final text plus the usage summed over every model call in the
+ * loop. Mirrors the agentic tool-use loop the sub-agents used to run inline.
  */
-export async function runToolLoop(opts: ToolLoopOptions): Promise<string> {
+export async function runToolLoop(opts: ToolLoopOptions): Promise<ToolLoopResult> {
   const ai = getClient()
   const resolved = resolveModel(opts.model)
   const config = copilotConfig({
@@ -277,14 +277,20 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<string> {
   const contents: Content[] = [{ role: 'user', parts: [{ text: opts.task }] }]
   const maxIterations = opts.maxIterations ?? 8
 
+  const usage: Usage = { input_tokens: 0, output_tokens: 0 }
+
   for (let i = 0; i < maxIterations; i++) {
     const response = await ai.models.generateContent({ model: resolved, contents, config })
+    // Accumulate token usage from every model call in the loop, not just the last.
+    usage.input_tokens += response.usageMetadata?.promptTokenCount ?? 0
+    usage.output_tokens += response.usageMetadata?.candidatesTokenCount ?? 0
+
     const calls = response.functionCalls ?? []
     const modelContent = response.candidates?.[0]?.content
     if (modelContent) contents.push(modelContent)
 
     if (calls.length === 0) {
-      return (response.text ?? '').trim()
+      return { text: (response.text ?? '').trim(), usage, model: resolved }
     }
 
     const results: { name: string; result: string }[] = []
@@ -296,7 +302,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<string> {
     contents.push(functionResultsContent(results))
   }
 
-  return '(sub-agent reached iteration limit without finishing)'
+  return { text: '(sub-agent reached iteration limit without finishing)', usage, model: resolved }
 }
 
 export interface CopilotEvent {

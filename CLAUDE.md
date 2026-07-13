@@ -30,7 +30,7 @@ npm run audit:canonical # Report direct table access by migration status
 - **Framework:** Next.js 14 (App Router), React 18, TypeScript 5
 - **Database:** Supabase (PostgreSQL), 48+ migrations in `supabase/migrations/`
 - **Auth:** Clerk (user auth + org management), multi-tenant via org_id
-- **AI:** Google GenAI SDK (Gemini) — Gemini 2.5 Pro for quality tasks, Gemini 2.5 Flash for speed/cost. Call sites still pass the old Claude tier names (e.g. `claude-sonnet-4-6`); a central wrapper (`src/lib/ai/llm.ts`, Django `ai/llm.py`) translates them to Gemini, so swapping providers is a one-file change.
+- **AI:** Google GenAI SDK (Gemini) — Gemini 2.5 Pro (`gemini-2.5-pro`) for quality tasks, Gemini 2.5 Flash (`gemini-2.5-flash`) for speed/cost. Call sites pass the Gemini model id directly; every call routes through a central wrapper (`src/lib/ai/llm.ts`, Django `ai/llm.py`) so the provider lives in one place.
 - **Email:** SendGrid
 - **Calendar:** Google Calendar API, Microsoft Graph (Outlook), Zoom
 - **Styling:** Tailwind CSS 3.4
@@ -68,7 +68,7 @@ src/
 ├── lib/
 │   ├── ai/                 # AI logic (jd-generator, job-scorer, matcher, autopilot)
 │   ├── api/                # API helpers (cache, rate-limit, search, csv, etc.)
-│   ├── copilot-tools.ts    # ~38 copilot tool definitions (Claude-format, translated to Gemini by lib/ai/llm.ts)
+│   ├── copilot-tools.ts    # ~38 copilot tool definitions (generic tool-schema, translated to Gemini by lib/ai/llm.ts)
 │   ├── domain/             # Canonical domain facades (people, candidates, applications, openings, job-pipelines, ...)
 │   ├── supabase/           # Supabase clients (browser + server)
 │   ├── google/             # Google Calendar integration

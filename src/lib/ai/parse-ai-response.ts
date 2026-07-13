@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger'
 /**
  * Parse an AI text response as JSON and validate with a Zod schema.
  *
- * Handles common Claude response quirks:
+ * Handles common AI response quirks:
  * - Markdown code fences (```json ... ```)
  * - Leading/trailing text around JSON object
  * - Extra whitespace

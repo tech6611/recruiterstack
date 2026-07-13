@@ -10,7 +10,7 @@ import type { Candidate, HiringRequest } from '@/lib/types/database'
 // Diagnostics:
 //   1. Column presence  — does ai_criterion_scores exist in the DB schema?
 //   2. Stored values    — what is currently in ai_criterion_scores for each app?
-//   3. Dry-run score    — call Claude for one application (app_id) and show the
+//   3. Dry-run score    — call Gemini for one application (app_id) and show the
 //                         raw JobScoreResult WITHOUT writing anything to the DB.
 //
 // This tells you exactly where the chain breaks without side effects.
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
         const candidate = (appRow as Record<string, unknown>).candidate as Candidate
         const job       = context.job as HiringRequest
 
-        const result = await scoreApplicationForJob(candidate, job)
+        const result = await scoreApplicationForJob(candidate, job, { orgId })
         dryRunResult = {
           score:             result.score,
           recommendation:    result.recommendation,

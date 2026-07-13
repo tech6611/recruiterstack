@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 import { generateText } from '@/lib/ai/llm'
+import { trackUsage } from '@/lib/ai/track-usage'
 
 export const maxDuration = 60
 
 // POST /api/sourcing/import
 // Body: { csv_text: string }
 // Returns: { candidates: ParsedCandidate[], count: number }
-export const POST = withCapability('recruiting:edit', async (request) => {
+export const POST = withCapability('recruiting:edit', async (request, orgId, _supabase, _ctx, _scope, userId) => {
   let body: { csv_text: string }
   try {
     body = await request.json()
@@ -50,10 +51,11 @@ CSV data:
 ${csv_text.slice(0, 10000)}`
 
   try {
-    const { text } = await generateText(prompt, {
-      model:     'claude-haiku-4-5-20251001',
+    const { text, usage, model } = await generateText(prompt, {
+      model:     'gemini-2.5-flash',
       maxTokens: 4096,
     })
+    trackUsage('sourcing-import', model, usage, { orgId, userId })
 
     const raw  = text.trim()
     const json = raw.startsWith('[') ? raw : (raw.match(/\[[\s\S]*\]/)?.[0] ?? '[]')

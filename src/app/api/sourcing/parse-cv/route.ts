@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 import { generateFromPdf } from '@/lib/ai/llm'
+import { trackUsage } from '@/lib/ai/track-usage'
 
 export const maxDuration = 30
 
 // POST /api/sourcing/parse-cv
 // Body: multipart/form-data { file: PDF }
 // Returns: { candidate: ParsedCandidate }
-export const POST = withCapability('recruiting:edit', async (request) => {
+export const POST = withCapability('recruiting:edit', async (request, orgId, _supabase, _ctx, _scope, userId) => {
   let formData: FormData
   try {
     formData = await request.formData()
@@ -35,7 +36,7 @@ export const POST = withCapability('recruiting:edit', async (request) => {
   const base64 = Buffer.from(arrayBuffer).toString('base64')
 
   try {
-    const { text } = await generateFromPdf(
+    const { text, usage, model } = await generateFromPdf(
       `Extract candidate information from this CV/resume. Return ONLY valid JSON — no markdown, no explanation:
 {
   "name": "<full name>",
@@ -49,8 +50,9 @@ export const POST = withCapability('recruiting:edit', async (request) => {
   "linkedin_url": "<LinkedIn profile URL or null>"
 }`,
       base64,
-      { model: 'claude-sonnet-4-6', maxTokens: 1024 },
+      { model: 'gemini-2.5-pro', maxTokens: 1024 },
     )
+    trackUsage('sourcing-parse-cv', model, usage, { orgId, userId })
 
     const raw  = text.trim()
     const json = raw.startsWith('```') ? raw.replace(/```(?:json)?\n?/g, '').trim() : raw

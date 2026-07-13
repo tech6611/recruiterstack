@@ -2,15 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { resolveModel, jsonModeConfig } from './llm'
 
 describe('resolveModel', () => {
-  it('maps the sonnet/opus aliases to gemini-2.5-pro', () => {
-    expect(resolveModel('claude-sonnet-4-6')).toBe('gemini-2.5-pro')
-    expect(resolveModel('claude-opus-4-6')).toBe('gemini-2.5-pro')
-  })
-  it('maps the haiku alias to gemini-2.5-flash', () => {
-    expect(resolveModel('claude-haiku-4-5-20251001')).toBe('gemini-2.5-flash')
-  })
   it('passes through explicit gemini model ids', () => {
     expect(resolveModel('gemini-2.5-flash')).toBe('gemini-2.5-flash')
+    expect(resolveModel('gemini-2.5-pro')).toBe('gemini-2.5-pro')
+  })
+  it('falls back to the default flash tier for anything unrecognised', () => {
+    expect(resolveModel('some-unknown-model')).toBe('gemini-2.5-flash')
   })
 })
 

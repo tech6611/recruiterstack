@@ -9,7 +9,7 @@
  */
 
 import { COPILOT_TOOLS } from '@/lib/copilot-tools'
-import type { ClaudeTool } from '@/lib/ai/llm'
+import type { ToolSchema } from '@/lib/ai/llm'
 
 // HRIS tools live in their own sub-agent. `request_approval` is a meta-tool
 // used only by the orchestrator (approval gates fire at the delegation boundary).
@@ -64,7 +64,7 @@ const PAYROLL_TOOL_NAMES = new Set([
   'get_employee_payslips',
 ])
 
-export const ATS_TOOLS: ClaudeTool[] = COPILOT_TOOLS.filter(
+export const ATS_TOOLS: ToolSchema[] = COPILOT_TOOLS.filter(
   t => !HRIS_TOOL_NAMES.has(t.name)
     && !CRM_TOOL_NAMES.has(t.name)
     && !PAYROLL_TOOL_NAMES.has(t.name)

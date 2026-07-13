@@ -10,7 +10,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ClaudeTool } from '@/lib/ai/llm'
+import type { ToolSchema } from '@/lib/ai/llm'
 import type { Capability } from '@/lib/permissions'
 import { ATS_SYSTEM_PROMPT, ATS_TOOLS } from '@/modules/ats/agent'
 import { HRIS_SYSTEM_PROMPT, HRIS_TOOLS } from '@/modules/hris/agent'
@@ -18,7 +18,7 @@ import { CRM_SYSTEM_PROMPT, CRM_TOOLS } from '@/modules/crm/agent'
 import { PAYROLL_SYSTEM_PROMPT, PAYROLL_TOOLS } from '@/modules/payroll/agent'
 import { runSubAgent } from '@/lib/agents/sub-agent'
 
-export const ORCHESTRATOR_TOOLS: ClaudeTool[] = [
+export const ORCHESTRATOR_TOOLS: ToolSchema[] = [
   {
     name: 'delegate_to_ats',
     description:

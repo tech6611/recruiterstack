@@ -11,13 +11,13 @@ import type {
 } from '@/lib/types/database'
 import { COPILOT_TOOLS } from '@/lib/copilot-tools'
 import { runSubAgent } from '@/lib/agents/sub-agent'
-import type { ClaudeTool } from '@/lib/ai/llm'
+import type { ToolSchema } from '@/lib/ai/llm'
 import { createNotification } from '@/lib/api/notify'
 
 type Supabase = SupabaseClient<Database>
 
 const SLA_HOURS = 48
-const MODEL     = 'claude-opus-4-6'
+const MODEL     = 'gemini-2.5-pro'
 
 // Read-only HRIS tools the AI uses for HR-case auto-answer. Whitelist —
 // explicitly excludes write tools (mark_*, record_*, set_*, decide_*,
@@ -43,7 +43,7 @@ const HRIS_READ_TOOL_NAMES = new Set([
   'list_employee_okrs',
   'get_okr',
 ])
-const HRIS_READ_TOOLS: ClaudeTool[] = COPILOT_TOOLS.filter(t =>
+const HRIS_READ_TOOLS: ToolSchema[] = COPILOT_TOOLS.filter(t =>
   HRIS_READ_TOOL_NAMES.has(t.name),
 )
 

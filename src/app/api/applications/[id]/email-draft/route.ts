@@ -15,7 +15,7 @@ const TEMPLATE_DESC: Record<TemplateKey, string> = {
 }
 
 // POST /api/applications/[id]/email-draft
-export const POST = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
+export const POST = withCapability('recruiting:edit', async (request, orgId, supabase, { params }, _scope, userId) => {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     return NextResponse.json(
@@ -88,13 +88,13 @@ Respond with ONLY a valid JSON object in this exact format, nothing else:
 {"subject": "...", "body": "..."}`
 
   try {
-    const MODEL = 'claude-haiku-4-5-20251001'
+    const MODEL = 'gemini-2.5-flash'
     const { text, usage, model } = await generateText(prompt, {
       model:     MODEL,
       maxTokens: 600,
     })
 
-    trackUsage('email-draft', model, usage)
+    trackUsage('email-draft', model, usage, { orgId, userId })
 
     const draft = parseAiJson(text.trim(), emailDraftResponseSchema, 'Email Draft')
 

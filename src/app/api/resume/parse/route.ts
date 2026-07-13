@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { checkRateLimit } from '@/lib/api/rate-limit'
 import { generateFromPdf } from '@/lib/ai/llm'
+import { trackUsage } from '@/lib/ai/track-usage'
 
 // POST /api/resume/parse
 // Accepts multipart/form-data with a `file` field (PDF)
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
   const base64 = Buffer.from(arrayBuffer).toString('base64')
 
   // Parse with the LLM
-  const { text } = await generateFromPdf(
+  const { text, usage, model } = await generateFromPdf(
     `Extract candidate information from this resume. Respond with ONLY valid JSON — no markdown, no extra text:
 {
   "name": "<full name>",
@@ -43,8 +44,9 @@ export async function POST(request: NextRequest) {
   "skills": [<array of technical skills, frameworks, tools — max 15 items>]
 }`,
     base64,
-    { model: 'claude-sonnet-4-6', maxTokens: 1024 },
+    { model: 'gemini-2.5-pro', maxTokens: 1024 },
   )
+  trackUsage('resume-parser', model, usage)
 
   let parsed: Record<string, unknown>
   try {
@@ -52,7 +54,7 @@ export async function POST(request: NextRequest) {
     const json = raw.startsWith('```') ? raw.replace(/```(?:json)?\n?/g, '').trim() : raw
     parsed = JSON.parse(json)
   } catch {
-    return NextResponse.json({ error: 'Failed to parse Claude response as JSON' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to parse Gemini response as JSON' }, { status: 500 })
   }
 
   // Upload to Supabase Storage

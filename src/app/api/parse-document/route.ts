@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkRateLimit } from '@/lib/api/rate-limit'
 import { logger } from '@/lib/logger'
 import { generateFromPdf } from '@/lib/ai/llm'
+import { trackUsage } from '@/lib/ai/track-usage'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
 // POST /api/parse-document
 // Accepts: multipart/form-data { file: File }
-// Supports: PDF (via Claude document API), TXT, MD
+// Supports: PDF (via Gemini document API), TXT, MD
 // Returns: { text: string }
 export async function POST(request: NextRequest) {
   const rateLimited = await checkRateLimit(request)
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
   const buffer = Buffer.from(bytes)
   const fileType = file.type
 
-  // Plain text — return directly without calling Claude
+  // Plain text — return directly without calling Gemini
   if (
     fileType === 'text/plain' ||
     fileType === 'text/markdown' ||
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ text: buffer.toString('utf-8') })
   }
 
-  // PDF — use Claude's document API
+  // PDF — use Gemini's document API
   if (fileType === 'application/pdf' || file.name.endsWith('.pdf')) {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
@@ -52,14 +53,15 @@ export async function POST(request: NextRequest) {
     const base64 = buffer.toString('base64')
 
     try {
-      const { text } = await generateFromPdf(
+      const { text, usage, model } = await generateFromPdf(
         'Extract all the text content from this document. Return only the extracted text, preserving structure (bullet points, sections, headings) where helpful. Do not add any commentary or preamble.',
         base64,
-        { model: 'claude-sonnet-4-6', maxTokens: 4000 },
+        { model: 'gemini-2.5-pro', maxTokens: 4000 },
       )
+      trackUsage('document-parser', model, usage)
       return NextResponse.json({ text })
     } catch (e) {
-      logger.error('Claude document extraction failed', e)
+      logger.error('Gemini document extraction failed', e)
       return NextResponse.json({ error: 'Failed to extract text from PDF.' }, { status: 500 })
     }
   }

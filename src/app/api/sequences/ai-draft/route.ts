@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 import { generateText } from '@/lib/ai/llm'
+import { trackUsage } from '@/lib/ai/track-usage'
 import { SEQUENCE_TOKENS } from '@/lib/sequences/tokens'
 
 // The five draft styles the stage editor offers. Each maps to a short brief the
@@ -24,7 +25,7 @@ const TOKEN_LIST = SEQUENCE_TOKENS.map(t => `${t.token} (${t.label})`).join(', '
 // POST /api/sequences/ai-draft  { template_id, channel?, company_name?, recruiter_name? }
 // Returns { subject, body } — an AI-written email template with merge tokens left
 // in place (substituted per candidate at send time).
-export const POST = withCapability('recruiting:edit', async (req, _orgId, _supabase) => {
+export const POST = withCapability('recruiting:edit', async (req, orgId, _supabase, _ctx, _scope, userId) => {
   let payload: { template_id?: string; channel?: string; company_name?: string; recruiter_name?: string }
   try {
     payload = await req.json()
@@ -62,10 +63,11 @@ Respond with ONLY valid JSON — no markdown, no code fences:
   "body": "<HTML body with tokens>"
 }`
 
-  const { text } = await generateText(prompt, {
-    model: 'claude-sonnet-4-6',
+  const { text, usage, model } = await generateText(prompt, {
+    model: 'gemini-2.5-pro',
     maxTokens: 1024,
   })
+  trackUsage('sequence-ai-draft', model, usage, { orgId, userId })
 
   let result: { subject: string; body: string }
   try {

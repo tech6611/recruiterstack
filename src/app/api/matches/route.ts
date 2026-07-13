@@ -63,7 +63,7 @@ async function runMatchingJob(roleId: string, orgId: string) {
 
   const results = await Promise.allSettled(
     candidates.map(async (candidate) => {
-      const match = await matchCandidateToRole(candidate, role)
+      const match = await matchCandidateToRole(candidate, role, { orgId })
 
       const { data, error } = await supabase
         .from('matches')

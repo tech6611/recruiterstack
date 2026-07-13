@@ -13,6 +13,7 @@ import { matchCandidateToRole } from '@/lib/ai/matcher'
 import { createAdminClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 import { generateText } from '@/lib/ai/llm'
+import { trackUsage } from '@/lib/ai/track-usage'
 import sgMail from '@sendgrid/mail'
 import type { Candidate, Role } from '@/lib/types/database'
 import {
@@ -24,7 +25,8 @@ import {
   listApplicationsForCandidateSummary,
 } from '@/modules/ats/domain/applications'
 import { getRoleMatchingInputs } from '@/modules/ats/domain/role-profiles'
-import { getApplicationJobTokens } from '@/modules/ats/domain/job-pipelines'
+import { getApplicationJobTokens, resolveApplicationHiringManager } from '@/modules/ats/domain/job-pipelines'
+import { randomBytes } from 'crypto'
 import { isSuppressedFromSequences, unsubscribeUrl, unsubscribeFooterHtml } from '@/modules/crm/domain/unsubscribe'
 import { applyTokens } from '@/lib/sequences/tokens'
 
@@ -138,10 +140,11 @@ Write a professional, factual summary covering:
 
 Be concise, direct, and useful for a recruiter who hasn't reviewed this profile before. Do not fabricate details not in the data.`
 
-  const { text } = await generateText(prompt, {
-    model: 'claude-haiku-4-5-20251001',
+  const { text, usage, model } = await generateText(prompt, {
+    model: 'gemini-2.5-flash',
     maxTokens: 800,
   })
+  trackUsage('ai-summary', model, usage, { orgId: job.org_id })
 
   const summary = text.trim()
 
@@ -166,7 +169,7 @@ registerHandler('matching', async (job: QueuedJob) => {
 
   const results = await Promise.allSettled(
     candidates.map(async (candidate) => {
-      const match = await matchCandidateToRole(candidate, role)
+      const match = await matchCandidateToRole(candidate, role, { orgId: job.org_id })
       const { error } = await supabase
         .from('matches')
         .upsert(
@@ -231,6 +234,67 @@ registerHandler('slack_notify', async (job: QueuedJob) => {
 })
 
 // ── Sequence Email ────────────────────────────────────────────────────────────
+
+// Resolve the {{hiring_manager_calendar}} token to a personal self-schedule URL
+// for this candidate's hiring manager. We reuse the existing /schedule/[token]
+// flow: mint a placeholder interview (unbooked — no calendar_event_id yet) with
+// the HM as interviewer, and hand the candidate its self_schedule_token. When the
+// candidate picks a slot, the standard confirm route creates the real calendar
+// invite. Returns null when no HM is resolvable, so applyTokens uses the token's
+// natural-language fallback instead of a dead link.
+//
+// Idempotent: a re-send/retry reuses the enrollment's existing unbooked
+// placeholder rather than piling up interview rows.
+async function mintHiringManagerBookingUrl(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  orgId: string,
+  applicationId: string,
+  candidateId: string,
+): Promise<string | null> {
+  const hm = await resolveApplicationHiringManager(supabase, orgId, applicationId)
+  if (!hm) return null
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) return null
+
+  // Reuse an existing unbooked placeholder for this candidacy + HM if present.
+  const { data: existing } = await supabase
+    .from('interviews')
+    .select('self_schedule_token')
+    .eq('org_id', orgId)
+    .eq('application_id', applicationId)
+    .eq('interviewer_email', hm.email)
+    .is('calendar_event_id', null)
+    .not('self_schedule_token', 'is', null)
+    .neq('status', 'cancelled')
+    .limit(1)
+  const reused = (existing as { self_schedule_token: string }[] | null)?.[0]?.self_schedule_token
+  if (reused) return `${appUrl}/schedule/${reused}`
+
+  const token = randomBytes(20).toString('hex')
+  const now = Date.now()
+  const { error } = await supabase.from('interviews').insert({
+    org_id:            orgId,
+    application_id:    applicationId,
+    candidate_id:      candidateId,
+    interviewer_name:  hm.name,
+    interviewer_email: hm.email,
+    interview_type:    'video',
+    // Placeholder time — the GET route hides it (calendar_event_id is null) and
+    // the candidate overwrites it when they pick a real slot.
+    scheduled_at:      new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    duration_minutes:  60,
+    status:            'scheduled',
+    self_schedule_token: token,
+    self_schedule_expires_at: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  })
+  if (error) {
+    logger.error('[sequence_email] failed to mint HM booking link', error)
+    return null
+  }
+  return `${appUrl}/schedule/${token}`
+}
 
 registerHandler('sequence_email', async (job: QueuedJob) => {
   const { enrollmentId, sequenceId } = job.payload as {
@@ -402,6 +466,17 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     job_title: jobTitle,
     company_name: companyName,
     recruiter_name: recruiterName,
+  }
+
+  // Only resolve the HM calendar link when a stage actually uses the token —
+  // this avoids minting placeholder interviews for the common case. A blank
+  // value here makes applyTokens fall back to the token's natural-language phrase.
+  const usesHmCalendar = `${stage.subject ?? ''} ${stage.body ?? ''}`.includes('{{hiring_manager_calendar}}')
+  if (usesHmCalendar && enrollment.application_id) {
+    const bookingUrl = await mintHiringManagerBookingUrl(
+      supabase, job.org_id, enrollment.application_id, enrollment.candidate_id,
+    )
+    if (bookingUrl) tokenValues.hiring_manager_calendar = bookingUrl
   }
 
   let subject = applyTokens(stage.subject ?? '', tokenValues)

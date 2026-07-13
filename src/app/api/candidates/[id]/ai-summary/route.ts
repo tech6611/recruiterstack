@@ -124,7 +124,7 @@ async function generateAndStoreSummary(candidateId: string, orgId: string) {
         .order('created_at', { ascending: false })
     : { data: [] }
 
-  // ── Build context for Claude ────────────────────────────────────────────────
+  // ── Build context for Gemini ────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const appSummaries = apps.map((a: any) => {
     const stage = a.pipeline_stages?.name ?? 'Unknown'
@@ -179,14 +179,14 @@ Write a professional, factual summary covering:
 
 Be concise, direct, and useful for a recruiter who hasn't reviewed this profile before. Do not fabricate details not in the data.`
 
-  const MODEL = 'claude-haiku-4-5-20251001'
+  const MODEL = 'gemini-2.5-flash'
 
   const { text, usage, model } = await generateText(prompt, {
     model:     MODEL,
     maxTokens: 800,
   })
 
-  trackUsage('ai-summary', model, usage)
+  trackUsage('ai-summary', model, usage, { orgId })
 
   const summary = text.trim()
 

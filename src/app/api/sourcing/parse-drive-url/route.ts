@@ -3,6 +3,7 @@ import { withCapability } from '@/lib/api/helpers'
 import { getValidAccessToken } from '@/lib/google/calendar'
 import { decryptSafe, encrypt } from '@/lib/crypto'
 import { generateFromPdf } from '@/lib/ai/llm'
+import { trackUsage } from '@/lib/ai/track-usage'
 
 export const maxDuration = 30
 
@@ -26,7 +27,7 @@ function extractDriveFileId(url: string): string | null {
   return null
 }
 
-export const POST = withCapability('recruiting:edit', async (request, orgId, supabase) => {
+export const POST = withCapability('recruiting:edit', async (request, orgId, supabase, _ctx, _scope, userId) => {
   let body: { url: string }
   try {
     body = await request.json()
@@ -155,7 +156,7 @@ export const POST = withCapability('recruiting:edit', async (request, orgId, sup
   const base64 = Buffer.from(arrayBuffer).toString('base64')
 
   try {
-    const { text } = await generateFromPdf(
+    const { text, usage, model } = await generateFromPdf(
       `Extract candidate information from this CV/resume. Return ONLY valid JSON — no markdown, no explanation:
 {
   "name": "<full name>",
@@ -168,8 +169,9 @@ export const POST = withCapability('recruiting:edit', async (request, orgId, sup
   "linkedin_url": "<LinkedIn profile URL or null>"
 }`,
       base64,
-      { model: 'claude-sonnet-4-6', maxTokens: 1024 },
+      { model: 'gemini-2.5-pro', maxTokens: 1024 },
     )
+    trackUsage('sourcing-parse-drive', model, usage, { orgId, userId })
 
     const raw = text.trim()
     const json = raw.startsWith('```') ? raw.replace(/```(?:json)?\n?/g, '').trim() : raw

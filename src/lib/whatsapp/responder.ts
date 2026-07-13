@@ -24,7 +24,7 @@ import {
 } from '@/modules/crm/domain/whatsapp'
 import { sendWhatsApp } from './send'
 
-const RESPONDER_MODEL = 'claude-haiku-4-5-20251001'
+const RESPONDER_MODEL = 'gemini-2.5-flash'
 const MAX_AGENT_TURNS = 10
 const MAX_LOOP_ITERATIONS = 4
 const OPT_OUT_RE = /^\s*(stop|unsubscribe|opt\s*out)\s*[.!]?\s*$/i

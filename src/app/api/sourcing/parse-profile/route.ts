@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 import { generateText } from '@/lib/ai/llm'
+import { trackUsage } from '@/lib/ai/track-usage'
 
 export const maxDuration = 30
 
 // POST /api/sourcing/parse-profile
 // Body: { text: string }
 // Returns: { candidate: ParsedCandidate }
-export const POST = withCapability('recruiting:edit', async (request) => {
+export const POST = withCapability('recruiting:edit', async (request, orgId, _supabase, _ctx, _scope, userId) => {
   let body: { text: string }
   try {
     body = await request.json()
@@ -50,10 +51,11 @@ Text to parse:
 ${text.slice(0, 6000)}`
 
   try {
-    const { text } = await generateText(prompt, {
-      model:     'claude-haiku-4-5-20251001',
+    const { text, usage, model } = await generateText(prompt, {
+      model:     'gemini-2.5-flash',
       maxTokens: 800,
     })
+    trackUsage('sourcing-parse-profile', model, usage, { orgId, userId })
 
     const raw       = text.trim()
     const json      = raw.startsWith('{') ? raw : (raw.match(/\{[\s\S]*\}/)?.[0] ?? '{}')

@@ -1,8 +1,8 @@
 import { generateText } from '@/lib/ai/llm'
-import { trackUsage } from '@/lib/ai/track-usage'
+import { trackUsage, type UsageIdentity } from '@/lib/ai/track-usage'
 import { withRetry } from '@/lib/ai/retry'
 
-const MODEL = 'claude-sonnet-4-6'
+const MODEL = 'gemini-2.5-pro'
 
 interface JDParams {
   position_title: string
@@ -21,7 +21,10 @@ interface JDParams {
   company_name?: string
 }
 
-export async function generateJD(params: JDParams): Promise<string> {
+export async function generateJD(
+  params: JDParams,
+  identity: UsageIdentity = {},
+): Promise<string> {
   const {
     position_title, department, level, location, remote_ok, headcount,
     team_context, key_requirements, nice_to_haves, budget_min, budget_max,
@@ -69,6 +72,6 @@ Be specific, compelling, and jargon-free. Respond with ONLY the markdown — no 
     { model: MODEL, maxTokens: 2048 },
   ), { label: 'JD Generator' })
 
-  trackUsage('jd-generator', model, usage)
+  trackUsage('jd-generator', model, usage, identity)
   return text
 }

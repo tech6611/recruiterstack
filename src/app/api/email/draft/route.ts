@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrg } from '@/lib/auth'
 import { getCandidateRoleMatchContext } from '@/modules/ats/domain/role-profiles'
 import { generateText } from '@/lib/ai/llm'
+import { trackUsage } from '@/lib/ai/track-usage'
 
 // POST /api/email/draft  { candidate_id, role_id, company_name?, recruiter_name?, recruiter_title?, recruiter_email? }
 // Returns { subject, body }
@@ -81,10 +82,11 @@ Respond with ONLY valid JSON — no markdown:
   "body": "<full email body with newlines as \\n>"
 }`
 
-  const { text } = await generateText(prompt, {
-    model: 'claude-sonnet-4-6',
+  const { text, usage, model } = await generateText(prompt, {
+    model: 'gemini-2.5-pro',
     maxTokens: 1024,
   })
+  trackUsage('outreach-email-draft', model, usage, { orgId })
 
   let result: { subject: string; body: string }
   try {
@@ -92,7 +94,7 @@ Respond with ONLY valid JSON — no markdown:
     const json = raw.startsWith('```') ? raw.replace(/```(?:json)?\n?/g, '').trim() : raw
     result = JSON.parse(json)
   } catch {
-    return NextResponse.json({ error: 'Failed to parse email from Claude' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to parse email from Gemini' }, { status: 500 })
   }
 
   return NextResponse.json(result)

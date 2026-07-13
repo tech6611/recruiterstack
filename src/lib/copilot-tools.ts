@@ -1,15 +1,16 @@
 /**
  * AI Copilot — Tool definitions and implementations
  *
- * COPILOT_TOOLS  : Claude-format tool schema array (translated to Gemini by lib/ai/llm.ts)
+ * COPILOT_TOOLS  : generic tool-schema array (translated to Gemini by lib/ai/llm.ts)
  * executeTool()  : Routes a tool call to the right Supabase query
  */
 
-import { generateText, type ClaudeTool } from '@/lib/ai/llm'
+import { generateText, type ToolSchema } from '@/lib/ai/llm'
 import sgMail from '@sendgrid/mail'
 import { SupabaseClient } from '@supabase/supabase-js'
 import type { Capability } from '@/lib/permissions'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
+import { trackUsage } from '@/lib/ai/track-usage'
 import {
   countCanonicalJobs,
   createCanonicalJobFromApprovedOpening,
@@ -160,7 +161,7 @@ import type {
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
-export const COPILOT_TOOLS: ClaudeTool[] = [
+export const COPILOT_TOOLS: ToolSchema[] = [
   {
     name: 'search_candidates',
     description:
@@ -1946,7 +1947,7 @@ async function bulkScoreApplications(
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await scoreApplicationForJob(candidate as any, job)
+      const result = await scoreApplicationForJob(candidate as any, job, { orgId })
 
       await applyAiScoreToApplication(supabase, app.id as string, result)
 
@@ -2710,10 +2711,11 @@ Requirements:
 Respond with ONLY valid JSON: {"subject": "...", "body": "..."}`
 
   try {
-    const { text } = await generateText(prompt, {
-      model: 'claude-haiku-4-5-20251001',
+    const { text, usage, model } = await generateText(prompt, {
+      model: 'gemini-2.5-flash',
       maxTokens: 600,
     })
+    trackUsage('copilot-email-draft', model, usage, { orgId })
     const raw   = text.trim()
     const json  = raw.startsWith('{') ? raw : (raw.match(/\{[\s\S]*\}/)?.[0] ?? '')
     const draft = JSON.parse(json) as { subject: string; body: string }

@@ -26,7 +26,7 @@ export const maxDuration = 60 // Gemini PDF extraction can take a while
 const CANDIDATE_FIELDS =
   'id, current_title, location, experience_years, skills, linkedin_url, phone, resume_url'
 
-const MODEL = 'claude-sonnet-4-6' // → gemini-2.5-pro; best extraction quality
+const MODEL = 'gemini-2.5-pro' // → gemini-2.5-pro; best extraction quality
 
 const EXTRACTION_PROMPT = `Extract candidate information from this CV/resume. Respond with ONLY valid JSON (no markdown, no explanation):
 {
@@ -38,7 +38,7 @@ const EXTRACTION_PROMPT = `Extract candidate information from this CV/resume. Re
   "phone": "<phone number, or null>"
 }`
 
-export const POST = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }) => {
+export const POST = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }, _scope, userId) => {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     return NextResponse.json({ error: 'GEMINI_API_KEY is not configured.' }, { status: 503 })
@@ -100,7 +100,7 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
       maxTokens: 2048,
       json: true,
     })
-    trackUsage('cv-parser', model, usage)
+    trackUsage('cv-parser', model, usage, { orgId, userId })
     parsed = parseAiJson(text, parsedCvSchema, 'CV Parser')
   } catch (err) {
     logger.error('parse-cv: extraction failed', err, { candidateId: c.id })

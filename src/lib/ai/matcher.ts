@@ -1,17 +1,18 @@
 import type { Candidate, Role } from '@/lib/types/database'
 import { parseAiJson } from '@/lib/ai/parse-ai-response'
 import { matchResponseSchema, type MatchResponse } from '@/lib/ai/schemas'
-import { trackUsage } from '@/lib/ai/track-usage'
+import { trackUsage, type UsageIdentity } from '@/lib/ai/track-usage'
 import { withRetry } from '@/lib/ai/retry'
 import { generateText } from '@/lib/ai/llm'
 
 export type MatchResult = MatchResponse
 
-const MODEL = 'claude-sonnet-4-6'
+const MODEL = 'gemini-2.5-pro'
 
 export async function matchCandidateToRole(
   candidate: Candidate,
   role: Role,
+  identity: UsageIdentity = {},
 ): Promise<MatchResult> {
   const salaryRange =
     role.salary_min && role.salary_max
@@ -50,12 +51,12 @@ Respond with ONLY valid JSON — no markdown, no extra text:
   const { text, usage, model } = await withRetry(() => generateText(prompt, {
     model: MODEL,
     // Headroom for Gemini 2.5's hidden "thinking" tokens; JSON mode so the reply
-    // is strictly parseable (see job-scorer for the same Claude→Gemini fix).
+    // is strictly parseable (see job-scorer for the same thinking-token fix).
     maxTokens: 2048,
     json: true,
   }), { label: 'Matcher' })
 
-  trackUsage('matcher', model, usage)
+  trackUsage('matcher', model, usage, identity)
 
   return parseAiJson(text, matchResponseSchema, 'Matcher')
 }

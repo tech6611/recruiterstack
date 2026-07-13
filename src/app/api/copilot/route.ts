@@ -33,7 +33,7 @@ import {
   messagesToContents,
 } from '@/lib/ai/llm'
 
-const MODEL = 'claude-opus-4-6'
+const MODEL = 'gemini-2.5-pro'
 
 export const maxDuration = 120
 
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          trackUsage('copilot', turn.model, turn.usage)
+          trackUsage('copilot', turn.model, turn.usage, { orgId, userId })
           contents.push(turn.modelContent)
 
           // ── Plan detection — look for <!-- PLAN: {...} --> in text output ──

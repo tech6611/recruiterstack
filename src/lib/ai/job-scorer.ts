@@ -2,17 +2,17 @@
  * AI Scoring: Candidate vs. HiringRequest
  *
  * Scores a candidate (0–100) against a specific job's requirements.
- * Uses Claude Haiku for speed and cost efficiency during bulk scoring.
+ * Uses Gemini 2.5 Flash for speed and cost efficiency during bulk scoring.
  * Separate from src/lib/ai/matcher.ts which scores against generic Role objects.
  *
- * When the job has scoring_criteria, Claude also returns a per-criterion rating
+ * When the job has scoring_criteria, Gemini also returns a per-criterion rating
  * (0–4 scale, matching the manual scorecard scale) stored as ai_criterion_scores.
  */
 
 import type { Candidate, HiringRequest } from '@/lib/types/database'
 import { parseAiJson } from '@/lib/ai/parse-ai-response'
 import { jobScoreResponseSchema, type JobScoreResponse } from '@/lib/ai/schemas'
-import { trackUsage } from '@/lib/ai/track-usage'
+import { trackUsage, type UsageIdentity } from '@/lib/ai/track-usage'
 import { withRetry } from '@/lib/ai/retry'
 import { generateText } from '@/lib/ai/llm'
 
@@ -48,7 +48,7 @@ function buildCriterionScoresTemplate(job: HiringRequest): string {
   const criteria = job.scoring_criteria
   if (!criteria || criteria.length === 0) return ''
   // Use integer 0 as a placeholder — never output angle-bracket syntax in JSON
-  // (Claude echoes <...> literally, breaking JSON.parse)
+  // (the model echoes <...> literally, breaking JSON.parse)
   const rows = criteria
     .map(c => `    {"name": ${JSON.stringify(c.name)}, "rating": 0, "weight": ${c.weight}}`)
     .join(',\n')
@@ -121,22 +121,23 @@ Replace every example value below with your actual assessment:
 }`
 }
 
-const MODEL = 'claude-haiku-4-5-20251001'
+const MODEL = 'gemini-2.5-flash'
 
 export async function scoreApplicationForJob(
   candidate: Candidate,
   job: HiringRequest,
+  identity: UsageIdentity = {},
 ): Promise<JobScoreResponse> {
   const { text, usage, model } = await withRetry(() => generateText(buildPrompt(candidate, job), {
     model:     MODEL,
     // Headroom so Gemini 2.5's hidden "thinking" tokens can't truncate the JSON
-    // (600 was ample for Claude Haiku, which didn't think).
+    // (600 was ample before the model gained hidden thinking tokens).
     maxTokens: 2048,
     // Force a pure-JSON reply so parseAiJson never chokes on prose/markdown.
     json:      true,
   }), { label: 'Job Scorer' })
 
-  trackUsage('job-scorer', model, usage)
+  trackUsage('job-scorer', model, usage, identity)
 
   return parseAiJson(text, jobScoreResponseSchema, 'Job Scorer')
 }

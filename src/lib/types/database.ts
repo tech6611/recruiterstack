@@ -1528,6 +1528,31 @@ export interface SequenceEmailInsert extends Omit<SequenceEmail, 'id' | 'created
 
 export interface SequenceEmailUpdate extends Partial<SequenceEmailInsert> {}
 
+// ai_usage — per-call AI token/cost ledger (migration 086). One row per LLM
+// call, written best-effort by trackUsage(). org_id/user_id are nullable
+// because public token flows and background jobs have no signed-in user.
+export interface AiUsage {
+  id: string
+  org_id: string | null
+  user_id: string | null
+  module: string
+  model: string
+  input_tokens: number
+  output_tokens: number
+  estimated_cost_usd: number
+  created_at: string
+}
+
+export interface AiUsageInsert
+  extends Omit<AiUsage, 'id' | 'created_at' | 'org_id' | 'user_id'> {
+  id?: string
+  created_at?: string
+  org_id?: string | null
+  user_id?: string | null
+}
+
+export interface AiUsageUpdate extends Partial<AiUsageInsert> {}
+
 // ── Supabase Database shape for typed client ─────────────────────────────────
 
 // Utility: converts an interface into a type with an implicit index signature.
@@ -1821,6 +1846,12 @@ export type Database = {
         Row: Indexify<OrgMember>
         Insert: Indexify<OrgMemberInsert>
         Update: Indexify<OrgMemberUpdate>
+        Relationships: []
+      }
+      ai_usage: {
+        Row: Indexify<AiUsage>
+        Insert: Indexify<AiUsageInsert>
+        Update: Indexify<AiUsageUpdate>
         Relationships: []
       }
       departments: {

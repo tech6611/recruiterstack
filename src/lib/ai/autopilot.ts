@@ -37,6 +37,7 @@ async function generateRejectionEmail(
   department:     string | null,
   recruiterName:  string,
   companyName:    string,
+  orgId:          string,
 ): Promise<{ subject: string; body: string } | null> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
@@ -44,7 +45,7 @@ async function generateRejectionEmail(
   const firstName = candidateName.split(' ')[0]
 
   try {
-    const MODEL = 'claude-haiku-4-5-20251001'
+    const MODEL = 'gemini-2.5-flash'
     const { text, usage, model } = await generateText(
       `Write a respectful, empathetic rejection email from a recruiter to a job candidate.
 
@@ -70,7 +71,7 @@ Respond with ONLY valid JSON (no markdown): {"subject": "...", "body": "..."}`,
       { model: MODEL, maxTokens: 2048, json: true },
     )
 
-    trackUsage('autopilot-rejection-email', model, usage)
+    trackUsage('autopilot-rejection-email', model, usage, { orgId })
 
     return parseAiJson(text.trim(), emailDraftResponseSchema, 'Autopilot Rejection Email')
   } catch {
@@ -169,7 +170,7 @@ export async function runAutopilot(
   // ── 5. Score ────────────────────────────────────────────────────────────────
   let result
   try {
-    result = await scoreApplicationForJob(candidate, job)
+    result = await scoreApplicationForJob(candidate, job, { orgId })
   } catch (err) {
     return {
       scored:    false,
@@ -261,6 +262,7 @@ export async function runAutopilot(
         job.department ?? null,
         recruiterName,
         companyName,
+        orgId,
       )
 
       if (draft) {

@@ -62,7 +62,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       budget_max: body.budget_max || null,
       target_start_date: body.target_start_date || null,
       additional_notes: body.additional_notes || null,
-    })
+    }, { orgId: job.org_id })
     // Persist the latest draft JD on the canonical job (status unchanged).
     try {
       await setCanonicalIntakeJobJd(supabase, params.token, jd)

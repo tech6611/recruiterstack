@@ -11,6 +11,65 @@ entries on top.
 
 ## 2026-07-13
 
+### Added
+- **Per-call AI cost logging (`ai_usage`).** Every Gemini call now writes one row
+  recording tokens in/out, estimated USD cost, which feature made the call, and
+  *who* triggered it (org = client, user = employee, both nullable for public
+  token flows and background jobs). Written best-effort and fire-and-forget from
+  the central `trackUsage()` funnel, so a logging failure never blocks or breaks a
+  user request. Every AI call site now reports usage — previously ~11 of them
+  discarded it, and the sub-agent tool loop was untracked entirely. This lets us
+  answer "cost per client" and "cost per employee" from real data; a reporting
+  view can be built on top later. (Note: production AI traffic is proxied to the
+  Django backend, which needs the same change to capture prod usage end-to-end.)
+
+### Schema
+- **`086_ai_usage.sql`** — new `ai_usage` ledger table (org_id, user_id, module,
+  model, input/output tokens, estimated_cost_usd, created_at) with per-org and
+  per-user time indexes. Additive and reversible. **Must be applied to Supabase**
+  before rows will persist; until then `trackUsage` logs a warning and continues.
+
+### Changed
+- **Retired the Claude naming now that the app runs entirely on Gemini.** Call
+  sites passed legacy Claude tier names (`claude-sonnet-4-6` etc.) that a wrapper
+  translated to Gemini; those are now replaced with the Gemini model ids directly
+  (`gemini-2.5-pro` / `gemini-2.5-flash`). Removed the translation map and legacy
+  Claude price rows, renamed the `ClaudeTool` type → `ToolSchema` (and
+  `claudeToolsToGemini` → `toolsToGemini`), and reworded all Claude comments and
+  user-facing error strings to Gemini. Provider still lives behind the one wrapper
+  (`src/lib/ai/llm.ts`); an unrecognised model id now falls back to the flash tier.
+
+### Added
+- **Name search on the Sequences page.** Each pane (Active and Archived) now has
+  its own "Search by name…" box in the header that narrows that pane's list as you
+  type. It works alongside the existing metric filter and time window, and
+  auto-opens a collapsed pane when you start typing.
+- **Eligibility filters on auto-enrollment rules.** A sequence's auto-enroll rules
+  (e.g. "when someone applies") used to enroll *everyone* whose event matched. Each
+  rule now has an optional "Only enroll candidates matching…" filter — Department,
+  Job, Stage, Tag, Application status, plus a skip-do-not-contact toggle — reusing
+  the same multi-select builder as Bulk enroll. When left blank, behaviour is
+  unchanged (enroll everyone). The scan engine checks each candidate against the
+  rule's filter before enrolling, reusing the existing `candidate-filter` resolver.
+- **Hiring-manager calendar link in sequence emails (`{{hiring_manager_calendar}}`).**
+  A new merge token that resolves, per candidate, to a personal booking link for
+  *their* hiring manager. At send-time we look up the HM for the candidate's job
+  (job's hiring team → hiring manager, else the linked opening's hiring manager),
+  mint a self-schedule link, and drop it into the email. The candidate picks a
+  slot on the existing `/schedule/[token]` page, which creates the real interview
+  and calendar invite (Google Meet / Teams / Zoom) — no separate booking flow. The
+  token only does work when a stage actually uses it, and re-sends reuse the same
+  unbooked link rather than piling up interview rows. When the HM (or their
+  availability) can't be resolved, the token falls back to a natural sentence
+  ("the hiring team will reach out to schedule a time") instead of a dead link.
+  (Note: production sequence sends run through the Django backend, which needs the
+  same send-time resolution to mint these links in prod.)
+
+### Schema
+- **`087_enrollment_rule_filters.sql`** — adds a `filters` JSONB column to
+  `sequence_enrollment_rules` (defaults to `{}` = no filter). Additive and
+  reversible. **Must be applied to Supabase** for rule filters to persist.
+
 ### Changed
 - **Sequences now have a type — Drip campaign vs Event notification — chosen at
   creation.** This replaces the per-sequence "send first email immediately"

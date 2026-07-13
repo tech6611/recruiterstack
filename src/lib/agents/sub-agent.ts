@@ -10,14 +10,15 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { executeTool } from '@/lib/copilot-tools'
-import { runToolLoop, type ClaudeTool } from '@/lib/ai/llm'
+import { runToolLoop, type ToolSchema } from '@/lib/ai/llm'
+import { trackUsage } from '@/lib/ai/track-usage'
 import type { Capability } from '@/lib/permissions'
 
 const MAX_TOKENS = 2048
 
 export interface SubAgentOptions {
   model: string
-  tools: ClaudeTool[]
+  tools: ToolSchema[]
   systemPrompt: string
   /** The natural-language task the orchestrator is delegating. */
   task: string
@@ -34,7 +35,7 @@ export interface SubAgentOptions {
 }
 
 export async function runSubAgent(opts: SubAgentOptions): Promise<string> {
-  return runToolLoop({
+  const { text, usage, model } = await runToolLoop({
     model:         opts.model,
     system:        opts.systemPrompt,
     tools:         opts.tools,
@@ -44,4 +45,6 @@ export async function runSubAgent(opts: SubAgentOptions): Promise<string> {
     executeTool:   (name, args) =>
       executeTool(name, args, opts.orgId, opts.supabase, opts.capabilities, opts.userId),
   })
+  trackUsage('sub-agent', model, usage, { orgId: opts.orgId, userId: opts.userId })
+  return text
 }

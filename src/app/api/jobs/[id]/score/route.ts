@@ -19,7 +19,7 @@ import type { Candidate, HiringRequest, PipelineStage, Application, ApplicationU
 
 export const maxDuration = 300 // 5 min — needed for large pipelines on Vercel
 
-export const POST = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase, { params }, _scope, userId) => {
   const jobId = params.id
 
   // Optional filters from request body
@@ -90,7 +90,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
           const jobForScoring = scoringCriteriaOverride
             ? { ...job, scoring_criteria: scoringCriteriaOverride } as HiringRequest
             : job
-          const result = await scoreApplicationForJob(candidate, jobForScoring)
+          const result = await scoreApplicationForJob(candidate, jobForScoring, { orgId, userId })
 
           // Write core score fields — always required
           const { error: updateErr } = await supabase
