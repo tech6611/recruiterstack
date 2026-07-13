@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
+import { sanitizeCandidateFilter } from '@/modules/crm/domain/candidate-filter'
 
 // PATCH /api/automations/[id] — update a rule (toggle enabled, rename, retarget)
 export const PATCH = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
@@ -11,6 +12,7 @@ export const PATCH = withCapability('recruiting:edit', async (req, orgId, supaba
   for (const key of allowed) {
     if (key in body) update[key] = body[key]
   }
+  if ('filters' in body) update.filters = sanitizeCandidateFilter(body.filters)
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
   }

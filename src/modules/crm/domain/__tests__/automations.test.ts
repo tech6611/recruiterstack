@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { matchTagRules, matchStageRules, matchStatusRules, matchAppliedRules, type EnrollmentRule } from '../automations'
+import { matchTagRules, matchStageRules, matchStatusRules, matchAppliedRules, isEmptyFilter, type EnrollmentRule } from '../automations'
 
 const rule = (over: Partial<EnrollmentRule>): EnrollmentRule => ({
   id: 'r', org_id: 'org1', name: '', enabled: true,
@@ -60,6 +60,26 @@ describe('matchStatusRules', () => {
   })
   it('does not match a different status or type', () => {
     expect(matchStatusRules(rules, 'org1', 'withdrawn')).toEqual([])
+  })
+})
+
+describe('isEmptyFilter', () => {
+  it('treats undefined/null/empty object as empty (enroll everyone)', () => {
+    expect(isEmptyFilter(undefined)).toBe(true)
+    expect(isEmptyFilter(null)).toBe(true)
+    expect(isEmptyFilter({})).toBe(true)
+  })
+  it('treats empty arrays as empty', () => {
+    expect(isEmptyFilter({ department_ids: [], tags: [] })).toBe(true)
+  })
+  it('the do-not-contact flag alone is not a positive filter', () => {
+    expect(isEmptyFilter({ exclude_do_not_contact: true })).toBe(true)
+    expect(isEmptyFilter({ exclude_do_not_contact: false })).toBe(true)
+  })
+  it('is non-empty when any positive filter is set', () => {
+    expect(isEmptyFilter({ department_ids: ['d1'] })).toBe(false)
+    expect(isEmptyFilter({ statuses: ['active'] })).toBe(false)
+    expect(isEmptyFilter({ tags: ['lead'] })).toBe(false)
   })
 })
 

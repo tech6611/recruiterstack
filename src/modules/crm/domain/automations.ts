@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { logger } from '@/lib/logger'
 import { enrollCandidate } from './enroll'
+import { type CandidateFilter, resolveFilteredCandidateIds } from './candidate-filter'
 
 export type TriggerType = 'tag_added' | 'stage_moved' | 'applied' | 'status_changed'
 
@@ -12,6 +13,9 @@ export interface EnrollmentRule {
   trigger_type: TriggerType
   trigger_value: string
   sequence_id: string
+  // Optional eligibility filter. When empty, the rule enrolls every candidate
+  // whose event matched; when set, only candidates matching the filter enroll.
+  filters?: CandidateFilter | null
 }
 
 // Max events processed per trigger per scan tick (keeps the cron call bounded).
@@ -38,6 +42,48 @@ export function matchStatusRules(rules: EnrollmentRule[], orgId: string, toStatu
 export function matchAppliedRules(rules: EnrollmentRule[], orgId: string): EnrollmentRule[] {
   return rules.filter(r =>
     r.enabled && r.trigger_type === 'applied' && r.org_id === orgId)
+}
+
+// ── Eligibility filter ────────────────────────────────────────────────────────
+
+/**
+ * True when a rule has no positive eligibility filter, i.e. it should enroll every
+ * candidate whose event matched (the original behaviour). The do-not-contact flag
+ * alone doesn't count as a filter — it only prunes an existing positive set.
+ */
+export function isEmptyFilter(f?: CandidateFilter | null): boolean {
+  if (!f) return true
+  return !(
+    f.department_ids?.length ||
+    f.job_ids?.length ||
+    f.stage_names?.length ||
+    f.tags?.length ||
+    f.statuses?.length
+  )
+}
+
+/**
+ * Whether `candidateId` passes a rule's eligibility filter. Rules with no filter
+ * always pass. Otherwise we resolve the filter to its candidate-id set (reusing
+ * the exact logic the Bulk-filter enrollment uses) and test membership. The set
+ * is memoised per rule for the duration of one scan via `cache`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function ruleAllowsCandidate(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
+  rule: EnrollmentRule,
+  candidateId: string,
+  cache: Map<string, Set<string>>,
+): Promise<boolean> {
+  if (isEmptyFilter(rule.filters)) return true
+  let set = cache.get(rule.id)
+  if (!set) {
+    const ids = await resolveFilteredCandidateIds(supabase, rule.org_id, rule.filters as CandidateFilter)
+    set = new Set(ids)
+    cache.set(rule.id, set)
+  }
+  return set.has(candidateId)
 }
 
 // ── Cursor helpers ────────────────────────────────────────────────────────────
@@ -77,6 +123,7 @@ async function scanAppEvents(
   rules: EnrollmentRule[],
   eventType: string,
   matchFn: (rules: EnrollmentRule[], orgId: string, toStage: string) => EnrollmentRule[],
+  filterCache: Map<string, Set<string>>,
 ): Promise<number> {
   const cursor = await getCursor(supabase, eventType)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,6 +144,7 @@ async function scanAppEvents(
     const orgId = app?.candidates?.org_id
     if (!candidateId || !orgId) continue
     for (const rule of matchFn(rules, orgId, ev.to_stage ?? '')) {
+      if (!(await ruleAllowsCandidate(supabase, rule, candidateId, filterCache))) continue
       const res = await enrollCandidate(supabase, {
         orgId, sequenceId: rule.sequence_id, candidateId, applicationId: ev.application_id, enrolledBy: 'automation',
       })
@@ -127,6 +175,8 @@ export async function scanAutomations(supabase: SupabaseClient<any>): Promise<Re
   if (!rules.length) return {}
 
   const out: Record<string, number> = {}
+  // Memoised per-rule eligibility sets, shared across every trigger in this scan.
+  const filterCache = new Map<string, Set<string>>()
 
   // tag_added — polls candidate_tags.
   if (rules.some(r => r.trigger_type === 'tag_added')) {
@@ -140,6 +190,7 @@ export async function scanAutomations(supabase: SupabaseClient<any>): Promise<Re
     for (const row of (tags ?? [])) {
       if (row.created_at > maxTs) maxTs = row.created_at
       for (const rule of matchTagRules(rules, row.org_id, row.tag)) {
+        if (!(await ruleAllowsCandidate(supabase, rule, row.candidate_id, filterCache))) continue
         const res = await enrollCandidate(supabase, {
           orgId: rule.org_id, sequenceId: rule.sequence_id, candidateId: row.candidate_id, enrolledBy: 'automation',
         })
@@ -152,13 +203,13 @@ export async function scanAutomations(supabase: SupabaseClient<any>): Promise<Re
 
   // Application-event triggers — all poll application_events.
   if (rules.some(r => r.trigger_type === 'applied')) {
-    out.applied = await scanAppEvents(supabase, rules, 'applied', (rs, org) => matchAppliedRules(rs, org))
+    out.applied = await scanAppEvents(supabase, rules, 'applied', (rs, org) => matchAppliedRules(rs, org), filterCache)
   }
   if (rules.some(r => r.trigger_type === 'stage_moved')) {
-    out.stage_moved = await scanAppEvents(supabase, rules, 'stage_moved', matchStageRules)
+    out.stage_moved = await scanAppEvents(supabase, rules, 'stage_moved', matchStageRules, filterCache)
   }
   if (rules.some(r => r.trigger_type === 'status_changed')) {
-    out.status_changed = await scanAppEvents(supabase, rules, 'status_changed', matchStatusRules)
+    out.status_changed = await scanAppEvents(supabase, rules, 'status_changed', matchStatusRules, filterCache)
   }
 
   return out

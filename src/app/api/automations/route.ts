@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
+import { sanitizeCandidateFilter } from '@/modules/crm/domain/candidate-filter'
 
 const TRIGGERS = ['tag_added', 'stage_moved', 'applied', 'status_changed']
 
@@ -50,6 +51,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
       trigger_type,
       trigger_value,
       sequence_id,
+      filters: sanitizeCandidateFilter(body.filters),
     })
     .select('*, sequences(name, status)')
     .single()

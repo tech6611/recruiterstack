@@ -7,6 +7,12 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "job-hunt-bot",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/sagar/job-hunt-bot", "run", "dev", "--", "--port", "3100"],
+      "port": 3100
     }
   ]
 }

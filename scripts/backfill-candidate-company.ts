@@ -41,7 +41,7 @@ async function main() {
       const { data: file, error: dErr } = await supabase.storage.from(BUCKET).download(path)
       if (dErr || !file) { console.warn(`  x ${label}: download failed (${dErr?.message ?? 'no file'}) path=${path}`); failed++; continue }
       const pdfBase64 = Buffer.from(await file.arrayBuffer()).toString('base64')
-      const { text } = await generateFromPdf(PROMPT, pdfBase64, { model: 'claude-sonnet-4-6', maxTokens: 128, json: true, temperature: 0 })
+      const { text } = await generateFromPdf(PROMPT, pdfBase64, { model: 'claude-haiku-4-5-20251001', maxTokens: 512, json: true, temperature: 0 })
       const company = parseCompany(text)
       if (!company) { console.log(`  - ${label}: no company found`); blank++; continue }
       if (APPLY) {

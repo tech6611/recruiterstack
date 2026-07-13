@@ -20,6 +20,30 @@ export interface CandidateFilter {
   exclude_do_not_contact?: boolean    // default true
 }
 
+/**
+ * Coerce arbitrary request JSON into a clean CandidateFilter: string arrays are
+ * de-duped and stripped of blanks, unknown keys are dropped, and the DNC flag is
+ * only carried when explicitly a boolean. Returns `{}` for anything unusable.
+ */
+export function sanitizeCandidateFilter(input: unknown): CandidateFilter {
+  if (!input || typeof input !== 'object') return {}
+  const src = input as Record<string, unknown>
+  const strArr = (v: unknown): string[] | undefined => {
+    if (!Array.isArray(v)) return undefined
+    const out = Array.from(new Set(v.filter((x): x is string => typeof x === 'string').map(s => s.trim()).filter(Boolean)))
+    return out.length ? out : undefined
+  }
+  const out: CandidateFilter = {}
+  const dept = strArr(src.department_ids); if (dept) out.department_ids = dept
+  const jobs = strArr(src.job_ids); if (jobs) out.job_ids = jobs
+  const stages = strArr(src.stage_names); if (stages) out.stage_names = stages
+  const tags = strArr(src.tags); if (tags) out.tags = tags
+  const statuses = strArr(src.statuses)?.filter(s => (APPLICATION_STATUSES as readonly string[]).includes(s))
+  if (statuses?.length) out.statuses = statuses
+  if (typeof src.exclude_do_not_contact === 'boolean') out.exclude_do_not_contact = src.exclude_do_not_contact
+  return out
+}
+
 // ── Pure combinators (unit-tested) ────────────────────────────────────────────
 
 /**

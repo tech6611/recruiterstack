@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Plus, Mail, Loader2,
   Play, Pause, Archive, ChevronRight, ChevronDown, Copy, X, Download,
-  Filter, Check, Clock, Trash2, Zap,
+  Filter, Check, Clock, Trash2, Zap, Search,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { downloadCsv, todayStamp } from '@/lib/api/csv-export'
@@ -69,6 +69,12 @@ function matchesFilter(seq: Sequence, f: PaneFilter): boolean {
     const v = metricValue(seq, r.metric)
     return r.op === '>=' ? v >= r.value : v <= r.value
   })
+}
+
+function matchesQuery(seq: Sequence, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return seq.name.toLowerCase().includes(q)
 }
 
 const filterCount = (f: PaneFilter) => f.states.length + f.rules.length
@@ -232,11 +238,13 @@ export default function SequencesPage() {
   // ── Per-pane filters (#5) ──────────────────────────────────────────────────
   const [activeFilter, setActiveFilter]     = useState<PaneFilter>(EMPTY_FILTER)
   const [archivedFilter, setArchivedFilter] = useState<PaneFilter>(EMPTY_FILTER)
+  const [activeQuery, setActiveQuery]       = useState('')
+  const [archivedQuery, setArchivedQuery]   = useState('')
 
   // Two buckets — non-archived (active + draft + paused) vs archived — each read
-  // from its own windowed fetch and then narrowed by its own state/perf filter.
-  const activeSeqs   = activeData.filter(s => s.status !== 'archived' && matchesFilter(s, activeFilter))
-  const archivedSeqs = archivedData.filter(s => s.status === 'archived' && matchesFilter(s, archivedFilter))
+  // from its own windowed fetch and then narrowed by its own name search + state/perf filter.
+  const activeSeqs   = activeData.filter(s => s.status !== 'archived' && matchesQuery(s, activeQuery) && matchesFilter(s, activeFilter))
+  const archivedSeqs = archivedData.filter(s => s.status === 'archived' && matchesQuery(s, archivedQuery) && matchesFilter(s, archivedFilter))
   const hasAny = activeData.length > 0 || archivedData.length > 0
 
   // ── Loading ──────────────────────────────────────────────────────────────
@@ -403,6 +411,8 @@ export default function SequencesPage() {
             onToggleAll={setMany}
             filter={activeFilter}
             onFilterChange={setActiveFilter}
+            query={activeQuery}
+            onQueryChange={setActiveQuery}
             stateOptions={['active', 'draft', 'paused']}
             rangeValue={activeRange}
             onRangeChange={setActiveRange}
@@ -425,6 +435,8 @@ export default function SequencesPage() {
             onToggleAll={setMany}
             filter={archivedFilter}
             onFilterChange={setArchivedFilter}
+            query={archivedQuery}
+            onQueryChange={setArchivedQuery}
             stateOptions={[]}
             rangeValue={archivedRange}
             onRangeChange={setArchivedRange}
@@ -571,8 +583,8 @@ function SequenceFilterPopover({
 // rows. Rendered twice — Active and Archived.
 function SequencePane({
   title, tone, count, defaultOpen, emptyText, selectableIds, selected, onToggleAll,
-  filter, onFilterChange, stateOptions, rangeValue, onRangeChange, downloadSeqs,
-  downloadName, children,
+  filter, onFilterChange, query, onQueryChange, stateOptions, rangeValue, onRangeChange,
+  downloadSeqs, downloadName, children,
 }: {
   title: string
   tone: PaneTone
@@ -584,6 +596,8 @@ function SequencePane({
   onToggleAll: (ids: string[], on: boolean) => void
   filter: PaneFilter
   onFilterChange: (f: PaneFilter) => void
+  query: string
+  onQueryChange: (q: string) => void
   stateOptions: SequenceStatus[]
   rangeValue: RangeValue
   onRangeChange: (v: RangeValue) => void
@@ -622,6 +636,27 @@ function SequencePane({
             {count}
           </span>
         </button>
+        {/* Per-pane name search — narrows this pane's list as you type. */}
+        <div className="relative hidden sm:block">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => { onQueryChange(e.target.value); if (e.target.value) setOpen(true) }}
+            placeholder="Search by name…"
+            className="h-8 w-44 rounded-lg border border-slate-200 bg-white/80 pl-7 pr-6 text-xs text-slate-700 placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-300"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => onQueryChange('')}
+              title="Clear search"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
         {/* Per-pane Time + Download + Filter — all icon buttons with hover tooltips. */}
         <TimeRangeControl value={rangeValue} onChange={onRangeChange} tone={tone} />
         <DownloadControl seqs={downloadSeqs} name={downloadName} tone={tone} />
