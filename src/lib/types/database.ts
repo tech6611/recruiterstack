@@ -1078,7 +1078,9 @@ export interface Offer {
   org_id:            string
   application_id:    string
   candidate_id:      string
-  hiring_request_id: string
+  // Legacy anchor. Nullable (migration 067): canonical offers leave it null and
+  // link to the job via their application.
+  hiring_request_id: string | null
   position_title:    string
   base_salary:       number | null
   bonus:             number | null

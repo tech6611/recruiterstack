@@ -4,7 +4,12 @@ import { offerStatusEnum } from './common'
 export const offerInsertSchema = z.object({
   application_id: z.string().uuid(),
   candidate_id: z.string().uuid(),
-  hiring_request_id: z.string().uuid(),
+  // Legacy anchor — optional now. Canonical offers leave it null and link to the
+  // job via their application. Absent / null / '' all normalize to null.
+  hiring_request_id: z.preprocess(
+    v => (v === '' || v == null ? null : v),
+    z.string().uuid().nullable(),
+  ),
   position_title: z.string().min(1, 'Position title is required'),
   base_salary: z.number().positive().nullish().default(null),
   bonus: z.number().min(0).nullish().default(null),

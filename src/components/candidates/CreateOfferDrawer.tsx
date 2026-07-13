@@ -58,7 +58,9 @@ export default function CreateOfferDrawer({
       body: JSON.stringify({
         application_id:    appId,
         candidate_id:      candidateId,
-        hiring_request_id: selectedApp?.hiring_request_id ?? '',
+        // Canonical apps have no legacy hiring_request; send null (the offer links
+        // to the job via its application). Empty string would fail uuid validation.
+        hiring_request_id: selectedApp?.hiring_request_id ?? null,
         position_title:    posTitle,
         base_salary:       baseSalary ? Number(baseSalary) : null,
         bonus:             bonus      ? Number(bonus)      : null,
