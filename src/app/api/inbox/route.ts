@@ -17,8 +17,7 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
         application:applications(
           id, status,
           candidate:candidates(id, full_name:name, email),
-          job:hiring_requests(id, position_title, department),
-          canonical_job:jobs(id, position_title:title, department:departments(name))
+            canonical_job:jobs(id, position_title:title, department:departments(name))
         )
       `)
       .eq('org_id', orgId)
@@ -31,7 +30,6 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
       .select(`
         id, status, applied_at, stage_id,
         candidate:candidates(id, full_name:name, email),
-        job:hiring_requests(id, position_title, department),
         canonical_job:jobs(id, position_title:title, department:departments(name)),
         stage:pipeline_stages(name, color)
       `)

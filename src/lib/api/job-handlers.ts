@@ -532,7 +532,7 @@ registerHandler('interview_reminder', async (job: QueuedJob) => {
   const supabase = createAdminClient()
   const { data: iv } = await supabase
     .from('interviews')
-    .select('*, candidate:candidates(name, email), hiring_request:hiring_requests(position_title), application:applications(job:jobs(position_title:title))')
+    .select('*, candidate:candidates(name, email), application:applications(job:jobs(position_title:title))')
     .eq('id', interviewId)
     .eq('org_id', job.org_id)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

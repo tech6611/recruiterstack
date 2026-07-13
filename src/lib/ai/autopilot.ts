@@ -116,8 +116,7 @@ export async function runAutopilot(
     .from('applications')
     .select(`
       id, status, stage_id, ai_scored_at,
-      candidate:candidates(*),
-      hiring_request:hiring_requests(*)
+      candidate:candidates(*)
     `)
     .eq('id', applicationId)
     .eq('org_id', orgId)
@@ -128,7 +127,10 @@ export async function runAutopilot(
   }
 
   const candidate = app.candidate as unknown as Candidate
-  const job       = app.hiring_request as unknown as HiringRequest
+  // Legacy autopilot ran off hiring_requests (now dropped). Canonical apps have
+  // no legacy job, so this is always undefined → the guard below skips them.
+  // (Canonical autopilot scoring is a separate migration.)
+  const job       = (app as unknown as { hiring_request?: HiringRequest }).hiring_request
 
   if (!candidate || !job) {
     return { scored: false, score: null, action: 'skipped', emailSent: false, error: 'Missing related data' }

@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
 
   const { data: interview, error } = await supabase
     .from('interviews')
-    .select('*, candidate:candidates(name, email), hiring_request:hiring_requests(position_title)')
+    .select('*, candidate:candidates(name, email)')
     .eq('self_schedule_token', token)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .single() as { data: any; error: any }

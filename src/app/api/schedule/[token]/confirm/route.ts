@@ -34,7 +34,7 @@ export async function POST(
   // Fetch interview
   const { data: interview, error } = await supabase
     .from('interviews')
-    .select('*, candidate:candidates(name, email), hiring_request:hiring_requests(position_title)')
+    .select('*, candidate:candidates(name, email), application:applications(job:jobs(position_title:title))')
     .eq('self_schedule_token', token)
     .single() as { data: any; error: any }
 
@@ -54,7 +54,7 @@ export async function POST(
   const orgId    = interview.org_id
   const candidateEmail = (interview.candidate as any)?.email ?? null
   const candidateName  = (interview.candidate as any)?.name  ?? 'Candidate'
-  const positionTitle  = (interview.hiring_request as any)?.position_title ?? 'Position'
+  const positionTitle  = (interview.application as any)?.job?.position_title ?? 'Position'
   const panelMembers: { name: string; email: string }[] = interview.panel ?? []
   const panelEmails = panelMembers.map((m: any) => m.email?.trim()).filter(Boolean)
 

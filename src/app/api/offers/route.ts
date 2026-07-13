@@ -15,7 +15,7 @@ export const GET = withCapability('recruiting:view', async (req, orgId, supabase
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q: any = supabase
     .from('offers')
-    .select('*, candidate:candidates(name, email), hiring_request:hiring_requests(position_title, ticket_number), application:applications(job:jobs(position_title:title))')
+    .select('*, candidate:candidates(name, email), application:applications(job:jobs(position_title:title))')
     .eq('org_id', orgId)
 
   if (application_id)    q = q.eq('application_id', application_id)

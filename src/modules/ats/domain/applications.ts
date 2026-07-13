@@ -586,7 +586,6 @@ export async function listApplicationsForCandidateSummary(
         id, status, source, applied_at, ai_score, ai_recommendation,
         ai_strengths, ai_gaps,
         pipeline_stages(name),
-        hiring_requests(position_title, department, level),
         canonical_job:jobs(position_title:title, department:departments(name))
       `)
     .eq('candidate_id', candidateId)

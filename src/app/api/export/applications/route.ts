@@ -29,13 +29,13 @@ export async function GET(req: NextRequest) {
     .select(`
       status, source, ai_score, applied_at,
       candidates(name, email),
-      hiring_requests(position_title, department),
+      job:jobs(position_title:title, department:departments(name)),
       pipeline_stages(name)
     `)
     .eq('org_id', orgId)
     .order('applied_at', { ascending: false })
 
-  if (jobId) query = query.eq('hiring_request_id', jobId)
+  if (jobId) query = query.eq('job_id', jobId)
   if (status) query = query.eq('status', status as import('@/lib/types/database').ApplicationStatus)
 
   const { data, error } = await query
@@ -48,8 +48,8 @@ export async function GET(req: NextRequest) {
   const rows = (data ?? []).map((a: any) => [
     a.candidates?.name ?? '',
     a.candidates?.email ?? '',
-    a.hiring_requests?.position_title ?? '',
-    a.hiring_requests?.department ?? '',
+    a.job?.position_title ?? '',
+    a.job?.department?.name ?? '',
     a.pipeline_stages?.name ?? '',
     a.status,
     a.source ?? '',

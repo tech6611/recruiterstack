@@ -25,7 +25,7 @@ export async function runInterviewCancellationSideEffects(
 ): Promise<void> {
   const { data: iv } = await supabase
     .from('interviews')
-    .select('*, candidate:candidates(name, email), hiring_request:hiring_requests(position_title)')
+    .select('*, candidate:candidates(name, email), application:applications(job:jobs(position_title:title))')
     .eq('id', interviewId)
     .eq('org_id', orgId)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,7 +58,7 @@ export async function runInterviewCancellationSideEffects(
       candidateEmail:   iv.candidate?.email ?? '',
       interviewerName:  iv.interviewer_name ?? 'Interviewer',
       interviewerEmail: iv.interviewer_email ?? null,
-      positionTitle:    iv.hiring_request?.position_title ?? 'Position',
+      positionTitle:    iv.application?.job?.position_title ?? 'Position',
       scheduledAt:      iv.scheduled_at,
       timezone:         null,
     })

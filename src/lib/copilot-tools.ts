@@ -2566,7 +2566,7 @@ async function getInbox(
         application:applications(
           id, status,
           candidate:candidates(full_name, email),
-          job:hiring_requests(position_title)
+          job:jobs(position_title:title)
         )
       `)
       .eq('org_id', orgId)
