@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts'
 import {
-  Coins, Zap, ArrowDownToLine, ArrowUpFromLine, RefreshCw, Lock,
+  Coins, Zap, ArrowDownToLine, ArrowUpFromLine, RefreshCw, Lock, Download,
 } from 'lucide-react'
 import { useCapabilities } from '@/components/providers/CapabilitiesProvider'
 
@@ -46,6 +46,50 @@ const int = (n: number) => n.toLocaleString('en-US')
 function shortDate(iso: string): string {
   const d = new Date(iso + 'T00:00:00')
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+
+// Quote a cell only when it contains a comma, quote, or newline (RFC-4180).
+function csvCell(v: string | number): string {
+  const s = String(v)
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+// A single spreadsheet-friendly file with a section per breakdown.
+function buildCsv(data: UsageData): string {
+  const rows: string[] = []
+  const line = (cells: (string | number)[]) => rows.push(cells.map(csvCell).join(','))
+
+  line([`AI usage & cost — last ${data.days} days`])
+  line([])
+  line(['Totals'])
+  line(['estimated_cost_usd', data.totals.cost])
+  line(['ai_calls', data.totals.calls])
+  line(['input_tokens', data.totals.input_tokens])
+  line(['output_tokens', data.totals.output_tokens])
+  line([])
+
+  line(['By feature'])
+  line(['module', 'calls', 'input_tokens', 'output_tokens', 'cost_usd'])
+  data.per_feature.forEach(f => line([f.module, f.calls, f.input_tokens, f.output_tokens, f.cost]))
+  line([])
+
+  line(['By employee'])
+  line(['name', 'email', 'calls', 'cost_usd'])
+  data.per_user.forEach(u => line([u.name, u.email ?? '', u.calls, u.cost]))
+  line([])
+
+  line(['By model'])
+  line(['model', 'calls', 'cost_usd'])
+  data.per_model.forEach(m => line([m.model, m.calls, m.cost]))
+  line([])
+
+  line(['Daily'])
+  line(['date', 'calls', 'cost_usd'])
+  data.trend.forEach(d => line([d.date, d.calls, d.cost]))
+
+  return rows.join('\n')
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -129,6 +173,19 @@ export default function AiUsagePage() {
   const maxFeatureCost = Math.max(1, ...(data?.per_feature.map(f => f.cost) ?? [0]))
   const maxUserCost = Math.max(1, ...(data?.per_user.map(u => u.cost) ?? [0]))
 
+  function handleExport() {
+    if (!data) return
+    const blob = new Blob([buildCsv(data)], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ai-usage-${data.days}d-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="flex flex-col gap-6 px-8 py-8 max-w-7xl">
       {/* Header */}
@@ -153,6 +210,15 @@ export default function AiUsagePage() {
               </button>
             ))}
           </div>
+          <button
+            onClick={handleExport}
+            disabled={!data || data.totals.calls === 0}
+            title="Download the numbers as a CSV spreadsheet"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export CSV
+          </button>
           <button
             onClick={load}
             disabled={loading}
