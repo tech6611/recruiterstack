@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { matchTagRules, matchStageRules, matchStatusRules, matchAppliedRules, isEmptyFilter, type EnrollmentRule } from '../automations'
+import { matchTagRules, matchStageRules, matchStatusRules, matchAppliedRules, isEmptyFilter, STAGE_ENTRY_EVENT_TYPES, type EnrollmentRule } from '../automations'
 
 const rule = (over: Partial<EnrollmentRule>): EnrollmentRule => ({
   id: 'r', org_id: 'org1', name: '', enabled: true,
@@ -35,6 +35,7 @@ describe('matchStageRules', () => {
     rule({ id: 'b', trigger_type: 'tag_added', trigger_value: 'Screening' }),
     rule({ id: 'c', trigger_type: 'stage_moved', trigger_value: 'Offer' }),
     rule({ id: 'd', trigger_type: 'stage_moved', trigger_value: 'Screening', enabled: false }),
+    rule({ id: 'e', trigger_type: 'stage_moved', trigger_value: 'Applied' }),
   ]
 
   it('matches only enabled stage rules for the same org + destination stage', () => {
@@ -45,6 +46,21 @@ describe('matchStageRules', () => {
   })
   it('ignores tag rules', () => {
     expect(matchStageRules(rules, 'org1', 'Screening').every(r => r.trigger_type === 'stage_moved')).toBe(true)
+  })
+  // The engine feeds 'applied' events to matchStageRules too (via to_stage), so a
+  // "when moved to Applied" rule catches real new applicants, not just manual drags.
+  it('matches an entry-stage rule when the destination is the applied stage', () => {
+    expect(matchStageRules(rules, 'org1', 'Applied').map(r => r.id)).toEqual(['e'])
+  })
+})
+
+describe('STAGE_ENTRY_EVENT_TYPES', () => {
+  // Guards the actual bug this fixes: a new application is recorded as an
+  // 'applied' event, so the stage-entry scan must read it alongside 'stage_moved'
+  // — otherwise stage rules never fire for people who apply.
+  it('includes both stage_moved and applied', () => {
+    expect(STAGE_ENTRY_EVENT_TYPES).toContain('stage_moved')
+    expect(STAGE_ENTRY_EVENT_TYPES).toContain('applied')
   })
 })
 

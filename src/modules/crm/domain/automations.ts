@@ -44,6 +44,15 @@ export function matchAppliedRules(rules: EnrollmentRule[], orgId: string): Enrol
     r.enabled && r.trigger_type === 'applied' && r.org_id === orgId)
 }
 
+// Which application_events count as "a candidate entered a stage" for stage rules.
+// A brand-new application is recorded as an 'applied' event (from_stage null →
+// to_stage = the first stage), NOT a 'stage_moved' event — but it's still a stage
+// entry. If stage rules only watched 'stage_moved', a rule like "when moved to
+// <first stage>" would never fire for real applicants (only for manual drags into
+// that stage, which never happens for the entry stage). Both types carry to_stage,
+// so matchStageRules works unchanged for either.
+export const STAGE_ENTRY_EVENT_TYPES = ['stage_moved', 'applied']
+
 // ── Eligibility filter ────────────────────────────────────────────────────────
 
 /**
@@ -111,25 +120,29 @@ async function setCursor(supabase: SupabaseClient<any>, key: string, ts: string)
 // ── application_events scanner (shared by applied / stage_moved / status_changed) ──
 
 /**
- * Poll one application_events event_type since its cursor and enroll matching
+ * Poll one or more application_events types since a cursor and enroll matching
  * candidates. `matchFn(rules, orgId, toStage)` picks the rules to fire for an
- * event (applied ignores `toStage`; stage/status match it). Resolves each event
- * to its candidate + org (application_events carries no org_id).
+ * event (applied ignores `toStage`; stage/status match it). `cursorKey` names the
+ * scan's own progress cursor, independent of the event types it reads — so the
+ * stage scan can also consume 'applied' events (see STAGE_ENTRY_EVENT_TYPES)
+ * without clashing with the applied scan's cursor. Resolves each event to its
+ * candidate + org (application_events carries no org_id).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function scanAppEvents(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
   rules: EnrollmentRule[],
-  eventType: string,
+  cursorKey: string,
+  eventTypes: string[],
   matchFn: (rules: EnrollmentRule[], orgId: string, toStage: string) => EnrollmentRule[],
   filterCache: Map<string, Set<string>>,
 ): Promise<number> {
-  const cursor = await getCursor(supabase, eventType)
+  const cursor = await getCursor(supabase, cursorKey)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: events } = await (supabase.from('application_events') as any)
-    .select('application_id, to_stage, created_at')
-    .eq('event_type', eventType).gt('created_at', cursor)
+    .select('application_id, event_type, to_stage, created_at')
+    .in('event_type', eventTypes).gt('created_at', cursor)
     .order('created_at', { ascending: true }).limit(BATCH)
 
   let maxTs = cursor
@@ -150,11 +163,11 @@ async function scanAppEvents(
       })
       if (res.enrolled) {
         enrolled++
-        logger.info('Auto-enrolled on application event', { ruleId: rule.id, candidateId, eventType, toStage: ev.to_stage })
+        logger.info('Auto-enrolled on application event', { ruleId: rule.id, candidateId, eventType: ev.event_type, toStage: ev.to_stage })
       }
     }
   }
-  if ((events ?? []).length) await setCursor(supabase, eventType, maxTs)
+  if ((events ?? []).length) await setCursor(supabase, cursorKey, maxTs)
   return enrolled
 }
 
@@ -203,13 +216,14 @@ export async function scanAutomations(supabase: SupabaseClient<any>): Promise<Re
 
   // Application-event triggers — all poll application_events.
   if (rules.some(r => r.trigger_type === 'applied')) {
-    out.applied = await scanAppEvents(supabase, rules, 'applied', (rs, org) => matchAppliedRules(rs, org), filterCache)
+    out.applied = await scanAppEvents(supabase, rules, 'applied', ['applied'], (rs, org) => matchAppliedRules(rs, org), filterCache)
   }
   if (rules.some(r => r.trigger_type === 'stage_moved')) {
-    out.stage_moved = await scanAppEvents(supabase, rules, 'stage_moved', matchStageRules, filterCache)
+    // Reads 'stage_moved' AND 'applied': a new application is a stage entry too.
+    out.stage_moved = await scanAppEvents(supabase, rules, 'stage_moved', STAGE_ENTRY_EVENT_TYPES, matchStageRules, filterCache)
   }
   if (rules.some(r => r.trigger_type === 'status_changed')) {
-    out.status_changed = await scanAppEvents(supabase, rules, 'status_changed', matchStatusRules, filterCache)
+    out.status_changed = await scanAppEvents(supabase, rules, 'status_changed', ['status_changed'], matchStatusRules, filterCache)
   }
 
   return out

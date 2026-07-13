@@ -12,6 +12,13 @@ entries on top.
 ## 2026-07-13
 
 ### Fixed
+- **Stage-based enrollment rules now fire for new applicants, not just manual
+  stage moves.** A brand-new application is recorded as an `applied` event (entry
+  into the first stage), but the auto-enrollment scanner only matched `stage_moved`
+  rules against `stage_moved` events — so a rule like "when moved to Applied" never
+  fired for people who actually applied. The stage-entry scan now reads `applied`
+  events too (`STAGE_ENTRY_EVENT_TYPES` in `src/modules/crm/domain/automations.ts`),
+  so those rules behave as expected. Later stage moves were already handled.
 - **Rich-text paragraph breaks now render identically on candidate-facing pages.**
   A line break at the end of a paragraph (which the editor shows as a blank line)
   was being collapsed by the browser on the apply/careers/detail views, gluing

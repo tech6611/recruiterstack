@@ -92,8 +92,14 @@ Both paths go through one shared function, `enrollCandidate()`
 Instead of adding candidates by hand, a **rule** enrolls them when an event fires.
 Managed per-sequence on the **Automations tab** of the sequence page.
 
-- **Triggers:** `tag_added` (a tag is added to a candidate) and `stage_moved`
-  (an application moves to a named pipeline stage).
+- **Triggers:** `tag_added` (a tag is added to a candidate), `stage_moved`
+  (an application enters a named pipeline stage), `applied` (any new application,
+  stage name ignored), and `status_changed` (application status becomes a value).
+- **Stage entry includes new applications:** a brand-new application is recorded
+  as an `applied` event (from nothing → the first stage), not a `stage_moved`
+  event. The stage scan therefore reads *both* event types (`STAGE_ENTRY_EVENT_TYPES`),
+  so a `stage_moved` rule for the entry stage (e.g. "Applied") fires for real
+  applicants, not only for manual drags into that stage.
 - **How it runs:** a poll (`scanAutomations`,
   `src/modules/crm/domain/automations.ts`) runs on the queue cron tick. It reads
   new `candidate_tags` / `application_events` rows since a saved cursor
