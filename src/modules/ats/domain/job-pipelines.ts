@@ -1659,6 +1659,23 @@ async function resolveOpeningRecruiterName(
   return u?.full_name ?? u?.email ?? null
 }
 
+// Company display name for an org, from onboarding-captured org settings.
+// Canonical `jobs` have no denormalized company column (unlike legacy
+// hiring_requests), so the {{company_name}} token resolves from here instead of
+// degrading to the "our company" fallback. Missing/error → null.
+async function resolveOrgCompanyName(
+  supabase: Supabase,
+  orgId: string | null,
+): Promise<string | null> {
+  if (!orgId) return null
+  const { data } = await supabase
+    .from('org_settings')
+    .select('company_name')
+    .eq('org_id', orgId)
+    .maybeSingle()
+  return (data as { company_name: string | null } | null)?.company_name ?? null
+}
+
 export async function getApplicationJobTokens(
   supabase: Supabase,
   applicationId: string,
@@ -1667,12 +1684,12 @@ export async function getApplicationJobTokens(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: app } = await (supabase as any)
     .from('applications')
-    .select('job_id, hiring_request_id')
+    .select('job_id, hiring_request_id, org_id')
     .eq('id', applicationId)
     .maybeSingle()
 
   if (!app) return null
-  const row = app as { job_id: string | null; hiring_request_id: string | null }
+  const row = app as { job_id: string | null; hiring_request_id: string | null; org_id: string | null }
 
   // Canonical candidacy: title from `jobs`; recruiter resolved live from the
   // job's hiring team (there's no denormalized recruiter column on `jobs`).
@@ -1693,7 +1710,7 @@ export async function getApplicationJobTokens(
       (await resolveOpeningRecruiterName(supabase, row.job_id))
     return {
       position_title: j.title,
-      autopilot_company_name: null,
+      autopilot_company_name: await resolveOrgCompanyName(supabase, row.org_id),
       autopilot_recruiter_name: recruiterName,
     }
   }

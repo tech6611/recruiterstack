@@ -12,6 +12,13 @@ entries on top.
 ## 2026-07-14
 
 ### Fixed
+- **`{{company_name}}` no longer degrades to "our company" for canonical jobs.**
+  The canonical branch of `getApplicationJobTokens` hard-coded the company field
+  to `null` (only legacy `hiring_requests` carried a company name), so the token
+  always fell back. It now resolves the org's onboarding-captured
+  `org_settings.company_name` via a new `resolveOrgCompanyName` helper, falling
+  back to "our company" only when the org has no company name set
+  (`src/modules/ats/domain/job-pipelines.ts`).
 - **Phone-screen scheduling link no longer 404s ("Invalid or expired").** The
   `/api/phone-screen/[token]` reader embedded `candidate:candidates(name)`, but
   there is no DB foreign key between `phone_screen_requests` and `candidates`, so
