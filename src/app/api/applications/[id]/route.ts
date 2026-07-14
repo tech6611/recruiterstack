@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 import { notifySlack, notifySlackDM } from '@/lib/notifications'
 import { applicationStatusEnum } from '@/lib/validations/common'
+import { resolveApplicationHiringManager } from '@/modules/ats/domain/job-pipelines'
 import type { ApplicationUpdate } from '@/lib/types/database'
 
 // GET /api/applications/[id]
@@ -58,6 +59,13 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
     hiring_request: { hiring_manager_email: string | null; position_title: string } | null
   }
 
+  // Hiring manager for Slack DMs. Legacy jobs carry the email on hiring_requests;
+  // canonical jobs have no such row, so resolve from the job / linked requisition.
+  const resolveHmEmail = async (): Promise<string | null> =>
+    current.hiring_request?.hiring_manager_email ??
+    (await resolveApplicationHiringManager(supabase, orgId, params.id))?.email ??
+    null
+
   // ── Stage move ────────────────────────────────────────────────────────────
   if ('stage_id' in body) {
     const { stage_id } = body as { stage_id: string | null }
@@ -95,7 +103,7 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
       })
 
     const candidateName = current.candidate?.name ?? 'Candidate'
-    const hmEmail = current.hiring_request?.hiring_manager_email ?? null
+    const hmEmail = await resolveHmEmail()
     const jobTitle = current.hiring_request?.position_title ?? null
     const stageMsg = `➡️ *${candidateName}* moved to *${newStageName ?? 'a new stage'}*${jobTitle ? ` for *${jobTitle}*` : ''}`
 
@@ -139,7 +147,7 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
       })
 
     const candidateName = current.candidate?.name ?? 'Candidate'
-    const hmEmailStatus = current.hiring_request?.hiring_manager_email ?? null
+    const hmEmailStatus = await resolveHmEmail()
     const label =
       status === 'hired'
         ? `🎉 *${candidateName}* was marked Hired`

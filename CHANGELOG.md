@@ -11,7 +11,30 @@ entries on top.
 
 ## 2026-07-14
 
+### Added
+- **Candidate application answers are now visible to recruiters.** Screening
+  answers were captured at apply time but never shown. The candidate profile's
+  "Forms" tab now lists each application's screening questions and the candidate's
+  answers (with a knockout-question warning badge), so recruiters can assess
+  applications without leaving the profile (`FormsTab.tsx`).
+- **Submitted phone-screen times now appear on the candidate profile.** Previously
+  the windows a candidate picked were only visible inside the phone-call pop-up.
+  A "Preferred Call Times" section now renders per application in the Forms tab
+  (`PhoneScreenAvailability.tsx`, embedded in `FormsTab.tsx`).
+
+### Changed
+- **Phone-screen scheduling link is now a proper calendar.** The candidate picker
+  previously offered fixed 9am–6pm, weekday-only, next-day-onward windows. It now
+  shows a day selector starting **today** (14 days ahead, weekends included) and
+  30-minute time slots spanning early morning to late evening, with past times on
+  today hidden (`src/app/phone-screen/[token]/page.tsx`).
+
 ### Fixed
+- **Hiring-manager Slack DMs now fire for canonical jobs.** Stage- and status-change
+  Slack DMs read the hiring manager's email only from the legacy `hiring_requests`
+  table, so canonical jobs (no such row) never notified their hiring manager. The
+  route now falls back to `resolveApplicationHiringManager` (job / linked
+  requisition) (`src/app/api/applications/[id]/route.ts`).
 - **`{{company_name}}` no longer degrades to "our company" for canonical jobs.**
   The canonical branch of `getApplicationJobTokens` hard-coded the company field
   to `null` (only legacy `hiring_requests` carried a company name), so the token
