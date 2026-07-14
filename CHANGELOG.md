@@ -11,6 +11,16 @@ entries on top.
 
 ## 2026-07-14
 
+### Changed
+- **Sequence Enrollments tab lists the sequence's auto-enroll rules when no one is
+  enrolled yet.** Previously a rules-only sequence showed a blank "No candidates
+  enrolled yet" card until an event fired, giving no sign of what the sequence was
+  set to run on. The empty state now shows each rule in plain language (e.g. "When
+  a candidate is tagged 'passive-lead'"), with a filtered/On-Off badge, and each
+  row opens the Rules editor. Once real candidates enroll, the normal enrolled
+  list is shown unchanged (`src/app/(dashboard)/sequences/[id]/page.tsx`,
+  `describeSequenceRule` in `src/lib/sequences/format.ts`).
+
 ### Fixed
 - **`{{hiring_manager_calendar}}` scheduling link now resolves for jobs created
   via the "Send to HM" intake flow.** The link reader only looked at the job's

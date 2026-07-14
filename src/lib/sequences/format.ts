@@ -21,3 +21,26 @@ export function formatStageDelay(opts: {
 
   return `+${parts.join(' ')}`
 }
+
+// Plain-language description of an auto-enroll rule's trigger, e.g.
+// "When a candidate is tagged “passive-lead”". Used to show the rules a sequence
+// runs on before any candidate has actually been enrolled.
+
+export type SequenceRuleTrigger = 'tag_added' | 'stage_moved' | 'applied' | 'status_changed'
+
+const RULE_TRIGGER_LABEL: Record<SequenceRuleTrigger, string> = {
+  tag_added: 'When a candidate is tagged',
+  stage_moved: 'When an application moves to stage',
+  applied: 'When someone applies',
+  status_changed: 'When application status changes to',
+}
+
+export function describeSequenceRule(rule: {
+  trigger_type: SequenceRuleTrigger
+  trigger_value?: string | null
+}): string {
+  const base = RULE_TRIGGER_LABEL[rule.trigger_type] ?? 'When an event fires'
+  const val = (rule.trigger_value ?? '').trim()
+  if (rule.trigger_type !== 'applied' && val) return `${base} \u201C${val}\u201D`
+  return base
+}

@@ -6,10 +6,10 @@ import {
   ArrowLeft, Loader2, Plus, Trash2, Pencil, X, Copy,
   ArrowDown, Play, Pause, Mail, Users, TrendingUp,
   User, Clock, Zap, ChevronDown, ChevronRight,
-  Send, Eye, MousePointerClick, Reply, AlertTriangle,
+  Send, Eye, MousePointerClick, Reply, AlertTriangle, Filter,
 } from 'lucide-react'
 import type { Sequence, SequenceStage, SequenceEnrollment, SequenceStatus } from '@/lib/types/database'
-import { formatStageDelay } from '@/lib/sequences/format'
+import { formatStageDelay, describeSequenceRule, type SequenceRuleTrigger } from '@/lib/sequences/format'
 import SequenceStageEditor from '@/components/sequences/SequenceStageEditor'
 import SequenceAnalytics from '@/components/sequences/SequenceAnalytics'
 import SequenceAutomations from '@/components/sequences/SequenceAutomations'
@@ -49,6 +49,25 @@ function fmtWhen(iso: string | null): string {
 
 type Tab = 'stages' | 'enrollments' | 'analytics'
 
+// Auto-enroll rule, as returned by /api/automations. Only the fields we render
+// in the empty-state rule summary are typed here.
+type EnrollRule = {
+  id: string
+  name?: string | null
+  enabled: boolean
+  trigger_type: SequenceRuleTrigger
+  trigger_value?: string | null
+  filters?: unknown
+}
+
+// True when a rule narrows its population with any eligibility filter.
+function ruleHasFilter(f: unknown): boolean {
+  if (!f || typeof f !== 'object') return false
+  const o = f as Record<string, unknown>
+  return ['department_ids', 'job_ids', 'stage_names', 'tags', 'statuses']
+    .some(k => Array.isArray(o[k]) && (o[k] as unknown[]).length > 0)
+}
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function SequenceDetailPage() {
@@ -62,6 +81,7 @@ export default function SequenceDetailPage() {
   const [editingName, setEditingName]     = useState(false)
   const [nameInput, setNameInput]         = useState('')
   const [enrollments, setEnrollments]     = useState<SequenceEnrollment[]>([])
+  const [rules, setRules]                 = useState<EnrollRule[]>([])
   const [enrollLoading, setEnrollLoading] = useState(false)
   const [selectedEnrollIds, setSelectedEnrollIds] = useState<string[]>([])
   const [expandedEnrollIds, setExpandedEnrollIds] = useState<string[]>([])
@@ -120,8 +140,16 @@ export default function SequenceDetailPage() {
     setEnrollLoading(false)
   }, [id])
 
+  const loadRules = useCallback(async () => {
+    const res = await fetch(`/api/automations?sequence_id=${id}`)
+    if (res.ok) {
+      const json = await res.json()
+      setRules(json.data ?? [])
+    }
+  }, [id])
+
   useEffect(() => { loadSequence() }, [loadSequence])
-  useEffect(() => { if (tab === 'enrollments') loadEnrollments() }, [tab, loadEnrollments])
+  useEffect(() => { if (tab === 'enrollments') { loadEnrollments(); loadRules() } }, [tab, loadEnrollments, loadRules])
 
   // ── Actions ─────────────────────────────────────────────────────────────
 
@@ -473,11 +501,46 @@ export default function SequenceDetailPage() {
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading…
               </div>
             ) : enrollments.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 py-14 text-center">
-                <Users className="mx-auto mb-3 h-8 w-8 text-slate-300" />
-                <p className="text-sm text-slate-500">No candidates enrolled yet</p>
-                <p className="mt-1 text-xs text-slate-400">Click <b>Add Candidates</b> to add some</p>
-              </div>
+              rules.length > 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <Zap className="h-4 w-4 text-emerald-500" />
+                    <p className="text-sm font-semibold text-slate-700">Auto-enroll rules</p>
+                  </div>
+                  <p className="mb-3 text-xs text-slate-400">
+                    No one is enrolled yet. Candidates will appear here automatically when they match a rule below.
+                  </p>
+                  <div className="space-y-2">
+                    {rules.map(r => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => { selectTool('automation'); openAddPane() }}
+                        className="flex w-full items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-left hover:border-slate-200 hover:bg-slate-50"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm text-slate-700">{describeSequenceRule(r)}</p>
+                          {r.name && <p className="truncate text-xs text-slate-400">{r.name}</p>}
+                        </div>
+                        {ruleHasFilter(r.filters) && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                            <Filter className="h-2.5 w-2.5" /> filtered
+                          </span>
+                        )}
+                        <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${r.enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                          {r.enabled ? 'On' : 'Off'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 py-14 text-center">
+                  <Users className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+                  <p className="text-sm text-slate-500">No candidates enrolled yet</p>
+                  <p className="mt-1 text-xs text-slate-400">Click <b>Add Candidates</b> to add some</p>
+                </div>
+              )
             ) : (
               <div className="space-y-2">
                 <div className="flex items-center justify-between px-1 py-1">
