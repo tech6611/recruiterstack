@@ -6,6 +6,18 @@ import VoiceCallDetailModal from '../VoiceCallDetailModal'
 import { ScoreRing } from '@/components/ui/ScoreRing'
 import { Panel } from '@/components/ui/card'
 import { useCandidateProfile } from '../CandidateProfileContext'
+import { resumeStoragePath } from '@/lib/storage/resume'
+
+// Only PDFs (and plain text) render inside a browser <iframe>. Pointing an iframe
+// at a Word doc makes the browser download it on every load/refresh instead of
+// previewing — so for those we show a Download card rather than an iframe.
+function resumeIsPreviewable(resumeUrl: string | null | undefined): boolean {
+  if (!resumeUrl) return false
+  const path = resumeStoragePath(resumeUrl)
+  if (!path) return true // external link (e.g. Google Drive) — let it try to embed
+  const ext = path.split('.').pop()?.toLowerCase() ?? ''
+  return ext === 'pdf' || ext === 'txt'
+}
 
 interface VoiceCallSummary {
   id: string
@@ -357,16 +369,29 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
         ) : undefined}
       >
         <div className="p-2">
-          {candidate.resume_url ? (
+          {!candidate.resume_url ? (
+            <div className="flex flex-col items-center py-10 text-center">
+              <FileText className="mb-2 h-8 w-8 text-slate-200" />
+              <p className="text-sm text-slate-400">No resume uploaded</p>
+            </div>
+          ) : resumeIsPreviewable(candidate.resume_url) ? (
             <iframe
               src={`/api/candidates/${candidate.id}/resume`}
               className="h-[500px] w-full rounded-xl border border-slate-100"
               title="Resume"
             />
           ) : (
-            <div className="flex flex-col items-center py-10 text-center">
-              <FileText className="mb-2 h-8 w-8 text-slate-200" />
-              <p className="text-sm text-slate-400">No resume uploaded</p>
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <FileText className="h-8 w-8 text-slate-300" />
+              <p className="text-sm text-slate-500">This CV is a Word document, which can&apos;t be previewed in the browser.</p>
+              <a
+                href={`/api/candidates/${candidate.id}/resume?download=1`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> Download CV
+              </a>
             </div>
           )}
         </div>

@@ -19,10 +19,14 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
   const { token } = params
   const supabase = createAdminClient()
 
+  // Fetch the request row on its own. There's no DB-level foreign key between
+  // phone_screen_requests and candidates, so a PostgREST embed
+  // (candidate:candidates(name)) errors out and would 404 an otherwise-valid
+  // link. Resolve the candidate name in a separate, non-fatal lookup instead.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: reqRow, error } = await (supabase as any)
     .from('phone_screen_requests')
-    .select('*, candidate:candidates(name)')
+    .select('*')
     .eq('token', token)
     .maybeSingle()
 
@@ -36,6 +40,18 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
     )
   }
 
+  // Candidate name — cosmetic, never fail the page over it.
+  let candidateName: string | null = null
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: cand } = await (supabase as any)
+      .from('candidates')
+      .select('name')
+      .eq('id', reqRow.candidate_id)
+      .maybeSingle()
+    candidateName = cand?.name ?? null
+  } catch { /* non-fatal */ }
+
   // Role title is cosmetic — never fail the page over it.
   let positionTitle: string | null = null
   try {
@@ -46,7 +62,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
   return NextResponse.json({
     token,
     status:          reqRow.status,
-    candidate_name:  reqRow.candidate?.name ?? null,
+    candidate_name:  candidateName,
     position_title:  positionTitle,
     expires_at:      reqRow.expires_at,
     preferred_slots: (reqRow.preferred_slots ?? []) as Slot[],

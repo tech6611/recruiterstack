@@ -45,6 +45,29 @@ function fmtWhen(iso: string | null): string {
   })
 }
 
+type EnrollEmailTimes = {
+  sent_at: string | null; opened_at: string | null; clicked_at: string | null
+  replied_at: string | null; bounced_at: string | null
+}
+
+// Most recent thing that happened across an enrollment's emails, so the collapsed
+// row can show a timestamp at a glance without expanding the timeline.
+function latestActivity(emails: EnrollEmailTimes[]): { label: string; iso: string } | null {
+  let best: { label: string; iso: string } | null = null
+  const consider = (label: string, iso: string | null) => {
+    if (!iso) return
+    if (!best || new Date(iso) > new Date(best.iso)) best = { label, iso }
+  }
+  for (const em of emails) {
+    consider('Sent', em.sent_at)
+    consider('Opened', em.opened_at)
+    consider('Clicked', em.clicked_at)
+    consider('Replied', em.replied_at)
+    consider('Bounced', em.bounced_at)
+  }
+  return best
+}
+
 // ── Types ───────────────────────────────────────────────────────────────────
 
 type Tab = 'stages' | 'enrollments' | 'analytics'
@@ -574,9 +597,15 @@ export default function SequenceDetailPage() {
                         <p className="text-sm font-semibold text-slate-800">{e.candidate_name || 'Unknown'}</p>
                         <p className="text-xs text-slate-400">{e.candidate_email || ''}</p>
                       </div>
-                      {emails.length > 0 && (
-                        <div className="text-xs text-slate-400">{emails.length} email{emails.length === 1 ? '' : 's'}</div>
-                      )}
+                      {emails.length > 0 && (() => {
+                        const act = latestActivity(emails)
+                        return (
+                          <div className="text-right text-xs text-slate-500">
+                            {act ? <span>{act.label} {fmtWhen(act.iso)}</span> : <span className="text-slate-400">Queued</span>}
+                            <span className="ml-1 text-slate-400">· {emails.length} email{emails.length === 1 ? '' : 's'}</span>
+                          </div>
+                        )
+                      })()}
                       <div className="text-center text-xs text-slate-500">Stage {e.current_stage_index} / {stages.length}</div>
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${ENROLL_STATUS_CLS[e.status] ?? 'bg-slate-100 text-slate-600'}`}>{e.status}</span>
                       {e.status === 'active' && (

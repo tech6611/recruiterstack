@@ -11,7 +11,32 @@ entries on top.
 
 ## 2026-07-14
 
+### Fixed
+- **Phone-screen scheduling link no longer 404s ("Invalid or expired").** The
+  `/api/phone-screen/[token]` reader embedded `candidate:candidates(name)`, but
+  there is no DB foreign key between `phone_screen_requests` and `candidates`, so
+  PostgREST errored and the route returned 404 for every *valid* link. It now
+  loads the request row on its own and resolves the candidate name in a separate,
+  non-fatal lookup (`src/app/api/phone-screen/[token]/route.ts`).
+- **`{{recruiter_name}}` no longer degrades to "the hiring team" for jobs without
+  a hiring team.** Recruiter resolution only read the job's hiring-team recruiter;
+  a job created straight from a requisition has no hiring team, so the token fell
+  back. It now falls back to the recruiter named on the linked requisition
+  (`openings.recruiter_id`), matching the recruiter-approver fallback
+  (`getApplicationJobTokens` / `resolveOpeningRecruiterName` in
+  `src/modules/ats/domain/job-pipelines.ts`).
+- **CV preview no longer force-downloads Word documents on every page load/refresh.**
+  The candidate resume viewer pointed an `<iframe>` at every CV regardless of type;
+  browsers can't preview `.doc/.docx` inline, so they downloaded the file each time.
+  Non-PDF CVs now show a "Download CV" card instead of an auto-downloading iframe;
+  PDFs still preview inline (`src/components/candidates/center/SummaryTab.tsx`).
+
 ### Changed
+- **Sequence Enrollments rows show the latest email activity inline.** The per-email
+  send/open/click timeline already existed but was hidden behind each row's expand
+  chevron; the collapsed row now shows the most recent activity (e.g. "Opened 14
+  Jul, 2:07 PM · 1 email") so a timestamp is visible at a glance
+  (`src/app/(dashboard)/sequences/[id]/page.tsx`).
 - **Sequence Enrollments tab lists the sequence's auto-enroll rules when no one is
   enrolled yet.** Previously a rules-only sequence showed a blank "No candidates
   enrolled yet" card until an event fired, giving no sign of what the sequence was

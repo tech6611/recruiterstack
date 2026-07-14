@@ -1625,6 +1625,40 @@ async function resolveJobRecruiterName(
   return u?.full_name ?? u?.email ?? null
 }
 
+// Fallback recruiter name for a canonical job that has no hiring team attached:
+// use the recruiter named on the linked requisition (openings.recruiter_id).
+// Mirrors the recruiter-approver fallback so both read the same source of truth.
+async function resolveOpeningRecruiterName(
+  supabase: Supabase,
+  jobId: string,
+): Promise<string | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+  const { data: link } = await sb
+    .from('job_openings')
+    .select('opening_id')
+    .eq('job_id', jobId)
+    .limit(1)
+  const openingId = (link as { opening_id: string }[] | null)?.[0]?.opening_id
+  if (!openingId) return null
+
+  const { data: opening } = await sb
+    .from('openings')
+    .select('recruiter_id')
+    .eq('id', openingId)
+    .maybeSingle()
+  const recruiterId = (opening as { recruiter_id: string | null } | null)?.recruiter_id
+  if (!recruiterId) return null
+
+  const { data: user } = await sb
+    .from('users')
+    .select('full_name, email')
+    .eq('id', recruiterId)
+    .maybeSingle()
+  const u = user as { full_name: string | null; email: string | null } | null
+  return u?.full_name ?? u?.email ?? null
+}
+
 export async function getApplicationJobTokens(
   supabase: Supabase,
   applicationId: string,
@@ -1651,10 +1685,16 @@ export async function getApplicationJobTokens(
       .maybeSingle()
     if (!job) return null
     const j = job as { title: string; hiring_team_id: string | null }
+    // Prefer the job's hiring-team recruiter; fall back to the recruiter named on
+    // the linked requisition so the token doesn't degrade to "the hiring team"
+    // for jobs created without a hiring team attached.
+    const recruiterName =
+      (await resolveJobRecruiterName(supabase, j.hiring_team_id)) ??
+      (await resolveOpeningRecruiterName(supabase, row.job_id))
     return {
       position_title: j.title,
       autopilot_company_name: null,
-      autopilot_recruiter_name: await resolveJobRecruiterName(supabase, j.hiring_team_id),
+      autopilot_recruiter_name: recruiterName,
     }
   }
 
