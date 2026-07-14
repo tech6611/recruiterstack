@@ -1712,10 +1712,36 @@ export async function resolveApplicationHiringManager(
   const jobRow = job as { custom_fields: Record<string, unknown> | null } | null
 
   const cf = jobRow?.custom_fields ?? {}
-  const cfEmail = typeof cf.hiring_manager_email === 'string' ? cf.hiring_manager_email.trim() : ''
-  if (cfEmail) {
-    const cfName = typeof cf.hiring_manager_name === 'string' ? cf.hiring_manager_name.trim() : ''
-    return { email: cfEmail, name: cfName || cfEmail }
+  // The HM contact lives in one of two spots depending on how the job was born:
+  //   • create-from-approved-requisition writes it TOP-LEVEL (req-jobs route)
+  //   • the "Send to HM" intake flow writes it NESTED under custom_fields.intake
+  //     (send-intake route + submitCanonicalIntakeJob), and never promotes it up.
+  // Read both so the {{hiring_manager_calendar}} link works regardless of path.
+  const intake = (cf.intake ?? {}) as Record<string, unknown>
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+  const email = str(cf.hiring_manager_email) || str(intake.hiring_manager_email)
+  const name  = str(cf.hiring_manager_name)  || str(intake.hiring_manager_name)
+  if (email) return { email, name: name || email }
+
+  // Last resort: read straight from the linked, approved requisition (openings),
+  // the true source of truth the job was supposed to inherit from.
+  const { data: link } = await sb
+    .from('job_openings')
+    .select('opening_id')
+    .eq('job_id', jobId)
+    .limit(1)
+    .maybeSingle()
+  const openingId = (link as { opening_id: string | null } | null)?.opening_id
+  if (openingId) {
+    const { data: op } = await sb
+      .from('openings')
+      .select('hiring_manager_email, hiring_manager_name')
+      .eq('id', openingId)
+      .eq('org_id', orgId)
+      .maybeSingle()
+    const opRow = op as { hiring_manager_email: string | null; hiring_manager_name: string | null } | null
+    const opEmail = str(opRow?.hiring_manager_email)
+    if (opEmail) return { email: opEmail, name: str(opRow?.hiring_manager_name) || opEmail }
   }
 
   return null

@@ -11,6 +11,17 @@ entries on top.
 
 ## 2026-07-14
 
+### Fixed
+- **`{{hiring_manager_calendar}}` scheduling link now resolves for jobs created
+  via the "Send to HM" intake flow.** The link reader only looked at the job's
+  top-level `custom_fields.hiring_manager_email`, but the intake flow writes the
+  HM contact one level down under `custom_fields.intake` — so the token silently
+  fell back to plain text ("the hiring team will reach out…") instead of a
+  clickable link. `resolveApplicationHiringManager` now reads both spots and, as a
+  last resort, the linked approved requisition (`openings`)
+  (`src/modules/ats/domain/job-pipelines.ts`, regression test in
+  `src/modules/ats/domain/__tests__/resolve-application-hiring-manager.test.ts`).
+
 ### Added
 - **Live character counter on justification / approval-comment fields.** A new
   reusable `CharCounter` shows characters remaining, turns amber below the minimum
