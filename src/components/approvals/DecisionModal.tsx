@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { CharCounter } from '@/components/ui/char-counter'
 
 interface Props {
   approvalId: string
@@ -48,7 +49,8 @@ export function DecisionModal({ approvalId, stepId, title, onClose }: Props) {
         <p className="text-sm text-slate-700 mb-3">{title}</p>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-slate-600">Comment</label>
-          <Textarea value={comment} onChange={e => setComment(e.target.value)} className="min-h-[80px]" placeholder="Optional for approve. Required (≥ 20 chars) for reject." />
+          <Textarea value={comment} onChange={e => setComment(e.target.value)} className="min-h-[80px]" placeholder="Optional for approve. Required (≥ 20 chars) for reject." maxLength={5000} />
+          <CharCounter value={comment} max={5000} min={20} />
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="outline" onClick={() => decide('rejected')} loading={submitting === 'rejected'}>

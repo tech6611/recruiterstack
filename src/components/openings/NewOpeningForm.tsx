@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { CharCounter } from '@/components/ui/char-counter'
 import { CustomFieldsBlock } from '@/components/openings/CustomFieldsBlock'
 import { DepartmentCombobox } from '@/components/openings/DepartmentCombobox'
 import type {
@@ -326,8 +327,12 @@ export function NewOpeningForm() {
               value={form.justification}
               onChange={e => setForm(f => ({ ...f, justification: e.target.value }))}
               className="min-h-[120px]"
+              maxLength={5000}
             />
-            <p className="text-[11px] text-slate-400">Required when submitting for approval (≥ 50 chars). Can be short or blank in draft.</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-slate-400">Required when submitting for approval (≥ 50 chars). Can be short or blank in draft.</p>
+              <CharCounter value={form.justification} max={5000} min={50} />
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

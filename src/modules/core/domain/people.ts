@@ -22,6 +22,26 @@ export interface PersonInput {
   linkedinUrl?: string | null
 }
 
+/**
+ * Tidy a person's name into readable title case. CVs and application forms often
+ * arrive shouting ("SAGAR") or all-lowercase ("sagar kumar"); we fix those but
+ * leave anything already mixed-case alone, so intentional casing like "McDonald"
+ * or "DeShawn" survives untouched. Word boundaries include spaces, hyphens and
+ * apostrophes so "mary-jane o'brien" becomes "Mary-Jane O'Brien".
+ */
+export function normalizePersonName(raw: string): string {
+  const name = raw.trim().replace(/\s+/g, ' ')
+  if (!name) return name
+
+  const upper = name.toUpperCase()
+  const lower = name.toLowerCase()
+  const isAllUpper = name === upper && name !== lower
+  const isAllLower = name === lower && name !== upper
+  if (!isAllUpper && !isAllLower) return name // already mixed-case — trust it
+
+  return lower.replace(/(^|[\s'’-])([a-z])/g, (_, sep: string, ch: string) => sep + ch.toUpperCase())
+}
+
 function toCanonical(person: Person, source: PersonSource = 'candidate_record'): CanonicalPerson {
   return {
     id: person.id,
@@ -77,7 +97,7 @@ export async function findOrCreatePerson(
 
   const row: PersonInsert = {
     org_id: orgId,
-    name: input.name,
+    name: normalizePersonName(input.name),
     email: input.email,
     phone: input.phone ?? null,
     linkedin_url: input.linkedinUrl ?? null,

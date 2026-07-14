@@ -96,7 +96,16 @@ async function sendSlackApprovalRequest(
       { headers: { Authorization: `Bearer ${token}` } },
     )
     const userData = await userRes.json()
-    if (!userData.ok || !userData.user?.id) return
+    if (!userData.ok || !userData.user?.id) {
+      // Common cause: the approver is an invited placeholder (no Clerk login,
+      // provisioned_via 'approver_invite') whose email isn't a member of the
+      // connected Slack workspace — so Slack can't resolve them to DM. Email +
+      // in-app still reach them; log so this silent gap is diagnosable.
+      logger.warn('[slack-interactive] no Slack user for email — DM skipped', {
+        orgId, email, slackError: userData.error ?? null,
+      })
+      return
+    }
 
     // value is parsed by /api/slack/interactions; encode the IDs we need.
     const value = `${approvalId}::${stepId}`

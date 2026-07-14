@@ -204,7 +204,14 @@ export function RichTextEditor({
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Placeholder.configure({ placeholder }),
-      Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-emerald-600 underline cursor-pointer' } }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: { class: 'text-emerald-600 underline cursor-pointer' },
+        // Merge tokens like {{phone_screen_scheduler}} are valid link targets in
+        // this app: they're rewritten to a real URL at send-time. Without this,
+        // Tiptap's URL sanitiser strips the token href, leaving a dead/blank link.
+        isAllowedUri: (url, ctx) => url.includes('{{') || ctx.defaultValidate(url),
+      }),
       Image.configure({ HTMLAttributes: { class: 'max-w-full rounded-lg my-2' } }),
     ],
     content: value || '',

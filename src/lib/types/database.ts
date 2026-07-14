@@ -2103,6 +2103,19 @@ export interface SequenceEnrollment {
   candidate_name?: string
   candidate_email?: string
   sequence_name?: string
+  emails?: SequenceEnrollmentEmail[]
+}
+
+// Per-message SendGrid activity attached to an enrollment row for display.
+export interface SequenceEnrollmentEmail {
+  stage_id: string | null
+  subject: string | null
+  status: string | null
+  sent_at: string | null
+  opened_at: string | null
+  clicked_at: string | null
+  replied_at: string | null
+  bounced_at: string | null
 }
 
 export interface SequenceEmail {

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { CharCounter } from '@/components/ui/char-counter'
 import { ApprovalProgress } from '@/components/approvals/ApprovalProgress'
 import { AuditLogTab } from '@/components/approvals/AuditLogTab'
 import { cn } from '@/lib/utils'
@@ -266,11 +267,15 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
               {!editing ? (
                 <p className="text-sm text-slate-700 whitespace-pre-line">{opening.justification ?? <span className="text-slate-400">—</span>}</p>
               ) : (
-                <Textarea
-                  className="min-h-[120px]"
-                  value={form.justification}
-                  onChange={e => setForm(f => ({ ...f, justification: e.target.value }))}
-                />
+                <>
+                  <Textarea
+                    className="min-h-[120px]"
+                    value={form.justification}
+                    onChange={e => setForm(f => ({ ...f, justification: e.target.value }))}
+                    maxLength={5000}
+                  />
+                  <CharCounter value={form.justification} max={5000} min={50} className="mt-1.5" />
+                </>
               )}
             </CardContent>
           </Card>

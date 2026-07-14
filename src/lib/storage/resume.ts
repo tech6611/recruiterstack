@@ -21,3 +21,26 @@ export function resumeStoragePath(url: string): string | null {
   }
   return null
 }
+
+/**
+ * Best-effort MIME type from a stored file path. Serving the correct type lets
+ * the browser render the CV inline in the viewer instead of force-downloading
+ * it (which happens when the type is unknown/octet-stream).
+ */
+export function resumeContentType(path: string): string {
+  const ext = path.split('.').pop()?.toLowerCase() ?? ''
+  switch (ext) {
+    case 'pdf':
+      return 'application/pdf'
+    case 'doc':
+      return 'application/msword'
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    case 'txt':
+      return 'text/plain; charset=utf-8'
+    case 'rtf':
+      return 'application/rtf'
+    default:
+      return 'application/octet-stream'
+  }
+}

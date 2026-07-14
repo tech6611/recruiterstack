@@ -349,7 +349,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
               {reparsing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
               {reparsing ? 'Reading…' : 'Re-parse CV'}
             </button>
-            <a href={`/api/candidates/${candidate.id}/resume`} target="_blank" rel="noopener noreferrer"
+            <a href={`/api/candidates/${candidate.id}/resume?download=1`} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-800">
               <ExternalLink className="h-3 w-3" /> Download
             </a>

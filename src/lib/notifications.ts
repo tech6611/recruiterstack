@@ -79,7 +79,15 @@ export async function notifySlackDM(
       { headers: { Authorization: `Bearer ${token}` } }
     )
     const userData = await userRes.json()
-    if (!userData.ok || !userData.user?.id) return
+    if (!userData.ok || !userData.user?.id) {
+      // The recipient's email isn't a member of the connected Slack workspace
+      // (e.g. an invited placeholder approver), so Slack can't resolve them to
+      // DM. Log rather than fail silently — email/in-app still reach them.
+      logger.warn('[slack-dm] no Slack user for email — DM skipped', {
+        orgId, email, slackError: userData.error ?? null,
+      })
+      return
+    }
 
     // Send DM (Slack accepts a user ID as the channel for direct messages)
     await fetch('https://slack.com/api/chat.postMessage', {

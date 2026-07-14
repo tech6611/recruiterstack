@@ -9,6 +9,56 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-14
+
+### Added
+- **Live character counter on justification / approval-comment fields.** A new
+  reusable `CharCounter` shows characters remaining, turns amber below the minimum
+  and red over the maximum, so writers can see at a glance when they've met the
+  length rule. Wired into the opening-request justification (new + edit) and the
+  approval decision comment (`src/components/ui/char-counter.tsx`,
+  `NewOpeningForm.tsx`, `OpeningDetail.tsx`, `approvals/DecisionModal.tsx`).
+- **Sequence Enrollments now show per-email SendGrid activity.** Each enrolled
+  candidate row expands to a timeline of its messages with sent / opened /
+  clicked / replied / bounced timestamps, sourced from `sequence_emails`
+  (`src/modules/crm/domain/sequences.ts`,
+  `src/app/(dashboard)/sequences/[id]/page.tsx`).
+
+### Changed
+- **`{{recruiter_name}}` in sequence emails resolves from the job's recruiter.**
+  Canonical jobs never populated the recruiter name, so the token always fell back
+  to "the hiring team"; it's now resolved live from the job's hiring team
+  (`src/modules/ats/domain/job-pipelines.ts`).
+
+### Fixed
+- **Merge tokens survive as link URLs in the email editor.** Tiptap's URL
+  sanitiser was stripping a `{{token}}` used as a hyperlink target (e.g.
+  `{{phone_screen_scheduler}}`), leaving a dead/blank link; the editor now treats
+  merge tokens as valid link targets so they're rewritten to a real URL at
+  send-time (`src/components/RichTextEditor.tsx`).
+- **Slack approval DMs that can't resolve a recipient now log a warning** instead
+  of failing silently, making it clear when a hiring manager's email isn't a member
+  of the connected Slack workspace (`src/lib/notifications.ts`,
+  `src/lib/approvals/notifications.ts`).
+- **Candidate CV preview no longer auto-downloads on every render.** The Summary
+  tab embedded the CV in an `<iframe>` pointing at `/api/candidates/[id]/resume`,
+  which 302-redirected to a Supabase signed URL served as an attachment — so the
+  browser force-downloaded the file each time the panel rendered, piling up
+  duplicate copies. The route now streams the file back with an explicit
+  `Content-Disposition: inline` (and correct MIME type), so it renders in place;
+  the explicit Download button uses `?download=1` for a real save
+  (`src/app/api/candidates/[id]/resume/route.ts`, `src/lib/storage/resume.ts`,
+  `src/components/candidates/center/SummaryTab.tsx`).
+- **Candidate names are normalised to title case on creation.** CVs and
+  application forms often arrive shouting ("SAGAR") or all-lowercase; the new
+  `normalizePersonName` helper fixes those at the single person-creation choke
+  point while leaving intentional mixed case (e.g. "McDonald") untouched
+  (`src/modules/core/domain/people.ts`, test in
+  `src/modules/core/domain/__tests__/normalize-person-name.test.ts`). A one-time
+  backfill tidied existing rows — 3 all-caps names fixed
+  (`scripts/backfill-person-name-casing.mjs`, dry run by default, `--apply` to
+  write; the migration-062 people→candidates trigger syncs the denormalized copy).
+
 ## 2026-07-13
 
 ### Fixed

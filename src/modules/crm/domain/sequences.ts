@@ -65,6 +65,17 @@ export interface SequenceDetail {
   reply_count:      number
 }
 
+export interface EnrollmentEmail {
+  stage_id:    string | null
+  subject:     string | null
+  status:      string | null
+  sent_at:     string | null
+  opened_at:   string | null
+  clicked_at:  string | null
+  replied_at:  string | null
+  bounced_at:  string | null
+}
+
 export interface EnrollmentRow {
   id:                  string
   org_id:              string
@@ -80,6 +91,7 @@ export interface EnrollmentRow {
   created_at:          string
   candidate_name:      string
   candidate_email:     string | null
+  emails:              EnrollmentEmail[]
 }
 
 export interface SequenceStageAnalytics {
@@ -364,11 +376,41 @@ export async function listEnrollments(
     .order('created_at', { ascending: false })
   if (error) throw error
 
+  const enrollmentIds = (data ?? []).map((e: { id: string }) => e.id)
+
+  // Attach the per-email SendGrid activity (send/open/click/reply/bounce times)
+  // so the Enrollments tab can show what actually happened to each message.
+  const emailsByEnrollment = new Map<string, EnrollmentEmail[]>()
+  if (enrollmentIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: emailRows } = await (supabase.from('sequence_emails') as any)
+      .select('enrollment_id, stage_id, subject, status, sent_at, opened_at, clicked_at, replied_at, bounced_at')
+      .in('enrollment_id', enrollmentIds)
+      .order('sent_at', { ascending: true, nullsFirst: true })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of (emailRows ?? []) as any[]) {
+      const list = emailsByEnrollment.get(r.enrollment_id) ?? []
+      list.push({
+        stage_id:   r.stage_id ?? null,
+        subject:    r.subject ?? null,
+        status:     r.status ?? null,
+        sent_at:    r.sent_at ?? null,
+        opened_at:  r.opened_at ?? null,
+        clicked_at: r.clicked_at ?? null,
+        replied_at: r.replied_at ?? null,
+        bounced_at: r.bounced_at ?? null,
+      })
+      emailsByEnrollment.set(r.enrollment_id, list)
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? []).map((e: any) => ({
     ...e,
     candidate_name:  e.candidates?.name ?? 'Unknown',
     candidate_email: e.candidates?.email ?? null,
+    emails:          emailsByEnrollment.get(e.id) ?? [],
     candidates:      undefined,
   })) as EnrollmentRow[]
 }

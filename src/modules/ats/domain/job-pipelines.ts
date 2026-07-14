@@ -1596,6 +1596,35 @@ export interface JobTokenFields {
   autopilot_recruiter_name: string | null
 }
 
+/**
+ * Recruiter display name for a canonical job, resolved live from its hiring team
+ * (the `recruiter`-role member). Returns null when the job has no team or no
+ * recruiter on it, so the {{recruiter_name}} token falls back to its default.
+ */
+async function resolveJobRecruiterName(
+  supabase: Supabase,
+  hiringTeamId: string | null,
+): Promise<string | null> {
+  if (!hiringTeamId) return null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: members } = await (supabase as any)
+    .from('hiring_team_members')
+    .select('user_id')
+    .eq('hiring_team_id', hiringTeamId)
+    .eq('role', 'recruiter')
+    .limit(1)
+  const userId = (members as { user_id: string }[] | null)?.[0]?.user_id
+  if (!userId) return null
+
+  const { data: user } = await supabase
+    .from('users')
+    .select('full_name, email')
+    .eq('id', userId)
+    .maybeSingle()
+  const u = user as { full_name: string | null; email: string | null } | null
+  return u?.full_name ?? u?.email ?? null
+}
+
 export async function getApplicationJobTokens(
   supabase: Supabase,
   applicationId: string,
@@ -1611,19 +1640,21 @@ export async function getApplicationJobTokens(
   if (!app) return null
   const row = app as { job_id: string | null; hiring_request_id: string | null }
 
-  // Canonical candidacy: read title from `jobs` (no company/recruiter columns).
+  // Canonical candidacy: title from `jobs`; recruiter resolved live from the
+  // job's hiring team (there's no denormalized recruiter column on `jobs`).
   if (row.job_id) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: job } = await (supabase as any)
       .from('jobs')
-      .select('title')
+      .select('title, hiring_team_id')
       .eq('id', row.job_id)
       .maybeSingle()
     if (!job) return null
+    const j = job as { title: string; hiring_team_id: string | null }
     return {
-      position_title: (job as { title: string }).title,
+      position_title: j.title,
       autopilot_company_name: null,
-      autopilot_recruiter_name: null,
+      autopilot_recruiter_name: await resolveJobRecruiterName(supabase, j.hiring_team_id),
     }
   }
 
