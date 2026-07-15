@@ -45,6 +45,8 @@ function isClerkBypassed(req: NextRequest): boolean {
   return (
     req.nextUrl.pathname.startsWith('/api/queue') ||
     req.nextUrl.pathname.startsWith('/api/sequences/process') ||
+    // Extension endpoints authenticate via API key (withApiKey), not Clerk.
+    req.nextUrl.pathname.startsWith('/api/ext') ||
     req.nextUrl.pathname.startsWith('/api/webhooks/clerk') ||
     req.nextUrl.pathname.startsWith('/api/webhooks/whatsapp') ||
     req.nextUrl.pathname.startsWith('/api/webhooks/sendgrid') ||
