@@ -23,7 +23,7 @@ export async function GET() {
     // Org-level: Slack
     const { data: orgRow, error: orgErr } = await supabase
       .from('org_settings')
-      .select('slack_webhook_url, slack_bot_token, slack_team_name')
+      .select('slack_webhook_url, slack_bot_token, slack_team_name, slack_routing')
       .eq('org_id', orgId)
       .maybeSingle()
 
@@ -50,6 +50,7 @@ export async function GET() {
       slack_webhook_url:      orgRow?.slack_webhook_url ?? null,
       slack_connected:        !!orgRow?.slack_bot_token,
       slack_team_name:        orgRow?.slack_team_name   ?? null,
+      slack_routing:          orgRow?.slack_routing     ?? null,
       google_connected:       byProvider.has('google'),
       google_connected_email: byProvider.get('google')?.connected_email ?? null,
       zoom_connected:         byProvider.has('zoom'),
@@ -88,6 +89,7 @@ export async function PATCH(request: NextRequest) {
     parsed.industry     !== undefined ||
     parsed.website      !== undefined ||
     parsed.enabled_agents !== undefined ||
+    parsed.slack_routing  !== undefined ||
     brandingFields.some((f) => parsed[f] !== undefined)
 
   if (adminFieldPresent) {
@@ -139,6 +141,7 @@ export async function PATCH(request: NextRequest) {
   if (parsed.nav_cta_url       !== undefined) patch.nav_cta_url       = parsed.nav_cta_url ?? null
   if (parsed.show_powered_by   !== undefined) patch.show_powered_by   = parsed.show_powered_by
   if (parsed.content_sections  !== undefined) patch.content_sections  = parsed.content_sections
+  if (parsed.slack_routing     !== undefined) patch.slack_routing      = parsed.slack_routing
 
   const { data, error } = await supabase
     .from('org_settings')

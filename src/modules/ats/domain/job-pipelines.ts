@@ -1803,3 +1803,73 @@ export async function resolveApplicationHiringManager(
 
   return null
 }
+
+// Recruiter email for an application's canonical job, for Slack DM routing.
+// Prefer the job's hiring-team recruiter; fall back to the recruiter named on the
+// linked requisition (openings.recruiter_id) — the same two-step path the
+// {{recruiter_name}} token uses, but returning the email instead of the name.
+// Returns null when no recruiter is attached, so the DM is simply skipped.
+export async function resolveApplicationRecruiterEmail(
+  supabase: Supabase,
+  orgId: string,
+  applicationId: string,
+): Promise<string | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+
+  const { data: app } = await sb
+    .from('applications')
+    .select('job_id')
+    .eq('id', applicationId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  const jobId = (app as { job_id: string | null } | null)?.job_id
+  if (!jobId) return null
+
+  const { data: job } = await sb
+    .from('jobs')
+    .select('hiring_team_id')
+    .eq('id', jobId)
+    .maybeSingle()
+  const hiringTeamId = (job as { hiring_team_id: string | null } | null)?.hiring_team_id
+
+  const emailForUser = async (userId: string | null | undefined): Promise<string | null> => {
+    if (!userId) return null
+    const { data: user } = await sb
+      .from('users')
+      .select('email')
+      .eq('id', userId)
+      .maybeSingle()
+    const e = (user as { email: string | null } | null)?.email
+    return e && e.trim() ? e.trim() : null
+  }
+
+  // 1) recruiter on the job's hiring team
+  if (hiringTeamId) {
+    const { data: members } = await sb
+      .from('hiring_team_members')
+      .select('user_id')
+      .eq('hiring_team_id', hiringTeamId)
+      .eq('role', 'recruiter')
+      .limit(1)
+    const teamEmail = await emailForUser((members as { user_id: string }[] | null)?.[0]?.user_id)
+    if (teamEmail) return teamEmail
+  }
+
+  // 2) recruiter named on the linked requisition
+  const { data: link } = await sb
+    .from('job_openings')
+    .select('opening_id')
+    .eq('job_id', jobId)
+    .limit(1)
+    .maybeSingle()
+  const openingId = (link as { opening_id: string | null } | null)?.opening_id
+  if (!openingId) return null
+
+  const { data: opening } = await sb
+    .from('openings')
+    .select('recruiter_id')
+    .eq('id', openingId)
+    .maybeSingle()
+  return emailForUser((opening as { recruiter_id: string | null } | null)?.recruiter_id)
+}

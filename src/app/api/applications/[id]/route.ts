@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 import { notifySlack, notifySlackDM } from '@/lib/notifications'
+import { dispatchSlackEvent } from '@/lib/slack/dispatch'
 import { applicationStatusEnum } from '@/lib/validations/common'
 import { resolveApplicationHiringManager } from '@/modules/ats/domain/job-pipelines'
 import type { ApplicationUpdate } from '@/lib/types/database'
@@ -103,15 +104,12 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
       })
 
     const candidateName = current.candidate?.name ?? 'Candidate'
-    const hmEmail = await resolveHmEmail()
     const jobTitle = current.hiring_request?.position_title ?? null
     const stageMsg = `➡️ *${candidateName}* moved to *${newStageName ?? 'a new stage'}*${jobTitle ? ` for *${jobTitle}*` : ''}`
 
-    // Fire-and-forget — don't block the API response waiting for Slack
-    void Promise.all([
-      notifySlack(orgId, stageMsg),
-      hmEmail ? notifySlackDM(orgId, hmEmail, stageMsg) : Promise.resolve(),
-    ])
+    // Fire-and-forget — routed through the Slack hub gate (channel + role DMs
+    // per the org's per-event config). Don't block the API response on Slack.
+    void dispatchSlackEvent({ orgId, event: 'stage_moved', text: stageMsg, applicationId: params.id })
 
     return NextResponse.json({ data })
   }
@@ -147,7 +145,6 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
       })
 
     const candidateName = current.candidate?.name ?? 'Candidate'
-    const hmEmailStatus = await resolveHmEmail()
     const label =
       status === 'hired'
         ? `🎉 *${candidateName}* was marked Hired`
@@ -155,11 +152,18 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
         ? `❌ *${candidateName}* was rejected`
         : `🔔 *${candidateName}* status changed to ${status}`
 
-    // Fire-and-forget — don't block the API response waiting for Slack
-    void Promise.all([
-      notifySlack(orgId, label),
-      hmEmailStatus ? notifySlackDM(orgId, hmEmailStatus, label) : Promise.resolve(),
-    ])
+    // Fire-and-forget — don't block the API response waiting for Slack.
+    // 'hired' is a hub-routed event (channel + role DMs per the org's config);
+    // other statuses keep the original channel + hiring-manager DM behaviour.
+    if (status === 'hired') {
+      void dispatchSlackEvent({ orgId, event: 'candidate_hired', text: label, applicationId: params.id })
+    } else {
+      const hmEmailStatus = await resolveHmEmail()
+      void Promise.all([
+        notifySlack(orgId, label),
+        hmEmailStatus ? notifySlackDM(orgId, hmEmailStatus, label) : Promise.resolve(),
+      ])
+    }
 
     return NextResponse.json({ data })
   }

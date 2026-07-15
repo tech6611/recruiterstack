@@ -9,9 +9,37 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-15
+
+### Added
+- **API keys for external tools (LinkedIn extension groundwork).** New
+  Settings → API Keys page (`/settings/api-keys`) to generate/copy-once/revoke
+  per-org bearer keys, gated by `settings:edit`. New key-authenticated endpoints
+  `GET /api/ext/sequences` (active sequences for the dropdown) and
+  `POST /api/ext/enroll` (create-or-find candidate + enrol in one call), reusing
+  the existing `findOrCreateCandidateProfile` / `enrollCandidate` domain
+  functions. Auth via `withApiKey` (`src/lib/api/api-keys.ts`); keys stored as
+  SHA-256 hashes, rate-limited per key. `/api/ext` added to the Clerk-bypass
+  list in `middleware.ts` (auth handled in-route, like `/api/sequences/process`).
+
+### Schema
+- **`094_api_keys.sql`** — new `api_keys` table (org-scoped, hashed key storage,
+  soft-revoke via `revoked_at`).
+
 ## 2026-07-14
 
 ### Added
+- **Slack event routing (hub Phase 1).** Admins can now decide, per lifecycle
+  event, where each Slack notification goes: to the shared channel and/or as a
+  DM to the recruiter and/or hiring manager. New Settings → Integrations card
+  ("Slack Event Routing") with per-event toggles. A single routing gate
+  (`src/lib/slack/dispatch.ts` + pure `src/lib/slack/routing.ts`) reads the
+  org's config and fans out to channel + role DMs; `candidate_applied`,
+  `stage_moved`, and `candidate_hired` now flow through it. Recruiter DMs are a
+  new capability (resolved via `resolveApplicationRecruiterEmail`). Defaults
+  reproduce the previous hard-coded behaviour, so orgs that never touch the
+  screen see no change. Other statuses (e.g. rejected) keep their existing
+  channel + hiring-manager DM behaviour.
 - **Candidate application answers are now visible to recruiters.** Screening
   answers were captured at apply time but never shown. The candidate profile's
   "Forms" tab now lists each application's screening questions and the candidate's
@@ -21,6 +49,11 @@ entries on top.
   the windows a candidate picked were only visible inside the phone-call pop-up.
   A "Preferred Call Times" section now renders per application in the Forms tab
   (`PhoneScreenAvailability.tsx`, embedded in `FormsTab.tsx`).
+
+### Schema
+- **`095_slack_routing.sql`** — new `org_settings.slack_routing` JSONB column
+  (per-event `{ channel, dm_roles }` map; default reproduces prior behaviour).
+  Needs to be applied to Supabase.
 
 ### Changed
 - **Phone-screen scheduling link is now a proper calendar.** The candidate picker

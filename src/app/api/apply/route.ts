@@ -177,6 +177,8 @@ export async function POST(request: NextRequest) {
     title: `New application: ${name}`,
     body: `${name} applied for ${job.title}`,
     slackText: `📥 New application: *${name}* applied for *${job.title}*`,
+    slackEvent: 'candidate_applied',
+    applicationId: appId,
     resourceType: 'application',
     resourceId: appId,
   })

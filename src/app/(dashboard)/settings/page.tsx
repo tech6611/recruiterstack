@@ -18,8 +18,22 @@ import { GroupsCard } from '@/components/settings/GroupsCard'
 import { CustomFieldsCard } from '@/components/settings/CustomFieldsCard'
 import { WhatsAppCard } from '@/components/settings/WhatsAppCard'
 import InterviewRemindersCard from '@/components/settings/InterviewRemindersCard'
+import type { SlackRouting, SlackEventKey, SlackDmRole } from '@/lib/types/database'
+import { DEFAULT_SLACK_ROUTING } from '@/lib/slack/routing'
 
 type TabId = 'general' | 'integrations' | 'workspace' | 'careers' | 'team'
+
+// Slack routing UI metadata. Keep the event keys in sync with the server gate
+// (lib/slack/routing.ts) and migration 095.
+const SLACK_EVENTS: { key: SlackEventKey; label: string; hint: string }[] = [
+  { key: 'candidate_applied', label: 'New application', hint: 'A candidate applies for a job' },
+  { key: 'stage_moved',       label: 'Stage change',    hint: 'A candidate moves to a new pipeline stage' },
+  { key: 'candidate_hired',   label: 'Candidate hired', hint: 'A candidate is marked Hired' },
+]
+const SLACK_DM_ROLES: { key: SlackDmRole; label: string }[] = [
+  { key: 'recruiter',      label: 'Recruiter' },
+  { key: 'hiring_manager', label: 'Hiring manager' },
+]
 
 export default function SettingsPage() {
   const { settings, save, loaded } = useSettings()
@@ -34,6 +48,12 @@ export default function SettingsPage() {
   // Slack OAuth state
   const [slackConnected, setSlackConnected] = useState(false)
   const [slackTeamName, setSlackTeamName] = useState<string | null>(null)
+
+  // Slack per-event routing (channel + role DMs). Mirrors the server-side
+  // defaults in lib/slack/dispatch.ts so the UI shows current behaviour before
+  // the admin has ever saved a custom config.
+  const [slackRouting, setSlackRouting] = useState<SlackRouting>(DEFAULT_SLACK_ROUTING)
+  const [routingStatus, setRoutingStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [oauthToast, setOauthToast] = useState<'connected' | 'error' | null>(null)
   const [oauthErrorReason, setOauthErrorReason] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
@@ -127,6 +147,7 @@ export default function SettingsPage() {
       .then(({ data }) => {
         if (data?.slack_webhook_url) setSlackUrl(data.slack_webhook_url)
         setSlackTeamName(data?.slack_team_name ?? null)
+        if (data?.slack_routing) setSlackRouting({ ...DEFAULT_SLACK_ROUTING, ...data.slack_routing })
         // Don't override optimistic `true` set by the URL-param effects — those
         // effects run synchronously before this async fetch resolves, so if we
         // just came back from an OAuth redirect we keep the optimistic state
@@ -277,6 +298,41 @@ export default function SettingsPage() {
     } catch {
       setSlackStatus('error')
       setTimeout(() => setSlackStatus('idle'), 2500)
+    }
+  }
+
+  // Toggle whether an event posts to the shared channel.
+  const toggleRoutingChannel = (event: SlackEventKey) => {
+    setSlackRouting(prev => {
+      const cur = prev[event] ?? DEFAULT_SLACK_ROUTING[event]
+      return { ...prev, [event]: { ...cur, channel: !cur.channel } }
+    })
+  }
+
+  // Toggle whether an event DMs a given role.
+  const toggleRoutingRole = (event: SlackEventKey, role: SlackDmRole) => {
+    setSlackRouting(prev => {
+      const cur = prev[event] ?? DEFAULT_SLACK_ROUTING[event]
+      const has = cur.dm_roles.includes(role)
+      const dm_roles = has ? cur.dm_roles.filter(r => r !== role) : [...cur.dm_roles, role]
+      return { ...prev, [event]: { ...cur, dm_roles } }
+    })
+  }
+
+  const saveRouting = async () => {
+    setRoutingStatus('saving')
+    try {
+      const res = await fetch('/api/org-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slack_routing: slackRouting }),
+      })
+      if (!res.ok) throw new Error('save failed')
+      setRoutingStatus('saved')
+      setTimeout(() => setRoutingStatus('idle'), 2500)
+    } catch {
+      setRoutingStatus('error')
+      setTimeout(() => setRoutingStatus('idle'), 2500)
     }
   }
 
@@ -748,6 +804,82 @@ export default function SettingsPage() {
                     </a>
                   </div>
                 )}
+              </div>
+              )}
+
+              {/* Slack Event Routing — per-event channel + role DMs (admin-only) */}
+              {canManageSettings && (
+              <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50">
+                    <SlidersHorizontal className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <h2 className="text-sm font-semibold text-slate-800">Slack Event Routing</h2>
+                </div>
+                <p className="text-xs text-slate-400 -mt-2">
+                  Choose where each event goes. Channel alerts use the webhook above; role DMs need the Slack app connected.
+                </p>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs font-semibold text-slate-500">
+                        <th className="py-2 pr-4">Event</th>
+                        <th className="py-2 px-3 text-center">Channel</th>
+                        {SLACK_DM_ROLES.map(r => (
+                          <th key={r.key} className="py-2 px-3 text-center">DM {r.label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {SLACK_EVENTS.map(ev => {
+                        const rule = slackRouting[ev.key] ?? DEFAULT_SLACK_ROUTING[ev.key]
+                        return (
+                          <tr key={ev.key} className="border-t border-slate-100">
+                            <td className="py-3 pr-4">
+                              <p className="font-medium text-slate-800">{ev.label}</p>
+                              <p className="text-xs text-slate-400">{ev.hint}</p>
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={rule.channel}
+                                onChange={() => toggleRoutingChannel(ev.key)}
+                                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
+                              />
+                            </td>
+                            {SLACK_DM_ROLES.map(r => (
+                              <td key={r.key} className="py-3 px-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={rule.dm_roles.includes(r.key)}
+                                  onChange={() => toggleRoutingRole(ev.key, r.key)}
+                                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={saveRouting}
+                    disabled={routingStatus === 'saving'}
+                    className="flex items-center gap-2 rounded-xl bg-[#221b14] px-4 py-2 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors disabled:opacity-60"
+                  >
+                    {routingStatus === 'saving' ? 'Saving…' : routingStatus === 'saved' ? (
+                      <><CheckCircle className="h-4 w-4" /> Saved!</>
+                    ) : 'Save routing'}
+                  </button>
+                  {routingStatus === 'error' && (
+                    <span className="text-xs text-red-500">Couldn’t save — try again.</span>
+                  )}
+                </div>
               </div>
               )}
 

@@ -1214,12 +1214,26 @@ export interface NotificationUpdate {
 export type CompanySize = '1-10' | '11-50' | '51-200' | '201-1000' | '1000+'
 export type AgentKey = 'drafter' | 'scout' | 'sifter' | 'scheduler' | 'closer'
 
+// ── Slack routing (migration 095) ────────────────────────────────────────────
+// Lifecycle events that can be routed to Slack, and the roles a DM can target.
+export type SlackEventKey = 'candidate_applied' | 'stage_moved' | 'candidate_hired'
+export type SlackDmRole = 'recruiter' | 'hiring_manager'
+
+// Per-event delivery rule: post to the channel and/or DM specific roles.
+export interface SlackEventRouting {
+  channel: boolean
+  dm_roles: SlackDmRole[]
+}
+
+export type SlackRouting = Partial<Record<SlackEventKey, SlackEventRouting>>
+
 export interface OrgSettings {
   org_id: string
   slack_webhook_url: string | null
   slack_bot_token: string | null
   slack_team_id: string | null
   slack_team_name: string | null
+  slack_routing: SlackRouting | null
   google_oauth_access_token: string | null
   google_oauth_refresh_token: string | null
   google_oauth_token_expiry: string | null

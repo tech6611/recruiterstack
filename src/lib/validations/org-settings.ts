@@ -87,6 +87,20 @@ const contentSection = z.discriminatedUnion('type', [
   textSection, benefitsSection, storySection, ctaSection,
 ])
 
+// ── Slack routing (migration 095) ───────────────────────────────────────────
+// Per-event delivery rule: post to the channel and/or DM specific roles.
+// The event keys and role names must stay in sync with SlackEventKey /
+// SlackDmRole in lib/types/database.ts.
+const slackEventRouting = z.object({
+  channel:  z.boolean(),
+  dm_roles: z.array(z.enum(['recruiter', 'hiring_manager'])).max(2),
+})
+const slackRouting = z.object({
+  candidate_applied: slackEventRouting.optional(),
+  stage_moved:       slackEventRouting.optional(),
+  candidate_hired:   slackEventRouting.optional(),
+})
+
 export const orgSettingsUpdateSchema = z.object({
   slack_webhook_url: z.string().url().nullish(),
   // Admin-only fields (enforced in the handler, not the schema)
@@ -116,6 +130,8 @@ export const orgSettingsUpdateSchema = z.object({
   show_powered_by:  z.boolean().optional(),
   // Custom content sections (migration 078)
   content_sections: z.array(contentSection).max(20).optional(),
+  // Slack per-event routing (migration 095)
+  slack_routing: slackRouting.optional(),
 })
 
 export type CareersContentSection = z.infer<typeof contentSection>

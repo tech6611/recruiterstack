@@ -2,6 +2,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { decryptSafe } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 import { createNotification, type NotificationType } from '@/lib/api/notify'
+import { dispatchSlackEvent } from '@/lib/slack/dispatch'
+import type { SlackEventKey } from '@/lib/types/database'
 
 interface NotifyParams {
   orgId: string
@@ -11,6 +13,12 @@ interface NotifyParams {
   slackText: string
   resourceType?: string
   resourceId?: string
+  // When set, the Slack side is routed through the per-event Slack hub gate
+  // (channel + role DMs per the org's config) instead of always posting to the
+  // channel. `applicationId` lets the gate resolve DM recipients. Callers that
+  // omit these keep the original channel-only behaviour.
+  slackEvent?: SlackEventKey
+  applicationId?: string
 }
 
 /**
@@ -27,7 +35,14 @@ export async function notify(params: NotifyParams): Promise<void> {
       resourceType: params.resourceType,
       resourceId: params.resourceId,
     }),
-    notifySlack(params.orgId, params.slackText),
+    params.slackEvent
+      ? dispatchSlackEvent({
+          orgId: params.orgId,
+          event: params.slackEvent,
+          text: params.slackText,
+          applicationId: params.applicationId,
+        })
+      : notifySlack(params.orgId, params.slackText),
   ])
 }
 
