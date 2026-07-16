@@ -9,6 +9,19 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-16
+
+### Added
+- **LinkedIn "Add to Sequence" Chrome extension (Stage 2).** New `extension/`
+  folder — a Manifest V3 extension (no build step, plain files) that injects an
+  "Add to sequence" button on LinkedIn `/in/` profile pages. Captures the
+  profile's name + URL, takes a typed email, lists the org's active sequences,
+  and enrols in one click via the Stage 1 `/api/ext/*` endpoints. Auth is a
+  per-org API key pasted into the extension's options; all API calls go through
+  the background service worker (bypasses CORS). Includes options/popup pages
+  and a README with load-unpacked + connect instructions. Self-contained; does
+  not touch the Next.js app.
+
 ## 2026-07-15
 
 ### Added

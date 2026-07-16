@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "RecruiterStack — Add to Sequence",
+  "version": "0.1.0",
+  "description": "Add a LinkedIn profile to a RecruiterStack outreach sequence with one click.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://recruiterstack.in/*",
+    "http://localhost:3000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "RecruiterStack"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/in/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
