@@ -6,7 +6,8 @@
   "permissions": ["storage"],
   "host_permissions": [
     "https://recruiterstack.in/*",
-    "http://localhost:3000/*"
+    "https://www.recruiterstack.in/*",
+    "http://localhost/*"
   ],
   "background": {
     "service_worker": "background.js"

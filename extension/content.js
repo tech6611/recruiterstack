@@ -8,9 +8,31 @@
   window.__rsExtLoaded = true
 
   // --- read what's on the profile page ---
+  function cleanName(s) {
+    return (s || '').replace(/\s+/g, ' ').trim()
+  }
+
+  // Fallback: pull the name out of the browser tab title, which LinkedIn sets to
+  // e.g. "(3) Jane Doe | LinkedIn" or "Jane Doe - Headline | LinkedIn".
+  function nameFromTitle() {
+    let t = document.title || ''
+    t = t.replace(/^\(\d+\)\s*/, '')            // strip "(3) " unread-count prefix
+    t = t.replace(/\s*\|\s*LinkedIn.*$/i, '')   // strip " | LinkedIn" suffix
+    t = t.replace(/\s+[-–—]\s.*$/, '')          // strip " - Headline" if present
+    return cleanName(t)
+  }
+
   function currentProfile() {
-    const nameEl = document.querySelector('main h1') || document.querySelector('h1')
-    const name = nameEl ? nameEl.innerText.trim() : ''
+    // LinkedIn sometimes uses a visually-hidden <h1> for the name (innerText is
+    // empty for hidden nodes, so fall back to textContent), and there can be more
+    // than one h1 — take the first that actually has text.
+    let name = ''
+    for (const h of document.querySelectorAll('main h1, h1')) {
+      const t = cleanName(h.innerText || h.textContent)
+      if (t) { name = t; break }
+    }
+    if (!name) name = nameFromTitle()
+
     // Normalise to the canonical https://www.linkedin.com/in/<slug>/ form.
     const m = location.href.match(/https?:\/\/[^/]*linkedin\.com\/in\/[^/?#]+/i)
     const linkedin_url = m ? `${m[0]}/` : location.href.split('?')[0]
