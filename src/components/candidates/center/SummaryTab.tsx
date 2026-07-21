@@ -8,15 +8,15 @@ import { Panel } from '@/components/ui/card'
 import { useCandidateProfile } from '../CandidateProfileContext'
 import { resumeStoragePath } from '@/lib/storage/resume'
 
-// Only PDFs (and plain text) render inside a browser <iframe>. Pointing an iframe
-// at a Word doc makes the browser download it on every load/refresh instead of
-// previewing — so for those we show a Download card rather than an iframe.
+// PDFs and plain text render natively in a browser <iframe>. Word .docx files
+// can't — but the resume API converts those to HTML on the fly (via mammoth), so
+// they preview too. Legacy .doc/.rtf still fall back to the Download card.
 function resumeIsPreviewable(resumeUrl: string | null | undefined): boolean {
   if (!resumeUrl) return false
   const path = resumeStoragePath(resumeUrl)
   if (!path) return true // external link (e.g. Google Drive) — let it try to embed
   const ext = path.split('.').pop()?.toLowerCase() ?? ''
-  return ext === 'pdf' || ext === 'txt'
+  return ext === 'pdf' || ext === 'txt' || ext === 'docx'
 }
 
 interface VoiceCallSummary {

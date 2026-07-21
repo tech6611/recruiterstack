@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
+import mammoth from 'mammoth'
 import { withCapability } from '@/lib/api/helpers'
 import { RESUME_BUCKET, resumeStoragePath, resumeContentType } from '@/lib/storage/resume'
+import { logger } from '@/lib/logger'
 
 /**
  * GET /api/candidates/[id]/resume
@@ -50,6 +52,37 @@ export const GET = withCapability('recruiting:view', async (req, orgId, supabase
   const wantsDownload = new URL(req.url).searchParams.get('download') === '1'
   const filename = (path.split('/').pop() || 'resume').replace(/"/g, '')
   const disposition = wantsDownload ? 'attachment' : 'inline'
+  const ext = path.split('.').pop()?.toLowerCase() ?? ''
+
+  // Word docs can't render natively in a browser <iframe>. When previewing (not
+  // downloading) a .docx, convert it to HTML with mammoth so the viewer shows the
+  // CV inline instead of the "can't preview" fallback. If conversion fails we fall
+  // through to serving the raw file. Legacy .doc isn't supported by mammoth.
+  if (!wantsDownload && ext === 'docx') {
+    try {
+      const buffer = Buffer.from(await file.arrayBuffer())
+      const { value: body } = await mammoth.convertToHtml({ buffer })
+      const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+        body { margin: 0; padding: 24px 28px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; font-size: 14px; }
+        h1, h2, h3 { color: #0f172a; line-height: 1.3; margin: 1.2em 0 0.4em; }
+        p { margin: 0 0 0.7em; }
+        ul, ol { margin: 0 0 0.7em; padding-left: 1.4em; }
+        table { border-collapse: collapse; width: 100%; }
+        td, th { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+        a { color: #059669; }
+        img { max-width: 100%; height: auto; }
+      </style></head><body>${body}</body></html>`
+      return new NextResponse(html, {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Disposition': 'inline',
+          'Cache-Control': 'private, no-store',
+        },
+      })
+    } catch (err) {
+      logger.error('[resume] docx→html conversion failed, serving raw file', err)
+    }
+  }
 
   return new NextResponse(await file.arrayBuffer(), {
     headers: {

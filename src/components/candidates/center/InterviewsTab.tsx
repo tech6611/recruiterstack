@@ -13,6 +13,15 @@ interface InterviewRow {
   location: string | null
   meeting_platform: string | null
   self_schedule_token: string | null
+  calendar_event_id: string | null
+}
+
+// A self-schedule invite the candidate hasn't booked yet: it has a booking token
+// but no real calendar event, and its scheduled_at is a throwaway placeholder
+// (send-time + 7 days). Show these as "awaiting the candidate" rather than as a
+// confirmed interview with a misleading date.
+function isPendingInvite(iv: InterviewRow): boolean {
+  return iv.status === 'scheduled' && !iv.calendar_event_id && !!iv.self_schedule_token
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -72,8 +81,8 @@ export default function InterviewsTab({ candidateId }: { candidateId: string }) 
     }
   }
 
-  const copyReschedule = (token: string, id: string) => {
-    const url = `${window.location.origin}/schedule/${token}?reschedule=1`
+  const copyLink = (token: string, id: string, reschedule: boolean) => {
+    const url = `${window.location.origin}/schedule/${token}${reschedule ? '?reschedule=1' : ''}`
     navigator.clipboard.writeText(url).then(() => {
       setCopied(id)
       setTimeout(() => setCopied(c => (c === id ? null : c)), 2500)
@@ -102,18 +111,21 @@ export default function InterviewsTab({ candidateId }: { candidateId: string }) 
       {interviews.map(iv => {
         const link = iv.location && /^https?:\/\//.test(iv.location) ? iv.location : null
         const isCancelled = iv.status === 'cancelled'
+        const pending = isPendingInvite(iv)
         return (
           <div key={iv.id} className={`rounded-xl border border-slate-200 p-4 ${isCancelled ? 'opacity-60' : ''}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-800">{fmt(iv.scheduled_at)}</p>
+                <p className="text-sm font-semibold text-slate-800">
+                  {pending ? 'Awaiting candidate to pick a time' : fmt(iv.scheduled_at)}
+                </p>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {iv.interviewer_name || 'Interviewer'} · {iv.duration_minutes ?? 60} min
                   {platformLabel(iv.meeting_platform) ? ` · ${platformLabel(iv.meeting_platform)}` : ''}
                 </p>
               </div>
-              <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full border px-2 py-0.5 shrink-0 ${STATUS_STYLES[iv.status] ?? 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                {iv.status.replace('_', ' ')}
+              <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full border px-2 py-0.5 shrink-0 ${pending ? 'bg-amber-50 text-amber-600 border-amber-200' : STATUS_STYLES[iv.status] ?? 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                {pending ? 'Invite sent' : iv.status.replace('_', ' ')}
               </span>
             </div>
 
@@ -127,11 +139,11 @@ export default function InterviewsTab({ candidateId }: { candidateId: string }) 
 
               {!isCancelled && iv.status !== 'completed' && iv.self_schedule_token && (
                 <button
-                  onClick={() => copyReschedule(iv.self_schedule_token!, iv.id)}
+                  onClick={() => copyLink(iv.self_schedule_token!, iv.id, !pending)}
                   className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700"
                 >
                   {copied === iv.id ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                  {copied === iv.id ? 'Copied reschedule link' : 'Copy reschedule link'}
+                  {copied === iv.id ? 'Copied' : pending ? 'Copy booking link' : 'Copy reschedule link'}
                 </button>
               )}
 

@@ -11,6 +11,31 @@ entries on top.
 
 ## 2026-07-21
 
+### Fixed
+- **Screening-question answers now show on the candidate profile's Forms panel.**
+  Candidates' application answers were saved correctly (`applications.screening_answers`)
+  but the Django candidate-detail serializer omitted the field, so the UI always
+  said "No screening questions were answered." Django's `Application` model
+  (`managed=False`) now declares `screening_answers` / `eeo_answers` /
+  `knockout_failed`, and `serialize_application_detail` emits them.
+  *(Django repo: `hiring/models.py`, `candidates/views.py`.)*
+- **Unbooked interview invites no longer look like confirmed interviews.** When a
+  sequence email carries the "book time with hiring manager" link, the system
+  mints a placeholder interview whose date is a throwaway (send-time + 7 days).
+  The Interviews tab was rendering that placeholder as a real SCHEDULED interview
+  with a misleading date. It now shows "Awaiting candidate to pick a time" with an
+  "Invite sent" badge and a "Copy booking link" action until the candidate books.
+  File: `src/components/candidates/center/InterviewsTab.tsx`.
+
+### Changed
+- **Word (.docx) CVs now preview inline on the candidate profile.** The resume
+  API converts `.docx` to styled HTML on the fly (via `mammoth`) when previewing,
+  so the viewer renders the CV instead of showing the "can't be previewed —
+  Download" card. PDFs/text preview as before; legacy `.doc`/`.rtf` still fall
+  back to download (mammoth can't read them). `?download=1` still serves the
+  original file untouched. Files: `src/app/api/candidates/[id]/resume/route.ts`,
+  `src/components/candidates/center/SummaryTab.tsx`.
+
 ### Added
 - **Two-way AI email conversations with candidates.** When a candidate replies
   to a sequence email, the reply is now captured into a proper conversation
