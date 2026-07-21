@@ -2006,6 +2006,18 @@ export type Database = {
         Update: Indexify<WhatsAppMessageUpdate>
         Relationships: []
       }
+      email_conversations: {
+        Row: Indexify<EmailConversation>
+        Insert: Indexify<EmailConversationInsert>
+        Update: Indexify<EmailConversationUpdate>
+        Relationships: []
+      }
+      email_messages: {
+        Row: Indexify<EmailMessage>
+        Insert: Indexify<EmailMessageInsert>
+        Update: Indexify<EmailMessageUpdate>
+        Relationships: []
+      }
     }
     Views: Record<never, never>
     Functions: Record<never, never>
@@ -2306,3 +2318,124 @@ export interface WhatsAppMessageInsert
 }
 
 export interface WhatsAppMessageUpdate extends Partial<WhatsAppMessageInsert> {}
+
+// ── Two-way email conversations (migration 096) ──────────────
+export type EmailConversationStatus = 'active' | 'replied' | 'closed' | 'archived'
+export type EmailMessageDirection = 'inbound' | 'outbound'
+export type EmailMessageStatus = 'received' | 'sent' | 'delivered' | 'failed'
+
+export interface EmailConversation {
+  id: string
+  org_id: string
+  enrollment_id: string | null
+  sequence_id: string | null
+  candidate_id: string | null
+  application_id: string | null
+  person_id: string | null
+  subject: string | null
+  status: EmailConversationStatus
+  agent_enabled: boolean          // AI auto-responder on/off per thread
+  last_inbound_at: string | null  // most recent candidate reply
+  last_outbound_at: string | null // most recent agent/recruiter send
+  unread: boolean
+  agent_turns: number             // responder loop guardrail counter
+  context: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface EmailConversationInsert
+  extends Omit<
+    EmailConversation,
+    | 'id'
+    | 'created_at'
+    | 'updated_at'
+    | 'enrollment_id'
+    | 'sequence_id'
+    | 'candidate_id'
+    | 'application_id'
+    | 'person_id'
+    | 'subject'
+    | 'status'
+    | 'agent_enabled'
+    | 'last_inbound_at'
+    | 'last_outbound_at'
+    | 'unread'
+    | 'agent_turns'
+    | 'context'
+  > {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  enrollment_id?: string | null
+  sequence_id?: string | null
+  candidate_id?: string | null
+  application_id?: string | null
+  person_id?: string | null
+  subject?: string | null
+  status?: EmailConversationStatus
+  agent_enabled?: boolean
+  last_inbound_at?: string | null
+  last_outbound_at?: string | null
+  unread?: boolean
+  agent_turns?: number
+  context?: Record<string, unknown>
+}
+
+export interface EmailConversationUpdate extends Partial<EmailConversationInsert> {}
+
+export interface EmailMessage {
+  id: string
+  conversation_id: string
+  org_id: string
+  direction: EmailMessageDirection
+  from_email: string | null
+  to_email: string | null
+  subject: string | null
+  body_text: string | null
+  body_html: string | null
+  sendgrid_message_id: string | null
+  provider_message_id: string | null  // inbound Message-Id header — idempotency key
+  sequence_email_id: string | null
+  status: EmailMessageStatus
+  sender: string | null                // 'candidate' | 'agent' | user id
+  error: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface EmailMessageInsert
+  extends Omit<
+    EmailMessage,
+    | 'id'
+    | 'created_at'
+    | 'from_email'
+    | 'to_email'
+    | 'subject'
+    | 'body_text'
+    | 'body_html'
+    | 'sendgrid_message_id'
+    | 'provider_message_id'
+    | 'sequence_email_id'
+    | 'status'
+    | 'sender'
+    | 'error'
+    | 'metadata'
+  > {
+  id?: string
+  created_at?: string
+  from_email?: string | null
+  to_email?: string | null
+  subject?: string | null
+  body_text?: string | null
+  body_html?: string | null
+  sendgrid_message_id?: string | null
+  provider_message_id?: string | null
+  sequence_email_id?: string | null
+  status?: EmailMessageStatus
+  sender?: string | null
+  error?: string | null
+  metadata?: Record<string, unknown>
+}
+
+export interface EmailMessageUpdate extends Partial<EmailMessageInsert> {}

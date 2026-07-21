@@ -5,7 +5,7 @@ import { useAuth } from '@clerk/nextjs'
 import Link from 'next/link'
 import {
   Inbox, RefreshCw, AlertCircle, ArrowRight, Clock,
-  User, Briefcase, MessageSquare, MoveRight, CheckCircle, XCircle,
+  User, Briefcase, MessageSquare, MoveRight, CheckCircle, XCircle, Mail, Bot,
 } from 'lucide-react'
 import type { StageColor } from '@/lib/types/database'
 import { timeAgo } from '@/lib/ui/date-utils'
@@ -44,6 +44,19 @@ interface StaleApp {
 interface InboxData {
   activity:        ActivityEvent[]
   needs_attention: StaleApp[]
+}
+
+interface EmailConversationSummary {
+  id:                  string
+  candidate_id:        string | null
+  candidate_name:      string | null
+  candidate_email:     string | null
+  subject:             string | null
+  status:              string
+  agent_enabled:       boolean
+  unread:              boolean
+  last_message_preview: string | null
+  last_message_at:     string | null
 }
 
 // ── Colour maps ───────────────────────────────────────────────────────────────
@@ -88,7 +101,7 @@ function eventLabel(e: ActivityEvent): { icon: React.ElementType; text: string; 
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = 'activity' | 'attention'
+type Tab = 'activity' | 'attention' | 'conversations'
 
 export default function InboxPage() {
   const { orgId } = useAuth()
@@ -96,6 +109,8 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState('')
   const [tab, setTab]         = useState<Tab>('activity')
+  const [conversations, setConversations] = useState<EmailConversationSummary[]>([])
+  const [convLoading, setConvLoading]     = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -106,7 +121,21 @@ export default function InboxPage() {
     setLoading(false)
   }, [])
 
+  const loadConversations = useCallback(async () => {
+    setConvLoading(true)
+    try {
+      const res = await fetch('/api/email-conversations')
+      if (res.ok) {
+        const json = await res.json()
+        setConversations(json.data?.conversations ?? [])
+      }
+    } finally {
+      setConvLoading(false)
+    }
+  }, [])
+
   useEffect(() => { if (orgId) load() }, [load, orgId])
+  useEffect(() => { if (orgId) loadConversations() }, [loadConversations, orgId])
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
@@ -145,7 +174,7 @@ export default function InboxPage() {
           <p className="text-sm text-slate-400 mt-0.5">Activity feed and candidates needing attention</p>
         </div>
         <button
-          onClick={load}
+          onClick={() => { load(); loadConversations() }}
           className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
         >
           <RefreshCw className="h-3.5 w-3.5" />
@@ -156,8 +185,9 @@ export default function InboxPage() {
       {/* Tabs */}
       <div className="flex gap-1 rounded-xl bg-slate-100 p-1 w-fit">
         {([
-          { id: 'activity',  label: 'Activity Feed',     count: activity.length },
-          { id: 'attention', label: 'Needs Attention',   count: needs_attention.length },
+          { id: 'activity',      label: 'Activity Feed',   count: activity.length },
+          { id: 'attention',     label: 'Needs Attention', count: needs_attention.length },
+          { id: 'conversations', label: 'Conversations',   count: conversations.filter(c => c.unread).length },
         ] as { id: Tab; label: string; count: number }[]).map(t => (
           <button
             key={t.id}
@@ -295,6 +325,61 @@ export default function InboxPage() {
               })}
             </>
           )}
+        </div>
+      )}
+
+      {/* ── Conversations (two-way email replies) ────────────────────────── */}
+      {tab === 'conversations' && (
+        <div className="rounded-2xl bg-white border border-slate-200 divide-y divide-slate-100">
+          {convLoading ? (
+            <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
+              <RefreshCw className="h-6 w-6 animate-spin" />
+              <p className="text-sm">Loading conversations…</p>
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
+              <Mail className="h-6 w-6" />
+              <p className="text-sm">No email conversations yet.</p>
+              <p className="text-xs text-slate-300">A thread appears here when a candidate replies to a sequence email.</p>
+            </div>
+          ) : conversations.map(conv => (
+            <div key={conv.id} className="flex items-start gap-4 px-5 py-4">
+              <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${conv.unread ? 'bg-indigo-100' : 'bg-slate-100'}`}>
+                <Mail className={`h-4 w-4 ${conv.unread ? 'text-indigo-600' : 'text-slate-500'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  {conv.candidate_id ? (
+                    <Link
+                      href={`/candidates/${conv.candidate_id}`}
+                      className={`text-sm ${conv.unread ? 'font-bold text-slate-900' : 'font-semibold text-slate-800'} hover:text-indigo-600 hover:underline truncate`}
+                    >
+                      {conv.candidate_name ?? conv.candidate_email ?? 'Candidate'}
+                    </Link>
+                  ) : (
+                    <span className="text-sm font-semibold text-slate-800 truncate">
+                      {conv.candidate_name ?? conv.candidate_email ?? 'Candidate'}
+                    </span>
+                  )}
+                  {conv.unread && (
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">New</span>
+                  )}
+                  {conv.agent_enabled && (
+                    <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                      <Bot className="h-3 w-3" /> AI
+                    </span>
+                  )}
+                </div>
+                {conv.subject && <p className="mt-0.5 text-xs font-medium text-slate-500 truncate">{conv.subject}</p>}
+                {conv.last_message_preview && (
+                  <p className="mt-0.5 text-xs text-slate-400 line-clamp-1">{conv.last_message_preview}</p>
+                )}
+              </div>
+              <div className="shrink-0 text-right">
+                {conv.last_message_at && <span className="text-xs text-slate-400">{timeAgo(conv.last_message_at)}</span>}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
