@@ -10,10 +10,11 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
     supabase.from('candidates').select('*').eq('id', id).eq('org_id', orgId).single(),
     supabase
       .from('applications')
-      // Legacy apps carry the title on hiring_requests; canonical apps (migration
-      // 064/067) leave hiring_request_id null and point at a canonical job instead,
-      // so we also embed jobs → and normalize both onto `hiring_requests` below.
-      .select('*, pipeline_stages(name, color), hiring_requests(id, position_title, department, ticket_number, hiring_manager_name, hiring_manager_email), job:jobs(id, position_title:title, department:departments(name))')
+      // The legacy `hiring_requests` table was dropped in the canonical migration;
+      // all apps now point at a canonical `job`. We embed jobs and normalize onto a
+      // synthetic `hiring_requests` shape below (ticket/manager have no canonical
+      // equivalent here and stay null, as they already did for canonical apps).
+      .select('*, pipeline_stages(name, color), job:jobs(id, position_title:title, department:departments(name))')
       .eq('candidate_id', id)
       .eq('org_id', orgId)
       .order('applied_at', { ascending: false }),

@@ -90,7 +90,7 @@ async function generateAndStoreSummary(candidateId: string, orgId: string) {
         id, status, source, applied_at, ai_score, ai_recommendation,
         ai_strengths, ai_gaps,
         pipeline_stages(name),
-        hiring_requests(position_title, department, level)
+        job:jobs(position_title:title, department:departments(name))
       `)
       .eq('candidate_id', candidateId)
       .eq('org_id', orgId)
@@ -128,8 +128,8 @@ async function generateAndStoreSummary(candidateId: string, orgId: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const appSummaries = apps.map((a: any) => {
     const stage = a.pipeline_stages?.name ?? 'Unknown'
-    const job   = a.hiring_requests
-    return `- ${job?.position_title ?? 'Unknown role'}${job?.department ? ` (${job.department})` : ''}: ${a.status} / stage: ${stage}${a.ai_score !== null ? ` / AI score: ${a.ai_score}/100` : ''}`
+    const job   = a.job
+    return `- ${job?.position_title ?? 'Unknown role'}${job?.department?.name ? ` (${job.department.name})` : ''}: ${a.status} / stage: ${stage}${a.ai_score !== null ? ` / AI score: ${a.ai_score}/100` : ''}`
   }).join('\n')
 
   const eventLog = (events ?? [])

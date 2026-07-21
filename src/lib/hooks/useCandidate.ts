@@ -17,17 +17,26 @@ export function useCandidate(id: string) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await fetch(`/api/candidates/${id}`)
-    const json = await res.json()
-    const data: CandidateWithPipeline | null = json.data ?? null
-    setCandidate(data)
-    // Initialise selectedAppId on first load (same React 18 batch - no null flash)
-    if (data && !appIdInitialised.current) {
-      appIdInitialised.current = true
-      const def = data.applications.find(a => a.status === 'active') ?? data.applications[0]
-      setSelectedAppId(def?.id ?? null)
+    try {
+      const res = await fetch(`/api/candidates/${id}`)
+      // Guard against error responses: without this, a 5xx (which returns an HTML
+      // error page, not JSON) makes res.json() throw and leaves the page stuck on
+      // "Loading…" forever instead of surfacing the error.
+      if (!res.ok) { setCandidate(null); return }
+      const json = await res.json()
+      const data: CandidateWithPipeline | null = json.data ?? null
+      setCandidate(data)
+      // Initialise selectedAppId on first load (same React 18 batch - no null flash)
+      if (data && !appIdInitialised.current) {
+        appIdInitialised.current = true
+        const def = data.applications.find(a => a.status === 'active') ?? data.applications[0]
+        setSelectedAppId(def?.id ?? null)
+      }
+    } catch {
+      setCandidate(null)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [id])
 
   useEffect(() => { load() }, [load])

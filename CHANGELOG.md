@@ -9,6 +9,24 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-07-22
+
+### Fixed
+- **Candidate detail (and offers / applications / interviews / email drafts / AI
+  summary) returned 500s because 6 API routes still embedded the dropped
+  `hiring_requests` table.** The canonical migration removed `hiring_requests`, but
+  these PostgREST relationship embeds survived — masked until now by a stale schema
+  cache, which is why the pages broke seemingly out of nowhere. Repointed each at the
+  canonical `jobs`/`openings` (title, department, hiring-manager email);
+  `ticket_number` and job `level` have no canonical field and are now null. Also
+  hardened `useCandidate` to stop loading on error responses instead of hanging on
+  "Loading…" forever. Files: `src/app/api/candidates/[id]/route.ts`,
+  `src/app/api/candidates/[id]/ai-summary/route.ts`,
+  `src/app/api/applications/[id]/route.ts`,
+  `src/app/api/applications/[id]/email-draft/route.ts`,
+  `src/app/api/interviews/[id]/route.ts`, `src/app/api/offers/[id]/route.ts`,
+  `src/lib/hooks/useCandidate.ts`.
+
 ## 2026-07-21
 
 ### Fixed

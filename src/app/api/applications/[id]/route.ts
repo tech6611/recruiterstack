@@ -46,7 +46,7 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
   // ── Fetch current application ─────────────────────────────────────────────
   const { data: currentData, error: fetchErr } = await supabase
     .from('applications')
-    .select('*, pipeline_stages(name), candidate:candidates(name), hiring_request:hiring_requests(hiring_manager_email, position_title)')
+    .select('*, pipeline_stages(name), candidate:candidates(name), job:jobs(title), opening:openings(hiring_manager_email, title)')
     .eq('id', params.id)
     .eq('org_id', orgId)
     .single()
@@ -57,13 +57,15 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
   const current = currentData as unknown as Record<string, unknown> & {
     pipeline_stages: { name: string } | null
     candidate: { name: string } | null
-    hiring_request: { hiring_manager_email: string | null; position_title: string } | null
+    job: { title: string } | null
+    opening: { hiring_manager_email: string | null; title: string } | null
   }
 
-  // Hiring manager for Slack DMs. Legacy jobs carry the email on hiring_requests;
-  // canonical jobs have no such row, so resolve from the job / linked requisition.
+  // Hiring manager for Slack DMs. The canonical opening carries the email directly;
+  // otherwise resolve from the job / linked requisition. (The legacy hiring_requests
+  // table was dropped in the canonical migration.)
   const resolveHmEmail = async (): Promise<string | null> =>
-    current.hiring_request?.hiring_manager_email ??
+    current.opening?.hiring_manager_email ??
     (await resolveApplicationHiringManager(supabase, orgId, params.id))?.email ??
     null
 
@@ -104,7 +106,7 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
       })
 
     const candidateName = current.candidate?.name ?? 'Candidate'
-    const jobTitle = current.hiring_request?.position_title ?? null
+    const jobTitle = current.job?.title ?? current.opening?.title ?? null
     const stageMsg = `➡️ *${candidateName}* moved to *${newStageName ?? 'a new stage'}*${jobTitle ? ` for *${jobTitle}*` : ''}`
 
     // Fire-and-forget — routed through the Slack hub gate (channel + role DMs

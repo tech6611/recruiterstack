@@ -44,7 +44,7 @@ export const POST = withCapability('recruiting:edit', async (request, orgId, sup
     .select(`
       id, status,
       candidate:candidates(name, email),
-      job:hiring_requests(position_title, department),
+      job:jobs(position_title:title, department:departments(name)),
       stage:pipeline_stages(name)
     `)
     .eq('id', params.id)
@@ -56,12 +56,12 @@ export const POST = withCapability('recruiting:edit', async (request, orgId, sup
   }
 
   const candidate   = app.candidate as unknown as { name: string; email: string } | null
-  const job         = app.job       as unknown as { position_title: string; department: string | null } | null
+  const job         = app.job       as unknown as { position_title: string; department: { name: string } | null } | null
   const stage       = app.stage     as unknown as { name: string } | null
 
   const firstName   = candidate?.name?.split(' ')[0] ?? 'there'
   const jobTitle    = job?.position_title ?? 'the position'
-  const department  = job?.department
+  const department  = job?.department?.name
   const stageName   = stage?.name ?? 'Applied'
 
   // ── Call the LLM ───────────────────────────────────────────────────────────
