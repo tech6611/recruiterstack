@@ -14,16 +14,33 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   async headers() {
+    // Shared hardening applied to every response.
+    const baseSecurityHeaders = [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'X-DNS-Prefetch-Control', value: 'on' },
+      { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+    ];
     return [
       {
-        source: '/(.*)',
+        // Everything except the CV route stays un-framable. The negative lookahead
+        // must exclude exactly the path the rule below covers — two matching rules
+        // would emit duplicate X-Frame-Options and browsers fall back to blocking.
+        // The trailing `$` keeps the exemption to that exact path, so deeper paths
+        // like /api/candidates/x/resume/extra still get DENY rather than nothing.
+        source: '/((?!api/candidates/[^/]+/resume$).*)',
+        headers: [{ key: 'X-Frame-Options', value: 'DENY' }, ...baseSecurityHeaders],
+      },
+      {
+        // The candidate profile embeds the CV in an <iframe> on the same origin,
+        // so this route opts into same-origin framing only. `frame-ancestors` is
+        // the modern equivalent; both are sent since Chrome still honours XFO.
+        source: '/api/candidates/:id/resume',
         headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'X-DNS-Prefetch-Control', value: 'on' },
-          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+          ...baseSecurityHeaders,
         ],
       },
     ];

@@ -12,6 +12,16 @@ entries on top.
 ## 2026-07-21
 
 ### Fixed
+- **CV preview was blocked by `X-Frame-Options: DENY` — the actual cause of the
+  blank/"refused to connect" viewer.** The global security header (added
+  2026-03-22 in the Phase 3 security commit, `079c9cb`) applied to `/(.*)`, so the
+  in-app `<iframe>` could never render the CV — *including PDFs*, not just Word
+  docs. The catch-all now excludes exactly `/api/candidates/:id/resume`, which
+  opts into same-origin framing (`X-Frame-Options: SAMEORIGIN` +
+  `Content-Security-Policy: frame-ancestors 'self'`). Verified against a running
+  server: the CV route returns a single SAMEORIGIN header while `/`,
+  `/candidates`, `/api/interviews`, `/api/candidates/:id` and
+  `/api/candidates/:id/resume/extra` all still return DENY. File: `next.config.mjs`.
 - **Screening-question answers now show on the candidate profile's Forms panel.**
   Candidates' application answers were saved correctly (`applications.screening_answers`)
   but the Django candidate-detail serializer omitted the field, so the UI always
