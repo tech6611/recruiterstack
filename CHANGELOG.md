@@ -34,6 +34,15 @@ entries on top.
   and a README with load-unpacked + connect instructions. Self-contained; does
   not touch the Next.js app.
 
+### Changed
+- **Phone-screen picker now lets candidates add any exact time (Option A).** The
+  fixed 30-minute time blocks were replaced with a day selector + a free time
+  field: the candidate picks a day, types any time (a native time input, any hour
+  of the day), and clicks "Add" to build a list of preferred call windows, each
+  removable individually. Each picked time still becomes a 30-minute window on
+  submit; past times on today are rejected on add
+  (`src/app/phone-screen/[token]/page.tsx`).
+
 ## 2026-07-15
 
 ### Added

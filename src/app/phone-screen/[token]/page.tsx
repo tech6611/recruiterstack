@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
-import { Loader2, Check, AlertCircle, PhoneCall } from 'lucide-react'
+import { Loader2, Check, AlertCircle, PhoneCall, Plus, X } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -18,39 +18,35 @@ interface PhoneScreenPayload {
   timezone: string | null
 }
 
-// ── Slot generation (candidate-local, no calendar check) ───────────────────────
-// An AI places the call, so there's nothing to check availability against — we
-// give the candidate a proper calendar: upcoming days starting today, and any
-// 30-minute slot across the day (not just business hours). `new Date(y, m, d, h)`
-// builds times in the browser's local timezone (which IS the candidate's), so
-// toISOString() gives the correct UTC.
+// ── Day list (candidate-local, no calendar check) ─────────────────────────────
+// An AI places the call, so there's nothing to check availability against. The
+// candidate picks a day, then types any exact time that works for them (Option A:
+// day + free time picker). Each picked time becomes a 30-minute window we call in.
+// `new Date(y, m, d, h, min)` builds times in the browser's local timezone (which
+// IS the candidate's), so toISOString() yields the correct UTC.
 
-const DAYS_AHEAD    = 14   // today + next 13 days
-const SLOT_MINUTES  = 30   // 30-minute selectable windows
-const DAY_START_HOUR = 7   // earliest slot start (7:00 AM)
-const DAY_END_HOUR   = 22  // slots run up to (but not past) 22:00
+const DAYS_AHEAD   = 14   // today + next 13 days
+const SLOT_MINUTES = 30   // the call window length each picked time represents
 
-interface DaySlots { key: string; date: Date; slots: Slot[] }
+interface Day { key: string; date: Date }
 
-// Build the selectable days. On today, slots already in the past are dropped, so
-// a candidate opening the link late in the day just sees tomorrow onward.
-function upcomingDays(): DaySlots[] {
-  const out: DaySlots[] = []
+// Build the selectable days, starting today. Past-time validation happens at add
+// time (a candidate opening the link at 11pm can still pick a later slot today).
+function upcomingDays(): Day[] {
+  const out: Day[] = []
   const now = new Date()
   for (let offset = 0; offset < DAYS_AHEAD; offset++) {
     const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
-    const slots: Slot[] = []
-    for (let h = DAY_START_HOUR; h < DAY_END_HOUR; h++) {
-      for (let m = 0; m < 60; m += SLOT_MINUTES) {
-        const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m, 0, 0)
-        if (start.getTime() <= now.getTime()) continue  // skip past times today
-        const end = new Date(start.getTime() + SLOT_MINUTES * 60_000)
-        slots.push({ start: start.toISOString(), end: end.toISOString() })
-      }
-    }
-    if (slots.length > 0) out.push({ key: `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`, date: day, slots })
+    out.push({ key: `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`, date: day })
   }
   return out
+}
+
+// Local day-key for an ISO instant, matching the keys upcomingDays() produces, so
+// a picked time can be grouped back under its day tab.
+function dayKeyForIso(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -64,6 +60,8 @@ export default function PhoneScreenPage() {
   const [payload,    setPayload]    = useState<PhoneScreenPayload | null>(null)
   const [selected,   setSelected]   = useState<Set<string>>(new Set())  // chosen slot start ISOs
   const [activeDay,  setActiveDay]  = useState<string | null>(null)
+  const [timeInput,  setTimeInput]  = useState('')                      // "HH:MM" from the time field
+  const [addError,   setAddError]   = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted,  setSubmitted]  = useState(false)
 
@@ -71,7 +69,6 @@ export default function PhoneScreenPage() {
   const tzLabel = tz.replace(/_/g, ' ')
 
   const days = useMemo(() => upcomingDays(), [])
-  const allSlots = useMemo(() => days.flatMap(d => d.slots), [days])
 
   // Default the calendar to the first available day.
   useEffect(() => {
@@ -112,26 +109,44 @@ export default function PhoneScreenPage() {
     [tz],
   )
 
-  // Count selected slots per day, for the little badge on each day tab.
-  const selectedPerDay = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const d of days) {
-      const n = d.slots.filter(s => selected.has(s.start)).length
-      if (n > 0) counts.set(d.key, n)
+  // Group every picked time under its day, sorted chronologically. Drives both the
+  // per-day count badges and the list shown for the active day.
+  const selectedByDay = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const iso of Array.from(selected)) {
+      const key = dayKeyForIso(iso)
+      const arr = map.get(key) ?? []
+      arr.push(iso)
+      map.set(key, arr)
     }
-    return counts
-  }, [days, selected])
+    for (const arr of Array.from(map.values())) arr.sort()
+    return map
+  }, [selected])
 
-  const activeSlots = useMemo(
-    () => days.find(d => d.key === activeDay)?.slots ?? [],
-    [days, activeDay],
+  const activeTimes = useMemo(
+    () => (activeDay ? selectedByDay.get(activeDay) ?? [] : []),
+    [selectedByDay, activeDay],
   )
 
-  const toggle = (iso: string) => {
+  const addTime = () => {
+    if (!activeDay || !timeInput) return
+    const day = days.find(d => d.key === activeDay)?.date
+    if (!day) return
+    const [h, m] = timeInput.split(':').map(Number)
+    if (Number.isNaN(h) || Number.isNaN(m)) { setAddError('Please enter a valid time.'); return }
+    const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m, 0, 0)
+    if (start.getTime() <= Date.now()) { setAddError('Please pick a time in the future.'); return }
+    const iso = start.toISOString()
+    if (selected.has(iso)) { setAddError('You already added that time.'); return }
+    setSelected(prev => new Set(prev).add(iso))
+    setTimeInput('')
+    setAddError(null)
+  }
+
+  const removeTime = (iso: string) => {
     setSelected(prev => {
       const next = new Set(prev)
-      if (next.has(iso)) next.delete(iso)
-      else next.add(iso)
+      next.delete(iso)
       return next
     })
   }
@@ -140,7 +155,11 @@ export default function PhoneScreenPage() {
     if (selected.size === 0) return
     setSubmitting(true)
     try {
-      const slots = allSlots.filter(w => selected.has(w.start))
+      // Reconstruct each 30-minute window from its start instant.
+      const slots: Slot[] = Array.from(selected).map(iso => ({
+        start: iso,
+        end: new Date(new Date(iso).getTime() + SLOT_MINUTES * 60_000).toISOString(),
+      }))
       const res = await fetch(`/api/phone-screen/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -232,7 +251,7 @@ export default function PhoneScreenPage() {
           </div>
           <p className="text-sm text-slate-600">
             Your application is moving forward. We&apos;d love to do a quick AI phone screen — pick a
-            day, then tap every time that works for you, and we&apos;ll call you during one of them.
+            day, add any times that work for you, and we&apos;ll call you during one of them.
           </p>
         </div>
 
@@ -245,7 +264,7 @@ export default function PhoneScreenPage() {
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/60">
               <h2 className="text-sm font-semibold text-slate-700">Pick your preferred times</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Choose as many as you like. Times are shown in your timezone ({tzLabel}).
+                Choose a day, then add as many times as you like. Times are in your timezone ({tzLabel}).
               </p>
             </div>
 
@@ -253,11 +272,11 @@ export default function PhoneScreenPage() {
             <div className="flex gap-2 overflow-x-auto px-5 py-3 border-b border-slate-100">
               {days.map(d => {
                 const isActive = d.key === activeDay
-                const count = selectedPerDay.get(d.key) ?? 0
+                const count = selectedByDay.get(d.key)?.length ?? 0
                 return (
                   <button
                     key={d.key}
-                    onClick={() => setActiveDay(d.key)}
+                    onClick={() => { setActiveDay(d.key); setAddError(null) }}
                     className={`relative shrink-0 rounded-xl border px-3 py-2 text-center transition-colors ${
                       isActive
                         ? 'border-emerald-500 bg-emerald-50'
@@ -280,25 +299,53 @@ export default function PhoneScreenPage() {
               })}
             </div>
 
-            {/* Time slots for the active day. */}
+            {/* Add-a-time row + the list of times picked for the active day. */}
             <div className="px-5 py-4">
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {activeSlots.map(slot => {
-                  const isSel = selected.has(slot.start)
-                  return (
-                    <button
-                      key={slot.start}
-                      onClick={() => toggle(slot.start)}
-                      className={`rounded-lg border px-2 py-2 text-sm font-medium transition-colors ${
-                        isSel
-                          ? 'border-emerald-500 bg-emerald-600 text-white'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50'
-                      }`}
-                    >
-                      {timeFmt.format(new Date(slot.start))}
-                    </button>
-                  )
-                })}
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Add a time</label>
+                  <input
+                    type="time"
+                    value={timeInput}
+                    onChange={e => { setTimeInput(e.target.value); setAddError(null) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTime() } }}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={addTime}
+                  disabled={!timeInput}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#221b14] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#33271b] transition-colors disabled:opacity-40"
+                >
+                  <Plus className="h-4 w-4" /> Add
+                </button>
+              </div>
+              {addError && <p className="mt-1.5 text-xs text-red-500">{addError}</p>}
+
+              <div className="mt-4">
+                {activeTimes.length === 0 ? (
+                  <p className="text-sm text-slate-400">No times added for this day yet.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {activeTimes.map(iso => (
+                      <span
+                        key={iso}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500 bg-emerald-50 pl-3 pr-1.5 py-1.5 text-sm font-medium text-emerald-900"
+                      >
+                        {timeFmt.format(new Date(iso))}
+                        <button
+                          type="button"
+                          onClick={() => removeTime(iso)}
+                          aria-label={`Remove ${timeFmt.format(new Date(iso))}`}
+                          className="rounded-md p-0.5 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
