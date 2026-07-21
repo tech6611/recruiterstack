@@ -13,10 +13,15 @@ entries on top.
 
 ### Fixed
 - **CV preview was blocked by `X-Frame-Options: DENY` — the actual cause of the
-  blank/"refused to connect" viewer.** The global security header (added
-  2026-03-22 in the Phase 3 security commit, `079c9cb`) applied to `/(.*)`, so the
-  in-app `<iframe>` could never render the CV — *including PDFs*, not just Word
-  docs. The catch-all now excludes exactly `/api/candidates/:id/resume`, which
+  blank/"refused to connect" viewer.** The header has applied to `/(.*)` since
+  `079c9cb` (2026-03-22), but was harmless while the viewer framed a Supabase URL:
+  the header only binds the response that actually loads in the frame. It turned
+  fatal on **2026-07-14** in `529c7ca`, when the resume route stopped 302-redirecting
+  to a Supabase signed URL and began streaming bytes from our own origin — so the
+  framed response started carrying DENY. This broke *all* CV previews, PDFs
+  included; the "Word docs can't be previewed" card added later the same day
+  (`f1475cd`) misattributed the blank viewer to the file format.
+  The catch-all now excludes exactly `/api/candidates/:id/resume`, which
   opts into same-origin framing (`X-Frame-Options: SAMEORIGIN` +
   `Content-Security-Policy: frame-ancestors 'self'`). Verified against a running
   server: the CV route returns a single SAMEORIGIN header while `/`,
