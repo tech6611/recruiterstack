@@ -213,6 +213,96 @@ export function assertOwner(scope: ViewerScope): NextResponse | null {
 }
 
 /**
+ * The three system roles every org must have, mirroring the one-time seed in
+ * migrations 065 (Owner, Recruiter) and 092 (Hiring Manager). Owner is granted
+ * every capability by the resolver (is_owner short-circuit), so it needs no
+ * capability rows — see 065_rbac.sql. Keep this in lockstep with those
+ * migrations: they seed orgs that existed at migration time; this seeds every
+ * org created afterwards.
+ */
+const SYSTEM_ROLE_DEFS: ReadonlyArray<{
+  name: string
+  description: string
+  isOwner: boolean
+  capabilities: Capability[]
+}> = [
+  {
+    name: 'Owner',
+    description: 'Full access; manages roles and permissions.',
+    isOwner: true,
+    capabilities: [],
+  },
+  {
+    name: 'Recruiter',
+    description: 'Recruiting, openings and analytics. The default member role.',
+    isOwner: false,
+    capabilities: ['recruiting:view', 'recruiting:edit', 'openings:view', 'openings:edit', 'analytics:view'],
+  },
+  {
+    name: 'Hiring Manager',
+    description: 'Views and approves only their own requisitions and approvals. No settings, analytics, candidates or edit.',
+    isOwner: false,
+    capabilities: ['openings:view', 'openings:approve', 'approvals:view', 'approvals:approve'],
+  },
+]
+
+/**
+ * Ensure an org has its system roles (Owner / Recruiter / Hiring Manager) seeded.
+ *
+ * The migration seeds only ran for orgs that existed when they were applied
+ * (`SELECT DISTINCT org_id FROM org_members`); a brand-new org gets no system
+ * roles, so ensureDefaultMemberRole finds no role to assign and the member lands
+ * with zero capabilities — the "empty sidebar" bug. Seeding here, in the member
+ * setup path, closes that gap and self-heals any already-affected org on next
+ * touch. Idempotent: skips entirely once all three roles exist, and every write
+ * is a no-op-on-conflict upsert.
+ */
+export async function ensureSystemRoles(
+  supabase: Supabase,
+  orgId: string,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+
+  const { data: rows } = await sb
+    .from('rbac_roles')
+    .select('name')
+    .eq('org_id', orgId)
+    .eq('is_system', true)
+  const present = new Set(((rows ?? []) as { name: string }[]).map(r => r.name))
+  if (SYSTEM_ROLE_DEFS.every(r => present.has(r.name))) return  // already seeded
+
+  for (const def of SYSTEM_ROLE_DEFS) {
+    if (present.has(def.name)) continue
+
+    // Insert the role; ignoreDuplicates guards a concurrent seeder. The upsert
+    // returns no row when it no-ops on conflict, so re-read the id either way.
+    await sb
+      .from('rbac_roles')
+      .upsert(
+        { org_id: orgId, name: def.name, description: def.description, is_system: true, is_owner: def.isOwner },
+        { onConflict: 'org_id,name', ignoreDuplicates: true },
+      )
+    const { data: roleRow } = await sb
+      .from('rbac_roles')
+      .select('id')
+      .eq('org_id', orgId)
+      .eq('is_system', true)
+      .eq('name', def.name)
+      .maybeSingle()
+    const roleId = (roleRow as { id?: string } | null)?.id
+    if (!roleId || def.capabilities.length === 0) continue
+
+    await sb
+      .from('rbac_role_capabilities')
+      .upsert(
+        def.capabilities.map(capability => ({ role_id: roleId, capability })),
+        { onConflict: 'role_id,capability', ignoreDuplicates: true },
+      )
+  }
+}
+
+/**
  * Ensure a member has at least their default RBAC role assignment, so new
  * members (created after the migration backfill) aren't locked out once
  * enforcement is on. admin → Owner, hiring_manager → Hiring Manager, everyone
@@ -233,6 +323,11 @@ export async function ensureDefaultMemberRole(
     .eq('user_id', userId)
     .limit(1)
   if (((existing ?? []) as unknown[]).length > 0) return
+
+  // A brand-new org has no system roles seeded (the migration backfill only
+  // covered orgs existing at migration time). Seed them before we try to look
+  // one up below, otherwise the member gets no role → empty sidebar.
+  await ensureSystemRoles(supabase, orgId)
 
   // If the member was invited with a specific RBAC role (Settings → team invite
   // stamps it on the Clerk invitation), honor that instead of the default.

@@ -29,6 +29,18 @@ entries on top.
 
 ## 2026-07-25
 
+### Fixed
+- **New organizations came up with an empty sidebar (no capabilities).** The
+  system RBAC roles (Owner / Recruiter / Hiring Manager) were only ever seeded by
+  the one-time migration backfill (`SELECT DISTINCT org_id FROM org_members`), so
+  a brand-new org had none — `ensureDefaultMemberRole` then found no role to
+  assign and the member landed with zero capabilities, hiding the whole left nav.
+  Added `ensureSystemRoles(supabase, orgId)` (mirrors migrations 065 + 092) and
+  call it inside `ensureDefaultMemberRole` before the role lookup, so every org's
+  three system roles are seeded on member setup. Idempotent and self-healing —
+  any already-affected org is repaired on next touch. File: `src/lib/rbac.ts`
+  (+ `src/lib/__tests__/rbac-seed.test.ts`).
+
 ### Changed
 - **Word/ODF CVs now render as faithful PDFs, not flattened text.** Replaced the
   mammoth `.docx`→HTML path (which discards direct formatting — most real resumes
