@@ -2,6 +2,18 @@
 export const RESUME_BUCKET = 'resumes'
 
 /**
+ * Office/ODF document extensions a browser can't render natively. The resume
+ * route converts these to PDF (via the LibreOffice service) before serving, so
+ * the viewer shows the real document instead of force-downloading it.
+ */
+export const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'rtf', 'odt', 'dot', 'dotx', 'wps'])
+
+/** Lowercased file extension for a storage path (no leading dot), or ''. */
+export function resumeExt(path: string): string {
+  return path.split('.').pop()?.toLowerCase() ?? ''
+}
+
+/**
  * Extract the in-bucket object path from a Supabase storage URL, or null if the
  * URL isn't one of our storage objects (e.g. an external Google Drive link).
  * Handles the public, signed, and authenticated URL shapes.

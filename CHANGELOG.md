@@ -27,6 +27,26 @@ entries on top.
   `src/app/api/interviews/[id]/route.ts`, `src/app/api/offers/[id]/route.ts`,
   `src/lib/hooks/useCandidate.ts`.
 
+## 2026-07-25
+
+### Changed
+- **Word/ODF CVs now render as faithful PDFs, not flattened text.** Replaced the
+  mammoth `.docx`→HTML path (which discards direct formatting — most real resumes
+  use manual bold/bullets, not Word styles, so they came out as plain paragraphs)
+  with true document rendering via headless LibreOffice. New stateless Django
+  endpoint `POST /api/office-to-pdf` (bytes in, PDF out; guarded by a shared
+  `INTERNAL_API_SECRET`, not Clerk) converts doc/docx/rtf/odt. The Next.js resume
+  route calls it for office extensions, streams the PDF inline, and caches the
+  render next to the immutable source object so each CV converts once.
+  - *Ops:* the Django image now installs `libreoffice-writer` + metric-compatible
+    font packs (Liberation/Carlito/Caladea for Arial/Calibri/Cambria, DejaVu, Noto,
+    Indic). **Requires a new `INTERNAL_API_SECRET` env var set identically on both
+    Vercel and Railway.**
+  - *Files:* `Dockerfile`, `core/views_convert.py`, `core/urls.py`,
+    `core/middleware.py`, `config/urls.py`, `config/settings/base.py` (Django);
+    `src/app/api/candidates/[id]/resume/route.ts`, `src/lib/storage/resume.ts`,
+    `src/components/candidates/center/SummaryTab.tsx` (Next.js).
+
 ## 2026-07-21
 
 ### Fixed

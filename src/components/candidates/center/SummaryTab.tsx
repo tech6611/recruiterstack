@@ -6,17 +6,17 @@ import VoiceCallDetailModal from '../VoiceCallDetailModal'
 import { ScoreRing } from '@/components/ui/ScoreRing'
 import { Panel } from '@/components/ui/card'
 import { useCandidateProfile } from '../CandidateProfileContext'
-import { resumeStoragePath } from '@/lib/storage/resume'
+import { resumeStoragePath, resumeExt, OFFICE_EXTENSIONS } from '@/lib/storage/resume'
 
-// PDFs and plain text render natively in a browser <iframe>. Word .docx files
-// can't — but the resume API converts those to HTML on the fly (via mammoth), so
-// they preview too. Legacy .doc/.rtf still fall back to the Download card.
+// PDFs and plain text render natively in a browser <iframe>. Word/ODF docs can't,
+// but the resume API converts those to a faithful PDF (LibreOffice) before serving,
+// so they preview too. Anything else falls back to the Download card.
 function resumeIsPreviewable(resumeUrl: string | null | undefined): boolean {
   if (!resumeUrl) return false
   const path = resumeStoragePath(resumeUrl)
   if (!path) return true // external link (e.g. Google Drive) — let it try to embed
-  const ext = path.split('.').pop()?.toLowerCase() ?? ''
-  return ext === 'pdf' || ext === 'txt' || ext === 'docx'
+  const ext = resumeExt(path)
+  return ext === 'pdf' || ext === 'txt' || OFFICE_EXTENSIONS.has(ext)
 }
 
 interface VoiceCallSummary {

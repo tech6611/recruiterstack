@@ -1,8 +1,64 @@
 import { NextResponse } from 'next/server'
-import mammoth from 'mammoth'
 import { withCapability } from '@/lib/api/helpers'
-import { RESUME_BUCKET, resumeStoragePath, resumeContentType } from '@/lib/storage/resume'
+import { RESUME_BUCKET, resumeStoragePath, resumeContentType, resumeExt, OFFICE_EXTENSIONS } from '@/lib/storage/resume'
 import { logger } from '@/lib/logger'
+
+// First-time conversion of a large CV can take a few seconds; allow headroom.
+export const maxDuration = 60
+
+// Converted PDFs are cached next to the source object. The source filename is
+// timestamped/immutable, so the cached render never goes stale.
+const RENDERED_SUFFIX = '.rendered.pdf'
+
+/**
+ * Return a faithful PDF render of an office-document CV (Word/ODF), or null if
+ * conversion isn't possible. Serves a cached render when present; otherwise asks
+ * the Django LibreOffice service to convert, then caches the result best-effort.
+ */
+async function renderedOfficePdf(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  path: string,
+  file: Blob,
+): Promise<ArrayBuffer | null> {
+  const cacheKey = path + RENDERED_SUFFIX
+
+  const { data: cached } = await supabase.storage.from(RESUME_BUCKET).download(cacheKey)
+  if (cached) return await cached.arrayBuffer()
+
+  const djangoUrl = process.env.DJANGO_API_URL
+  const secret = process.env.INTERNAL_API_SECRET
+  if (!djangoUrl || !secret) {
+    logger.error('[resume] office→pdf not configured (need DJANGO_API_URL + INTERNAL_API_SECRET)')
+    return null
+  }
+
+  try {
+    const res = await fetch(`${djangoUrl}/api/office-to-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Internal-Secret': secret,
+        'X-File-Ext': resumeExt(path),
+      },
+      body: await file.arrayBuffer(),
+    })
+    if (!res.ok) {
+      logger.error('[resume] office→pdf conversion failed', { status: res.status })
+      return null
+    }
+    const pdf = await res.arrayBuffer()
+    // Cache for next time; a storage-policy hiccup must not break serving.
+    const { error: upErr } = await supabase.storage
+      .from(RESUME_BUCKET)
+      .upload(cacheKey, pdf, { contentType: 'application/pdf', upsert: true })
+    if (upErr) logger.error('[resume] could not cache converted PDF', upErr)
+    return pdf
+  } catch (err) {
+    logger.error('[resume] office→pdf conversion error', err)
+    return null
+  }
+}
 
 /**
  * GET /api/candidates/[id]/resume
@@ -52,35 +108,22 @@ export const GET = withCapability('recruiting:view', async (req, orgId, supabase
   const wantsDownload = new URL(req.url).searchParams.get('download') === '1'
   const filename = (path.split('/').pop() || 'resume').replace(/"/g, '')
   const disposition = wantsDownload ? 'attachment' : 'inline'
-  const ext = path.split('.').pop()?.toLowerCase() ?? ''
+  const ext = resumeExt(path)
 
-  // Word docs can't render natively in a browser <iframe>. When previewing (not
-  // downloading) a .docx, convert it to HTML with mammoth so the viewer shows the
-  // CV inline instead of the "can't preview" fallback. If conversion fails we fall
-  // through to serving the raw file. Legacy .doc isn't supported by mammoth.
-  if (!wantsDownload && ext === 'docx') {
-    try {
-      const buffer = Buffer.from(await file.arrayBuffer())
-      const { value: body } = await mammoth.convertToHtml({ buffer })
-      const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>
-        body { margin: 0; padding: 24px 28px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; font-size: 14px; }
-        h1, h2, h3 { color: #0f172a; line-height: 1.3; margin: 1.2em 0 0.4em; }
-        p { margin: 0 0 0.7em; }
-        ul, ol { margin: 0 0 0.7em; padding-left: 1.4em; }
-        table { border-collapse: collapse; width: 100%; }
-        td, th { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
-        a { color: #059669; }
-        img { max-width: 100%; height: auto; }
-      </style></head><body>${body}</body></html>`
-      return new NextResponse(html, {
+  // Word/ODF docs can't render natively in a browser <iframe>. When previewing
+  // (not downloading), convert to a faithful PDF via the LibreOffice service and
+  // serve that inline. If conversion is unavailable we fall through to serving
+  // the raw file (which the browser will download).
+  if (!wantsDownload && OFFICE_EXTENSIONS.has(ext)) {
+    const pdf = await renderedOfficePdf(supabase, path, file)
+    if (pdf) {
+      return new NextResponse(pdf, {
         headers: {
-          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Type': 'application/pdf',
           'Content-Disposition': 'inline',
           'Cache-Control': 'private, no-store',
         },
       })
-    } catch (err) {
-      logger.error('[resume] docx→html conversion failed, serving raw file', err)
     }
   }
 
