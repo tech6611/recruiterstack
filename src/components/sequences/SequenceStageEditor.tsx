@@ -364,16 +364,29 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
   }
 
   const insertTokenInBody = (token: string, anchor?: string) => {
-    // Link tokens are inserted as a real anchor (<a href="{{token}}">anchor</a>)
-    // so the candidate sees clickable text, not the raw URL. The Tiptap Link
-    // extension is configured to keep {{…}} hrefs, and applyTokens() rewrites the
-    // href to the real URL at send-time. Plain tokens insert as bare text.
-    const content = anchor ? `<a href="${token}">${anchor}</a>&nbsp;` : token
     const editor = editorRef.current
+
+    // Plain personalization tokens: drop the bare {{token}} at the cursor.
+    if (!anchor) {
+      if (editor) editor.chain().focus().insertContent(token).run()
+      else setBody(prev => prev + token)
+      return
+    }
+
+    // Link tokens ({{phone_screen_scheduler}} / {{hiring_manager_calendar}}):
+    // hyperlink the user's SELECTED text with the placeholder URL so they choose
+    // the wording. With nothing selected, drop in a default clickable phrase they
+    // can edit. The Tiptap Link extension keeps {{…}} hrefs; applyTokens()
+    // rewrites the href to the real URL at send-time.
     if (editor) {
-      editor.chain().focus().insertContent(content).run()
+      const { from, to } = editor.state.selection
+      if (from !== to) {
+        editor.chain().focus().setLink({ href: token }).run()
+      } else {
+        editor.chain().focus().insertContent(`<a href="${token}">${anchor}</a>&nbsp;`).run()
+      }
     } else {
-      setBody(prev => prev + content)
+      setBody(prev => prev + `<a href="${token}">${anchor}</a> `)
     }
   }
 
@@ -762,6 +775,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                   key={t.token}
                   type="button"
                   onClick={() => insertTokenInBody(t.token, t.link ? t.anchor : undefined)}
+                  title={t.link ? 'Select text in the message first, then click to turn it into this link' : undefined}
                   className="rounded-lg bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 hover:bg-emerald-100 transition-colors"
                 >
                   + {t.label}

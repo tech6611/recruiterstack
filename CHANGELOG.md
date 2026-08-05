@@ -35,10 +35,12 @@ entries on top.
   The per-enrollment `reply+<id>@…` routing address stays intact, but the mail
   client now shows the sender name (e.g. "RecruiterStack Hiring Team") instead of
   the raw token. Files: `src/lib/api/job-handlers.ts`, `src/lib/email/send-reply.ts`.
-- **Sequence link tokens insert clickable hyperlinks, not raw URLs.** The
-  "+ Phone Screen Slots" and "+ HM Calendar Link" buttons now drop in an editable
-  anchor (`<a href="{{token}}">…</a>`) so candidates see friendly link text
-  instead of the full URL. Preview now resolves the phone-screen token too. File:
+- **Sequence link tokens hyperlink your selected text.** Select any text in the
+  message body and click "+ Phone Screen Slots" or "+ HM Calendar Link" to turn
+  that text into the link (the `{{token}}` sits in the href and is rewritten to
+  the real URL at send-time, so candidates see friendly wording, never a raw URL).
+  With nothing selected, the button drops in an editable default phrase instead.
+  Preview now resolves the phone-screen token too. File:
   `src/components/sequences/SequenceStageEditor.tsx`.
 
 ## 2026-07-22
