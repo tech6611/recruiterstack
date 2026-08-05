@@ -9,6 +9,36 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-05 — Native Slack integration (Slices 1–2)
+
+### Added
+- **Interactive lifecycle Slack DMs.** The three routed events (`candidate_applied`,
+  `stage_moved`, `candidate_hired`) now DM recruiters/hiring managers a rich Block
+  Kit message with working buttons: **Move to next stage**, **Add note** (modal),
+  and **Open in RecruiterStack**. Buttons reuse the same domain facades as the web
+  app (`updateApplicationStage`, `recordApplicationEventSafe`) and are gated on the
+  clicker's `recruiting:edit` capability. Channel posts are unchanged (plain-text
+  webhook). Files: `src/lib/slack/blocks.ts`, `src/lib/slack/handlers/applications.ts`,
+  `src/lib/slack/dispatch.ts`, `src/modules/ats/domain/applications.ts`
+  (`getApplicationStageProgression`).
+- **Generalized Slack interaction dispatcher.** `/api/slack/interactions` is now a
+  thin router that resolves the acting user once and dispatches by `action_id` /
+  `callback_id` via a registry (`src/lib/slack/actions.ts`), instead of being
+  hard-wired to approvals. Approvals were moved behind the registry with identical
+  behavior (`src/lib/slack/handlers/approvals.ts`).
+- **Shared Slack Web API client** (`src/lib/slack/client.ts`) — consolidates the
+  bot-token/decrypt/fetch boilerplate previously duplicated across notifications,
+  the interactions route, and approvals. `notifySlackDM`, approvals, and the route
+  now use it.
+- **Slack ↔ RecruiterStack identity cache** (`src/lib/slack/identity.ts`) — resolves
+  Slack users to RS users (and back) via the new `slack_user_map` table, hitting the
+  Slack API only on a cache miss. Makes DMs reliable and fixes repeat live lookups.
+
+### Schema
+- **Migration `097_slack_user_map.sql`** — new `slack_user_map(org_id, user_id ↔
+  slack_user_id)` cache table (RLS + service-role policy + updated_at trigger).
+  **Apply manually in the Supabase SQL Editor.**
+
 ## 2026-08-05
 
 ### Added

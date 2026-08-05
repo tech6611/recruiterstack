@@ -508,6 +508,66 @@ export async function getApplicationStageNameInOrg(
   return (data ?? null) as any
 }
 
+export interface StageProgression {
+  applicationId: string
+  currentStageId: string | null
+  currentStageName: string | null
+  nextStageId: string | null
+  nextStageName: string | null
+}
+
+/**
+ * Where an application sits in its pipeline and what the next stage is.
+ *
+ * Pipeline stages are grouped by `hiring_request_id` (which, for canonical jobs,
+ * holds the job id) and ordered by `order_index`. We follow the current stage's
+ * own grouping key so this works across the legacy/canonical split. The "next"
+ * stage is the lowest order_index strictly greater than the current one; null
+ * when the application is already at the final stage (or has no stages).
+ * Used by the Slack "Move to next stage" button. Org-scoped. Never throws.
+ */
+export async function getApplicationStageProgression(
+  supabase: Supabase,
+  orgId: string,
+  applicationId: string,
+): Promise<StageProgression | null> {
+  const { data: appRow } = await supabase
+    .from('applications')
+    .select('id, stage_id, hiring_request_id, job_id, stage:pipeline_stages(id, name, order_index, hiring_request_id)')
+    .eq('id', applicationId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const app = appRow as any
+  if (!app) return null
+
+  const stage = app.stage ?? null
+  const groupKey: string | null =
+    stage?.hiring_request_id ?? app.hiring_request_id ?? app.job_id ?? null
+
+  const base: StageProgression = {
+    applicationId,
+    currentStageId: app.stage_id ?? null,
+    currentStageName: stage?.name ?? null,
+    nextStageId: null,
+    nextStageName: null,
+  }
+  if (!groupKey) return base
+
+  const { data: stagesRaw } = await supabase
+    .from('pipeline_stages')
+    .select('id, name, order_index')
+    .eq('hiring_request_id', groupKey)
+    .eq('org_id', orgId)
+    .order('order_index', { ascending: true })
+  const stages = (stagesRaw ?? []) as Array<{ id: string; name: string; order_index: number }>
+
+  // No current stage → the first stage is "next"; else the next one along.
+  const currentOrder = stage?.order_index ?? -1
+  const next = stages.find(s => s.order_index > currentOrder) ?? null
+  return { ...base, nextStageId: next?.id ?? null, nextStageName: next?.name ?? null }
+}
+
 /** Set the stage of one application by id only (no org filter), mirroring the
  *  prior inline update inside the bulk move loop where the row was already
  *  org-verified by the preceding fetch. */

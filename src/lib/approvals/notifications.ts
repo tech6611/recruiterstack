@@ -8,9 +8,9 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/server'
-import { decryptSafe } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email/send'
+import { hasSlackInstalled, usersLookupByEmail, chatPostMessage } from '@/lib/slack/client'
 import {
   renderApprovalRequested,
   renderApprovalStepDecided,
@@ -60,16 +60,6 @@ async function getTargetTitle(targetType: ApprovalTargetType, targetId: string):
   return 'Offer'
 }
 
-async function hasSlackInstalled(orgId: string): Promise<boolean> {
-  const supabase = createAdminClient()
-  const { data } = await supabase
-    .from('org_settings')
-    .select('slack_bot_token')
-    .eq('org_id', orgId)
-    .maybeSingle()
-  return !!decryptSafe((data as { slack_bot_token: string | null } | null)?.slack_bot_token ?? null)
-}
-
 // ── Slack interactive message (Block Kit) ──────────────────────────
 
 async function sendSlackApprovalRequest(
@@ -81,65 +71,39 @@ async function sendSlackApprovalRequest(
   stepName: string,
   requesterName: string,
 ): Promise<void> {
-  const supabase = createAdminClient()
-  const { data } = await supabase
-    .from('org_settings')
-    .select('slack_bot_token')
-    .eq('org_id', orgId)
-    .maybeSingle()
-  const token = decryptSafe((data as { slack_bot_token: string | null } | null)?.slack_bot_token ?? null)
-  if (!token || !email) return
+  if (!email) return
+  // Resolve the approver's Slack user id (cached). A miss is logged by the
+  // resolver — common cause is an invited placeholder approver whose email
+  // isn't in the workspace; email + in-app still reach them.
+  const slackUserId = await usersLookupByEmail(orgId, email)
+  if (!slackUserId) return
 
-  try {
-    const userRes = await fetch(
-      `https://slack.com/api/users.lookupByEmail?email=${encodeURIComponent(email)}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    )
-    const userData = await userRes.json()
-    if (!userData.ok || !userData.user?.id) {
-      // Common cause: the approver is an invited placeholder (no Clerk login,
-      // provisioned_via 'approver_invite') whose email isn't a member of the
-      // connected Slack workspace — so Slack can't resolve them to DM. Email +
-      // in-app still reach them; log so this silent gap is diagnosable.
-      logger.warn('[slack-interactive] no Slack user for email — DM skipped', {
-        orgId, email, slackError: userData.error ?? null,
-      })
-      return
-    }
+  // value is parsed by /api/slack/interactions; encode the IDs we need.
+  const value = `${approvalId}::${stepId}`
+  const blocks = [
+    {
+      type: 'section',
+      text: { type: 'mrkdwn',
+        text: `*Approval requested*\n${requesterName} needs your decision on *${escapeMd(targetTitle)}* (step: ${escapeMd(stepName)}).` },
+    },
+    {
+      type: 'actions',
+      elements: [
+        { type: 'button', text: { type: 'plain_text', text: '✅ Approve' },
+          style: 'primary', action_id: 'approval_approve', value },
+        { type: 'button', text: { type: 'plain_text', text: '❌ Reject' },
+          style: 'danger', action_id: 'approval_reject', value },
+        { type: 'button', text: { type: 'plain_text', text: 'Open in app' },
+          url: `${APP_URL()}/approvals/inbox`, action_id: 'approval_open' },
+      ],
+    },
+  ]
 
-    // value is parsed by /api/slack/interactions; encode the IDs we need.
-    const value = `${approvalId}::${stepId}`
-    const blocks = [
-      {
-        type: 'section',
-        text: { type: 'mrkdwn',
-          text: `*Approval requested*\n${requesterName} needs your decision on *${escapeMd(targetTitle)}* (step: ${escapeMd(stepName)}).` },
-      },
-      {
-        type: 'actions',
-        elements: [
-          { type: 'button', text: { type: 'plain_text', text: '✅ Approve' },
-            style: 'primary', action_id: 'approval_approve', value },
-          { type: 'button', text: { type: 'plain_text', text: '❌ Reject' },
-            style: 'danger', action_id: 'approval_reject', value },
-          { type: 'button', text: { type: 'plain_text', text: 'Open in app' },
-            url: `${APP_URL()}/approvals/inbox`, action_id: 'approval_open' },
-        ],
-      },
-    ]
-
-    await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        channel: userData.user.id,
-        text: `Approval requested: ${targetTitle}`,
-        blocks,
-      }),
-    })
-  } catch (err) {
-    logger.error('[slack-interactive] send failed', err, { orgId, email })
-  }
+  await chatPostMessage(orgId, {
+    channel: slackUserId,
+    text: `Approval requested: ${targetTitle}`,
+    blocks,
+  })
 }
 
 function escapeMd(s: string): string {

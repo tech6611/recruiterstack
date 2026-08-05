@@ -1249,6 +1249,32 @@ export interface SlackEventRouting {
 
 export type SlackRouting = Partial<Record<SlackEventKey, SlackEventRouting>>
 
+// ── Slack identity map (migration 097) ───────────────────────────────────────
+// Persistent cache of the Slack-user ↔ RecruiterStack-user mapping, so we don't
+// hit the Slack API on every DM / button click. Resolved lazily by
+// src/lib/slack/identity.ts.
+export interface SlackUserMap {
+  id: string
+  org_id: string
+  user_id: string
+  slack_user_id: string
+  slack_team_id: string | null
+  email: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SlackUserMapInsert
+  extends Omit<SlackUserMap, 'id' | 'created_at' | 'updated_at' | 'slack_team_id' | 'email'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  slack_team_id?: string | null
+  email?: string | null
+}
+
+export interface SlackUserMapUpdate extends Partial<SlackUserMapInsert> {}
+
 export interface OrgSettings {
   org_id: string
   slack_webhook_url: string | null
@@ -2038,6 +2064,12 @@ export type Database = {
         Row: Indexify<EmailMessage>
         Insert: Indexify<EmailMessageInsert>
         Update: Indexify<EmailMessageUpdate>
+        Relationships: []
+      }
+      slack_user_map: {
+        Row: Indexify<SlackUserMap>
+        Insert: Indexify<SlackUserMapInsert>
+        Update: Indexify<SlackUserMapUpdate>
         Relationships: []
       }
     }
