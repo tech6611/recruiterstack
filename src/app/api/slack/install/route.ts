@@ -15,7 +15,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Slack integration not configured' }, { status: 500 })
   }
 
-  const scopes = 'chat:write,users:read,users:read.email,im:write'
+  // Bot scopes. Beyond the original DM set we add:
+  //   chat:write.public — post to any public channel without inviting the bot
+  //   channels:read, groups:read — list channels for the Settings channel picker
+  //   commands — pre-authorise the (Slice 4) /recruiterstack slash command so it
+  //     needs no second reconnect
+  const scopes =
+    'chat:write,chat:write.public,channels:read,groups:read,commands,users:read,users:read.email,im:write'
   const redirectUri = encodeURIComponent(
     `${process.env.NEXT_PUBLIC_APP_URL}/api/slack/callback`
   )

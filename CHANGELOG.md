@@ -9,6 +9,31 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-05 — Native Slack integration (Slice 3: channel posting)
+
+### Added
+- **Native channel posting.** When an admin picks a channel (new picker in Settings →
+  Integrations → Slack App), lifecycle alerts post there via bot-token
+  `chat.postMessage` as **rich messages with working buttons** (Move-stage / Add-note /
+  Open) instead of the plain-text webhook. The existing interaction dispatcher handles
+  channel button clicks with no changes. Files: `src/lib/slack/dispatch.ts`,
+  `src/lib/slack/client.ts` (`conversationsList`), `src/app/api/slack/channels/route.ts`,
+  `src/app/(dashboard)/settings/page.tsx`.
+- **Per-candidate threading.** The first channel post for a candidate is remembered
+  (`slack_channel_messages`); later events (`stage_moved`, `candidate_hired`) reply
+  in-thread so each candidate's updates stay together.
+- **Wider OAuth scopes + reconnect prompt.** Install now requests `chat:write.public`,
+  `channels:read`, `groups:read`, and `commands` (the last pre-authorises the upcoming
+  slash command, so no second reconnect). The Slack App card prompts admins to reconnect
+  when channel posting isn't yet enabled. `src/app/api/slack/install/route.ts`.
+- **Backward compatible:** orgs with no channel chosen (or not reconnected) keep the
+  existing plain-text webhook path.
+
+### Schema
+- **Migration `098_slack_channel.sql`** — adds `org_settings.slack_channel_id` /
+  `slack_channel_name` and a `slack_channel_messages` thread-anchor table (RLS +
+  service-role policy + updated_at trigger). **Apply manually in the Supabase SQL Editor.**
+
 ## 2026-08-05 — Native Slack integration (Slices 1–2)
 
 ### Added
@@ -65,10 +90,12 @@ entries on top.
   The per-enrollment `reply+<id>@…` routing address stays intact, but the mail
   client now shows the sender name (e.g. "RecruiterStack Hiring Team") instead of
   the raw token. Files: `src/lib/api/job-handlers.ts`, `src/lib/email/send-reply.ts`.
-- **Sequence link tokens insert clickable hyperlinks, not raw URLs.** The
-  "+ Phone Screen Slots" and "+ HM Calendar Link" buttons now drop in an editable
-  anchor (`<a href="{{token}}">…</a>`) so candidates see friendly link text
-  instead of the full URL. Preview now resolves the phone-screen token too. File:
+- **Sequence link tokens hyperlink your selected text.** Select any text in the
+  message body and click "+ Phone Screen Slots" or "+ HM Calendar Link" to turn
+  that text into the link (the `{{token}}` sits in the href and is rewritten to
+  the real URL at send-time, so candidates see friendly wording, never a raw URL).
+  With nothing selected, the button drops in an editable default phrase instead.
+  Preview now resolves the phone-screen token too. File:
   `src/components/sequences/SequenceStageEditor.tsx`.
 
 ## 2026-07-22

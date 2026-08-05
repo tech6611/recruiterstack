@@ -34,6 +34,8 @@ export interface PostMessageArgs {
   channel: string
   text: string
   blocks?: unknown[]
+  /** Set to reply in-thread under an existing message (its ts). */
+  thread_ts?: string
 }
 
 export interface UpdateMessageArgs {
@@ -199,6 +201,43 @@ export async function usersLookupByEmail(orgId: string, email: string): Promise<
   const token = await getBotToken(orgId)
   if (!token) return null
   return usersLookupByEmailWithToken(token, email)
+}
+
+// ── conversations.list (channel picker) ──────────────────────────────
+
+export interface SlackChannel {
+  id: string
+  name: string
+}
+
+/**
+ * List the public channels in the org's workspace for the Settings channel
+ * picker. Returns [] if Slack isn't connected or the call fails. Pulls a single
+ * page (up to 1000) sorted by name — enough for a dropdown; pagination can be
+ * added later if an org outgrows it.
+ */
+export async function conversationsList(orgId: string): Promise<SlackChannel[]> {
+  const token = await getBotToken(orgId)
+  if (!token) return []
+  try {
+    const res = await fetch(
+      `${SLACK_API}/conversations.list?types=public_channel&exclude_archived=true&limit=1000`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    const body = (await res.json()) as SlackApiResult & {
+      channels?: Array<{ id: string; name: string }>
+    }
+    if (!body.ok || !body.channels) {
+      logger.warn('[slack] conversations.list failed', { slackError: body.error ?? null })
+      return []
+    }
+    return body.channels
+      .map(c => ({ id: c.id, name: c.name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  } catch (err) {
+    logger.error('[slack] conversations.list threw', err)
+    return []
+  }
 }
 
 // ── response_url (ephemeral replies to an interaction) ───────────────
