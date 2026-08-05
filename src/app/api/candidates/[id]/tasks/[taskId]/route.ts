@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
+import { recordCandidateEventSafe } from '@/modules/ats/domain/applications'
 
 // PATCH /api/candidates/[id]/tasks/[taskId]
 // Accepts: title, description, due_date, assignee_name, completed (boolean)
@@ -39,6 +40,9 @@ export const PATCH = withCapability('recruiting:edit', async (req, orgId, supaba
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
   }
 
+  // A task moving to "done" is a candidate action worth showing on History.
+  const markedDone = body.completed === true || body.status === 'done'
+
   // Separate status/completed_at from other updates for graceful fallback
   const statusUpdates: Record<string, unknown> = {}
   if ('status'       in updates) { statusUpdates.status       = updates.status;       delete updates.status }
@@ -70,10 +74,23 @@ export const PATCH = withCapability('recruiting:edit', async (req, orgId, supaba
         const httpStatus = error2.code === 'PGRST116' ? 404 : 500
         return NextResponse.json({ error: error2.message }, { status: httpStatus })
       }
+      if (markedDone) {
+        await recordCandidateEventSafe(supabase, {
+          orgId, candidateId: params.id, eventType: 'task_completed',
+          note: (data2 as { title?: string } | null)?.title ?? null,
+        })
+      }
       return NextResponse.json({ data: { ...data2, ...statusUpdates } })
     }
     const httpStatus = error.code === 'PGRST116' ? 404 : 500
     return NextResponse.json({ error: error.message }, { status: httpStatus })
+  }
+
+  if (markedDone) {
+    await recordCandidateEventSafe(supabase, {
+      orgId, candidateId: params.id, eventType: 'task_completed',
+      note: (data as { title?: string } | null)?.title ?? null,
+    })
   }
 
   return NextResponse.json({ data })

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
+import { recordCandidateEventSafe } from '@/modules/ats/domain/applications'
 
 // GET /api/candidates/[id]/tasks
 // Returns tasks ordered: incomplete first (by due_date asc), then completed (by completed_at desc)
@@ -62,10 +63,13 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
         .select()
         .single()
       if (error2) return NextResponse.json({ error: error2.message }, { status: 500 })
+      await recordCandidateEventSafe(supabase, { orgId, candidateId: params.id, eventType: 'task_created', note: title })
       return NextResponse.json({ data: { ...data2, status: statusValue } }, { status: 201 })
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  await recordCandidateEventSafe(supabase, { orgId, candidateId: params.id, eventType: 'task_created', note: title })
 
   return NextResponse.json({ data }, { status: 201 })
 })

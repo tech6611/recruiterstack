@@ -14,7 +14,12 @@ import type { Editor } from '@tiptap/react'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const TOKENS = [
+// `link` tokens resolve to a URL at send-time. Instead of dropping the raw
+// token (which renders as the full ugly URL in the email), their buttons insert
+// a proper clickable hyperlink — `anchor` is the default visible text, which the
+// recruiter can edit inline. The {{token}} sits in the href and is rewritten to
+// the real URL when the email is sent.
+const TOKENS: { token: string; label: string; link?: boolean; anchor?: string }[] = [
   { token: '{{candidate_first_name}}', label: 'First Name' },
   { token: '{{candidate_name}}',       label: 'Full Name' },
   { token: '{{candidate_title}}',      label: 'Current Title' },
@@ -23,8 +28,8 @@ const TOKENS = [
   { token: '{{job_title}}',            label: 'Job Title' },
   { token: '{{company_name}}',         label: 'Hiring Company' },
   { token: '{{recruiter_name}}',       label: 'Recruiter' },
-  { token: '{{hiring_manager_calendar}}', label: 'HM Calendar Link' },
-  { token: '{{phone_screen_scheduler}}', label: 'Phone Screen Slots' },
+  { token: '{{hiring_manager_calendar}}', label: 'HM Calendar Link', link: true, anchor: 'book a time with the hiring manager' },
+  { token: '{{phone_screen_scheduler}}', label: 'Phone Screen Slots', link: true, anchor: 'share your availability' },
 ]
 
 const CHANNELS: { value: SequenceChannel; label: string; icon: string; soon?: boolean }[] = [
@@ -302,6 +307,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
       recruiter_title: settings.recruiter_title || '',
       department: 'Engineering',
       hiring_manager_calendar: 'https://recruiterstack.in/schedule/preview-link',
+      phone_screen_scheduler: 'https://recruiterstack.in/phone-screen/preview-link',
     }
 
     const renderedSubject = subject.replace(/\{\{(\w+)\}\}/g, (_, key) => sampleContext[key] || `[${key}]`)
@@ -357,12 +363,17 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
     }
   }
 
-  const insertTokenInBody = (token: string) => {
+  const insertTokenInBody = (token: string, anchor?: string) => {
+    // Link tokens are inserted as a real anchor (<a href="{{token}}">anchor</a>)
+    // so the candidate sees clickable text, not the raw URL. The Tiptap Link
+    // extension is configured to keep {{…}} hrefs, and applyTokens() rewrites the
+    // href to the real URL at send-time. Plain tokens insert as bare text.
+    const content = anchor ? `<a href="${token}">${anchor}</a>&nbsp;` : token
     const editor = editorRef.current
     if (editor) {
-      editor.chain().focus().insertContent(token).run()
+      editor.chain().focus().insertContent(content).run()
     } else {
-      setBody(prev => prev + token)
+      setBody(prev => prev + content)
     }
   }
 
@@ -750,7 +761,7 @@ export default function SequenceStageEditor({ sequenceId, stage, stageCount, isF
                 <button
                   key={t.token}
                   type="button"
-                  onClick={() => insertTokenInBody(t.token)}
+                  onClick={() => insertTokenInBody(t.token, t.link ? t.anchor : undefined)}
                   className="rounded-lg bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 hover:bg-emerald-100 transition-colors"
                 >
                   + {t.label}

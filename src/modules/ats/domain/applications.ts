@@ -6,6 +6,7 @@ import type {
   Database,
   ScreeningAnswer,
 } from '@/lib/types/database'
+import { logger } from '@/lib/logger'
 
 type Supabase = SupabaseClient<Database>
 
@@ -81,6 +82,82 @@ export async function recordApplicationEvent(
     .insert(input as never)
 
   if (error) throw error
+}
+
+/**
+ * Best-effort variant of {@link recordApplicationEvent} for History logging that
+ * is *secondary* to the action being performed. Swallows (and logs) errors so a
+ * failed timeline write never breaks the primary operation.
+ */
+export async function recordApplicationEventSafe(
+  supabase: Supabase,
+  input: ApplicationEventInsert,
+): Promise<void> {
+  try {
+    await recordApplicationEvent(supabase, input)
+  } catch (err) {
+    logger.error('Failed to record application_event (non-fatal)', err, {
+      eventType: input.event_type,
+      applicationId: input.application_id,
+    })
+  }
+}
+
+/**
+ * The candidate's most-recent application in the org, or null if they have none.
+ * History (`application_events`) is application-scoped, so candidate-level
+ * actions (tags, tasks, profile edits, …) are attached to this application.
+ */
+export async function resolveCandidateApplicationId(
+  supabase: Supabase,
+  orgId: string,
+  candidateId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('applications')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('candidate_id', candidateId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return (data as { id: string } | null)?.id ?? null
+}
+
+/**
+ * Log a candidate-level action to History. Resolves the candidate's most-recent
+ * application and records the event against it. No-op (not an error) when the
+ * candidate has no application yet — e.g. a CRM-only contact — since there is no
+ * application-scoped timeline to attach to. Never throws.
+ */
+export async function recordCandidateEventSafe(
+  supabase: Supabase,
+  input: {
+    orgId: string
+    candidateId: string
+    eventType: string
+    createdBy?: string
+    note?: string | null
+    metadata?: Record<string, unknown>
+  },
+): Promise<void> {
+  try {
+    const applicationId = await resolveCandidateApplicationId(supabase, input.orgId, input.candidateId)
+    if (!applicationId) return
+    await recordApplicationEvent(supabase, {
+      org_id: input.orgId,
+      application_id: applicationId,
+      event_type: input.eventType,
+      created_by: input.createdBy ?? 'Recruiter',
+      note: input.note ?? null,
+      metadata: input.metadata ?? {},
+    } as ApplicationEventInsert)
+  } catch (err) {
+    logger.error('Failed to record candidate event (non-fatal)', err, {
+      eventType: input.eventType,
+      candidateId: input.candidateId,
+    })
+  }
 }
 
 /** Active applications for a set of candidates, with their job title.

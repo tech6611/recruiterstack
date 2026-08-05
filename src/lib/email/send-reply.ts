@@ -46,8 +46,10 @@ export async function sendConversationReply(
   }
 
   const html = input.bodyHtml || input.bodyText.replace(/\n/g, '<br>')
+  // Mask the raw reply+<id>@… token behind a friendly display name (the address
+  // itself must stay intact for inbound routing). Mirrors job-handlers.ts.
   const replyTo = input.conversation.enrollment_id
-    ? replyToAddress(input.conversation.enrollment_id)
+    ? { email: replyToAddress(input.conversation.enrollment_id), name: 'RecruiterStack' }
     : undefined
 
   sgMail.setApiKey(apiKey)

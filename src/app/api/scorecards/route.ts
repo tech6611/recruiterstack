@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
+import { recordApplicationEventSafe } from '@/modules/ats/domain/applications'
 
 export const GET = withCapability('recruiting:view', async (req, orgId, supabase) => {
   const application_id = req.nextUrl.searchParams.get('application_id')
@@ -44,5 +45,14 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await recordApplicationEventSafe(supabase, {
+    application_id,
+    event_type: 'scorecard_added',
+    note: `${recommendation}${interviewer_name ? ` · ${interviewer_name.trim()}` : ''}`,
+    created_by: interviewer_name?.trim() || 'Recruiter',
+    org_id: orgId,
+  })
+
   return NextResponse.json({ data }, { status: 201 })
 })

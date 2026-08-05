@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withCapability, parseBody } from '@/lib/api/helpers'
 import { candidateUpdateSchema } from '@/lib/validations/candidates'
+import { recordCandidateEventSafe } from '@/modules/ats/domain/applications'
 
 // GET /api/candidates/:id — candidate + all applications (with job + stage) + all events + tags + tasks + referrals
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
@@ -139,6 +140,15 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
       .update(identityPatch as never)
       .eq('id', candidate.person_id).eq('org_id', orgId)
     if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 })
+  }
+
+  // Record which fields a recruiter edited on the candidate's History timeline.
+  const changedFields = [...Object.keys(identityPatch), ...Object.keys(candidatePatch)]
+  if (changedFields.length > 0) {
+    const labels = changedFields.map(f => f.replace(/_/g, ' ')).join(', ')
+    await recordCandidateEventSafe(supabase, {
+      orgId, candidateId: params.id, eventType: 'candidate_updated', note: `Updated: ${labels}`,
+    })
   }
 
   return NextResponse.json({ data: candidate })

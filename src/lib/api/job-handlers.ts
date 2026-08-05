@@ -23,6 +23,7 @@ import {
 } from '@/modules/ats/domain/candidates'
 import {
   listApplicationsForCandidateSummary,
+  recordApplicationEventSafe,
 } from '@/modules/ats/domain/applications'
 import { getRoleMatchingInputs } from '@/modules/ats/domain/role-profiles'
 import { getApplicationJobTokens, resolveApplicationHiringManager } from '@/modules/ats/domain/job-pipelines'
@@ -550,7 +551,7 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     if (phoneScreenUrl) tokenValues.phone_screen_scheduler = phoneScreenUrl
   }
 
-  let subject = applyTokens(stage.subject ?? '', tokenValues)
+  const subject = applyTokens(stage.subject ?? '', tokenValues)
   let body = applyTokens(stage.body ?? '', tokenValues)
 
   // Append a one-click unsubscribe footer so every outbound sequence email is
@@ -572,7 +573,13 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
   // to THIS enrollment, letting the inbound webhook mark it 'replied' and
   // auto-stop the remaining stages. See recruiterstack-api sequences/views_webhooks.py.
   const replyDomain = process.env.SEQUENCE_REPLY_DOMAIN || 'reply.recruiterstack.in'
-  const replyTo = `reply+${enrollmentId}@${replyDomain}`
+  // The address must stay unique per enrollment for inbound routing, but we mask
+  // the raw token behind a friendly display name so the candidate's mail client
+  // shows "RecruiterStack Hiring Team" instead of the bare reply+<id>@… address.
+  const replyTo = {
+    email: `reply+${enrollmentId}@${replyDomain}`,
+    name: stage.send_on_behalf_of || 'RecruiterStack',
+  }
 
   let sendgridMessageId: string | null = null
   try {
@@ -609,6 +616,20 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
       to_email: candidate.email, subject, body, sendgrid_message_id: sendgridMessageId,
       status: 'sent', sent_at: new Date().toISOString(), org_id: job.org_id,
     })
+
+  // Mirror the send onto the candidate's History timeline so sequence emails
+  // appear alongside manual emails. Application-scoped; skipped for CRM-only
+  // enrollments that have no application to attach to.
+  if (enrollment.application_id) {
+    await recordApplicationEventSafe(supabase, {
+      org_id: job.org_id,
+      application_id: enrollment.application_id,
+      event_type: 'email_sent',
+      created_by: stage.send_on_behalf_of || 'Sequence',
+      note: `Sequence email · ${subject}`,
+      metadata: { subject, source: 'sequence', enrollment_id: enrollmentId, stage_id: stage.id },
+    })
+  }
 
   // Mark this stage handled and advance the display cursor (stages done so far).
   processedStageIds.add(stage.id)

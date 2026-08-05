@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
+import { recordCandidateEventSafe } from '@/modules/ats/domain/applications'
 
 // GET /api/candidates/[id]/tags
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
@@ -48,6 +49,10 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  await recordCandidateEventSafe(supabase, {
+    orgId, candidateId: params.id, eventType: 'tag_added', note: tag,
+  })
 
   return NextResponse.json({ data }, { status: 201 })
 })

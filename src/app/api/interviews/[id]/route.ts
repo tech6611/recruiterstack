@@ -58,12 +58,31 @@ export const PATCH = withCapability('recruiting:edit', async (req, orgId, supaba
     })
     // Remove the real calendar event and notify attendees.
     await runInterviewCancellationSideEffects(supabase, orgId, params.id)
+  } else if (body.scheduled_at !== undefined) {
+    // Time moved without a status change — record the reschedule on History.
+    await supabase.from('application_events').insert({
+      application_id: data.application_id,
+      org_id:         orgId,
+      event_type:     'interview_scheduled',
+      note:           `Interview rescheduled with ${data.interviewer_name}`,
+      metadata:       { interview_id: params.id, rescheduled: true },
+      created_by:     orgId,
+    })
   }
 
   return NextResponse.json({ data })
 })
 
 export const DELETE = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }) => {
+  // Read the row first: we need its application_id/interviewer for the History
+  // entry, and the calendar side effects need its stored details.
+  const { data: interview } = await supabase
+    .from('interviews')
+    .select('application_id, interviewer_name')
+    .eq('id', params.id)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
   // Clean up the calendar event + notify attendees *before* removing the row,
   // since the side effects need the interview's stored details.
   await runInterviewCancellationSideEffects(supabase, orgId, params.id)
@@ -75,5 +94,17 @@ export const DELETE = withCapability('recruiting:edit', async (_req, orgId, supa
     .eq('org_id', orgId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (interview?.application_id) {
+    await supabase.from('application_events').insert({
+      application_id: interview.application_id,
+      org_id:         orgId,
+      event_type:     'interview_cancelled',
+      note:           `Interview deleted${interview.interviewer_name ? ` (with ${interview.interviewer_name})` : ''}`,
+      metadata:       { interview_id: params.id, deleted: true },
+      created_by:     orgId,
+    })
+  }
+
   return NextResponse.json({ success: true })
 })

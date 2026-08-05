@@ -10,6 +10,7 @@ import {
   Send, ChevronRight, FileText, Calendar,
   BadgeCheck, Ban, Gift, ClipboardList, Clock,
   AlertCircle, Mail, Users, GitBranch, Phone, MessageCircle,
+  Tag, ListTodo, CheckSquare, Pencil, Eye,
 } from 'lucide-react'
 import type { ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import { fmtRelative, fmtDateTime } from '@/lib/ui/date-utils'
@@ -40,8 +41,15 @@ const EVENT_ICON: Record<string, { icon: React.ReactNode; bg: string; title: (e:
   applied:              { icon: <Send className="h-3.5 w-3.5" />,         bg: 'bg-slate-500',    title: e => `Applied — entered ${e.to_stage ?? 'pipeline'}` },
   stage_moved:          { icon: <ChevronRight className="h-3.5 w-3.5" />, bg: 'bg-slate-500',  title: e => `Moved to ${e.to_stage ?? '?'}${e.from_stage ? ` from ${e.from_stage}` : ''}` },
   note_added:           { icon: <FileText className="h-3.5 w-3.5" />,     bg: 'bg-amber-500',   title: () => 'Note added' },
+  tag_added:            { icon: <Tag className="h-3.5 w-3.5" />,          bg: 'bg-slate-500',   title: e => `Tag added${e.note ? ` · ${e.note}` : ''}` },
+  tag_removed:          { icon: <Tag className="h-3.5 w-3.5" />,          bg: 'bg-slate-400',   title: e => `Tag removed${e.note ? ` · ${e.note}` : ''}` },
+  task_created:         { icon: <ListTodo className="h-3.5 w-3.5" />,     bg: 'bg-amber-500',   title: e => `Task created${e.note ? ` · ${e.note}` : ''}` },
+  task_completed:       { icon: <CheckSquare className="h-3.5 w-3.5" />,  bg: 'bg-emerald-500', title: e => `Task completed${e.note ? ` · ${e.note}` : ''}` },
+  review_triaged:       { icon: <Eye className="h-3.5 w-3.5" />,          bg: 'bg-slate-500',   title: e => `Marked for review${e.note ? ` → ${e.note}` : ''}` },
+  candidate_updated:    { icon: <Pencil className="h-3.5 w-3.5" />,       bg: 'bg-slate-500',   title: e => `Profile updated${e.note ? ` · ${e.note}` : ''}` },
   status_changed:       { icon: <AlertCircle className="h-3.5 w-3.5" />,  bg: 'bg-slate-500',   title: e => `Status changed → ${e.to_stage ?? '?'}` },
   email_sent:           { icon: <Mail className="h-3.5 w-3.5" />,         bg: 'bg-slate-500',    title: e => `Email sent${(e.metadata as { subject?: string })?.subject ? ` · ${(e.metadata as { subject?: string }).subject}` : ''}` },
+  email_received:       { icon: <Mail className="h-3.5 w-3.5" />,         bg: 'bg-emerald-500', title: e => `Email reply received${(e.metadata as { subject?: string })?.subject ? ` · ${(e.metadata as { subject?: string }).subject}` : ''}` },
   interview_scheduled:  { icon: <Calendar className="h-3.5 w-3.5" />,     bg: 'bg-amber-500',   title: () => 'Interview scheduled' },
   interview_completed:  { icon: <BadgeCheck className="h-3.5 w-3.5" />,   bg: 'bg-emerald-500', title: () => 'Interview completed' },
   interview_cancelled:  { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-400',     title: () => 'Interview cancelled' },

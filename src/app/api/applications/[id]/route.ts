@@ -211,6 +211,18 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // Record the triage decision on the candidate's History timeline.
+    await supabase
+      .from('application_events')
+      .insert({
+        application_id: params.id,
+        event_type: 'review_triaged',
+        note: review_status,
+        created_by: 'Recruiter',
+        org_id: orgId,
+      })
+
     return NextResponse.json({ data })
   }
 

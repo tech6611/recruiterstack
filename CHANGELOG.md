@@ -9,6 +9,38 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-05
+
+### Added
+- **Candidate History now captures many previously-invisible actions.** Sequence
+  emails, tags added/removed, tasks created/completed, review-triage decisions,
+  profile edits, scorecard submissions, and interview reschedules/deletions now
+  write to the History timeline. Added a shared, non-throwing logging helper plus
+  a candidate→application resolver (History is application-scoped, so candidate-
+  level actions attach to the candidate's most-recent application; CRM-only
+  contacts with no application are skipped). New `application_events` types:
+  `tag_added`, `tag_removed`, `task_created`, `task_completed`, `review_triaged`,
+  `candidate_updated`, with icons/labels in the History tab. Files:
+  `src/modules/ats/domain/applications.ts` (helpers), `src/lib/api/job-handlers.ts`
+  (sequence emails), `src/app/api/candidates/[id]/tags/**`, `.../tasks/**`,
+  `src/app/api/scorecards/route.ts`, `src/app/api/applications/[id]/route.ts`
+  (review triage), `src/app/api/candidates/[id]/route.ts` (profile edits),
+  `src/app/api/interviews/[id]/route.ts` (reschedule + delete),
+  `src/components/candidates/center/HistoryTab.tsx`, `src/lib/types/database.ts`.
+  Still pending (backend/Django): inbound candidate email replies and AI
+  phone-screen started/completed.
+
+### Changed
+- **Sequence "Reply-To" address is now masked behind a friendly display name.**
+  The per-enrollment `reply+<id>@…` routing address stays intact, but the mail
+  client now shows the sender name (e.g. "RecruiterStack Hiring Team") instead of
+  the raw token. Files: `src/lib/api/job-handlers.ts`, `src/lib/email/send-reply.ts`.
+- **Sequence link tokens insert clickable hyperlinks, not raw URLs.** The
+  "+ Phone Screen Slots" and "+ HM Calendar Link" buttons now drop in an editable
+  anchor (`<a href="{{token}}">…</a>`) so candidates see friendly link text
+  instead of the full URL. Preview now resolves the phone-screen token too. File:
+  `src/components/sequences/SequenceStageEditor.tsx`.
+
 ## 2026-07-22
 
 ### Fixed
