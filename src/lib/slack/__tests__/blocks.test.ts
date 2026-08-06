@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildLifecycleBlocks } from '@/lib/slack/blocks'
+import { buildLifecycleBlocks, buildSearchResultsBlocks } from '@/lib/slack/blocks'
 
 // Small helpers to inspect the generated Block Kit.
 function actionsBlock(blocks: unknown[]) {
@@ -45,5 +45,32 @@ describe('buildLifecycleBlocks', () => {
   it('without a candidateId the Open link is dropped but actions remain', () => {
     const blocks = buildLifecycleBlocks({ event: 'stage_moved', text: 't', applicationId: 'app-1' })
     expect(actionIds(blocks)).toEqual(['app:move_stage', 'app:add_note'])
+  })
+})
+
+describe('buildSearchResultsBlocks', () => {
+  const row = (over = {}) => ({ candidateId: 'c1', name: 'Jane', title: 'Eng', status: 'active', jobs: ['Backend'], ...over })
+
+  it('renders a count header and a section per candidate with an Open link', () => {
+    const blocks = buildSearchResultsBlocks('jane', [row(), row({ candidateId: 'c2', name: 'John' })])
+    const dump = JSON.stringify(blocks)
+    expect(dump).toContain('*2* candidates matching')
+    expect(dump).toContain('/candidates/c1')
+    expect(dump).toContain('/candidates/c2')
+  })
+
+  it('shows an empty-state message when there are no rows', () => {
+    const blocks = buildSearchResultsBlocks('zzz', [])
+    expect(JSON.stringify(blocks)).toContain('No candidates matching')
+  })
+
+  it('caps the list at 10 and notes the overflow', () => {
+    const rows = Array.from({ length: 14 }, (_, i) => row({ candidateId: `c${i}`, name: `Cand ${i}` }))
+    const blocks = buildSearchResultsBlocks('a', rows)
+    const dump = JSON.stringify(blocks)
+    expect(dump).toContain('and 4 more')
+    // 10 candidate sections shown, not 14
+    expect(dump).toContain('/candidates/c9')
+    expect(dump).not.toContain('/candidates/c10')
   })
 })

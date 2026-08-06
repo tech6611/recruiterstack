@@ -9,6 +9,25 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-05 — Native Slack integration (Slice 4: slash command)
+
+### Added
+- **`/recruiterstack search <name or title>` slash command.** Recruiters can search
+  candidates from inside Slack and get a rich, ephemeral result list (name, title,
+  active jobs, status) with an **Open** link per candidate. Reuses the app's existing
+  search (`searchCandidatesForAgent` + `listActiveApplicationsByCandidatesWithJobTitle`).
+  The invoking Slack user is resolved to their RecruiterStack account (cached) and gated
+  on `recruiting:view`, so results never leak to someone without access. New:
+  `src/app/api/slack/commands/route.ts`, `src/lib/slack/handlers/commands.ts`,
+  `buildSearchResultsBlocks` in `src/lib/slack/blocks.ts`. Signature-verified via the
+  existing generic `verifySlackSignature`.
+
+### Setup (no code)
+- Register the slash command in the Slack app dashboard: **Command** `/recruiterstack`,
+  **Request URL** `${APP_URL}/api/slack/commands`. The `commands` scope was already
+  granted in the Slice 3 reconnect; a one-time reinstall may be needed for the command
+  to appear in the workspace.
+
 ## 2026-08-05 — Native Slack integration (Slice 3: channel posting)
 
 ### Added

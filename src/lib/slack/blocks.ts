@@ -65,3 +65,70 @@ export function buildLifecycleBlocks(input: LifecycleBlockInput): unknown[] {
   if (elements.length) blocks.push({ type: 'actions', elements })
   return blocks
 }
+
+// Escape Slack mrkdwn control chars in user-supplied text.
+function esc(s: string): string {
+  return s.replace(/[*_`>]/g, c => `\\${c}`)
+}
+
+export interface SearchResultRow {
+  candidateId: string
+  name: string
+  title: string | null
+  status: string
+  jobs: string[]
+}
+
+const SEARCH_RESULT_LIMIT = 10
+
+/**
+ * Block Kit for a `/recruiterstack search` result: a count header then one
+ * section per candidate (name + title · active jobs · status) with an "Open"
+ * link button. Caps the list at SEARCH_RESULT_LIMIT with an overflow note so the
+ * message stays within Slack's block limits.
+ */
+export function buildSearchResultsBlocks(query: string, rows: SearchResultRow[]): unknown[] {
+  if (rows.length === 0) {
+    return [{ type: 'section', text: { type: 'mrkdwn', text: `No candidates matching *${esc(query)}*.` } }]
+  }
+
+  const blocks: unknown[] = [
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*${rows.length}* candidate${rows.length === 1 ? '' : 's'} matching *${esc(query)}*`,
+      },
+    },
+    { type: 'divider' },
+  ]
+
+  for (const r of rows.slice(0, SEARCH_RESULT_LIMIT)) {
+    const meta = [
+      r.title,
+      r.jobs.length ? `active: ${r.jobs.join(', ')}` : null,
+      `status: ${r.status}`,
+    ].filter(Boolean).join(' · ')
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*${esc(r.name)}*${meta ? `\n${esc(meta)}` : ''}` },
+      accessory: {
+        type: 'button',
+        text: { type: 'plain_text', text: 'Open' },
+        url: `${APP_URL()}/candidates/${r.candidateId}`,
+        action_id: 'app:open',
+      },
+    })
+  }
+
+  if (rows.length > SEARCH_RESULT_LIMIT) {
+    blocks.push({
+      type: 'context',
+      elements: [{
+        type: 'mrkdwn',
+        text: `…and ${rows.length - SEARCH_RESULT_LIMIT} more. Refine your search to narrow it down.`,
+      }],
+    })
+  }
+  return blocks
+}
