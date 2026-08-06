@@ -45,6 +45,20 @@ describe('resolveSlackUser (inbound: Slack user → RS user)', () => {
     expect(String((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0])).toContain('users.info')
   })
 
+  it('picks the user who belongs to the Slack-linked org when emails collide', async () => {
+    mock.results.set('slack_user_map', { data: null, error: null })
+    // Same email exists as two user rows (dual Clerk dev/prod instances).
+    mock.results.set('users', { data: [{ id: 'u_other_org' }, { id: 'u_this_org' }], error: null })
+    // Only u_this_org is a member of the org that owns the Slack install.
+    mock.results.set('org_members', { data: [{ user_id: 'u_this_org' }], error: null })
+    ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      json: async () => ({ ok: true, user: { profile: { email: 'a@b.com' } } }),
+    })
+
+    const res = await resolveSlackUser('T1', 'U1')
+    expect(res?.userId).toBe('u_this_org')
+  })
+
   it('returns null when the Slack email maps to no RecruiterStack user', async () => {
     mock.results.set('slack_user_map', { data: null, error: null })
     mock.results.set('users', { data: [], error: null })

@@ -23,20 +23,34 @@ export interface ResolvedSlackUser {
   email: string
 }
 
-/** RecruiterStack user id for an email, or null. Case-insensitive, and tolerant
- *  of duplicate rows (e.g. the same email across Clerk dev/prod instances) —
- *  `.maybeSingle()` would error and silently return nothing when >1 row matches,
- *  so we take the first of a limited set instead. */
-async function ourUserIdByEmail(email: string): Promise<string | null> {
+/**
+ * RecruiterStack user id for an email, scoped to a given org, or null.
+ *
+ * The same email can exist as several `users` rows — e.g. one per Clerk dev/prod
+ * instance, each an admin of a different org. Matching by email alone (and taking
+ * an arbitrary row) can pick a user who has no role in the Slack-linked org, so
+ * the capability check then wrongly denies them. We therefore disambiguate to the
+ * row that is actually a member of THIS org. Case-insensitive.
+ */
+async function ourUserIdByEmail(orgId: string, email: string): Promise<string | null> {
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('users')
     .select('id')
     .ilike('email', email) // case-insensitive exact (no wildcards)
-    .limit(1)
   if (error) logger.warn('[slack-identity] users lookup failed', { error: error.message })
-  const rows = (data ?? []) as Array<{ id: string }>
-  return rows[0]?.id ?? null
+  const ids = ((data ?? []) as Array<{ id: string }>).map(u => u.id)
+  if (ids.length === 0) return null
+  if (ids.length === 1) return ids[0]
+
+  // Duplicate emails across instances → pick the one that belongs to this org.
+  const { data: members } = await supabase
+    .from('org_members')
+    .select('user_id')
+    .eq('org_id', orgId)
+    .in('user_id', ids)
+    .limit(1)
+  return ((members ?? []) as Array<{ user_id: string }>)[0]?.user_id ?? ids[0]
 }
 
 /** Best-effort upsert into the identity cache. Never throws. */
@@ -101,7 +115,7 @@ export async function resolveSlackUser(
     logger.warn('[slack-identity] users.info returned no email', { teamId, slackUserId })
     return null
   }
-  const userId = await ourUserIdByEmail(email)
+  const userId = await ourUserIdByEmail(org.orgId, email)
   if (!userId) {
     logger.warn('[slack-identity] no RecruiterStack user matches Slack email', {
       orgId: org.orgId, email,
@@ -141,7 +155,7 @@ export async function resolveSlackUserIdByEmail(
   if (!slackUserId) return null
 
   // Cache only if this email maps to a real RS user (the table needs user_id).
-  const userId = await ourUserIdByEmail(email)
+  const userId = await ourUserIdByEmail(orgId, email)
   if (userId) await cacheMapping(orgId, userId, slackUserId, null, email)
   return slackUserId
 }
