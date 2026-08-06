@@ -50,7 +50,11 @@ function isClerkBypassed(req: NextRequest): boolean {
     req.nextUrl.pathname.startsWith('/api/webhooks/clerk') ||
     req.nextUrl.pathname.startsWith('/api/webhooks/whatsapp') ||
     req.nextUrl.pathname.startsWith('/api/webhooks/sendgrid') ||
-    req.nextUrl.pathname.startsWith('/api/slack/interactions')
+    // Slack calls these server-to-server (signature-verified in the route), so
+    // they must bypass Clerk. install/callback stay behind Clerk on purpose —
+    // they're kicked off by a logged-in admin in the browser.
+    req.nextUrl.pathname.startsWith('/api/slack/interactions') ||
+    req.nextUrl.pathname.startsWith('/api/slack/commands')
   )
 }
 
