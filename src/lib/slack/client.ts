@@ -72,12 +72,17 @@ export async function getOrgBySlackTeam(
   teamId: string,
 ): Promise<{ orgId: string; token: string } | null> {
   const supabase = createAdminClient()
-  const { data } = await supabase
+  // A workspace can be linked to more than one org row across a project's history
+  // (dev/prod, re-installs). `.maybeSingle()` errors on >1 row and returns nothing,
+  // so take the first connected (token present) row instead.
+  const { data, error } = await supabase
     .from('org_settings')
     .select('org_id, slack_bot_token')
     .eq('slack_team_id', teamId)
-    .maybeSingle()
-  const row = data as { org_id: string; slack_bot_token: string | null } | null
+    .not('slack_bot_token', 'is', null)
+    .limit(1)
+  if (error) logger.warn('[slack] org lookup by team failed', { teamId, error: error.message })
+  const row = (data ?? [])[0] as { org_id: string; slack_bot_token: string | null } | undefined
   const token = decryptSafe(row?.slack_bot_token ?? null)
   if (!row || !token) return null
   return { orgId: row.org_id, token }
@@ -276,7 +281,16 @@ export async function usersInfoEmailWithToken(
       { headers: { Authorization: `Bearer ${token}` } },
     )
     const body = (await res.json()) as SlackApiResult
-    return body?.user?.profile?.email ?? null
+    const email = body?.user?.profile?.email ?? null
+    if (!email) {
+      // ok:false → a Slack error (e.g. missing_scope, invalid_auth); ok:true with
+      // no email → the profile email isn't visible to the app. Log either way so a
+      // scope/token gap is diagnosable.
+      logger.warn('[slack] users.info returned no email', {
+        slackUserId, ok: body?.ok ?? null, slackError: body?.error ?? null,
+      })
+    }
+    return email
   } catch (err) {
     logger.error('[slack] users.info failed', err)
     return null

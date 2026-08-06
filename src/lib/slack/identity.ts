@@ -23,15 +23,20 @@ export interface ResolvedSlackUser {
   email: string
 }
 
-/** RecruiterStack user id for an email (lowercased), or null. */
+/** RecruiterStack user id for an email, or null. Case-insensitive, and tolerant
+ *  of duplicate rows (e.g. the same email across Clerk dev/prod instances) —
+ *  `.maybeSingle()` would error and silently return nothing when >1 row matches,
+ *  so we take the first of a limited set instead. */
 async function ourUserIdByEmail(email: string): Promise<string | null> {
   const supabase = createAdminClient()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('users')
     .select('id')
-    .eq('email', email.toLowerCase())
-    .maybeSingle()
-  return (data as { id: string } | null)?.id ?? null
+    .ilike('email', email) // case-insensitive exact (no wildcards)
+    .limit(1)
+  if (error) logger.warn('[slack-identity] users lookup failed', { error: error.message })
+  const rows = (data ?? []) as Array<{ id: string }>
+  return rows[0]?.id ?? null
 }
 
 /** Best-effort upsert into the identity cache. Never throws. */
@@ -73,7 +78,10 @@ export async function resolveSlackUser(
   slackUserId: string,
 ): Promise<ResolvedSlackUser | null> {
   const org = await getOrgBySlackTeam(teamId)
-  if (!org) return null
+  if (!org) {
+    logger.warn('[slack-identity] no org for Slack team', { teamId })
+    return null
+  }
 
   const supabase = createAdminClient()
   const { data: cached } = await supabase
@@ -89,9 +97,17 @@ export async function resolveSlackUser(
 
   // Miss → live resolve, then cache.
   const email = await usersInfoEmailWithToken(org.token, slackUserId)
-  if (!email) return null
+  if (!email) {
+    logger.warn('[slack-identity] users.info returned no email', { teamId, slackUserId })
+    return null
+  }
   const userId = await ourUserIdByEmail(email)
-  if (!userId) return null
+  if (!userId) {
+    logger.warn('[slack-identity] no RecruiterStack user matches Slack email', {
+      orgId: org.orgId, email,
+    })
+    return null
+  }
 
   await cacheMapping(org.orgId, userId, slackUserId, teamId, email)
   return { orgId: org.orgId, userId, email }

@@ -15,8 +15,9 @@ describe('resolveSlackUser (inbound: Slack user → RS user)', () => {
     mock = createMockSupabase()
     vi.mocked(createAdminClient).mockReturnValue(mock.client as never)
     // Org install found by Slack team id, with a usable bot token.
+    // (getOrgBySlackTeam selects with .limit(1), so a list.)
     mock.results.set('org_settings', {
-      data: { org_id: 'org_1', slack_bot_token: 'xoxb-test' }, error: null,
+      data: [{ org_id: 'org_1', slack_bot_token: 'xoxb-test' }], error: null,
     })
     global.fetch = vi.fn() as never
   })
@@ -32,7 +33,7 @@ describe('resolveSlackUser (inbound: Slack user → RS user)', () => {
 
   it('falls back to a live users.info lookup on a cache miss', async () => {
     mock.results.set('slack_user_map', { data: null, error: null }) // miss (+ upsert no-op)
-    mock.results.set('users', { data: { id: 'u1' }, error: null })
+    mock.results.set('users', { data: [{ id: 'u1' }], error: null })
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       json: async () => ({ ok: true, user: { profile: { email: 'a@b.com' } } }),
     })
@@ -46,7 +47,7 @@ describe('resolveSlackUser (inbound: Slack user → RS user)', () => {
 
   it('returns null when the Slack email maps to no RecruiterStack user', async () => {
     mock.results.set('slack_user_map', { data: null, error: null })
-    mock.results.set('users', { data: null, error: null })
+    mock.results.set('users', { data: [], error: null })
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       json: async () => ({ ok: true, user: { profile: { email: 'ghost@b.com' } } }),
     })
@@ -81,7 +82,7 @@ describe('resolveSlackUserIdByEmail (outbound: email → Slack user id)', () => 
 
   it('does a live users.lookupByEmail on a cache miss', async () => {
     mock.results.set('slack_user_map', { data: null, error: null })
-    mock.results.set('users', { data: { id: 'u1' }, error: null })
+    mock.results.set('users', { data: [{ id: 'u1' }], error: null })
     ;(global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       json: async () => ({ ok: true, user: { id: 'U9' } }),
     })
