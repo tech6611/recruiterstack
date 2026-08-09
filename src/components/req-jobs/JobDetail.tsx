@@ -16,6 +16,7 @@ import { AuditLogTab } from '@/components/approvals/AuditLogTab'
 import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
+import { InterviewPlanTab } from '@/components/req-jobs/InterviewPlanTab'
 import { cn } from '@/lib/utils'
 import { RichText } from '@/components/RichText'
 import { RichTextEditor, isHtmlEmpty } from '@/components/RichTextEditor'
@@ -49,12 +50,13 @@ interface Props {
   linkedOpenings:  Pick<Opening, 'id' | 'title' | 'status' | 'comp_min' | 'comp_max' | 'comp_currency' | 'target_start_date'>[]
 }
 
-type Tab = 'overview' | 'postings' | 'screening' | 'audit'
+type Tab = 'overview' | 'postings' | 'screening' | 'plan' | 'audit'
 
 const TAB_LABELS: Record<Tab, string> = {
   overview:  'Overview',
   postings:  'Postings',
   screening: 'Application form',
+  plan:      'Interview plan',
   audit:     'Audit log',
 }
 
@@ -524,7 +526,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
 
       <div className="border-b border-slate-200 mb-4">
         <nav className="flex gap-4">
-          {(['overview', 'postings', 'screening', 'audit'] as Tab[]).map(t => (
+          {(['overview', 'postings', 'screening', 'plan', 'audit'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -826,6 +828,8 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           }}
         />
       )}
+
+      {tab === 'plan' && <InterviewPlanTab jobId={job.id} />}
 
       {tab === 'audit' && <AuditLogTab targetType="job" targetId={job.id} />}
 
