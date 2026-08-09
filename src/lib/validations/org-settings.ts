@@ -103,6 +103,10 @@ const slackRouting = z.object({
 
 export const orgSettingsUpdateSchema = z.object({
   slack_webhook_url: z.string().url().nullish(),
+  // Chosen channel for native (bot-token) channel posting; admin-only (enforced
+  // in the handler). Nullish so the picker can clear it back to the webhook.
+  slack_channel_id:   z.string().trim().max(50).nullish(),
+  slack_channel_name: z.string().trim().max(100).nullish(),
   // Admin-only fields (enforced in the handler, not the schema)
   company_name:   z.string().trim().min(1).max(200).optional(),
   company_size:   z.enum(['1-10', '11-50', '51-200', '201-1000', '1000+']).optional(),

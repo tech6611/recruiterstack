@@ -1249,12 +1249,62 @@ export interface SlackEventRouting {
 
 export type SlackRouting = Partial<Record<SlackEventKey, SlackEventRouting>>
 
+// ── Slack identity map (migration 097) ───────────────────────────────────────
+// Persistent cache of the Slack-user ↔ RecruiterStack-user mapping, so we don't
+// hit the Slack API on every DM / button click. Resolved lazily by
+// src/lib/slack/identity.ts.
+export interface SlackUserMap {
+  id: string
+  org_id: string
+  user_id: string
+  slack_user_id: string
+  slack_team_id: string | null
+  email: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SlackUserMapInsert
+  extends Omit<SlackUserMap, 'id' | 'created_at' | 'updated_at' | 'slack_team_id' | 'email'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+  slack_team_id?: string | null
+  email?: string | null
+}
+
+export interface SlackUserMapUpdate extends Partial<SlackUserMapInsert> {}
+
+// ── Slack channel thread anchors (migration 098) ─────────────────────────────
+// One row per (org, application): the ts of the first channel post for a
+// candidate, so later lifecycle events reply in-thread. See src/lib/slack/dispatch.ts.
+export interface SlackChannelMessage {
+  id: string
+  org_id: string
+  application_id: string
+  channel_id: string
+  ts: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SlackChannelMessageInsert
+  extends Omit<SlackChannelMessage, 'id' | 'created_at' | 'updated_at'> {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface SlackChannelMessageUpdate extends Partial<SlackChannelMessageInsert> {}
+
 export interface OrgSettings {
   org_id: string
   slack_webhook_url: string | null
   slack_bot_token: string | null
   slack_team_id: string | null
   slack_team_name: string | null
+  slack_channel_id: string | null
+  slack_channel_name: string | null
   slack_routing: SlackRouting | null
   google_oauth_access_token: string | null
   google_oauth_refresh_token: string | null
@@ -2038,6 +2088,18 @@ export type Database = {
         Row: Indexify<EmailMessage>
         Insert: Indexify<EmailMessageInsert>
         Update: Indexify<EmailMessageUpdate>
+        Relationships: []
+      }
+      slack_user_map: {
+        Row: Indexify<SlackUserMap>
+        Insert: Indexify<SlackUserMapInsert>
+        Update: Indexify<SlackUserMapUpdate>
+        Relationships: []
+      }
+      slack_channel_messages: {
+        Row: Indexify<SlackChannelMessage>
+        Insert: Indexify<SlackChannelMessageInsert>
+        Update: Indexify<SlackChannelMessageUpdate>
         Relationships: []
       }
     }

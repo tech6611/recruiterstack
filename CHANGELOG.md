@@ -51,6 +51,79 @@ entries on top.
   `src/modules/ats/domain/__tests__/create-application-canonical.test.ts`,
   `src/lib/validations/__tests__/applications-canonical.test.ts`,
   `src/app/api/pipeline-stages/__tests__/route.test.ts`.
+## 2026-08-05 — Native Slack integration (Slice 4: slash command)
+
+### Added
+- **`/recruiterstack search <name or title>` slash command.** Recruiters can search
+  candidates from inside Slack and get a rich, ephemeral result list (name, title,
+  active jobs, status) with an **Open** link per candidate. Reuses the app's existing
+  search (`searchCandidatesForAgent` + `listActiveApplicationsByCandidatesWithJobTitle`).
+  The invoking Slack user is resolved to their RecruiterStack account (cached) and gated
+  on `recruiting:view`, so results never leak to someone without access. New:
+  `src/app/api/slack/commands/route.ts`, `src/lib/slack/handlers/commands.ts`,
+  `buildSearchResultsBlocks` in `src/lib/slack/blocks.ts`. Signature-verified via the
+  existing generic `verifySlackSignature`.
+
+### Setup (no code)
+- Register the slash command in the Slack app dashboard: **Command** `/recruiterstack`,
+  **Request URL** `${APP_URL}/api/slack/commands`. The `commands` scope was already
+  granted in the Slice 3 reconnect; a one-time reinstall may be needed for the command
+  to appear in the workspace.
+
+## 2026-08-05 — Native Slack integration (Slice 3: channel posting)
+
+### Added
+- **Native channel posting.** When an admin picks a channel (new picker in Settings →
+  Integrations → Slack App), lifecycle alerts post there via bot-token
+  `chat.postMessage` as **rich messages with working buttons** (Move-stage / Add-note /
+  Open) instead of the plain-text webhook. The existing interaction dispatcher handles
+  channel button clicks with no changes. Files: `src/lib/slack/dispatch.ts`,
+  `src/lib/slack/client.ts` (`conversationsList`), `src/app/api/slack/channels/route.ts`,
+  `src/app/(dashboard)/settings/page.tsx`.
+- **Per-candidate threading.** The first channel post for a candidate is remembered
+  (`slack_channel_messages`); later events (`stage_moved`, `candidate_hired`) reply
+  in-thread so each candidate's updates stay together.
+- **Wider OAuth scopes + reconnect prompt.** Install now requests `chat:write.public`,
+  `channels:read`, `groups:read`, and `commands` (the last pre-authorises the upcoming
+  slash command, so no second reconnect). The Slack App card prompts admins to reconnect
+  when channel posting isn't yet enabled. `src/app/api/slack/install/route.ts`.
+- **Backward compatible:** orgs with no channel chosen (or not reconnected) keep the
+  existing plain-text webhook path.
+
+### Schema
+- **Migration `098_slack_channel.sql`** — adds `org_settings.slack_channel_id` /
+  `slack_channel_name` and a `slack_channel_messages` thread-anchor table (RLS +
+  service-role policy + updated_at trigger). **Apply manually in the Supabase SQL Editor.**
+
+## 2026-08-05 — Native Slack integration (Slices 1–2)
+
+### Added
+- **Interactive lifecycle Slack DMs.** The three routed events (`candidate_applied`,
+  `stage_moved`, `candidate_hired`) now DM recruiters/hiring managers a rich Block
+  Kit message with working buttons: **Move to next stage**, **Add note** (modal),
+  and **Open in RecruiterStack**. Buttons reuse the same domain facades as the web
+  app (`updateApplicationStage`, `recordApplicationEventSafe`) and are gated on the
+  clicker's `recruiting:edit` capability. Channel posts are unchanged (plain-text
+  webhook). Files: `src/lib/slack/blocks.ts`, `src/lib/slack/handlers/applications.ts`,
+  `src/lib/slack/dispatch.ts`, `src/modules/ats/domain/applications.ts`
+  (`getApplicationStageProgression`).
+- **Generalized Slack interaction dispatcher.** `/api/slack/interactions` is now a
+  thin router that resolves the acting user once and dispatches by `action_id` /
+  `callback_id` via a registry (`src/lib/slack/actions.ts`), instead of being
+  hard-wired to approvals. Approvals were moved behind the registry with identical
+  behavior (`src/lib/slack/handlers/approvals.ts`).
+- **Shared Slack Web API client** (`src/lib/slack/client.ts`) — consolidates the
+  bot-token/decrypt/fetch boilerplate previously duplicated across notifications,
+  the interactions route, and approvals. `notifySlackDM`, approvals, and the route
+  now use it.
+- **Slack ↔ RecruiterStack identity cache** (`src/lib/slack/identity.ts`) — resolves
+  Slack users to RS users (and back) via the new `slack_user_map` table, hitting the
+  Slack API only on a cache miss. Makes DMs reliable and fixes repeat live lookups.
+
+### Schema
+- **Migration `097_slack_user_map.sql`** — new `slack_user_map(org_id, user_id ↔
+  slack_user_id)` cache table (RLS + service-role policy + updated_at trigger).
+  **Apply manually in the Supabase SQL Editor.**
 
 ## 2026-08-05
 

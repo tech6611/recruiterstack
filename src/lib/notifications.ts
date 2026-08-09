@@ -1,8 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { decryptSafe } from '@/lib/crypto'
 import { logger } from '@/lib/logger'
 import { createNotification, type NotificationType } from '@/lib/api/notify'
 import { dispatchSlackEvent } from '@/lib/slack/dispatch'
+import { chatPostMessage } from '@/lib/slack/client'
+import { resolveSlackUserIdByEmail } from '@/lib/slack/identity'
 import type { SlackEventKey } from '@/lib/types/database'
 
 interface NotifyParams {
@@ -70,50 +71,20 @@ export async function notifySlack(orgId: string, text: string): Promise<void> {
 }
 
 // ── OAuth bot: DMs a specific person by their email address ──────────────────
+// Resolves the email → Slack user id via the cached identity resolver, then
+// sends via the shared client. `blocks` is optional — pass Block Kit for rich,
+// interactive DMs (buttons handled by /api/slack/interactions); `text` is always
+// used as the notification/fallback string. No-ops (with a logged warning) when
+// the email isn't a workspace member — email/in-app still reach them.
 export async function notifySlackDM(
   orgId: string,
   email: string,
-  text: string
+  text: string,
+  blocks?: unknown[],
 ): Promise<void> {
   if (!email) return
-
-  const supabase = createAdminClient()
-  const { data } = await supabase
-    .from('org_settings')
-    .select('slack_bot_token')
-    .eq('org_id', orgId)
-    .single()
-
-  const token = decryptSafe(data?.slack_bot_token ?? null)
-  if (!token) return
-
-  try {
-    // Look up the Slack user by their email address
-    const userRes = await fetch(
-      `https://slack.com/api/users.lookupByEmail?email=${encodeURIComponent(email)}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-    const userData = await userRes.json()
-    if (!userData.ok || !userData.user?.id) {
-      // The recipient's email isn't a member of the connected Slack workspace
-      // (e.g. an invited placeholder approver), so Slack can't resolve them to
-      // DM. Log rather than fail silently — email/in-app still reach them.
-      logger.warn('[slack-dm] no Slack user for email — DM skipped', {
-        orgId, email, slackError: userData.error ?? null,
-      })
-      return
-    }
-
-    // Send DM (Slack accepts a user ID as the channel for direct messages)
-    await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ channel: userData.user.id, text }),
-    })
-  } catch (e) {
-    logger.error('[slack-dm] failed', e)
-  }
+  const slackUserId = await resolveSlackUserIdByEmail(orgId, email)
+  if (!slackUserId) return
+  // Slack accepts a user id as the channel for a direct message.
+  await chatPostMessage(orgId, { channel: slackUserId, text, blocks })
 }

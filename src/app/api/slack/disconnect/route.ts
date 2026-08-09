@@ -17,6 +17,10 @@ export async function POST() {
         slack_bot_token: null,
         slack_team_id: null,
         slack_team_name: null,
+        // Channel posting depends on the bot token, so clear the chosen channel
+        // too — dispatch falls back to the webhook until Slack is reconnected.
+        slack_channel_id: null,
+        slack_channel_name: null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'org_id' }

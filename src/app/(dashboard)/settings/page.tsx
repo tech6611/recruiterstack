@@ -49,6 +49,13 @@ export default function SettingsPage() {
   const [slackConnected, setSlackConnected] = useState(false)
   const [slackTeamName, setSlackTeamName] = useState<string | null>(null)
 
+  // Slack channel for native (bot-token) channel posting. When a channel is
+  // chosen, lifecycle alerts post there via chat.postMessage (rich + buttons +
+  // threaded); otherwise they fall back to the webhook above.
+  const [slackChannelId, setSlackChannelId] = useState<string>('')
+  const [slackChannels, setSlackChannels] = useState<{ id: string; name: string }[]>([])
+  const [channelStatus, setChannelStatus] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('idle')
+
   // Slack per-event routing (channel + role DMs). Mirrors the server-side
   // defaults in lib/slack/dispatch.ts so the UI shows current behaviour before
   // the admin has ever saved a custom config.
@@ -147,6 +154,7 @@ export default function SettingsPage() {
       .then(({ data }) => {
         if (data?.slack_webhook_url) setSlackUrl(data.slack_webhook_url)
         setSlackTeamName(data?.slack_team_name ?? null)
+        setSlackChannelId(data?.slack_channel_id ?? '')
         if (data?.slack_routing) setSlackRouting({ ...DEFAULT_SLACK_ROUTING, ...data.slack_routing })
         // Don't override optimistic `true` set by the URL-param effects — those
         // effects run synchronously before this async fetch resolves, so if we
@@ -181,6 +189,19 @@ export default function SettingsPage() {
       setTimeout(() => setOauthToast(null), 8000)
     }
   }, [searchParams])
+
+  // Load the workspace's channels for the picker once Slack is connected.
+  // Requires the new channels:read scope — an empty list usually means the
+  // admin needs to reconnect (see the reconnect prompt in the Slack App card).
+  useEffect(() => {
+    if (!slackConnected) { setSlackChannels([]); return }
+    setChannelStatus('loading')
+    fetch('/api/slack/channels')
+      .then(r => r.json())
+      .then(({ data }) => setSlackChannels(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setChannelStatus('idle'))
+  }, [slackConnected])
 
   // Show toast if redirected back from Google OAuth
   useEffect(() => {
@@ -358,6 +379,25 @@ export default function SettingsPage() {
       // ignore
     } finally {
       setDisconnecting(false)
+    }
+  }
+
+  const saveChannel = async (channelId: string) => {
+    const chan = slackChannels.find(c => c.id === channelId) ?? null
+    setSlackChannelId(channelId)
+    setChannelStatus('saving')
+    try {
+      const res = await fetch('/api/org-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slack_channel_id: channelId || null,
+          slack_channel_name: chan?.name ?? null,
+        }),
+      })
+      setChannelStatus(res.ok ? 'saved' : 'error')
+    } catch {
+      setChannelStatus('error')
     }
   }
 
@@ -772,21 +812,57 @@ export default function SettingsPage() {
                 <p className="text-xs text-slate-400 -mt-2">DM hiring managers directly on stage moves</p>
 
                 {slackConnected ? (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                      <p className="text-sm text-slate-700">
-                        Connected to <span className="font-semibold">{slackTeamName ?? 'your workspace'}</span>
-                      </p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                        <p className="text-sm text-slate-700">
+                          Connected to <span className="font-semibold">{slackTeamName ?? 'your workspace'}</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={disconnectSlack}
+                        disabled={disconnecting}
+                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-60"
+                      >
+                        {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={disconnectSlack}
-                      disabled={disconnecting}
-                      className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-60"
-                    >
-                      {disconnecting ? 'Disconnecting…' : 'Disconnect'}
-                    </button>
+
+                    {/* Channel picker — native (bot-token) channel posting */}
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-2">
+                      <label className="block text-xs font-semibold text-slate-700">Channel for pipeline alerts</label>
+                      <p className="text-xs text-slate-500">
+                        Posts candidate applied / stage moved / hired to a channel as rich messages with buttons.
+                        Leave unset to use the webhook above.
+                      </p>
+                      {channelStatus === 'loading' ? (
+                        <p className="text-xs text-slate-400">Loading channels…</p>
+                      ) : slackChannels.length === 0 ? (
+                        <p className="text-xs text-amber-600">
+                          No channels loaded. If you just enabled channel posting,{' '}
+                          <a href="/api/slack/install" className="underline font-medium">reconnect Slack</a>{' '}
+                          to grant the new permission.
+                        </p>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={slackChannelId}
+                            onChange={e => saveChannel(e.target.value)}
+                            className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                          >
+                            <option value="">— Use webhook (no channel) —</option>
+                            {slackChannels.map(c => (
+                              <option key={c.id} value={c.id}>#{c.name}</option>
+                            ))}
+                          </select>
+                          <span className="w-16 text-xs text-slate-500">
+                            {channelStatus === 'saving' ? 'Saving…' : channelStatus === 'saved' ? 'Saved ✓' : channelStatus === 'error' ? 'Error' : ''}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3">
