@@ -2,7 +2,10 @@ import { z } from 'zod'
 import { applicationSourceEnum, applicationStatusEnum } from './common'
 
 export const applicationInsertSchema = z.object({
-  hiring_request_id: z.string().uuid('hiring_request_id is required'),
+  // Canonical anchor. `job_id` links the candidacy to a canonical job pipeline;
+  // `hiring_request_id` is the legacy anchor, kept only for backward compatibility.
+  job_id: z.string().uuid().optional(),
+  hiring_request_id: z.string().uuid().optional(),
   candidate_id: z.string().uuid().optional(),
   candidate_data: z.object({
     name: z.string().min(1, 'Name is required'),
@@ -15,6 +18,9 @@ export const applicationInsertSchema = z.object({
   source: applicationSourceEnum.default('manual'),
   source_detail: z.string().nullish(),
 }).refine(
+  data => data.job_id || data.hiring_request_id,
+  { message: 'Either job_id or hiring_request_id is required' },
+).refine(
   data => data.candidate_id || data.candidate_data,
   { message: 'Either candidate_id or candidate_data is required' },
 )

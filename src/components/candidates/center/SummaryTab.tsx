@@ -270,7 +270,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
           <button
             onClick={generate}
             disabled={generating}
-            className="flex items-center gap-1.5 rounded-lg bg-slate-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60 transition-colors"
+            className="flex items-center gap-1.5 rounded-xl bg-[#221b14] px-3.5 py-1.5 text-xs font-semibold text-[#f6efe3] hover:bg-[#34291e] disabled:opacity-60 transition-colors"
           >
             {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : summary ? <RefreshCw className="h-3 w-3" /> : <Wand2 className="h-3 w-3" />}
             {generating ? 'Generating…' : summary ? 'Regenerate' : 'Generate Summary'}

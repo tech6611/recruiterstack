@@ -69,7 +69,7 @@ interface CandidateProfileContextValue {
   jobsLoading: boolean
   openAddToJob: () => Promise<void>
   closeAddToJob: () => void
-  addToJob: (hiringRequestId: string, reload: () => Promise<void>) => Promise<void>
+  addToJob: (jobId: string, reload: () => Promise<void>) => Promise<void>
 }
 
 const CandidateProfileContext = createContext<CandidateProfileContextValue | null>(null)

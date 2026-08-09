@@ -8,7 +8,9 @@ export default function AddToJobModal() {
 
   if (!showAddToJob || !candidate) return null
 
-  const existingJobIds = new Set(candidate.applications.map(a => a.hiring_request_id))
+  // Canonical apps identify their job via job_id; keep the legacy field as a
+  // fallback so a candidate on any existing app is still de-duplicated.
+  const existingJobIds = new Set(candidate.applications.map(a => a.job_id ?? a.hiring_request_id))
   const availableJobs = jobs.filter(j => !existingJobIds.has(j.id))
 
   return (

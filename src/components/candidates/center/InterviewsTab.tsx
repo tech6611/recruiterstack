@@ -43,7 +43,15 @@ function platformLabel(p: string | null) {
   return p === 'google_meet' ? 'Google Meet' : p === 'ms_teams' ? 'Teams' : p === 'zoom' ? 'Zoom' : null
 }
 
-export default function InterviewsTab({ candidateId }: { candidateId: string }) {
+export default function InterviewsTab({
+  candidateId,
+  heading,
+  hideWhenEmpty = false,
+}: {
+  candidateId: string
+  heading?: string
+  hideWhenEmpty?: boolean
+}) {
   const [interviews, setInterviews] = useState<InterviewRow[] | null>(null)
   const [error, setError]           = useState<string | null>(null)
   const [confirmingCancel, setConfirmingCancel] = useState<string | null>(null)
@@ -90,13 +98,13 @@ export default function InterviewsTab({ candidateId }: { candidateId: string }) 
   }
 
   if (error && !interviews) {
-    return <div className="p-6 text-sm text-red-500">{error}</div>
+    return hideWhenEmpty ? null : <div className="p-6 text-sm text-red-500">{error}</div>
   }
   if (!interviews) {
-    return <div className="p-8 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+    return hideWhenEmpty ? null : <div className="p-8 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
   }
   if (interviews.length === 0) {
-    return (
+    return hideWhenEmpty ? null : (
       <div className="p-10 text-center">
         <Calendar className="h-8 w-8 text-slate-300 mx-auto mb-3" />
         <p className="text-sm text-slate-500">No interviews scheduled yet.</p>
@@ -107,6 +115,7 @@ export default function InterviewsTab({ candidateId }: { candidateId: string }) 
 
   return (
     <div className="p-4 space-y-3">
+      {heading && <h3 className="pt-1 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{heading}</h3>}
       {error && <div className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</div>}
       {interviews.map(iv => {
         const link = iv.location && /^https?:\/\//.test(iv.location) ? iv.location : null

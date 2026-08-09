@@ -11,7 +11,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
   const body = await parseBody(req, applicationInsertSchema)
   if (body instanceof NextResponse) return body
 
-  const { hiring_request_id, stage_id, source, source_detail, candidate_id, candidate_data } = body
+  const { job_id, hiring_request_id, stage_id, source, source_detail, candidate_id, candidate_data } = body
 
   let resolvedCandidateId = candidate_id
 
@@ -36,16 +36,19 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
   }
 
   // ── Resolve stage (default to first stage) ────────────────────────────────
+  // Canonical apps key their stages by job_id; legacy apps by hiring_request_id.
   let resolvedStageId = stage_id
   if (!resolvedStageId) {
-    const { data: firstStage } = await supabase
+    const stageQuery = supabase
       .from('pipeline_stages')
       .select('id')
-      .eq('hiring_request_id', hiring_request_id)
       .order('order_index')
       .limit(1)
-      .single()
-    resolvedStageId = firstStage?.id ?? undefined
+    const { data: firstStage } = await (job_id
+      ? stageQuery.eq('job_id', job_id)
+      : stageQuery.eq('hiring_request_id', hiring_request_id as string)
+    ).maybeSingle()
+    resolvedStageId = (firstStage as { id?: string } | null)?.id ?? undefined
   }
 
   // ── Get stage name for timeline event ─────────────────────────────────────
@@ -66,7 +69,8 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     app = await createApplication(supabase, {
       orgId,
       candidateId: resolvedCandidateId,
-      hiringRequestId: hiring_request_id,
+      jobId: job_id ?? null,
+      hiringRequestId: hiring_request_id ?? null,
       stageId: resolvedStageId ?? null,
       source,
       sourceDetail: source_detail ?? null,

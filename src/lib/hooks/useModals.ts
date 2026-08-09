@@ -108,12 +108,14 @@ export function useModals(candidateId: string) {
     setShowAddToJob(false)
   }, [])
 
-  const addToJob = useCallback(async (hiringRequestId: string, reload: () => Promise<void>) => {
-    setAddingToJob(hiringRequestId)
+  const addToJob = useCallback(async (jobId: string, reload: () => Promise<void>) => {
+    setAddingToJob(jobId)
+    // Canonical: link the new application to the job via job_id (not the legacy
+    // hiring_request_id column), so the candidacy resolves its job & stages.
     const res = await fetch('/api/applications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidate_id: candidateId, hiring_request_id: hiringRequestId, source: 'manual' }),
+      body: JSON.stringify({ candidate_id: candidateId, job_id: jobId, source: 'manual' }),
     })
     setAddingToJob(null)
     if (res.ok || res.status === 409) {

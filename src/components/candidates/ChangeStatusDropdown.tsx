@@ -25,9 +25,17 @@ export default function ChangeStatusDropdown() {
   const openStatusDropdown = async () => {
     setStatusOpen(true)
     if (stages.length > 0 || activeApps.length === 0) return
-    const hrId = activeApps[0].hiring_request_id
-    const res = await fetch(`/api/pipeline-stages?hiring_request_id=${hrId}`)
-    if (res.ok) setStages((await res.json()).data ?? [])
+    // Canonical apps anchor on job_id; fall back to the legacy field for old apps.
+    const app = activeApps[0]
+    const qs = app.job_id
+      ? `job_id=${app.job_id}`
+      : `hiring_request_id=${app.hiring_request_id}`
+    const res = await fetch(`/api/pipeline-stages?${qs}`)
+    if (res.ok) {
+      const data = (await res.json()).data ?? []
+      // "Hired" is a terminal outcome, offered under "Mark As" — not a stage move.
+      setStages(data.filter((s: { name: string }) => s.name.toLowerCase() !== 'hired'))
+    }
   }
 
   const changeStatus = async (appId: string, type: 'stage' | 'status', value: string) => {

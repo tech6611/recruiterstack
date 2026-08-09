@@ -1,11 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Check, X, ArrowRight } from 'lucide-react'
+import { Pencil, Check, X } from 'lucide-react'
 import type { CandidateTask, ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
-import { fmtShort } from '@/lib/ui/date-utils'
 import TaskScheduler from '../TaskScheduler'
-import InterviewProgressTable from '../InterviewProgressTable'
 import { Card } from '@/components/ui/card'
 
 type ApplicationWithAttribution = Application & {
@@ -113,18 +111,6 @@ function PipelineFlowSection({ events, applications }: {
   events: ApplicationEvent[]
   applications: ApplicationWithAttribution[]
 }) {
-  const totalDays = (() => {
-    const sorted = [...events].sort((a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    )
-    if (!sorted[0]) return 0
-    return Math.floor((Date.now() - new Date(sorted[0].created_at).getTime()) / 86400000)
-  })()
-
-  const stagesMoved    = events.filter(e => (e.event_type as string) === 'stage_moved').length
-  const emailsSent     = events.filter(e => (e.event_type as string) === 'email_sent').length
-  const interviewsDone = events.filter(e => (e.event_type as string) === 'interview_completed').length
-
   const flows = applications.map(app => ({
     app,
     steps: buildPipelineFlow(events, app.id),
@@ -136,63 +122,41 @@ function PipelineFlowSection({ events, applications }: {
     <Card className="p-4 space-y-4">
       <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Pipeline Activity</h4>
 
-      {/* Stats bar */}
-      <div className="grid grid-cols-4 gap-2">
-        {[
-          { label: 'Days in pipeline', value: totalDays },
-          { label: 'Stage moves',      value: stagesMoved },
-          { label: 'Emails sent',      value: emailsSent },
-          { label: 'Interviews done',  value: interviewsDone },
-        ].map(stat => (
-          <div key={stat.label} className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5 text-center">
-            <p className="text-xl font-bold text-slate-900">{stat.value}</p>
-            <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{stat.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Stage progression blocks */}
+      {/* Stage progression as a table */}
       {flows.map(({ app, steps }) => (
-        <div key={app.id}>
+        <div key={app.id} className="space-y-2">
           {app.hiring_requests && flows.length > 1 && (
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
               {app.hiring_requests.position_title}
             </p>
           )}
-          {/* Adaptive: flex-wrap when ≤ 4 stages, horizontal scroll when more */}
-          <div className={`flex items-center gap-1 pb-1 ${steps.length > 4 ? 'overflow-x-auto' : 'flex-wrap'}`}>
-            {steps.map((step, idx) => {
-              const isLast = idx === steps.length - 1
-              // Color scheme: Applied = indigo, current/last stage = violet, past = white/slate
-              const blockCls = step.type === 'applied'
-                ? isLast
-                  ? 'bg-slate-600 border-slate-600'
-                  : 'bg-slate-50 border-slate-200'
-                : isLast
-                  ? 'bg-slate-600 border-slate-600'
-                  : 'bg-white border-slate-200'
-              const labelCls = step.type === 'applied'
-                ? isLast ? 'text-white' : 'text-slate-700'
-                : isLast ? 'text-white' : 'text-slate-800'
-              const dateCls = step.type === 'applied'
-                ? isLast ? 'text-slate-200' : 'text-slate-400'
-                : isLast ? 'text-slate-200' : 'text-slate-400'
-              return (
-                <div key={`${step.stage}-${idx}`} className="flex items-center gap-1 shrink-0">
-                  <div className={`rounded-xl px-3 py-2.5 text-center min-w-[80px] border transition-colors ${blockCls}`}>
-                    <p className={`text-[11px] font-semibold leading-tight truncate max-w-[96px] ${labelCls}`}>
-                      {step.stage}
-                    </p>
-                    <p className={`text-[9px] font-medium mt-1 ${dateCls}`}>
-                      {fmtShort(step.date)}
-                    </p>
-                  </div>
-                  {!isLast && (
-                    <ArrowRight className="h-3 w-3 text-slate-300 shrink-0" />
-                  )}
-                </div>
-              )
-            })}
+          <div className="rounded-xl border border-slate-100 overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="px-3 py-2 text-left font-semibold text-slate-500">Stage</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-500">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {steps.map((step, idx) => {
+                  const isCurrent = idx === steps.length - 1
+                  return (
+                    <tr key={`${step.stage}-${idx}`} className={isCurrent ? 'bg-emerald-50/40' : ''}>
+                      <td className="px-3 py-2 font-medium text-slate-700">
+                        {step.stage}
+                        {isCurrent && (
+                          <span className="ml-2 text-[9px] font-semibold uppercase tracking-wide text-emerald-600">Current</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-slate-500">
+                        {new Date(step.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       ))}
@@ -239,13 +203,6 @@ export default function ActivitiesTab({
 
       {/* Pipeline flow + stats */}
       <PipelineFlowSection events={events} applications={appsWithLocalCredit} />
-
-      {/* Interview Progress */}
-      {events.length > 0 && (
-        <Card className="p-4">
-          <InterviewProgressTable events={events} />
-        </Card>
-      )}
 
       {/* Attribution */}
       {applications.length > 0 && (

@@ -9,6 +9,49 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-09
+
+### Changed
+- **Candidate page declutter.** Collapsed the six top action buttons (Schedule
+  Interview, Phone Screen, Add to Sequence, Draft Email, Create Offer, Add
+  Scorecard) into a single **Actions** menu. Reduced the four center tabs to two
+  — **Summary** and **Activities & Progress** — styled as pills in the sidebar
+  "coffee" colour (`#221b14`) with a green underline marking the active tab.
+  **Pipeline Activity** is now a Stage/Date table (was a horizontal flow) with the
+  current stage highlighted. **Skills** in the left panel replaced its edit pencil
+  with a fold chevron that caps long lists at 6 (`+N more`). Files:
+  `src/components/candidates/CenterPanel.tsx`, `LeftPanel.tsx`,
+  `center/ActivitiesTab.tsx`, `center/InterviewsTab.tsx`, `center/SummaryTab.tsx`.
+
+### Fixed
+- **"Add to Job" and "Change Status" now use the canonical `job_id`.** Both were
+  built on the legacy `hiring_request_id` path: "Add to Job" wrote the job id into
+  the dropped-table column (leaving `job_id` null → "Unknown Role", no stage), and
+  "Change Status" loaded pipeline stages by `hiring_request_id` (empty list for
+  canonical apps). Add-to-Job now posts `job_id`; the applications POST route,
+  insert schema, and dedup guard accept/use it; `/api/pipeline-stages` and the
+  Change-Status dropdown load stages by `job_id` (legacy fallback kept). Files:
+  `src/lib/hooks/useModals.ts`, `src/app/api/applications/route.ts`,
+  `src/lib/validations/applications.ts`,
+  `src/components/candidates/AddToJobModal.tsx`,
+  `src/app/api/pipeline-stages/route.ts`,
+  `src/components/candidates/ChangeStatusDropdown.tsx`.
+
+### Removed
+- **Interview Progress table** and the **History** timeline from the candidate's
+  Activities & Progress tab (History is covered by the right-side Feed). Deleted
+  `center/HistoryTab.tsx` and `InterviewProgressTable.tsx`. Also dropped the
+  redundant **Hired** entry from Change Status → "Move to Stage" (it stays under
+  "Mark As", where the terminal status carries downstream meaning).
+
+### Added
+- Tests locking in canonical application linkage: `createApplication` anchors on
+  `job_id` not `hiring_request_id`; the insert schema accepts `job_id` and requires
+  an anchor; `/api/pipeline-stages` accepts `job_id`. Files:
+  `src/modules/ats/domain/__tests__/create-application-canonical.test.ts`,
+  `src/lib/validations/__tests__/applications-canonical.test.ts`,
+  `src/app/api/pipeline-stages/__tests__/route.test.ts`.
+
 ## 2026-08-05
 
 ### Added

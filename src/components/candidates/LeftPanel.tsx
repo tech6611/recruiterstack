@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import {
   Mail, Phone, MapPin, Briefcase, ExternalLink, FileText,
-  Linkedin, Pencil, Check, X,
+  Linkedin, Pencil, Check, X, ChevronDown,
 } from 'lucide-react'
 import type { Candidate, CandidateTag, Application, HiringRequest } from '@/lib/types/database'
 import TagInput from './TagInput'
@@ -23,6 +23,9 @@ const STAGE_COLOR_MAP: Record<string, string> = {
   pink:    'bg-slate-50 text-slate-700',
 }
 
+// Collapse a long skills list to this many chips until expanded.
+const SKILL_LIMIT = 6
+
 type ApplicationWithJobInfo = Application & {
   pipeline_stages: { name: string; color: string } | null
   hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number'> | null
@@ -41,12 +44,10 @@ export default React.memo(function LeftPanel({
 }: LeftPanelProps) {
   const { addTag: onTagAdded, removeTag: onTagRemoved, setCandidate, openEmailDraft, activeApps: ctxActiveApps } = useCandidateProfile()
   const onLinkedinSaved = (url: string | null) => setCandidate(prev => prev ? { ...prev, linkedin_url: url } : prev)
-  const onSkillsUpdated = (skills: string[]) => setCandidate(prev => prev ? { ...prev, skills } : prev)
   const onDraftEmail = () => openEmailDraft(ctxActiveApps[0]?.id ?? null)
   const [editLinkedin, setEditLinkedin] = useState(false)
   const [linkedinInput, setLinkedinInput] = useState('')
-  const [editSkills, setEditSkills] = useState(false)
-  const [skillInput, setSkillInput] = useState('')
+  const [skillsExpanded, setSkillsExpanded] = useState(false)
 
   const saveLinkedin = async () => {
     const val = linkedinInput.trim()
@@ -58,27 +59,6 @@ export default React.memo(function LeftPanel({
     })
     setEditLinkedin(false)
     onLinkedinSaved(normalized)
-  }
-
-  const removeSkill = async (skill: string) => {
-    const skills = candidate.skills.filter(s => s !== skill)
-    await fetch(`/api/candidates/${candidate.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skills }),
-    })
-    onSkillsUpdated(skills)
-  }
-
-  const addSkill = async (skill: string) => {
-    const skills = [...candidate.skills, skill]
-    await fetch(`/api/candidates/${candidate.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skills }),
-    })
-    onSkillsUpdated(skills)
-    setSkillInput('')
   }
 
   const activeApps = applications.filter(a => a.status === 'active')
@@ -209,50 +189,39 @@ export default React.memo(function LeftPanel({
           </div>
         </div>
 
-        {/* Skills */}
+        {/* Skills — read-only; a long list folds down to a handful */}
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Skills</p>
-            <button
-              onClick={() => setEditSkills(e => !e)}
-              aria-label={editSkills ? "Save skills" : "Edit skills"}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-            >
-              {editSkills ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-            </button>
+            {candidate.skills.length > SKILL_LIMIT && (
+              <button
+                onClick={() => setSkillsExpanded(v => !v)}
+                aria-label={skillsExpanded ? 'Collapse skills' : 'Show all skills'}
+                aria-expanded={skillsExpanded}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${skillsExpanded ? 'rotate-180' : ''}`} />
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {candidate.skills.map(skill => (
+            {(skillsExpanded ? candidate.skills : candidate.skills.slice(0, SKILL_LIMIT)).map(skill => (
               <span
                 key={skill}
-                className="flex items-center gap-1 rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600"
+                className="rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600"
               >
                 {skill}
-                {editSkills && (
-                  <button
-                    onClick={() => removeSkill(skill)}
-                    aria-label={`Remove ${skill}`}
-                    className="text-slate-400 hover:text-red-500 transition-colors"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
               </span>
             ))}
-            {editSkills && (
-              <input
-                value={skillInput}
-                onChange={e => setSkillInput(e.target.value)}
-                onKeyDown={async e => {
-                  if ((e.key === 'Enter' || e.key === ',') && skillInput.trim()) {
-                    await addSkill(skillInput.trim().replace(',', ''))
-                  }
-                }}
-                placeholder="Add skill…"
-                className="rounded-lg border border-dashed border-slate-300 px-2.5 py-1 text-xs w-24 focus:outline-none focus:border-emerald-400"
-              />
+            {!skillsExpanded && candidate.skills.length > SKILL_LIMIT && (
+              <button
+                onClick={() => setSkillsExpanded(true)}
+                className="rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200 transition-colors"
+              >
+                +{candidate.skills.length - SKILL_LIMIT} more
+              </button>
             )}
-            {candidate.skills.length === 0 && !editSkills && (
+            {candidate.skills.length === 0 && (
               <p className="text-xs text-slate-400">No skills listed</p>
             )}
           </div>
