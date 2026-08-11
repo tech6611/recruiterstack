@@ -13,6 +13,22 @@ import CandidateModals from './CandidateModals'
 export default function CandidateProfileContent() {
   const router = useRouter()
   const ctx = useCandidateProfile()
+  const { selectedAppId } = ctx
+
+  // Derive filtered data for RightPanel. Computed BEFORE any early return so the
+  // hook order stays stable across the loading → loaded transition (Rules of Hooks).
+  const filteredApps = useMemo(() =>
+    !ctx.candidate ? []
+      : selectedAppId ? ctx.candidate.applications.filter(a => a.id === selectedAppId)
+      : ctx.candidate.applications,
+    [selectedAppId, ctx.candidate],
+  )
+  const filteredEvents = useMemo(() =>
+    !ctx.candidate ? []
+      : selectedAppId ? ctx.candidate.events.filter(e => e.application_id === selectedAppId)
+      : ctx.candidate.events,
+    [selectedAppId, ctx.candidate],
+  )
 
   // Loading state
   if (ctx.loading) {
@@ -33,21 +49,7 @@ export default function CandidateProfileContent() {
     )
   }
 
-  const { candidate, activeApps, tags, tasks, scorecards, scorecardsLoading, referrals, selectedAppId } = ctx
-
-  // Derive filtered data for RightPanel based on selectedAppId
-  const filteredApps = useMemo(() =>
-    selectedAppId
-      ? candidate.applications.filter(a => a.id === selectedAppId)
-      : candidate.applications,
-    [selectedAppId, candidate]
-  )
-  const filteredEvents = useMemo(() =>
-    selectedAppId
-      ? candidate.events.filter(e => e.application_id === selectedAppId)
-      : candidate.events,
-    [selectedAppId, candidate]
-  )
+  const { candidate, tags, tasks, scorecards, scorecardsLoading, referrals } = ctx
 
   return (
     <>
