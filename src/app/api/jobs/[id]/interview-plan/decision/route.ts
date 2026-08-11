@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
+import { notifyPlanChangeDecided } from '@/lib/interview-plan/notify'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Loose = any
@@ -54,6 +55,11 @@ export const POST = withCapability('approvals:approve', async (req, orgId, supab
     pending_meta: { ...meta, status: decision === 'approve' ? 'approved' : 'rejected', decided_by: userId, decided_at: new Date().toISOString(), reason },
     updated_at: new Date().toISOString(),
   }).eq('id', plan.id)
+
+  await notifyPlanChangeDecided({
+    orgId, jobId, requesterUserId: meta.requested_by ?? null, deciderUserId: userId,
+    decision: decision as 'approve' | 'reject', reason,
+  })
 
   return NextResponse.json({ data: { decision } })
 })

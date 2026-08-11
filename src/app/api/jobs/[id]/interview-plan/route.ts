@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withCapability, parseBody } from '@/lib/api/helpers'
 import { interviewPlanPutSchema } from '@/lib/validations/interview-plans'
+import { notifyPlanChangeSubmitted } from '@/lib/interview-plan/notify'
 
 // `interview_plans` / `interview_plan_rounds` and the pending columns are added by
 // migrations 099/101 and aren't in the generated Supabase types yet; use a
@@ -93,6 +94,7 @@ export const PUT = withCapability('recruiting:edit', async (req, orgId, supabase
       approver_user_id: approverUserId, approver_source: approverSource,
     }
     await sb.from('interview_plans').update({ pending_rounds: body.rounds, pending_meta: meta }).eq('id', planId)
+    await notifyPlanChangeSubmitted({ orgId, jobId, approverUserId, requesterUserId: userId })
     return NextResponse.json({ data: { status: 'pending_approval', approver_source: approverSource } })
   }
 
