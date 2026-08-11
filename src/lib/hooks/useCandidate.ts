@@ -29,7 +29,13 @@ export function useCandidate(id: string) {
       // Initialise selectedAppId on first load (same React 18 batch - no null flash)
       if (data && !appIdInitialised.current) {
         appIdInitialised.current = true
-        const def = data.applications.find(a => a.status === 'active') ?? data.applications[0]
+        // Default to the application the candidate is furthest along in (highest
+        // pipeline stage) among active ones — not just the most-recently-added.
+        const active = data.applications.filter(a => a.status === 'active')
+        const pool = active.length ? active : data.applications
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const stageOrder = (a: any) => (a.pipeline_stages?.order_index ?? -1) as number
+        const def = pool.reduce((best, a) => (stageOrder(a) > stageOrder(best) ? a : best), pool[0])
         setSelectedAppId(def?.id ?? null)
       }
     } catch {

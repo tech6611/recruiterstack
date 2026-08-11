@@ -15,7 +15,7 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
       // all apps now point at a canonical `job`. We embed jobs and normalize onto a
       // synthetic `hiring_requests` shape below (ticket/manager have no canonical
       // equivalent here and stay null, as they already did for canonical apps).
-      .select('*, pipeline_stages(name, color), job:jobs(id, position_title:title, department:departments(name))')
+      .select('*, pipeline_stages(name, color, order_index), job:jobs(id, position_title:title, department:departments(name))')
       .eq('candidate_id', id)
       .eq('org_id', orgId)
       .order('applied_at', { ascending: false }),
