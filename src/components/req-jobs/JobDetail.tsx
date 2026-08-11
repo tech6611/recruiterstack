@@ -18,6 +18,7 @@ import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { InterviewPlanTab } from '@/components/req-jobs/InterviewPlanTab'
 import { JobTeamRoster } from '@/components/req-jobs/JobTeamRoster'
+import { JobHiringManagerPicker } from '@/components/req-jobs/JobHiringManagerPicker'
 import { cn } from '@/lib/utils'
 import { RichText } from '@/components/RichText'
 import { RichTextEditor, isHtmlEmpty } from '@/components/RichTextEditor'
@@ -166,6 +167,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   // a just-committed status change (e.g. an approval that just landed).
   const [job, setJob]                 = useState<Job>(initialJob)
   const [tab, setTab]                 = useState<Tab>('overview')
+  const [hmKey, setHmKey]             = useState(0)  // bump to refresh the roster's hiring manager
   const [submitting, setSubmitting]   = useState(false)
   const [publishing, setPublishing]   = useState(false)
   const [pausing, setPausing]         = useState(false)
@@ -796,7 +798,8 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           </div>
 
           <div className="space-y-4">
-            <JobTeamRoster jobId={job.id} hmName={intake.hm_name || null} hmEmail={intake.hm_email || null} />
+            <JobHiringManagerPicker jobId={job.id} onChange={() => setHmKey(k => k + 1)} />
+            <JobTeamRoster jobId={job.id} hmRefreshKey={hmKey} />
             <Card>
               <CardHeader><CardTitle className="text-sm">Approval</CardTitle></CardHeader>
               <CardContent>
@@ -831,7 +834,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
         />
       )}
 
-      {tab === 'plan' && <InterviewPlanTab jobId={job.id} hmName={intake.hm_name || null} hmEmail={intake.hm_email || null} />}
+      {tab === 'plan' && <InterviewPlanTab jobId={job.id} />}
 
       {tab === 'audit' && <AuditLogTab targetType="job" targetId={job.id} />}
 

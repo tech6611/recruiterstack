@@ -24,16 +24,17 @@ export type RosterRound = {
  * to render from an in-progress editor (updates as you type); omit them and the
  * component fetches the saved plan itself (used on the Overview tab).
  */
-export function JobTeamRoster({ jobId, hmName, hmEmail, liveRounds, liveTeam }: {
+export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }: {
   jobId: string
-  hmName: string | null
-  hmEmail: string | null
   liveRounds?: RosterRound[]
   liveTeam?: TeamMember[]
+  /** Bump to re-fetch the resolved hiring manager (e.g. after the HM picker changes). */
+  hmRefreshKey?: number
 }) {
   const isLive = liveRounds !== undefined
   const [fetchedRounds, setFetchedRounds] = useState<RosterRound[]>([])
   const [fetchedTeam, setFetchedTeam]     = useState<TeamMember[]>([])
+  const [hm, setHm]                       = useState<{ name: string | null; email: string | null } | null>(null)
   const [loading, setLoading]             = useState(!isLive)
 
   const load = useCallback(async () => {
@@ -47,6 +48,13 @@ export function JobTeamRoster({ jobId, hmName, hmEmail, liveRounds, liveTeam }: 
     setLoading(false)
   }, [jobId])
   useEffect(() => { if (!isLive) load() }, [isLive, load])
+
+  // Resolve the hiring manager (assigned real user, else intake) — in both modes.
+  useEffect(() => {
+    fetch(`/api/jobs/${jobId}/hiring-manager`).then(r => r.json())
+      .then(j => setHm(j?.data ? { name: j.data.name ?? null, email: j.data.email ?? null } : null))
+      .catch(() => setHm(null))
+  }, [jobId, hmRefreshKey])
 
   const rounds = isLive ? liveRounds! : fetchedRounds
   const team   = isLive ? (liveTeam ?? []) : fetchedTeam
@@ -65,6 +73,8 @@ export function JobTeamRoster({ jobId, hmName, hmEmail, liveRounds, liveTeam }: 
     groups.get(key)!.rounds.push({ round: r, n: idx + 1 })
   })
   const interviewers = order.map(k => groups.get(k)!)
+  const hmName = hm?.name ?? null
+  const hmEmail = hm?.email ?? null
   const hasHM = !!(hmName || hmEmail)
 
   return (

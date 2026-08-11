@@ -46,7 +46,7 @@ const STARTER: Round[] = [
   { name: 'Hiring Manager',   interview_type: 'video',      duration_minutes: 45, interviewer_user_id: null, interviewer_name: null, interviewer_role: 'Hiring Manager', stage_id: null },
 ]
 
-export function InterviewPlanTab({ jobId, hmName, hmEmail }: { jobId: string; hmName: string | null; hmEmail: string | null }) {
+export function InterviewPlanTab({ jobId }: { jobId: string }) {
   const [rounds, setRounds]   = useState<Round[]>([])
   const [stages, setStages]   = useState<Stage[]>([])
   const [team, setTeam]       = useState<TeamMember[]>([])
@@ -131,8 +131,6 @@ export function InterviewPlanTab({ jobId, hmName, hmEmail }: { jobId: string; hm
     <div className="space-y-4">
       <JobTeamRoster
         jobId={jobId}
-        hmName={hmName}
-        hmEmail={hmEmail}
         liveTeam={team}
         liveRounds={rounds.map(r => ({
           name: r.name,
