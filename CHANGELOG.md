@@ -9,6 +9,15 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-11
+
+### Added
+- **Collapsible sidebar.** A small round chevron disc on the right edge of the
+  desktop nav pane (the coffee-brown `#221b14` rail), aligned with the Dashboard
+  row, collapses the pane to zero width so the page gets full room. The disc
+  stays as an "expand" handle when collapsed and the chevron flips; the choice is
+  remembered per browser via `localStorage` (`rs.sidebarCollapsed`).
+
 ## 2026-08-09
 
 ### Changed

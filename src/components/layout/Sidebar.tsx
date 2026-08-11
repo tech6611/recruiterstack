@@ -26,6 +26,7 @@ import {
   Target,
   Menu,
   X,
+  ChevronLeft,
 } from 'lucide-react'
 import { UserButton, useOrganization } from '@clerk/nextjs'
 import { useEffect, useRef, useState } from 'react'
@@ -133,6 +134,9 @@ export function Sidebar() {
   const { capabilities: caps } = useCapabilities()
   const [openSection, setOpenSection] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen]   = useState(false)
+  // Desktop rail collapse. Lets users hide the coffee-brown pane to give the
+  // page more room; the choice is remembered across navigations/sessions.
+  const [collapsed, setCollapsed]     = useState(false)
   // Count of approval decisions waiting on the current user, shown as a badge on
   // the Approvals nav item. Mirrors the NotificationBell's polling cadence.
   const [approvalsCount, setApprovalsCount] = useState(0)
@@ -161,6 +165,20 @@ export function Sidebar() {
     if (openTimer.current)  clearTimeout(openTimer.current)
     if (closeTimer.current) clearTimeout(closeTimer.current)
   }, [])
+
+  // Restore the saved collapse preference after mount (kept out of the initial
+  // state to avoid a server/client hydration mismatch).
+  useEffect(() => {
+    if (localStorage.getItem('rs.sidebarCollapsed') === '1') setCollapsed(true)
+  }, [])
+
+  function toggleCollapsed() {
+    setCollapsed(prev => {
+      const next = !prev
+      try { localStorage.setItem('rs.sidebarCollapsed', next ? '1' : '0') } catch { /* private mode */ }
+      return next
+    })
+  }
 
   // Close any open flyout / mobile drawer on navigation.
   useEffect(() => { setOpenSection(null); setMobileOpen(false) }, [pathname])
@@ -327,7 +345,17 @@ export function Sidebar() {
   return (
     <>
       {/* ── Desktop rail (md+) ─────────────────────────────────────────── */}
-      <aside className="relative hidden h-full w-[240px] shrink-0 flex-col border-r border-[#34291e] bg-[#221b14] md:flex">
+      {/* Wrapper hosts the collapsible pane plus the edge disc that toggles it.
+          The disc lives outside the pane's clip box so it stays visible (as an
+          "expand" handle) even when the pane is fully collapsed to zero width. */}
+      <div className="relative hidden h-full shrink-0 md:flex">
+      <aside
+        className={`flex h-full flex-col bg-[#221b14] transition-[width] duration-300 ease-in-out ${
+          collapsed
+            ? 'w-0 overflow-hidden border-r border-transparent'
+            : 'w-[240px] overflow-visible border-r border-[#34291e]'
+        }`}
+      >
         {/* Logo + notifications */}
         <div className="flex h-14 items-center gap-2 border-b border-white/10 px-3">
           <BrandMark className="h-[34px] w-[34px]" />
@@ -358,6 +386,25 @@ export function Sidebar() {
           </div>
         </div>
       </aside>
+
+        {/* Collapse / expand disc — a small round handle straddling the pane's
+            right edge, lined up horizontally with the Dashboard row (~90px from
+            the top: 56px header + 12px nav padding + half the first row). When
+            collapsed it rests flush at the screen edge and the chevron flips. */}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+          aria-expanded={!collapsed}
+          className={`absolute top-[90px] z-[60] flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-[left,color] duration-300 ease-in-out hover:border-emerald-500 hover:text-emerald-600 ${
+            collapsed ? 'left-0' : 'left-[228px]'
+          }`}
+        >
+          <ChevronLeft
+            className={`h-3.5 w-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
+          />
+        </button>
+      </div>
 
       {/* ── Mobile hamburger (below md) ─────────────────────────────────── */}
       <button
