@@ -34,7 +34,7 @@ export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }:
   const isLive = liveRounds !== undefined
   const [fetchedRounds, setFetchedRounds] = useState<RosterRound[]>([])
   const [fetchedTeam, setFetchedTeam]     = useState<TeamMember[]>([])
-  const [hm, setHm]                       = useState<{ name: string | null; email: string | null } | null>(null)
+  const [hm, setHm]                       = useState<{ name: string | null; email: string | null; source: string } | null>(null)
   const [loading, setLoading]             = useState(!isLive)
 
   const load = useCallback(async () => {
@@ -52,7 +52,7 @@ export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }:
   // Resolve the hiring manager (assigned real user, else intake) — in both modes.
   useEffect(() => {
     fetch(`/api/jobs/${jobId}/hiring-manager`).then(r => r.json())
-      .then(j => setHm(j?.data ? { name: j.data.name ?? null, email: j.data.email ?? null } : null))
+      .then(j => setHm(j?.data ? { name: j.data.name ?? null, email: j.data.email ?? null, source: j.data.source ?? 'none' } : null))
       .catch(() => setHm(null))
   }, [jobId, hmRefreshKey])
 
@@ -91,7 +91,8 @@ export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }:
           <div className="divide-y divide-slate-100">
             {hasHM && (
               <Row initials={nameInitials(hmName || hmEmail || 'HM')} name={hmName || hmEmail || 'Hiring manager'}
-                   sub={hmEmail && hmName ? hmEmail : 'Hiring manager'} pill="from intake" />
+                   sub={hmEmail && hmName ? hmEmail : 'Hiring manager'}
+                   pill={hm?.source === 'assigned' ? 'hiring manager' : 'from intake'} />
             )}
             {interviewers.map((p, i) => (
               <Row key={i} initials={nameInitials(p.name)} name={p.name}

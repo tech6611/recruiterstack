@@ -25,7 +25,7 @@ function toRoundRow(orgId: string, planId: string, r: Record<string, unknown>, i
 
 // GET /api/jobs/:id/interview-plan — plan + rounds, plus any pending change and
 // whether the current viewer can decide it.
-export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }, scope, userId) => {
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }, _scope, userId) => {
   const sb = supabase as unknown as Loose
   const jobId = params.id
 
@@ -41,7 +41,9 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
   const meta = plan?.pending_meta && plan.pending_meta.status === 'pending' ? plan.pending_meta : null
   const pending = meta ? { rounds: plan.pending_rounds ?? [], meta } : null
   const approvalRequired = ACTIVE_STATUSES.includes(job?.status) && rounds.length > 0
-  const canDecide = !!pending && (userId === meta.approver_user_id || scope.isOwner)
+  // Strict: only the designated approver decides (the assigned HM, or the
+  // Owner/admin only in the no-HM fallback where they ARE the approver).
+  const canDecide = !!pending && userId === meta.approver_user_id
 
   return NextResponse.json({ data: { plan: plan ?? null, rounds, pending, approvalRequired, canDecide } })
 })

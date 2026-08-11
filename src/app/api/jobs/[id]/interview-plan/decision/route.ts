@@ -7,7 +7,7 @@ type Loose = any
 // POST /api/jobs/:id/interview-plan/decision  { decision: 'approve'|'reject', reason?: string }
 // The hiring manager (or an Owner) decides on a pending interview-plan change.
 // Approve applies the parked rounds to the live plan; reject discards them.
-export const POST = withCapability('approvals:approve', async (req, orgId, supabase, { params }, scope, userId) => {
+export const POST = withCapability('approvals:approve', async (req, orgId, supabase, { params }, _scope, userId) => {
   const sb = supabase as unknown as Loose
   const jobId = params.id
   const body = await req.json().catch(() => null)
@@ -24,9 +24,10 @@ export const POST = withCapability('approvals:approve', async (req, orgId, supab
     return NextResponse.json({ error: 'No change is awaiting approval.' }, { status: 409 })
   }
 
-  // Only the assigned approver (HM / Owner fallback) or an Owner may decide.
-  if (userId !== meta.approver_user_id && !scope.isOwner) {
-    return NextResponse.json({ error: 'Only the hiring manager can approve this change.' }, { status: 403 })
+  // Strict: only the designated approver (the assigned HM, or the Owner/admin in
+  // the no-HM fallback) may decide — an Owner can't override the job's HM.
+  if (userId !== meta.approver_user_id) {
+    return NextResponse.json({ error: 'Only the assigned hiring manager can approve this change.' }, { status: 403 })
   }
 
   if (decision === 'approve') {

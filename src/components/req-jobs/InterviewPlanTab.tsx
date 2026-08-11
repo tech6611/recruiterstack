@@ -169,7 +169,7 @@ export function InterviewPlanTab({ jobId }: { jobId: string }) {
               <CardTitle className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-slate-500" /> Interview Plan</CardTitle>
               <CardDescription>
                 Define the rounds for this job — how many, of what kind, and who runs each.
-                {approvalRequired ? ' Changes on this Active job need the hiring manager’s approval.' : ' Scheduling will follow this plan.'}
+                {approvalRequired ? ' Because this job is active, plan changes need the hiring manager’s approval before they go live.' : ' Scheduling will follow this plan.'}
               </CardDescription>
             </div>
             <Button onClick={save} size="sm" disabled={saving}>
