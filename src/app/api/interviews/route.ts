@@ -67,6 +67,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     application_id, candidate_id, hiring_request_id, stage_id,
     interviewer_name, interviewer_email, interview_type, scheduled_at, duration_minutes,
     location, notes, generate_self_schedule, timezone, meeting_platform, panel, host_email,
+    plan_round_id,
   } = body
 
   if (!application_id || !candidate_id || !interviewer_name?.trim() || !scheduled_at) {
@@ -217,6 +218,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
       calendar_event_id,
       meeting_platform: resolvedPlatform,
       panel:            panel ?? null,
+      plan_round_id:    cleanUuid(plan_round_id),
     } as unknown as InterviewInsert)
     .select()
     .single()
@@ -236,6 +238,29 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     metadata:     { interview_id: interviewData.id, interview_type: interview_type ?? 'video', duration_minutes: duration_minutes ?? 60 },
     created_by:   orgId,
   } as unknown as ApplicationEventInsert)
+
+  // ── Phase D: booking a plan round with a linked stage advances the candidate ──
+  if (cleanUuid(plan_round_id)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+    const { data: round } = await sb.from('interview_plan_rounds').select('stage_id').eq('id', plan_round_id).maybeSingle()
+    const roundStage = round?.stage_id ?? null
+    if (roundStage && roundStage !== stageId) {
+      const { data: app } = await sb.from('applications').select('stage_id').eq('id', application_id).eq('org_id', orgId).maybeSingle()
+      if (app && app.stage_id !== roundStage) {
+        const [{ data: fromS }, { data: toS }] = await Promise.all([
+          app.stage_id ? sb.from('pipeline_stages').select('name').eq('id', app.stage_id).maybeSingle() : Promise.resolve({ data: null }),
+          sb.from('pipeline_stages').select('name').eq('id', roundStage).maybeSingle(),
+        ])
+        await sb.from('applications').update({ stage_id: roundStage }).eq('id', application_id).eq('org_id', orgId)
+        await sb.from('application_events').insert({
+          application_id, org_id: orgId, event_type: 'stage_moved',
+          from_stage: fromS?.name ?? null, to_stage: toS?.name ?? null,
+          note: 'Advanced by scheduling the interview round.', created_by: orgId,
+        })
+      }
+    }
+  }
 
   // ── Fire notifications (non-blocking) ────────────────────────────────────
   // Fetch recruiter + candidate info for notification copy

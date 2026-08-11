@@ -14,7 +14,10 @@ interface InterviewRow {
   meeting_platform: string | null
   self_schedule_token: string | null
   calendar_event_id: string | null
+  plan_round_id: string | null
 }
+
+type PlanRoundLite = { id: string; name: string }
 
 // A self-schedule invite the candidate hasn't booked yet: it has a booking token
 // but no real calendar event, and its scheduled_at is a throwaway placeholder
@@ -45,18 +48,28 @@ function platformLabel(p: string | null) {
 
 export default function InterviewsTab({
   candidateId,
+  jobId,
   heading,
   hideWhenEmpty = false,
 }: {
   candidateId: string
+  jobId?: string | null
   heading?: string
   hideWhenEmpty?: boolean
 }) {
   const [interviews, setInterviews] = useState<InterviewRow[] | null>(null)
+  const [planRounds, setPlanRounds] = useState<PlanRoundLite[]>([])
   const [error, setError]           = useState<string | null>(null)
   const [confirmingCancel, setConfirmingCancel] = useState<string | null>(null)
   const [busy, setBusy]             = useState<string | null>(null)
   const [copied, setCopied]         = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!jobId) { setPlanRounds([]); return }
+    fetch(`/api/jobs/${jobId}/interview-plan`).then(r => r.json())
+      .then(j => setPlanRounds((j?.data?.rounds ?? []).map((r: { id: string; name: string }) => ({ id: r.id, name: r.name }))))
+      .catch(() => setPlanRounds([]))
+  }, [jobId])
 
   const load = useCallback(async () => {
     try {
@@ -113,9 +126,36 @@ export default function InterviewsTab({
     )
   }
 
+  // Round-by-round progress against the plan (Phase D). Best status per round:
+  // completed > booked (scheduled) > todo.
+  const roundStatus = new Map<string, 'done' | 'booked'>()
+  for (const iv of interviews) {
+    if (!iv.plan_round_id) continue
+    const s = iv.status === 'completed' ? 'done' : iv.status === 'cancelled' ? null : 'booked'
+    if (!s) continue
+    if (s === 'done' || !roundStatus.has(iv.plan_round_id)) roundStatus.set(iv.plan_round_id, s)
+  }
+
   return (
     <div className="p-4 space-y-3">
       {heading && <h3 className="pt-1 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{heading}</h3>}
+
+      {planRounds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {planRounds.map((r, i) => {
+            const st = roundStatus.get(r.id) ?? 'todo'
+            const cls = st === 'done' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : st === 'booked' ? 'bg-slate-800 text-white border-slate-800'
+              : 'bg-white text-slate-400 border-slate-200'
+            return (
+              <span key={r.id} className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${cls}`}>
+                {st === 'done' ? '✓ ' : st === 'booked' ? '● ' : ''}{i + 1}. {r.name}
+              </span>
+            )
+          })}
+        </div>
+      )}
+
       {error && <div className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</div>}
       {interviews.map(iv => {
         const link = iv.location && /^https?:\/\//.test(iv.location) ? iv.location : null

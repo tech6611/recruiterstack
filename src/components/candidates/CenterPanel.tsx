@@ -228,7 +228,7 @@ export default React.memo(function CenterPanel({
             />
 
             {/* Interviews — the whole section disappears when there are none */}
-            <InterviewsTab candidateId={candidate.id} heading="Interviews" hideWhenEmpty />
+            <InterviewsTab candidateId={candidate.id} jobId={filteredActiveApps[0]?.job_id ?? filteredApps[0]?.job_id ?? null} heading="Interviews" hideWhenEmpty />
 
           </div>
         )}

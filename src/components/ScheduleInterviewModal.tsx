@@ -31,6 +31,7 @@ interface ScheduleApp {
   candidate_id: string
   stage_id: string | null
   hiring_request_id: string
+  job_id?: string | null
   candidate?: { name: string } | null
 }
 
@@ -109,6 +110,51 @@ export default function ScheduleInterviewModal({
   const [selfScheduleLink,  setSelfScheduleLink]  = useState<string | null>(null)
   const [linkCopied,        setLinkCopied]        = useState(false)
   const [sendingLink,       setSendingLink]       = useState(false)
+
+  // ── Phase D: pre-fill from the job's interview plan ──────────────────────────
+  type PlanRound = { id: string; name: string; interview_type: string; duration_minutes: number; interviewer_user_id: string | null; interviewer_name: string | null; interviewer_role: string | null; stage_id: string | null }
+  const [planRounds, setPlanRounds]           = useState<PlanRound[]>([])
+  const [planTeam, setPlanTeam]               = useState<{ user_id: string; users?: { email?: string | null } | null }[]>([])
+  const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null)
+  const [roundStageId, setRoundStageId]       = useState<string | null>(null)
+
+  const applyRound = (round: PlanRound, teamList = planTeam) => {
+    setInterviewType(round.interview_type)
+    setDuration(round.duration_minutes)
+    setSelectedRoundId(round.id)
+    setRoundStageId(round.stage_id)
+    const name  = round.interviewer_name || round.interviewer_role || ''
+    const email = round.interviewer_user_id ? (teamList.find(t => t.user_id === round.interviewer_user_id)?.users?.email ?? '') : ''
+    if (name) {
+      setInterviewer(name)
+      setInterviewerEmail(email)
+      setPanel([{ name, email }])
+      if (email) setHostEmail(email)
+    }
+  }
+
+  useEffect(() => {
+    const jobId = apps[0]?.job_id
+    if (!jobId) return
+    let cancelled = false
+    ;(async () => {
+      const [planRes, ivRes, teamRes] = await Promise.all([
+        fetch(`/api/jobs/${jobId}/interview-plan`).then(r => r.json()).catch(() => null),
+        fetch(`/api/interviews?application_id=${apps[0].id}`).then(r => r.json()).catch(() => null),
+        fetch('/api/team').then(r => r.json()).catch(() => null),
+      ])
+      if (cancelled) return
+      const rounds: PlanRound[] = planRes?.data?.rounds ?? []
+      const team = teamRes?.data ?? []
+      setPlanRounds(rounds)
+      setPlanTeam(team)
+      if (!rounds.length) return
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const doneCount = ((ivRes?.data ?? []) as any[]).filter(iv => iv.status !== 'cancelled').length
+      applyRound(rounds[Math.min(doneCount, rounds.length - 1)], team)
+    })()
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [availWeekOffset,   setAvailWeekOffset]   = useState(0)
   const [busyRangesByEmail, setBusyRangesByEmail] = useState<Record<string, { start: string; end: string }[]>>({})
@@ -311,7 +357,8 @@ export default function ScheduleInterviewModal({
           application_id:    apps[0].id,
           candidate_id:      apps[0].candidate_id,
           hiring_request_id: apps[0].hiring_request_id,
-          stage_id:          apps[0].stage_id ?? null,
+          stage_id:          roundStageId ?? apps[0].stage_id ?? null,
+          plan_round_id:     selectedRoundId,
           interviewer_name:  interviewer.trim(),
           interviewer_email: interviewerEmail.trim() || null,
           interview_type:    interviewType,
@@ -378,7 +425,8 @@ export default function ScheduleInterviewModal({
             application_id:    app.id,
             candidate_id:      app.candidate_id,
             hiring_request_id: app.hiring_request_id,
-            stage_id:          app.stage_id ?? null,
+            stage_id:          (app.job_id === apps[0].job_id ? roundStageId : null) ?? app.stage_id ?? null,
+            plan_round_id:     app.job_id === apps[0].job_id ? selectedRoundId : null,
             interviewer_name:  interviewer.trim(),
             interviewer_email: interviewerEmail.trim() || null,
             interview_type:    interviewType,
@@ -672,6 +720,28 @@ export default function ScheduleInterviewModal({
               <p className="mt-1 text-[11px] text-slate-400">
                 This panelist&rsquo;s calendar owns the event. If their connection fails, we fall back to other panelists.
               </p>
+            </div>
+          )}
+
+          {/* Round (from the interview plan) */}
+          {planRounds.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                Round <span className="font-normal text-slate-400">· from the interview plan</span>
+              </label>
+              <select
+                value={selectedRoundId ?? ''}
+                onChange={e => {
+                  const r = planRounds.find(p => p.id === e.target.value)
+                  if (r) applyRound(r)
+                  else { setSelectedRoundId(null); setRoundStageId(null) }
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none"
+              >
+                {planRounds.map((r, i) => <option key={r.id} value={r.id}>Round {i + 1}: {r.name}</option>)}
+                <option value="">Custom (not from the plan)</option>
+              </select>
+              <p className="mt-1 text-[11px] text-slate-400">Pre-fills type, duration &amp; interviewer. Everything below stays editable.</p>
             </div>
           )}
 

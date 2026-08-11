@@ -50,6 +50,7 @@ export default function CandidateModals() {
             candidate_id:       a.candidate_id,
             stage_id:           a.stage_id ?? null,
             hiring_request_id:  a.hiring_request_id,
+            job_id:             a.job_id ?? null,
             candidate:          { name: candidate.name },
           }))}
           positionTitle={activeApps[0].hiring_requests?.position_title ?? 'Interview'}
