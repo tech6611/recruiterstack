@@ -17,6 +17,7 @@ import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { InterviewPlanTab } from '@/components/req-jobs/InterviewPlanTab'
+import { JobTeamRoster } from '@/components/req-jobs/JobTeamRoster'
 import { cn } from '@/lib/utils'
 import { RichText } from '@/components/RichText'
 import { RichTextEditor, isHtmlEmpty } from '@/components/RichTextEditor'
@@ -795,6 +796,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           </div>
 
           <div className="space-y-4">
+            <JobTeamRoster jobId={job.id} hmName={intake.hm_name || null} hmEmail={intake.hm_email || null} />
             <Card>
               <CardHeader><CardTitle className="text-sm">Approval</CardTitle></CardHeader>
               <CardContent>
@@ -829,7 +831,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
         />
       )}
 
-      {tab === 'plan' && <InterviewPlanTab jobId={job.id} />}
+      {tab === 'plan' && <InterviewPlanTab jobId={job.id} hmName={intake.hm_name || null} hmEmail={intake.hm_email || null} />}
 
       {tab === 'audit' && <AuditLogTab targetType="job" targetId={job.id} />}
 
