@@ -37,6 +37,16 @@ entries on top.
   after an early return; moved above the guards so the hook order is stable.
 - **Default candidate view** now opens the application the candidate is furthest
   along in, so adding them to a new job no longer hijacks the view.
+- **Duplicate person in the "Team on this job" roster** — a hiring manager who also
+  ran a round appeared twice; the roster now dedupes by person.
+
+### Changed
+- **Candidate page: job switching moved to the left "Jobs Considered For" list.**
+  Removed the center job-picker row; the view shows one job at a time and you switch
+  from the left cards (current job highlighted). Header pluralizes by job count.
+- Job tabs restyled to match the Summary / Activities & Progress tabs (coffee pill +
+  green underline on the selected job); dropped the confusing "· Active" tab label.
+- Scheduling availability calendar now uses **30-minute** slots (was 15-minute).
 
 ### Schema
 - `099` interview_plans + interview_plan_rounds; `100` jobs.hiring_manager_user_id;
