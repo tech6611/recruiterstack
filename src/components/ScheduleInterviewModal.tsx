@@ -24,6 +24,9 @@ const DURATION_OPTIONS = [
   { value: 120, label: '2 hr'   },
 ] as const
 
+// Availability grid granularity (minutes per row).
+const SLOT_MINUTES = 30
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface ScheduleApp {
@@ -181,9 +184,10 @@ export default function ScheduleInterviewModal({
 
   const weekDays = getWeekDays(date, availWeekOffset)
 
-  const HOUR_SLOTS: string[] = Array.from({ length: 96 }, (_, i) => {
-    const h = Math.floor(i / 4)
-    const m = (i % 4) * 15
+  const HOUR_SLOTS: string[] = Array.from({ length: (24 * 60) / SLOT_MINUTES }, (_, i) => {
+    const total = i * SLOT_MINUTES
+    const h = Math.floor(total / 60)
+    const m = total % 60
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
   })
 
@@ -203,7 +207,7 @@ export default function ScheduleInterviewModal({
     const [y, mo, d]           = datePart.split('-').map(Number)
     const [h, m]               = timePart.split(':').map(Number)
     const slotStart = new Date(y, mo - 1, d, h, m, 0, 0).getTime()
-    const slotEnd   = slotStart + 15 * 60 * 1000
+    const slotEnd   = slotStart + SLOT_MINUTES * 60 * 1000
     return Object.entries(busyRangesByEmail)
       .filter(([, ranges]) => ranges.some(r => {
         const bStart = new Date(r.start).getTime()
@@ -282,13 +286,13 @@ export default function ScheduleInterviewModal({
 
   useEffect(() => {
     if (!availLoading && !availNoData && inlineGridRef.current) {
-      inlineGridRef.current.scrollTop = 32 * 14
+      inlineGridRef.current.scrollTop = (8 * 60 / SLOT_MINUTES) * 14
     }
   }, [availLoading, availNoData])
 
   useEffect(() => {
     if (gridExpanded && !availLoading && !availNoData && popupGridRef.current) {
-      popupGridRef.current.scrollTop = 32 * 20
+      popupGridRef.current.scrollTop = (8 * 60 / SLOT_MINUTES) * 20
     }
   }, [gridExpanded, availLoading, availNoData])
 
@@ -915,7 +919,7 @@ export default function ScheduleInterviewModal({
                               const [slH, slM]   = slot.split(':').map(Number)
                               const selMin = selH * 60 + selM
                               const slMin  = slH * 60 + slM
-                              return slMin + 15 >= selMin + duration
+                              return slMin + SLOT_MINUTES >= selMin + duration
                             })()
                             const blockRound = !isInBlock ? 'rounded'
                               : isSelected && isLastOfBlock ? 'rounded'
@@ -1181,7 +1185,7 @@ export default function ScheduleInterviewModal({
                           if (!date || !time || date !== toLocalDateStr(day)) return false
                           const [selH, selM] = time.split(':').map(Number)
                           const [slH, slM]   = slot.split(':').map(Number)
-                          return (slH * 60 + slM) + 15 >= (selH * 60 + selM) + duration
+                          return (slH * 60 + slM) + SLOT_MINUTES >= (selH * 60 + selM) + duration
                         })()
                         const blockRound = !isInBlock ? 'rounded'
                           : isSelected && isLastOfBlock ? 'rounded'

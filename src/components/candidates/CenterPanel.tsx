@@ -190,9 +190,11 @@ export default React.memo(function CenterPanel({
               >
                 <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${statusDot(app.status, isSel)}`} />
                 <span className="max-w-[140px] truncate">{jobTitle}</span>
-                {!isSel && (
+                {/* Only tag terminal states; "Active" on a non-selected tab reads
+                    like "the active tab" and is confusing — the dark pill already
+                    marks the selected job. */}
+                {!isSel && app.status !== 'active' && (
                   <span className={`text-[9px] font-normal ${
-                    app.status === 'active'   ? 'text-emerald-500' :
                     app.status === 'rejected' ? 'text-red-400'     :
                     app.status === 'hired'    ? 'text-emerald-600' :
                     'text-slate-400'
