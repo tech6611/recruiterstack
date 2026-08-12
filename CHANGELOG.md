@@ -9,6 +9,39 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-12
+
+### Added
+- **Interview Plans — a per-job hiring plan (Phases A–D).** Every job can define an
+  ordered list of interview **rounds** (name, type, interviewer, duration, optional
+  pipeline stage) on a new **"Interview plan"** tab. Rounds pick a real **team
+  member** as the interviewer, and the job shows an auto-built **"Team on this job"**
+  roster (hiring manager + interviewers). The **hiring manager is now a first-class
+  team member** (a real user on the job, `jobs.hiring_manager_user_id`), not just an
+  intake name. Once a job is **Active** and has a plan, **changes require the hiring
+  manager's approval** (parked as a pending change; strict — only the assigned HM
+  decides, Owner/admin only as the no-HM fallback), with **email + Slack DM + in-app**
+  notifications to the HM on submit and the requester on decision. **Scheduling
+  follows the plan**: "Schedule Interview" pre-fills the next round (type, duration,
+  interviewer) with a Round dropdown, links the booked interview to its round,
+  advances the candidate to the round's stage, and the candidate page shows a
+  round-by-round **progress strip**. Files: `src/components/req-jobs/InterviewPlanTab.tsx`,
+  `JobTeamRoster.tsx`, `JobHiringManagerPicker.tsx`, `src/components/ScheduleInterviewModal.tsx`,
+  `src/app/api/jobs/[id]/interview-plan/**`, `.../hiring-manager/route.ts`,
+  `src/lib/interview-plan/notify.ts`, `src/lib/team-members.ts`.
+
+### Fixed
+- **Add to Job / Change Status now use the canonical `job_id`** (were on the dropped
+  `hiring_request_id` path — "Unknown Role", empty stage list). Tests added.
+- **Intermittent candidate-page crash** — `CandidateProfileContent` called `useMemo`
+  after an early return; moved above the guards so the hook order is stable.
+- **Default candidate view** now opens the application the candidate is furthest
+  along in, so adding them to a new job no longer hijacks the view.
+
+### Schema
+- `099` interview_plans + interview_plan_rounds; `100` jobs.hiring_manager_user_id;
+  `101` interview_plans.pending_rounds/pending_meta; `102` interviews.plan_round_id.
+
 ## 2026-08-11
 
 ### Added
