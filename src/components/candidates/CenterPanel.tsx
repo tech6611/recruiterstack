@@ -182,10 +182,8 @@ export default React.memo(function CenterPanel({
               <button
                 key={app.id}
                 onClick={() => handleAppSelect(app.id)}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium shrink-0 transition-colors border ${
-                  isSel
-                    ? 'bg-slate-600 border-slate-600 text-white'
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold shrink-0 transition-colors bg-[#221b14] text-[#f6efe3] hover:bg-[#34291e] ${
+                  isSel ? 'shadow-[inset_0_-3px_0_0_#2f9e7b]' : ''
                 }`}
               >
                 <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${statusDot(app.status, isSel)}`} />
