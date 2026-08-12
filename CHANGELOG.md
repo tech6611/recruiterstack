@@ -39,6 +39,11 @@ entries on top.
   along in, so adding them to a new job no longer hijacks the view.
 - **Duplicate person in the "Team on this job" roster** — a hiring manager who also
   ran a round appeared twice; the roster now dedupes by person.
+- **Interviews from another job bled into the candidate view.** The candidate page's
+  **Interviews** section loaded by candidate only, so an interview scheduled on one
+  job showed while viewing a different job. It now scopes to the selected job
+  (`/api/interviews?application_id=…`), matching the Feed and pipeline.
+  File: `src/components/candidates/center/InterviewsTab.tsx`.
 
 ### Changed
 - **Candidate page: job switching moved to the left "Jobs Considered For" list.**

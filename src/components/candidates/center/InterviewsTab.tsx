@@ -48,11 +48,15 @@ function platformLabel(p: string | null) {
 
 export default function InterviewsTab({
   candidateId,
+  applicationId,
   jobId,
   heading,
   hideWhenEmpty = false,
 }: {
   candidateId: string
+  /** Scope interviews to a single application (job). When set, only this job's
+   *  interviews load; without it, the whole candidate's interviews are shown. */
+  applicationId?: string | null
   jobId?: string | null
   heading?: string
   hideWhenEmpty?: boolean
@@ -73,14 +77,17 @@ export default function InterviewsTab({
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/interviews?candidate_id=${candidateId}`, { cache: 'no-store' })
+      // Scope to the selected job when we have one, so an interview on a
+      // different application doesn't bleed into this job's view.
+      const query = applicationId ? `application_id=${applicationId}` : `candidate_id=${candidateId}`
+      const res = await fetch(`/api/interviews?${query}`, { cache: 'no-store' })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed to load interviews')
       setInterviews(json.data ?? [])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load interviews')
     }
-  }, [candidateId])
+  }, [candidateId, applicationId])
 
   useEffect(() => { load() }, [load])
 
