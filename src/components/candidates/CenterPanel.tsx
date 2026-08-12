@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Calendar, Wand2, Gift, ClipboardList, Briefcase, PhoneCall, Mail, ChevronDown, Sparkles, FileText, Activity } from 'lucide-react'
+import { Calendar, Wand2, Gift, ClipboardList, PhoneCall, Mail, ChevronDown, Sparkles, FileText, Activity } from 'lucide-react'
 import type { Candidate, CandidateTask, ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import { useCandidateProfile } from './CandidateProfileContext'
 import ActivitiesTab from './center/ActivitiesTab'
@@ -30,23 +30,6 @@ interface CenterPanelProps {
   selectedAppId: string | null
 }
 
-// ── Status styles for job pills ───────────────────────────────────────────────
-function statusDot(status: Application['status'], selected: boolean) {
-  if (selected) return 'bg-white/70'
-  return status === 'active'  ? 'bg-emerald-400'
-       : status === 'hired'   ? 'bg-emerald-600'
-       : status === 'rejected'? 'bg-red-400'
-       : 'bg-slate-400'
-}
-
-function statusLabel(status: Application['status']) {
-  return status === 'active'   ? 'Active'
-       : status === 'hired'    ? 'Hired'
-       : status === 'rejected' ? 'Rejected'
-       : status === 'withdrawn'? 'Withdrawn'
-       : status
-}
-
 export default React.memo(function CenterPanel({
   candidate,
   tasks,
@@ -64,7 +47,6 @@ export default React.memo(function CenterPanel({
     openScorecardDrawer,
     openVoiceCallModal: onPhoneScreen,
     openEnrollDrawer: onAddToSequence,
-    setSelectedAppId: onAppSelected,
     activeApps,
   } = useCandidateProfile()
 
@@ -85,17 +67,12 @@ export default React.memo(function CenterPanel({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const handleAppSelect = (id: string) => {
-    onAppSelected(id)
-  }
-
   // Derive filtered data for the selected application context
   const selectedApp   = selectedAppId ? applications.find(a => a.id === selectedAppId) ?? null : null
   const filteredApps  = selectedApp ? [selectedApp] : applications
   const filteredEvents = selectedApp ? events.filter(e => e.application_id === selectedApp.id) : events
   const filteredActiveApps = filteredApps.filter(a => a.status === 'active')
   const hasActiveApps = filteredActiveApps.length > 0
-  const multiJob      = applications.length > 1
 
   // Every candidate action now lives in the single "Options" menu below.
   const runOption = (fn: () => void) => { setOptionsOpen(false); fn() }
@@ -171,40 +148,7 @@ export default React.memo(function CenterPanel({
         </div>
       </div>
 
-      {/* ── Job / Application picker (only when candidate has multiple apps) ── */}
-      {multiJob && (
-        <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 flex items-center gap-2 overflow-x-auto">
-          <Briefcase className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-          {applications.map(app => {
-            const isSel     = app.id === selectedAppId
-            const jobTitle  = app.hiring_requests?.position_title ?? 'Unknown Role'
-            return (
-              <button
-                key={app.id}
-                onClick={() => handleAppSelect(app.id)}
-                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold shrink-0 transition-colors bg-[#221b14] text-[#f6efe3] hover:bg-[#34291e] ${
-                  isSel ? 'shadow-[inset_0_-3px_0_0_#2f9e7b]' : ''
-                }`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${statusDot(app.status, isSel)}`} />
-                <span className="max-w-[140px] truncate">{jobTitle}</span>
-                {/* Only tag terminal states; "Active" on a non-selected tab reads
-                    like "the active tab" and is confusing — the dark pill already
-                    marks the selected job. */}
-                {!isSel && app.status !== 'active' && (
-                  <span className={`text-[9px] font-normal ${
-                    app.status === 'rejected' ? 'text-red-400'     :
-                    app.status === 'hired'    ? 'text-emerald-600' :
-                    'text-slate-400'
-                  }`}>
-                    · {statusLabel(app.status)}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      )}
+      {/* Job switching now lives in the left panel's "Considered For" list. */}
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">

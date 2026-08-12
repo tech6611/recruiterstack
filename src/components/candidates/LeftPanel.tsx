@@ -42,7 +42,7 @@ export default React.memo(function LeftPanel({
   tags,
   applications,
 }: LeftPanelProps) {
-  const { addTag: onTagAdded, removeTag: onTagRemoved, setCandidate, openEmailDraft, activeApps: ctxActiveApps } = useCandidateProfile()
+  const { addTag: onTagAdded, removeTag: onTagRemoved, setCandidate, openEmailDraft, activeApps: ctxActiveApps, selectedAppId, setSelectedAppId } = useCandidateProfile()
   const onLinkedinSaved = (url: string | null) => setCandidate(prev => prev ? { ...prev, linkedin_url: url } : prev)
   const onDraftEmail = () => openEmailDraft(ctxActiveApps[0]?.id ?? null)
   const [editLinkedin, setEditLinkedin] = useState(false)
@@ -60,8 +60,6 @@ export default React.memo(function LeftPanel({
     setEditLinkedin(false)
     onLinkedinSaved(normalized)
   }
-
-  const activeApps = applications.filter(a => a.status === 'active')
 
   return (
     <div className="w-64 shrink-0 overflow-y-auto border-r border-slate-200 bg-white flex flex-col">
@@ -228,14 +226,28 @@ export default React.memo(function LeftPanel({
         </div>
 
         {/* Considered for */}
-        {activeApps.length > 0 && (
+        {applications.length > 0 && (
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Considered For</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+              Considered For{applications.length > 1 ? ' · tap to switch' : ''}
+            </p>
             <div className="space-y-2">
-              {activeApps.map(app => {
+              {applications.map(app => {
                 const stageStyle = STAGE_COLOR_MAP[app.pipeline_stages?.color ?? 'slate'] ?? STAGE_COLOR_MAP.slate
+                const isSel = app.id === selectedAppId
                 return (
-                  <div key={app.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div
+                    key={app.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSel}
+                    onClick={() => setSelectedAppId(app.id)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedAppId(app.id) } }}
+                    className={`cursor-pointer rounded-xl border p-3 transition-colors ${
+                      isSel ? 'border-emerald-400 ring-1 ring-emerald-100 bg-emerald-50/40'
+                            : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-slate-800 truncate">
@@ -247,6 +259,7 @@ export default React.memo(function LeftPanel({
                       </div>
                       <a
                         href={`/jobs/${app.hiring_request_id ?? app.job_id}`}
+                        onClick={e => e.stopPropagation()}
                         className="text-[10px] text-emerald-600 hover:text-emerald-800 shrink-0"
                       >
                         View →
