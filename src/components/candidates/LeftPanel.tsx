@@ -229,7 +229,7 @@ export default React.memo(function LeftPanel({
         {applications.length > 0 && (
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
-              Considered For{applications.length > 1 ? ' · tap to switch' : ''}
+              {applications.length === 1 ? 'Job' : 'Jobs'} Considered For
             </p>
             <div className="space-y-2">
               {applications.map(app => {
