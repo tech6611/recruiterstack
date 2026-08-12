@@ -34,7 +34,7 @@ export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }:
   const isLive = liveRounds !== undefined
   const [fetchedRounds, setFetchedRounds] = useState<RosterRound[]>([])
   const [fetchedTeam, setFetchedTeam]     = useState<TeamMember[]>([])
-  const [hm, setHm]                       = useState<{ name: string | null; email: string | null; source: string } | null>(null)
+  const [hm, setHm]                       = useState<{ user_id: string | null; name: string | null; email: string | null; source: string } | null>(null)
   const [loading, setLoading]             = useState(!isLive)
 
   const load = useCallback(async () => {
@@ -52,7 +52,7 @@ export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }:
   // Resolve the hiring manager (assigned real user, else intake) — in both modes.
   useEffect(() => {
     fetch(`/api/jobs/${jobId}/hiring-manager`).then(r => r.json())
-      .then(j => setHm(j?.data ? { name: j.data.name ?? null, email: j.data.email ?? null, source: j.data.source ?? 'none' } : null))
+      .then(j => setHm(j?.data ? { user_id: j.data.user_id ?? null, name: j.data.name ?? null, email: j.data.email ?? null, source: j.data.source ?? 'none' } : null))
       .catch(() => setHm(null))
   }, [jobId, hmRefreshKey])
 
@@ -72,10 +72,30 @@ export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }:
     if (!groups.has(key)) { groups.set(key, { name, rounds: [] }); order.push(key) }
     groups.get(key)!.rounds.push({ round: r, n: idx + 1 })
   })
-  const interviewers = order.map(k => groups.get(k)!)
   const hmName = hm?.name ?? null
   const hmEmail = hm?.email ?? null
   const hasHM = !!(hmName || hmEmail)
+  const hmPill = hm?.source === 'assigned' ? 'hiring manager' : 'from intake'
+  const hmKey = hm?.user_id ?? null
+  const hmIsInterviewer = !!(hmKey && groups.has(hmKey))
+
+  const roundsSub = (rs: { round: RosterRound; n: number }[]) =>
+    rs.map(x => `${x.round.name} · ${TYPE_LABEL[x.round.interview_type] ?? x.round.interview_type} · ${x.round.duration_minutes}m`).join('  ·  ')
+
+  // One row per person. If the hiring manager also runs a round, merge them into
+  // that round's row (with the HM pill) instead of showing a duplicate.
+  const rows: { key: string; name: string; sub: string; pill: string }[] = []
+  if (hasHM && !hmIsInterviewer) {
+    rows.push({ key: 'hm', name: hmName || hmEmail || 'Hiring manager', sub: hmEmail && hmName ? hmEmail : 'Hiring manager', pill: hmPill })
+  }
+  for (const k of order) {
+    const g = groups.get(k)!
+    const isHM = k === hmKey
+    rows.push({
+      key: k, name: g.name, sub: roundsSub(g.rounds),
+      pill: isHM ? hmPill : (g.rounds.length === 1 ? `Round ${g.rounds[0].n}` : `${g.rounds.length} rounds`),
+    })
+  }
 
   return (
     <Card>
@@ -85,19 +105,12 @@ export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }:
       <CardContent>
         {loading ? (
           <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
-        ) : !hasHM && interviewers.length === 0 ? (
+        ) : rows.length === 0 ? (
           <p className="py-2 text-sm text-slate-400">Assign interviewers in the Interview Plan to build the team.</p>
         ) : (
           <div className="divide-y divide-slate-100">
-            {hasHM && (
-              <Row initials={nameInitials(hmName || hmEmail || 'HM')} name={hmName || hmEmail || 'Hiring manager'}
-                   sub={hmEmail && hmName ? hmEmail : 'Hiring manager'}
-                   pill={hm?.source === 'assigned' ? 'hiring manager' : 'from intake'} />
-            )}
-            {interviewers.map((p, i) => (
-              <Row key={i} initials={nameInitials(p.name)} name={p.name}
-                   sub={p.rounds.map(x => `${x.round.name} · ${TYPE_LABEL[x.round.interview_type] ?? x.round.interview_type} · ${x.round.duration_minutes}m`).join('  ·  ')}
-                   pill={p.rounds.length === 1 ? `Round ${p.rounds[0].n}` : `${p.rounds.length} rounds`} />
+            {rows.map(r => (
+              <Row key={r.key} initials={nameInitials(r.name)} name={r.name} sub={r.sub} pill={r.pill} />
             ))}
           </div>
         )}
