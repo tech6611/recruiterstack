@@ -24,18 +24,31 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
   return NextResponse.json({ data: { ...data, hiring_request } })
 })
 
-export const PATCH = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
+export const PATCH = withCapability('recruiting:edit', async (req, orgId, supabase, { params }, _scope, userId) => {
   const body = await req.json()
+
+  // Only these fields may be updated via PATCH — mirrors the Django handler and
+  // stops a client from overwriting identity columns (org_id / candidate_id / id).
+  const ALLOWED = [
+    'interviewer_name', 'interviewer_email', 'interview_type',
+    'scheduled_at', 'duration_minutes', 'location', 'notes',
+    'status', 'stage_id', 'calendar_event_id',
+  ] as const
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  for (const f of ALLOWED) if (f in body) patch[f] = body[f]
 
   const { data, error } = await supabase
     .from('interviews')
-    .update({ ...body, updated_at: new Date().toISOString() } as import('@/lib/types/database').InterviewUpdate)
+    .update(patch as import('@/lib/types/database').InterviewUpdate)
     .eq('id', params.id)
     .eq('org_id', orgId)
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Attribute History events to the acting user (fall back to org), like Django.
+  const actor = userId || orgId
 
   // Log status change events
   if (body.status === 'completed') {
@@ -45,7 +58,7 @@ export const PATCH = withCapability('recruiting:edit', async (req, orgId, supaba
       event_type:     'interview_completed',
       note:           `Interview completed with ${data.interviewer_name}`,
       metadata:       { interview_id: params.id },
-      created_by:     orgId,
+      created_by:     actor,
     })
   } else if (body.status === 'cancelled') {
     await supabase.from('application_events').insert({
@@ -54,7 +67,7 @@ export const PATCH = withCapability('recruiting:edit', async (req, orgId, supaba
       event_type:     'interview_cancelled',
       note:           `Interview cancelled`,
       metadata:       { interview_id: params.id },
-      created_by:     orgId,
+      created_by:     actor,
     })
     // Remove the real calendar event and notify attendees.
     await runInterviewCancellationSideEffects(supabase, orgId, params.id)
@@ -66,14 +79,14 @@ export const PATCH = withCapability('recruiting:edit', async (req, orgId, supaba
       event_type:     'interview_scheduled',
       note:           `Interview rescheduled with ${data.interviewer_name}`,
       metadata:       { interview_id: params.id, rescheduled: true },
-      created_by:     orgId,
+      created_by:     actor,
     })
   }
 
   return NextResponse.json({ data })
 })
 
-export const DELETE = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }) => {
+export const DELETE = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }, _scope, userId) => {
   // Read the row first: we need its application_id/interviewer for the History
   // entry, and the calendar side effects need its stored details.
   const { data: interview } = await supabase
@@ -102,7 +115,7 @@ export const DELETE = withCapability('recruiting:edit', async (_req, orgId, supa
       event_type:     'interview_cancelled',
       note:           `Interview deleted${interview.interviewer_name ? ` (with ${interview.interviewer_name})` : ''}`,
       metadata:       { interview_id: params.id, deleted: true },
-      created_by:     orgId,
+      created_by:     userId || orgId,
     })
   }
 

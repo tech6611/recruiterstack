@@ -105,9 +105,14 @@ const nextConfig = {
             { source: '/api/slack/install',    destination: `${djangoUrl}/api/slack/install` },
             { source: '/api/slack/callback',   destination: `${djangoUrl}/api/slack/callback` },
             { source: '/api/slack/disconnect', destination: `${djangoUrl}/api/slack/disconnect` },
-            // ── Batch 5: Interviews + Offers + Inbox ──────────────────────
-            { source: '/api/interviews',           destination: `${djangoUrl}/api/interviews` },
-            { source: '/api/interviews/:id',       destination: `${djangoUrl}/api/interviews/:id` },
+            // ── Batch 5: Offers + Inbox ───────────────────────────────────
+            // NOTE: interviews are handled by Next.js, NOT proxied to Django.
+            // Only the Next.js route runs the calendar side effects (create +
+            // *cancel* the Google/Teams/Zoom event). Django's interview handler
+            // updates the DB status only, so a cancel there left the calendar
+            // event orphaned. Keep interviews on Next so create and cancel stay
+            // symmetric. (`/api/interviews` was already served by the static
+            // Next route; `/api/interviews/:id` was the one leaking to Django.)
             { source: '/api/offers',               destination: `${djangoUrl}/api/offers` },
             { source: '/api/offers/:id',           destination: `${djangoUrl}/api/offers/:id` },
             { source: '/api/inbox',                destination: `${djangoUrl}/api/inbox` },

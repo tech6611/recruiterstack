@@ -9,6 +9,25 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-13
+
+### Fixed
+- **Cancelling an interview now removes its calendar event.** `/api/interviews/:id`
+  was proxied to the Django backend (an "afterFiles" rewrite that shadows the
+  dynamic Next.js route), and Django's cancel handler only flips the DB status —
+  it never calls Google/Teams/Zoom to delete the event. So a cancelled interview
+  vanished from the app but lingered on the interviewer's calendar. Removed the
+  `/api/interviews` + `/api/interviews/:id` rewrites so the Next.js route handles
+  them; it already runs the calendar side effects (`runInterviewCancellationSideEffects`)
+  on cancel/delete. Create and cancel are now symmetric (both on Next.js).
+  Files: `next.config.mjs`, `src/app/api/interviews/[id]/route.ts`.
+
+### Changed
+- **Interview PATCH hardened to match the Django contract** now that Next.js owns it:
+  updates are restricted to an allowlist (can't overwrite `org_id`/`candidate_id`/`id`),
+  and History events attribute to the acting user (`userId || orgId`) instead of the
+  org — so the Feed shows a person, not an org id.
+
 ## 2026-08-12
 
 ### Added
