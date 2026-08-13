@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { withCapability, parseBody } from '@/lib/api/helpers'
+import { withCapability, withScope, parseBody } from '@/lib/api/helpers'
+import { assertCanViewJob } from '@/lib/rbac'
 import { interviewPlanPutSchema } from '@/lib/validations/interview-plans'
 import { notifyPlanChangeSubmitted } from '@/lib/interview-plan/notify'
 
@@ -26,11 +27,16 @@ function toRoundRow(orgId: string, planId: string, r: Record<string, unknown>, i
 
 // GET /api/jobs/:id/interview-plan — plan + rounds, plus any pending change and
 // whether the current viewer can decide it.
-export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }, _scope, userId) => {
+export const GET = withScope(async (_req, orgId, supabase, { params }, scope, userId) => {
   const sb = supabase as unknown as Loose
   const jobId = params.id
 
-  const { data: job } = await sb.from('jobs').select('status').eq('id', jobId).eq('org_id', orgId).maybeSingle()
+  const { data: job } = await sb.from('jobs').select('status, hiring_manager_user_id').eq('id', jobId).eq('org_id', orgId).maybeSingle()
+  // Broad recruiting view, or the assigned hiring manager for THIS job (so they
+  // can see the plan they're being asked to approve).
+  const denied = assertCanViewJob(scope, job)
+  if (denied) return denied
+
   const { data: plan } = await sb.from('interview_plans').select('*').eq('org_id', orgId).eq('job_id', jobId).maybeSingle()
 
   let rounds: unknown[] = []

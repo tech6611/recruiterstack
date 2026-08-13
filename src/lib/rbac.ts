@@ -117,6 +117,31 @@ export function assertAdmin(scope: ViewerScope): NextResponse | null {
   return scope.isAdmin ? null : forbidden('Admins only')
 }
 
+/**
+ * Job-scoped read access. A permission should carry the reads needed to use it:
+ * anyone with broad `recruiting:view` may read any job, and the assigned hiring
+ * manager may read the specific job they're responsible for (so they can see and
+ * approve its interview plan) — without granting them the whole recruiting
+ * surface. Extend the same pattern to other "items associated with a job the
+ * viewer is on" as needed.
+ */
+export function canViewJob(
+  scope: ViewerScope,
+  job: { hiring_manager_user_id?: string | null } | null | undefined,
+): boolean {
+  if (scope.capabilities.has('recruiting:view')) return true
+  if (job?.hiring_manager_user_id && job.hiring_manager_user_id === scope.userId) return true
+  return false
+}
+
+/** 403 to return-as-is, or null if the viewer may read this job. */
+export function assertCanViewJob(
+  scope: ViewerScope,
+  job: { hiring_manager_user_id?: string | null } | null | undefined,
+): NextResponse | null {
+  return canViewJob(scope, job) ? null : forbidden()
+}
+
 export function assertCanViewSensitive(
   scope: ViewerScope,
   targetEmployeeId: string,

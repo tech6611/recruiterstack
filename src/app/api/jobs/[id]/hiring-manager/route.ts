@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { withCapability } from '@/lib/api/helpers'
+import { withCapability, withScope } from '@/lib/api/helpers'
+import { assertCanViewJob } from '@/lib/rbac'
 import { teamMemberName, type TeamMember } from '@/lib/team-members'
 
 // `jobs.hiring_manager_user_id` is added by migration 100 and isn't in the
@@ -9,7 +10,7 @@ type Loose = any
 
 // GET /api/jobs/:id/hiring-manager — the resolved hiring manager for the job.
 // Prefers the assigned real user; falls back to the intake name/email.
-export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
+export const GET = withScope(async (_req, orgId, supabase, { params }, scope) => {
   const sb = supabase as unknown as Loose
   const first = await sb
     .from('jobs').select('hiring_manager_user_id, custom_fields').eq('id', params.id).eq('org_id', orgId).maybeSingle()
@@ -20,6 +21,10 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
     job = r.data ? { hiring_manager_user_id: null, custom_fields: r.data.custom_fields } : null
   }
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  // Broad recruiting view, or the assigned hiring manager for THIS job (so their
+  // own Overview resolves who the HM is instead of showing "— none —").
+  const denied = assertCanViewJob(scope, job)
+  if (denied) return denied
 
   if (job.hiring_manager_user_id) {
     const { data: m } = await sb

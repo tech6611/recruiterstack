@@ -38,6 +38,16 @@ interface HistoryItem {
   completed_at:       string | null
 }
 
+// Interview-plan changes awaiting my decision (a separate, self-contained flow
+// from the chain engine above — the decision is made on the job's Interview plan tab).
+interface PlanApprovalItem {
+  job_id:            string
+  job_title:         string
+  requested_by_name: string | null
+  requested_at:      string | null
+  rounds_count:      number
+}
+
 /** Detail-page route for a given approval target. */
 function targetHref(targetType: string, targetId: string): string {
   switch (targetType) {
@@ -65,6 +75,7 @@ const PANE_TINT: { pending: PaneTone; history: PaneTone } = {
 
 export default function ApprovalInboxPage() {
   const [items, setItems]     = useState<InboxItem[]>([])
+  const [planItems, setPlanItems] = useState<PlanApprovalItem[]>([])
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [loaded, setLoaded]   = useState(false)
   const [open,  setOpen]      = useState<InboxItem | null>(null)
@@ -77,16 +88,21 @@ export default function ApprovalInboxPage() {
   const [typeFilter, setTypeFilter]     = useState('all')
 
   async function refresh() {
-    const [inboxRes, histRes] = await Promise.all([
+    const [inboxRes, histRes, planRes] = await Promise.all([
       fetch('/api/approvals/inbox'),
       fetch('/api/approvals/history'),
+      fetch('/api/me/interview-plan-approvals'),
     ])
     const inboxBody = await inboxRes.json()
     const histBody  = await histRes.json()
+    const planBody  = await planRes.json()
     setItems(inboxBody.data ?? [])
     setHistory(histBody.data ?? [])
+    setPlanItems(planBody.data ?? [])
     setLoaded(true)
   }
+
+  const pendingCount = items.length + planItems.length
 
   useEffect(() => { refresh() }, [])
 
@@ -115,8 +131,8 @@ export default function ApprovalInboxPage() {
           {/* Summary stat cards — same at-a-glance strip as the other list pages. */}
           <StatCards
             cards={[
-              { key: 'total',    label: 'Total',      value: items.length + history.length,                              tone: 'slate', icon: <CheckSquare className="h-4 w-4" /> },
-              { key: 'pending',  label: 'Pending',    value: items.length,                                               tone: 'amber', icon: <Clock className="h-4 w-4" /> },
+              { key: 'total',    label: 'Total',      value: pendingCount + history.length,                              tone: 'slate', icon: <CheckSquare className="h-4 w-4" /> },
+              { key: 'pending',  label: 'Pending',    value: pendingCount,                                               tone: 'amber', icon: <Clock className="h-4 w-4" /> },
               { key: 'approved', label: 'Approved',   value: history.filter(h => h.my_decision === 'approved').length,   tone: 'pine',  icon: <CheckCircle className="h-4 w-4" /> },
               { key: 'rejected', label: 'Rejected',   value: history.filter(h => h.my_decision === 'rejected').length,   tone: 'stone', icon: <XCircle className="h-4 w-4" /> },
             ]}
@@ -134,15 +150,42 @@ export default function ApprovalInboxPage() {
                 : <ChevronRight className={cn('h-4 w-4 shrink-0', PANE_TINT.pending.chevron)} />}
               <span className={cn('text-sm font-semibold uppercase tracking-wide', PANE_TINT.pending.title)}>Pending decisions</span>
               <span className={cn('inline-flex items-center justify-center rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold', PANE_TINT.pending.badge)}>
-                {items.length}
+                {pendingCount}
               </span>
             </button>
 
             {pendingOpen && (
-              items.length === 0 ? (
+              pendingCount === 0 ? (
                 <p className="border-t border-slate-100 py-8 text-center text-sm text-slate-500">No pending decisions.</p>
               ) : (
                 <div className="space-y-3 border-t border-slate-100 p-3">
+                  {/* Interview-plan approvals — decided on the job's Interview plan tab. */}
+                  {planItems.map(pi => (
+                    <Card key={`plan-${pi.job_id}`}>
+                      <CardContent>
+                        <div className="flex items-center justify-between gap-4 py-1">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                Interview plan
+                              </span>
+                              <Link href={`/req-jobs/${pi.job_id}`} className="truncate text-sm font-semibold text-slate-900 hover:text-emerald-700">
+                                {pi.job_title}
+                              </Link>
+                            </div>
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              {pi.requested_by_name && <>Requested by {pi.requested_by_name} · </>}
+                              {pi.rounds_count} proposed round{pi.rounds_count === 1 ? '' : 's'}
+                              {pi.requested_at && <> · {new Date(pi.requested_at).toLocaleString()}</>}
+                            </div>
+                          </div>
+                          <Link href={`/req-jobs/${pi.job_id}`}>
+                            <Button size="sm">Review</Button>
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                   {items.map(item => {
                     const isOverdue = item.due_at != null && new Date(item.due_at).getTime() < Date.now()
                     return (

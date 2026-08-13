@@ -12,6 +12,28 @@ entries on top.
 ## 2026-08-13
 
 ### Fixed
+- **An assigned hiring manager can now see and approve the interview plan they're
+  responsible for.** The "Hiring Manager" role grants `approvals:approve` but not
+  `recruiting:view`, yet the Interview-plan read and the hiring-manager read were
+  gated on `recruiting:view` — so the HM's Overview showed "— none —" for the HM
+  and the Interview-plan tab never rendered the Approve/Reject buttons (they could
+  only reach it via the bell notification, whose link was also mis-routed to
+  `/jobs/:id`). Reads are now **job-scoped**: allowed for anyone with
+  `recruiting:view`, or the assigned hiring manager for *that* job — encoding the
+  rule that a permission carries the reads needed to use it, without widening the
+  role. New helper `canViewJob`/`assertCanViewJob` + `withScope` wrapper.
+  Files: `src/lib/rbac.ts`, `src/lib/api/helpers.ts`,
+  `src/app/api/jobs/[id]/interview-plan/route.ts`, `.../hiring-manager/route.ts`.
+
+### Added
+- **Interview-plan approvals now appear in the Approvals inbox.** Previously the
+  inbox listed only time-off requests, so interview-plan sign-offs were reachable
+  only via the bell. They now show under "Pending decisions" (with proposed-round
+  count + a Review link to the plan tab) for the assigned approver. New endpoint
+  `GET /api/me/interview-plan-approvals`; the submit/decision notifications now
+  deep-link correctly to `/req-jobs/:id` (new `req_job` notification resource type).
+
+### Fixed
 - **Cancelling an interview now removes its calendar event.** `/api/interviews/:id`
   was proxied to the Django backend (an "afterFiles" rewrite that shadows the
   dynamic Next.js route), and Django's cancel handler only flips the DB status —

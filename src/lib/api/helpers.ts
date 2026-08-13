@@ -95,6 +95,38 @@ export function withCapability(capability: Capability, handler: CapabilityHandle
 }
 
 /**
+ * Like `withCapability` but enforces NO single capability up front — it resolves
+ * the viewer's scope and hands it to the handler, which decides access itself
+ * (e.g. a job-scoped check: broad `recruiting:view` OR "I'm the assigned hiring
+ * manager for THIS job"). Use when a capability alone can't express the rule.
+ */
+export function withScope(handler: CapabilityHandler) {
+  return async (req: NextRequest, ctx?: { params: Record<string, string> }) => {
+    const start = Date.now()
+    const method = req.method
+    const path = new URL(req.url).pathname
+
+    try {
+      const auth = await requireOrgAndUser()
+      if (auth instanceof NextResponse) return auth
+      const { orgId, userId } = auth
+
+      Sentry.setTag('org_id', orgId)
+      const supabase = createAdminClient()
+      const scope = await getViewerScope(supabase, orgId, userId)
+
+      const response = await handler(req, orgId, supabase, ctx ?? { params: {} }, scope, userId)
+      logger.info(`${method} ${path}`, { orgId, status: response.status, ms: Date.now() - start })
+      return response
+    } catch (err) {
+      Sentry.captureException(err)
+      logger.error(`${method} ${path} failed`, err, { ms: Date.now() - start })
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    }
+  }
+}
+
+/**
  * Parse a request body and validate with a Zod schema.
  * Returns parsed data or a 400 NextResponse with validation errors.
  */

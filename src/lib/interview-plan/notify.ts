@@ -46,7 +46,7 @@ export async function notifyPlanChangeSubmitted(input: {
 
     await createNotification({
       orgId: input.orgId, userId: input.approverUserId, type: 'approval_requested',
-      title: `Interview-plan change awaiting approval — ${title}`, resourceType: 'job', resourceId: input.jobId,
+      title: `Interview-plan change awaiting approval — ${title}`, resourceType: 'req_job', resourceId: input.jobId,
     })
     if (approver.email) {
       await sendEmail({
@@ -80,7 +80,7 @@ export async function notifyPlanChangeDecided(input: {
 
     await createNotification({
       orgId: input.orgId, userId: input.requesterUserId, type: 'approval_decided',
-      title: subject, resourceType: 'job', resourceId: input.jobId,
+      title: subject, resourceType: 'req_job', resourceId: input.jobId,
     })
     if (requester.email) {
       await sendEmail({

@@ -60,6 +60,7 @@ function resourceHref(type: string | null, id: string | null): string | null {
     case 'candidate':           return `/candidates/${id}`
     case 'application':         return `/candidates/${id}`
     case 'job':                 return `/jobs/${id}`
+    case 'req_job':             return `/req-jobs/${id}` // canonical job detail (Interview plan tab lives here)
     case 'opening':             return `/openings/${id}` // requisition (display name)
     case 'approval':            return '/approvals/inbox' // approver's pending-decision queue
     case 'role':                return `/roles/${id}`
