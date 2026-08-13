@@ -17,6 +17,13 @@ entries on top.
   File: `src/components/candidates/center/SummaryTab.tsx`.
 
 ### Fixed
+- **Jobs list now shows the Hiring Manager.** The board column read
+  `hiring_manager_name`, but the Django job-list serializer only filled it from
+  `custom_fields.hiring_manager_name` — empty for jobs whose HM is an assigned user
+  or an intake-form name — so the column was always blank. It now resolves the name
+  like the detail endpoint: assigned member's real name, else custom field, else
+  intake name. (Django: `hiring/views_hiring_requests.py`, `hiring/models.py`,
+  `ai/models.py`.)
 - **AI summaries now persist.** They were generated on demand and never stored —
   the Django endpoint only returned a summary (no save, no read), and the Next.js
   code expected a `candidates.ai_summary` column that never existed — so a summary
