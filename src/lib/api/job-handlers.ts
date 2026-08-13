@@ -149,7 +149,7 @@ Be concise, direct, and useful for a recruiter who hasn't reviewed this profile 
 
   const summary = text.trim()
 
-  await saveCandidateAiSummary(supabase, job.org_id, candidateId, summary)
+  await saveCandidateAiSummary(supabase, job.org_id, candidateId, summary, { model })
 
   logger.info('AI summary generated via queue', { jobId: job.id, candidateId })
 })

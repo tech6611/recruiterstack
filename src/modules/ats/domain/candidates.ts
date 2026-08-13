@@ -125,22 +125,52 @@ export async function getCandidateForSummary(
   return data as Candidate
 }
 
+// AI summaries live in their own table (`candidate_ai_summaries`, migration 103),
+// one current row per candidate. Not in the generated Supabase types yet, so use
+// a loose handle for that table.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LooseSb = any
+
 export async function saveCandidateAiSummary(
   supabase: Supabase,
   orgId: string,
   candidateId: string,
   summary: string,
+  opts?: { model?: string | null; generatedBy?: string | null },
 ): Promise<void> {
-  const { error } = await supabase
-    .from('candidates')
-    .update({
-      ai_summary: summary,
-      ai_summary_generated_at: new Date().toISOString(),
-    } as never)
-    .eq('id', candidateId)
-    .eq('org_id', orgId)
+  const now = new Date().toISOString()
+  const { error } = await (supabase as unknown as LooseSb)
+    .from('candidate_ai_summaries')
+    .upsert(
+      {
+        org_id:       orgId,
+        candidate_id: candidateId,
+        summary,
+        model:        opts?.model ?? null,
+        generated_by: opts?.generatedBy ?? null,
+        generated_at: now,
+        updated_at:   now,
+      },
+      { onConflict: 'candidate_id' },
+    )
 
   if (error) throw new Error(`Failed to save summary: ${error.message}`)
+}
+
+/** The current stored summary for a candidate, or null if none generated yet. */
+export async function getCandidateAiSummary(
+  supabase: Supabase,
+  orgId: string,
+  candidateId: string,
+): Promise<{ summary: string; generated_at: string } | null> {
+  const { data } = await (supabase as unknown as LooseSb)
+    .from('candidate_ai_summaries')
+    .select('summary, generated_at')
+    .eq('org_id', orgId)
+    .eq('candidate_id', candidateId)
+    .maybeSingle()
+
+  return data ? { summary: data.summary, generated_at: data.generated_at } : null
 }
 
 export async function listCandidatesForOrg(

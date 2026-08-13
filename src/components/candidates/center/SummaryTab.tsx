@@ -187,85 +187,22 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
     }
   }
 
-  // Find applications that have been AI-scored
-  const scoredApps = applications.filter(a => a.ai_score !== null && a.ai_scored_at)
+  // The scored application in view — its score merges with the candidate summary
+  // into one "AI Assessment" card (Option B: score on the left, summary on the right).
+  const scoredApp = applications.find(a => a.ai_score !== null && a.ai_scored_at) ?? null
+  const rec = scoredApp?.ai_recommendation ? REC_CONFIG[scoredApp.ai_recommendation] : null
 
   return (
     <>
     <div className="space-y-4 p-5">
 
-      {/* ── AI Scorecard (one per scored application) ─────────────────────── */}
-      {scoredApps.map(app => {
-        const rec = app.ai_recommendation ? REC_CONFIG[app.ai_recommendation] : null
-        return (
-          <Panel
-            key={app.id}
-            icon={TrendingUp}
-            title="AI Score"
-            meta={applications.length > 1 ? `· ${app.hiring_requests?.position_title ?? 'Role'}` : undefined}
-            action={app.ai_scored_at ? (
-              <span className="text-[10px] text-slate-400">
-                Scored {new Date(app.ai_scored_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            ) : undefined}
-          >
-            <div className="flex items-start gap-5 px-5 py-4">
-              <ScoreRing score={app.ai_score!} />
-              <div className="min-w-0 flex-1">
-                {rec && (
-                  <span className={`mb-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${rec.bg} ${rec.color}`}>
-                    {rec.label}
-                  </span>
-                )}
-                {app.ai_criterion_scores && app.ai_criterion_scores.length > 0 && (
-                  <div className="mb-3 space-y-1.5">
-                    {app.ai_criterion_scores.map((c, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <p className="w-28 shrink-0 truncate text-[10px] text-slate-500">{c.name}</p>
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-slate-500" style={{ width: `${(c.rating / 4) * 100}%` }} />
-                        </div>
-                        <span className="w-8 text-right text-[10px] text-slate-400">{c.rating}/4</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  {app.ai_strengths?.length > 0 && (
-                    <div>
-                      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
-                        <TrendingUp className="h-2.5 w-2.5" /> Strengths
-                      </p>
-                      <ul className="space-y-0.5">
-                        {app.ai_strengths.slice(0, 3).map((s, i) => (
-                          <li key={i} className="text-[10px] leading-relaxed text-slate-600">• {s}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {app.ai_gaps?.length > 0 && (
-                    <div>
-                      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-amber-600">
-                        <TrendingDown className="h-2.5 w-2.5" /> Gaps
-                      </p>
-                      <ul className="space-y-0.5">
-                        {app.ai_gaps.slice(0, 3).map((g, i) => (
-                          <li key={i} className="text-[10px] leading-relaxed text-slate-600">• {g}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Panel>
-        )
-      })}
-
-      {/* ── AI Summary ────────────────────────────────────────────────────── */}
+      {/* ── AI Assessment — score + summary in one card (Option B) ─────────── */}
       <Panel
-        icon={Wand2}
-        title="AI Summary"
+        icon={TrendingUp}
+        title="AI Assessment"
+        meta={scoredApp?.ai_scored_at
+          ? `· Scored ${new Date(scoredApp.ai_scored_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+          : undefined}
         action={
           <button
             onClick={generate}
@@ -277,13 +214,84 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
           </button>
         }
       >
-        <div className="px-5 py-4">
-          {genError && <p className="text-sm text-red-600">{genError}</p>}
-          {summary ? (
-            <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{summary}</p>
-          ) : !generating && (
-            <p className="text-sm italic text-slate-400">Click &quot;Generate Summary&quot; to get an AI overview of this candidate.</p>
-          )}
+        <div className="grid grid-cols-1 md:grid-cols-2">
+          {/* Left — AI score */}
+          <div className="border-b border-slate-100 p-5 md:border-b-0 md:border-r">
+            {scoredApp ? (
+              <div className="space-y-3">
+                <div className="flex items-start gap-4">
+                  <ScoreRing score={scoredApp.ai_score!} />
+                  <div className="min-w-0 flex-1">
+                    {rec && (
+                      <span className={`mb-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${rec.bg} ${rec.color}`}>
+                        {rec.label}
+                      </span>
+                    )}
+                    {scoredApp.ai_criterion_scores && scoredApp.ai_criterion_scores.length > 0 && (
+                      <div className="space-y-1.5">
+                        {scoredApp.ai_criterion_scores.map((c, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <p className="w-28 shrink-0 truncate text-[10px] text-slate-500">{c.name}</p>
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                              <div className="h-full rounded-full bg-slate-500" style={{ width: `${(c.rating / 4) * 100}%` }} />
+                            </div>
+                            <span className="w-8 text-right text-[10px] text-slate-400">{c.rating}/4</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {scoredApp.ai_strengths?.length > 0 && (
+                    <div>
+                      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                        <TrendingUp className="h-2.5 w-2.5" /> Strengths
+                      </p>
+                      <ul className="space-y-0.5">
+                        {scoredApp.ai_strengths.slice(0, 3).map((s, i) => (
+                          <li key={i} className="text-[10px] leading-relaxed text-slate-600">• {s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {scoredApp.ai_gaps?.length > 0 && (
+                    <div>
+                      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-amber-600">
+                        <TrendingDown className="h-2.5 w-2.5" /> Gaps
+                      </p>
+                      <ul className="space-y-0.5">
+                        {scoredApp.ai_gaps.slice(0, 3).map((g, i) => (
+                          <li key={i} className="text-[10px] leading-relaxed text-slate-600">• {g}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center py-8 text-center">
+                <TrendingUp className="mb-2 h-7 w-7 text-slate-200" />
+                <p className="text-sm text-slate-400">Not scored for this job yet</p>
+                <p className="mt-1 text-xs text-slate-300">Scoring runs automatically when a candidate applies.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Right — AI summary */}
+          <div className="p-5">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Summary</p>
+            {genError && <p className="text-sm text-red-600">{genError}</p>}
+            {summary ? (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{summary}</p>
+            ) : generating ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…
+              </div>
+            ) : (
+              <p className="text-sm italic text-slate-400">Click &quot;Generate Summary&quot; to get an AI overview of this candidate.</p>
+            )}
+          </div>
         </div>
       </Panel>
 

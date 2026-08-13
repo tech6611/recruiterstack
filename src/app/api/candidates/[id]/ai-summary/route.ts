@@ -6,24 +6,15 @@ import { runInBackground } from '@/lib/api/background'
 import { logger } from '@/lib/logger'
 import { trackUsage } from '@/lib/ai/track-usage'
 import { generateText } from '@/lib/ai/llm'
+import { getCandidateAiSummary, saveCandidateAiSummary } from '@/modules/ats/domain/candidates'
 
-// GET /api/candidates/[id]/ai-summary — poll for generated summary
+// GET /api/candidates/[id]/ai-summary — the stored summary (poll target)
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
-  const { data, error } = await supabase
-    .from('candidates')
-    .select('ai_summary, ai_summary_generated_at')
-    .eq('id', params.id)
-    .eq('org_id', orgId)
-    .single()
-
-  if (error || !data) {
-    return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
-  }
-
+  const row = await getCandidateAiSummary(supabase, orgId, params.id)
   return NextResponse.json({
     data: {
-      summary: data.ai_summary ?? null,
-      generated_at: data.ai_summary_generated_at ?? null,
+      summary: row?.summary ?? null,
+      generated_at: row?.generated_at ?? null,
     },
   })
 })
@@ -190,19 +181,11 @@ Be concise, direct, and useful for a recruiter who hasn't reviewed this profile 
 
   const summary = text.trim()
 
-  // Store the summary on the candidate record
-  const { error: updateErr } = await supabase
-    .from('candidates')
-    .update({
-      ai_summary: summary,
-      ai_summary_generated_at: new Date().toISOString(),
-    })
-    .eq('id', candidateId)
-    .eq('org_id', orgId)
-
-  if (updateErr) {
-    logger.error('AI summary: failed to save', updateErr, { candidateId })
-  } else {
+  // Store the summary in its dedicated table (migration 103).
+  try {
+    await saveCandidateAiSummary(supabase, orgId, candidateId, summary, { model })
     logger.info('AI summary generated', { candidateId })
+  } catch (err) {
+    logger.error('AI summary: failed to save', err instanceof Error ? err : undefined, { candidateId })
   }
 }

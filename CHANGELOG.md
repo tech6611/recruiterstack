@@ -11,7 +11,28 @@ entries on top.
 
 ## 2026-08-13
 
+### Added
+- **Candidate Summary tab: AI Score and AI Summary merged into one "AI Assessment"
+  card** (score on the left, summary on the right; single Regenerate in the header).
+  File: `src/components/candidates/center/SummaryTab.tsx`.
+
 ### Fixed
+- **AI summaries now persist.** They were generated on demand and never stored —
+  the Django endpoint only returned a summary (no save, no read), and the Next.js
+  code expected a `candidates.ai_summary` column that never existed — so a summary
+  vanished on reload and had to be regenerated (extra cost + wait) every view. They
+  now live in a dedicated `candidate_ai_summaries` table (one current row per
+  candidate): Django saves on generate and serves it via a new GET; the Next.js
+  facade/route/job-handler read and write the same table.
+  Files: `candidates/models.py` + `candidates/views.py` (Django),
+  `src/modules/ats/domain/candidates.ts`, `src/app/api/candidates/[id]/ai-summary/route.ts`,
+  `src/lib/api/job-handlers.ts`.
+
+### Schema
+- **103_candidate_ai_summaries** — new table storing one AI summary per candidate
+  (org_id, candidate_id unique, summary, model, generated_by, generated_at).
+
+### Fixed (RBAC)
 - **An assigned hiring manager can now see and approve the interview plan they're
   responsible for.** The "Hiring Manager" role grants `approvals:approve` but not
   `recruiting:view`, yet the Interview-plan read and the hiring-manager read were
