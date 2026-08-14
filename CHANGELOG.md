@@ -18,6 +18,13 @@ entries on top.
   Forms tab. File: `src/components/candidates/center/SummaryTab.tsx`.
 
 ### Changed
+- **AI summary prompt tightened.** Now asks for ~2 short paragraphs and explicitly
+  forbids restating logistics the recruiter already sees (which job, pipeline stage,
+  application dates, acknowledgement emails) — so the summary focuses on who the
+  candidate is + a recommendation, and the AI Assessment box is shorter. Updated in
+  all three copies: Django `candidates/views.py`, `src/lib/api/job-handlers.ts`,
+  `src/app/api/candidates/[id]/ai-summary/route.ts`. Affects newly-generated
+  summaries (hit Regenerate to refresh an existing one).
 - **AI Assessment card polished.** Score sits in a light neutral panel; the summary
   gets a clear bold "Summary" heading with an underline rule; criterion/strength/gap
   text darkened for readability.
