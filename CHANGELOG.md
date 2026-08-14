@@ -9,6 +9,25 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-14
+
+### Added
+- **Candidate Summary tab now shows the candidate's form answers.** A new
+  "Application Answers" card surfaces the screening responses (question bold, answer
+  beneath) right on the Summary tab, so a recruiter sees them without opening the
+  Forms tab. File: `src/components/candidates/center/SummaryTab.tsx`.
+
+### Changed
+- **AI Assessment card polished.** Score sits in a light neutral panel; the summary
+  gets a clear bold "Summary" heading with an underline rule; criterion/strength/gap
+  text darkened for readability.
+- **"Regenerate" now (re)scores AND re-summarizes together, and persists.** The
+  button scores the selected application then refreshes the summary (previously the
+  score and summary were generated in separate flows, so a manually-added
+  application showed "Not scored"). New endpoint `POST /api/applications/[id]/score`
+  scores one application via the shared scorer. Files:
+  `src/app/api/applications/[id]/score/route.ts`, `SummaryTab.tsx`.
+
 ## 2026-08-13
 
 ### Added

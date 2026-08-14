@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, TrendingDown, Phone, ChevronRight } from 'lucide-react'
+import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, TrendingDown, Phone, ChevronRight, ClipboardList } from 'lucide-react'
 import type { Candidate, Application, AiRecommendation, HiringRequest } from '@/lib/types/database'
 import VoiceCallDetailModal from '../VoiceCallDetailModal'
 import { ScoreRing } from '@/components/ui/ScoreRing'
@@ -61,6 +61,13 @@ const REC_CONFIG: Record<AiRecommendation, { label: string; color: string; bg: s
   no:         { label: 'No',          color: 'text-red-700',     bg: 'bg-red-100'     },
 }
 
+
+// Render one screening answer in plain text (mirrors FormsTab).
+function fmtAnswer(value: unknown): string {
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '—'
+  const v = (value ?? '').toString().trim()
+  return v.length ? v : '—'
+}
 
 export default function SummaryTab({ candidate, applications }: SummaryTabProps) {
   const { reload } = useCandidateProfile()
@@ -127,76 +134,155 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
     load()
   }, [candidate.id])
 
-  // Poll for summary result after triggering background generation
-  const pollForResult = useCallback(async () => {
-    const MAX_ATTEMPTS = 30
-    for (let i = 0; i < MAX_ATTEMPTS; i++) {
-      if (!mountedRef.current) return
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      if (!mountedRef.current) return
+  // Awaitable summary generation: POST, and if the server processes in the
+  // background (202) poll until it lands. Sets `summary`; throws on failure.
+  const runSummary = useCallback(async (): Promise<void> => {
+    const res = await fetch(`/api/candidates/${candidate.id}/ai-summary`, { method: 'POST' })
+    const json = await res.json().catch(() => null)
 
-      try {
-        const res = await fetch(`/api/candidates/${candidate.id}/ai-summary`)
-        if (!res.ok) continue
-        const json = await res.json()
-        if (json.data?.summary) {
-          if (mountedRef.current) {
-            setSummary(json.data.summary)
-            setGenerating(false)
-          }
-          return
-        }
-        // Still processing — continue polling
-      } catch {
-        // Network error — continue polling
+    if (res.status === 202) {
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 2000))
+        if (!mountedRef.current) return
+        const poll = await fetch(`/api/candidates/${candidate.id}/ai-summary`)
+          .then(r => (r.ok ? r.json() : null))
+          .catch(() => null)
+        if (poll?.data?.summary) { if (mountedRef.current) setSummary(poll.data.summary); return }
       }
+      throw new Error('Taking longer than expected. Please try again later.')
     }
-    // Timed out
-    if (mountedRef.current) {
-      setGenError('Taking longer than expected. Please try again later.')
-      setGenerating(false)
-    }
+
+    if (!res.ok) throw new Error(json?.error ?? 'Generation failed')
+    if (json?.data?.summary && mountedRef.current) setSummary(json.data.summary)
   }, [candidate.id])
 
-  const generate = async () => {
+  // Regenerate the whole AI Assessment: (re)score the selected application AND
+  // refresh the summary, then reload so the new score shows on the card. Scoring
+  // is best-effort — a scoring hiccup shouldn't block the summary.
+  const regenerateAssessment = async () => {
+    const app = applications[0] ?? null
     setGenerating(true); setGenError('')
     try {
-      const res = await fetch(`/api/candidates/${candidate.id}/ai-summary`, { method: 'POST' })
-      const json = await res.json()
-
-      if (res.status === 202) {
-        // Background processing started — poll for result
-        pollForResult()
-        return
+      if (app?.job_id) {
+        try { await fetch(`/api/applications/${app.id}/score`, { method: 'POST' }) } catch { /* best-effort */ }
+        await reload()   // surface the fresh score right away, before the summary
       }
-
-      if (!res.ok) {
-        setGenError(json.error ?? 'Generation failed')
-        setGenerating(false)
-        return
-      }
-
-      // Direct response (non-background mode)
-      if (json.data?.summary) {
-        setSummary(json.data.summary)
-      }
-      setGenerating(false)
-    } catch {
-      setGenError('Network error. Please try again.')
-      setGenerating(false)
+      await runSummary()
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : 'Something went wrong')
+    } finally {
+      if (mountedRef.current) setGenerating(false)
     }
   }
 
-  // The scored application in view — its score merges with the candidate summary
-  // into one "AI Assessment" card (Option B: score on the left, summary on the right).
+  // The scored application in view — its score sits beside the candidate summary
+  // in one "AI Assessment" card.
   const scoredApp = applications.find(a => a.ai_score !== null && a.ai_scored_at) ?? null
   const rec = scoredApp?.ai_recommendation ? REC_CONFIG[scoredApp.ai_recommendation] : null
+
+  // Selected application's screening answers (for the Form Answers card, item 1).
+  const primaryApp = applications[0] ?? null
+  const answers = primaryApp?.screening_answers ?? []
+
+  // Shared inner content for the AI Assessment card.
+  const scoreContent = scoredApp ? (
+    <div className="space-y-3">
+      <div className="flex items-start gap-4">
+        <ScoreRing score={scoredApp.ai_score!} />
+        <div className="min-w-0 flex-1">
+          {rec && (
+            <span className={`mb-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${rec.bg} ${rec.color}`}>
+              {rec.label}
+            </span>
+          )}
+          {scoredApp.ai_criterion_scores && scoredApp.ai_criterion_scores.length > 0 && (
+            <div className="space-y-1.5">
+              {scoredApp.ai_criterion_scores.map((c, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <p className="w-28 shrink-0 truncate text-[10px] font-medium text-slate-700">{c.name}</p>
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/70">
+                    <div className="h-full rounded-full bg-slate-600" style={{ width: `${(c.rating / 4) * 100}%` }} />
+                  </div>
+                  <span className="w-8 text-right text-[10px] font-medium text-slate-500">{c.rating}/4</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {scoredApp.ai_strengths?.length > 0 && (
+          <div>
+            <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
+              <TrendingUp className="h-2.5 w-2.5" /> Strengths
+            </p>
+            <ul className="space-y-0.5">
+              {scoredApp.ai_strengths.slice(0, 3).map((s, i) => (
+                <li key={i} className="text-[10px] leading-relaxed text-slate-700">• {s}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {scoredApp.ai_gaps?.length > 0 && (
+          <div>
+            <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-amber-700">
+              <TrendingDown className="h-2.5 w-2.5" /> Gaps
+            </p>
+            <ul className="space-y-0.5">
+              {scoredApp.ai_gaps.slice(0, 3).map((g, i) => (
+                <li key={i} className="text-[10px] leading-relaxed text-slate-700">• {g}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  ) : (
+    <div className="flex h-full flex-col items-center justify-center py-8 text-center">
+      <TrendingUp className="mb-2 h-7 w-7 text-slate-200" />
+      <p className="text-sm text-slate-400">Not scored for this job yet</p>
+      <p className="mt-1 text-xs text-slate-300">Scoring runs automatically when a candidate applies.</p>
+    </div>
+  )
+
+  const summaryContent = (
+    <>
+      {genError && <p className="text-sm text-red-600">{genError}</p>}
+      {summary ? (
+        <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{summary}</p>
+      ) : generating ? (
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…
+        </div>
+      ) : (
+        <p className="text-sm italic text-slate-400">Click &quot;Regenerate&quot; to build the AI assessment for this candidate.</p>
+      )}
+    </>
+  )
+
+  // Score sits in a light neutral panel on the left; summary on the right.
+  const tintedScore = (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">{scoreContent}</div>
+  )
+  const summaryHeader = (
+    <div className="mb-3 flex items-center gap-2 border-b border-slate-200 pb-1.5">
+      <Wand2 className="h-4 w-4 text-emerald-600" />
+      <span className="text-sm font-bold text-slate-800">Summary</span>
+    </div>
+  )
+
+  const assessmentBody = (
+    <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
+      {tintedScore}
+      <div className="p-1">{summaryHeader}{summaryContent}</div>
+    </div>
+  )
 
   return (
     <>
     <div className="space-y-4 p-5">
 
-      {/* ── AI Assessment — score + summary in one card (Option B) ─────────── */}
+      {/* ── AI Assessment — score + summary in one card ─────────────────────── */}
       <Panel
         icon={TrendingUp}
         title="AI Assessment"
@@ -205,95 +291,36 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
           : undefined}
         action={
           <button
-            onClick={generate}
+            onClick={regenerateAssessment}
             disabled={generating}
             className="flex items-center gap-1.5 rounded-xl bg-[#221b14] px-3.5 py-1.5 text-xs font-semibold text-[#f6efe3] hover:bg-[#34291e] disabled:opacity-60 transition-colors"
           >
             {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : summary ? <RefreshCw className="h-3 w-3" /> : <Wand2 className="h-3 w-3" />}
-            {generating ? 'Generating…' : summary ? 'Regenerate' : 'Generate Summary'}
+            {generating ? 'Scoring &amp; summarizing…' : summary ? 'Regenerate' : 'Generate Assessment'}
           </button>
         }
       >
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          {/* Left — AI score */}
-          <div className="border-b border-slate-100 p-5 md:border-b-0 md:border-r">
-            {scoredApp ? (
-              <div className="space-y-3">
-                <div className="flex items-start gap-4">
-                  <ScoreRing score={scoredApp.ai_score!} />
-                  <div className="min-w-0 flex-1">
-                    {rec && (
-                      <span className={`mb-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${rec.bg} ${rec.color}`}>
-                        {rec.label}
-                      </span>
-                    )}
-                    {scoredApp.ai_criterion_scores && scoredApp.ai_criterion_scores.length > 0 && (
-                      <div className="space-y-1.5">
-                        {scoredApp.ai_criterion_scores.map((c, i) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <p className="w-28 shrink-0 truncate text-[10px] text-slate-500">{c.name}</p>
-                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                              <div className="h-full rounded-full bg-slate-500" style={{ width: `${(c.rating / 4) * 100}%` }} />
-                            </div>
-                            <span className="w-8 text-right text-[10px] text-slate-400">{c.rating}/4</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {scoredApp.ai_strengths?.length > 0 && (
-                    <div>
-                      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
-                        <TrendingUp className="h-2.5 w-2.5" /> Strengths
-                      </p>
-                      <ul className="space-y-0.5">
-                        {scoredApp.ai_strengths.slice(0, 3).map((s, i) => (
-                          <li key={i} className="text-[10px] leading-relaxed text-slate-600">• {s}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {scoredApp.ai_gaps?.length > 0 && (
-                    <div>
-                      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-amber-600">
-                        <TrendingDown className="h-2.5 w-2.5" /> Gaps
-                      </p>
-                      <ul className="space-y-0.5">
-                        {scoredApp.ai_gaps.slice(0, 3).map((g, i) => (
-                          <li key={i} className="text-[10px] leading-relaxed text-slate-600">• {g}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center py-8 text-center">
-                <TrendingUp className="mb-2 h-7 w-7 text-slate-200" />
-                <p className="text-sm text-slate-400">Not scored for this job yet</p>
-                <p className="mt-1 text-xs text-slate-300">Scoring runs automatically when a candidate applies.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Right — AI summary */}
-          <div className="p-5">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Summary</p>
-            {genError && <p className="text-sm text-red-600">{genError}</p>}
-            {summary ? (
-              <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{summary}</p>
-            ) : generating ? (
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating…
-              </div>
-            ) : (
-              <p className="text-sm italic text-slate-400">Click &quot;Generate Summary&quot; to get an AI overview of this candidate.</p>
-            )}
-          </div>
-        </div>
+        {assessmentBody}
       </Panel>
+
+      {/* ── Application Answers — the candidate's form responses (item 1) ────── */}
+      {answers.length > 0 && (
+        <Panel
+          icon={ClipboardList}
+          title="Application Answers"
+          meta={primaryApp?.hiring_requests?.position_title ? `· ${primaryApp.hiring_requests.position_title}` : undefined}
+        >
+          <div className="divide-y divide-slate-100 px-5">
+            {answers.map((a, i) => (
+              <div key={a.field_id || i} className="py-3 first:pt-4 last:pb-4">
+                {/* Question is the prominent label; answer follows, lighter. */}
+                <p className="text-sm font-semibold leading-snug text-slate-800">{a.label}</p>
+                <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-slate-600">{fmtAnswer(a.value)}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
 
       {/* ── Phone Screens ─────────────────────────────────────────────────── */}
       <Panel
