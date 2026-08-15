@@ -18,6 +18,7 @@ import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { ScoringTab } from '@/components/req-jobs/ScoringTab'
 import { IcpEditor } from '@/components/req-jobs/IcpEditor'
+import { SourcingTab } from '@/components/req-jobs/SourcingTab'
 import { ScoringRubricSummary } from '@/components/req-jobs/ScoringRubricSummary'
 import { InterviewPlanTab } from '@/components/req-jobs/InterviewPlanTab'
 import { readScoringCriteria } from '@/lib/scoring'
@@ -56,13 +57,14 @@ interface Props {
   linkedOpenings:  Pick<Opening, 'id' | 'title' | 'status' | 'comp_min' | 'comp_max' | 'comp_currency' | 'target_start_date'>[]
 }
 
-type Tab = 'overview' | 'postings' | 'screening' | 'scoring' | 'plan' | 'audit'
+type Tab = 'overview' | 'postings' | 'screening' | 'scoring' | 'source' | 'plan' | 'audit'
 
 const TAB_LABELS: Record<Tab, string> = {
   overview:  'Overview',
   postings:  'Postings',
   screening: 'Application form',
   scoring:   'Scoring',
+  source:    'Source',
   plan:      'Interview plan',
   audit:     'Audit log',
 }
@@ -537,7 +539,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
 
       <div className="border-b border-slate-200 mb-4">
         <nav className="flex gap-4">
-          {(['overview', 'postings', 'screening', 'scoring', 'plan', 'audit'] as Tab[]).map(t => (
+          {(['overview', 'postings', 'screening', 'scoring', 'source', 'plan', 'audit'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -864,6 +866,8 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           />
         </div>
       )}
+
+      {tab === 'source' && <SourcingTab jobId={job.id} />}
 
       {tab === 'plan' && <InterviewPlanTab jobId={job.id} />}
 

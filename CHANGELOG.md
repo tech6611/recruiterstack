@@ -9,6 +9,24 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-16
+
+### Added
+- **Sourcing — rank your candidate pool by the ICP (Component 05, Slice 5a).** A new
+  **Source** tab on the job (`SourcingTab.tsx`) ranks the org's existing candidates
+  against the job's approved ICP: a cheap deterministic pre-filter
+  (`src/lib/ai/sourcing-rank.ts` — keyword overlap + location/experience) shortlists,
+  then the Fit Engine scores the top ~20, and the matches (score, fit bucket, gate
+  failures, rationale) are cached. Recruiters select and **Add to pipeline** as
+  `applications(source:'sourced')`. Endpoints: `GET`/`POST /api/jobs/[id]/source` and
+  `POST /api/jobs/[id]/source/add`. Never runs the LLM over the whole DB — two-pass by
+  design; embeddings (5c) will replace the overlap step at scale. Pure ranking unit-tested.
+
+### Schema
+- **`106_sourcing_matches.sql`** — per-job cache of ICP-driven candidate matches
+  ({score, fit_bucket, gate_failures, red_flags, rationale, competencies, icp_version};
+  unique on job_id+candidate_id; staleness via icp_version). Service-role RLS.
+
 ## 2026-08-15
 
 ### Added
