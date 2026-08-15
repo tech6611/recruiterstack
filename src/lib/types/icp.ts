@@ -1,0 +1,67 @@
+// Ideal Candidate Profile (ICP) — the living, versioned "who's great for this
+// role" object (migration 104_icp.sql). Not yet in the generated Supabase types,
+// so these interfaces are the source of truth for the `icps` table shape.
+//
+// The key design fact: IcpCompetency is a SUPERSET of ScoringCriterion (same
+// id/name/weight), so an ICP down-projects losslessly to the flat rubric the
+// existing Sifter reads — see icpToScoringCriteria() in src/lib/scoring.ts.
+
+export type IcpStatus = 'draft' | 'approved' | 'superseded'
+export type IcpSource = 'seed' | 'intake' | 'refinement' | 'manual'
+
+/**
+ * A hard gate. Applied BEFORE weighted scoring — a candidate who fails any
+ * must-have is filtered out, never averaged in. (Enforcement lands in the Fit
+ * Engine, Component 06; in Slice 1a these are stored but not yet applied.)
+ */
+export interface IcpMustHave {
+  id: string
+  label: string // human phrasing, e.g. "5+ years backend"
+  attribute: string // 'location' | 'min_experience' | 'skill' | 'seniority' | ...
+  operator: string // 'equals' | 'gte' | 'includes' | 'one_of'
+  value: string | number | string[]
+}
+
+/**
+ * A weighted competency = ScoringCriterion (id/name/weight) + behaviours/anchors.
+ * `anchors` describe what each 1–4 rating "sounds like", reusing the exact scale
+ * the Sifter and manual scorecards already use.
+ */
+export interface IcpCompetency {
+  id: string // reuse ScoringCriterion ids: 'technical', 'experience', ...
+  name: string
+  weight: number // 1–100; competencies sum to 100
+  description?: string
+  verbatim?: string // the hiring manager's exact phrasing, when captured
+  behaviours: string[] // 0–7 concrete, observable behaviours
+  anchors?: { '1': string; '2': string; '3': string; '4': string }
+}
+
+export interface IcpChangelogEntry {
+  version: number
+  change: string
+  by?: string
+  at: string // ISO timestamp
+}
+
+export interface Icp {
+  id: string
+  org_id: string
+  job_id: string
+  version: number
+  status: IcpStatus
+  source: IcpSource
+  must_haves: IcpMustHave[]
+  competencies: IcpCompetency[]
+  changelog: IcpChangelogEntry[]
+  supersedes_id: string | null
+  created_by: string | null
+  approved_by: string | null
+  approved_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** The editable payload for a draft ICP (create / update). */
+export type IcpDraftInput = Pick<Icp, 'must_haves' | 'competencies'> &
+  Partial<Pick<Icp, 'source'>>

@@ -11,6 +11,13 @@ entries on top.
 
 ## 2026-08-15
 
+### Schema
+- **ICP (Ideal Candidate Profile) object — migration `104_icp.sql`.** New `icps`
+  table: versioned per job, keyed to canonical `jobs.id`, with must-haves +
+  competencies + changelog as JSONB and a partial unique index enforcing one
+  approved version per job. Slice 1a of the Metaview-style ICP work. Embedding
+  deferred to the Fit Engine (no pgvector). Not yet in generated Supabase types.
+
 ### Changed
 - **"Team on this job": the hiring manager is now tagged by the round they run**
   (e.g. "Round 2"), like every other interviewer, instead of a redundant "hiring
@@ -24,6 +31,13 @@ entries on top.
   `src/components/req-jobs/ScoringRubricSummary.tsx`.
 
 ### Added
+- **ICP object: types, facade & API (Slice 1a).** `src/lib/types/icp.ts` (an
+  `IcpCompetency` is a superset of `ScoringCriterion`), a `src/modules/ats/domain/icp.ts`
+  facade (get current / versions / create-draft / update-draft / approve / refine),
+  and `/api/jobs/[id]/icp` routes (GET current, POST draft, PUT draft, POST approve,
+  GET versions). Approving an ICP down-projects (`icpToScoringCriteria` in
+  `src/lib/scoring.ts`) back to `jobs.custom_fields.scoring_criteria`, so the board
+  and the Sifter keep working unchanged. No AI/UI yet (Slices 1b/1c).
 - **Scoring rubric is now a first-class job-setup step.** A new **Scoring** tab on
   the job page (`/req-jobs/[id]`, between Application form and Interview plan) lets
   you define the weighted criteria the AI scores candidates against — add/remove
