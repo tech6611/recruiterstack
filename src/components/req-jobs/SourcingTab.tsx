@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2 } from 'lucide-react'
+import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -44,6 +44,9 @@ export function SourcingTab({ jobId }: { jobId: string }) {
   const [embedding, setEmbedding] = useState(false)
   const [calibrate, setCalibrate] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [sequences, setSequences] = useState<{ id: string; name: string }[]>([])
+  const [selectedSequence, setSelectedSequence] = useState('')
+  const [enrolling, setEnrolling] = useState(false)
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/jobs/${jobId}/source`)
@@ -57,6 +60,19 @@ export function SourcingTab({ jobId }: { jobId: string }) {
   }, [jobId])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    fetch('/api/sequences')
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((j) =>
+        setSequences(
+          (j.data ?? [])
+            .filter((s: { status?: string }) => s.status === 'active')
+            .map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })),
+        ),
+      )
+      .catch(() => {})
+  }, [])
 
   async function runSource() {
     setSourcing(true)
@@ -91,6 +107,26 @@ export function SourcingTab({ jobId }: { jobId: string }) {
     toast.success(`Added ${data.added} to the pipeline${data.skipped ? `, ${data.skipped} already there` : ''}.`)
     setSelected(new Set())
     load()
+  }
+
+  async function enrollSelected() {
+    if (selected.size === 0 || !selectedSequence) return
+    setEnrolling(true)
+    const res = await fetch(`/api/jobs/${jobId}/source/enroll`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_ids: Array.from(selected), sequence_id: selectedSequence }),
+    })
+    setEnrolling(false)
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast.error(j.error ?? 'Could not enroll into the sequence')
+      return
+    }
+    const { data } = await res.json()
+    toast.success(`Enrolled ${data.enrolled} into the sequence${data.skipped ? `, ${data.skipped} skipped` : ''}.`)
+    setSelected(new Set())
+    setSelectedSequence('')
   }
 
   async function decide(candidateId: string, decision: 'yes' | 'no') {
@@ -276,11 +312,31 @@ export function SourcingTab({ jobId }: { jobId: string }) {
       </CardContent>
 
       {selected.size > 0 && (
-        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-6 py-3">
           <span className="text-xs text-slate-500">{selected.size} selected</span>
-          <Button size="sm" onClick={addSelected} loading={adding}>
-            <UserPlus className="h-3.5 w-3.5" /> Add to pipeline
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {sequences.length > 0 && (
+              <>
+                <select
+                  value={selectedSequence}
+                  onChange={(e) => setSelectedSequence(e.target.value)}
+                  className="h-8 rounded border border-slate-200 bg-white px-2 text-xs text-slate-600"
+                  title="Enroll into a sequence with a personalized first message"
+                >
+                  <option value="">Add to sequence…</option>
+                  {sequences.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <Button size="sm" variant="outline" onClick={enrollSelected} loading={enrolling} disabled={!selectedSequence}>
+                  <Send className="h-3.5 w-3.5" /> Enroll
+                </Button>
+              </>
+            )}
+            <Button size="sm" onClick={addSelected} loading={adding}>
+              <UserPlus className="h-3.5 w-3.5" /> Add to pipeline
+            </Button>
+          </div>
         </div>
       )}
     </Card>

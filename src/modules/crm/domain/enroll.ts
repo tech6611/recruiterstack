@@ -29,9 +29,11 @@ export async function enrollCandidate(
     candidateId: string
     applicationId?: string | null
     enrolledBy?: string | null
+    /** Personalized first message (Component 08) — overrides the stage-0 template. */
+    intro?: { subject: string; body: string } | null
   },
 ): Promise<EnrollResult> {
-  const { orgId, sequenceId, candidateId, applicationId = null, enrolledBy = null } = params
+  const { orgId, sequenceId, candidateId, applicationId = null, enrolledBy = null, intro = null } = params
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: seq } = await (supabase.from('sequences') as any)
@@ -68,6 +70,8 @@ export async function enrollCandidate(
     current_stage_index: 0,
     next_send_at: null, // the enqueued job is the sole trigger (dynamic chaining)
     started_at: now,
+    intro_subject: intro?.subject ?? null,
+    intro_body: intro?.body ?? null,
   })
   if (error) {
     logger.error('Failed to insert enrollment', error, { sequenceId, candidateId })

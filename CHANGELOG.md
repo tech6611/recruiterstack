@@ -12,6 +12,15 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Personalized outreach sequences from sourcing (Component 08, Slice 8b-1).** The
+  Source tab can now enroll selected matches into a sequence — with each candidate's
+  **first message personalized from their Fit-Engine evidence** ("here's specifically
+  why we're reaching out"). `src/lib/ai/outreach-draft.ts` drafts the intro from the
+  sourcing match's rationale + per-competency evidence; `enrollCandidate` stores it as
+  a per-enrollment override; the `sequence_email` handler prefers it for stage 0 (later
+  steps use the shared template). The sequence then sends per its own schedule. Endpoint
+  `POST /api/jobs/[id]/source/enroll`; pure prompt builder unit-tested. (Review-before-send
+  mode is the next slice, 8b-2.)
 - **Semantic sourcing with embeddings (Component 05, Slice 5c).** Sourcing shortlists
   by *meaning*, not just keywords: it embeds the ICP and the candidate pool (Gemini
   `text-embedding-004`, 768-dim) and finds nearest candidates via a pgvector
@@ -38,6 +47,8 @@ entries on top.
   design; embeddings (5c) will replace the overlap step at scale. Pure ranking unit-tested.
 
 ### Schema
+- **`109_sequence_enrollment_intro.sql`** — adds `intro_subject` / `intro_body` to
+  `sequence_enrollments` (per-enrollment personalized first message; used for stage 0).
 - **`108_candidate_embeddings.sql`** — enables pgvector, adds `candidates.embedding
   vector(768)` + an ivfflat index + the `match_candidates(query, org, count, exclude)`
   nearest-neighbour function. (Enabling the `vector` extension may need the Supabase dashboard.)
