@@ -17,6 +17,7 @@ import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { ScoringTab } from '@/components/req-jobs/ScoringTab'
+import { ScoringRubricSummary } from '@/components/req-jobs/ScoringRubricSummary'
 import { InterviewPlanTab } from '@/components/req-jobs/InterviewPlanTab'
 import { readScoringCriteria } from '@/lib/scoring'
 import { JobTeamRoster } from '@/components/req-jobs/JobTeamRoster'
@@ -757,15 +758,22 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
               </CardContent>
             </Card>
 
+          </div>
+
+          <div className="space-y-4">
+            <JobHiringManagerPicker jobId={job.id} onChange={() => setHmKey(k => k + 1)} />
+            <JobTeamRoster jobId={job.id} hmRefreshKey={hmKey} />
+
+            {/* Linked requisitions — moved from the main column into the sidebar. */}
             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-2">
                   <div>
-                    <CardTitle>Linked requisitions</CardTitle>
+                    <CardTitle className="text-sm">Linked requisitions</CardTitle>
                     <CardDescription>Headcount seats this pipeline fills.</CardDescription>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => setLinkOpen(true)}>
-                    <Plus className="h-4 w-4" /> Link requisition
+                    <Plus className="h-4 w-4" /> Link
                   </Button>
                 </div>
               </CardHeader>
@@ -801,11 +809,12 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                 )}
               </CardContent>
             </Card>
-          </div>
 
-          <div className="space-y-4">
-            <JobHiringManagerPicker jobId={job.id} onChange={() => setHmKey(k => k + 1)} />
-            <JobTeamRoster jobId={job.id} hmRefreshKey={hmKey} />
+            {/* Scoring rubric summary (item 2). */}
+            <ScoringRubricSummary
+              criteria={readScoringCriteria(job.custom_fields)}
+              onEdit={() => setTab('scoring')}
+            />
             <Card>
               <CardHeader><CardTitle className="text-sm">Approval</CardTitle></CardHeader>
               <CardContent>

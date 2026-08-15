@@ -11,6 +11,13 @@ entries on top.
 
 ## 2026-08-15
 
+### Changed
+- **Job Overview: Linked requisitions moved into the right sidebar** (under "Team on
+  this job"), and a new **Scoring rubric** summary card added below it — each
+  criterion with its weight and a proportional bar, an Edit link to the Scoring tab,
+  and a "set one up" empty state. Files: `src/components/req-jobs/JobDetail.tsx`,
+  `src/components/req-jobs/ScoringRubricSummary.tsx`.
+
 ### Added
 - **Scoring rubric is now a first-class job-setup step.** A new **Scoring** tab on
   the job page (`/req-jobs/[id]`, between Application form and Interview plan) lets
