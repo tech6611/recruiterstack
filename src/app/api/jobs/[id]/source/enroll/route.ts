@@ -11,6 +11,8 @@ export const maxDuration = 300 // drafts a personalized intro per candidate
 const bodySchema = z.object({
   candidate_ids: z.array(z.string().uuid()).min(1).max(50),
   sequence_id: z.string().uuid(),
+  // When true, hold each enrollment for review instead of sending right away (8b-2).
+  review: z.boolean().optional(),
 })
 
 /** POST — enroll sourced candidates into a sequence, personalizing each one's
@@ -58,12 +60,14 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
         candidateId,
         enrolledBy: userId,
         intro,
+        holdForReview: body.review === true,
+        jobId: params.id,
       })
       if (res.enrolled) enrolled++
       else skipped++
     }
 
-    return NextResponse.json({ data: { enrolled, skipped } })
+    return NextResponse.json({ data: { enrolled, skipped, held: body.review === true } })
   } catch (e) {
     return handleSupabaseError(e as { code: string; message: string })
   }
