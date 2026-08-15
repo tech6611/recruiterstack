@@ -26,6 +26,7 @@ export interface SourcingMatch {
   rationale: string | null
   competencies: { name: string; rating: number; evidence?: string }[]
   icp_version: number | null
+  decision: string | null
   updated_at: string
   candidate?: {
     id: string
@@ -56,6 +57,29 @@ export async function getSourcingMatches(
     .order('score', { ascending: false })
   if (error) throw error
   return (data ?? []) as SourcingMatch[]
+}
+
+/** Record the recruiter's yes/no/maybe on a sourced match (calibration, 5b). */
+export async function setSourcingDecision(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+  candidateId: string,
+  decision: 'yes' | 'no' | 'maybe' | null,
+  decidedBy?: string | null,
+): Promise<void> {
+  const sb = supabase as unknown as LooseSb
+  const { error } = await sb
+    .from('sourcing_matches')
+    .update({
+      decision,
+      decided_at: decision ? new Date().toISOString() : null,
+      decided_by: decision ? (decidedBy ?? null) : null,
+    })
+    .eq('org_id', orgId)
+    .eq('job_id', jobId)
+    .eq('candidate_id', candidateId)
+  if (error) throw error
 }
 
 /**

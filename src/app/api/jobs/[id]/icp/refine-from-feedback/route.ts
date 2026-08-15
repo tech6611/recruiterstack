@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withCapability, handleSupabaseError } from '@/lib/api/helpers'
 import { getCurrentIcp, refineIcp } from '@/modules/ats/domain/icp'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
+import { getSourcingMatches } from '@/modules/ats/domain/sourcing'
 import {
   summarizeFeedback,
   suggestRefinement,
@@ -40,7 +41,7 @@ export const POST = withCapability(
     if (!context) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     const apps = context.applications as unknown as ScoredApp[]
-    const labels: FeedbackLabel[] = apps
+    const appLabels: FeedbackLabel[] = apps
       .filter((a) => a.ai_scored_at && (a.review_status === 'yes' || a.review_status === 'no' || a.review_status === 'maybe'))
       .map((a) => ({
         decision: a.review_status as Decision,
@@ -49,6 +50,21 @@ export const POST = withCapability(
         competencies: (a.ai_criterion_scores ?? []).map((c) => ({ name: c.name, rating: c.rating })),
         title: a.candidate?.current_title ?? null,
       }))
+
+    // Calibration decisions on sourced candidates (5b) feed the loop too — these
+    // capture the "no"s that never became applications.
+    const sourcing = await getSourcingMatches(supabase, orgId, params.id).catch(() => [])
+    const sourcingLabels: FeedbackLabel[] = sourcing
+      .filter((m) => m.decision === 'yes' || m.decision === 'no' || m.decision === 'maybe')
+      .map((m) => ({
+        decision: m.decision as Decision,
+        bucket: m.fit_bucket ?? null,
+        score: m.score ?? null,
+        competencies: (m.competencies ?? []).map((c) => ({ name: c.name, rating: c.rating })),
+        title: m.candidate?.current_title ?? null,
+      }))
+
+    const labels = [...appLabels, ...sourcingLabels]
 
     if (labels.length < MIN_FEEDBACK) {
       return NextResponse.json({
