@@ -38,6 +38,13 @@ entries on top.
   GET versions). Approving an ICP down-projects (`icpToScoringCriteria` in
   `src/lib/scoring.ts`) back to `jobs.custom_fields.scoring_criteria`, so the board
   and the Sifter keep working unchanged. No AI/UI yet (Slices 1b/1c).
+- **ICP seeding & editor (Slice 1b).** `deriveIcpSeed()` (`src/lib/ai/icp-seed.ts`,
+  LLM-free) maps a job's existing rubric + location + level into a draft ICP, exposed
+  via `POST /api/jobs/[id]/icp/generate`. A new **ICP editor** on the job's Scoring tab
+  (`src/components/req-jobs/IcpEditor.tsx`) generates a draft, edits hard must-haves +
+  weighted competencies with observable behaviours, and approves it — approving syncs
+  the flat rubric back so the Scoring rubric card stays in step. LLM enrichment (anchors,
+  verbatim) is still to come in Slice 1c.
 - **Scoring rubric is now a first-class job-setup step.** A new **Scoring** tab on
   the job page (`/req-jobs/[id]`, between Application form and Interview plan) lets
   you define the weighted criteria the AI scores candidates against — add/remove
