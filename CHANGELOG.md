@@ -9,6 +9,20 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-15
+
+### Added
+- **Scoring rubric is now a first-class job-setup step.** A new **Scoring** tab on
+  the job page (`/req-jobs/[id]`, between Application form and Interview plan) lets
+  you define the weighted criteria the AI scores candidates against — add/remove
+  criteria, adjust weights, must total 100%. Editable any time. The Publish action
+  now runs a soft, non-blocking **pre-publish nudge**: if a job is missing screening
+  questions and/or a scoring rubric, it prompts you to set them up (jump to the tab)
+  or "Publish anyway" — the same pattern the screening-questions nudge already used.
+  No blanket default is ever auto-applied; a rubric-less job scores holistically
+  until you set one. Files: `src/components/req-jobs/ScoringTab.tsx`,
+  `src/components/req-jobs/JobDetail.tsx`, `src/lib/scoring.ts`.
+
 ## 2026-08-14
 
 ### Added

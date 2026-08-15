@@ -16,7 +16,9 @@ import { AuditLogTab } from '@/components/approvals/AuditLogTab'
 import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
+import { ScoringTab } from '@/components/req-jobs/ScoringTab'
 import { InterviewPlanTab } from '@/components/req-jobs/InterviewPlanTab'
+import { readScoringCriteria } from '@/lib/scoring'
 import { JobTeamRoster } from '@/components/req-jobs/JobTeamRoster'
 import { JobHiringManagerPicker } from '@/components/req-jobs/JobHiringManagerPicker'
 import { cn } from '@/lib/utils'
@@ -52,12 +54,13 @@ interface Props {
   linkedOpenings:  Pick<Opening, 'id' | 'title' | 'status' | 'comp_min' | 'comp_max' | 'comp_currency' | 'target_start_date'>[]
 }
 
-type Tab = 'overview' | 'postings' | 'screening' | 'plan' | 'audit'
+type Tab = 'overview' | 'postings' | 'screening' | 'scoring' | 'plan' | 'audit'
 
 const TAB_LABELS: Record<Tab, string> = {
   overview:  'Overview',
   postings:  'Postings',
   screening: 'Application form',
+  scoring:   'Scoring',
   plan:      'Interview plan',
   audit:     'Audit log',
 }
@@ -179,9 +182,10 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   const [editing, setEditing]         = useState(false)
   const [saving, setSaving]           = useState(false)
   const [form, setForm]               = useState(initForm(job))
-  // Soft nudge shown when publishing a job whose application form has no custom
-  // questions — guides toward adding screening questions without blocking.
-  const [publishNudge, setPublishNudge] = useState(false)
+  // Soft pre-publish nudge: flags setup a recruiter usually wants decided before a
+  // job goes live (screening questions, a scoring rubric) — guides them there
+  // without blocking. Null = nothing missing / not shown.
+  const [nudge, setNudge] = useState<{ screening: boolean; rubric: boolean } | null>(null)
 
   const intake = readIntake(job)
 
@@ -330,26 +334,28 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
     router.refresh()
   }
 
-  // Publish gate: if the job's application form has no custom questions, surface a
-  // soft nudge first; otherwise publish straight away. A failed check never blocks
-  // publishing — we just proceed.
+  // Publish gate: nudge if the job is missing setup a recruiter usually wants
+  // before go-live — screening questions and/or a scoring rubric. Non-blocking;
+  // a failed check never stops publishing.
   async function publish() {
     setPublishing(true)
+    let noScreening = false
     try {
       const r = await fetch(`/api/jobs/${job.id}/screening`)
       const j = await r.json()
-      if ((j.data?.fields ?? []).length === 0) {
-        setPublishing(false)
-        setPublishNudge(true)
-        return
-      }
-    } catch { /* check failed — fall through and publish */ }
+      noScreening = (j.data?.fields ?? []).length === 0
+    } catch { /* check failed — treat as present, don't block */ }
+    const noRubric = readScoringCriteria(job.custom_fields).length === 0
     setPublishing(false)
+    if (noScreening || noRubric) {
+      setNudge({ screening: noScreening, rubric: noRubric })
+      return
+    }
     doPublish()
   }
 
   async function doPublish() {
-    setPublishNudge(false)
+    setNudge(null)
     setPublishing(true)
     const res = await fetch(`/api/req-jobs/${job.id}/publish`, { method: 'POST' })
     setPublishing(false)
@@ -529,7 +535,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
 
       <div className="border-b border-slate-200 mb-4">
         <nav className="flex gap-4">
-          {(['overview', 'postings', 'screening', 'plan', 'audit'] as Tab[]).map(t => (
+          {(['overview', 'postings', 'screening', 'scoring', 'plan', 'audit'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -834,6 +840,14 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
         />
       )}
 
+      {tab === 'scoring' && (
+        <ScoringTab
+          jobId={job.id}
+          initialCriteria={readScoringCriteria(job.custom_fields)}
+          onSaved={c => setJob(j => ({ ...j, custom_fields: { ...j.custom_fields, scoring_criteria: c } }))}
+        />
+      )}
+
       {tab === 'plan' && <InterviewPlanTab jobId={job.id} />}
 
       {tab === 'audit' && <AuditLogTab targetType="job" targetId={job.id} />}
@@ -846,20 +860,40 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
         />
       )}
 
-      {publishNudge && (
+      {nudge && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setPublishNudge(false)} />
+          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setNudge(null)} />
           <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="text-base font-semibold text-slate-900">Publish with just the basics?</h2>
+            <h2 className="text-base font-semibold text-slate-900">Publish before finishing setup?</h2>
             <p className="mt-2 text-sm text-slate-600">
-              This job&apos;s application form has no custom screening questions yet. Candidates will
-              still be asked for the built-in fields (name, email, phone, LinkedIn, résumé, cover
-              letter) — but you won&apos;t collect anything role-specific.
+              This job is about to go live, but a couple of things usually worth deciding first
+              aren&apos;t set. You can add them now, or publish anyway and edit later.
             </p>
-            <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setPublishNudge(false); setTab('screening') }}>
-                Add screening questions
-              </Button>
+            <ul className="mt-3 space-y-2">
+              {nudge.screening && (
+                <li className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <span><span className="font-medium text-slate-800">No screening questions.</span> Candidates are only asked the built-in fields (name, email, phone, LinkedIn, résumé) — nothing role-specific.</span>
+                </li>
+              )}
+              {nudge.rubric && (
+                <li className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <span><span className="font-medium text-slate-800">No scoring rubric.</span> Candidates will be scored holistically, with no per-criterion breakdown against your priorities.</span>
+                </li>
+              )}
+            </ul>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              {nudge.screening && (
+                <Button variant="outline" size="sm" onClick={() => { setNudge(null); setTab('screening') }}>
+                  Add screening questions
+                </Button>
+              )}
+              {nudge.rubric && (
+                <Button variant="outline" size="sm" onClick={() => { setNudge(null); setTab('scoring') }}>
+                  Set up scoring
+                </Button>
+              )}
               <Button size="sm" onClick={doPublish} loading={publishing}>
                 Publish anyway
               </Button>
