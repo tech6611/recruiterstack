@@ -12,6 +12,15 @@ entries on top.
 ## 2026-08-15
 
 ### Added
+- **ICP feedback loop (Component 06, Slice 6c).** `src/lib/ai/icp-feedback.ts` +
+  `POST /api/jobs/[id]/icp/refine-from-feedback` turn accumulated recruiter
+  Yes/Maybe/No decisions on scored candidates into a proposed ICP refinement — a new
+  DRAFT version to review and approve (the living-spec loop). `summarizeFeedback`
+  categorises where the ICP was too harsh (recruiter Yes ↔ ICP "okay") or too generous
+  (recruiter No ↔ ICP "good/great"); Gemini proposes targeted edits (weight nudges,
+  behaviours, gate add/remove); `applyRefinement` merges them deterministically and
+  re-normalises weights to 100. Gated on ≥5 decisions. Pure summarise/apply logic
+  unit-tested. (UI trigger is a follow-up.)
 - **Fit Engine results in the UI (Component 06, Slice 6b).** The candidate AI
   Assessment card (`SummaryTab.tsx`) now surfaces the Fit Engine output: the
   Great/Good/Okay **fit bucket** beside the recommendation, a red **"Missing
