@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target } from 'lucide-react'
+import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,6 +34,7 @@ export function IcpEditor({
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [approving, setApproving] = useState(false)
+  const [refining, setRefining] = useState(false)
 
   const total = comps.reduce((s, c) => s + (c.weight || 0), 0)
   const canApprove = comps.some((c) => c.name.trim()) && total === 100
@@ -134,6 +135,28 @@ export function IcpEditor({
     hydrate(data as Icp)
     toast.success('ICP approved — the scoring rubric is now in sync.')
     onApproved?.(icpToScoringCriteria(data as Icp))
+  }
+
+  // Propose an ICP refinement from accumulated recruiter Yes/No decisions. Loads
+  // the resulting draft for review; a human still approves it.
+  async function refineFromFeedback() {
+    setRefining(true)
+    const res = await fetch(`/api/jobs/${jobId}/icp/refine-from-feedback`, { method: 'POST' })
+    setRefining(false)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      toast.error(body.error ?? 'Could not refine the ICP')
+      return
+    }
+    const data = body.data
+    if (data?.status === 'insufficient') {
+      toast(`${data.decided}/${data.needed} candidate decisions so far — mark a few more Yes/No, then refine.`)
+      return
+    }
+    if (data?.icp) {
+      hydrate(data.icp as Icp)
+      toast.success(`Refined from feedback — review draft v${data.icp.version}${data.change_summary ? `: ${data.change_summary}` : ''}`)
+    }
   }
 
   // ── competency editing ──────────────────────────────────────────────────────
@@ -361,13 +384,23 @@ export function IcpEditor({
         </section>
       </CardContent>
 
-      <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-6 py-3">
-        <Button size="sm" variant="outline" onClick={handleSave} loading={saving}>
-          <Save className="h-3.5 w-3.5" /> Save draft
-        </Button>
-        <Button size="sm" onClick={handleApprove} loading={approving} disabled={!canApprove}>
-          <CheckCircle2 className="h-3.5 w-3.5" /> {isApproved ? 'Re-approve' : 'Approve ICP'}
-        </Button>
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-6 py-3">
+        <div>
+          {isApproved && (
+            <Button size="sm" variant="outline" onClick={refineFromFeedback} loading={refining}
+              title="Propose an updated ICP from recruiter Yes/No decisions on scored candidates">
+              <RefreshCw className="h-3.5 w-3.5" /> Refine from feedback
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleSave} loading={saving}>
+            <Save className="h-3.5 w-3.5" /> Save draft
+          </Button>
+          <Button size="sm" onClick={handleApprove} loading={approving} disabled={!canApprove}>
+            <CheckCircle2 className="h-3.5 w-3.5" /> {isApproved ? 'Re-approve' : 'Approve ICP'}
+          </Button>
+        </div>
       </div>
     </Card>
   )

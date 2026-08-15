@@ -20,7 +20,9 @@ entries on top.
   (recruiter No ↔ ICP "good/great"); Gemini proposes targeted edits (weight nudges,
   behaviours, gate add/remove); `applyRefinement` merges them deterministically and
   re-normalises weights to 100. Gated on ≥5 decisions. Pure summarise/apply logic
-  unit-tested. (UI trigger is a follow-up.)
+  unit-tested. **UI (6c-b):** a "Refine from feedback" button on the approved ICP in
+  `IcpEditor` runs it, loads the proposed draft for review, and shows the change
+  summary (or "N/5 decisions so far" when there isn't enough feedback yet).
 - **Fit Engine results in the UI (Component 06, Slice 6b).** The candidate AI
   Assessment card (`SummaryTab.tsx`) now surfaces the Fit Engine output: the
   Great/Good/Okay **fit bucket** beside the recommendation, a red **"Missing
