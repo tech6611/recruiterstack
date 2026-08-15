@@ -43,8 +43,14 @@ entries on top.
   via `POST /api/jobs/[id]/icp/generate`. A new **ICP editor** on the job's Scoring tab
   (`src/components/req-jobs/IcpEditor.tsx`) generates a draft, edits hard must-haves +
   weighted competencies with observable behaviours, and approves it — approving syncs
-  the flat rubric back so the Scoring rubric card stays in step. LLM enrichment (anchors,
-  verbatim) is still to come in Slice 1c.
+  the flat rubric back so the Scoring rubric card stays in step.
+- **ICP LLM enrichment (Slice 1c).** `generateIcp()` (`src/lib/ai/icp-generator.ts`)
+  layers Gemini 2.5 Pro on top of the deterministic seed — drafting observable
+  behaviours + 1–4 anchors + verbatim per competency and pulling hard must-have
+  gates from the requirements. Competency ids/names/weights are preserved (the
+  rubric always sums to 100), and any AI failure falls back to the plain seed, so
+  "Generate ICP" always returns something usable. `POST /api/jobs/[id]/icp/generate`
+  now uses it.
 - **Scoring rubric is now a first-class job-setup step.** A new **Scoring** tab on
   the job page (`/req-jobs/[id]`, between Application form and Interview plan) lets
   you define the weighted criteria the AI scores candidates against — add/remove
