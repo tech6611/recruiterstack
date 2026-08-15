@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, TrendingDown, Phone, ChevronRight, ClipboardList } from 'lucide-react'
+import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, TrendingDown, Phone, ChevronRight, ClipboardList, ShieldAlert } from 'lucide-react'
 import type { Candidate, Application, AiRecommendation, HiringRequest } from '@/lib/types/database'
 import VoiceCallDetailModal from '../VoiceCallDetailModal'
 import { ScoreRing } from '@/components/ui/ScoreRing'
@@ -59,6 +59,13 @@ const REC_CONFIG: Record<AiRecommendation, { label: string; color: string; bg: s
   yes:        { label: 'Yes',         color: 'text-slate-700',    bg: 'bg-slate-100'    },
   maybe:      { label: 'Maybe',       color: 'text-amber-700',   bg: 'bg-amber-100'   },
   no:         { label: 'No',          color: 'text-red-700',     bg: 'bg-red-100'     },
+}
+
+// ICP-fit bucket (Component 06). The headline signal — shown beside the recommendation.
+const BUCKET_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  great: { label: 'Great fit', color: 'text-emerald-700', bg: 'bg-emerald-100' },
+  good:  { label: 'Good fit',  color: 'text-sky-700',     bg: 'bg-sky-100'     },
+  okay:  { label: 'Okay fit',  color: 'text-amber-700',   bg: 'bg-amber-100'   },
 }
 
 
@@ -180,6 +187,18 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
   const scoredApp = applications.find(a => a.ai_score !== null && a.ai_scored_at) ?? null
   const rec = scoredApp?.ai_recommendation ? REC_CONFIG[scoredApp.ai_recommendation] : null
 
+  // Fit Engine fields (Component 06) — not in the generated Supabase types yet,
+  // so read them off the scored application through a loose view.
+  const fit = scoredApp as unknown as {
+    ai_fit_bucket?: string | null
+    ai_red_flags?: string[] | null
+    ai_gate_failures?: { label?: string }[] | null
+    ai_rationale?: string | null
+  } | null
+  const bucket = fit?.ai_fit_bucket ? BUCKET_CONFIG[fit.ai_fit_bucket] : null
+  const gateFailures = (fit?.ai_gate_failures ?? []).map(g => g?.label).filter(Boolean) as string[]
+  const redFlags = fit?.ai_red_flags ?? []
+
   // Selected application's screening answers (for the Form Answers card, item 1).
   const primaryApp = applications[0] ?? null
   const answers = primaryApp?.screening_answers ?? []
@@ -187,29 +206,55 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
   // Shared inner content for the AI Assessment card.
   const scoreContent = scoredApp ? (
     <div className="space-y-3">
+      {gateFailures.length > 0 && (
+        <div className="flex items-start gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2">
+          <ShieldAlert className="mt-0.5 h-3 w-3 shrink-0 text-red-500" />
+          <p className="text-[10px] leading-relaxed text-red-700">
+            <span className="font-semibold">Missing must-have{gateFailures.length > 1 ? 's' : ''}:</span> {gateFailures.join('; ')}
+          </p>
+        </div>
+      )}
       <div className="flex items-start gap-4">
         <ScoreRing score={scoredApp.ai_score!} />
         <div className="min-w-0 flex-1">
-          {rec && (
-            <span className={`mb-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${rec.bg} ${rec.color}`}>
-              {rec.label}
-            </span>
-          )}
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            {bucket && (
+              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${bucket.bg} ${bucket.color}`}>
+                {bucket.label}
+              </span>
+            )}
+            {rec && (
+              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${rec.bg} ${rec.color}`}>
+                {rec.label}
+              </span>
+            )}
+          </div>
           {scoredApp.ai_criterion_scores && scoredApp.ai_criterion_scores.length > 0 && (
-            <div className="space-y-1.5">
-              {scoredApp.ai_criterion_scores.map((c, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <p className="w-28 shrink-0 truncate text-[10px] font-medium text-slate-700">{c.name}</p>
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/70">
-                    <div className="h-full rounded-full bg-slate-600" style={{ width: `${(c.rating / 4) * 100}%` }} />
+            <div className="space-y-2">
+              {scoredApp.ai_criterion_scores.map((c, i) => {
+                const evidence = (c as { evidence?: string }).evidence
+                return (
+                  <div key={i} className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <p className="w-28 shrink-0 truncate text-[10px] font-medium text-slate-700">{c.name}</p>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200/70">
+                        <div className="h-full rounded-full bg-slate-600" style={{ width: `${(c.rating / 4) * 100}%` }} />
+                      </div>
+                      <span className="w-8 text-right text-[10px] font-medium text-slate-500">{c.rating}/4</span>
+                    </div>
+                    {evidence && (
+                      <p className="pl-[7.5rem] text-[10px] leading-relaxed text-slate-400">{evidence}</p>
+                    )}
                   </div>
-                  <span className="w-8 text-right text-[10px] font-medium text-slate-500">{c.rating}/4</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
       </div>
+      {fit?.ai_rationale && (
+        <p className="text-[10px] italic leading-relaxed text-slate-500">{fit.ai_rationale}</p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         {scoredApp.ai_strengths?.length > 0 && (
           <div>
@@ -236,6 +281,18 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
           </div>
         )}
       </div>
+      {redFlags.length > 0 && (
+        <div>
+          <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-red-700">
+            <ShieldAlert className="h-2.5 w-2.5" /> Red flags
+          </p>
+          <ul className="space-y-0.5">
+            {redFlags.slice(0, 4).map((f, i) => (
+              <li key={i} className="text-[10px] leading-relaxed text-slate-700">• {f}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   ) : (
     <div className="flex h-full flex-col items-center justify-center py-8 text-center">

@@ -13,9 +13,14 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
+import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
+import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { createNotification } from '@/lib/api/notify'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
-import type { Candidate, HiringRequest, PipelineStage, Application, ApplicationUpdate, ApplicationEventInsert } from '@/lib/types/database'
+import { logger } from '@/lib/logger'
+import type { JobScoreResponse } from '@/lib/ai/schemas'
+import type { Icp } from '@/lib/types/icp'
+import type { HiringRequest, ApplicationUpdate, ApplicationEventInsert } from '@/lib/types/database'
 
 export const maxDuration = 300 // 5 min — needed for large pipelines on Vercel
 
@@ -65,6 +70,21 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     }
   }
 
+  // Load the job's approved ICP once. When present (and the caller isn't
+  // overriding the rubric with unsaved criteria), scoring runs through the Fit
+  // Engine — hard gates + ICP-anchored judging — instead of the flat-rubric Sifter.
+  // Resilient by design: if the ICP table isn't present (e.g. migrations not yet
+  // applied in an environment), fall back to flat-rubric scoring rather than 500.
+  let icp: Icp | null = null
+  try {
+    icp = await getCurrentIcp(supabase, orgId, jobId)
+  } catch (e) {
+    logger.warn('score: ICP lookup failed, using flat-rubric scoring', {
+      error: e instanceof Error ? e.message : String(e),
+    })
+  }
+  const useIcp = !!icp && icp.status === 'approved' && !scoringCriteriaOverride
+
   // ── 2. Stream SSE response ─────────────────────────────────────────────────
   const stream = new ReadableStream({
     async start(controller) {
@@ -90,7 +110,46 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
           const jobForScoring = scoringCriteriaOverride
             ? { ...job, scoring_criteria: scoringCriteriaOverride } as HiringRequest
             : job
-          const result = await scoreApplicationForJob(candidate, jobForScoring, { orgId, userId })
+
+          // Fit Engine path (approved ICP) or flat-rubric Sifter. Both produce a
+          // common `result` (score/recommendation/strengths/gaps) so the
+          // auto-advance and progress code below is unchanged; the ICP path also
+          // carries evidence-rich criterion scores and the new fit fields.
+          let result: JobScoreResponse
+          let criterionScores: unknown[] | undefined
+          let icpExtra: Record<string, unknown> = {}
+          let icpProgress: Record<string, unknown> = {}
+
+          if (useIcp) {
+            const fit = await scoreAgainstIcp(candidate, icp!, { orgId, userId })
+            result = {
+              score:          fit.score,
+              recommendation: fit.recommendation,
+              strengths:      fit.strengths,
+              gaps:           fit.gaps,
+              reasoning:      fit.rationale,
+            }
+            criterionScores = fit.competencies.map(c => ({
+              name: c.name, rating: c.rating, weight: c.weight, evidence: c.evidence,
+            }))
+            icpExtra = {
+              ai_red_flags:     fit.red_flags,
+              ai_rationale:     fit.rationale,
+              ai_fit_bucket:    fit.fit_bucket,
+              ai_gate_failures: fit.gate_failures,
+              knockout_failed:  !fit.passed_gates,
+              ai_icp_id:        icp!.id,
+              ai_icp_version:   icp!.version,
+            }
+            icpProgress = {
+              fit_bucket:    fit.fit_bucket,
+              red_flags:     fit.red_flags,
+              gate_failures: fit.gate_failures.map(g => g.label),
+            }
+          } else {
+            result = await scoreApplicationForJob(candidate, jobForScoring, { orgId, userId })
+            criterionScores = result.criterion_scores
+          }
 
           // Write core score fields — always required
           const { error: updateErr } = await supabase
@@ -101,16 +160,17 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
               ai_strengths:      result.strengths,
               ai_gaps:           result.gaps,
               ai_scored_at:      new Date().toISOString(),
+              ...icpExtra,
             } as unknown as ApplicationUpdate)
             .eq('id', app.id)
 
           if (updateErr) throw new Error(`DB write failed: ${updateErr.message}`)
 
           // Write per-criterion scores separately — non-fatal if column missing
-          if (result.criterion_scores && result.criterion_scores.length > 0) {
+          if (criterionScores && criterionScores.length > 0) {
             await supabase
               .from('applications')
-              .update({ ai_criterion_scores: result.criterion_scores } as unknown as ApplicationUpdate)
+              .update({ ai_criterion_scores: criterionScores } as unknown as ApplicationUpdate)
               .eq('id', app.id)
             // ignore error: column may not exist yet (migration 018 pending)
           }
@@ -233,8 +293,9 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
             recommendation:   result.recommendation,
             strengths:        result.strengths,
             gaps:             result.gaps,
-            criterion_scores: result.criterion_scores ?? null,
+            criterion_scores: criterionScores ?? null,
             action,
+            ...icpProgress,
           })
 
         } catch (err) {

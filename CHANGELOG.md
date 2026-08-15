@@ -11,6 +11,43 @@ entries on top.
 
 ## 2026-08-15
 
+### Added
+- **ICP feedback loop (Component 06, Slice 6c).** `src/lib/ai/icp-feedback.ts` +
+  `POST /api/jobs/[id]/icp/refine-from-feedback` turn accumulated recruiter
+  Yes/Maybe/No decisions on scored candidates into a proposed ICP refinement — a new
+  DRAFT version to review and approve (the living-spec loop). `summarizeFeedback`
+  categorises where the ICP was too harsh (recruiter Yes ↔ ICP "okay") or too generous
+  (recruiter No ↔ ICP "good/great"); Gemini proposes targeted edits (weight nudges,
+  behaviours, gate add/remove); `applyRefinement` merges them deterministically and
+  re-normalises weights to 100. Gated on ≥5 decisions. Pure summarise/apply logic
+  unit-tested. **UI (6c-b):** a "Refine from feedback" button on the approved ICP in
+  `IcpEditor` runs it, loads the proposed draft for review, and shows the change
+  summary (or "N/5 decisions so far" when there isn't enough feedback yet).
+- **Fit Engine results in the UI (Component 06, Slice 6b).** The candidate AI
+  Assessment card (`SummaryTab.tsx`) now surfaces the Fit Engine output: the
+  Great/Good/Okay **fit bucket** beside the recommendation, a red **"Missing
+  must-have"** banner listing failed gates, **per-competency evidence** under each
+  rating bar, the **rationale**, and a **Red flags** list. The candidate drawer
+  (`CandidateDrawer.tsx`) gets a compact "Missing must-have" pill. All read the new
+  `applications` fields via a loose view (not yet in generated types).
+- **Fit Engine — ICP-driven scoring (Component 06, Slice 6a).** When a job has an
+  approved ICP, the bulk scorer (`/api/jobs/[id]/score`) now runs a two-stage
+  evaluation via `src/lib/ai/fit-engine.ts`: (1) deterministic hard **gates** from
+  the ICP must-haves (`evaluateGates`), (2) a Gemini judge rating each competency
+  1–4 against its behaviours/anchors with evidence, red flags, strengths, gaps and a
+  rationale. The 0–100 score + Great/Good/Okay bucket are computed **deterministically**
+  from the ICP weights (`combineFit`) — the model never sets the number. A gate
+  failure caps the bucket and sets `knockout_failed` but never auto-rejects; a human
+  decides. Jobs without an approved ICP keep using the flat-rubric Sifter unchanged.
+  Pure gate/combine logic is unit-tested.
+
+### Schema
+- **ICP (Ideal Candidate Profile) object — migration `104_icp.sql`.** New `icps`
+  table: versioned per job, keyed to canonical `jobs.id`, with must-haves +
+  competencies + changelog as JSONB and a partial unique index enforcing one
+  approved version per job. Slice 1a of the Metaview-style ICP work. Embedding
+  deferred to the Fit Engine (no pgvector). Not yet in generated Supabase types.
+
 ### Changed
 - **"Team on this job": the hiring manager is now tagged by the round they run**
   (e.g. "Round 2"), like every other interviewer, instead of a redundant "hiring
@@ -24,6 +61,26 @@ entries on top.
   `src/components/req-jobs/ScoringRubricSummary.tsx`.
 
 ### Added
+- **ICP object: types, facade & API (Slice 1a).** `src/lib/types/icp.ts` (an
+  `IcpCompetency` is a superset of `ScoringCriterion`), a `src/modules/ats/domain/icp.ts`
+  facade (get current / versions / create-draft / update-draft / approve / refine),
+  and `/api/jobs/[id]/icp` routes (GET current, POST draft, PUT draft, POST approve,
+  GET versions). Approving an ICP down-projects (`icpToScoringCriteria` in
+  `src/lib/scoring.ts`) back to `jobs.custom_fields.scoring_criteria`, so the board
+  and the Sifter keep working unchanged. No AI/UI yet (Slices 1b/1c).
+- **ICP seeding & editor (Slice 1b).** `deriveIcpSeed()` (`src/lib/ai/icp-seed.ts`,
+  LLM-free) maps a job's existing rubric + location + level into a draft ICP, exposed
+  via `POST /api/jobs/[id]/icp/generate`. A new **ICP editor** on the job's Scoring tab
+  (`src/components/req-jobs/IcpEditor.tsx`) generates a draft, edits hard must-haves +
+  weighted competencies with observable behaviours, and approves it — approving syncs
+  the flat rubric back so the Scoring rubric card stays in step.
+- **ICP LLM enrichment (Slice 1c).** `generateIcp()` (`src/lib/ai/icp-generator.ts`)
+  layers Gemini 2.5 Pro on top of the deterministic seed — drafting observable
+  behaviours + 1–4 anchors + verbatim per competency and pulling hard must-have
+  gates from the requirements. Competency ids/names/weights are preserved (the
+  rubric always sums to 100), and any AI failure falls back to the plain seed, so
+  "Generate ICP" always returns something usable. `POST /api/jobs/[id]/icp/generate`
+  now uses it.
 - **Scoring rubric is now a first-class job-setup step.** A new **Scoring** tab on
   the job page (`/req-jobs/[id]`, between Application form and Interview plan) lets
   you define the weighted criteria the AI scores candidates against — add/remove

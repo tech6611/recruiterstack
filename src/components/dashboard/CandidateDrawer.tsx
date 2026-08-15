@@ -21,6 +21,7 @@ import {
   Zap,
   CheckCircle2,
   XCircle,
+  ShieldAlert,
 } from 'lucide-react'
 import { timeAgo } from '@/lib/ui/date-utils'
 import { trackEvent } from '@/lib/analytics'
@@ -448,6 +449,11 @@ function ApplicationCard({
           {app.ai_recommendation && RECO_STYLES[app.ai_recommendation] && (
             <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${RECO_STYLES[app.ai_recommendation].cls}`}>
               {RECO_STYLES[app.ai_recommendation].label}
+            </span>
+          )}
+          {(app as { knockout_failed?: boolean | null }).knockout_failed && (
+            <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700" title="Fails a hard must-have">
+              <ShieldAlert className="inline h-2.5 w-2.5 mr-0.5" />Missing must-have
             </span>
           )}
         </div>

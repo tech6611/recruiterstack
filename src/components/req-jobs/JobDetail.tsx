@@ -17,6 +17,7 @@ import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { ScoringTab } from '@/components/req-jobs/ScoringTab'
+import { IcpEditor } from '@/components/req-jobs/IcpEditor'
 import { ScoringRubricSummary } from '@/components/req-jobs/ScoringRubricSummary'
 import { InterviewPlanTab } from '@/components/req-jobs/InterviewPlanTab'
 import { readScoringCriteria } from '@/lib/scoring'
@@ -850,11 +851,18 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
       )}
 
       {tab === 'scoring' && (
-        <ScoringTab
-          jobId={job.id}
-          initialCriteria={readScoringCriteria(job.custom_fields)}
-          onSaved={c => setJob(j => ({ ...j, custom_fields: { ...j.custom_fields, scoring_criteria: c } }))}
-        />
+        <div className="space-y-4">
+          <IcpEditor
+            jobId={job.id}
+            onApproved={c => setJob(j => ({ ...j, custom_fields: { ...j.custom_fields, scoring_criteria: c } }))}
+          />
+          <ScoringTab
+            key={JSON.stringify(readScoringCriteria(job.custom_fields))}
+            jobId={job.id}
+            initialCriteria={readScoringCriteria(job.custom_fields)}
+            onSaved={c => setJob(j => ({ ...j, custom_fields: { ...j.custom_fields, scoring_criteria: c } }))}
+          />
+        </div>
       )}
 
       {tab === 'plan' && <InterviewPlanTab jobId={job.id} />}
