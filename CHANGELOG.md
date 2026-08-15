@@ -12,6 +12,13 @@ entries on top.
 ## 2026-08-15
 
 ### Added
+- **Fit Engine results in the UI (Component 06, Slice 6b).** The candidate AI
+  Assessment card (`SummaryTab.tsx`) now surfaces the Fit Engine output: the
+  Great/Good/Okay **fit bucket** beside the recommendation, a red **"Missing
+  must-have"** banner listing failed gates, **per-competency evidence** under each
+  rating bar, the **rationale**, and a **Red flags** list. The candidate drawer
+  (`CandidateDrawer.tsx`) gets a compact "Missing must-have" pill. All read the new
+  `applications` fields via a loose view (not yet in generated types).
 - **Fit Engine — ICP-driven scoring (Component 06, Slice 6a).** When a job has an
   approved ICP, the bulk scorer (`/api/jobs/[id]/score`) now runs a two-stage
   evaluation via `src/lib/ai/fit-engine.ts`: (1) deterministic hard **gates** from
