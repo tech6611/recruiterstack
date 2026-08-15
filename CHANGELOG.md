@@ -11,6 +11,18 @@ entries on top.
 
 ## 2026-08-15
 
+### Added
+- **Fit Engine — ICP-driven scoring (Component 06, Slice 6a).** When a job has an
+  approved ICP, the bulk scorer (`/api/jobs/[id]/score`) now runs a two-stage
+  evaluation via `src/lib/ai/fit-engine.ts`: (1) deterministic hard **gates** from
+  the ICP must-haves (`evaluateGates`), (2) a Gemini judge rating each competency
+  1–4 against its behaviours/anchors with evidence, red flags, strengths, gaps and a
+  rationale. The 0–100 score + Great/Good/Okay bucket are computed **deterministically**
+  from the ICP weights (`combineFit`) — the model never sets the number. A gate
+  failure caps the bucket and sets `knockout_failed` but never auto-rejects; a human
+  decides. Jobs without an approved ICP keep using the flat-rubric Sifter unchanged.
+  Pure gate/combine logic is unit-tested.
+
 ### Schema
 - **ICP (Ideal Candidate Profile) object — migration `104_icp.sql`.** New `icps`
   table: versioned per job, keyed to canonical `jobs.id`, with must-haves +

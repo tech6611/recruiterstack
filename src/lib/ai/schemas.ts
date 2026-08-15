@@ -23,6 +23,25 @@ export const jobScoreResponseSchema = z.object({
 
 export type JobScoreResponse = z.infer<typeof jobScoreResponseSchema>
 
+// ── ICP Fit Engine Response (Component 06) ───────────────────────────────────
+// What Gemini returns when judging a candidate against an approved ICP. The
+// numeric score/bucket are NOT taken from the model — they're computed
+// deterministically from these per-competency ratings (see fit-engine.ts).
+
+export const icpFitResponseSchema = z.object({
+  competencies: z.array(z.object({
+    id:       z.string(),
+    rating:   z.number().min(1).max(4),
+    evidence: z.string().catch(''),
+  })).catch([]),
+  red_flags: z.array(z.string()).catch([]),
+  strengths: z.array(z.string()).catch([]),
+  gaps:      z.array(z.string()).catch([]),
+  rationale: z.string().catch(''),
+}).strip()
+
+export type IcpFitResponse = z.infer<typeof icpFitResponseSchema>
+
 // ── Matcher Response ─────────────────────────────────────────────────────────
 
 export const matchResponseSchema = z.object({
