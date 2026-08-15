@@ -159,7 +159,11 @@ export async function generateIcp(
   const seed = deriveIcpSeed(job)
   try {
     const { text, usage, model } = await withRetry(
-      () => generateText(buildEnrichmentPrompt(job, seed), { model: MODEL, maxTokens: 2048, json: true }),
+      // Gemini 2.5 Pro's hidden "thinking" tokens count against maxOutputTokens,
+      // and a full ICP (4+ competencies × behaviours + anchors + gates) is a large
+      // JSON payload — so give generous headroom or the reply truncates mid-JSON
+      // and we silently fall back to the plain seed.
+      () => generateText(buildEnrichmentPrompt(job, seed), { model: MODEL, maxTokens: 8192, json: true }),
       { label: 'ICP Generator' },
     )
     trackUsage('icp-generator', model, usage, identity)
