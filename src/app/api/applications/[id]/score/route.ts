@@ -4,6 +4,7 @@ import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
+import type { Icp } from '@/lib/types/icp'
 import type { ApplicationUpdate, HiringRequest } from '@/lib/types/database'
 
 // POST /api/applications/[id]/score — (re)score this ONE application and persist
@@ -40,7 +41,13 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
   }
 
   // Fit Engine when the job has an approved ICP; else the flat-rubric scorer.
-  const icp = await getCurrentIcp(supabase, orgId, app.job_id)
+  // Resilient: a missing ICP table (migrations not yet applied) → flat scoring.
+  let icp: Icp | null = null
+  try {
+    icp = await getCurrentIcp(supabase, orgId, app.job_id)
+  } catch {
+    icp = null
+  }
   const update: Record<string, unknown> = { ai_scored_at: new Date().toISOString() }
   let criterionScores: unknown[] | undefined
   let respExtra: Record<string, unknown> = {}

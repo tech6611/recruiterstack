@@ -17,7 +17,9 @@ import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { createNotification } from '@/lib/api/notify'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
+import { logger } from '@/lib/logger'
 import type { JobScoreResponse } from '@/lib/ai/schemas'
+import type { Icp } from '@/lib/types/icp'
 import type { HiringRequest, ApplicationUpdate, ApplicationEventInsert } from '@/lib/types/database'
 
 export const maxDuration = 300 // 5 min — needed for large pipelines on Vercel
@@ -71,7 +73,16 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
   // Load the job's approved ICP once. When present (and the caller isn't
   // overriding the rubric with unsaved criteria), scoring runs through the Fit
   // Engine — hard gates + ICP-anchored judging — instead of the flat-rubric Sifter.
-  const icp = await getCurrentIcp(supabase, orgId, jobId)
+  // Resilient by design: if the ICP table isn't present (e.g. migrations not yet
+  // applied in an environment), fall back to flat-rubric scoring rather than 500.
+  let icp: Icp | null = null
+  try {
+    icp = await getCurrentIcp(supabase, orgId, jobId)
+  } catch (e) {
+    logger.warn('score: ICP lookup failed, using flat-rubric scoring', {
+      error: e instanceof Error ? e.message : String(e),
+    })
+  }
   const useIcp = !!icp && icp.status === 'approved' && !scoringCriteriaOverride
 
   // ── 2. Stream SSE response ─────────────────────────────────────────────────
