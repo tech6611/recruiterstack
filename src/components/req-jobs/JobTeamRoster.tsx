@@ -82,18 +82,20 @@ export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }:
   const roundsSub = (rs: { round: RosterRound; n: number }[]) =>
     rs.map(x => `${x.round.name} · ${TYPE_LABEL[x.round.interview_type] ?? x.round.interview_type} · ${x.round.duration_minutes}m`).join('  ·  ')
 
-  // One row per person. If the hiring manager also runs a round, merge them into
-  // that round's row (with the HM pill) instead of showing a duplicate.
+  // One row per person. A hiring manager who also runs a round is merged into that
+  // round's row. Everyone — including the HM — is tagged by the round they run
+  // (e.g. "Round 2"), not their role: the HM is already identified on the Overview,
+  // so re-tagging them "hiring manager" here just duplicates that. Only a HM who
+  // runs no round at all keeps the "hiring manager" tag (there's no round to show).
   const rows: { key: string; name: string; sub: string; pill: string }[] = []
   if (hasHM && !hmIsInterviewer) {
     rows.push({ key: 'hm', name: hmName || hmEmail || 'Hiring manager', sub: hmEmail && hmName ? hmEmail : 'Hiring manager', pill: hmPill })
   }
   for (const k of order) {
     const g = groups.get(k)!
-    const isHM = k === hmKey
     rows.push({
       key: k, name: g.name, sub: roundsSub(g.rounds),
-      pill: isHM ? hmPill : (g.rounds.length === 1 ? `Round ${g.rounds[0].n}` : `${g.rounds.length} rounds`),
+      pill: g.rounds.length === 1 ? `Round ${g.rounds[0].n}` : `${g.rounds.length} rounds`,
     })
   }
 

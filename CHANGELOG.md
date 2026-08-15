@@ -12,6 +12,11 @@ entries on top.
 ## 2026-08-15
 
 ### Changed
+- **"Team on this job": the hiring manager is now tagged by the round they run**
+  (e.g. "Round 2"), like every other interviewer, instead of a redundant "hiring
+  manager" tag — the HM is already identified on the Overview. A HM who runs no
+  round keeps the "hiring manager" tag. File: `src/components/req-jobs/JobTeamRoster.tsx`.
+
 - **Job Overview: Linked requisitions moved into the right sidebar** (under "Team on
   this job"), and a new **Scoring rubric** summary card added below it — each
   criterion with its weight and a proportional bar, an Edit link to the Scoring tab,
