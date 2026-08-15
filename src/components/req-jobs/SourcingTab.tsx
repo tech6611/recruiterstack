@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2 } from 'lucide-react'
+import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2, Send, MailCheck, Check, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,15 @@ interface Match {
   candidate: { id: string; name: string | null; current_title: string | null; location: string | null } | null
 }
 
+interface PendingReview {
+  enrollment_id: string
+  sequence_name: string
+  candidate_name: string
+  candidate_title: string | null
+  subject: string
+  body: string
+}
+
 /**
  * Sourcing (Component 05, 5a). Ranks the org's candidate pool against the job's
  * approved ICP with the Fit Engine, shows the matches, and adds the good ones to
@@ -44,6 +53,11 @@ export function SourcingTab({ jobId }: { jobId: string }) {
   const [embedding, setEmbedding] = useState(false)
   const [calibrate, setCalibrate] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [sequences, setSequences] = useState<{ id: string; name: string }[]>([])
+  const [selectedSequence, setSelectedSequence] = useState('')
+  const [enrolling, setEnrolling] = useState(false)
+  const [reviewMode, setReviewMode] = useState(false)
+  const [pending, setPending] = useState<PendingReview[]>([])
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/jobs/${jobId}/source`)
@@ -57,6 +71,27 @@ export function SourcingTab({ jobId }: { jobId: string }) {
   }, [jobId])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    fetch('/api/sequences')
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((j) =>
+        setSequences(
+          (j.data ?? [])
+            .filter((s: { status?: string }) => s.status === 'active')
+            .map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })),
+        ),
+      )
+      .catch(() => {})
+  }, [])
+
+  const loadPending = useCallback(() => {
+    fetch(`/api/jobs/${jobId}/source/pending-review`)
+      .then((r) => (r.ok ? r.json() : { data: { pending: [] } }))
+      .then((j) => setPending(j.data?.pending ?? []))
+      .catch(() => {})
+  }, [jobId])
+  useEffect(() => { loadPending() }, [loadPending])
 
   async function runSource() {
     setSourcing(true)
@@ -91,6 +126,49 @@ export function SourcingTab({ jobId }: { jobId: string }) {
     toast.success(`Added ${data.added} to the pipeline${data.skipped ? `, ${data.skipped} already there` : ''}.`)
     setSelected(new Set())
     load()
+  }
+
+  async function enrollSelected() {
+    if (selected.size === 0 || !selectedSequence) return
+    setEnrolling(true)
+    const res = await fetch(`/api/jobs/${jobId}/source/enroll`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_ids: Array.from(selected), sequence_id: selectedSequence, review: reviewMode }),
+    })
+    setEnrolling(false)
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast.error(j.error ?? 'Could not enroll into the sequence')
+      return
+    }
+    const { data } = await res.json()
+    toast.success(
+      data.held
+        ? `${data.enrolled} queued for review before sending${data.skipped ? `, ${data.skipped} skipped` : ''}.`
+        : `Enrolled ${data.enrolled} into the sequence${data.skipped ? `, ${data.skipped} skipped` : ''}.`,
+    )
+    setSelected(new Set())
+    setSelectedSequence('')
+    if (data.held) loadPending()
+  }
+
+  async function reviewEnrollment(enrollmentId: string, action: 'approve' | 'reject') {
+    // Optimistically drop it from the list; restore on failure.
+    const prev = pending
+    setPending((p) => p.filter((x) => x.enrollment_id !== enrollmentId))
+    const res = await fetch(`/api/sequences/enrollments/${enrollmentId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    if (!res.ok) {
+      setPending(prev)
+      const j = await res.json().catch(() => ({}))
+      toast.error(j.error ?? 'Could not update this message')
+      return
+    }
+    toast.success(action === 'approve' ? 'Approved — the first message will send.' : 'Rejected — nothing was sent.')
   }
 
   async function decide(candidateId: string, decision: 'yes' | 'no') {
@@ -276,11 +354,77 @@ export function SourcingTab({ jobId }: { jobId: string }) {
       </CardContent>
 
       {selected.size > 0 && (
-        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-6 py-3">
           <span className="text-xs text-slate-500">{selected.size} selected</span>
-          <Button size="sm" onClick={addSelected} loading={adding}>
-            <UserPlus className="h-3.5 w-3.5" /> Add to pipeline
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {sequences.length > 0 && (
+              <>
+                <select
+                  value={selectedSequence}
+                  onChange={(e) => setSelectedSequence(e.target.value)}
+                  className="h-8 rounded border border-slate-200 bg-white px-2 text-xs text-slate-600"
+                  title="Enroll into a sequence with a personalized first message"
+                >
+                  <option value="">Add to sequence…</option>
+                  {sequences.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <label className="flex items-center gap-1 text-xs text-slate-500" title="Hold each first message for you to read and approve before it sends">
+                  <input type="checkbox" checked={reviewMode} onChange={(e) => setReviewMode(e.target.checked)} className="h-3.5 w-3.5" />
+                  Review before sending
+                </label>
+                <Button size="sm" variant="outline" onClick={enrollSelected} loading={enrolling} disabled={!selectedSequence}>
+                  <Send className="h-3.5 w-3.5" /> Enroll
+                </Button>
+              </>
+            )}
+            <Button size="sm" onClick={addSelected} loading={adding}>
+              <UserPlus className="h-3.5 w-3.5" /> Add to pipeline
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {pending.length > 0 && (
+        <div className="border-t border-slate-100 px-6 py-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+            <MailCheck className="h-4 w-4 text-sky-600" />
+            Awaiting your review ({pending.length})
+          </div>
+          <p className="mb-3 text-xs text-slate-500">
+            These first messages are held and will not send until you approve them.
+          </p>
+          <div className="space-y-2">
+            {pending.map((p) => (
+              <div key={p.enrollment_id} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-slate-800">
+                      {p.candidate_name}
+                      {p.candidate_title && <span className="font-normal text-slate-400"> · {p.candidate_title}</span>}
+                    </div>
+                    <div className="text-[11px] text-slate-400">into {p.sequence_name}</div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button type="button" onClick={() => reviewEnrollment(p.enrollment_id, 'approve')} title="Approve and send"
+                      className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700">
+                      <Check className="h-3.5 w-3.5" /> Approve
+                    </button>
+                    <button type="button" onClick={() => reviewEnrollment(p.enrollment_id, 'reject')} title="Reject — do not send"
+                      className="flex items-center gap-1 rounded border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:bg-white hover:text-red-600">
+                      <X className="h-3.5 w-3.5" /> Reject
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-2 rounded border border-slate-200 bg-white p-2">
+                  <div className="text-xs font-medium text-slate-700">{p.subject || '(no subject)'}</div>
+                  <div className="mt-1 line-clamp-4 whitespace-pre-wrap text-xs text-slate-500"
+                    dangerouslySetInnerHTML={{ __html: p.body || '<span class="italic">(empty)</span>' }} />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </Card>

@@ -549,8 +549,14 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
     if (phoneScreenUrl) tokenValues.phone_screen_scheduler = phoneScreenUrl
   }
 
-  const subject = applyTokens(stage.subject ?? '', tokenValues)
-  let body = applyTokens(stage.body ?? '', tokenValues)
+  // Component 08: the first message can be a per-enrollment personalized intro
+  // (written from the candidate's Fit-Engine evidence at enroll time). Prefer it
+  // over the stage template for stage 0; later stages always use the template.
+  const useIntro = stage.order_index === 0
+  const rawSubject = useIntro && enrollment.intro_subject ? enrollment.intro_subject : (stage.subject ?? '')
+  const rawBody = useIntro && enrollment.intro_body ? enrollment.intro_body : (stage.body ?? '')
+  const subject = applyTokens(rawSubject, tokenValues)
+  let body = applyTokens(rawBody, tokenValues)
 
   // Append a one-click unsubscribe footer so every outbound sequence email is
   // compliant. The link carries an encrypted {org, candidate} token.

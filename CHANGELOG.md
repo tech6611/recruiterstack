@@ -12,6 +12,25 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Review-before-send for sourced outreach (Component 08, Slice 8b-2).** When
+  enrolling matches from the Source tab you can now tick **"Review before sending"** —
+  each enrollment is *held* (no send scheduled) and its personalized first message
+  appears in an **"Awaiting your review"** panel with **Approve** (schedules the send)
+  or **Reject** (cancels, nothing goes out). Delivers the recruiter's "see the message
+  before it goes" mode without touching the auto-send path (8b-1). New: held-enrollment
+  flag on `enrollCandidate` + reusable `enqueueFirstStage`; `GET
+  /api/jobs/[id]/source/pending-review`; `POST /api/sequences/enrollments/[id]/review`
+  (approve/reject, with optional edits to the message). Reviews the AI-personalized
+  first message; follow-up template steps still auto-send.
+- **Personalized outreach sequences from sourcing (Component 08, Slice 8b-1).** The
+  Source tab can now enroll selected matches into a sequence — with each candidate's
+  **first message personalized from their Fit-Engine evidence** ("here's specifically
+  why we're reaching out"). `src/lib/ai/outreach-draft.ts` drafts the intro from the
+  sourcing match's rationale + per-competency evidence; `enrollCandidate` stores it as
+  a per-enrollment override; the `sequence_email` handler prefers it for stage 0 (later
+  steps use the shared template). The sequence then sends per its own schedule. Endpoint
+  `POST /api/jobs/[id]/source/enroll`; pure prompt builder unit-tested. (Review-before-send
+  mode is the next slice, 8b-2.)
 - **Semantic sourcing with embeddings (Component 05, Slice 5c).** Sourcing shortlists
   by *meaning*, not just keywords: it embeds the ICP and the candidate pool (Gemini
   `text-embedding-004`, 768-dim) and finds nearest candidates via a pgvector
@@ -38,6 +57,11 @@ entries on top.
   design; embeddings (5c) will replace the overlap step at scale. Pure ranking unit-tested.
 
 ### Schema
+- **`110_sequence_enrollment_review.sql`** — adds `awaiting_review` (held-for-review
+  flag) and `job_id` (ties a held enrollment back to its Source tab) to
+  `sequence_enrollments`, plus a partial index for the review queue. (8b-2)
+- **`109_sequence_enrollment_intro.sql`** — adds `intro_subject` / `intro_body` to
+  `sequence_enrollments` (per-enrollment personalized first message; used for stage 0).
 - **`108_candidate_embeddings.sql`** — enables pgvector, adds `candidates.embedding
   vector(768)` + an ivfflat index + the `match_candidates(query, org, count, exclude)`
   nearest-neighbour function. (Enabling the `vector` extension may need the Supabase dashboard.)
