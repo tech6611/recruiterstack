@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles } from 'lucide-react'
+import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -41,6 +41,7 @@ export function SourcingTab({ jobId }: { jobId: string }) {
   const [sourcing, setSourcing] = useState(false)
   const [adding, setAdding] = useState(false)
   const [refining, setRefining] = useState(false)
+  const [embedding, setEmbedding] = useState(false)
   const [calibrate, setCalibrate] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -109,6 +110,26 @@ export function SourcingTab({ jobId }: { jobId: string }) {
     }
   }
 
+  // Backfill embeddings so sourcing can use semantic recall (5c). Org-wide, batched.
+  async function embedPool() {
+    setEmbedding(true)
+    let total = 0
+    try {
+      for (;;) {
+        const res = await fetch('/api/candidates/embed', { method: 'POST' })
+        if (!res.ok) { toast.error('Embedding failed'); break }
+        const { data } = await res.json()
+        total += data.embedded
+        if (data.embedded === 0 || data.remaining === 0) {
+          toast.success(total > 0 ? `Embedded ${total} candidate${total === 1 ? '' : 's'} — semantic sourcing is ready.` : 'Your pool is already embedded.')
+          break
+        }
+      }
+    } finally {
+      setEmbedding(false)
+    }
+  }
+
   async function refineFromFeedback() {
     setRefining(true)
     const res = await fetch(`/api/jobs/${jobId}/icp/refine-from-feedback`, { method: 'POST' })
@@ -157,6 +178,10 @@ export function SourcingTab({ jobId }: { jobId: string }) {
           </div>
           {hasIcp && (
             <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={embedPool} loading={embedding}
+                title="Embed your candidate pool once so sourcing can match semantically">
+                <Wand2 className="h-3.5 w-3.5" /> Embed pool
+              </Button>
               {matches.length > 0 && (
                 <Button size="sm" variant={calibrate ? 'primary' : 'outline'} onClick={() => setCalibrate((v) => !v)}
                   title="Show a diverse ~15 to calibrate the ICP faster">

@@ -55,6 +55,25 @@ function getClient(): GoogleGenAI {
   return new GoogleGenAI({ apiKey })
 }
 
+// ── Embeddings (semantic recall, Component 05 Slice 5c) ──────────────────────
+export const EMBEDDING_MODEL = 'text-embedding-004'
+export const EMBEDDING_DIM = 768
+
+/** Embed a single text with Gemini's embedding model → a 768-dim vector. */
+export async function embedText(text: string): Promise<number[]> {
+  const res = await getClient().models.embedContent({ model: EMBEDDING_MODEL, contents: text })
+  const values = res.embeddings?.[0]?.values
+  if (!values || values.length === 0) throw new Error('Embedding returned no values')
+  return values
+}
+
+/** Embed many texts in one call → one vector each, in order. */
+export async function embedTexts(texts: string[]): Promise<number[][]> {
+  if (texts.length === 0) return []
+  const res = await getClient().models.embedContent({ model: EMBEDDING_MODEL, contents: texts })
+  return (res.embeddings ?? []).map((e) => e.values ?? [])
+}
+
 function toUsage(response: { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }): Usage {
   const meta = response.usageMetadata ?? {}
   return {

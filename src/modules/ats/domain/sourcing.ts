@@ -1,10 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/lib/types/database'
+import type { Candidate, Database } from '@/lib/types/database'
+import type { Icp } from '@/lib/types/icp'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { listCandidatesForOrg } from '@/modules/ats/domain/candidates'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
 import { rankCandidatesForIcp } from '@/lib/ai/sourcing-rank'
+import { icpEmbeddingText } from '@/lib/ai/embeddings'
+import { embedText } from '@/lib/ai/llm'
 import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
 
 type Supabase = SupabaseClient<Database>
@@ -83,9 +86,41 @@ export async function setSourcingDecision(
 }
 
 /**
+ * Shortlist the pool for the ICP. Prefers semantic recall (5c) — embed the ICP,
+ * find nearest candidates via pgvector — and falls back to keyword overlap (5a)
+ * when embeddings aren't populated, pgvector is unavailable, or the query errors.
+ */
+async function shortlistForIcp(
+  supabase: Supabase,
+  orgId: string,
+  icp: Icp,
+  candidates: Candidate[],
+  inPipeline: Set<string>,
+): Promise<Candidate[]> {
+  try {
+    const query = await embedText(icpEmbeddingText(icp))
+    const sb = supabase as unknown as LooseSb
+    const { data, error } = await sb.rpc('match_candidates', {
+      query_embedding: query,
+      match_org: orgId,
+      match_count: SHORTLIST,
+      exclude_ids: Array.from(inPipeline),
+    })
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const byId = new Map(candidates.map((c) => [c.id, c]))
+      const matched = data.map((r: { id: string }) => byId.get(r.id)).filter(Boolean) as Candidate[]
+      if (matched.length > 0) return matched
+    }
+  } catch {
+    /* fall through to keyword overlap */
+  }
+  return rankCandidatesForIcp(candidates, icp, SHORTLIST)
+}
+
+/**
  * Source from the org's own candidate pool against the job's approved ICP:
- * pre-filter by overlap, Fit-Engine the shortlist, and upsert into the cache.
- * Skips candidates already in this job's pipeline.
+ * shortlist (semantic recall, or keyword overlap), Fit-Engine the shortlist, and
+ * upsert into the cache. Skips candidates already in this job's pipeline.
  */
 export async function runSourcing(
   supabase: Supabase,
@@ -104,7 +139,7 @@ export async function runSourcing(
     (context?.applications ?? []).map((a) => a.candidate?.id).filter(Boolean),
   )
   const candidates = pool.filter((c) => !inPipeline.has(c.id))
-  const shortlist = rankCandidatesForIcp(candidates, icp, SHORTLIST)
+  const shortlist = await shortlistForIcp(supabase, orgId, icp, candidates, inPipeline)
 
   const sb = supabase as unknown as LooseSb
   let scored = 0
