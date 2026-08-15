@@ -12,6 +12,21 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Semantic sourcing with embeddings (Component 05, Slice 5c).** Sourcing shortlists
+  by *meaning*, not just keywords: it embeds the ICP and the candidate pool (Gemini
+  `text-embedding-004`, 768-dim) and finds nearest candidates via a pgvector
+  `match_candidates` RPC before the Fit Engine — falling back to the 5a keyword overlap
+  when a candidate has no embedding or pgvector is unavailable (fully additive).
+  `embedText`/`embedTexts` in `llm.ts`; pure text builders in `src/lib/ai/embeddings.ts`
+  (tested). Backfill via `POST /api/candidates/embed` + an "Embed pool" button on the Source tab.
+- **Cold-start calibration (Component 05, Slice 5b).** The Source tab now lets you
+  mark 👍/👎 on sourced candidates; a **Calibrate** toggle surfaces a *diverse* ~15
+  (`src/lib/ai/calibration.ts` — even spread across the score range so it spans
+  clear-yes, clear-no, and the borderline middle, where a decision carries the most
+  signal). Once ≥5 decisions are in, **Refine ICP** feeds them into the 6c feedback
+  loop — and the loop now folds in these sourcing decisions (the "no"s that never
+  became applications) alongside pipeline decisions. Endpoint
+  `POST /api/jobs/[id]/source/decide`; pure sampler unit-tested.
 - **Sourcing — rank your candidate pool by the ICP (Component 05, Slice 5a).** A new
   **Source** tab on the job (`SourcingTab.tsx`) ranks the org's existing candidates
   against the job's approved ICP: a cheap deterministic pre-filter
@@ -23,6 +38,11 @@ entries on top.
   design; embeddings (5c) will replace the overlap step at scale. Pure ranking unit-tested.
 
 ### Schema
+- **`108_candidate_embeddings.sql`** — enables pgvector, adds `candidates.embedding
+  vector(768)` + an ivfflat index + the `match_candidates(query, org, count, exclude)`
+  nearest-neighbour function. (Enabling the `vector` extension may need the Supabase dashboard.)
+- **`107_sourcing_decision.sql`** — adds `decision` / `decided_at` / `decided_by` to
+  `sourcing_matches` so calibration yes/no on sourced candidates can feed the ICP loop.
 - **`106_sourcing_matches.sql`** — per-job cache of ICP-driven candidate matches
   ({score, fit_bucket, gate_failures, red_flags, rationale, competencies, icp_version};
   unique on job_id+candidate_id; staleness via icp_version). Service-role RLS.

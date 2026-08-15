@@ -1,10 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw } from 'lucide-react'
+import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { pickCalibrationSet } from '@/lib/ai/calibration'
+
+const CALIBRATION_SIZE = 15
+const MIN_DECISIONS = 5
 
 const BUCKET: Record<string, { label: string; cls: string }> = {
   great: { label: 'Great fit', cls: 'bg-emerald-100 text-emerald-700' },
@@ -20,6 +24,7 @@ interface Match {
   red_flags: string[]
   rationale: string | null
   icp_version: number | null
+  decision: string | null
   candidate: { id: string; name: string | null; current_title: string | null; location: string | null } | null
 }
 
@@ -35,6 +40,9 @@ export function SourcingTab({ jobId }: { jobId: string }) {
   const [loading, setLoading] = useState(true)
   const [sourcing, setSourcing] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [refining, setRefining] = useState(false)
+  const [embedding, setEmbedding] = useState(false)
+  const [calibrate, setCalibrate] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
@@ -85,6 +93,60 @@ export function SourcingTab({ jobId }: { jobId: string }) {
     load()
   }
 
+  async function decide(candidateId: string, decision: 'yes' | 'no') {
+    // Toggle off if the same decision is clicked again.
+    const current = matches.find((m) => m.candidate_id === candidateId)?.decision
+    const next = current === decision ? null : decision
+    setMatches((prev) => prev.map((m) => (m.candidate_id === candidateId ? { ...m, decision: next } : m)))
+    const res = await fetch(`/api/jobs/${jobId}/source/decide`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candidateId, decision: next }),
+    })
+    if (!res.ok) {
+      // revert on failure
+      setMatches((prev) => prev.map((m) => (m.candidate_id === candidateId ? { ...m, decision: current ?? null } : m)))
+      toast.error('Could not save your decision')
+    }
+  }
+
+  // Backfill embeddings so sourcing can use semantic recall (5c). Org-wide, batched.
+  async function embedPool() {
+    setEmbedding(true)
+    let total = 0
+    try {
+      for (;;) {
+        const res = await fetch('/api/candidates/embed', { method: 'POST' })
+        if (!res.ok) { toast.error('Embedding failed'); break }
+        const { data } = await res.json()
+        total += data.embedded
+        if (data.embedded === 0 || data.remaining === 0) {
+          toast.success(total > 0 ? `Embedded ${total} candidate${total === 1 ? '' : 's'} — semantic sourcing is ready.` : 'Your pool is already embedded.')
+          break
+        }
+      }
+    } finally {
+      setEmbedding(false)
+    }
+  }
+
+  async function refineFromFeedback() {
+    setRefining(true)
+    const res = await fetch(`/api/jobs/${jobId}/icp/refine-from-feedback`, { method: 'POST' })
+    setRefining(false)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      toast.error(body.error ?? 'Could not refine the ICP')
+      return
+    }
+    const data = body.data
+    if (data?.status === 'insufficient') {
+      toast(`${data.decided}/${data.needed} decisions so far — mark a few more, then refine.`)
+      return
+    }
+    toast.success(`ICP refined from your decisions — review draft v${data?.icp?.version ?? ''} on the Scoring tab.`)
+  }
+
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev)
@@ -92,6 +154,9 @@ export function SourcingTab({ jobId }: { jobId: string }) {
       else next.add(id)
       return next
     })
+
+  const decidedCount = matches.filter((m) => m.decision === 'yes' || m.decision === 'no' || m.decision === 'maybe').length
+  const shown = calibrate ? pickCalibrationSet(matches, CALIBRATION_SIZE) : matches
 
   const stale = matches.some((m) => currentVersion != null && m.icp_version !== currentVersion)
 
@@ -112,9 +177,21 @@ export function SourcingTab({ jobId }: { jobId: string }) {
             </CardDescription>
           </div>
           {hasIcp && (
-            <Button size="sm" onClick={runSource} loading={sourcing}>
-              <Radar className="h-3.5 w-3.5" /> {matches.length ? 'Re-source' : 'Source candidates'}
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={embedPool} loading={embedding}
+                title="Embed your candidate pool once so sourcing can match semantically">
+                <Wand2 className="h-3.5 w-3.5" /> Embed pool
+              </Button>
+              {matches.length > 0 && (
+                <Button size="sm" variant={calibrate ? 'primary' : 'outline'} onClick={() => setCalibrate((v) => !v)}
+                  title="Show a diverse ~15 to calibrate the ICP faster">
+                  {calibrate ? 'Calibration set' : 'Calibrate'}
+                </Button>
+              )}
+              <Button size="sm" onClick={runSource} loading={sourcing}>
+                <Radar className="h-3.5 w-3.5" /> {matches.length ? 'Re-source' : 'Source candidates'}
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -132,6 +209,17 @@ export function SourcingTab({ jobId }: { jobId: string }) {
           </div>
         ) : (
           <>
+            {(calibrate || decidedCount > 0) && (
+              <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                <span>
+                  {decidedCount} decision{decidedCount === 1 ? '' : 's'}
+                  {calibrate ? ` · reviewing ${shown.length} diverse candidates` : ''}
+                </span>
+                <Button size="sm" variant="outline" onClick={refineFromFeedback} loading={refining} disabled={decidedCount < MIN_DECISIONS}>
+                  <Sparkles className="h-3 w-3" /> Refine ICP{decidedCount < MIN_DECISIONS ? ` (${decidedCount}/${MIN_DECISIONS})` : ''}
+                </Button>
+              </div>
+            )}
             {stale && (
               <div className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-700">
                 <RefreshCw className="h-3 w-3 shrink-0" />
@@ -139,11 +227,11 @@ export function SourcingTab({ jobId }: { jobId: string }) {
               </div>
             )}
             <div className="overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100">
-              {matches.map((m) => {
+              {shown.map((m) => {
                 const b = m.fit_bucket ? BUCKET[m.fit_bucket] : null
                 const gated = m.gate_failures.length > 0
                 return (
-                  <label key={m.candidate_id} className="flex cursor-pointer items-start gap-3 px-3 py-2.5 hover:bg-slate-50">
+                  <div key={m.candidate_id} className="flex items-start gap-3 px-3 py-2.5 hover:bg-slate-50">
                     <input
                       type="checkbox"
                       checked={selected.has(m.candidate_id)}
@@ -169,7 +257,17 @@ export function SourcingTab({ jobId }: { jobId: string }) {
                       </div>
                       {m.rationale && <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{m.rationale}</p>}
                     </div>
-                  </label>
+                    <div className="flex shrink-0 items-center gap-1 pt-0.5">
+                      <button type="button" onClick={() => decide(m.candidate_id, 'yes')} title="Good fit"
+                        className={`rounded p-1 ${m.decision === 'yes' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-300 hover:bg-slate-100 hover:text-emerald-600'}`}>
+                        <ThumbsUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => decide(m.candidate_id, 'no')} title="Not a fit"
+                        className={`rounded p-1 ${m.decision === 'no' ? 'bg-red-100 text-red-700' : 'text-slate-300 hover:bg-slate-100 hover:text-red-600'}`}>
+                        <ThumbsDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 )
               })}
             </div>
