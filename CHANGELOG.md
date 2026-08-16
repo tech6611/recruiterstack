@@ -49,6 +49,17 @@ entries on top.
   Backfilled all 8 affected candidates; 0 remain null. File: `src/lib/ai/llm.ts`.
 
 ### Added
+- **The learning loop — separate fit / reachability / movability (Sourcing Brain,
+  Slice 3).** Before refining the ICP, the pipeline now diagnoses **why** candidates
+  fall out: a rejection at review is a **fit** miss (refine the ICP), a candidate who
+  never replies is a **reachability** miss (fix outreach/targeting, not the ICP), a
+  declined offer is a **movability/comp** miss. A "What the pipeline is teaching you"
+  panel on the Source tab shows the three-way breakdown, names the dominant issue, and
+  only offers **Refine ICP from fit feedback** when fit is actually the problem — so
+  the loop fixes the right thing. `src/modules/ats/domain/learning-signals.ts` (pure
+  `classifyOutcome` + `diagnoseFailureModes` joining review status + sequence replies +
+  offer outcomes, unit-tested); `GET /api/jobs/[id]/learning`; `LearningPanel`. No
+  migration. Pool-B unlocks flow in automatically (they become candidates).
 - **Candidate archetypes — 2–4 distinct "bets" per role (Sourcing Brain, Slice 2).**
   ICP generation's reasoning pass now also produces **candidate archetypes**: instead
   of one "ideal," 2–4 distinct hypotheses that could each succeed — each with a thesis,
