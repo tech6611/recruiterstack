@@ -24,6 +24,7 @@ import {
   Search,
   Mail,
   Target,
+  Database,
   Menu,
   X,
   ChevronLeft,
@@ -73,6 +74,10 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/jobs',       label: 'Jobs',       icon: Briefcase,     cap: 'recruiting:view' },
       { href: '/candidates', label: 'Candidates', icon: Users,         cap: 'recruiting:view' },
       { href: '/sourcing',   label: 'Sourcing',   icon: Search,        cap: 'recruiting:view' },
+      // The pool is a cross-org candidate database an org subscribes to — it sits
+      // under Recruiting next to Sourcing, but reads a different store entirely
+      // (pool_profiles, not candidates). See migration 115.
+      { href: '/pool',       label: 'Candidate pool', icon: Database,  cap: 'recruiting:view' },
       { href: '/sequences',  label: 'Sequences',  icon: Mail,          cap: 'recruiting:view' },
       { href: '/inbox',      label: 'Inbox',      icon: Inbox,         cap: 'recruiting:view' },
     ],

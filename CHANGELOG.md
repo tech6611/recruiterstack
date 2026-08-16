@@ -11,6 +11,51 @@ entries on top.
 
 ## 2026-08-16
 
+### Fixed
+- **Embeddings were silently broken in production — semantic sourcing never worked.**
+  `EMBEDDING_MODEL` was `text-embedding-004`, which Google has since retired; the
+  endpoint now returns 404, so every `embedText`/`embedTexts` call failed and
+  `candidates.embedding` stayed null. Sourcing therefore fell back to keyword
+  overlap on every job, with no error surfaced. Switched to `gemini-embedding-001`
+  (the live model) and pinned `outputDimensionality: 768`, since it returns 3072 by
+  default — this keeps the existing `vector(768)` columns and `match_candidates()`
+  working with **no migration**. Truncated vectors aren't unit-length, which is fine:
+  every index here uses cosine (`vector_cosine_ops`), and cosine is scale-invariant.
+  Backfilled all 8 affected candidates; 0 remain null. File: `src/lib/ai/llm.ts`.
+
+### Added
+- **Candidate Pool UI — the Resdex-style surface (`/pool`).** Search the cross-org
+  pool by name/title/company, location, skill, minimum experience and **time in
+  current role** (the movability signal — three years in a seat reads very
+  differently from three months). New `src/modules/pool/domain/pool.ts` facade is the
+  security boundary, not the query: because pool tables carry no `org_id`, nothing
+  returns a row without first checking the org holds an active grant, and **contact
+  details stay hidden until the profile is unlocked**. Orgs with no subscription get a
+  self-serve trial (25 unlocks) rather than an empty page. Profile drawer shows the
+  dated career arc, education, skills, and a **"Where this came from" provenance
+  table** — every field with its source and trust score, conflicting values kept side
+  by side rather than silently resolved. `GET/POST /api/pool`, `GET /api/pool/[id]`;
+  nav entry under Recruiting.
+
+### Schema
+- **Candidate Pool — first-party sourcing pool (Component 05, Slice 5e; migration 115).**
+  Nine tables for a cross-org pool of people who have *not* applied anywhere — a
+  database an org subscribes to, alongside the ATS rather than inside it. Layered
+  raw → resolved → curated → projection: `pool_documents` (append-only bronze, so a
+  changed extraction rule re-derives without re-fetching), `pool_profiles` +
+  `pool_identities` (resolved human vs per-platform account, so a merge stays
+  reversible), `pool_profile_fields` (field-level provenance — conflicting values are
+  kept, not silently resolved), `pool_experiences` (same shape as
+  `candidate_experiences`, so promotion copies across untranslated), `pool_contacts`
+  (isolated, own retention clock), and `pool_sources` (a registry, not an enum —
+  trust weights drive fusion; `enabled=false` is a kill switch that drops a source's
+  contributions from the resolved view without touching raw). `match_pool_profiles()`
+  mirrors `match_candidates()` on an HNSW index. **Deliberate exception:** pool tables
+  carry no `org_id` — the first cross-org store in a codebase where `requireOrg()`
+  scoping is otherwise universal. `pool_access_grants` and `pool_unlocks` are the only
+  org-scoped tables and form that boundary (grants = entitlement, unlocks = billing +
+  audit + the record of who has seen whom).
+
 ### Added
 - **Candidate Enrichment — structured, dated career history (Sourcing Brain, Slice 0).**
   Every incoming résumé is now broken into canonical structured fields — most
