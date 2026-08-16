@@ -24,6 +24,16 @@ entries on top.
   Backfilled all 8 affected candidates; 0 remain null. File: `src/lib/ai/llm.ts`.
 
 ### Added
+- **ICP reasoning — "how this ICP was reasoned" (Sourcing Brain, Slice 1a).** ICP
+  generation now also produces a **reasoning layer** a recruiter/HM can read and argue
+  with: a plain-English *why-this-ICP* narrative (what the role really is + why the
+  competencies are weighted that way), the **requirement decomposition** (each
+  requirement bucketed **hard-filter / ranking-signal / screen-later** with the
+  findable proxy), and the **unwritten filters** it inferred (with the cost of applying
+  each). Shown as a "How this ICP was reasoned" panel in the ICP editor. Stored on the
+  ICP (`sourcing_map`, migration 116); `src/lib/ai/sourcing-strategist.ts` (pure prompt
+  builder, unit-tested; a second Gemini pass that explains — never rewrites — the
+  drafted ICP). Answers "where's the reasoning behind the first ICP."
 - **Candidate Pool UI — the Resdex-style surface (`/pool`).** Search the cross-org
   pool by name/title/company, location, skill, minimum experience and **time in
   current role** (the movability signal — three years in a seat reads very

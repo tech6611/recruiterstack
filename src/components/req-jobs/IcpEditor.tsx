@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus } from 'lucide-react'
+import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Brain, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,13 @@ import { icpToScoringCriteria } from '@/lib/scoring'
 
 const GATE_ATTRIBUTES = ['location', 'seniority', 'skill', 'min_experience'] as const
 const GATE_OPERATORS = ['equals', 'gte', 'includes', 'one_of'] as const
+
+const BUCKET_LABEL: Record<string, string> = { hard_filter: 'Hard filter', ranking_signal: 'Ranking', screen_later: 'Screen later' }
+const BUCKET_CLS: Record<string, string> = {
+  hard_filter: 'bg-red-100 text-red-700',
+  ranking_signal: 'bg-emerald-100 text-emerald-700',
+  screen_later: 'bg-amber-100 text-amber-700',
+}
 
 /**
  * The Ideal Candidate Profile editor (Slice 1b). Generates a draft ICP by seeding
@@ -45,6 +52,7 @@ export function IcpEditor({
   // Component 04 — optional intake-call notes to enrich generation with verbatim.
   const [intakeNotes, setIntakeNotes] = useState('')
   const [showIntake, setShowIntake] = useState(false)
+  const [showReasoning, setShowReasoning] = useState(true)
 
   function loadTemplates() {
     fetch('/api/role-templates')
@@ -351,6 +359,55 @@ export function IcpEditor({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* ── Reasoning (Sourcing Brain, Slice 1) — how the JD was dissected ── */}
+        {icp.sourcing_map && (
+          <section className="rounded-xl border border-slate-200 bg-slate-50/60">
+            <button type="button" onClick={() => setShowReasoning((s) => !s)}
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-xs font-semibold text-slate-600">
+              {showReasoning ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              <Brain className="h-3.5 w-3.5 text-indigo-500" /> How this ICP was reasoned
+            </button>
+            {showReasoning && (
+              <div className="space-y-3 px-3 pb-3">
+                {icp.sourcing_map.reasoning && (
+                  <p className="text-xs leading-relaxed text-slate-600">{icp.sourcing_map.reasoning}</p>
+                )}
+
+                {icp.sourcing_map.requirement_decomposition?.length > 0 && (
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Requirement breakdown</div>
+                    <div className="space-y-1">
+                      {icp.sourcing_map.requirement_decomposition.map((r, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs">
+                          <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${BUCKET_CLS[r.bucket] ?? 'bg-slate-100 text-slate-600'}`}>
+                            {BUCKET_LABEL[r.bucket] ?? r.bucket}
+                          </span>
+                          <span className="text-slate-600">{r.requirement}{r.findable_proxy ? <span className="text-slate-400"> — look for: {r.findable_proxy}</span> : null}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {icp.sourcing_map.unwritten_filters?.length > 0 && (
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Unwritten filters (inferred)</div>
+                    <div className="space-y-1.5">
+                      {icp.sourcing_map.unwritten_filters.map((f, i) => (
+                        <div key={i} className="text-xs">
+                          <span className="font-medium text-slate-700">{f.filter}</span>
+                          {typeof f.confidence === 'number' && <span className="text-slate-400"> · {Math.round(f.confidence * 100)}% conf</span>}
+                          {f.exclusion_cost && <div className="text-[11px] text-amber-700">Cost: {f.exclusion_cost}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* ── Must-haves ── */}
         <section className="space-y-2">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
