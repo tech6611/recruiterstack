@@ -1,7 +1,10 @@
 # LinkedIn "Add to Sequence" extension — project status & handoff
 
-**Status: PAUSED (2026-07-21).** Fully built and tested end-to-end. Paused before
-public launch on purpose — see the blocker in "What's left" below.
+**Status: launch blocker RESOLVED; fit-aware upgrade built (2026-08-16), pending
+live test + re-packaging before public launch.** The Clerk production migration
+completed on 2026-07-21, so users can now log in and generate an API key — the one
+thing that had paused this. Since then the extension was upgraded to score profiles
+and personalize outreach (see "Fit-aware upgrade" below).
 
 This file is the single place to understand what exists and what remains if we
 ever pick this back up.
@@ -55,14 +58,35 @@ enrolments. Name auto-fill confirmed after a fix.
 
 ---
 
+## Fit-aware upgrade (Component 08, Slice 8c — 2026-08-16, branch `feat/ext-fit-8c`)
+
+The extension now does what in-app sourcing does, on a profile you're viewing:
+- Reads more of the visible profile (headline, location, About, some experience —
+  still button-first, only what's on screen).
+- Lets you pick one of your **jobs** and **Evaluate fit**: scores the profile against
+  that job's approved ICP with the Fit Engine and shows the Great/Good/Okay bucket,
+  score, why, and any missing must-haves.
+- **Add to sequence** then writes the **first message personalized from that fit**,
+  with an optional "Review first message before it sends" checkbox.
+- With no job picked, it behaves exactly as the original (plain enrol).
+
+New platform endpoints (API-key auth): `GET /api/ext/jobs` (jobs with an approved
+ICP), `POST /api/ext/score` (score a viewed profile). `POST /api/ext/enroll` extended
+to take `job_id` + `fit` + `review`. Backend built + unit-tested + shipped-ready on
+`feat/ext-fit-8c`. **Not yet live-tested against real LinkedIn pages / prod data.**
+
 ## What's left, to let others access it
 
-### 🚧 BLOCKER (why we paused)
-The live site's login (Clerk) is running in **development mode**. Users can't log
-into recruiterstack.in reliably, so they can't reach Settings → API Keys to
-generate the key the extension needs. **This must move to a production Clerk
-instance before rolling the extension out to anyone.** (This is a broader platform
-issue, not extension-specific.)
+### ✅ Former blocker (RESOLVED 2026-07-21)
+The live-site Clerk "development mode" issue is fixed — production Clerk is live, so
+users can log in and generate an API key at Settings → API Keys.
+
+### Before publishing the fit-aware version
+- Live-test the new fit flow on real LinkedIn profiles (DOM selectors for headline/
+  location/About/experience are best-effort and may need tuning).
+- Re-run `bash extension/package.sh` to rebuild the store zip, and refresh
+  `STORE-LISTING.md` to describe the new scoring/personalization capability + its
+  data handling (it now sends profile text to your own server for scoring).
 
 ### Then, to publish (details in `PUBLISH.md`)
 1. Create a Chrome Web Store developer account (one-time US$5).

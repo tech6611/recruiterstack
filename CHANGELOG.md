@@ -12,6 +12,14 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **LinkedIn extension is now fit-aware (Component 08, Slice 8c-3).** The on-profile
+  panel now reads more of the viewed profile (headline, location, About, a little
+  experience — still button-first, only what's on screen), lets you pick one of your
+  jobs and **Evaluate fit** (shows the Great/Good/Okay bucket, score, why, and any
+  missing must-haves), then **Add to sequence** with the first message personalized
+  from that fit — and an optional "Review first message before it sends" checkbox.
+  With no job picked it behaves exactly as before. `background.js` gains `getJobs` /
+  `score` calls; no new permissions (same domain, same page).
 - **Personalized enrollment from the LinkedIn extension (Component 08, Slice 8c-2).**
   `POST /api/ext/enroll` now optionally takes the `job_id` the profile was scored
   against plus the computed `fit` — and enrolls with a **personalized first message**

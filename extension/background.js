@@ -50,6 +50,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         return sendResponse({ ok: true, sequences: r.body?.data || [] })
       }
 
+      if (msg.type === 'getJobs') {
+        const r = await apiFetch('/api/ext/jobs')
+        if (r.notConnected) return sendResponse({ ok: false, notConnected: true, error: r.error })
+        if (!r.ok) return sendResponse({ ok: false, error: r.body?.error || `Request failed (${r.status || '?'})` })
+        return sendResponse({ ok: true, jobs: r.body?.data || [] })
+      }
+
+      if (msg.type === 'score') {
+        const r = await apiFetch('/api/ext/score', { method: 'POST', body: JSON.stringify(msg.payload) })
+        if (r.notConnected) return sendResponse({ ok: false, notConnected: true, error: r.error })
+        if (!r.ok) return sendResponse({ ok: false, error: r.body?.error || `Request failed (${r.status || '?'})` })
+        return sendResponse({ ok: true, data: r.body?.data })
+      }
+
       if (msg.type === 'enroll') {
         const r = await apiFetch('/api/ext/enroll', { method: 'POST', body: JSON.stringify(msg.payload) })
         if (r.notConnected) return sendResponse({ ok: false, notConnected: true, error: r.error })
