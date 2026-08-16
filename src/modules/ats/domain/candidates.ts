@@ -6,6 +6,7 @@ import type {
   Database,
 } from '@/lib/types/database'
 import { findOrCreatePerson } from '@/modules/core/domain/people'
+import { logger } from '@/lib/logger'
 
 type Supabase = SupabaseClient<Database>
 
@@ -88,7 +89,22 @@ export async function createCandidateProfile(
     .single()
 
   if (error) throw error
-  return data as Pick<Candidate, 'id'>
+  const created = data as Pick<Candidate, 'id'>
+
+  // Canonical enrichment trigger (Sourcing Brain, Slice 0): when a résumé is
+  // present, queue a job to extract the structured, dated history. One place →
+  // every ingestion path benefits. Best-effort: a queue hiccup never blocks
+  // candidate creation (the backfill endpoint is the safety net).
+  if (input.resume_url) {
+    try {
+      const { enqueue } = await import('@/lib/api/job-queue')
+      await enqueue({ orgId, jobType: 'enrich_candidate', payload: { candidateId: created.id } })
+    } catch (err) {
+      logger.warn('Failed to enqueue candidate enrichment', { candidateId: created.id, error: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
+  return created
 }
 
 export async function findOrCreateCandidateProfile(
