@@ -24,6 +24,18 @@ entries on top.
   Backfilled all 8 affected candidates; 0 remain null. File: `src/lib/ai/llm.ts`.
 
 ### Added
+- **Source the market — ICP-ranked sourcing over the Candidate Pool (Sourcing Brain
+  + Pool B).** The Source tab now has a **"From the market"** section: it runs the job's
+  approved ICP against the cross-org **Candidate Pool** (semantic recall +
+  `match_pool_profiles` → Fit Engine — the same brain as your own pool), and ranks the
+  matches (bucket, score, why, missing must-haves). **Unlock & add to pipeline**
+  projects a chosen pool profile into a per-org candidate — copying its dated history
+  into `candidate_experiences` — spends an unlock, and drops them into the job's
+  pipeline. Gated on a pool subscription (self-serve 25-unlock trial). New
+  `src/modules/pool/domain/pool-sourcing.ts` + `pool-unlock.ts`;
+  `POST /api/jobs/[id]/source/pool` + `/source/pool/add`; `PoolSourcingSection`. No
+  migration (reuses the pool tables + Slice 0's `candidate_experiences`). This is the
+  consumption layer over the pool the other track is filling.
 - **ICP reasoning — "how this ICP was reasoned" (Sourcing Brain, Slice 1a).** ICP
   generation now also produces a **reasoning layer** a recruiter/HM can read and argue
   with: a plain-English *why-this-ICP* narrative (what the role really is + why the
