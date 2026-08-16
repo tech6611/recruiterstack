@@ -11,6 +11,21 @@ entries on top.
 
 ## 2026-08-16
 
+### Fixed
+- **First-time ICP now derives competencies from the job, not the default rubric.**
+  Previously, a job with no custom weighted rubric seeded the ICP from
+  `DEFAULT_SCORING_CRITERIA` and the LLM only decorated those generic competencies
+  (it was told to keep the exact ids/weights) — so a first ICP looked like the global
+  default. Now, when there's no deliberately-set rubric, the generator DESIGNS the
+  competencies (names, weights summing to 100, behaviours, anchors, gates) from the
+  role itself — JD, key requirements, nice-to-haves, target companies, level. Jobs
+  with a custom rubric still enrich-in-place (weights respected). `buildIcpFromGeneration`
+  / `normalizeWeights` are pure + unit-tested.
+- **LinkedIn extension profile capture hardened.** `readName` now reads the `<main>`
+  h1 first (a stray page-level/hidden h1 could win before); headline/location have
+  extra fallback selectors; the panel now shows a "Read from page →" readout (and
+  logs the captured profile) so a bad scrape is visible at a glance.
+
 ### Added
 - **Intake-call capture for ICP (Component 04).** The ICP generator can now take the
   hiring-manager **intake call notes/transcript** (optional textarea on "Generate

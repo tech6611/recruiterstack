@@ -97,6 +97,15 @@
 
 .rs-ext-opt { color: #94a3b8; font-weight: 500; }
 
+/* Diagnostic readout of what was scraped from the LinkedIn page. */
+.rs-ext-captured {
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #64748b;
+  word-break: break-word;
+}
+
 /* Secondary "Evaluate fit" button — outlined, not filled. */
 .rs-ext-btn-ghost {
   margin-top: 8px;

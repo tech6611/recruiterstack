@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { mergeEnrichment, type IcpEnrichment } from './icp-generator'
+import { mergeEnrichment, normalizeWeights, buildIcpFromGeneration, type IcpEnrichment } from './icp-generator'
 import type { IcpDraftInput } from '@/lib/types/icp'
+import type { HiringRequest } from '@/lib/types/database'
 
 const seed: IcpDraftInput = {
   source: 'seed',
@@ -64,5 +65,49 @@ describe('mergeEnrichment', () => {
     const out = mergeEnrichment(seed, enrichment)
     expect(out.must_haves.map((g) => g.attribute)).toEqual(['location', 'min_experience'])
     expect(out.must_haves[1].id).toMatch(/^g-ai-/)
+  })
+})
+
+describe('normalizeWeights', () => {
+  it('rescales arbitrary weights to sum exactly 100', () => {
+    expect(normalizeWeights([1, 1, 1]).reduce((a, b) => a + b, 0)).toBe(100)
+    expect(normalizeWeights([30, 30, 30]).reduce((a, b) => a + b, 0)).toBe(100)
+    expect(normalizeWeights([50, 25, 25])).toEqual([50, 25, 25])
+  })
+  it('handles empty / zero input without NaN', () => {
+    expect(normalizeWeights([])).toEqual([])
+    expect(normalizeWeights([0, 0]).reduce((a, b) => a + b, 0)).toBe(100)
+  })
+})
+
+describe('buildIcpFromGeneration', () => {
+  const job = { position_title: 'Payments Engineer', level: 'senior', location: 'Bengaluru', remote_ok: false } as unknown as HiringRequest
+
+  it('derives role-specific competencies with slugged ids and weights summing to 100', () => {
+    const out = buildIcpFromGeneration(job, {
+      competencies: [
+        { name: 'Payments domain depth', weight: 40, behaviours: ['designs ledgers'] },
+        { name: 'Systems reliability', weight: 35, behaviours: [] },
+        { name: 'Communication', weight: 25, behaviours: [] },
+      ],
+      must_haves: [{ label: '5+ yrs payments', attribute: 'min_experience', operator: 'gte', value: '5' }],
+    })
+    expect(out.competencies.map((c) => c.id)).toContain('payments-domain-depth')
+    expect(out.competencies.reduce((s, c) => s + c.weight, 0)).toBe(100)
+    // structural seed gates (location/seniority) are preserved, model gate appended
+    expect(out.must_haves.some((g) => g.attribute === 'location')).toBe(true)
+    expect(out.must_haves.some((g) => g.attribute === 'min_experience')).toBe(true)
+  })
+
+  it('makes duplicate competency names unique', () => {
+    const out = buildIcpFromGeneration(job, {
+      competencies: [
+        { name: 'Depth', weight: 50, behaviours: [] },
+        { name: 'Depth', weight: 50, behaviours: [] },
+      ],
+      must_haves: [],
+    })
+    const ids = out.competencies.map((c) => c.id)
+    expect(new Set(ids).size).toBe(2)
   })
 })
