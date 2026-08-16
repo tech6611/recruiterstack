@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { pickCalibrationSet } from '@/lib/ai/calibration'
 import { PoolSourcingSection } from '@/components/req-jobs/PoolSourcingSection'
 import { ShortlistBrief } from '@/components/req-jobs/ShortlistBrief'
+import { LearningPanel } from '@/components/req-jobs/LearningPanel'
 
 const CALIBRATION_SIZE = 15
 const MIN_DECISIONS = 5
@@ -435,6 +436,9 @@ export function SourcingTab({ jobId }: { jobId: string }) {
 
       {/* ── Sourcing Brain — the shortlist brief (Slice 1b) ──────────────────── */}
       <ShortlistBrief jobId={jobId} />
+
+      {/* ── Sourcing Brain — the learning loop (Slice 3) ─────────────────────── */}
+      <LearningPanel jobId={jobId} />
     </Card>
   )
 }
