@@ -19,6 +19,7 @@ import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { ScoringTab } from '@/components/req-jobs/ScoringTab'
 import { IcpEditor } from '@/components/req-jobs/IcpEditor'
 import { SourcingTab } from '@/components/req-jobs/SourcingTab'
+import { JobPostReview } from '@/components/req-jobs/JobPostReview'
 import { ScoringRubricSummary } from '@/components/req-jobs/ScoringRubricSummary'
 import { InterviewPlanTab } from '@/components/req-jobs/InterviewPlanTab'
 import { readScoringCriteria } from '@/lib/scoring'
@@ -736,6 +737,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                         <RichText html={job.description} />
                       </div>
                     )}
+                    {job.description && <JobPostReview jobId={job.id} />}
                     {intake.level && (
                       <div className="mt-5 pt-4 border-t border-slate-100">
                         <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Level</dt>

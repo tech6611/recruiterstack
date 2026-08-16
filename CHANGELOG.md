@@ -12,6 +12,12 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **AI job-post review (Component 13).** A one-click QA pass over a job's post —
+  scores **clarity / inclusivity / engagement / completeness** (1–5), lists concrete
+  issues (severity + the exact quote + a suggested fix), and offers a tightened
+  opening paragraph. Read-only — it suggests, the recruiter edits. Appears under the
+  job description on the job's details view. `src/lib/ai/job-post-review.ts` (pure
+  prompt builder + HTML→text, unit-tested); `POST /api/jobs/[id]/post-review`.
 - **Reusable role templates — "calibrate once, reuse" (Component 02, Recruiting
   Knowledge).** Save any job's ICP (its hard gates + weighted competencies) as a
   named **role template**, then start a new job's ICP from it instead of a cold,
