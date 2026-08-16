@@ -12,6 +12,13 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Copilot can now source & read ICPs (Component 14).** Two new Copilot tools:
+  `source_candidates` (runs ICP-driven sourcing for a job via the Fit Engine and
+  returns ranked matches with bucket/score/why + candidate ids to feed
+  `bulk_add_to_pipeline`) and `get_icp` (reads a job's current gates + weighted
+  competencies so the agent can explain what "good" looks like). Wired into
+  `executeTool` + the capability map (`source_candidates` → recruiting:edit,
+  `get_icp` → recruiting:view). Closes the deferred autonomous-sourcing gap.
 - **AI job-post review (Component 13).** A one-click QA pass over a job's post —
   scores **clarity / inclusivity / engagement / completeness** (1–5), lists concrete
   issues (severity + the exact quote + a suggested fix), and offers a tightened
