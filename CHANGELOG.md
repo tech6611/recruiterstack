@@ -49,6 +49,15 @@ entries on top.
   Backfilled all 8 affected candidates; 0 remain null. File: `src/lib/ai/llm.ts`.
 
 ### Added
+- **The recruiter brief — one ranked shortlist across your pool + the market (Sourcing
+  Brain, Slice 1b).** A **Build shortlist** action on the Source tab assembles the
+  hiring-manager brief: the ICP **reasoning** ("what we're looking for") + a single
+  shortlist **ranked across your own candidates (already scored) and the market (Pool
+  B, scored on demand)** — each with source (your pool / market), bucket, score, the
+  "why", and missing must-haves — plus **Copy for hiring manager** (a clean text
+  export to paste into email/Slack). `src/modules/ats/domain/shortlist-brief.ts`
+  (pure `buildShortlist` merge/rank, unit-tested) + `POST /api/jobs/[id]/brief` +
+  `ShortlistBrief`. No migration.
 - **Source the market — ICP-ranked sourcing over the Candidate Pool (Sourcing Brain
   + Pool B).** The Source tab now has a **"From the market"** section: it runs the job's
   approved ICP against the cross-org **Candidate Pool** (semantic recall +
