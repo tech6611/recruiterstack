@@ -18,10 +18,12 @@ interface Item {
   gate_failures: string[]
   reachable?: boolean
 }
+interface Archetype { name: string; thesis: string; where_from?: string | null; is_non_obvious?: boolean }
 interface Brief {
   role_title: string | null
   reasoning: string | null
   unwritten_filters: { filter: string; exclusion_cost?: string | null }[]
+  archetypes: Archetype[]
   shortlist: Item[]
   counts: { total: number; yours: number; market: number; great: number; good: number; okay: number }
   has_market: boolean
@@ -58,6 +60,11 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
     lines.push(`Shortlist — ${brief.role_title ?? 'this role'}`)
     lines.push('')
     if (brief.reasoning) { lines.push('What we’re looking for:'); lines.push(brief.reasoning); lines.push('') }
+    if (brief.archetypes?.length) {
+      lines.push('Who could fit (the bets we’re making):')
+      brief.archetypes.forEach((a) => lines.push(`- ${a.name}${a.is_non_obvious ? ' (non-obvious)' : ''}: ${a.thesis}`))
+      lines.push('')
+    }
     lines.push(`Top candidates (${brief.counts.total} — ${brief.counts.yours} from our pool, ${brief.counts.market} from the market):`)
     brief.shortlist.forEach((i, n) => {
       const where = [i.title, i.company].filter(Boolean).join(' @ ')
@@ -106,6 +113,19 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
           {brief.reasoning && (
             <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-xs leading-relaxed text-slate-600">
               {brief.reasoning}
+            </div>
+          )}
+
+          {brief.archetypes?.length > 0 && (
+            <div>
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Who could fit (the bets)</div>
+              <div className="flex flex-wrap gap-1.5">
+                {brief.archetypes.map((a, i) => (
+                  <span key={i} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600" title={a.thesis}>
+                    {a.name}{a.is_non_obvious && <span className="text-indigo-500"> ✦</span>}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 

@@ -49,6 +49,14 @@ entries on top.
   Backfilled all 8 affected candidates; 0 remain null. File: `src/lib/ai/llm.ts`.
 
 ### Added
+- **Candidate archetypes — 2–4 distinct "bets" per role (Sourcing Brain, Slice 2).**
+  ICP generation's reasoning pass now also produces **candidate archetypes**: instead
+  of one "ideal," 2–4 distinct hypotheses that could each succeed — each with a thesis,
+  where they come from (career path), the pitch, the friction, and the hire risk —
+  including at least one **non-obvious / adjacent** archetype (the pool the manager
+  hasn't thought of). Shown in the ICP editor's "How this ICP was reasoned" panel and
+  as "the bets" in the recruiter brief (+ its hiring-manager export). Extends
+  `sourcing_map.archetypes` (no migration — it's JSONB); `analyzeRole` prompt + schema.
 - **The recruiter brief — one ranked shortlist across your pool + the market (Sourcing
   Brain, Slice 1b).** A **Build shortlist** action on the Source tab assembles the
   hiring-manager brief: the ICP **reasoning** ("what we're looking for") + a single
