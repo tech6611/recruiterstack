@@ -12,15 +12,17 @@ entries on top.
 ## 2026-08-16
 
 ### Fixed
-- **First-time ICP now derives competencies from the job, not the default rubric.**
-  Previously, a job with no custom weighted rubric seeded the ICP from
-  `DEFAULT_SCORING_CRITERIA` and the LLM only decorated those generic competencies
-  (it was told to keep the exact ids/weights) — so a first ICP looked like the global
-  default. Now, when there's no deliberately-set rubric, the generator DESIGNS the
-  competencies (names, weights summing to 100, behaviours, anchors, gates) from the
-  role itself — JD, key requirements, nice-to-haves, target companies, level. Jobs
-  with a custom rubric still enrich-in-place (weights respected). `buildIcpFromGeneration`
-  / `normalizeWeights` are pure + unit-tested.
+- **First-time ICP now derives competencies from the job, not the default four.**
+  Two-part fix. (1) When a job has no genuinely-curated rubric, the generator now
+  DESIGNS the competencies (role-specific names, weights summing to 100, behaviours,
+  anchors, gates) from the role — JD, key requirements, nice-to-haves, target
+  companies, level — instead of decorating the generic default set. (2) The detection
+  itself was the real bug: a job's `custom_fields.scoring_criteria` is often populated
+  with the **default four** (technical/experience/communication/culture) even when the
+  recruiter never set a rubric, so the first attempt still enriched the defaults.
+  `isDefaultRubric` now treats a rubric whose competencies are the default set — even
+  reweighted — as "not custom", so generation kicks in. Only a genuinely curated
+  rubric (different competencies) still enriches-in-place. All pure + unit-tested.
 - **LinkedIn extension profile capture hardened.** `readName` now reads the `<main>`
   h1 first (a stray page-level/hidden h1 could win before); headline/location have
   extra fallback selectors; the panel now shows a "Read from page →" readout (and

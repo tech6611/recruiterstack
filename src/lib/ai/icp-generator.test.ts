@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { mergeEnrichment, normalizeWeights, buildIcpFromGeneration, type IcpEnrichment } from './icp-generator'
+import { mergeEnrichment, normalizeWeights, buildIcpFromGeneration, isDefaultRubric, type IcpEnrichment } from './icp-generator'
+import { DEFAULT_SCORING_CRITERIA } from '@/lib/scoring'
 import type { IcpDraftInput } from '@/lib/types/icp'
 import type { HiringRequest } from '@/lib/types/database'
 
@@ -109,5 +110,25 @@ describe('buildIcpFromGeneration', () => {
     })
     const ids = out.competencies.map((c) => c.id)
     expect(new Set(ids).size).toBe(2)
+  })
+})
+
+describe('isDefaultRubric', () => {
+  it('treats empty / null as default', () => {
+    expect(isDefaultRubric(null)).toBe(true)
+    expect(isDefaultRubric([])).toBe(true)
+  })
+  it('treats the default four (even reweighted) as default', () => {
+    expect(isDefaultRubric(DEFAULT_SCORING_CRITERIA)).toBe(true)
+    // reweighted defaults (the exact bug case: 45/10/15/30) still = default
+    expect(isDefaultRubric(DEFAULT_SCORING_CRITERIA.map((c, i) => ({ ...c, weight: [45, 10, 15, 30][i] })))).toBe(true)
+  })
+  it('treats a genuinely curated rubric as custom', () => {
+    expect(isDefaultRubric([
+      { id: 'payments-depth', name: 'Payments depth', weight: 50, description: '' },
+      { id: 'reliability', name: 'Reliability', weight: 50, description: '' },
+    ])).toBe(false)
+    // defaults + an extra competency = curated
+    expect(isDefaultRubric([...DEFAULT_SCORING_CRITERIA, { id: 'leadership', name: 'Leadership', weight: 0, description: '' }])).toBe(false)
   })
 })
