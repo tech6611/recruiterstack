@@ -42,6 +42,9 @@ export function IcpEditor({
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
+  // Component 04 — optional intake-call notes to enrich generation with verbatim.
+  const [intakeNotes, setIntakeNotes] = useState('')
+  const [showIntake, setShowIntake] = useState(false)
 
   function loadTemplates() {
     fetch('/api/role-templates')
@@ -127,7 +130,11 @@ export function IcpEditor({
 
   async function generate() {
     setGenerating(true)
-    const res = await fetch(`/api/jobs/${jobId}/icp/generate`, { method: 'POST' })
+    const res = await fetch(`/api/jobs/${jobId}/icp/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(intakeNotes.trim() ? { intake_notes: intakeNotes.trim() } : {}),
+    })
     setGenerating(false)
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
@@ -296,6 +303,26 @@ export function IcpEditor({
             <p className="mt-2 text-xs text-slate-400">
               Seeds from your scoring rubric, location, and level — or reuse a saved role. Nothing is applied until you approve.
             </p>
+            <div className="mt-3">
+              {showIntake ? (
+                <div className="text-left">
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                    Intake call notes (optional)
+                  </label>
+                  <textarea
+                    value={intakeNotes}
+                    onChange={(e) => setIntakeNotes(e.target.value)}
+                    rows={4}
+                    placeholder="Paste the hiring-manager intake call notes/transcript — the AI will pull their exact phrasing and must-haves."
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              ) : (
+                <button type="button" onClick={() => setShowIntake(true)} className="text-xs font-medium text-slate-400 hover:text-slate-600">
+                  + Paste intake call notes for sharper, verbatim competencies
+                </button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

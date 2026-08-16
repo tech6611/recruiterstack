@@ -382,6 +382,18 @@ export const COPILOT_TOOLS: ToolSchema[] = [
     },
   },
   {
+    name: 'get_interview_notes',
+    description:
+      "Query the interview conversation corpus: return the AI summaries + competency-mapped notes (signals, evidence, concerns, follow-ups) from a candidate's interviews. Use it to answer 'what did interviews say about X', build an evidence view across rounds, or compare candidates.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        candidate_id:   { type: 'string', description: 'UUID of the candidate (returns notes across all their interviews)' },
+        application_id: { type: 'string', description: 'UUID of an application (scopes to that pipeline)' },
+      },
+    },
+  },
+  {
     name: 'bulk_score_applications',
     description:
       'Run AI scoring on all active, unscored applications for a job. Returns top candidates and score distribution.',
@@ -1286,6 +1298,7 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   get_interviews: 'recruiting:view', get_sequence: 'recruiting:view',
   list_sequences: 'recruiting:view', list_candidate_sequence_history: 'recruiting:view',
   list_roles: 'recruiting:view', get_icp: 'recruiting:view',
+  get_interview_notes: 'recruiting:view',
   // source_candidates writes the sourcing_matches cache, so it needs edit.
   source_candidates: 'recruiting:edit',
   // Recruiting — write
@@ -1363,6 +1376,7 @@ export async function executeTool(
       case 'search_candidate_pool':     return await searchCandidatePool(input, orgId, supabase)
       case 'source_candidates':         return await sourceCandidatesTool(input, orgId, supabase)
       case 'get_icp':                   return await getIcpTool(input, orgId, supabase)
+      case 'get_interview_notes':       return await getInterviewNotesTool(input, orgId, supabase)
       case 'bulk_add_to_pipeline':      return await bulkAddToPipeline(input, orgId, supabase)
       case 'bulk_score_applications':   return await bulkScoreApplications(input, orgId, supabase)
       case 'send_outreach_email':       return await sendOutreachEmail(input, orgId, supabase)
@@ -1891,6 +1905,44 @@ async function getIcpTool(
     .map((c) => `- ${c.name} (${c.weight}%)`)
     .join('\n') || '- (none)'
   return `ICP for this job — ${icp.status} v${icp.version}.\nMust-haves (hard gates):\n${gates}\nWeighted competencies:\n${comps}`
+}
+
+// Component 12 — query the interview conversation corpus (Notetaker output).
+async function getInterviewNotesTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const candidateId = input.candidate_id ? String(input.candidate_id) : null
+  const applicationId = input.application_id ? String(input.application_id) : null
+  if (!candidateId && !applicationId) return 'Provide a candidate_id or application_id.'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q = (supabase as any)
+    .from('interviews')
+    .select('id, interviewer_name, scheduled_at, ai_summary, ai_notes')
+    .eq('org_id', orgId)
+    .not('ai_notes', 'is', null)
+    .order('scheduled_at', { ascending: true })
+  if (applicationId) q = q.eq('application_id', applicationId)
+  else if (candidateId) q = q.eq('candidate_id', candidateId)
+
+  const { data, error } = await q
+  if (error) return 'Could not read interview notes (the notetaker may not be set up yet).'
+  if (!data || !data.length) return 'No AI interview notes found yet for that candidate/application.'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const blocks = data.map((iv: any, i: number) => {
+    const notes = iv.ai_notes || {}
+    const comp = Array.isArray(notes.competency_notes)
+      ? notes.competency_notes.map((c: { name?: string; signal?: string; evidence?: string }) => `    - ${c.name}: ${c.signal} — ${c.evidence}`).join('\n')
+      : ''
+    const concerns = Array.isArray(notes.concerns) && notes.concerns.length ? `\n  Concerns: ${notes.concerns.join('; ')}` : ''
+    const follow = Array.isArray(notes.follow_ups) && notes.follow_ups.length ? `\n  Follow-ups: ${notes.follow_ups.join('; ')}` : ''
+    return `Interview ${i + 1} (${iv.interviewer_name || 'interviewer'}):\n  ${iv.ai_summary || '(no summary)'}${comp ? '\n' + comp : ''}${concerns}${follow}`
+  })
+  return `Found ${data.length} interview note set(s):\n\n${blocks.join('\n\n')}`
 }
 
 async function searchCandidatePool(

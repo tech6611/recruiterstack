@@ -12,6 +12,15 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Intake-call capture for ICP (Component 04).** The ICP generator can now take the
+  hiring-manager **intake call notes/transcript** (optional textarea on "Generate
+  ICP") and lift their verbatim phrasing + hard must-haves straight from the
+  conversation — closing the "form-only intake, no verbatim" gap. Additive to
+  `generateIcp` / the generate route; no migration.
+- **Conversation analytics via Copilot (Component 12).** New `get_interview_notes`
+  Copilot tool queries the interview corpus (AI summaries + competency-mapped notes,
+  concerns, follow-ups) for a candidate or application — so you can ask "what did the
+  interviews say about X" or build an evidence view across rounds.
 - **Interview Notetaker + scorecard auto-fill (Components 10 & 11).** Bring-your-own
   transcript: on any interview (candidate → Interviews), paste the transcript and
   **Generate notes** → a TLDR summary + notes mapped to the ICP competencies

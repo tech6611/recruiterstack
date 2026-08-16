@@ -10,7 +10,7 @@ import { createIcpDraft } from '@/modules/ats/domain/icp'
  *  recruiter reviews, edits, and approves the draft. */
 export const POST = withCapability(
   'recruiting:edit',
-  async (_req, orgId, supabase, { params }, _scope, userId) => {
+  async (req, orgId, supabase, { params }, _scope, userId) => {
     let context
     try {
       context = await getCanonicalJobScoringContext(supabase, orgId, params.id)
@@ -19,8 +19,17 @@ export const POST = withCapability(
     }
     if (!context) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
+    // Optional intake-call notes/transcript (Component 04) to enrich with verbatim.
+    let intakeNotes: string | null = null
     try {
-      const draft = await generateIcp(context.job, { orgId, userId })
+      const body = await req.json()
+      if (body && typeof body.intake_notes === 'string') intakeNotes = body.intake_notes.slice(0, 12000)
+    } catch {
+      /* no body — fine */
+    }
+
+    try {
+      const draft = await generateIcp(context.job, { orgId, userId }, intakeNotes)
       const icp = await createIcpDraft(supabase, orgId, params.id, draft, { createdBy: userId })
       return NextResponse.json({ data: icp }, { status: 201 })
     } catch (e) {
