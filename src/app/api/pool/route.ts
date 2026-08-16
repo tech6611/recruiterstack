@@ -21,6 +21,7 @@ export const GET = withCapability('recruiting:view', async (req, orgId, supabase
       reachableOnly: searchParams.get('reachable') === '1',
       minExperienceMonths: Number(searchParams.get('minExp')) || undefined,
       minTenureMonths: Number(searchParams.get('minTenure')) || undefined,
+      maxEvidenceAgeMonths: Number(searchParams.get('maxEvidenceAge')) || undefined,
       limit: Number(searchParams.get('limit')) || 25,
       offset: Number(searchParams.get('offset')) || 0,
     }),

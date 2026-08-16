@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Search, MapPin, Briefcase, Clock, Mail, Linkedin, Sparkles,
-  Loader2, X, Database, Filter, CheckCircle2,
+  Loader2, X, Database, Filter, CheckCircle2, CalendarClock, AlertTriangle,
 } from 'lucide-react'
 
 type Summary = {
@@ -25,11 +25,24 @@ type Summary = {
   num_roles: number | null
   total_experience_months: number | null
   current_tenure_months: number | null
+  tenure_verified_months: number | null
+  evidence_as_of: string | null
+  evidence_source: string | null
+  employer_disputed: boolean
+  evidence_age_months?: number | null
+  freshness?: 'fresh' | 'aging' | 'stale' | 'unknown'
   has_email: boolean
   has_linkedin: boolean
   reachable: boolean
   sources: string[]
   unlocked?: boolean
+}
+
+const FRESHNESS: Record<string, { label: string; cls: string }> = {
+  fresh:   { label: 'Verified <1 yr', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  aging:   { label: '1–3 yrs old',    cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  stale:   { label: '3+ yrs old',     cls: 'bg-red-50 text-red-700 ring-red-200' },
+  unknown: { label: 'Undated',        cls: 'bg-gray-100 text-gray-600 ring-gray-200' },
 }
 type Experience = {
   id: string; title: string | null; employer: string | null; location: string | null
@@ -51,6 +64,19 @@ const months = (m: number | null | undefined) =>
 const fmt = (d: string | null) =>
   !d ? '' : new Date(d).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 
+function FreshnessPill({ r }: { r: Summary }) {
+  const f = FRESHNESS[r.freshness ?? 'unknown']
+  return (
+    <span
+      title={r.evidence_as_of ? `Newest evidence: ${fmt(r.evidence_as_of)} (${r.evidence_source})` : 'No dated evidence'}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${f.cls}`}
+    >
+      <CalendarClock className="h-3 w-3" />
+      {r.evidence_as_of ? fmt(r.evidence_as_of) : f.label}
+    </span>
+  )
+}
+
 export default function PoolPage() {
   const [access, setAccess]   = useState<Access | null>(null)
   const [rows, setRows]       = useState<Summary[]>([])
@@ -65,6 +91,7 @@ export default function PoolPage() {
   const [minExp, setMinExp]       = useState(0)
   const [minTenure, setMinTenure] = useState(0)
   const [reachable, setReachable] = useState(false)
+  const [maxAge, setMaxAge]       = useState(0)   // months; 0 = any
 
   const [selected, setSelected] = useState<Detail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -78,11 +105,12 @@ export default function PoolPage() {
     if (minExp) p.set('minExp', String(minExp * 12))
     if (minTenure) p.set('minTenure', String(minTenure * 12))
     if (reachable) p.set('reachable', '1')
+    if (maxAge) p.set('maxEvidenceAge', String(maxAge))
     const res = await fetch(`/api/pool?${p}`)
     const j = await res.json()
     setAccess(j.access); setRows(j.rows ?? []); setTotal(j.total ?? 0); setFacets(j.facets)
     setLoading(false)
-  }, [q, city, skill, minExp, minTenure, reachable])
+  }, [q, city, skill, minExp, minTenure, reachable, maxAge])
 
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [load])
 
@@ -180,10 +208,20 @@ export default function PoolPage() {
               className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
             Contactable only
           </label>
+          <select value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value={0}>Evidence: any age</option>
+            <option value={12}>Verified within 1 yr</option>
+            <option value={24}>Within 2 yrs</option>
+            <option value={36}>Within 3 yrs</option>
+          </select>
         </div>
         <p className="mt-2 text-xs text-gray-400">
-          &ldquo;In role ≥ 3 yrs&rdquo; is the movability signal — someone three years in a seat is
-          far more likely to move than someone three months in.
+          &ldquo;In role&rdquo; is <strong>last known</strong> tenure — role start to today. A
+          <span className="text-amber-600"> *</span> means no source has confirmed it recently:
+          a résumé is written while its author is job-hunting, so it can only ever prove
+          where someone was, never where they still are. Use <strong>Evidence</strong> to
+          demand freshness.
         </p>
       </div>
 
@@ -213,6 +251,13 @@ export default function PoolPage() {
                         <CheckCircle2 className="h-3 w-3" /> In your ATS
                       </span>
                     )}
+                    <FreshnessPill r={r} />
+                    {r.employer_disputed && (
+                      <span title="Sources disagree on the current employer — one is out of date"
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+                        <AlertTriangle className="h-3 w-3" /> Employer disputed
+                      </span>
+                    )}
                   </div>
                   <div className="mt-0.5 text-sm text-gray-600">
                     {r.current_title || '—'}{r.current_company ? ` · ${r.current_company}` : ''}
@@ -229,7 +274,13 @@ export default function PoolPage() {
                 <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs text-gray-500">
                   <div className="flex items-center gap-3 tabular-nums">
                     <span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" />{months(r.total_experience_months)}</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{months(r.current_tenure_months)} in role</span>
+                    <span
+                      className="flex items-center gap-1"
+                      title={`Last known: ${months(r.current_tenure_months)} since the role started. Only ${months(r.tenure_verified_months)} of that is confirmed by a source — nothing observes the present.`}
+                    >
+                      <Clock className="h-3.5 w-3.5" />{months(r.current_tenure_months)} in role
+                      {r.freshness !== 'fresh' && <span className="text-amber-600">*</span>}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     {r.location_city && (
@@ -268,10 +319,10 @@ export default function PoolPage() {
                   </button>
                 </div>
 
-                <div className="mb-5 grid grid-cols-4 gap-3 rounded-lg bg-gray-50 p-3 text-center">
+                <div className="mb-3 grid grid-cols-4 gap-3 rounded-lg bg-gray-50 p-3 text-center">
                   {[
                     ['Experience', months(selected.total_experience_months)],
-                    ['In role', months(selected.current_tenure_months)],
+                    ['In role (last known)', months(selected.current_tenure_months)],
                     ['Roles', String(selected.num_roles ?? '—')],
                     ['Location', selected.location_city ?? '—'],
                   ].map(([l, v]) => (
@@ -280,6 +331,32 @@ export default function PoolPage() {
                       <div className="text-xs text-gray-500">{l}</div>
                     </div>
                   ))}
+                </div>
+
+                {/* Freshness — the honest "as of", and what we do NOT know */}
+                <div className="mb-5 rounded-lg border border-gray-200 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FreshnessPill r={selected} />
+                    <span className="text-xs text-gray-500">
+                      newest evidence{selected.evidence_source ? ` from ${selected.evidence_source}` : ''}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Of the {months(selected.current_tenure_months)} shown in role, only{' '}
+                    <strong>{months(selected.tenure_verified_months)}</strong> is confirmed by a
+                    source{selected.evidence_as_of ? ` (as of ${fmt(selected.evidence_as_of)})` : ''}.
+                    {selected.evidence_age_months != null && selected.evidence_age_months > 12 && (
+                      <> Nothing confirms where this person works since then — treat the employer
+                      above as a last-known value, not a current fact.</>
+                    )}
+                  </p>
+                  {selected.employer_disputed && (
+                    <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      Two sources name different employers — see the provenance table below.
+                      One of them is out of date.
+                    </p>
+                  )}
                 </div>
 
                 {/* Contacts — gated on unlock */}

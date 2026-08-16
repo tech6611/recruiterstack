@@ -12,6 +12,31 @@ entries on top.
 ## 2026-08-16
 
 ### Fixed
+- **Pool tenure was inflating itself, and the movability filter ranked the stalest
+  records highest (migration 117).** `current_tenure_months` runs role-start → *now*,
+  but the evidence stops whenever the source was written. A résumé last edited in 2018
+  saying "current role since 2015" therefore read as "11 years in seat" in 2026. Because
+  a record nobody refreshes keeps accruing imaginary tenure, "in role ≥ 3 yrs" — the
+  pool's main sourcing signal — preferentially surfaced the *worst* data: 52 of 108
+  profiles claimed 3+ years while their newest evidence was 2+ years old.
+  New `evidence_as_of` / `evidence_source` / `tenure_verified_months` /
+  `employer_disputed` columns separate *when the role started* (a fact) from *how long a
+  source actually attests to it*. Freshness is derived at read time, never stored — a
+  staleness number written today is wrong tomorrow. Résumé document dates come from PDF
+  `/ModDate` metadata, because the latest date *printed* on a résumé is usually the
+  current role's start and would make verified tenure zero by construction. UI now shows
+  a freshness pill with the real evidence date, an "Employer disputed" badge (38 of 108 —
+  GitHub and the résumé name different employers), an evidence-age filter, and both
+  tenure figures side by side.
+  **The finding worth keeping:** median *verified* tenure is 6 months and only 2 of 108
+  clear three years — a résumé is written while its author is job-hunting, so its date
+  sits at the start of the role they are now in. No first-party source observes the
+  present. Continuous observation is the one capability this pool structurally cannot
+  build, and precisely what a data vendor sells.
+- **`pool` module no longer imports `ats`.** `unlockPoolProfile` took
+  `findOrCreateCandidateProfile` directly, breaking the boundary rule; the projection is
+  now injected by the API route (the composition layer, which may import both). Logic
+  unchanged. `npm run check:boundaries` passes again.
 - **Embeddings were silently broken in production — semantic sourcing never worked.**
   `EMBEDDING_MODEL` was `text-embedding-004`, which Google has since retired; the
   endpoint now returns 404, so every `embedText`/`embedTexts` call failed and
