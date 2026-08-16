@@ -56,12 +56,23 @@ function getClient(): GoogleGenAI {
 }
 
 // ── Embeddings (semantic recall, Component 05 Slice 5c) ──────────────────────
-export const EMBEDDING_MODEL = 'text-embedding-004'
+// `text-embedding-004` was retired and now 404s, which silently broke every
+// embedding write (candidates.embedding stayed null → sourcing fell back to
+// keyword overlap). `gemini-embedding-001` is the live model. It returns 3072
+// dims by default, so we ask for 768 via outputDimensionality to keep the
+// existing vector(768) columns + match_candidates() working with no migration.
+// Truncated vectors are not unit-length, which is fine: every index here uses
+// cosine (`vector_cosine_ops` / `<=>`), and cosine is scale-invariant.
+export const EMBEDDING_MODEL = 'gemini-embedding-001'
 export const EMBEDDING_DIM = 768
 
 /** Embed a single text with Gemini's embedding model → a 768-dim vector. */
 export async function embedText(text: string): Promise<number[]> {
-  const res = await getClient().models.embedContent({ model: EMBEDDING_MODEL, contents: text })
+  const res = await getClient().models.embedContent({
+    model: EMBEDDING_MODEL,
+    contents: text,
+    config: { outputDimensionality: EMBEDDING_DIM },
+  })
   const values = res.embeddings?.[0]?.values
   if (!values || values.length === 0) throw new Error('Embedding returned no values')
   return values
@@ -70,7 +81,11 @@ export async function embedText(text: string): Promise<number[]> {
 /** Embed many texts in one call → one vector each, in order. */
 export async function embedTexts(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return []
-  const res = await getClient().models.embedContent({ model: EMBEDDING_MODEL, contents: texts })
+  const res = await getClient().models.embedContent({
+    model: EMBEDDING_MODEL,
+    contents: texts,
+    config: { outputDimensionality: EMBEDDING_DIM },
+  })
   return (res.embeddings ?? []).map((e) => e.values ?? [])
 }
 
