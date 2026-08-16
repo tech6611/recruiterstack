@@ -12,6 +12,15 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **AI Screening — async, ICP-scored (Component 07).** From a candidate's AI
+  Assessment, **Start screen** generates ~5 ICP-targeted questions and a private link
+  (`/screen/[token]`, no login). The candidate answers async; the AI scores the
+  answers against the job's ICP competencies (reusing the Fit Engine's deterministic
+  combine) and the result — bucket, score, per-competency evidence, summary — shows
+  back on the candidate. Recruiter shares the link (not auto-sent). New
+  `screening_sessions` table (migration 112), `src/lib/ai/screening.ts` (pure prompt
+  builders, tested), `POST/GET /api/applications/[id]/screen`, public
+  `GET/POST /api/screen/[token]`, `AiScreenPanel`.
 - **Copilot can now source & read ICPs (Component 14).** Two new Copilot tools:
   `source_candidates` (runs ICP-driven sourcing for a job via the Fit Engine and
   returns ranked matches with bucket/score/why + candidate ids to feed
