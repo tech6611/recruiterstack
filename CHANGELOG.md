@@ -11,6 +11,23 @@ entries on top.
 
 ## 2026-08-16
 
+### Added
+- **Candidate Enrichment — structured, dated career history (Sourcing Brain, Slice 0).**
+  Every incoming résumé is now broken into canonical structured fields — most
+  importantly a **dated work history** (per-role title/employer/start–end), which
+  nothing captured before (parsers flattened it to one current title + a single
+  years-of-experience number). This is the substrate the reasoning brain needs for
+  the movability/trajectory read, and the source-agnostic shape bought vendor data
+  will conform to later. New `candidate_experiences` table + `education`/`enriched_at`
+  on candidates (migration 114); `src/lib/ai/candidate-enrichment.ts` (pure date
+  normalization + movability math + prompt, unit-tested) extracts via the existing
+  PDF reader; runs automatically after any candidate with a résumé is created (queued
+  `enrich_candidate` job, from the one canonical creation path → every ingestion flow
+  benefits), refreshes the semantic embedding in the same pass, and backfills via
+  `POST /api/candidates/enrich-backfill`. A **Career history** panel on the candidate
+  (dated timeline + tenure/total-experience signals + education); `GET/POST
+  /api/candidates/[id]/enrich`.
+
 ### Fixed
 - **First-time ICP now derives competencies from the job, not the default four.**
   Two-part fix. (1) When a job has no genuinely-curated rubric, the generator now

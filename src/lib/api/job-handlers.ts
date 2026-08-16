@@ -52,6 +52,18 @@ registerHandler('autopilot', async (job: QueuedJob) => {
   })
 })
 
+// ── Candidate enrichment ──────────────────────────────────────────────────────
+// Break a new candidate's résumé into structured, dated history (Sourcing Brain,
+// Slice 0). Runs for any candidate created with a résumé, from any ingestion path.
+
+registerHandler('enrich_candidate', async (job: QueuedJob) => {
+  const { candidateId } = job.payload as { candidateId: string }
+  if (!candidateId) throw new Error('Missing candidateId in payload')
+  const { enrichCandidateById } = await import('@/modules/ats/domain/candidate-enrichment')
+  const result = await enrichCandidateById(createAdminClient(), job.org_id, candidateId, { orgId: job.org_id })
+  logger.info('Candidate enrichment job done', { jobId: job.id, candidateId, status: result.status })
+})
+
 // ── AI Summary ────────────────────────────────────────────────────────────────
 
 registerHandler('ai_summary', async (job: QueuedJob) => {

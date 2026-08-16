@@ -16,6 +16,7 @@ import { logger } from '@/lib/logger'
 
 export type JobType =
   | 'autopilot'
+  | 'enrich_candidate'
   | 'ai_summary'
   | 'matching'
   | 'slack_notify'

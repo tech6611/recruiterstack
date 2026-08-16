@@ -7,6 +7,7 @@ import { ScoreRing } from '@/components/ui/ScoreRing'
 import { Panel } from '@/components/ui/card'
 import { useCandidateProfile } from '../CandidateProfileContext'
 import { AiScreenPanel } from './AiScreenPanel'
+import { CandidateHistoryPanel } from './CandidateHistoryPanel'
 import { resumeStoragePath, resumeExt, OFFICE_EXTENSIONS } from '@/lib/storage/resume'
 
 // PDFs and plain text render natively in a browser <iframe>. Word/ODF docs can't,
@@ -363,6 +364,9 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
 
       {/* ── AI Screen (Component 07) — async screening interview ─────────────── */}
       {primaryApp && <AiScreenPanel applicationId={primaryApp.id} />}
+
+      {/* ── Career history (Sourcing Brain, Slice 0) — structured dated history ── */}
+      <CandidateHistoryPanel candidateId={candidate.id} />
 
       {/* ── Application Answers — the candidate's form responses (item 1) ────── */}
       {answers.length > 0 && (
