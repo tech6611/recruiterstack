@@ -42,6 +42,20 @@ const sourcingMapSchema = z.object({
       }),
     )
     .max(12),
+  archetypes: z
+    .array(
+      z.object({
+        name: z.string(),
+        thesis: z.string(),
+        where_from: z.string().nullish(),
+        why_interested: z.string().nullish(),
+        why_no: z.string().nullish(),
+        is_non_obvious: z.boolean().default(false),
+        hire_risk: z.string().nullish(),
+      }),
+    )
+    .max(4)
+    .default([]),
 })
 
 export function buildRoleAnalysisPrompt(
@@ -100,11 +114,14 @@ Produce three things:
 
 3. unwritten_filters: the filters that will actually drive hiring-manager rejection but appear NOWHERE in the JD (e.g. product-vs-services background, scale/complexity, environment/stage fit). Mark each with what it was inferred_from, a confidence 0–1, and its exclusion_cost — which good candidates it would wrongly exclude.
 
+4. archetypes: 2–4 DISTINCT candidate archetypes ("bets") that could each succeed in this role — NOT one ideal. A real sourcer holds several hypotheses at once because they have different backgrounds, pitches and close rates. Each: a short name, a one-line thesis, where_from (the career path / employer patterns that produce this person), why_interested (the pitch), why_no (the friction), and hire_risk (what this type typically gets wrong). Include at least ONE non-obvious/adjacent archetype (adjacent industry or function, over-qualified downshifting, under-titled-at-a-great-company) with is_non_obvious=true.
+
 Respond with ONLY valid JSON (no markdown):
 {
   "reasoning": "...",
   "requirement_decomposition": [ { "requirement": "", "bucket": "hard_filter", "findable_proxy": "", "notes": "" } ],
-  "unwritten_filters": [ { "filter": "", "type": "", "inferred_from": "", "confidence": 0.7, "exclusion_cost": "", "recommend_apply": true } ]
+  "unwritten_filters": [ { "filter": "", "type": "", "inferred_from": "", "confidence": 0.7, "exclusion_cost": "", "recommend_apply": true } ],
+  "archetypes": [ { "name": "", "thesis": "", "where_from": "", "why_interested": "", "why_no": "", "is_non_obvious": false, "hire_risk": "" } ]
 }`
 }
 

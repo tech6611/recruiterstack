@@ -67,6 +67,16 @@ export interface SourcingMap {
     exclusion_cost?: string | null
     recommend_apply?: boolean
   }[]
+  /** 2–4 distinct candidate archetypes ("bets"), incl. a non-obvious one (Slice 2). */
+  archetypes?: {
+    name: string
+    thesis: string
+    where_from?: string | null      // career path / employer patterns
+    why_interested?: string | null
+    why_no?: string | null
+    is_non_obvious?: boolean
+    hire_risk?: string | null
+  }[]
   generated_at?: string
 }
 

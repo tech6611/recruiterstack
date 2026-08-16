@@ -32,6 +32,10 @@ describe('buildRoleAnalysisPrompt', () => {
     // asks for the unwritten filters
     expect(p).toContain('unwritten_filters')
     expect(p).toContain('exclusion_cost')
+    // asks for 2–4 distinct archetypes incl. a non-obvious one
+    expect(p).toContain('archetypes')
+    expect(p.toLowerCase()).toContain('non-obvious')
+    expect(p).toContain('is_non_obvious')
   })
 
   it('degrades gracefully with sparse inputs', () => {

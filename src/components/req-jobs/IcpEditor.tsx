@@ -403,6 +403,29 @@ export function IcpEditor({
                     </div>
                   </div>
                 )}
+
+                {(icp.sourcing_map.archetypes?.length ?? 0) > 0 && (
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Candidate archetypes (the bets)</div>
+                    <div className="space-y-2">
+                      {icp.sourcing_map.archetypes!.map((a, i) => (
+                        <div key={i} className="rounded-lg border border-slate-200 bg-white p-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-slate-700">{a.name}</span>
+                            {a.is_non_obvious && <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-600">non-obvious</span>}
+                          </div>
+                          {a.thesis && <p className="mt-0.5 text-[11px] text-slate-600">{a.thesis}</p>}
+                          {a.where_from && <p className="mt-1 text-[11px] text-slate-500"><span className="text-slate-400">Where from:</span> {a.where_from}</p>}
+                          <div className="mt-1 grid grid-cols-1 gap-0.5 sm:grid-cols-2">
+                            {a.why_interested && <p className="text-[11px] text-emerald-700">+ {a.why_interested}</p>}
+                            {a.why_no && <p className="text-[11px] text-amber-700">− {a.why_no}</p>}
+                          </div>
+                          {a.hire_risk && <p className="mt-0.5 text-[11px] text-slate-400">Risk: {a.hire_risk}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </section>

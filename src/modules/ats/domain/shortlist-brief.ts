@@ -84,6 +84,7 @@ export interface Brief {
   reasoning: string | null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   unwritten_filters: any[]
+  archetypes: NonNullable<Icp['sourcing_map']>['archetypes']
   shortlist: BriefItem[]
   counts: ReturnType<typeof shortlistCounts>
   has_market: boolean
@@ -117,6 +118,7 @@ export async function assembleBrief(
       role_title: roleTitle,
       reasoning: sm?.reasoning ?? null,
       unwritten_filters: sm?.unwritten_filters ?? [],
+      archetypes: sm?.archetypes ?? [],
       shortlist,
       counts: shortlistCounts(shortlist),
       has_market: poolBResult.status === 'ok' && poolB.length > 0,
