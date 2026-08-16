@@ -17,8 +17,23 @@ import { withRetry } from '@/lib/ai/retry'
 import { trackUsage, type UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
 import { deriveIcpSeed } from '@/lib/ai/icp-seed'
-import type { HiringRequest } from '@/lib/types/database'
+import { DEFAULT_SCORING_CRITERIA } from '@/lib/scoring'
+import type { HiringRequest, ScoringCriterion } from '@/lib/types/database'
 import type { IcpDraftInput, IcpMustHave } from '@/lib/types/icp'
+
+const DEFAULT_RUBRIC_IDS = DEFAULT_SCORING_CRITERIA.map((c) => c.id).sort().join(',')
+
+/**
+ * True when a job has no MEANINGFUL custom rubric — i.e. it's empty, or it's just
+ * the default competency set (technical/experience/communication/culture), even if
+ * the weights were nudged. In that case the first ICP should be DESIGNED from the
+ * role, not locked to the generic four. PURE + tested.
+ */
+export function isDefaultRubric(criteria: ScoringCriterion[] | null | undefined): boolean {
+  if (!criteria || criteria.length === 0) return true
+  const ids = criteria.map((c) => c.id).sort().join(',')
+  return ids === DEFAULT_RUBRIC_IDS
+}
 
 const MODEL = 'gemini-2.5-pro'
 const MAX_BEHAVIOURS = 6
@@ -287,10 +302,11 @@ export async function generateIcp(
 ): Promise<IcpDraftInput> {
   const seed = deriveIcpSeed(job)
 
-  // Only ENRICH an existing rubric when the recruiter deliberately set one (so we
-  // never silently rewrite their weights). Otherwise the seed is just the generic
-  // DEFAULT rubric — in that case DERIVE the competencies from the role itself.
-  const hasCustomRubric = !!(job.scoring_criteria && job.scoring_criteria.length > 0)
+  // Only ENRICH an existing rubric when the recruiter deliberately CURATED one (its
+  // competencies differ from the default four). A rubric that is just the default
+  // set — even reweighted — is treated as "no custom rubric", so the first ICP is
+  // DESIGNED from the role itself instead of being locked to the generic four.
+  const hasCustomRubric = !isDefaultRubric(job.scoring_criteria)
 
   try {
     if (hasCustomRubric) {
