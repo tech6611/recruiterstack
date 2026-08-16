@@ -573,6 +573,10 @@ export function IcpEditor({
 
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-6 py-3">
         <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={generate} loading={generating}
+            title="Rebuild the ICP from this role from scratch (creates a new draft)">
+            <Sparkles className="h-3.5 w-3.5" /> Regenerate
+          </Button>
           {isApproved && (
             <Button size="sm" variant="outline" onClick={refineFromFeedback} loading={refining}
               title="Propose an updated ICP from recruiter Yes/No decisions on scored candidates">
