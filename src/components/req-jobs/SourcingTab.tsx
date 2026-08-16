@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { pickCalibrationSet } from '@/lib/ai/calibration'
+import { PoolSourcingSection } from '@/components/req-jobs/PoolSourcingSection'
 
 const CALIBRATION_SIZE = 15
 const MIN_DECISIONS = 5
@@ -427,6 +428,9 @@ export function SourcingTab({ jobId }: { jobId: string }) {
           </div>
         </div>
       )}
+
+      {/* ── Sourcing Brain — the market (Pool B) ─────────────────────────────── */}
+      <PoolSourcingSection jobId={jobId} />
     </Card>
   )
 }
