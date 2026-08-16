@@ -117,7 +117,7 @@ export function combineFit(
   return { score, fit_bucket, recommendation, passed_gates }
 }
 
-function buildJudgePrompt(candidate: Candidate, icp: Icp): string {
+function buildJudgePrompt(candidate: Candidate, icp: Icp, profileText?: string | null): string {
   const comps = icp.competencies
     .map((c) => {
       const behaviours = c.behaviours?.length
@@ -143,7 +143,11 @@ function buildJudgePrompt(candidate: Candidate, icp: Icp): string {
 - Skills: ${candidate.skills?.length ? candidate.skills.join(', ') : 'Not listed'}
 - Location: ${candidate.location ?? 'Not provided'}
 </candidate>
-
+${profileText && profileText.trim() ? `
+<profile_details>
+${profileText.trim()}
+</profile_details>
+` : ''}
 <must_haves>
 ${gates}
 </must_haves>
@@ -171,11 +175,14 @@ export async function scoreAgainstIcp(
   candidate: Candidate,
   icp: Icp,
   identity: UsageIdentity = {},
+  // Optional free-text profile (e.g. a LinkedIn About + experience narrative) the
+  // structured fields don't capture. Purely additive — existing callers pass nothing.
+  profileText?: string | null,
 ): Promise<FitResult> {
   const gate_failures = evaluateGates(candidate, icp.must_haves ?? [])
 
   const { text, usage, model } = await withRetry(
-    () => generateText(buildJudgePrompt(candidate, icp), { model: MODEL, maxTokens: 4096, json: true }),
+    () => generateText(buildJudgePrompt(candidate, icp, profileText), { model: MODEL, maxTokens: 4096, json: true }),
     { label: 'Fit Engine' },
   )
   trackUsage('fit-engine', model, usage, identity)

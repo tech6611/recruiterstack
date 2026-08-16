@@ -12,6 +12,16 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Fit scoring for the LinkedIn extension — backend (Component 08, Slice 8c-1).**
+  Groundwork to make the "add from LinkedIn" extension as smart as in-app sourcing:
+  `POST /api/ext/score` scores a viewed LinkedIn profile against a chosen job's
+  **approved ICP** with the Fit Engine (read-only, scores nothing to the DB), and
+  `GET /api/ext/jobs` lists the jobs that have an approved ICP (for a picker). The
+  Fit Engine's judge now accepts an optional free-text profile blurb (the About +
+  experience narrative the structured fields miss) — additive, existing callers
+  unchanged. Pure `buildFitCandidate` / `buildProfileText` normalizers in
+  `src/lib/ai/ext-profile.ts` (unit-tested). Both routes are API-key authenticated.
+  (Personalized enrollment + the extension UI are the next slices, 8c-2 / 8c-3.)
 - **Review-before-send for sourced outreach (Component 08, Slice 8b-2).** When
   enrolling matches from the Source tab you can now tick **"Review before sending"** —
   each enrollment is *held* (no send scheduled) and its personalized first message
