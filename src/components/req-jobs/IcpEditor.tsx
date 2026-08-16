@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,20 @@ export function IcpEditor({
   const [saving, setSaving] = useState(false)
   const [approving, setApproving] = useState(false)
   const [refining, setRefining] = useState(false)
+  // Component 02 — reusable role templates.
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [applyingTemplate, setApplyingTemplate] = useState(false)
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [savingTemplate, setSavingTemplate] = useState(false)
+
+  function loadTemplates() {
+    fetch('/api/role-templates')
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((j) => setTemplates((j.data ?? []).map((t: { id: string; name: string }) => ({ id: t.id, name: t.name }))))
+      .catch(() => {})
+  }
 
   const total = comps.reduce((s, c) => s + (c.weight || 0), 0)
   const canApprove = comps.some((c) => c.name.trim()) && total === 100
@@ -63,6 +77,53 @@ export function IcpEditor({
       active = false
     }
   }, [jobId])
+
+  useEffect(() => { loadTemplates() }, [])
+
+  // Seed a draft ICP from a saved role template (Component 02).
+  async function applyTemplate() {
+    if (!selectedTemplate) return
+    setApplyingTemplate(true)
+    const res = await fetch(`/api/jobs/${jobId}/icp/from-template`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template_id: selectedTemplate }),
+    })
+    setApplyingTemplate(false)
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast.error(j.error ?? 'Could not start from that template')
+      return
+    }
+    const { data } = await res.json()
+    hydrate(data as Icp)
+    toast.success('Draft ICP started from your saved role — review and approve.')
+  }
+
+  // Save the current ICP as a reusable role template.
+  async function saveAsTemplate() {
+    const name = templateName.trim()
+    if (!name) {
+      toast.error('Give the template a name')
+      return
+    }
+    setSavingTemplate(true)
+    const res = await fetch('/api/role-templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: jobId, name }),
+    })
+    setSavingTemplate(false)
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast.error(j.error ?? 'Could not save the template')
+      return
+    }
+    setShowSaveTemplate(false)
+    setTemplateName('')
+    loadTemplates()
+    toast.success(`Saved "${name}" as a reusable role template.`)
+  }
 
   async function generate() {
     setGenerating(true)
@@ -208,13 +269,32 @@ export function IcpEditor({
         <CardContent>
           <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
             <p className="text-sm text-slate-500">No ICP yet for this role.</p>
-            <div className="mt-3 flex justify-center">
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               <Button size="sm" onClick={generate} loading={generating}>
                 <Sparkles className="h-3.5 w-3.5" /> Generate ICP
               </Button>
+              {templates.length > 0 && (
+                <>
+                  <span className="text-xs text-slate-300">or</span>
+                  <select
+                    value={selectedTemplate}
+                    onChange={(e) => setSelectedTemplate(e.target.value)}
+                    className="h-8 rounded border border-slate-200 bg-white px-2 text-xs text-slate-600"
+                    title="Start from a saved role calibration"
+                  >
+                    <option value="">Start from a saved role…</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                  <Button size="sm" variant="outline" onClick={applyTemplate} loading={applyingTemplate} disabled={!selectedTemplate}>
+                    <Library className="h-3.5 w-3.5" /> Use
+                  </Button>
+                </>
+              )}
             </div>
             <p className="mt-2 text-xs text-slate-400">
-              Seeds from your scoring rubric, location, and level — nothing is applied until you approve.
+              Seeds from your scoring rubric, location, and level — or reuse a saved role. Nothing is applied until you approve.
             </p>
           </div>
         </CardContent>
@@ -385,11 +465,29 @@ export function IcpEditor({
       </CardContent>
 
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-6 py-3">
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           {isApproved && (
             <Button size="sm" variant="outline" onClick={refineFromFeedback} loading={refining}
               title="Propose an updated ICP from recruiter Yes/No decisions on scored candidates">
               <RefreshCw className="h-3.5 w-3.5" /> Refine from feedback
+            </Button>
+          )}
+          {showSaveTemplate ? (
+            <div className="flex items-center gap-1">
+              <Input
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="Template name"
+                className="h-8 w-40 text-sm"
+                autoFocus
+              />
+              <Button size="sm" onClick={saveAsTemplate} loading={savingTemplate}>Save</Button>
+              <button type="button" onClick={() => setShowSaveTemplate(false)} className="text-slate-400 hover:text-slate-600 text-xs px-1">Cancel</button>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => setShowSaveTemplate(true)}
+              title="Save this calibration as a reusable role template">
+              <BookmarkPlus className="h-3.5 w-3.5" /> Save as template
             </Button>
           )}
         </div>

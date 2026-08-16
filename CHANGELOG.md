@@ -12,6 +12,15 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Reusable role templates — "calibrate once, reuse" (Component 02, Recruiting
+  Knowledge).** Save any job's ICP (its hard gates + weighted competencies) as a
+  named **role template**, then start a new job's ICP from it instead of a cold,
+  JD-derived seed. On the ICP editor: **Save as template** (footer) and, when a job
+  has no ICP yet, **Start from a saved role…** alongside Generate. New `role_templates`
+  table (migration 111), `src/modules/ats/domain/role-templates.ts` facade (pure
+  `templateToDraftInput`, unit-tested), `GET/POST /api/role-templates`,
+  `DELETE /api/role-templates/[id]`, `POST /api/jobs/[id]/icp/from-template`. Added a
+  `'template'` ICP source.
 - **LinkedIn extension is now fit-aware (Component 08, Slice 8c-3).** The on-profile
   panel now reads more of the viewed profile (headline, location, About, a little
   experience — still button-first, only what's on screen), lets you pick one of your
@@ -82,6 +91,8 @@ entries on top.
   design; embeddings (5c) will replace the overlap step at scale. Pure ranking unit-tested.
 
 ### Schema
+- **`111_role_templates.sql`** — new `role_templates` table (org-scoped reusable role
+  calibrations: gates + competencies snapshot, `source_job_id`). (Component 02)
 - **`110_sequence_enrollment_review.sql`** — adds `awaiting_review` (held-for-review
   flag) and `job_id` (ties a held enrollment back to its Source tab) to
   `sequence_enrollments`, plus a partial index for the review queue. (8b-2)

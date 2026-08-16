@@ -7,7 +7,7 @@
 // existing Sifter reads — see icpToScoringCriteria() in src/lib/scoring.ts.
 
 export type IcpStatus = 'draft' | 'approved' | 'superseded'
-export type IcpSource = 'seed' | 'intake' | 'refinement' | 'manual'
+export type IcpSource = 'seed' | 'intake' | 'refinement' | 'manual' | 'template'
 
 /**
  * A hard gate. Applied BEFORE weighted scoring — a candidate who fails any
@@ -65,3 +65,20 @@ export interface Icp {
 /** The editable payload for a draft ICP (create / update). */
 export type IcpDraftInput = Pick<Icp, 'must_haves' | 'competencies'> &
   Partial<Pick<Icp, 'source'>>
+
+/**
+ * A saved, reusable role calibration (Component 02 — Recruiting Knowledge). It's an
+ * ICP snapshot (gates + competencies) detached from any one job, so a new req can
+ * start from a proven calibration instead of a cold JD-derived seed.
+ */
+export interface RoleTemplate {
+  id: string
+  org_id: string
+  name: string
+  description: string | null
+  must_haves: IcpMustHave[]
+  competencies: IcpCompetency[]
+  source_job_id: string | null
+  created_by: string | null
+  created_at: string
+}
