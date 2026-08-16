@@ -27,20 +27,34 @@
   }
 
   function readName() {
-    for (const h of document.querySelectorAll('main h1, h1')) {
-      const t = clean(h.innerText || h.textContent)
-      if (t) return t
+    // The profile name is the h1 in the top card. Read h1s INSIDE <main> first, in
+    // order — a page-level/hidden h1 outside main must never win.
+    const scopes = [document.querySelector('main'), document]
+    for (const scope of scopes) {
+      if (!scope) continue
+      for (const h of scope.querySelectorAll('h1')) {
+        const t = clean(h.innerText || h.textContent)
+        // Skip obvious non-name headings (nav/section labels).
+        if (t && t.length <= 80 && !/^(main content|search|messaging|linkedin)$/i.test(t)) return t
+      }
     }
     return nameFromTitle()
   }
 
   // The headline is the line right under the name in the intro card.
   function readHeadline() {
-    try {
-      const el = document.querySelector('main .text-body-medium.break-words')
-      const t = clean(el && (el.innerText || el.textContent))
-      if (t) return t
-    } catch (_) { /* ignore */ }
+    const tryEls = [
+      'main .text-body-medium.break-words',
+      'main section .text-body-medium',
+      'main .pv-text-details__left-panel .text-body-medium',
+    ]
+    for (const sel of tryEls) {
+      try {
+        const el = document.querySelector(sel)
+        const t = clean(el && (el.innerText || el.textContent))
+        if (t && !/connection|follower|contact info/i.test(t)) return t
+      } catch (_) { /* ignore */ }
+    }
     // Fallback: the "- Headline" portion of the tab title.
     const m = (document.title || '').match(/[-–—]\s(.+?)\s*\|\s*LinkedIn/i)
     return m ? clean(m[1]) : ''
@@ -130,6 +144,7 @@
       <div id="rs-ext-body">
         <label class="rs-ext-label" for="rs-ext-name">Name</label>
         <input id="rs-ext-name" class="rs-ext-input" type="text" />
+        <div id="rs-ext-captured" class="rs-ext-captured"></div>
 
         <label class="rs-ext-label" for="rs-ext-email">Email <span class="rs-ext-req">(required)</span></label>
         <input id="rs-ext-email" class="rs-ext-input" type="email" placeholder="name@company.com" />
@@ -164,6 +179,7 @@
   const reviewChk = root.querySelector('#rs-ext-review')
   const addBtn = root.querySelector('#rs-ext-add')
   const msg = root.querySelector('#rs-ext-msg')
+  const capturedBox = root.querySelector('#rs-ext-captured')
 
   // The fit the recruiter last computed, reused to personalize the first message.
   let lastFit = null
@@ -183,9 +199,23 @@
 
   function openPanel() {
     const p = currentProfile()
+    // Log + show exactly what was read from the page, so a bad capture is visible
+    // (LinkedIn changes its markup often). Helps diagnose "nothing was captured".
+    console.log('[RecruiterStack] captured profile:', p)
     nameInput.value = p.name
     emailInput.value = ''
     reviewChk.checked = false
+    if (capturedBox) {
+      const bits = [
+        p.headline ? `Headline: ${p.headline}` : 'Headline: —',
+        p.location ? `Location: ${p.location}` : 'Location: —',
+        `About: ${p.about ? p.about.length + ' chars' : 'none'}`,
+        `Experience: ${p.experience.length} item(s)`,
+      ]
+      capturedBox.textContent = 'Read from page → ' + bits.join(' · ')
+      capturedBox.style.color = p.name ? '#64748b' : '#dc2626'
+      if (!p.name) capturedBox.textContent = '⚠ Could not read the name — scroll to the top of the profile and reopen. ' + capturedBox.textContent
+    }
     resetFit()
     setMsg('')
     panel.hidden = false
