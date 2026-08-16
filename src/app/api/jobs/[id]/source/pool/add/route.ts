@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { withCapability, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { getFirstJobStage } from '@/modules/ats/domain/job-pipelines'
 import { insertPipelineApplication, listExistingApplicationCandidateIds } from '@/modules/ats/domain/applications'
+import { findOrCreateCandidateProfile } from '@/modules/ats/domain/candidates'
 import { unlockPoolProfile } from '@/modules/pool/domain/pool-unlock'
 
 export const maxDuration = 120
@@ -25,7 +26,9 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     let quotaExceeded = false
 
     for (const profileId of body.profile_ids) {
-      const res = await unlockPoolProfile(supabase, orgId, profileId, userId)
+      // `pool` may not import `ats`; this route is the composition layer, so it
+      // supplies the projection into candidates.
+      const res = await unlockPoolProfile(supabase, orgId, profileId, userId, findOrCreateCandidateProfile)
       if (res.status === 'quota_exceeded') { quotaExceeded = true; break }
       if (res.status !== 'unlocked' && res.status !== 'already') { skipped++; continue }
       if (res.status === 'unlocked') unlocked++

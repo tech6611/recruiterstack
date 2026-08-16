@@ -50,13 +50,24 @@ export interface PoolProfileSummary {
   skills: string[]
   num_roles: number | null
   total_experience_months: number | null
+  /** ASSUMED tenure (role start → now). Overstates when the record is stale. */
   current_tenure_months: number | null
+  /** VERIFIED tenure (role start → evidence_as_of). Never exceeds what a source attests. */
+  tenure_verified_months: number | null
+  /** Newest date any source asserts about this person. */
+  evidence_as_of: string | null
+  evidence_source: string | null
+  /** Two sources name different current employers — one is out of date. */
+  employer_disputed: boolean
   has_email: boolean
   has_linkedin: boolean
   reachable: boolean
   sources: string[]
   /** True when THIS org has already unlocked the profile. */
   unlocked?: boolean
+  /** Derived at read time — storing it would itself go stale. */
+  evidence_age_months?: number | null
+  freshness?: 'fresh' | 'aging' | 'stale' | 'unknown'
 }
 
 export interface PoolProfileDetail extends PoolProfileSummary {
@@ -73,7 +84,12 @@ export interface PoolSearchFilters {
   city?: string
   skill?: string
   minExperienceMonths?: number
+  /** Last-known tenure (role start → now). Use for recall. */
   minTenureMonths?: number
+  /** Verified tenure (role start → evidence date). Strict; very low recall. */
+  minVerifiedTenureMonths?: number
+  /** Only profiles whose newest evidence is at most this many months old. */
+  maxEvidenceAgeMonths?: number
   reachableOnly?: boolean
   source?: string
   limit?: number
@@ -90,7 +106,27 @@ export interface PoolAccess {
 const SUMMARY_COLS =
   'id,display_name,headline,current_title,current_company,location_city,experience_years,' +
   'skills,num_roles,total_experience_months,current_tenure_months,has_email,has_linkedin,' +
-  'reachable,sources'
+  'reachable,sources,evidence_as_of,evidence_source,tenure_verified_months,employer_disputed'
+
+/** Months between an ISO date and now. */
+function monthsSince(iso: string | null): number | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  const n = new Date()
+  return Math.max(0, (n.getFullYear() - d.getFullYear()) * 12 + (n.getMonth() - d.getMonth()))
+}
+
+/**
+ * Derive freshness at read time. Deliberately NOT a stored column: a staleness
+ * number written today is wrong tomorrow. `evidence_as_of` is the stored fact.
+ */
+export function withFreshness<T extends PoolProfileSummary>(row: T): T {
+  const age = monthsSince(row.evidence_as_of)
+  row.evidence_age_months = age
+  row.freshness = age == null ? 'unknown' : age <= 12 ? 'fresh' : age <= 36 ? 'aging' : 'stale'
+  return row
+}
 
 /** Does this org hold an active pool subscription? The gate for every read below. */
 export async function getPoolAccess(supabase: Supabase, orgId: string): Promise<PoolAccess> {
@@ -142,7 +178,20 @@ export async function searchPool(
   if (f.source) q = q.contains('sources', [f.source])
   if (f.reachableOnly) q = q.eq('reachable', true)
   if (f.minExperienceMonths) q = q.gte('total_experience_months', f.minExperienceMonths)
+  // `minTenureMonths` filters LAST KNOWN tenure (role start → now). Filtering
+  // VERIFIED tenure instead is honest but useless: a résumé is written while its
+  // author is job-hunting, so its document date sits at the START of the role they
+  // are now in — measured across the first 108 profiles, median verified tenure was
+  // 6 months and only 2 people cleared three years. No first-party source observes
+  // the present, so recall comes from the assumed figure and QUALITY comes from
+  // `maxEvidenceAgeMonths` below. Both numbers are always shown to the recruiter.
   if (f.minTenureMonths) q = q.gte('current_tenure_months', f.minTenureMonths)
+  if (f.minVerifiedTenureMonths) q = q.gte('tenure_verified_months', f.minVerifiedTenureMonths)
+  if (f.maxEvidenceAgeMonths) {
+    const cut = new Date()
+    cut.setMonth(cut.getMonth() - f.maxEvidenceAgeMonths)
+    q = q.gte('evidence_as_of', cut.toISOString().slice(0, 10))
+  }
   if (f.q) {
     const term = f.q.replace(/[%,()]/g, ' ').trim()
     if (term) {
@@ -155,7 +204,7 @@ export async function searchPool(
 
   const { data, error, count } = await q
   if (error) throw error
-  const rows = (data ?? []) as PoolProfileSummary[]
+  const rows = ((data ?? []) as PoolProfileSummary[]).map(withFreshness)
 
   // Mark the ones this org has already unlocked, so the UI can show "in your ATS".
   if (rows.length) {
@@ -206,7 +255,7 @@ export async function getPoolProfile(
   }
 
   return {
-    ...(p as PoolProfileSummary),
+    ...withFreshness(p as PoolProfileSummary),
     education: (p as { education?: PoolProfileDetail['education'] }).education ?? [],
     experiences: (exps ?? []) as PoolExperience[],
     contacts,

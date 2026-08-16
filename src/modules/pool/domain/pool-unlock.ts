@@ -1,12 +1,36 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import { getPoolAccess } from '@/modules/pool/domain/pool'
-import { findOrCreateCandidateProfile } from '@/modules/ats/domain/candidates'
 import { logger } from '@/lib/logger'
 
 type Supabase = SupabaseClient<Database>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseSb = any
+
+/**
+ * Projecting a pool profile into a per-org candidate is inherently cross-module:
+ * `pool` owns the source record, `ats` owns `candidates`. Rather than importing
+ * the sibling (which the boundary rule forbids — see
+ * docs/platform-modular-architecture.md), the caller injects the projection. The
+ * API route is the composition layer and may import both modules freely.
+ */
+export interface CandidateProjectionInput {
+  name: string
+  email: string
+  phone: string | null
+  resume_url: string | null
+  current_title: string | null
+  current_company: string | null
+  location: string | null
+  linkedin_url: string | null
+  skills: string[]
+  experience_years: number
+}
+export type ProjectCandidate = (
+  supabase: Supabase,
+  orgId: string,
+  input: CandidateProjectionInput,
+) => Promise<{ id: string }>
 
 export type UnlockResult =
   | { status: 'unlocked' | 'already'; candidate_id: string }
@@ -23,7 +47,8 @@ export async function unlockPoolProfile(
   supabase: Supabase,
   orgId: string,
   profileId: string,
-  userId?: string | null,
+  userId: string | null | undefined,
+  projectCandidate: ProjectCandidate,
 ): Promise<UnlockResult> {
   const access = await getPoolAccess(supabase, orgId)
   if (!access.hasAccess) return { status: 'no_access' }
@@ -49,7 +74,7 @@ export async function unlockPoolProfile(
   const linkedin = (contacts ?? []).find((c: any) => c.kind === 'linkedin')?.value ?? null
 
   try {
-    const result = await findOrCreateCandidateProfile(supabase, orgId, {
+    const result = await projectCandidate(supabase, orgId, {
       name: profile.display_name ?? 'Candidate',
       email,
       phone: null,
