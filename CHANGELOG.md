@@ -12,6 +12,56 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Intake-call capture for ICP (Component 04).** The ICP generator can now take the
+  hiring-manager **intake call notes/transcript** (optional textarea on "Generate
+  ICP") and lift their verbatim phrasing + hard must-haves straight from the
+  conversation — closing the "form-only intake, no verbatim" gap. Additive to
+  `generateIcp` / the generate route; no migration.
+- **Conversation analytics via Copilot (Component 12).** New `get_interview_notes`
+  Copilot tool queries the interview corpus (AI summaries + competency-mapped notes,
+  concerns, follow-ups) for a candidate or application — so you can ask "what did the
+  interviews say about X" or build an evidence view across rounds.
+- **Interview Notetaker + scorecard auto-fill (Components 10 & 11).** Bring-your-own
+  transcript: on any interview (candidate → Interviews), paste the transcript and
+  **Generate notes** → a TLDR summary + notes mapped to the ICP competencies
+  (strong/mixed/weak signal + evidence) + highlights, concerns, follow-ups. Then
+  **Draft scorecard** turns it into objective 1–4 ratings per competency (no overall
+  recommendation — the interviewer decides), to review and fill their scorecard.
+  `src/lib/ai/notetaker.ts` (pure builders, tested); `POST/GET /api/interviews/[id]/notes`,
+  `POST /api/interviews/[id]/scorecard-draft`; `InterviewNotesPanel`. Migration 113
+  adds transcript/ai_summary/ai_notes to `interviews`. (Auto-join/transcription bot is
+  a later integration; this is the AI core.)
+- **AI Screening — async, ICP-scored (Component 07).** From a candidate's AI
+  Assessment, **Start screen** generates ~5 ICP-targeted questions and a private link
+  (`/screen/[token]`, no login). The candidate answers async; the AI scores the
+  answers against the job's ICP competencies (reusing the Fit Engine's deterministic
+  combine) and the result — bucket, score, per-competency evidence, summary — shows
+  back on the candidate. Recruiter shares the link (not auto-sent). New
+  `screening_sessions` table (migration 112), `src/lib/ai/screening.ts` (pure prompt
+  builders, tested), `POST/GET /api/applications/[id]/screen`, public
+  `GET/POST /api/screen/[token]`, `AiScreenPanel`.
+- **Copilot can now source & read ICPs (Component 14).** Two new Copilot tools:
+  `source_candidates` (runs ICP-driven sourcing for a job via the Fit Engine and
+  returns ranked matches with bucket/score/why + candidate ids to feed
+  `bulk_add_to_pipeline`) and `get_icp` (reads a job's current gates + weighted
+  competencies so the agent can explain what "good" looks like). Wired into
+  `executeTool` + the capability map (`source_candidates` → recruiting:edit,
+  `get_icp` → recruiting:view). Closes the deferred autonomous-sourcing gap.
+- **AI job-post review (Component 13).** A one-click QA pass over a job's post —
+  scores **clarity / inclusivity / engagement / completeness** (1–5), lists concrete
+  issues (severity + the exact quote + a suggested fix), and offers a tightened
+  opening paragraph. Read-only — it suggests, the recruiter edits. Appears under the
+  job description on the job's details view. `src/lib/ai/job-post-review.ts` (pure
+  prompt builder + HTML→text, unit-tested); `POST /api/jobs/[id]/post-review`.
+- **Reusable role templates — "calibrate once, reuse" (Component 02, Recruiting
+  Knowledge).** Save any job's ICP (its hard gates + weighted competencies) as a
+  named **role template**, then start a new job's ICP from it instead of a cold,
+  JD-derived seed. On the ICP editor: **Save as template** (footer) and, when a job
+  has no ICP yet, **Start from a saved role…** alongside Generate. New `role_templates`
+  table (migration 111), `src/modules/ats/domain/role-templates.ts` facade (pure
+  `templateToDraftInput`, unit-tested), `GET/POST /api/role-templates`,
+  `DELETE /api/role-templates/[id]`, `POST /api/jobs/[id]/icp/from-template`. Added a
+  `'template'` ICP source.
 - **LinkedIn extension is now fit-aware (Component 08, Slice 8c-3).** The on-profile
   panel now reads more of the viewed profile (headline, location, About, a little
   experience — still button-first, only what's on screen), lets you pick one of your
@@ -82,6 +132,8 @@ entries on top.
   design; embeddings (5c) will replace the overlap step at scale. Pure ranking unit-tested.
 
 ### Schema
+- **`111_role_templates.sql`** — new `role_templates` table (org-scoped reusable role
+  calibrations: gates + competencies snapshot, `source_job_id`). (Component 02)
 - **`110_sequence_enrollment_review.sql`** — adds `awaiting_review` (held-for-review
   flag) and `job_id` (ties a held enrollment back to its Source tab) to
   `sequence_enrollments`, plus a partial index for the review queue. (8b-2)

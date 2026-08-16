@@ -24,6 +24,8 @@ import {
   updateCanonicalJob,
   type CanonicalJobUpdate,
 } from '@/modules/ats/domain/job-pipelines'
+import { runSourcing, getSourcingMatches } from '@/modules/ats/domain/sourcing'
+import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import {
   getOpeningById,
   listApprovedOpenings,
@@ -354,6 +356,41 @@ export const COPILOT_TOOLS: ToolSchema[] = [
         },
       },
       required: ['job_id', 'candidate_ids'],
+    },
+  },
+  {
+    name: 'source_candidates',
+    description:
+      "ICP-driven sourcing: rank the org's candidate pool against a job's APPROVED Ideal Candidate Profile using the Fit Engine, and return the top matches with their fit bucket (Great/Good/Okay), score, and why. Requires an approved ICP on the job. Follow with bulk_add_to_pipeline to add the good ones.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        job_id: { type: 'string', description: 'UUID of the job to source for' },
+        limit:  { type: 'number', description: 'Max matches to return (default: 10)' },
+      },
+      required: ['job_id'],
+    },
+  },
+  {
+    name: 'get_icp',
+    description:
+      "Get a job's current Ideal Candidate Profile (approved version, or latest draft) — its hard must-haves and weighted competencies. Use it to explain what 'good' looks like for the role.",
+    input_schema: {
+      type: 'object',
+      properties: { job_id: { type: 'string', description: 'UUID of the job' } },
+      required: ['job_id'],
+    },
+  },
+  {
+    name: 'get_interview_notes',
+    description:
+      "Query the interview conversation corpus: return the AI summaries + competency-mapped notes (signals, evidence, concerns, follow-ups) from a candidate's interviews. Use it to answer 'what did interviews say about X', build an evidence view across rounds, or compare candidates.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        candidate_id:   { type: 'string', description: 'UUID of the candidate (returns notes across all their interviews)' },
+        application_id: { type: 'string', description: 'UUID of an application (scopes to that pipeline)' },
+      },
     },
   },
   {
@@ -1260,7 +1297,10 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   get_inbox: 'recruiting:view', get_scorecard: 'recruiting:view', get_offers: 'recruiting:view',
   get_interviews: 'recruiting:view', get_sequence: 'recruiting:view',
   list_sequences: 'recruiting:view', list_candidate_sequence_history: 'recruiting:view',
-  list_roles: 'recruiting:view',
+  list_roles: 'recruiting:view', get_icp: 'recruiting:view',
+  get_interview_notes: 'recruiting:view',
+  // source_candidates writes the sourcing_matches cache, so it needs edit.
+  source_candidates: 'recruiting:edit',
   // Recruiting — write
   add_note_to_application: 'recruiting:edit', move_application_to_stage: 'recruiting:edit',
   bulk_add_to_pipeline: 'recruiting:edit', bulk_move_to_stage: 'recruiting:edit',
@@ -1334,6 +1374,9 @@ export async function executeTool(
       // Autonomous workflow tools
       case 'create_job_and_pipeline':   return await createJobAndPipeline(input, orgId, supabase, userId)
       case 'search_candidate_pool':     return await searchCandidatePool(input, orgId, supabase)
+      case 'source_candidates':         return await sourceCandidatesTool(input, orgId, supabase)
+      case 'get_icp':                   return await getIcpTool(input, orgId, supabase)
+      case 'get_interview_notes':       return await getInterviewNotesTool(input, orgId, supabase)
       case 'bulk_add_to_pipeline':      return await bulkAddToPipeline(input, orgId, supabase)
       case 'bulk_score_applications':   return await bulkScoreApplications(input, orgId, supabase)
       case 'send_outreach_email':       return await sendOutreachEmail(input, orgId, supabase)
@@ -1808,6 +1851,98 @@ async function createJobAndPipeline(
   }, userId)
 
   return `Created job "${job.title}" from approved requisition "${opening.title}" — ID: ${job.id}. Pipeline stages are being auto-created.`
+}
+
+// Component 05/14 — ICP-driven sourcing as a Copilot tool. Runs the Fit Engine over
+// the pool against the job's approved ICP and returns the ranked matches.
+async function sourceCandidatesTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const jobId = String(input.job_id ?? '')
+  if (!jobId) return 'Provide a job_id to source for.'
+  const limit = Math.min(Math.max(Number(input.limit) || 10, 1), 25)
+
+  const result = await runSourcing(supabase, orgId, jobId, { orgId })
+  if (result.status === 'no_icp') {
+    return 'This job has no approved ICP yet, so sourcing can’t run. Generate and approve an ICP first (get_icp shows the current one).'
+  }
+
+  const matches = await getSourcingMatches(supabase, orgId, jobId)
+  if (!matches.length) return `Sourced the pool against the ICP (v${result.icp_version}) but found no matches.`
+
+  const lines = matches.slice(0, limit).map((m, i) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mm = m as any
+    const name = mm.candidate?.name ?? 'Candidate'
+    const title = mm.candidate?.current_title ? ` — ${mm.candidate.current_title}` : ''
+    const bucket = mm.fit_bucket ? mm.fit_bucket.toUpperCase() : '—'
+    const gates = Array.isArray(mm.gate_failures) && mm.gate_failures.length
+      ? ` · missing: ${mm.gate_failures.map((g: { label?: string }) => g.label).filter(Boolean).join(', ')}`
+      : ''
+    const why = mm.rationale ? ` — ${String(mm.rationale).slice(0, 160)}` : ''
+    return `${i + 1}. ${name}${title} [${bucket}, ${mm.score ?? 0}/100${gates}] (id: ${mm.candidate_id})${why}`
+  })
+  return `Sourced ${matches.length} match${matches.length === 1 ? '' : 'es'} for this job against ICP v${result.icp_version} (scored ${result.scored}). Top ${Math.min(limit, matches.length)}:\n${lines.join('\n')}\n\nUse bulk_add_to_pipeline with the candidate ids to add the strong ones.`
+}
+
+// Component 01/14 — read a job's current ICP so the agent can explain "good fit".
+async function getIcpTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const jobId = String(input.job_id ?? '')
+  if (!jobId) return 'Provide a job_id.'
+  const icp = await getCurrentIcp(supabase, orgId, jobId)
+  if (!icp) return 'This job has no ICP yet.'
+
+  const gates = (icp.must_haves ?? []).map((g) => `- ${g.label}`).join('\n') || '- (none)'
+  const comps = (icp.competencies ?? [])
+    .map((c) => `- ${c.name} (${c.weight}%)`)
+    .join('\n') || '- (none)'
+  return `ICP for this job — ${icp.status} v${icp.version}.\nMust-haves (hard gates):\n${gates}\nWeighted competencies:\n${comps}`
+}
+
+// Component 12 — query the interview conversation corpus (Notetaker output).
+async function getInterviewNotesTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const candidateId = input.candidate_id ? String(input.candidate_id) : null
+  const applicationId = input.application_id ? String(input.application_id) : null
+  if (!candidateId && !applicationId) return 'Provide a candidate_id or application_id.'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q = (supabase as any)
+    .from('interviews')
+    .select('id, interviewer_name, scheduled_at, ai_summary, ai_notes')
+    .eq('org_id', orgId)
+    .not('ai_notes', 'is', null)
+    .order('scheduled_at', { ascending: true })
+  if (applicationId) q = q.eq('application_id', applicationId)
+  else if (candidateId) q = q.eq('candidate_id', candidateId)
+
+  const { data, error } = await q
+  if (error) return 'Could not read interview notes (the notetaker may not be set up yet).'
+  if (!data || !data.length) return 'No AI interview notes found yet for that candidate/application.'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const blocks = data.map((iv: any, i: number) => {
+    const notes = iv.ai_notes || {}
+    const comp = Array.isArray(notes.competency_notes)
+      ? notes.competency_notes.map((c: { name?: string; signal?: string; evidence?: string }) => `    - ${c.name}: ${c.signal} — ${c.evidence}`).join('\n')
+      : ''
+    const concerns = Array.isArray(notes.concerns) && notes.concerns.length ? `\n  Concerns: ${notes.concerns.join('; ')}` : ''
+    const follow = Array.isArray(notes.follow_ups) && notes.follow_ups.length ? `\n  Follow-ups: ${notes.follow_ups.join('; ')}` : ''
+    return `Interview ${i + 1} (${iv.interviewer_name || 'interviewer'}):\n  ${iv.ai_summary || '(no summary)'}${comp ? '\n' + comp : ''}${concerns}${follow}`
+  })
+  return `Found ${data.length} interview note set(s):\n\n${blocks.join('\n\n')}`
 }
 
 async function searchCandidatePool(
