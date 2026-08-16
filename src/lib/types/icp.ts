@@ -44,6 +44,32 @@ export interface IcpChangelogEntry {
   at: string // ISO timestamp
 }
 
+/**
+ * The reasoning behind an ICP (Sourcing Brain, Slice 1) — how a recruiter dissected
+ * the JD. Explains the ICP and drives sourcing. Stored on the ICP; regenerated with it.
+ */
+export interface SourcingMap {
+  /** The "why this ICP" narrative — what the role really is and how it was weighted. */
+  reasoning: string
+  /** Every requirement resolved into one of three buckets. */
+  requirement_decomposition: {
+    requirement: string
+    bucket: 'hard_filter' | 'ranking_signal' | 'screen_later'
+    findable_proxy?: string | null
+    notes?: string | null
+  }[]
+  /** Filters that drive rejection but appear nowhere in the JD — inferred. */
+  unwritten_filters: {
+    filter: string
+    type?: string | null
+    inferred_from?: string | null
+    confidence?: number | null
+    exclusion_cost?: string | null
+    recommend_apply?: boolean
+  }[]
+  generated_at?: string
+}
+
 export interface Icp {
   id: string
   org_id: string
@@ -53,6 +79,7 @@ export interface Icp {
   source: IcpSource
   must_haves: IcpMustHave[]
   competencies: IcpCompetency[]
+  sourcing_map?: SourcingMap | null
   changelog: IcpChangelogEntry[]
   supersedes_id: string | null
   created_by: string | null

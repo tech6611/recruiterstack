@@ -2,7 +2,14 @@ import { NextResponse } from 'next/server'
 import { withCapability, handleSupabaseError } from '@/lib/api/helpers'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
 import { generateIcp } from '@/lib/ai/icp-generator'
+import { analyzeRole } from '@/lib/ai/sourcing-strategist'
 import { createIcpDraft } from '@/modules/ats/domain/icp'
+
+export const maxDuration = 120 // two Gemini passes: competency generation + reasoning
+
+// icps.sourcing_map (migration 116) isn't in the generated types yet.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LooseSb = any
 
 /** POST — generate a draft ICP for this job. Seeds from the job's existing fields
  *  (rubric, location, level), then enriches with Gemini (behaviours, anchors,
@@ -31,7 +38,24 @@ export const POST = withCapability(
     try {
       const draft = await generateIcp(context.job, { orgId, userId }, intakeNotes)
       const icp = await createIcpDraft(supabase, orgId, params.id, draft, { createdBy: userId })
-      return NextResponse.json({ data: icp }, { status: 201 })
+
+      // Reasoning layer (Sourcing Brain, Slice 1): explain + pressure-test the ICP.
+      // Best-effort — a reasoning hiccup never blocks the ICP itself.
+      let sourcing_map = null
+      try {
+        sourcing_map = await analyzeRole(
+          context.job,
+          icp.competencies.map((c) => ({ name: c.name, weight: c.weight })),
+          icp.must_haves.map((g) => ({ label: g.label })),
+          { orgId, userId },
+        )
+        await (supabase as unknown as LooseSb)
+          .from('icps').update({ sourcing_map }).eq('id', icp.id).eq('org_id', orgId)
+      } catch {
+        /* reasoning is additive; keep the ICP */
+      }
+
+      return NextResponse.json({ data: { ...icp, sourcing_map } }, { status: 201 })
     } catch (e) {
       return handleSupabaseError(e as { code: string; message: string })
     }
