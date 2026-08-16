@@ -12,6 +12,13 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Personalized enrollment from the LinkedIn extension (Component 08, Slice 8c-2).**
+  `POST /api/ext/enroll` now optionally takes the `job_id` the profile was scored
+  against plus the computed `fit` — and enrolls with a **personalized first message**
+  drafted from that fit (reusing 8b-1), ties the enrollment to the job, and supports
+  `review` (hold for approval, 8b-2). Fully backward compatible: without `job_id`/`fit`
+  it behaves exactly as before (plain template). Also stores the scraped headline as
+  the candidate's title.
 - **Fit scoring for the LinkedIn extension — backend (Component 08, Slice 8c-1).**
   Groundwork to make the "add from LinkedIn" extension as smart as in-app sourcing:
   `POST /api/ext/score` scores a viewed LinkedIn profile against a chosen job's
