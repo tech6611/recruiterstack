@@ -12,6 +12,31 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **LinkedIn extension is now fit-aware (Component 08, Slice 8c-3).** The on-profile
+  panel now reads more of the viewed profile (headline, location, About, a little
+  experience — still button-first, only what's on screen), lets you pick one of your
+  jobs and **Evaluate fit** (shows the Great/Good/Okay bucket, score, why, and any
+  missing must-haves), then **Add to sequence** with the first message personalized
+  from that fit — and an optional "Review first message before it sends" checkbox.
+  With no job picked it behaves exactly as before. `background.js` gains `getJobs` /
+  `score` calls; no new permissions (same domain, same page).
+- **Personalized enrollment from the LinkedIn extension (Component 08, Slice 8c-2).**
+  `POST /api/ext/enroll` now optionally takes the `job_id` the profile was scored
+  against plus the computed `fit` — and enrolls with a **personalized first message**
+  drafted from that fit (reusing 8b-1), ties the enrollment to the job, and supports
+  `review` (hold for approval, 8b-2). Fully backward compatible: without `job_id`/`fit`
+  it behaves exactly as before (plain template). Also stores the scraped headline as
+  the candidate's title.
+- **Fit scoring for the LinkedIn extension — backend (Component 08, Slice 8c-1).**
+  Groundwork to make the "add from LinkedIn" extension as smart as in-app sourcing:
+  `POST /api/ext/score` scores a viewed LinkedIn profile against a chosen job's
+  **approved ICP** with the Fit Engine (read-only, scores nothing to the DB), and
+  `GET /api/ext/jobs` lists the jobs that have an approved ICP (for a picker). The
+  Fit Engine's judge now accepts an optional free-text profile blurb (the About +
+  experience narrative the structured fields miss) — additive, existing callers
+  unchanged. Pure `buildFitCandidate` / `buildProfileText` normalizers in
+  `src/lib/ai/ext-profile.ts` (unit-tested). Both routes are API-key authenticated.
+  (Personalized enrollment + the extension UI are the next slices, 8c-2 / 8c-3.)
 - **Review-before-send for sourced outreach (Component 08, Slice 8b-2).** When
   enrolling matches from the Source tab you can now tick **"Review before sending"** —
   each enrollment is *held* (no send scheduled) and its personalized first message
