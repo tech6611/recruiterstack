@@ -12,6 +12,16 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Interview Notetaker + scorecard auto-fill (Components 10 & 11).** Bring-your-own
+  transcript: on any interview (candidate → Interviews), paste the transcript and
+  **Generate notes** → a TLDR summary + notes mapped to the ICP competencies
+  (strong/mixed/weak signal + evidence) + highlights, concerns, follow-ups. Then
+  **Draft scorecard** turns it into objective 1–4 ratings per competency (no overall
+  recommendation — the interviewer decides), to review and fill their scorecard.
+  `src/lib/ai/notetaker.ts` (pure builders, tested); `POST/GET /api/interviews/[id]/notes`,
+  `POST /api/interviews/[id]/scorecard-draft`; `InterviewNotesPanel`. Migration 113
+  adds transcript/ai_summary/ai_notes to `interviews`. (Auto-join/transcription bot is
+  a later integration; this is the AI core.)
 - **AI Screening — async, ICP-scored (Component 07).** From a candidate's AI
   Assessment, **Start screen** generates ~5 ICP-targeted questions and a private link
   (`/screen/[token]`, no login). The candidate answers async; the AI scores the

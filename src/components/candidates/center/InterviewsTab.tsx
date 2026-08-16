@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Loader2, Calendar, ExternalLink, X, Copy, Check } from 'lucide-react'
+import { InterviewNotesPanel } from './InterviewNotesPanel'
 
 interface InterviewRow {
   id: string
@@ -226,6 +227,7 @@ export default function InterviewsTab({
                 )
               )}
             </div>
+            <InterviewNotesPanel interviewId={iv.id} />
           </div>
         )
       })}
