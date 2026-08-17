@@ -74,7 +74,7 @@ export function IcpEditor({
     let active = true
     ;(async () => {
       try {
-        const res = await fetch(`/api/jobs/${jobId}/icp`)
+        const res = await fetch(`/api/jobs/${jobId}/icp?latest=1`)
         if (!active) return
         if (res.ok) {
           const { data } = await res.json()
