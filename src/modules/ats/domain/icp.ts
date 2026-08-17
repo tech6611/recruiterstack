@@ -11,6 +11,30 @@ type LooseSb = any
 
 /** The live ICP for a job: the approved version, or the newest draft if none is
  *  approved yet. Returns null when the job has no ICP. */
+/**
+ * The LATEST ICP version for a job — draft or approved, highest version number.
+ * For the ICP EDITOR only: after generating/regenerating, the newest draft (with
+ * its reasoning) is what the recruiter is working on, so it must survive a refresh —
+ * unlike getCurrentIcp, which returns the approved yardstick (used by scoring/sourcing).
+ */
+export async function getLatestIcp(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<Icp | null> {
+  const sb = supabase as unknown as LooseSb
+  const { data, error } = await sb
+    .from('icps')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('job_id', jobId)
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return (data ?? null) as Icp | null
+}
+
 export async function getCurrentIcp(
   supabase: Supabase,
   orgId: string,
