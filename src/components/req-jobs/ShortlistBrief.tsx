@@ -33,6 +33,7 @@ const BUCKET: Record<string, { label: string; cls: string }> = {
   great: { label: 'Great', cls: 'bg-emerald-100 text-emerald-700' },
   good: { label: 'Good', cls: 'bg-sky-100 text-sky-700' },
   okay: { label: 'Okay', cls: 'bg-amber-100 text-amber-700' },
+  weak: { label: 'Weak', cls: 'bg-rose-100 text-rose-700' },
 }
 
 /** Sourcing Brain, Slice 1b — one ranked shortlist across your candidates + the

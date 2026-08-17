@@ -45,9 +45,16 @@ describe('combineFit', () => {
     expect(r).toMatchObject({ score: 100, fit_bucket: 'great', recommendation: 'strong_yes', passed_gates: true })
   })
 
-  it('maps all-1 ratings to 0 (okay / maybe)', () => {
+  it('maps all-1 ratings to 0 → WEAK / no (a 0 must not read as an OK fit)', () => {
     const r = combineFit([{ rating: 1, weight: 100 }], noGates)
-    expect(r).toMatchObject({ score: 0, fit_bucket: 'okay', recommendation: 'maybe' })
+    expect(r).toMatchObject({ score: 0, fit_bucket: 'weak', recommendation: 'no' })
+  })
+
+  it('bands: >=40 okay, <40 weak', () => {
+    // rating 2 across the board → (2-1)/3 = 33 → weak
+    expect(combineFit([{ rating: 2, weight: 100 }], noGates).fit_bucket).toBe('weak')
+    // rating ~2.2 needed for 40; use mixed to land >=40 → okay
+    expect(combineFit([{ rating: 3, weight: 60 }, { rating: 1, weight: 40 }], noGates).fit_bucket).toBe('okay')
   })
 
   it('computes a weighted middle score', () => {
