@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Globe, Lock, Sparkles } from 'lucide-react'
+import { Globe, Lock, Sparkles, Building2, Clock, TrendingUp, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { fitBucketFor } from '@/lib/ai/fit-bucket'
 
 interface PoolMatch {
   profile_id: string
@@ -12,17 +13,38 @@ interface PoolMatch {
   current_company: string | null
   location: string | null
   reachable: boolean
+  experience_years: number | null
+  total_experience_months: number | null
+  current_tenure_months: number | null
+  skills: string[]
   score: number
   fit_bucket: string
   rationale: string
   gate_failures: string[]
 }
 
-const BUCKET: Record<string, { label: string; cls: string }> = {
-  great: { label: 'Great fit', cls: 'bg-emerald-100 text-emerald-700' },
-  good: { label: 'Good fit', cls: 'bg-sky-100 text-sky-700' },
-  okay: { label: 'Okay fit', cls: 'bg-amber-100 text-amber-700' },
-  weak: { label: 'Weak fit', cls: 'bg-rose-100 text-rose-700' },
+const BUCKET: Record<string, { label: string; cls: string; fill: string }> = {
+  great: { label: 'Great fit', cls: 'bg-emerald-100 text-emerald-700', fill: 'bg-emerald-500' },
+  good: { label: 'Good fit', cls: 'bg-sky-100 text-sky-700', fill: 'bg-sky-500' },
+  okay: { label: 'Okay fit', cls: 'bg-amber-100 text-amber-700', fill: 'bg-amber-500' },
+  weak: { label: 'Weak fit', cls: 'bg-rose-100 text-rose-700', fill: 'bg-rose-500' },
+}
+
+function initials(name: string | null): string {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean)
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?'
+}
+function years(m: PoolMatch): string | null {
+  const mo = m.total_experience_months ?? (m.experience_years != null ? m.experience_years * 12 : null)
+  if (mo == null) return null
+  const y = Math.round(mo / 12)
+  return y > 0 ? `${y} yr${y === 1 ? '' : 's'} total` : null
+}
+function tenure(m: PoolMatch): string | null {
+  if (m.current_tenure_months == null) return null
+  const y = Math.floor(m.current_tenure_months / 12), mo = m.current_tenure_months % 12
+  const s = y ? `${y}y${mo ? ` ${mo}m` : ''}` : `${mo}m`
+  return `${s} in role`
 }
 
 /** Sourcing Brain — ICP-ranked sourcing over the cross-org Candidate Pool (Pool B),
@@ -126,24 +148,48 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
 
       {state === 'ok' && (
         <div className="mt-3 space-y-2">
-          {matches.map((m) => (
-            <label key={m.profile_id} className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
-              <input type="checkbox" checked={selected.has(m.profile_id)} onChange={() => toggle(m.profile_id)} className="mt-1 h-3.5 w-3.5" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium text-slate-800">{m.name ?? 'Candidate'}</span>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${BUCKET[m.fit_bucket]?.cls ?? 'bg-slate-100 text-slate-600'}`}>{BUCKET[m.fit_bucket]?.label ?? 'Fit'}</span>
-                  <span className="shrink-0 text-xs font-bold text-slate-500">{m.score}</span>
-                  {!m.reachable && <span className="shrink-0 text-[10px] text-amber-600">no contact</span>}
+          {matches.map((m) => {
+            // Derive the band from the score so a stale cached label can't misread a low score.
+            const bucket = fitBucketFor(m.score, (m.gate_failures?.length ?? 0) === 0)
+            const b = BUCKET[bucket]
+            const sel = selected.has(m.profile_id)
+            const yrs = years(m), ten = tenure(m)
+            return (
+              <div key={m.profile_id} onClick={() => toggle(m.profile_id)}
+                className={`cursor-pointer rounded-xl border p-3.5 transition hover:bg-slate-50/60 ${sel ? 'border-sky-300 ring-1 ring-sky-200' : 'border-slate-200'}`}>
+                <div className="flex items-start gap-3">
+                  <input type="checkbox" checked={sel} onChange={() => toggle(m.profile_id)} onClick={(e) => e.stopPropagation()} className="mt-1.5 h-3.5 w-3.5" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold text-sky-700">{initials(m.name)}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-slate-800">{m.name ?? 'Candidate'}</div>
+                    <div className="truncate text-xs text-slate-500">{m.current_title ?? '—'}</div>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${b?.cls ?? 'bg-slate-100 text-slate-600'}`}>{b?.label ?? 'Fit'}</span>
                 </div>
-                <div className="truncate text-[11px] text-slate-400">
-                  {[m.current_title, m.current_company].filter(Boolean).join(' · ')}{m.location ? ` — ${m.location}` : ''}
+
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {m.current_company && <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600"><Building2 className="h-3 w-3 text-slate-400" />{m.current_company}</span>}
+                  {yrs && <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600"><Clock className="h-3 w-3 text-slate-400" />{yrs}</span>}
+                  {ten && <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600"><TrendingUp className="h-3 w-3 text-slate-400" />{ten}</span>}
+                  {m.location && <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600"><MapPin className="h-3 w-3 text-slate-400" />{m.location}</span>}
+                  {!m.reachable && <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] text-amber-600">no contact</span>}
                 </div>
-                {m.rationale && <div className="mt-1 line-clamp-2 text-[11px] text-slate-500">{m.rationale}</div>}
-                {m.gate_failures.length > 0 && <div className="text-[11px] text-red-600">Missing: {m.gate_failures.join(', ')}</div>}
+
+                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className={`h-full rounded-full ${b?.fill ?? 'bg-slate-400'}`} style={{ width: `${Math.max(3, Math.min(100, m.score))}%` }} />
+                </div>
+                <div className="mt-1 flex justify-between text-[10px] text-slate-400"><span>Fit vs ICP</span><span className="font-semibold text-slate-600">{m.score} / 100</span></div>
+
+                {(m.skills?.length ?? 0) > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {m.skills.slice(0, 5).map((s, i) => <span key={i} className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-600">{s}</span>)}
+                  </div>
+                )}
+                {m.rationale && <div className="mt-2 line-clamp-2 text-[11px] text-slate-500">{m.rationale}</div>}
+                {m.gate_failures.length > 0 && <div className="mt-1 text-[11px] text-rose-600">Missing: {m.gate_failures.join(', ')}</div>}
               </div>
-            </label>
-          ))}
+            )
+          })}
           {selected.size > 0 && (
             <div className="flex items-center justify-between pt-1">
               <span className="text-xs text-slate-500">{selected.size} selected</span>

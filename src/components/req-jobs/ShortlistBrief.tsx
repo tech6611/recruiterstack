@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ClipboardList, Copy, Sparkles, Users, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { fitBucketFor } from '@/lib/ai/fit-bucket'
 
 interface Item {
   source: 'yours' | 'market'
@@ -69,7 +70,8 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
     lines.push(`Top candidates (${brief.counts.total} — ${brief.counts.yours} from our pool, ${brief.counts.market} from the market):`)
     brief.shortlist.forEach((i, n) => {
       const where = [i.title, i.company].filter(Boolean).join(' @ ')
-      lines.push(`${n + 1}. ${i.name}${where ? ` — ${where}` : ''} [${BUCKET[i.fit_bucket]?.label ?? 'Fit'}, ${i.score}/100${i.source === 'market' ? ', market' : ''}]`)
+      const bk = fitBucketFor(i.score, i.gate_failures.length === 0)
+      lines.push(`${n + 1}. ${i.name}${where ? ` — ${where}` : ''} [${BUCKET[bk]?.label ?? 'Fit'}, ${i.score}/100${i.source === 'market' ? ', market' : ''}]`)
       if (i.rationale) lines.push(`   ${i.rationale}`)
     })
     navigator.clipboard.writeText(lines.join('\n')).then(
@@ -138,7 +140,7 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-slate-800">{i.name}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${BUCKET[i.fit_bucket]?.cls ?? 'bg-slate-100 text-slate-600'}`}>{BUCKET[i.fit_bucket]?.label ?? 'Fit'}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${BUCKET[fitBucketFor(i.score, i.gate_failures.length === 0)]?.cls ?? 'bg-slate-100 text-slate-600'}`}>{BUCKET[fitBucketFor(i.score, i.gate_failures.length === 0)]?.label ?? 'Fit'}</span>
                       <span className="text-xs font-bold text-slate-500">{i.score}</span>
                       <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${i.source === 'market' ? 'bg-sky-50 text-sky-600' : 'bg-slate-100 text-slate-500'}`}>
                         {i.source === 'market' ? 'Market' : 'Your pool'}

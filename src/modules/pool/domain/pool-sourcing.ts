@@ -23,6 +23,10 @@ export interface PoolMatch {
   current_company: string | null
   location: string | null
   reachable: boolean
+  experience_years: number | null
+  total_experience_months: number | null
+  current_tenure_months: number | null
+  skills: string[]
   score: number
   fit_bucket: string
   rationale: string
@@ -79,7 +83,7 @@ export async function sourcePoolForIcp(
 
   const { data: profiles } = await sb
     .from('pool_profiles')
-    .select('id, display_name, current_title, current_company, location_city, location_raw, skills, experience_years, reachable')
+    .select('id, display_name, current_title, current_company, location_city, location_raw, skills, experience_years, total_experience_months, current_tenure_months, reachable')
     .in('id', ids)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const byId = new Map((profiles ?? []).map((p: any) => [p.id, p]))
@@ -100,6 +104,10 @@ export async function sourcePoolForIcp(
             current_company: p.current_company,
             location: p.location_city ?? p.location_raw ?? null,
             reachable: !!p.reachable,
+            experience_years: p.experience_years ?? null,
+            total_experience_months: p.total_experience_months ?? null,
+            current_tenure_months: p.current_tenure_months ?? null,
+            skills: p.skills ?? [],
             score: fit.score,
             fit_bucket: fit.fit_bucket,
             rationale: fit.rationale,
