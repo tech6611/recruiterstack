@@ -12,6 +12,14 @@ entries on top.
 ## 2026-08-16
 
 ### Fixed
+- **A low fit score no longer reads as "Okay fit" — new "Weak fit" band.** The Fit
+  Engine had only three buckets (great / good / okay), so *any* score under 60 — including
+  0, 10, 17 — showed as **"Okay fit,"** making obviously-wrong matches (e.g. a non-engineer
+  for an engineering role) look acceptable. Added a fourth band: **score < 40 → "Weak fit"**
+  (rose), so 0–39 reads honestly. (Scores 40–59 stay "Okay" = marginal.) A gate failure
+  still caps optimism to "okay" but a genuinely weak score stays weak; weak → recommendation
+  "no". Surfaced across sourcing, the market, the brief, screening, the candidate assessment,
+  and the extension. `combineFit` + `FitBucket`; no migration.
 - **Market sourcing (Pool B) now survives a refresh.** "Source the market" results were
   component-local, so a hard refresh wiped them and forced a re-search (and re-scoring).
   They're now cached server-side per job and reloaded on mount — the same way your own-pool

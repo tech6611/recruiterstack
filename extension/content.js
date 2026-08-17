@@ -129,7 +129,7 @@
     ))
   }
 
-  const BUCKET_LABEL = { great: 'Great fit', good: 'Good fit', okay: 'Okay fit' }
+  const BUCKET_LABEL = { great: 'Great fit', good: 'Good fit', okay: 'Okay fit', weak: 'Weak fit' }
 
   // --- build the UI ---
   const root = document.createElement('div')

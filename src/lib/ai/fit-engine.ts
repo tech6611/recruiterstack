@@ -23,7 +23,7 @@ import type { Icp, IcpMustHave } from '@/lib/types/icp'
 
 const MODEL = 'gemini-2.5-flash' // bulk per-candidate scoring — speed/cost, like the Sifter
 
-export type FitBucket = 'great' | 'good' | 'okay'
+export type FitBucket = 'great' | 'good' | 'okay' | 'weak'
 export type FitRecommendation = 'strong_yes' | 'yes' | 'maybe' | 'no'
 
 export interface FitCompetency {
@@ -107,12 +107,15 @@ export function combineFit(
   const score = Math.round((raw / totalWeight) * 100)
 
   const passed_gates = gateFailures.length === 0
-  let fit_bucket: FitBucket = score >= 80 ? 'great' : score >= 60 ? 'good' : 'okay'
-  if (!passed_gates) fit_bucket = 'okay' // cap, don't reject
+  // Four bands: a low score is WEAK, not "okay" — a 0/10 must never read as an OK fit.
+  let fit_bucket: FitBucket =
+    score >= 80 ? 'great' : score >= 60 ? 'good' : score >= 40 ? 'okay' : 'weak'
+  // A gate failure caps optimism to "okay" (never rejects), but a genuinely weak
+  // score stays weak.
+  if (!passed_gates && fit_bucket !== 'weak') fit_bucket = 'okay'
 
-  let recommendation: FitRecommendation =
-    fit_bucket === 'great' ? 'strong_yes' : fit_bucket === 'good' ? 'yes' : 'maybe'
-  if (!passed_gates && score < 40) recommendation = 'no'
+  const recommendation: FitRecommendation =
+    fit_bucket === 'great' ? 'strong_yes' : fit_bucket === 'good' ? 'yes' : fit_bucket === 'okay' ? 'maybe' : 'no'
 
   return { score, fit_bucket, recommendation, passed_gates }
 }

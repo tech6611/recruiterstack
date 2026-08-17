@@ -68,6 +68,7 @@ const BUCKET_CONFIG: Record<string, { label: string; color: string; bg: string }
   great: { label: 'Great fit', color: 'text-emerald-700', bg: 'bg-emerald-100' },
   good:  { label: 'Good fit',  color: 'text-sky-700',     bg: 'bg-sky-100'     },
   okay:  { label: 'Okay fit',  color: 'text-amber-700',   bg: 'bg-amber-100'   },
+  weak:  { label: 'Weak fit',  color: 'text-rose-700',    bg: 'bg-rose-100'    },
 }
 
 

@@ -25,7 +25,7 @@ export interface ScreeningAnswer {
 }
 export interface ScreeningResult {
   score: number
-  fit_bucket: 'great' | 'good' | 'okay'
+  fit_bucket: 'great' | 'good' | 'okay' | 'weak'
   recommendation: 'strong_yes' | 'yes' | 'maybe' | 'no'
   competencies: { id: string; name: string; rating: number; weight: number; evidence: string }[]
   summary: string
