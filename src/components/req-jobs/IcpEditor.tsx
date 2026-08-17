@@ -571,12 +571,30 @@ export function IcpEditor({
         </section>
       </CardContent>
 
+      {/* Component 04 — optional intake notes to fold into a Regenerate. */}
+      {showIntake && (
+        <div className="border-t border-slate-100 px-6 py-3">
+          <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Intake call notes (used on Regenerate)</label>
+          <textarea
+            value={intakeNotes}
+            onChange={(e) => setIntakeNotes(e.target.value)}
+            rows={3}
+            placeholder="Paste the hiring-manager intake call notes/transcript — the AI pulls their exact phrasing and must-haves when you Regenerate."
+            className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+          />
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-6 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={generate} loading={generating}
             title="Rebuild the ICP from this role from scratch (creates a new draft)">
             <Sparkles className="h-3.5 w-3.5" /> Regenerate
           </Button>
+          <button type="button" onClick={() => setShowIntake((s) => !s)}
+            className="text-xs font-medium text-slate-400 hover:text-slate-600">
+            {showIntake ? '− intake notes' : '+ intake notes'}
+          </button>
           {isApproved && (
             <Button size="sm" variant="outline" onClick={refineFromFeedback} loading={refining}
               title="Propose an updated ICP from recruiter Yes/No decisions on scored candidates">

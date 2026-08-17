@@ -12,6 +12,18 @@ entries on top.
 ## 2026-08-16
 
 ### Fixed
+- **ICP generation now weights what recruiters screen on first + intake notes work on
+  regenerate + template ICPs get their own reasoning.** Three ICP improvements: (1) the
+  generation prompt now explicitly gives **dedicated, weighted competencies to company
+  pedigree / feeder (target) companies, scale &amp; complexity, and span of management
+  (team size managed)** — the signals a recruiter screens on first — instead of burying
+  them (pedigree stays a weighted signal, never a hard gate — bias). (2) The **"paste
+  intake call notes"** box is now available after an ICP exists (a **+ intake notes**
+  toggle by Regenerate), so you can fold verbatim manager phrasing into a regeneration,
+  not just the first draft. (3) Starting a job's ICP **from a saved role template** now
+  **generates the reasoning fresh for that job** — the "How this ICP was reasoned" panel
+  was blank on template-derived ICPs because reasoning is job-specific and wasn't being
+  produced on the from-template path. No migration.
 - **Pool tenure was inflating itself, and the movability filter ranked the stalest
   records highest (migration 117).** `current_tenure_months` runs role-start → *now*,
   but the evidence stops whenever the source was written. A résumé last edited in 2018

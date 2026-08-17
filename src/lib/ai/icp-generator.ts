@@ -212,7 +212,12 @@ Design 4–6 WEIGHTED COMPETENCIES that capture what separates a great hire for 
 - anchors: a 1–4 scale describing what each level sounds like (1 poor → 4 excellent)
 - optionally verbatim: the hiring manager's exact phrasing when present in the inputs
 
-Also identify HARD MUST-HAVES — genuine non-negotiable gates (specific required skills, minimum years, required certifications). Only true non-negotiables from the inputs, not soft preferences.
+WEIGHT WHAT A RECRUITER SCREENS ON FIRST. These are usually the strongest predictors and must NOT be omitted when the role calls for them — give them a real, dedicated competency with meaningful weight (not buried inside a generic one):
+- **Company pedigree / feeder background** — experience at the TARGET COMPANIES listed (or close comparables in the same category: product-vs-services, same stage/sector). This is often the first filter a recruiter applies; reflect it explicitly.
+- **Scale & complexity** — has the person operated at the transaction volume, user/revenue scale, regulatory intensity, or company stage this role demands?
+- **Span of management** (for people-manager / leadership roles) — the size of team managed and the seniority of reports. A role that manages a team of N needs a competency (and often a gate) reflecting that scope.
+
+Also identify HARD MUST-HAVES — genuine non-negotiable gates (specific required skills, minimum years, minimum team size managed, required certifications). Only true non-negotiables from the inputs, not soft preferences. Do NOT gate on company pedigree (keep it a weighted signal, never a hard filter — bias risk).
 
 Respond with ONLY valid JSON (no markdown, no commentary):
 {
