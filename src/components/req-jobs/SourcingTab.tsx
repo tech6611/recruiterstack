@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { pickCalibrationSet } from '@/lib/ai/calibration'
+import { fitBucketFor } from '@/lib/ai/fit-bucket'
 import { PoolSourcingSection } from '@/components/req-jobs/PoolSourcingSection'
 import { ShortlistBrief } from '@/components/req-jobs/ShortlistBrief'
 import { LearningPanel } from '@/components/req-jobs/LearningPanel'
@@ -310,7 +311,8 @@ export function SourcingTab({ jobId }: { jobId: string }) {
             )}
             <div className="overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100">
               {shown.map((m) => {
-                const b = m.fit_bucket ? BUCKET[m.fit_bucket] : null
+                // Derive the band from the score so a stale stored label can't misread a low score.
+                const b = BUCKET[fitBucketFor(m.score, m.gate_failures.length === 0)]
                 const gated = m.gate_failures.length > 0
                 return (
                   <div key={m.candidate_id} className="flex items-start gap-3 px-3 py-2.5 hover:bg-slate-50">

@@ -7,7 +7,7 @@ const poolA = [
   { candidate_id: 'c2', score: 60, fit_bucket: 'good', rationale: 'ok', gate_failures: [], candidate: { name: 'Ben', current_title: 'Lead' } },
 ]
 const poolB: PoolMatch[] = [
-  { profile_id: 'p1', name: 'Priyank', current_title: 'MD', current_company: 'Sahaj', location: 'BLR', reachable: true, score: 95, fit_bucket: 'great', rationale: 'exec', gate_failures: [] },
+  { profile_id: 'p1', name: 'Priyank', current_title: 'MD', current_company: 'Sahaj', location: 'BLR', reachable: true, experience_years: 17, total_experience_months: 204, current_tenure_months: 132, skills: [], score: 95, fit_bucket: 'great', rationale: 'exec', gate_failures: [] },
 ]
 
 describe('buildShortlist', () => {

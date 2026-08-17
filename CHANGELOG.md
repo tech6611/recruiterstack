@@ -75,6 +75,14 @@ entries on top.
   Backfilled all 8 affected candidates; 0 remain null. File: `src/lib/ai/llm.ts`.
 
 ### Added
+- **Richer market candidate cards (SeekOut-style) + fit band derived from the score.**
+  The "From the market" list now shows an enriched card per candidate — avatar, current
+  title, **current company · total years of experience · time in role · location** pills,
+  a fit **meter**, top skills, and the rationale (Variant C). And the fit band is now
+  **derived from the score at display time** (`fitBucketFor`, a dependency-free helper)
+  everywhere it's shown — sourcing, the market, the brief — so a match cached with an old
+  label can no longer render a **0** as "Okay fit"; it re-reads as **Weak** from the score.
+  `PoolMatch` gains experience/tenure/skills.
 - **The learning loop — separate fit / reachability / movability (Sourcing Brain,
   Slice 3).** Before refining the ICP, the pipeline now diagnoses **why** candidates
   fall out: a rejection at review is a **fit** miss (refine the ICP), a candidate who
