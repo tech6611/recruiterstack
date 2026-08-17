@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Globe, Lock, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,18 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   const [matches, setMatches] = useState<PoolMatch[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [adding, setAdding] = useState(false)
+  const [stale, setStale] = useState(false)
+
+  // Load the cached market shortlist so it survives a refresh (no re-scoring).
+  useEffect(() => {
+    fetch(`/api/jobs/${jobId}/source/pool`)
+      .then((r) => (r.ok ? r.json() : { data: { matches: [] } }))
+      .then((j) => {
+        const m = j.data?.matches ?? []
+        if (m.length) { setMatches(m); setStale(!!j.data?.stale); setState('ok') }
+      })
+      .catch(() => {})
+  }, [jobId])
 
   async function search() {
     setState('loading')
@@ -44,6 +56,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
     }
     const { data } = await res.json()
     if (data.status === 'no_access') { setState('no_access'); return }
+    setStale(false)
     setMatches(data.matches ?? [])
     setState((data.matches ?? []).length ? 'ok' : 'empty')
   }
@@ -105,6 +118,10 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
       )}
 
       {state === 'empty' && <p className="mt-3 text-xs text-slate-400">No market matches yet — the pool may still be filling, or none fit this ICP.</p>}
+
+      {state === 'ok' && stale && (
+        <p className="mt-2 text-[11px] text-amber-600">The ICP has changed since this search — re-search for fresh matches.</p>
+      )}
 
       {state === 'ok' && (
         <div className="mt-3 space-y-2">

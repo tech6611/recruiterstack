@@ -12,6 +12,12 @@ entries on top.
 ## 2026-08-16
 
 ### Fixed
+- **Market sourcing (Pool B) now survives a refresh.** "Source the market" results were
+  component-local, so a hard refresh wiped them and forced a re-search (and re-scoring).
+  They're now cached server-side per job and reloaded on mount — the same way your own-pool
+  sourcing already persists. Re-searching replaces the cache; if the ICP has moved on since
+  the cached search, a "re-search for fresh matches" hint shows. New `pool_sourcing_matches`
+  table (migration 118); `GET /api/jobs/[id]/source/pool` returns the cache.
 - **ICP generation now weights what recruiters screen on first + intake notes work on
   regenerate + template ICPs get their own reasoning.** Three ICP improvements: (1) the
   generation prompt now explicitly gives **dedicated, weighted competencies to company

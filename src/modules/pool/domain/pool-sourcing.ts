@@ -115,3 +115,45 @@ export async function sourcePoolForIcp(
   matches.sort((a, b) => b.score - a.score)
   return { status: 'ok', matches }
 }
+
+/** Persist the market shortlist so it survives a refresh (and avoids re-scoring). */
+export async function savePoolMatches(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+  icpVersion: number | null,
+  matches: PoolMatch[],
+): Promise<void> {
+  await (supabase as unknown as LooseSb)
+    .from('pool_sourcing_matches')
+    .upsert(
+      { org_id: orgId, job_id: jobId, icp_version: icpVersion, matches, updated_at: new Date().toISOString() },
+      { onConflict: 'org_id,job_id' },
+    )
+}
+
+/** The cached market shortlist for a job (for on-mount load). Null if none / table
+ *  not there yet. Flags stale when the ICP has moved past the cached version. */
+export async function getCachedPoolMatches(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+  currentIcpVersion: number | null,
+): Promise<{ matches: PoolMatch[]; stale: boolean; updated_at: string } | null> {
+  try {
+    const { data, error } = await (supabase as unknown as LooseSb)
+      .from('pool_sourcing_matches')
+      .select('matches, icp_version, updated_at')
+      .eq('org_id', orgId)
+      .eq('job_id', jobId)
+      .maybeSingle()
+    if (error || !data) return null
+    return {
+      matches: (data.matches ?? []) as PoolMatch[],
+      stale: currentIcpVersion != null && data.icp_version != null && data.icp_version !== currentIcpVersion,
+      updated_at: data.updated_at,
+    }
+  } catch {
+    return null
+  }
+}
