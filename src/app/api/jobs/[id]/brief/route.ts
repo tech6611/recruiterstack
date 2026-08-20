@@ -3,11 +3,10 @@ import { withCapability, handleSupabaseError } from '@/lib/api/helpers'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
 import { assembleBrief } from '@/modules/ats/domain/shortlist-brief'
 
-export const maxDuration = 300 // may score the market on demand
-
-/** POST — the recruiter brief for this job: ICP reasoning + one shortlist ranked
- *  across your own candidates and the market (Sourcing Brain, Slice 1b). */
-export const POST = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }, _scope, userId) => {
+/** GET — the recruiter brief for this job: ICP reasoning + one shortlist ranked across
+ *  your own candidates and the market. Assembled from the sourcing caches (no scoring),
+ *  so it loads on mount (survives a refresh) and matches the "Source the market" section. */
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   try {
     let roleTitle: string | null = null
     try {
@@ -17,7 +16,7 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
       /* keep null */
     }
 
-    const result = await assembleBrief(supabase, orgId, params.id, roleTitle, { orgId, userId })
+    const result = await assembleBrief(supabase, orgId, params.id, roleTitle)
     if (result.status === 'no_icp') {
       return NextResponse.json({ error: 'Approve an ICP for this job to build a shortlist.' }, { status: 400 })
     }

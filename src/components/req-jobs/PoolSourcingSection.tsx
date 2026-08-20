@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Globe, Lock, Sparkles, Building2, Clock, TrendingUp, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -126,11 +127,14 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
           <Globe className="h-4 w-4 text-sky-600" /> From the market <span className="text-xs font-normal text-slate-400">(Candidate Pool)</span>
         </div>
-        {state !== 'no_access' && (
-          <Button size="sm" variant="outline" onClick={search} loading={state === 'loading'}>
-            <Sparkles className="h-3.5 w-3.5" /> {state === 'idle' ? 'Search the market' : 'Re-search'}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <Link href="/pool/usage" className="text-[11px] text-slate-400 hover:text-slate-600">Unlock usage</Link>
+          {state !== 'no_access' && (
+            <Button size="sm" variant="outline" onClick={search} loading={state === 'loading'}>
+              <Sparkles className="h-3.5 w-3.5" /> {state === 'idle' ? 'Search the market' : 'Re-search'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {state === 'no_access' && (

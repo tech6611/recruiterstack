@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ClipboardList, Copy, Sparkles, Users, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ interface Brief {
   shortlist: Item[]
   counts: { total: number; yours: number; market: number; great: number; good: number; okay: number }
   has_market: boolean
+  market_stale?: boolean
 }
 
 const BUCKET: Record<string, { label: string; cls: string }> = {
@@ -43,18 +44,24 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
   const [brief, setBrief] = useState<Brief | null>(null)
   const [loading, setLoading] = useState(false)
 
-  async function build() {
+  const build = useCallback(async (announce = false) => {
     setLoading(true)
-    const res = await fetch(`/api/jobs/${jobId}/brief`, { method: 'POST' })
+    const res = await fetch(`/api/jobs/${jobId}/brief`)
     setLoading(false)
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
-      toast.error(j.error ?? 'Could not build the shortlist')
+      if (announce) {
+        const j = await res.json().catch(() => ({}))
+        toast.error(j.error ?? 'Could not build the shortlist')
+      }
       return
     }
     const { data } = await res.json()
-    setBrief(data as Brief)
-  }
+    // Only surface the brief once there's something in it (avoids an empty card on mount).
+    if (announce || (data?.shortlist?.length ?? 0) > 0) setBrief(data as Brief)
+  }, [jobId])
+
+  // Load on mount so the brief survives a hard refresh.
+  useEffect(() => { build(false) }, [build])
 
   function copyForHm() {
     if (!brief) return
@@ -92,7 +99,7 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
               <Copy className="h-3.5 w-3.5" /> Copy for hiring manager
             </Button>
           )}
-          <Button size="sm" onClick={build} loading={loading}>
+          <Button size="sm" onClick={() => build(true)} loading={loading}>
             <Sparkles className="h-3.5 w-3.5" /> {brief ? 'Rebuild' : 'Build shortlist'}
           </Button>
         </div>
@@ -100,8 +107,12 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
 
       {!brief && (
         <p className="mt-2 text-xs text-slate-500">
-          One ranked shortlist across your own candidates and the market, with the reasoning — ready to share with the hiring manager.
+          One ranked shortlist across your sourced candidates and your last market search, with the reasoning — ready to share with the hiring manager. Source your pool and the market above, then build.
         </p>
+      )}
+
+      {brief?.market_stale && (
+        <p className="mt-2 text-[11px] text-amber-600">The ICP has changed since your last market search — re-search the market above for fresh market picks.</p>
       )}
 
       {brief && (

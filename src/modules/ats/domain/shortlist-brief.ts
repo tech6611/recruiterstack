@@ -1,10 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import type { Icp } from '@/lib/types/icp'
-import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { getSourcingMatches } from '@/modules/ats/domain/sourcing'
-import { sourcePoolForIcp, type PoolMatch } from '@/modules/pool/domain/pool-sourcing'
+import { getCachedPoolMatches, type PoolMatch } from '@/modules/pool/domain/pool-sourcing'
 
 type Supabase = SupabaseClient<Database>
 
@@ -88,26 +87,31 @@ export interface Brief {
   shortlist: BriefItem[]
   counts: ReturnType<typeof shortlistCounts>
   has_market: boolean
+  market_stale?: boolean
 }
 
 /**
  * Assemble the recruiter brief for a job (Sourcing Brain, Slice 1b): the ICP
- * reasoning + a single shortlist ranked across your own candidates (already scored)
- * and the market (Pool B, scored on demand).
+ * reasoning + a single shortlist ranked across your own candidates and the market.
+ *
+ * Reads BOTH sides from their caches (own-pool `sourcing_matches` + the market
+ * `pool_sourcing_matches`) — no re-scoring. That makes it (a) cheap enough to load
+ * on mount so it survives a refresh, and (b) consistent with the "Source the market"
+ * section, since it uses the exact same cached market run rather than a fresh
+ * (non-deterministic) one.
  */
 export async function assembleBrief(
   supabase: Supabase,
   orgId: string,
   jobId: string,
   roleTitle: string | null,
-  identity: UsageIdentity = {},
 ): Promise<{ status: 'ok' | 'no_icp'; brief?: Brief }> {
   const icp = await getCurrentIcp(supabase, orgId, jobId).catch(() => null)
   if (!icp || icp.status !== 'approved') return { status: 'no_icp' }
 
   const poolA = await getSourcingMatches(supabase, orgId, jobId).catch(() => [])
-  const poolBResult = await sourcePoolForIcp(supabase, orgId, icp as Icp, identity).catch(() => ({ status: 'ok' as const, matches: [] }))
-  const poolB = poolBResult.matches ?? []
+  const cachedMarket = await getCachedPoolMatches(supabase, orgId, jobId, (icp as Icp).version).catch(() => null)
+  const poolB = cachedMarket?.matches ?? []
 
   const shortlist = buildShortlist(poolA, poolB)
   const sm = (icp as Icp).sourcing_map
@@ -121,7 +125,8 @@ export async function assembleBrief(
       archetypes: sm?.archetypes ?? [],
       shortlist,
       counts: shortlistCounts(shortlist),
-      has_market: poolBResult.status === 'ok' && poolB.length > 0,
+      has_market: poolB.length > 0,
+      market_stale: cachedMarket?.stale ?? false,
     },
   }
 }
