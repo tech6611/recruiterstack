@@ -6,9 +6,14 @@ import { z } from 'zod'
 export const icpMustHaveSchema = z.object({
   id: z.string().min(1).max(60),
   label: z.string().trim().min(1).max(200),
-  attribute: z.string().trim().min(1).max(60),
-  operator: z.string().trim().min(1).max(30),
-  value: z.union([z.string().max(500), z.number(), z.array(z.string().max(200))]),
+  // A must-have is now just its plain-English question — the Fit Engine judge reads
+  // the `label` and rules pass/fail from the candidate's history. attribute/operator/
+  // value are legacy metadata (empty for new gates; kept for old ICPs & templates), so
+  // they are OPTIONAL and may be empty — requiring them here rejected label-only gates
+  // and broke ICP save/approve.
+  attribute: z.string().trim().max(60).default(''),
+  operator: z.string().trim().max(30).default(''),
+  value: z.union([z.string().max(500), z.number(), z.array(z.string().max(200))]).default(''),
 })
 
 export const icpCompetencySchema = z.object({
