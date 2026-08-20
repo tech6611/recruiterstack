@@ -438,7 +438,7 @@ export function IcpEditor({
             <ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> Must-haves (hard gates)
           </div>
           <p className="text-[11px] text-slate-400">
-            Each is a yes/no deal-breaker the AI checks against the candidate’s real history — failing any one rejects them. Location is never a deal-breaker.
+            Each is a yes/no deal-breaker the AI checks against the candidate’s real history — failing any one rejects them.
           </p>
           {gates.length === 0 ? (
             <p className="text-xs text-slate-400">No gates — every candidate is scored on competencies alone.</p>
