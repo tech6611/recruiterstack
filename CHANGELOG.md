@@ -11,7 +11,22 @@ entries on top.
 
 ## 2026-08-16
 
+### Added
+- **Pool usage view (`/pool/usage`).** Every org can now see their Candidate Pool
+  consumption: plan/tier, unlocks **used vs quota** (with a progress bar), remaining,
+  how many unlocked people made it **into the ATS**, and the full **unlock history**
+  (candidate, date, status → links to the candidate). Data already captured in
+  `pool_access_grants` + `pool_unlocks`; new `getPoolUsage` facade + `GET /api/pool/usage`
+  + page, linked from the Source tab's "From the market" section. No migration.
+
 ### Fixed
+- **The shortlist brief now survives a hard refresh — and matches the market section.**
+  The brief was in-memory only, and it re-scored the market on each build (a fresh,
+  non-deterministic run), so a refresh wiped it and its market ranking could disagree
+  with "Source the market." It now **assembles from the caches** (own-pool
+  `sourcing_matches` + the market `pool_sourcing_matches`) with no scoring — so it loads
+  on mount (survives refresh) and uses the **exact same cached market run** as the market
+  section. Shows a "re-search the market" hint if the ICP moved on. `GET /api/jobs/[id]/brief`.
 - **A low fit score no longer reads as "Okay fit" — new "Weak fit" band.** The Fit
   Engine had only three buckets (great / good / okay), so *any* score under 60 — including
   0, 10, 17 — showed as **"Okay fit,"** making obviously-wrong matches (e.g. a non-engineer
