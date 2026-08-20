@@ -9,6 +9,15 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-21
+
+### Changed
+- **Sourcing tab sections are now collapsible.** The four sections — *From your candidates*
+  (internal), *From the market*, *Shortlist brief*, and *What the pipeline is teaching you* —
+  each fold from their header (chevron + a count badge). The internal section is open by
+  default; the rest start collapsed, so the page fits close to one screen regardless of how
+  many candidates each holds. Interim tidy-up; a fuller redesign comes later.
+
 ## 2026-08-20
 
 ### Added
