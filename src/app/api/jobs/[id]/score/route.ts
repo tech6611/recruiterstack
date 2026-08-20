@@ -128,7 +128,8 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
           let icpProgress: Record<string, unknown> = {}
 
           if (useIcp) {
-            const fit = await scoreAgainstIcp(candidate, icp!, { orgId, userId }, undefined, histories.get(candidate.id))
+            // Applicant: FLAG missing background data (don't reject).
+            const fit = await scoreAgainstIcp(candidate, icp!, { orgId, userId }, undefined, histories.get(candidate.id), 'flag')
             result = {
               score:          fit.score,
               recommendation: fit.recommendation,
@@ -145,6 +146,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
               ai_fit_bucket:    fit.fit_bucket,
               ai_gate_failures: fit.gate_failures,
               knockout_failed:  !fit.passed_gates,
+              ai_data_incomplete: fit.data_incomplete,
               ai_icp_id:        icp!.id,
               ai_icp_version:   icp!.version,
             }

@@ -152,7 +152,8 @@ export async function runSourcing(
     const chunk = shortlist.slice(i, i + CONCURRENCY)
     const fits = await Promise.all(
       chunk.map((c) =>
-        scoreAgainstIcp(c, icp, identity, undefined, histories.get(c.id))
+        // Internal candidates: FLAG missing-data (don't reject) — data_incomplete surfaces it.
+        scoreAgainstIcp(c, icp, identity, undefined, histories.get(c.id), 'flag')
           .then((f) => ({ candidateId: c.id, fit: f }))
           .catch(() => null),
       ),
@@ -171,6 +172,7 @@ export async function runSourcing(
           red_flags: r.fit.red_flags,
           rationale: r.fit.rationale,
           competencies: r.fit.competencies.map((c) => ({ name: c.name, rating: c.rating, evidence: c.evidence })),
+          data_incomplete: r.fit.data_incomplete,
           icp_id: icp.id,
           icp_version: icp.version,
           updated_at: new Date().toISOString(),

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, TrendingDown, Phone, ChevronRight, ClipboardList, ShieldAlert } from 'lucide-react'
+import { Wand2, Loader2, RefreshCw, FileText, ExternalLink, TrendingUp, TrendingDown, Phone, ChevronRight, ClipboardList, ShieldAlert, FileQuestion } from 'lucide-react'
 import type { Candidate, Application, AiRecommendation, HiringRequest } from '@/lib/types/database'
 import VoiceCallDetailModal from '../VoiceCallDetailModal'
 import { ScoreRing } from '@/components/ui/ScoreRing'
@@ -197,6 +197,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
     ai_red_flags?: string[] | null
     ai_gate_failures?: { label?: string }[] | null
     ai_rationale?: string | null
+    ai_data_incomplete?: boolean | null
   } | null
   const bucket = fit?.ai_fit_bucket ? BUCKET_CONFIG[fit.ai_fit_bucket] : null
   const gateFailures = (fit?.ai_gate_failures ?? []).map(g => g?.label).filter(Boolean) as string[]
@@ -214,6 +215,14 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
           <ShieldAlert className="mt-0.5 h-3 w-3 shrink-0 text-red-500" />
           <p className="text-[10px] leading-relaxed text-red-700">
             <span className="font-semibold">Missing must-have{gateFailures.length > 1 ? 's' : ''}:</span> {gateFailures.join('; ')}
+          </p>
+        </div>
+      )}
+      {fit?.ai_data_incomplete && (
+        <div className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
+          <FileQuestion className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+          <p className="text-[10px] leading-relaxed text-amber-700">
+            <span className="font-semibold">Background unverified:</span> no education or work history on file, so we can&apos;t confirm this candidate&apos;s background (e.g. whether they&apos;re an engineer). Their CV may be missing it — enrich the profile to verify.
           </p>
         </div>
       )}

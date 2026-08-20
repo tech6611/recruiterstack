@@ -48,7 +48,19 @@ export interface FitResult {
   strengths: string[]
   gaps: string[]
   rationale: string
+  // True when the candidate has NO education AND NO work history on file, so a
+  // background/identity deal-breaker can't be verified. Internal candidates get
+  // FLAGGED (surfaced, not rejected); market candidates get REJECTED (see absentPolicy).
+  data_incomplete: boolean
 }
+
+/**
+ * What to do when a candidate has no education/history to verify a background gate on.
+ *  - 'flag'   (internal / applied candidates): don't reject — surface an "unverified" flag.
+ *  - 'reject' (market / sourced candidates): assume complete vendor data → missing means
+ *             genuinely absent → reject.
+ */
+export type AbsentDataPolicy = 'flag' | 'reject'
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
 
@@ -240,6 +252,9 @@ export async function scoreAgainstIcp(
   // The candidate's education + dated work history — the evidence a background gate
   // must be judged on. Callers fetch it; without it, background gates default to pass.
   history?: CandidateHistory,
+  // How to treat a candidate with no education/history — flag (internal) or reject
+  // (market). See AbsentDataPolicy. Defaults to 'flag' (the safe, non-rejecting option).
+  absentPolicy: AbsentDataPolicy = 'flag',
 ): Promise<FitResult> {
   // Only genuine deal-breakers can reject — location/seniority never do (and this
   // neutralises old auto-seeded gates on existing ICPs).
@@ -256,6 +271,14 @@ export async function scoreAgainstIcp(
   // a must-have fails only when the judge explicitly returned pass=false for its id.
   const verdictById = new Map(judged.gate_results.map((r) => [r.id, r]))
   const gate_failures = gates.filter((g) => verdictById.get(g.id)?.pass === false)
+
+  // No education AND no work history → a background gate can't be verified. Internal
+  // candidates get flagged; market candidates get rejected (a synthetic gate failure so
+  // the reject carries a visible reason).
+  const data_incomplete = !(history?.education?.length) && !(history?.experiences?.length)
+  if (data_incomplete && absentPolicy === 'reject' && gates.length > 0) {
+    gate_failures.push({ id: 'data-missing', label: 'No education or work history on file', attribute: '', operator: '', value: '' })
+  }
 
   const byId = new Map(judged.competencies.map((c) => [c.id, c]))
   const competencies: FitCompetency[] = icp.competencies.map((c) => {
@@ -282,5 +305,6 @@ export async function scoreAgainstIcp(
     strengths: judged.strengths,
     gaps: judged.gaps,
     rationale: judged.rationale,
+    data_incomplete,
   }
 }
