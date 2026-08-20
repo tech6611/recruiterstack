@@ -23,6 +23,8 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     let added = 0
     let unlocked = 0
     let skipped = 0
+    let noContact = 0
+    let noEmail = 0
     let quotaExceeded = false
 
     for (const profileId of body.profile_ids) {
@@ -30,8 +32,9 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
       // supplies the projection into candidates.
       const res = await unlockPoolProfile(supabase, orgId, profileId, userId, findOrCreateCandidateProfile)
       if (res.status === 'quota_exceeded') { quotaExceeded = true; break }
+      if (res.status === 'no_contact') { noContact++; skipped++; continue }
       if (res.status !== 'unlocked' && res.status !== 'already') { skipped++; continue }
-      if (res.status === 'unlocked') unlocked++
+      if (res.status === 'unlocked') { unlocked++; if (res.placeholder_email) noEmail++ }
 
       // Add the projected candidate to this job's pipeline (skip if already there).
       const existing = await listExistingApplicationCandidateIds(supabase, orgId, jobId, [res.candidate_id])
@@ -53,7 +56,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
       added++
     }
 
-    return NextResponse.json({ data: { added, unlocked, skipped, quota_exceeded: quotaExceeded } })
+    return NextResponse.json({ data: { added, unlocked, skipped, no_contact: noContact, no_email: noEmail, quota_exceeded: quotaExceeded } })
   } catch (e) {
     return handleSupabaseError(e as { code: string; message: string })
   }

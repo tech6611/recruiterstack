@@ -9,6 +9,20 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-20
+
+### Fixed
+- **No more fake `pool-…@unlocked.recruiterstack.in` email on unlocked market
+  candidates.** When a Candidate-Pool profile had *no* email (only LinkedIn/phone),
+  unlocking it minted a fake-looking placeholder address that showed on the candidate
+  and could be sequenced to. Now: (1) profiles with **no contact channel at all** are
+  **skipped without spending a credit** (`no_contact`); (2) contactable-but-no-email
+  profiles get a **clearly non-deliverable placeholder** (reserved `.invalid` domain,
+  RFC 2606) instead of a real-looking one; (3) the candidate profile shows **"No email
+  on file"** rather than the placeholder; (4) sequences **stop instead of emailing** a
+  placeholder address; (5) the unlock toast reports how many were skipped or unlocked
+  without an email. New `src/lib/pool-email.ts` helper; no migration.
+
 ## 2026-08-16
 
 ### Added
