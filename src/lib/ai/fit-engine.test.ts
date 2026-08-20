@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { evaluateGates, combineFit } from './fit-engine'
+import { evaluateGates, combineFit, gatingMustHaves } from './fit-engine'
 import type { Candidate } from '@/lib/types/database'
 import type { IcpMustHave } from '@/lib/types/icp'
 
@@ -37,6 +37,19 @@ describe('evaluateGates', () => {
   })
 })
 
+describe('gatingMustHaves', () => {
+  it('strips location and seniority so they can never reject, keeps real deal-breakers', () => {
+    const gates = [
+      gate({ id: 'a', attribute: 'location', value: 'Bengaluru' }),
+      gate({ id: 'b', attribute: 'seniority', value: 'Senior' }),
+      gate({ id: 'c', attribute: 'background', value: 'software engineering' }),
+      gate({ id: 'd', attribute: 'min_experience', value: '5' }),
+    ]
+    expect(gatingMustHaves(gates).map((g) => g.id)).toEqual(['c', 'd'])
+    expect(gatingMustHaves(undefined)).toEqual([])
+  })
+})
+
 describe('combineFit', () => {
   const noGates: IcpMustHave[] = []
 
@@ -65,9 +78,13 @@ describe('combineFit', () => {
     expect(combineFit([{ rating: 4, weight: 20 }, { rating: 4, weight: 20 }], noGates).score).toBe(100)
   })
 
-  it('caps the bucket to okay on a gate failure, even with a perfect score', () => {
+  it('REJECTS on a deal-breaker failure, even with a perfect competency score', () => {
+    // A failed must-have floors the score into the reject band and forces weak/no.
     const r = combineFit([{ rating: 4, weight: 100 }], [gate({})])
-    expect(r).toMatchObject({ score: 100, fit_bucket: 'okay', passed_gates: false, recommendation: 'maybe' })
+    expect(r.passed_gates).toBe(false)
+    expect(r.fit_bucket).toBe('weak')
+    expect(r.recommendation).toBe('no')
+    expect(r.score).toBeLessThan(40)
   })
 
   it('recommends no when a gate fails and the score is weak', () => {

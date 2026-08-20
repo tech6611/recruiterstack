@@ -32,30 +32,12 @@ export function deriveIcpSeed(job: HiringRequest): IcpDraftInput {
     behaviours: [],
   }))
 
-  // Hard gates derived from structured fields. Kept deliberately conservative —
-  // only unambiguous constraints become gates; everything else stays a weighted
-  // competency so nobody is filtered out on a soft signal.
+  // No hard gates are auto-added from structured fields anymore. A hard gate now
+  // REJECTS a candidate, and a good recruiter never rejects on location or a level
+  // label alone — those are preferences, not deal-breakers. Deal-breakers are
+  // decided by the recruiter-brain LLM from the actual JD (see icp-generator.ts);
+  // this seed is the safe LLM-free fallback, and it errs toward gating nobody.
   const must_haves: IcpMustHave[] = []
-
-  if (job.location && !job.remote_ok) {
-    must_haves.push({
-      id: 'location',
-      label: `Based in ${job.location}`,
-      attribute: 'location',
-      operator: 'equals',
-      value: job.location,
-    })
-  }
-
-  if (job.level) {
-    must_haves.push({
-      id: 'seniority',
-      label: `${job.level} level`,
-      attribute: 'seniority',
-      operator: 'equals',
-      value: job.level,
-    })
-  }
 
   return { must_haves, competencies, source: 'seed' }
 }
