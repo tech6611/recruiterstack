@@ -121,6 +121,33 @@ entries on top.
 ## 2026-08-16
 
 ### Added
+- **Location + company normalization for the pool (`modules/pool/domain/normalize.ts`).**
+  Pure, unit-tested (13 cases), and the step that decides whether the city filter works
+  at all — 1,500 GitHub profiles produced **91 distinct spellings of one city**, and an
+  uploaded CV set added misspellings on top (`Banglore, India`). `normalizeCity` handles
+  exact aliases, fuzzy misspellings within an edit budget scaled to name length, metro
+  satellites (Gurugram/Noida → Delhi NCR), and multi-city strings: a movement marker
+  means the last city wins (`Kolkata ✈ Bangalore` → Bengaluru), otherwise the first does,
+  since "City, State, Country" is the common shape. Returns **null rather than guessing** —
+  18 of 145 profiles are genuinely unrecognised tier-2 cities (Alwar, Cuttack, Roorkee)
+  and a wrong city is worse than none. `normalizeCompany` strips the GitHub `@handle`
+  convention, legal suffixes and appended job titles. Backfilled across the pool.
+- **Source filter + "CV" badge on `/pool`.** The pool now spans four sources, so search
+  can be scoped to one (GitHub profile / personal website / crawled résumé / uploaded CV /
+  self-declared link), and rows sourced from an uploaded CV are badged.
+
+### Changed
+- **Pool grew to 145 profiles / 422 dated roles** with a new `upload:cv` source
+  (trust weight 88 — above a crawled résumé at 85, below a self-declared link at 90;
+  a CV handed over directly is better evidence than one found on a website). 37 licensed
+  sample CVs enriched through the existing `generateFromPdf` path: 37/37 parsed, 28 with
+  dated history, 93 roles, **$0.07**. Notably these are *not* engineers — analysts, sales,
+  consulting, a founder — so they cover ground a GitHub-sourced pipeline structurally
+  cannot reach, which makes them useful for testing whether the Fit Engine correctly
+  *rejects* an off-profile candidate rather than only ranking similar ones.
+
+
+### Added
 - **Pool usage view (`/pool/usage`).** Every org can now see their Candidate Pool
   consumption: plan/tier, unlocks **used vs quota** (with a progress bar), remaining,
   how many unlocked people made it **into the ATS**, and the full **unlock history**
