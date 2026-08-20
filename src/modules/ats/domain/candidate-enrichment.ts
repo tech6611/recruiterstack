@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import { RESUME_BUCKET, resumeStoragePath, resumeExt } from '@/lib/storage/resume'
 import { embedText } from '@/lib/ai/llm'
-import { enrichFromPdf, deriveMovability, type EnrichedProfile } from '@/lib/ai/candidate-enrichment'
+import { enrichFromPdf, deriveMovability, normalizeEducationLevel, type EnrichedProfile } from '@/lib/ai/candidate-enrichment'
 import type { CandidateHistory } from '@/lib/ai/fit-engine'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
@@ -135,7 +135,13 @@ export async function getCandidatesHistory(
   type Exp = NonNullable<CandidateHistory['experiences']>
   const eduById = new Map<string, Edu>()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const c of (cands ?? []) as any[]) eduById.set(c.id, (c.education ?? []) as Edu)
+  for (const c of (cands ?? []) as any[]) {
+    // Infer the normalized level from the degree for rows enriched before the level
+    // field existed — so the recruiter-brain gets it without a re-enrich.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const edu = ((c.education ?? []) as any[]).map((e) => ({ ...e, level: e.level ?? normalizeEducationLevel(e.degree ?? e.field) }))
+    eduById.set(c.id, edu as Edu)
+  }
   const expsById = new Map<string, Exp>()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const e of (exps ?? []) as any[]) {
