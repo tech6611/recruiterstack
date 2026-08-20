@@ -11,6 +11,17 @@ entries on top.
 
 ## 2026-08-21
 
+### Added
+- **Normalized education level on every parsed qualification.** Enrichment now tags each
+  education entry with an ISCED-aligned **level** — `secondary` (10th/SSC) · `senior_secondary`
+  (12th/HSC/A-levels) · `diploma` · `undergraduate` · `postgraduate` · `doctorate` ·
+  `professional_cert` — mapping Indian and international vocabulary onto one ladder, plus a
+  `status` (completed/ongoing). The level is shown to the recruiter-brain as **evidence it
+  reasons over** (never a rigid filter — a Civil B.Tech + SDE role still reads as an engineer).
+  Levels are also **inferred at read time from the degree** for candidates enriched before this,
+  so no re-enrich is needed. `normalizeEducationLevel` + `highestEducationLevel` (pure, tested).
+  Education is JSONB — no migration.
+
 ### Changed
 - **The Fit Engine judge now reasons like a recruiter in market context — not a keyword
   filter.** It's told to read the candidate's whole trajectory (what they studied, the

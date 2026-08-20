@@ -155,7 +155,7 @@ export function combineFit(
  * the caller (which has DB access); the Fit Engine itself stays DB-free.
  */
 export interface CandidateHistory {
-  education?: { degree?: string | null; field?: string | null; school?: string | null; year?: string | number | null }[]
+  education?: { degree?: string | null; field?: string | null; school?: string | null; year?: string | number | null; level?: string | null }[]
   experiences?: { title?: string | null; employer?: string | null; start_date?: string | null; end_date?: string | null; is_current?: boolean | null }[]
 }
 
@@ -164,7 +164,9 @@ function formatEducation(edu?: CandidateHistory['education']): string {
   const lines = edu
     .map((e) => {
       const head = [e.degree, e.field].filter(Boolean).join(' in ')
-      return `${head}${e.school ? ` — ${e.school}` : ''}${e.year ? ` (${e.year})` : ''}`.trim()
+      const meta = [e.school || null, e.year ? `${e.year}` : null].filter(Boolean).join(', ')
+      const lvl = e.level ? ` [${e.level}]` : ''
+      return `${head}${meta ? ` — ${meta}` : ''}${lvl}`.trim()
     })
     .filter(Boolean)
   return lines.length ? lines.join('; ') : 'Not provided'

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeMonth, deriveMovability, toEnrichedProfile, type EnrichedExperience } from './candidate-enrichment'
+import { normalizeMonth, deriveMovability, toEnrichedProfile, normalizeEducationLevel, highestEducationLevel, type EnrichedExperience } from './candidate-enrichment'
 
 describe('normalizeMonth', () => {
   it('parses common résumé date shapes to first-of-month', () => {
@@ -36,6 +36,36 @@ describe('deriveMovability', () => {
     expect(m.num_roles).toBe(1)
     expect(m.current_tenure_months).toBeNull()
     expect(m.total_experience_months).toBeNull()
+  })
+})
+
+describe('normalizeEducationLevel', () => {
+  it('maps Indian + international vocabulary onto the ladder', () => {
+    expect(normalizeEducationLevel('B.Tech')).toBe('undergraduate')
+    expect(normalizeEducationLevel('Bachelor of Engineering')).toBe('undergraduate')
+    expect(normalizeEducationLevel('B.Com (Honours)')).toBe('undergraduate')
+    expect(normalizeEducationLevel('MBA')).toBe('postgraduate')
+    expect(normalizeEducationLevel('M.Tech')).toBe('postgraduate')
+    expect(normalizeEducationLevel('PhD')).toBe('doctorate')
+    expect(normalizeEducationLevel('Class XII')).toBe('senior_secondary')
+    expect(normalizeEducationLevel('HSC')).toBe('senior_secondary')
+    expect(normalizeEducationLevel('Class X')).toBe('secondary')
+    expect(normalizeEducationLevel('SSC')).toBe('secondary')
+    expect(normalizeEducationLevel('AWS Certified Solutions Architect')).toBe('professional_cert')
+    expect(normalizeEducationLevel('undergraduate')).toBe('undergraduate') // passes the enum through
+    expect(normalizeEducationLevel('')).toBeNull()
+  })
+})
+
+describe('highestEducationLevel', () => {
+  it('returns the top academic rung (Prabal: MBA + B.Tech + XII + X → postgraduate)', () => {
+    expect(highestEducationLevel([
+      { level: 'postgraduate' }, { level: 'undergraduate' }, { level: 'senior_secondary' }, { level: 'secondary' },
+    ])).toBe('postgraduate')
+  })
+  it('ignores professional certs and null levels', () => {
+    expect(highestEducationLevel([{ level: 'undergraduate' }, { level: 'professional_cert' }, { level: null }])).toBe('undergraduate')
+    expect(highestEducationLevel([])).toBeNull()
   })
 })
 

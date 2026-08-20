@@ -24,11 +24,51 @@ export interface EnrichedExperience {
   is_current: boolean
   summary: string | null
 }
+// ISCED-aligned academic ladder (low → high), used as EVIDENCE the recruiter-brain
+// reasons over — never a rigid filter. `professional_cert` sits off the academic ladder.
+export const EDUCATION_LEVELS = [
+  'secondary', 'senior_secondary', 'diploma', 'undergraduate', 'postgraduate', 'doctorate',
+] as const
+export type EducationLevel = (typeof EDUCATION_LEVELS)[number] | 'professional_cert'
+
 export interface EnrichedEducation {
   degree: string | null
   field: string | null
   school: string | null
   year: number | null
+  level: EducationLevel | null // normalized rung (undergraduate, postgraduate, …)
+  status: 'completed' | 'ongoing' | null
+}
+
+const LEVEL_RANK: Record<string, number> = {
+  secondary: 1, senior_secondary: 2, diploma: 3, undergraduate: 4, postgraduate: 5, doctorate: 6,
+}
+
+/** Map a loose degree/level string to the normalized ladder — handles Indian +
+ *  international vocabulary (SSC/HSC/matriculation, A-levels, US diploma, …). PURE. */
+export function normalizeEducationLevel(raw: string | null | undefined): EducationLevel | null {
+  const s = (raw ?? '').toLowerCase().trim()
+  if (!s) return null
+  if ((EDUCATION_LEVELS as readonly string[]).includes(s) || s === 'professional_cert') return s as EducationLevel
+  if (/ph\.?d|doctora|dphil/.test(s)) return 'doctorate'
+  if (/master|m\.?tech|m\.?sc|m\.?a\b|m\.?com|mba|pgdm|pg\s*diploma|post.?grad|masters/.test(s)) return 'postgraduate'
+  if (/bachelor|b\.?tech|b\.?e\b|b\.?sc|b\.?a\b|b\.?com|bba|bca|under.?grad|llb|mbbs/.test(s)) return 'undergraduate'
+  if (/diploma|associate|polytechnic/.test(s)) return 'diploma'
+  if (/12th|xii|class\s*12|hsc|higher secondary|senior secondary|intermediate|a-?level|high school/.test(s)) return 'senior_secondary'
+  if (/10th|\bx\b|class\s*10|ssc|matric|secondary school|o-?level/.test(s)) return 'secondary'
+  if (/certif|licen|credential|nanodegree|bootcamp/.test(s)) return 'professional_cert'
+  return null
+}
+
+/** The highest ACADEMIC level attained (professional certs excluded). PURE + tested. */
+export function highestEducationLevel(education: { level?: EducationLevel | null }[]): EducationLevel | null {
+  let best: EducationLevel | null = null
+  let bestRank = 0
+  for (const e of education ?? []) {
+    const r = e.level ? LEVEL_RANK[e.level] ?? 0 : 0
+    if (r > bestRank) { bestRank = r; best = e.level ?? null }
+  }
+  return best
 }
 
 const enrichmentSchema = z.object({
@@ -57,6 +97,8 @@ const enrichmentSchema = z.object({
         field: z.string().nullish(),
         school: z.string().nullish(),
         year: z.number().nullish(),
+        level: z.string().nullish(),  // normalized in toEnrichedProfile (robust to loose LLM output)
+        status: z.string().nullish(), // "completed" | "ongoing"
       }),
     )
     .default([]),
@@ -151,12 +193,18 @@ export function toEnrichedProfile(raw: EnrichmentRaw): EnrichedProfile {
     experience_years: typeof raw.experience_years === 'number' ? raw.experience_years : null,
     skills: (raw.skills ?? []).map((s) => s.trim()).filter(Boolean).slice(0, 30),
     experiences,
-    education: (raw.education ?? []).map((ed) => ({
-      degree: clean(ed.degree),
-      field: clean(ed.field),
-      school: clean(ed.school),
-      year: typeof ed.year === 'number' ? ed.year : null,
-    })),
+    education: (raw.education ?? []).map((ed) => {
+      const status = clean(ed.status)?.toLowerCase()
+      return {
+        degree: clean(ed.degree),
+        field: clean(ed.field),
+        school: clean(ed.school),
+        year: typeof ed.year === 'number' ? ed.year : null,
+        // Trust the model's level; fall back to inferring from the degree name.
+        level: normalizeEducationLevel(ed.level) ?? normalizeEducationLevel(ed.degree),
+        status: status === 'ongoing' ? 'ongoing' : status === 'completed' ? 'completed' : null,
+      }
+    }),
   }
 }
 
@@ -176,9 +224,10 @@ export function buildCandidateEnrichmentPrompt(): string {
   "experiences": [
     { "title": "", "employer": "", "location": "", "start": "YYYY-MM or YYYY", "end": "YYYY-MM or YYYY or present", "is_current": false, "summary": "<one line, optional>" }
   ],
-  "education": [ { "degree": "", "field": "", "school": "", "year": <graduation year or null> } ]
+  "education": [ { "degree": "", "field": "", "school": "", "year": <graduation year or null>, "level": "", "status": "" } ]
 }
-Rules: order experiences most-recent first. Use "present" for a current role's end and set is_current true. Use null for anything not stated — never guess dates.`
+Rules: order experiences most-recent first. Use "present" for a current role's end and set is_current true. Use null for anything not stated — never guess dates.
+For EACH education entry also return a normalized "level" — exactly one of: "secondary" (Class 10 / SSC / Matriculation / O-levels), "senior_secondary" (Class 12 / HSC / Intermediate / A-levels / high-school diploma), "diploma" (polytechnic / associate), "undergraduate" (Bachelor's — B.Tech/BE/BA/BSc/BCom/BBA/MBBS/LLB), "postgraduate" (Master's / PG diploma — MTech/MSc/MA/MBA/PGDM), "doctorate" (PhD), or "professional_cert" (a professional certificate/licence). Map ANY country's qualifications onto these. And a "status": "completed" or "ongoing".`
 }
 
 export async function enrichFromPdf(pdfBase64: string, identity: UsageIdentity = {}): Promise<EnrichedProfile> {
