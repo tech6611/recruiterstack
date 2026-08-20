@@ -11,6 +11,17 @@ entries on top.
 
 ## 2026-08-21
 
+### Changed
+- **The Fit Engine judge now reasons like a recruiter in market context — not a keyword
+  filter.** It's told to read the candidate's whole trajectory (what they studied, the
+  calibre of their institutions, the roles + companies they've actually worked in) in the
+  hiring norms of their market. For a professional-background gate, the **degree field is
+  a weak proxy, never a filter**: e.g. an IIT civil-engineering grad who then worked as a
+  Software Development Engineer genuinely has a software-engineering background (common in
+  India) → not disqualified on the degree label; institution pedigree + actual roles
+  outweigh titles/labels. Fails only when the whole picture shows the wrong kind of
+  professional; absent data still defaults to pass. `buildJudgePrompt`; no migration.
+
 ### Added
 - **Missing-data policy for background gates (Part B).** When a candidate has **no
   education AND no work history** on file, a background/identity deal-breaker ("is this a
