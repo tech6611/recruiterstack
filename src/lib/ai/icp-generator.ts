@@ -17,7 +17,6 @@ import { withRetry } from '@/lib/ai/retry'
 import { trackUsage, type UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
 import { deriveIcpSeed } from '@/lib/ai/icp-seed'
-import { analyzeRole } from '@/lib/ai/sourcing-strategist'
 import { DEFAULT_SCORING_CRITERIA } from '@/lib/scoring'
 import type { HiringRequest, ScoringCriterion } from '@/lib/types/database'
 import type { IcpCompetency, IcpDraftInput, IcpMustHave, SourcingMap } from '@/lib/types/icp'
@@ -450,7 +449,7 @@ Work in this exact order, and let each step drive the next:
 
 4) archetypes — 2–4 DISTINCT candidate "bets" that could each succeed (NOT one ideal). Each: a short name, a one-line thesis, where_from (career path / employer patterns), why_interested (the pitch), why_no (the friction), hire_risk (what this type typically gets wrong). Include at least one non-obvious/adjacent bet with is_non_obvious=true.
 
-5) competencies — NOW translate the reasoning above into 4–6 WEIGHTED competencies. THIS IS THE CRUX: the weights must be a direct consequence of your reasoning — put the most weight on whatever step 1 said matters most, and make the highest-weighted competency the strongest predictor you identified. Weights are integers that MUST sum to exactly 100. For each: a specific, role-relevant name (e.g. "Payments domain depth", not "Domain Experience"); 3–6 concrete, observable behaviours; a 1–4 anchor scale (1 poor → 4 excellent); optionally the hiring manager's verbatim phrasing. Give recruiter-first signals REAL weight when the role calls for them — company pedigree / feeder background (target companies or close comparables), scale & complexity, and span of management for leadership roles — rather than burying them in a generic competency.
+5) competencies — NOW translate the reasoning above into WEIGHTED competencies: choose AS MANY as THIS role genuinely needs — usually 4 to 7. Use more when the role has several distinct, independent success factors; use fewer when one or two clearly dominate. Do not pad to a round number. THIS IS THE CRUX: the weights must be a direct consequence of your reasoning — put the most weight on whatever step 1 said matters most, and make the highest-weighted competency the strongest predictor you identified. Do NOT default to a tidy 35/30/20/15 descending split — that is a template, not a judgement. The spread must reflect THIS role's real priorities: it is fine for one competency to clearly dominate (e.g. 45–55), for two to be near-tied, or for a genuinely minor factor to sit at 5–10. Two different roles should almost never produce the same weight column. Weights are integers that MUST sum to exactly 100. For each: a specific, role-relevant name (e.g. "Payments domain depth", not "Domain Experience"); 3–6 concrete, observable behaviours; a 1–4 anchor scale (1 poor → 4 excellent); optionally the hiring manager's verbatim phrasing. Give recruiter-first signals REAL weight when the role calls for them — company pedigree / feeder background (target companies or close comparables), scale & complexity, and span of management for leadership roles — rather than burying them in a generic competency.
 
 6) must_haves — the genuine DEAL-BREAKERS, written as plain yes/no questions a recruiter could answer from a CV. A candidate who fails any is REJECTED, so include only true non-negotiables. The most important is usually RELEVANT BACKGROUND — is this actually the right kind of professional for the role (an engineering role needs a genuine engineering background)? Also valid: a specifically required skill/license, or a hard minimum of years. Do NOT gate on location, relocation, or company pedigree — those are weighted signals, never rejections.
 
@@ -484,31 +483,17 @@ function draftFromReasoning(g: ReasoningFirstGeneration): IcpDraftInput {
 }
 
 /**
- * Generate a draft ICP AND its reasoning in one reasoning-first pass. For a fresh
- * role (no curated rubric) the weights are DERIVED from the reasoning. For a job with
- * a human-curated rubric we keep the existing enrichment (preserve those weights) and
- * reason about it afterwards. On any failure, falls back to the deterministic seed.
+ * Generate a draft ICP AND its reasoning in one reasoning-first pass. ALWAYS
+ * re-reasons: the weights and the NUMBER of competencies are derived fresh from the
+ * role every time — a "Regenerate" is an explicit rethink, so it never preserves the
+ * weights synced from a previously-approved ICP. On any failure, falls back to the
+ * deterministic seed (which does keep the job's existing rubric weights).
  */
 export async function generateIcpWithReasoning(
   job: HiringRequest,
   identity: UsageIdentity = {},
   intakeNotes?: string | null,
 ): Promise<{ draft: IcpDraftInput; sourcingMap: SourcingMap | null }> {
-  const hasCustomRubric = !isDefaultRubric(job.scoring_criteria)
-
-  // Curated rubric → don't rewrite the recruiter's weights: enrich, then reason.
-  if (hasCustomRubric) {
-    const draft = await generateIcp(job, identity, intakeNotes)
-    const sourcingMap = await analyzeRole(
-      job,
-      draft.competencies.map((c) => ({ name: c.name, weight: c.weight })),
-      draft.must_haves.map((m) => ({ label: m.label })),
-      identity,
-    ).catch(() => null)
-    return { draft, sourcingMap }
-  }
-
-  // Fresh role → one reasoning-first pass derives the weights from the reasoning.
   try {
     const { text, usage, model } = await withRetry(
       () => generateText(buildReasoningFirstPrompt(job, intakeNotes), { model: MODEL, maxTokens: 8192, json: true }),
