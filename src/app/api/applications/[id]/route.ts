@@ -4,6 +4,7 @@ import { notifySlack, notifySlackDM } from '@/lib/notifications'
 import { dispatchSlackEvent } from '@/lib/slack/dispatch'
 import { applicationStatusEnum } from '@/lib/validations/common'
 import { resolveApplicationHiringManager } from '@/modules/ats/domain/job-pipelines'
+import { logDecision } from '@/modules/ats/domain/scoring-feedback'
 import type { ApplicationUpdate } from '@/lib/types/database'
 
 // GET /api/applications/[id]
@@ -35,7 +36,7 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
 // body: { stage_id }                  → move to stage
 //     | { status }                    → reject / withdraw / hire
 //     | { note, event_type? }         → add note
-export const PATCH = withCapability('recruiting:edit', async (request, orgId, supabase, { params }) => {
+export const PATCH = withCapability('recruiting:edit', async (request, orgId, supabase, { params }, _scope, userId) => {
   let body: Record<string, unknown>
   try {
     body = await request.json()
@@ -222,6 +223,20 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
         created_by: 'Recruiter',
         org_id: orgId,
       })
+
+    // Freeze a point-in-time training row for the ICP learning loop (best-effort).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = data as any
+    if ((review_status === 'yes' || review_status === 'no' || review_status === 'maybe') && row?.job_id && row?.candidate_id) {
+      await logDecision(supabase, orgId, {
+        jobId: row.job_id,
+        candidateId: row.candidate_id,
+        applicationId: params.id,
+        source: 'application',
+        decision: review_status,
+        decidedBy: userId,
+      })
+    }
 
     return NextResponse.json({ data })
   }

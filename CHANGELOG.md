@@ -11,6 +11,27 @@ entries on top.
 
 ## 2026-08-20
 
+### Added
+- **ICP learning loop — Stage 1: the data foundation (no ML yet, just clean data).**
+  Every recruiter decision (Yes/No/Maybe, from the pipeline *or* on a sourced candidate)
+  now freezes a **point-in-time training row** in a new `scoring_feedback` table — the
+  candidate's features, the ICP's prediction (score + per-competency ratings + gates),
+  and the human verdict, exactly as they were at decision time (the live `ai_*` columns
+  get overwritten on re-score, so this is the only place that truth survives). Written
+  best-effort from the review + sourcing-decide routes; never blocks the user. New
+  `scoring-feedback.ts` facade (`logDecision`, pure `buildFeedbackRow`/`resolveCompetencyIds`).
+- **ICP evolution timeline + convergence signal.** The `icps` table was already fully
+  versioned; now every version records its **lineage** (`supersedes_id` set on *all*
+  versions, not just refinements) and **why it exists** (`derived_from`: generation /
+  regeneration / feedback / manual / template), and persists a per-version **embedding**
+  (for future job-to-job similarity + meaning-drift). New `getIcpEvolution` (weight/gate/
+  competency diffs across versions) + `getIcpConvergence` (did each newer version predict
+  your decisions better?) → `GET /api/jobs/[id]/icp/evolution`. Pure diff/agreement logic
+  unit-tested (8 tests).
+- **Schema:** migration **119** — `scoring_feedback` table (+ indexes, RLS), and
+  `icps.embedding vector(768)` + `icps.derived_from jsonb`. Additive/safe. **⚠️ Apply
+  migration 119 to prod; existing ICP embeddings backfill as ICPs are regenerated.**
+
 ### Changed
 - **Regenerate ICP now always re-reasons the weights — it no longer inherits the same
   4 buckets / same split every time.** Root cause: approving an ICP syncs its
