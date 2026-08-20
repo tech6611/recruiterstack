@@ -12,6 +12,23 @@ entries on top.
 ## 2026-08-20
 
 ### Added
+- **ICP learning engine — Stages 2–3 complete (backend; no frontend yet).** The full
+  learner that turns the decision log into a proposed ICP refinement, activating as
+  calibrations accumulate:
+  - **Pooled weight learning:** the weight suggestion now **borrows strength from
+    similar jobs** — cosine similarity over the persisted per-version ICP embeddings
+    finds the role's "family"; their decisions are pooled in at a fractional
+    (similarity-scaled) weight, so a role with few decisions of its own still learns.
+  - **Structural learning:** when the recruiter **systematically rejects candidates the
+    ICP rates a fit** (and who passed every gate), reweighting can't explain it — a
+    factor is missing. The engine detects this and asks Gemini to **name a new
+    competency** to add (and flags "too strict" the other way).
+  - **Proposal, not mutation:** `POST /api/jobs/[id]/icp/learn` drafts a **new ICP
+    version** (recalibrated weights + any new competency) with a plain-English change
+    summary; it's approved via the normal flow — **live scoring never changes without a
+    human.** `GET /api/jobs/[id]/icp/learning` shows readiness + the pooled weight
+    signal + the structural diagnosis. New `icp-learning.ts` facade + `weight-learning.ts`
+    extensions (weighted pooling, `detectStructuralGaps`), unit-tested. No migration.
 - **"Refine ICP from feedback" now reads the frozen decision log.** Instead of
   reconstructing labels from the live tables (which lose history on re-score), it reads
   `scoring_feedback` — point-in-time correct — falling back to the live tables only for

@@ -262,6 +262,35 @@ export async function getFeedbackLabels(supabase: Supabase, orgId: string, jobId
   }))
 }
 
+export interface FeedbackRow {
+  decision: Decision
+  predicted_bucket: string | null
+  predicted_score: number | null
+  passed_gates: boolean | null
+  competency_ratings: CompetencyRating[]
+  candidate_features: Record<string, unknown>
+  icp_version: number | null
+}
+
+/** Raw log rows for a job (richer than getFeedbackLabels) — used by the learner. */
+export async function getFeedbackRows(supabase: Supabase, orgId: string, jobId: string): Promise<FeedbackRow[]> {
+  const sb = supabase as unknown as LooseSb
+  const { data } = await sb.from('scoring_feedback')
+    .select('decision, predicted_bucket, predicted_score, passed_gates, competency_ratings, candidate_features, icp_version')
+    .eq('org_id', orgId).eq('job_id', jobId)
+    .order('decided_at', { ascending: false })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    decision: r.decision,
+    predicted_bucket: r.predicted_bucket ?? null,
+    predicted_score: r.predicted_score ?? null,
+    passed_gates: r.passed_gates ?? null,
+    competency_ratings: (r.competency_ratings ?? []) as CompetencyRating[],
+    candidate_features: (r.candidate_features ?? {}) as Record<string, unknown>,
+    icp_version: r.icp_version ?? null,
+  }))
+}
+
 // ── Convergence read-side ────────────────────────────────────────────────────────
 // Does each newer ICP version predict the recruiter's decisions better than the last?
 
