@@ -95,8 +95,9 @@ describe('buildIcpFromGeneration', () => {
     })
     expect(out.competencies.map((c) => c.id)).toContain('payments-domain-depth')
     expect(out.competencies.reduce((s, c) => s + c.weight, 0)).toBe(100)
-    // structural seed gates (location/seniority) are preserved, model gate appended
-    expect(out.must_haves.some((g) => g.attribute === 'location')).toBe(true)
+    // No auto-seeded location/seniority gates anymore — only the model's own
+    // deal-breakers survive (a good recruiter never rejects on location).
+    expect(out.must_haves.some((g) => g.attribute === 'location')).toBe(false)
     expect(out.must_haves.some((g) => g.attribute === 'min_experience')).toBe(true)
   })
 

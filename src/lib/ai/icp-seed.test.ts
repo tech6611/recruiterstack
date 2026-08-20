@@ -36,25 +36,18 @@ describe('deriveIcpSeed', () => {
     expect(seed.competencies.every((c) => c.behaviours.length === 0)).toBe(true)
   })
 
-  it('makes an on-site location a hard gate, but not a remote one', () => {
+  it('never auto-adds a location gate — location is a preference, not a deal-breaker', () => {
     const onsite = deriveIcpSeed(job({ location: 'Bengaluru', remote_ok: false }))
-    expect(onsite.must_haves).toContainEqual(
-      expect.objectContaining({ attribute: 'location', value: 'Bengaluru' }),
-    )
-
-    const remote = deriveIcpSeed(job({ location: 'Bengaluru', remote_ok: true }))
-    expect(remote.must_haves.find((m) => m.attribute === 'location')).toBeUndefined()
+    expect(onsite.must_haves.find((m) => m.attribute === 'location')).toBeUndefined()
   })
 
-  it('makes a specified level a seniority gate', () => {
+  it('never auto-adds a seniority gate from the level field', () => {
     const seed = deriveIcpSeed(job({ level: 'Senior' }))
-    expect(seed.must_haves).toContainEqual(
-      expect.objectContaining({ attribute: 'seniority', value: 'Senior' }),
-    )
+    expect(seed.must_haves.find((m) => m.attribute === 'seniority')).toBeUndefined()
   })
 
-  it('adds no gates when location is remote and level is unset', () => {
-    const seed = deriveIcpSeed(job({ location: null, remote_ok: true, level: null }))
-    expect(seed.must_haves).toEqual([])
+  it('adds no auto gates at all — the recruiter-brain LLM decides deal-breakers', () => {
+    expect(deriveIcpSeed(job({ location: 'Bengaluru', remote_ok: false, level: 'Senior' })).must_haves).toEqual([])
+    expect(deriveIcpSeed(job({ location: null, remote_ok: true, level: null })).must_haves).toEqual([])
   })
 })

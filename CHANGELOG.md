@@ -11,6 +11,25 @@ entries on top.
 
 ## 2026-08-20
 
+### Changed
+- **Fit Engine now screens like a recruiter — deal-breakers can reject, and location
+  never does.** Previously the only enforced hard gates were location/years/exact-skill,
+  a gate failure merely capped a candidate to "Okay fit" (so non-engineers looked
+  acceptable for engineering roles), and location was auto-forced as a gate that
+  silently sank strong out-of-city people. Now: (1) the ICP generator is prompted to
+  separate genuine **deal-breakers** (incl. "is this the right *kind* of professional?"
+  — e.g. a real engineering background) from **weighted signals**, and is told never to
+  gate on location or pedigree; (2) the AI judge — which already reads the full CV,
+  education and work history — **rules pass/fail on each deal-breaker with evidence**
+  (`gate_results`), replacing the rigid location/years/skill checker; (3) **failing any
+  deal-breaker REJECTS**: the score is floored into the reject band and the bucket
+  becomes "Weak fit / no", instead of capping at "Okay"; (4) **location & seniority can
+  never reject** — enforced in the engine (`gatingMustHaves`), which also neutralises
+  old auto-seeded gates on existing ICPs. Deal-breakers live on the versioned ICP, so
+  they still evolve via the feedback/refine loop. No migration.
+  *(Existing approved ICPs keep their old gates until you **Regenerate + re-approve** them.)*
+  `fit-engine.ts`, `fit-bucket.ts`, `icp-generator.ts`, `icp-seed.ts`, `schemas.ts`.
+
 ### Fixed
 - **No more fake `pool-…@unlocked.recruiterstack.in` email on unlocked market
   candidates.** When a Candidate-Pool profile had *no* email (only LinkedIn/phone),

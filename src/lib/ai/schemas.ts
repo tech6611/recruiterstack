@@ -34,6 +34,13 @@ export const icpFitResponseSchema = z.object({
     rating:   z.number().min(1).max(4),
     evidence: z.string().catch(''),
   })).catch([]),
+  // The judge's pass/fail verdict on each hard deal-breaker (must-have), by id.
+  // `pass` defaults to true so a parse hiccup never wrongly rejects someone.
+  gate_results: z.array(z.object({
+    id:     z.string(),
+    pass:   z.boolean().catch(true),
+    reason: z.string().catch(''),
+  })).catch([]),
   red_flags: z.array(z.string()).catch([]),
   strengths: z.array(z.string()).catch([]),
   gaps:      z.array(z.string()).catch([]),

@@ -217,7 +217,16 @@ WEIGHT WHAT A RECRUITER SCREENS ON FIRST. These are usually the strongest predic
 - **Scale & complexity** — has the person operated at the transaction volume, user/revenue scale, regulatory intensity, or company stage this role demands?
 - **Span of management** (for people-manager / leadership roles) — the size of team managed and the seniority of reports. A role that manages a team of N needs a competency (and often a gate) reflecting that scope.
 
-Also identify HARD MUST-HAVES — genuine non-negotiable gates (specific required skills, minimum years, minimum team size managed, required certifications). Only true non-negotiables from the inputs, not soft preferences. Do NOT gate on company pedigree (keep it a weighted signal, never a hard filter — bias risk).
+Also identify HARD MUST-HAVES — the genuine DEAL-BREAKERS. A candidate who fails ANY must-have is REJECTED (not merely down-ranked), so include only things that are truly non-negotiable and disqualifying-if-absent — the way an experienced recruiter would screen a résumé before spending another second on it. For each, write the "label" as a plain yes/no question a recruiter could answer by reading a CV.
+
+The single most important deal-breaker is usually RIGHT KIND OF PROFESSIONAL / RELEVANT BACKGROUND: is this person actually the sort of professional this role is for? An engineering role needs a genuine engineering background; a nursing role needs a nurse; a sales role needs a seller. Include this as a must-have whenever the role has a clear professional identity — it is what stops obviously-wrong profiles from slipping through.
+
+Other valid deal-breakers: a specifically required hard skill or license/certification the role cannot be done without, or a hard minimum of years where the JD makes it non-negotiable.
+
+Do NOT make these hard must-haves (keep them as WEIGHTED SIGNALS instead — rejecting on them is bad recruiting / bias risk):
+- Location or willingness to relocate — a preference, never a rejection.
+- Company pedigree / feeder background — weight it, never gate it.
+- "Nice to have" skills, or a preferred (vs required) seniority label.
 
 Respond with ONLY valid JSON (no markdown, no commentary):
 {
@@ -225,6 +234,7 @@ Respond with ONLY valid JSON (no markdown, no commentary):
     { "name": "...", "weight": 30, "behaviours": ["..."], "anchors": { "1": "...", "2": "...", "3": "...", "4": "..." }, "verbatim": "..." }
   ],
   "must_haves": [
+    { "label": "Has a genuine software-engineering background (built and shipped software)", "attribute": "background", "operator": "includes", "value": "software engineering" },
     { "label": "5+ years in payments", "attribute": "min_experience", "operator": "gte", "value": "5" }
   ]
 }`
@@ -281,11 +291,12 @@ For EACH competency id listed below, write:
 Competencies (keep these exact ids; do NOT invent new ones or change weights):
 ${compList}
 
-Separately, identify HARD MUST-HAVES — non-negotiable gates that would auto-filter a candidate (specific required skills, minimum years of experience, required certifications). Only include genuine non-negotiables from the requirements, NOT soft preferences.
+Separately, identify HARD MUST-HAVES — the genuine DEAL-BREAKERS. A candidate who fails any must-have is REJECTED, so include only truly non-negotiable, disqualifying-if-absent things, and write each "label" as a plain yes/no question answerable from a CV. Usually the most important one is RELEVANT BACKGROUND — is this actually the right kind of professional for the role (e.g. an engineering role needs a genuine engineering background)? Also valid: a specifically required skill/license, or a hard minimum of years. Do NOT gate on location, relocation, company pedigree, or soft preferences — keep those as weighted signals.
 
 Respond with ONLY valid JSON (no markdown, no commentary), in exactly this shape:
 {
   "must_haves": [
+    { "label": "Has a genuine growth-marketing background", "attribute": "background", "operator": "includes", "value": "growth marketing" },
     { "label": "5+ years in growth marketing", "attribute": "min_experience", "operator": "gte", "value": "5" }
   ],
   "competencies": [

@@ -7,11 +7,12 @@
 
 export type FitBucket = 'great' | 'good' | 'okay' | 'weak'
 
-/** Four bands: >=80 great, >=60 good, >=40 okay, <40 weak. A gate failure caps
- *  optimism to "okay" (never rejects), but a genuinely weak score stays weak. PURE. */
+/** Four bands: >=80 great, >=60 good, >=40 okay, <40 weak. Failing a hard
+ *  deal-breaker REJECTS: it forces the lowest band ("weak") regardless of score.
+ *  (The Fit Engine also floors the score itself on a gate failure, so callers that
+ *  don't pass `passedGates` still read a reject correctly.) PURE. */
 export function fitBucketFor(score: number, passedGates = true): FitBucket {
   const s = Number.isFinite(score) ? score : 0
-  let bucket: FitBucket = s >= 80 ? 'great' : s >= 60 ? 'good' : s >= 40 ? 'okay' : 'weak'
-  if (!passedGates && bucket !== 'weak') bucket = 'okay'
-  return bucket
+  if (!passedGates) return 'weak'
+  return s >= 80 ? 'great' : s >= 60 ? 'good' : s >= 40 ? 'okay' : 'weak'
 }
