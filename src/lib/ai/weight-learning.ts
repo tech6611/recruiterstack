@@ -35,13 +35,20 @@ export interface WeightSignal {
 interface Label {
   decision: 'yes' | 'no' | 'maybe'
   competencies: { name: string; rating: number | null }[]
+  // Importance of this example: 1 for a decision on THIS job, a fraction for a
+  // decision borrowed from a similar job (cross-job pooling). Defaults to 1.
+  weight?: number
 }
 interface CompetencyWeight { id?: string | null; name: string; weight: number }
 
 const MIN_DECISIONS = 5
-const SHRINK_K = 12 // decisions needed to reach 50% confidence
+const SHRINK_K = 12 // (effective) decisions needed to reach 50% confidence
 
-const mean = (a: number[]): number | null => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null)
+/** Weighted mean of {value, weight} pairs. PURE. */
+const wMean = (pairs: { v: number; w: number }[]): number | null => {
+  const wsum = pairs.reduce((s, p) => s + p.w, 0)
+  return wsum > 0 ? pairs.reduce((s, p) => s + p.v * p.w, 0) / wsum : null
+}
 
 /** Rescale to integers summing to 100, absorbing rounding drift on the largest. PURE. */
 function normalizeTo100(weights: number[]): number[] {
@@ -70,20 +77,23 @@ export function computeWeightSignal(
 
   const decisive = labels.filter((l) => l.decision === 'yes' || l.decision === 'no')
   const decided = decisive.length
-  const confidence = decided / (decided + k)
+  // Effective sample size counts a borrowed (down-weighted) decision fractionally,
+  // so cross-job pooling adds confidence, but less than a decision on this job.
+  const effectiveN = decisive.reduce((s, l) => s + (l.weight ?? 1), 0)
+  const confidence = effectiveN / (effectiveN + k)
 
   const rows: WeightSignalRow[] = competencies.map((c) => {
     const nameKey = c.name.trim().toLowerCase()
-    const yes: number[] = []
-    const no: number[] = []
+    const yes: { v: number; w: number }[] = []
+    const no: { v: number; w: number }[] = []
     for (const l of decisive) {
       const r = l.competencies.find((x) => x.name.trim().toLowerCase() === nameKey)?.rating
       if (r == null) continue
-      if (l.decision === 'yes') yes.push(r)
-      else no.push(r)
+      if (l.decision === 'yes') yes.push({ v: r, w: l.weight ?? 1 })
+      else no.push({ v: r, w: l.weight ?? 1 })
     }
-    const mean_yes = mean(yes)
-    const mean_no = mean(no)
+    const mean_yes = wMean(yes)
+    const mean_no = wMean(no)
     const separation = mean_yes != null && mean_no != null ? (mean_yes - mean_no) / 3 : null
     return {
       id: c.id ?? null,
@@ -98,7 +108,7 @@ export function computeWeightSignal(
     }
   })
 
-  const sufficient = decided >= minDecisions && rows.some((r) => r.separation != null)
+  const sufficient = effectiveN >= minDecisions && rows.some((r) => r.separation != null)
   if (!sufficient) return { decided, confidence, sufficient: false, competencies: rows }
 
   // Signal-implied importance = the POSITIVE part of each competency's separation
@@ -116,4 +126,53 @@ export function computeWeightSignal(
   rows.forEach((r, i) => (r.suggested_weight = suggested[i]))
 
   return { decided, confidence, sufficient: true, competencies: rows }
+}
+
+// ── Structural gaps (Stage 3) ────────────────────────────────────────────────────
+// Reweighting can only move the competencies the ICP already has. When the recruiter
+// SYSTEMATICALLY disagrees with a confident ICP, the ICP is missing a factor entirely:
+//  - rejecting people the ICP rated a fit (and who passed every gate) ⇒ there's an
+//    unwritten DISQUALIFIER / missing competency the recruiter screens on.
+//  - accepting people the ICP rated a poor fit ⇒ the ICP is too harsh / missing a
+//    positive factor those people share.
+
+export interface GapRow {
+  decision: 'yes' | 'no' | 'maybe'
+  icp_positive: boolean // the ICP rated this candidate a fit
+  passed_gates: boolean
+}
+
+export interface StructuralDiagnosis {
+  decided: number
+  reject_despite_positive: number // count: recruiter No, ICP fit + passed gates
+  positives: number               // count of ICP-positive, gate-passing candidates
+  accept_despite_negative: number // count: recruiter Yes, ICP not a fit
+  negatives: number               // count of ICP-negative candidates
+  missing_disqualifier: boolean   // a new competency/gate likely needed
+  too_harsh: boolean              // the ICP likely over-filters
+}
+
+const GAP_MIN = 4          // need a few examples of the pattern
+const GAP_RATE = 0.4       // …occurring at least this often
+
+/** Diagnose systematic disagreement that reweighting alone can't fix. PURE + tested. */
+export function detectStructuralGaps(rows: GapRow[]): StructuralDiagnosis {
+  const decisive = rows.filter((r) => r.decision === 'yes' || r.decision === 'no')
+  const positives = decisive.filter((r) => r.icp_positive && r.passed_gates)
+  const negatives = decisive.filter((r) => !r.icp_positive)
+  const reject_despite_positive = positives.filter((r) => r.decision === 'no').length
+  const accept_despite_negative = negatives.filter((r) => r.decision === 'yes').length
+
+  const rejectRate = positives.length ? reject_despite_positive / positives.length : 0
+  const acceptRate = negatives.length ? accept_despite_negative / negatives.length : 0
+
+  return {
+    decided: decisive.length,
+    reject_despite_positive,
+    positives: positives.length,
+    accept_despite_negative,
+    negatives: negatives.length,
+    missing_disqualifier: reject_despite_positive >= GAP_MIN && rejectRate >= GAP_RATE,
+    too_harsh: accept_despite_negative >= GAP_MIN && acceptRate >= GAP_RATE,
+  }
 }

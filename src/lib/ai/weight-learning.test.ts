@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeWeightSignal } from './weight-learning'
+import { computeWeightSignal, detectStructuralGaps, type GapRow } from './weight-learning'
 
 // Two competencies at 50/50. "signal" cleanly separates Yes (rating 4) from No (rating 1);
 // "noise" is ~2.5 for everyone. The learner should shift weight toward "signal".
@@ -54,5 +54,50 @@ describe('computeWeightSignal', () => {
     ]
     const r = computeWeightSignal(withMaybes, comps)
     expect(r.decided).toBe(10) // the maybe is not counted
+  })
+
+  it('pools borrowed (down-weighted) labels but trusts them less than own decisions', () => {
+    // Only 3 own decisions (insufficient) + 20 borrowed at weight 0.5 → effective 3+10.
+    const own = labels(3)
+    const borrowed = labels(20).map((l) => ({ ...l, weight: 0.5 }))
+    const r = computeWeightSignal([...own, ...borrowed], comps)
+    expect(r.sufficient).toBe(true) // effectiveN (13) crosses the threshold
+    expect(r.confidence).toBeLessThan(0.6) // but confidence is modest, not as if 23 own
+  })
+})
+
+describe('detectStructuralGaps', () => {
+  const row = (decision: 'yes' | 'no', icp_positive: boolean, passed_gates = true): GapRow => ({ decision, icp_positive, passed_gates })
+
+  it('flags a missing disqualifier when the recruiter keeps rejecting ICP-loved candidates', () => {
+    const rows: GapRow[] = [
+      ...Array(6).fill(null).map(() => row('no', true)),   // rejected despite ICP fit + gates passed
+      ...Array(3).fill(null).map(() => row('yes', true)),
+    ]
+    const d = detectStructuralGaps(rows)
+    expect(d.reject_despite_positive).toBe(6)
+    expect(d.missing_disqualifier).toBe(true)
+    expect(d.too_harsh).toBe(false)
+  })
+
+  it('flags too-harsh when the recruiter keeps accepting ICP-rejected candidates', () => {
+    const rows: GapRow[] = [
+      ...Array(5).fill(null).map(() => row('yes', false)), // accepted despite ICP negative
+      ...Array(4).fill(null).map(() => row('no', false)),
+    ]
+    const d = detectStructuralGaps(rows)
+    expect(d.accept_despite_negative).toBe(5)
+    expect(d.too_harsh).toBe(true)
+    expect(d.missing_disqualifier).toBe(false)
+  })
+
+  it('stays quiet when the ICP and recruiter mostly agree', () => {
+    const rows: GapRow[] = [
+      ...Array(8).fill(null).map(() => row('yes', true)),
+      ...Array(8).fill(null).map(() => row('no', false)),
+    ]
+    const d = detectStructuralGaps(rows)
+    expect(d.missing_disqualifier).toBe(false)
+    expect(d.too_harsh).toBe(false)
   })
 })
