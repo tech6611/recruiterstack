@@ -116,7 +116,11 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
     }
     const { data } = await res.json()
     if (data.quota_exceeded) toast.error('Unlock quota reached — upgrade to unlock more.')
-    else toast.success(`Unlocked ${data.unlocked} · added ${data.added} to the pipeline.`)
+    else {
+      toast.success(`Unlocked ${data.unlocked} · added ${data.added} to the pipeline.`)
+      if (data.no_contact) toast(`${data.no_contact} skipped — no contact details, so no credit spent.`)
+      if (data.no_email) toast(`${data.no_email} had no email on file — reach out via LinkedIn or find their email before sequencing.`)
+    }
     setMatches((m) => m.filter((x) => !selected.has(x.profile_id)))
     setSelected(new Set())
   }

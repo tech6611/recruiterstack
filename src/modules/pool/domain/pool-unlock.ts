@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import { getPoolAccess } from '@/modules/pool/domain/pool'
+import { poolPlaceholderEmail } from '@/lib/pool-email'
 import { logger } from '@/lib/logger'
 
 type Supabase = SupabaseClient<Database>
@@ -33,8 +34,8 @@ export type ProjectCandidate = (
 ) => Promise<{ id: string }>
 
 export type UnlockResult =
-  | { status: 'unlocked' | 'already'; candidate_id: string }
-  | { status: 'no_access' | 'quota_exceeded' | 'not_found' }
+  | { status: 'unlocked' | 'already'; candidate_id: string; placeholder_email?: boolean }
+  | { status: 'no_access' | 'quota_exceeded' | 'not_found' | 'no_contact' }
   | { status: 'error'; message: string }
 
 /**
@@ -68,16 +69,24 @@ export async function unlockPoolProfile(
 
   const { data: contacts } = await sb.from('pool_contacts').select('kind, value').eq('profile_id', profileId)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const email = (contacts ?? []).find((c: any) => c.kind === 'email')?.value
-    ?? `pool-${profileId}@unlocked.recruiterstack.in` // candidate identity needs an email; placeholder if none
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const linkedin = (contacts ?? []).find((c: any) => c.kind === 'linkedin')?.value ?? null
+  const find = (kind: string) => (contacts ?? []).find((c: any) => c.kind === kind)?.value ?? null
+  const realEmail = find('email')
+  const linkedin = find('linkedin')
+  const phone = find('phone')
+
+  // Nothing to reach them by — don't spend a credit on an uncontactable profile.
+  if (!realEmail && !linkedin && !phone) return { status: 'no_contact' }
+
+  // Candidate identity needs an email; if there's none, use a non-deliverable
+  // placeholder (.invalid) — the UI shows "no email on file" and sequences skip it.
+  const usingPlaceholder = !realEmail
+  const email = realEmail ?? poolPlaceholderEmail(profileId)
 
   try {
     const result = await projectCandidate(supabase, orgId, {
       name: profile.display_name ?? 'Candidate',
       email,
-      phone: null,
+      phone,
       resume_url: null,
       current_title: profile.current_title ?? null,
       current_company: profile.current_company ?? null,
@@ -104,7 +113,7 @@ export async function unlockPoolProfile(
     await sb.from('pool_unlocks').insert({ org_id: orgId, profile_id: profileId, user_id: userId ?? null, candidate_id: candidateId })
     await sb.from('pool_access_grants').update({ unlocks_used: (access.unlocksUsed ?? 0) + 1 }).eq('org_id', orgId)
 
-    return { status: 'unlocked', candidate_id: candidateId }
+    return { status: 'unlocked', candidate_id: candidateId, placeholder_email: usingPlaceholder }
   } catch (err) {
     logger.error('Pool unlock failed', err, { orgId, profileId })
     return { status: 'error', message: err instanceof Error ? err.message : 'unlock failed' }

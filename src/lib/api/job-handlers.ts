@@ -30,6 +30,7 @@ import { getApplicationJobTokens, resolveApplicationHiringManager } from '@/modu
 import { randomBytes } from 'crypto'
 import { isSuppressedFromSequences, unsubscribeUrl, unsubscribeFooterHtml } from '@/modules/crm/domain/unsubscribe'
 import { applyTokens } from '@/lib/sequences/tokens'
+import { isPoolPlaceholderEmail } from '@/lib/pool-email'
 
 // ── Autopilot ─────────────────────────────────────────────────────────────────
 
@@ -393,6 +394,17 @@ registerHandler('sequence_email', async (job: QueuedJob) => {
   const candidate = enrollment.candidates
   if (!candidate?.email) {
     logger.error('Candidate has no email', undefined, { enrollmentId })
+    return
+  }
+
+  // Pool-unlocked profiles with no real email carry a non-deliverable placeholder
+  // (.invalid). Never send to it — stop the enrollment so it doesn't retry forever.
+  if (isPoolPlaceholderEmail(candidate.email)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('sequence_enrollments') as any)
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', enrollmentId)
+    logger.info('Sequence stopped — candidate has no real email (pool placeholder)', { enrollmentId })
     return
   }
 

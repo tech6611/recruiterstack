@@ -8,6 +8,7 @@ import {
 import type { Candidate, CandidateTag, Application, HiringRequest } from '@/lib/types/database'
 import TagInput from './TagInput'
 import { avatarColor, initials } from '@/lib/ui/avatar'
+import { isPoolPlaceholderEmail } from '@/lib/pool-email'
 import { useCandidateProfile } from './CandidateProfileContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -90,20 +91,28 @@ export default React.memo(function LeftPanel({
         <div className="space-y-2.5 text-sm">
           <div className="flex items-center gap-2.5 group">
             <Mail className="h-4 w-4 shrink-0 text-slate-400" />
-            <button
-              onClick={onDraftEmail}
-              className="flex-1 min-w-0 text-left text-emerald-600 hover:text-emerald-800 transition-colors truncate text-sm"
-              title="Draft AI email to candidate"
-            >
-              {candidate.email}
-            </button>
-            <a
-              href={`mailto:${candidate.email}`}
-              title="Open in mail client"
-              className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-600"
-            >
-              <ExternalLink className="h-3 w-3" />
-            </a>
+            {isPoolPlaceholderEmail(candidate.email) ? (
+              <span className="flex-1 min-w-0 truncate text-sm italic text-slate-400" title="This profile was unlocked without an email address">
+                No email on file
+              </span>
+            ) : (
+              <>
+                <button
+                  onClick={onDraftEmail}
+                  className="flex-1 min-w-0 text-left text-emerald-600 hover:text-emerald-800 transition-colors truncate text-sm"
+                  title="Draft AI email to candidate"
+                >
+                  {candidate.email}
+                </button>
+                <a
+                  href={`mailto:${candidate.email}`}
+                  title="Open in mail client"
+                  className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-600"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </>
+            )}
           </div>
           {candidate.phone && (
             <div className="flex items-center gap-2.5 text-slate-600">
