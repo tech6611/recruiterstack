@@ -17,6 +17,7 @@ import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { createNotification } from '@/lib/api/notify'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
+import { getCandidatesHistory } from '@/modules/ats/domain/candidate-enrichment'
 import { logger } from '@/lib/logger'
 import type { JobScoreResponse } from '@/lib/ai/schemas'
 import type { Icp } from '@/lib/types/icp'
@@ -99,6 +100,12 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
         ? stages.find(s => s.id === job.auto_advance_stage_id)
         : null
 
+      // Education + work history for all applicants up front (one batch), so the Fit
+      // Engine judges background deal-breakers on real evidence, not the title alone.
+      const histories = useIcp
+        ? await getCandidatesHistory(supabase, orgId, apps.map((a) => a.candidate?.id).filter(Boolean) as string[])
+        : new Map()
+
       // ── 3. Score each application (sequentially for meaningful progress) ────
       for (const app of apps) {
         const candidate = app.candidate
@@ -121,7 +128,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
           let icpProgress: Record<string, unknown> = {}
 
           if (useIcp) {
-            const fit = await scoreAgainstIcp(candidate, icp!, { orgId, userId })
+            const fit = await scoreAgainstIcp(candidate, icp!, { orgId, userId }, undefined, histories.get(candidate.id))
             result = {
               score:          fit.score,
               recommendation: fit.recommendation,

@@ -3,6 +3,7 @@ import type { Database } from '@/lib/types/database'
 import { RESUME_BUCKET, resumeStoragePath, resumeExt } from '@/lib/storage/resume'
 import { embedText } from '@/lib/ai/llm'
 import { enrichFromPdf, deriveMovability, type EnrichedProfile } from '@/lib/ai/candidate-enrichment'
+import type { CandidateHistory } from '@/lib/ai/fit-engine'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
 
@@ -109,6 +110,41 @@ export async function enrichCandidateById(
     logger.error('Candidate enrichment failed', err, { candidateId })
     return { status: 'error', message: err instanceof Error ? err.message : 'enrichment failed' }
   }
+}
+
+/**
+ * Batch-fetch education + dated work history for many candidates — the evidence the
+ * Fit Engine needs to judge a background/identity deal-breaker. Two queries total.
+ */
+export async function getCandidatesHistory(
+  supabase: Supabase,
+  orgId: string,
+  candidateIds: string[],
+): Promise<Map<string, CandidateHistory>> {
+  const map = new Map<string, CandidateHistory>()
+  const ids = Array.from(new Set(candidateIds.filter(Boolean)))
+  if (ids.length === 0) return map
+  const sb = supabase as unknown as LooseSb
+  const [{ data: cands }, { data: exps }] = await Promise.all([
+    sb.from('candidates').select('id, education').eq('org_id', orgId).in('id', ids),
+    sb.from('candidate_experiences')
+      .select('candidate_id, title, employer, start_date, end_date, is_current, sort_order')
+      .eq('org_id', orgId).in('candidate_id', ids).order('sort_order', { ascending: true }),
+  ])
+  type Edu = NonNullable<CandidateHistory['education']>
+  type Exp = NonNullable<CandidateHistory['experiences']>
+  const eduById = new Map<string, Edu>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const c of (cands ?? []) as any[]) eduById.set(c.id, (c.education ?? []) as Edu)
+  const expsById = new Map<string, Exp>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const e of (exps ?? []) as any[]) {
+    const arr = expsById.get(e.candidate_id) ?? ([] as Exp)
+    arr.push({ title: e.title, employer: e.employer, start_date: e.start_date, end_date: e.end_date, is_current: e.is_current })
+    expsById.set(e.candidate_id, arr)
+  }
+  for (const id of ids) map.set(id, { education: eduById.get(id) ?? [], experiences: expsById.get(id) ?? [] })
+  return map
 }
 
 /** Read a candidate's enriched history + derived movability (for the profile UI). */

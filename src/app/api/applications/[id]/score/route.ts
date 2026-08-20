@@ -4,6 +4,7 @@ import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
+import { getCandidatesHistory } from '@/modules/ats/domain/candidate-enrichment'
 import type { Icp } from '@/lib/types/icp'
 import type { ApplicationUpdate, HiringRequest } from '@/lib/types/database'
 
@@ -53,7 +54,8 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
   let respExtra: Record<string, unknown> = {}
 
   if (icp && icp.status === 'approved') {
-    const fit = await scoreAgainstIcp(candidate, icp, { orgId, userId })
+    const histories = await getCandidatesHistory(supabase, orgId, [candidate.id])
+    const fit = await scoreAgainstIcp(candidate, icp, { orgId, userId }, undefined, histories.get(candidate.id))
     update.ai_score          = fit.score
     update.ai_recommendation = fit.recommendation
     update.ai_strengths      = fit.strengths
