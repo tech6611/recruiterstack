@@ -12,6 +12,21 @@ entries on top.
 ## 2026-08-20
 
 ### Changed
+- **ICP generation is now reasoning-first — the reasoning derives the weights, not the
+  other way round.** Previously the AI locked the weighted competencies first, then a
+  second call wrote "How this ICP was reasoned" to *justify* the numbers already set
+  (the tail explaining the dog). Now a single elaborate "recruiter's brain" pass reasons
+  about the role first — what it really is, what predicts success, unwritten filters,
+  candidate archetypes — and the **weighted competency column falls out of that
+  reasoning** (highest weight on what the reasoning says matters most), along with the
+  deal-breaker questions. It's also **one Gemini Pro call instead of two**. Jobs with a
+  human-curated rubric still keep their weights (enrich + reason). New
+  `generateIcpWithReasoning`; `GET/POST …/icp/generate`. No migration; regenerate an ICP
+  to see it.
+- **ICP editor: a must-have is just its plain-English question.** Removed the leftover
+  attribute/operator/value dropdowns (which mis-rendered new AI tags like "background"
+  as "location" and could silently turn a real gate into an ignored location gate). The
+  Fit Engine judges each deal-breaker from the question text. `IcpEditor.tsx`.
 - **Fit Engine now screens like a recruiter — deal-breakers can reject, and location
   never does.** Previously the only enforced hard gates were location/years/exact-skill,
   a gate failure merely capped a candidate to "Okay fit" (so non-engineers looked
