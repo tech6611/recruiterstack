@@ -11,6 +11,20 @@ entries on top.
 
 ## 2026-08-21
 
+### Fixed
+- **The Fit Engine now judges background deal-breakers on education + work history — not
+  the current title.** A "genuine engineering background" gate was passing non-engineers
+  (e.g. a "Strategy & Ops Manager" with a few adjacent skills like Python/SQL) because the
+  judge prompt only ever received the candidate's **current title, a years number, a flat
+  skills list, and location** — never their **education or dated work history**, the exact
+  evidence that determines it. Now the judge gets both (fetched per candidate), and is
+  told to judge a professional-background/identity gate ONLY from what they studied and
+  the roles they actually held — a title in another function or adjacent skills is not
+  evidence, and a full non-engineering history is grounds to **fail**. Wired into internal
+  sourcing, the market (Pool B), and single + bulk applicant scoring. New
+  `getCandidatesHistory` batch fetch; `CandidateHistory` on `scoreAgainstIcp`. No migration
+  — **re-source / re-score to apply** (cached rows keep their old verdict until then).
+
 ### Changed
 - **Sourcing tab sections are now collapsible.** The four sections — *From your candidates*
   (internal), *From the market*, *Shortlist brief*, and *What the pipeline is teaching you* —

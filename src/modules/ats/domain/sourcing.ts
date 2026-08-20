@@ -5,6 +5,7 @@ import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { listCandidatesForOrg } from '@/modules/ats/domain/candidates'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
+import { getCandidatesHistory } from '@/modules/ats/domain/candidate-enrichment'
 import { rankCandidatesForIcp } from '@/lib/ai/sourcing-rank'
 import { icpEmbeddingText } from '@/lib/ai/embeddings'
 import { embedText } from '@/lib/ai/llm'
@@ -141,13 +142,17 @@ export async function runSourcing(
   const candidates = pool.filter((c) => !inPipeline.has(c.id))
   const shortlist = await shortlistForIcp(supabase, orgId, icp, candidates, inPipeline)
 
+  // Education + work history for the shortlist, so background deal-breakers ("is this a
+  // genuine engineer?") are judged on real evidence, not the current title alone.
+  const histories = await getCandidatesHistory(supabase, orgId, shortlist.map((c) => c.id))
+
   const sb = supabase as unknown as LooseSb
   let scored = 0
   for (let i = 0; i < shortlist.length; i += CONCURRENCY) {
     const chunk = shortlist.slice(i, i + CONCURRENCY)
     const fits = await Promise.all(
       chunk.map((c) =>
-        scoreAgainstIcp(c, icp, identity)
+        scoreAgainstIcp(c, icp, identity, undefined, histories.get(c.id))
           .then((f) => ({ candidateId: c.id, fit: f }))
           .catch(() => null),
       ),

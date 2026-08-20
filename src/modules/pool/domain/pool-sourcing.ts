@@ -89,6 +89,21 @@ export async function sourcePoolForIcp(
   const byId = new Map((profiles ?? []).map((p: any) => [p.id, p]))
   const ordered = ids.map((id) => byId.get(id)).filter(Boolean)
 
+  // Dated work history per profile, so background deal-breakers are judged on real
+  // roles held — not the current title alone (market profiles are often the thinnest).
+  const { data: pexps } = await sb
+    .from('pool_experiences')
+    .select('profile_id, title, employer, start_date, end_date, is_current, sort_order')
+    .in('profile_id', ids).order('sort_order', { ascending: true })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const expsByProfile = new Map<string, any[]>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const e of (pexps ?? []) as any[]) {
+    const arr = expsByProfile.get(e.profile_id) ?? []
+    arr.push({ title: e.title, employer: e.employer, start_date: e.start_date, end_date: e.end_date, is_current: e.is_current })
+    expsByProfile.set(e.profile_id, arr)
+  }
+
   const matches: PoolMatch[] = []
   for (let i = 0; i < ordered.length; i += CONCURRENCY) {
     const chunk = ordered.slice(i, i + CONCURRENCY)
@@ -96,7 +111,7 @@ export async function sourcePoolForIcp(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       chunk.map(async (p: any) => {
         try {
-          const fit = await scoreAgainstIcp(poolProfileToFitCandidate(p), icp, identity)
+          const fit = await scoreAgainstIcp(poolProfileToFitCandidate(p), icp, identity, undefined, { experiences: expsByProfile.get(p.id) ?? [] })
           return {
             profile_id: p.id,
             name: p.display_name,
