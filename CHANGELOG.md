@@ -107,6 +107,12 @@ entries on top.
   `fit-engine.ts`, `fit-bucket.ts`, `icp-generator.ts`, `icp-seed.ts`, `schemas.ts`.
 
 ### Fixed
+- **ICP approve/save no longer fails with "Validation failed."** After must-haves became
+  plain-English questions (label only), the draft validation schema still *required* the
+  legacy `attribute`/`operator` fields to be non-empty — so saving or approving any ICP
+  with a label-only gate (i.e. every reasoning-first ICP) was rejected. Made those legacy
+  fields optional/empty-allowed (the Fit Engine judges a must-have from its label).
+  Regression-tested. `src/lib/validations/icp.ts`.
 - **No more fake `pool-…@unlocked.recruiterstack.in` email on unlocked market
   candidates.** When a Candidate-Pool profile had *no* email (only LinkedIn/phone),
   unlocking it minted a fake-looking placeholder address that showed on the candidate
