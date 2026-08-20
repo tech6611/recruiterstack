@@ -3,6 +3,7 @@ import { withCapability, handleSupabaseError } from '@/lib/api/helpers'
 import { getCurrentIcp, refineIcp } from '@/modules/ats/domain/icp'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
 import { getSourcingMatches } from '@/modules/ats/domain/sourcing'
+import { getFeedbackLabels } from '@/modules/ats/domain/scoring-feedback'
 import {
   summarizeFeedback,
   suggestRefinement,
@@ -64,7 +65,11 @@ export const POST = withCapability(
         title: m.candidate?.current_title ?? null,
       }))
 
-    const labels = [...appLabels, ...sourcingLabels]
+    // Prefer the frozen decision log (point-in-time correct, keeps history the live
+    // tables may have re-scored away). Fall back to the live tables for jobs whose
+    // decisions predate the log (migration 119).
+    const logLabels = await getFeedbackLabels(supabase, orgId, params.id).catch(() => [])
+    const labels = logLabels.length ? logLabels : [...appLabels, ...sourcingLabels]
 
     if (labels.length < MIN_FEEDBACK) {
       return NextResponse.json({

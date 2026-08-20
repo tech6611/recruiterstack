@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import { deriveMovability } from '@/lib/ai/candidate-enrichment'
+import type { FeedbackLabel } from '@/lib/ai/icp-feedback'
+import { computeWeightSignal, type WeightSignal } from '@/lib/ai/weight-learning'
+import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { logger } from '@/lib/logger'
 
 /**
@@ -233,6 +236,32 @@ export async function logDecision(
   }
 }
 
+// ── Read-side for the refinement loop ────────────────────────────────────────────
+
+/**
+ * The recruiter's decisions for a job as FeedbackLabels, read from the frozen log
+ * (point-in-time correct, and includes history the live tables may have re-scored
+ * away). This is what "Refine ICP from feedback" now consumes.
+ */
+export async function getFeedbackLabels(supabase: Supabase, orgId: string, jobId: string): Promise<FeedbackLabel[]> {
+  const sb = supabase as unknown as LooseSb
+  const { data } = await sb.from('scoring_feedback')
+    .select('decision, predicted_bucket, predicted_score, competency_ratings, candidate_features')
+    .eq('org_id', orgId).eq('job_id', jobId)
+    .order('decided_at', { ascending: false })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    decision: r.decision,
+    bucket: r.predicted_bucket ?? null,
+    score: r.predicted_score ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    competencies: ((r.competency_ratings ?? []) as any[])
+      .filter((c) => c.rating != null)
+      .map((c) => ({ name: c.name, rating: c.rating as number })),
+    title: r.candidate_features?.current_title ?? null,
+  }))
+}
+
 // ── Convergence read-side ────────────────────────────────────────────────────────
 // Does each newer ICP version predict the recruiter's decisions better than the last?
 
@@ -273,4 +302,24 @@ export async function getIcpConvergence(supabase: Supabase, orgId: string, jobId
   return Array.from(byVersion.entries())
     .map(([version, b]) => ({ version, decided: b.decided, agreement: b.decided ? b.agree / b.decided : null }))
     .sort((a, b) => a.version - b.version)
+}
+
+// ── Stage 2 (advisory): the weight signal ────────────────────────────────────────
+
+export interface WeightSignalResult extends WeightSignal {
+  icp_version: number | null
+}
+
+/**
+ * The data-driven weight suggestion for a job's current ICP, learned from the frozen
+ * decision log. Advisory only — read-only; a human still approves any reweighting.
+ */
+export async function getWeightSignal(supabase: Supabase, orgId: string, jobId: string): Promise<WeightSignalResult> {
+  const [labels, icp] = await Promise.all([
+    getFeedbackLabels(supabase, orgId, jobId),
+    getCurrentIcp(supabase, orgId, jobId),
+  ])
+  const competencies = (icp?.competencies ?? []).map((c) => ({ id: c.id, name: c.name, weight: c.weight }))
+  const signal = computeWeightSignal(labels, competencies)
+  return { ...signal, icp_version: icp?.version ?? null }
 }

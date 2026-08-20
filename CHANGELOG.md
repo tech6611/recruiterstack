@@ -12,6 +12,19 @@ entries on top.
 ## 2026-08-20
 
 ### Added
+- **"Refine ICP from feedback" now reads the frozen decision log.** Instead of
+  reconstructing labels from the live tables (which lose history on re-score), it reads
+  `scoring_feedback` — point-in-time correct — falling back to the live tables only for
+  jobs whose decisions predate the log. New `getFeedbackLabels` facade.
+- **ICP learning loop — Stage 2 (v1, advisory): a data-driven weight signal.** For each
+  competency it measures how well its 1–4 ratings **separated the recruiter's Yeses from
+  their Nos**, and proposes a reweighting **blended toward the current weights by a
+  confidence that grows with the number of decisions** — so it barely moves on thin data
+  and firms up as evidence accumulates. Interpretable, deterministic, and **read-only /
+  advisory** (a human still approves any change via Refine). Returns `sufficient:false`
+  until ~5+ decisions exist. New pure `weight-learning.ts` (`computeWeightSignal`, 4
+  tests) + `getWeightSignal` facade + `GET /api/jobs/[id]/icp/weight-signal`. Graduates
+  to pooled logistic regression once there's volume. No migration.
 - **ICP learning loop — Stage 1: the data foundation (no ML yet, just clean data).**
   Every recruiter decision (Yes/No/Maybe, from the pipeline *or* on a sourced candidate)
   now freezes a **point-in-time training row** in a new `scoring_feedback` table — the
