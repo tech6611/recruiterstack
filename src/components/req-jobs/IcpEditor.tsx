@@ -10,8 +10,6 @@ import type { ScoringCriterion } from '@/lib/types/database'
 import type { Icp, IcpCompetency, IcpMustHave } from '@/lib/types/icp'
 import { icpToScoringCriteria } from '@/lib/scoring'
 
-const GATE_ATTRIBUTES = ['location', 'seniority', 'skill', 'min_experience'] as const
-const GATE_OPERATORS = ['equals', 'gte', 'includes', 'one_of'] as const
 
 const BUCKET_LABEL: Record<string, string> = { hard_filter: 'Hard filter', ranking_signal: 'Ranking', screen_later: 'Screen later' }
 const BUCKET_CLS: Record<string, string> = {
@@ -258,7 +256,10 @@ export function IcpEditor({
   const addGate = () =>
     setGates((prev) => [
       ...prev,
-      { id: `g-${prev.length}-${Date.now()}`, label: '', attribute: 'skill', operator: 'includes', value: '' },
+      // A must-have is now just a plain-English yes/no question the Fit Engine judge
+      // answers from the candidate's history. attribute/operator/value are legacy
+      // fields the judge no longer reads — kept empty so nothing mis-tags as a gate.
+      { id: `g-${prev.length}-${Date.now()}`, label: '', attribute: '', operator: '', value: '' },
     ])
 
   if (loading) {
@@ -436,41 +437,20 @@ export function IcpEditor({
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
             <ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> Must-haves (hard gates)
           </div>
+          <p className="text-[11px] text-slate-400">
+            Each is a yes/no deal-breaker the AI checks against the candidate’s real history — failing any one rejects them. Location is never a deal-breaker.
+          </p>
           {gates.length === 0 ? (
             <p className="text-xs text-slate-400">No gates — every candidate is scored on competencies alone.</p>
           ) : (
             <div className="overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100">
               {gates.map((g, i) => (
-                <div key={g.id} className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+                <div key={g.id} className="flex items-center gap-2 px-3 py-2.5">
                   <Input
                     value={g.label}
                     onChange={(e) => setGate(i, { label: e.target.value })}
-                    placeholder="e.g. 5+ years backend"
+                    placeholder="A yes/no deal-breaker, e.g. Has a genuine software-engineering background?"
                     className="h-8 min-w-[10rem] flex-1 text-sm"
-                  />
-                  <select
-                    value={g.attribute}
-                    onChange={(e) => setGate(i, { attribute: e.target.value })}
-                    className="h-8 rounded border border-slate-200 bg-white px-2 text-xs text-slate-600"
-                  >
-                    {GATE_ATTRIBUTES.map((a) => (
-                      <option key={a} value={a}>{a}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={g.operator}
-                    onChange={(e) => setGate(i, { operator: e.target.value })}
-                    className="h-8 rounded border border-slate-200 bg-white px-2 text-xs text-slate-600"
-                  >
-                    {GATE_OPERATORS.map((o) => (
-                      <option key={o} value={o}>{o}</option>
-                    ))}
-                  </select>
-                  <Input
-                    value={Array.isArray(g.value) ? g.value.join(', ') : String(g.value ?? '')}
-                    onChange={(e) => setGate(i, { value: e.target.value })}
-                    placeholder="value"
-                    className="h-8 w-32 text-sm"
                   />
                   <button type="button" onClick={() => removeGate(i)} className="text-slate-300 hover:text-red-500">
                     <Trash2 className="h-3.5 w-3.5" />
