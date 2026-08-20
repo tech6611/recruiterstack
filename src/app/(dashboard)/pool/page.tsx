@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Search, MapPin, Briefcase, Clock, Mail, Linkedin, Sparkles,
-  Loader2, X, Database, Filter, CheckCircle2, CalendarClock, AlertTriangle,
+  Loader2, X, Database, Filter, CheckCircle2, CalendarClock, AlertTriangle, FileText,
 } from 'lucide-react'
 
 type Summary = {
@@ -36,6 +36,14 @@ type Summary = {
   reachable: boolean
   sources: string[]
   unlocked?: boolean
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  'github':        'GitHub profile',
+  'web:site':      'Personal website',
+  'web:resume':    'Résumé (crawled)',
+  'upload:cv':     'Uploaded CV',
+  'self_declared': 'Self-declared link',
 }
 
 const FRESHNESS: Record<string, { label: string; cls: string }> = {
@@ -92,6 +100,7 @@ export default function PoolPage() {
   const [minTenure, setMinTenure] = useState(0)
   const [reachable, setReachable] = useState(false)
   const [maxAge, setMaxAge]       = useState(0)   // months; 0 = any
+  const [source, setSource]       = useState('')
 
   const [selected, setSelected] = useState<Detail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -106,11 +115,12 @@ export default function PoolPage() {
     if (minTenure) p.set('minTenure', String(minTenure * 12))
     if (reachable) p.set('reachable', '1')
     if (maxAge) p.set('maxEvidenceAge', String(maxAge))
+    if (source) p.set('source', source)
     const res = await fetch(`/api/pool?${p}`)
     const j = await res.json()
     setAccess(j.access); setRows(j.rows ?? []); setTotal(j.total ?? 0); setFacets(j.facets)
     setLoading(false)
-  }, [q, city, skill, minExp, minTenure, reachable, maxAge])
+  }, [q, city, skill, minExp, minTenure, reachable, maxAge, source])
 
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [load])
 
@@ -215,6 +225,13 @@ export default function PoolPage() {
             <option value={24}>Within 2 yrs</option>
             <option value={36}>Within 3 yrs</option>
           </select>
+          <select value={source} onChange={(e) => setSource(e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="">Any source</option>
+            {facets?.sources.map((s) => (
+              <option key={s} value={s}>{SOURCE_LABEL[s] ?? s}</option>
+            ))}
+          </select>
         </div>
         <p className="mt-2 text-xs text-gray-400">
           &ldquo;In role&rdquo; is <strong>last known</strong> tenure — role start to today. A
@@ -252,6 +269,11 @@ export default function PoolPage() {
                       </span>
                     )}
                     <FreshnessPill r={r} />
+                    {(r.sources ?? []).includes('upload:cv') && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-inset ring-violet-200">
+                        <FileText className="h-3 w-3" /> CV
+                      </span>
+                    )}
                     {r.employer_disputed && (
                       <span title="Sources disagree on the current employer — one is out of date"
                         className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
