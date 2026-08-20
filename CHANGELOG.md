@@ -12,6 +12,16 @@ entries on top.
 ## 2026-08-20
 
 ### Changed
+- **Regenerate ICP now always re-reasons the weights — it no longer inherits the same
+  4 buckets / same split every time.** Root cause: approving an ICP syncs its
+  competencies into the job's scoring rubric, and the generator then treated that synced
+  rubric as "human-curated" and took an enrichment path that PRESERVED the weights — so
+  every regenerate re-used the first version's 4 buckets at (e.g.) 35/30/20/15, only
+  refreshing the wording. Now "Regenerate" always runs the reasoning-first pass and
+  re-derives both the weights AND the number of competencies from the role. The prompt
+  also allows the granularity the role needs (~4–7) and is told not to default to a tidy
+  35/30/20/15 split, so two different roles almost never produce the same weight column.
+  `generateIcpWithReasoning`; no migration.
 - **ICP generation is now reasoning-first — the reasoning derives the weights, not the
   other way round.** Previously the AI locked the weighted competencies first, then a
   second call wrote "How this ICP was reasoned" to *justify* the numbers already set
