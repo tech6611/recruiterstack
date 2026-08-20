@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2, Send, MailCheck, Check, X } from 'lucide-react'
+import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2, Send, MailCheck, Check, X, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,7 @@ interface PendingReview {
  */
 export function SourcingTab({ jobId }: { jobId: string }) {
   const [matches, setMatches] = useState<Match[]>([])
+  const [openInternal, setOpenInternal] = useState(true) // the primary section — open by default
   const [currentVersion, setCurrentVersion] = useState<number | null>(null)
   const [hasIcp, setHasIcp] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -252,10 +253,14 @@ export function SourcingTab({ jobId }: { jobId: string }) {
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Radar className="h-4 w-4 text-slate-500" /> Sourcing
-            </CardTitle>
-            <CardDescription>
+            <button type="button" onClick={() => setOpenInternal((v) => !v)} className="flex items-center gap-1.5 text-left">
+              <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform ${openInternal ? 'rotate-90' : ''}`} />
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Radar className="h-4 w-4 text-slate-500" /> From your candidates
+                {matches.length > 0 && <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">{matches.length}</span>}
+              </CardTitle>
+            </button>
+            <CardDescription className="pl-[1.375rem]">
               Rank your existing candidate pool against this job&apos;s approved ICP, then add the best to the pipeline.
             </CardDescription>
           </div>
@@ -279,6 +284,7 @@ export function SourcingTab({ jobId }: { jobId: string }) {
         </div>
       </CardHeader>
 
+      {openInternal && (<>
       <CardContent className="space-y-3">
         {!hasIcp ? (
           <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
@@ -433,6 +439,7 @@ export function SourcingTab({ jobId }: { jobId: string }) {
           </div>
         </div>
       )}
+      </>)}
 
       {/* ── Sourcing Brain — the market (Pool B) ─────────────────────────────── */}
       <PoolSourcingSection jobId={jobId} />

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { GraduationCap, Target, Send, DollarSign, RefreshCw } from 'lucide-react'
+import { GraduationCap, Target, Send, DollarSign, RefreshCw, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
@@ -25,6 +25,7 @@ export function LearningPanel({ jobId }: { jobId: string }) {
   const [d, setD] = useState<Diagnosis | null>(null)
   const [loading, setLoading] = useState(true)
   const [refining, setRefining] = useState(false)
+  const [open, setOpen] = useState(false)
 
   const load = useCallback(() => {
     fetch(`/api/jobs/${jobId}/learning`)
@@ -50,10 +51,12 @@ export function LearningPanel({ jobId }: { jobId: string }) {
 
   return (
     <div className="border-t border-slate-100 px-6 py-4">
-      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+        <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`} />
         <GraduationCap className="h-4 w-4 text-indigo-500" /> What the pipeline is teaching you
-      </div>
+      </button>
 
+      {open && (<>
       <div className="grid grid-cols-3 gap-2">
         {MODES.map((m) => {
           const n = d.breakdown[m.key] ?? 0
@@ -76,6 +79,7 @@ export function LearningPanel({ jobId }: { jobId: string }) {
           <RefreshCw className="h-3.5 w-3.5" /> Refine ICP from fit feedback
         </Button>
       )}
+      </>)}
     </div>
   )
 }

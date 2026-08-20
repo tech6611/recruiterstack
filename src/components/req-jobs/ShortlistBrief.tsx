@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ClipboardList, Copy, Sparkles, Users, Globe } from 'lucide-react'
+import { ClipboardList, Copy, Sparkles, Users, Globe, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { fitBucketFor } from '@/lib/ai/fit-bucket'
@@ -43,6 +43,7 @@ const BUCKET: Record<string, { label: string; cls: string }> = {
 export function ShortlistBrief({ jobId }: { jobId: string }) {
   const [brief, setBrief] = useState<Brief | null>(null)
   const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
 
   const build = useCallback(async (announce = false) => {
     setLoading(true)
@@ -90,9 +91,11 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
   return (
     <div className="border-t border-slate-100 px-6 py-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`} />
           <ClipboardList className="h-4 w-4 text-indigo-500" /> Shortlist brief
-        </div>
+          {brief && <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">{brief.counts.total}</span>}
+        </button>
         <div className="flex items-center gap-2">
           {brief && (
             <Button size="sm" variant="outline" onClick={copyForHm}>
@@ -104,6 +107,7 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
           </Button>
         </div>
       </div>
+      {open && (<>
 
       {!brief && (
         <p className="mt-2 text-xs text-slate-500">
@@ -169,6 +173,7 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
           {brief.shortlist.length === 0 && <p className="text-xs text-slate-400">No matches yet — source your pool or the market first.</p>}
         </div>
       )}
+      </>)}
     </div>
   )
 }

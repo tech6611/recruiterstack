@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Globe, Lock, Sparkles, Building2, Clock, TrendingUp, MapPin } from 'lucide-react'
+import { Globe, Lock, Sparkles, Building2, Clock, TrendingUp, MapPin, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { fitBucketFor } from '@/lib/ai/fit-bucket'
@@ -57,6 +57,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [adding, setAdding] = useState(false)
   const [stale, setStale] = useState(false)
+  const [open, setOpen] = useState(false)
 
   // Load the cached market shortlist so it survives a refresh (no re-scoring).
   useEffect(() => {
@@ -128,9 +129,11 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   return (
     <div className="border-t border-slate-100 px-6 py-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+        <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`} />
           <Globe className="h-4 w-4 text-sky-600" /> From the market <span className="text-xs font-normal text-slate-400">(Candidate Pool)</span>
-        </div>
+          {matches.length > 0 && <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">{matches.length}</span>}
+        </button>
         <div className="flex items-center gap-2">
           <Link href="/pool/usage" className="text-[11px] text-slate-400 hover:text-slate-600">Unlock usage</Link>
           {state !== 'no_access' && (
@@ -140,6 +143,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
           )}
         </div>
       </div>
+      {open && (<>
 
       {state === 'no_access' && (
         <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-4 text-center">
@@ -208,6 +212,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
           )}
         </div>
       )}
+      </>)}
     </div>
   )
 }
