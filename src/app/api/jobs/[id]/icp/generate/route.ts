@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
 import { withCapability, handleSupabaseError } from '@/lib/api/helpers'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
-import { generateIcp } from '@/lib/ai/icp-generator'
-import { analyzeRole } from '@/lib/ai/sourcing-strategist'
+import { generateIcpWithReasoning } from '@/lib/ai/icp-generator'
 import { createIcpDraft } from '@/modules/ats/domain/icp'
 
-export const maxDuration = 120 // two Gemini passes: competency generation + reasoning
+export const maxDuration = 120 // one deep reasoning-first Gemini pass (reasoning → weights)
 
 // icps.sourcing_map (migration 116) isn't in the generated types yet.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,26 +35,18 @@ export const POST = withCapability(
     }
 
     try {
-      const draft = await generateIcp(context.job, { orgId, userId }, intakeNotes)
+      // One reasoning-first pass: the recruiter's brain reasons about the role, then
+      // the weighted competencies + deal-breakers fall out of that reasoning. The same
+      // pass produces the sourcing_map (reasoning/decomposition/archetypes).
+      const { draft, sourcingMap } = await generateIcpWithReasoning(context.job, { orgId, userId }, intakeNotes)
       const icp = await createIcpDraft(supabase, orgId, params.id, draft, { createdBy: userId })
 
-      // Reasoning layer (Sourcing Brain, Slice 1): explain + pressure-test the ICP.
-      // Best-effort — a reasoning hiccup never blocks the ICP itself.
-      let sourcing_map = null
-      try {
-        sourcing_map = await analyzeRole(
-          context.job,
-          icp.competencies.map((c) => ({ name: c.name, weight: c.weight })),
-          icp.must_haves.map((g) => ({ label: g.label })),
-          { orgId, userId },
-        )
+      if (sourcingMap) {
         await (supabase as unknown as LooseSb)
-          .from('icps').update({ sourcing_map }).eq('id', icp.id).eq('org_id', orgId)
-      } catch {
-        /* reasoning is additive; keep the ICP */
+          .from('icps').update({ sourcing_map: sourcingMap }).eq('id', icp.id).eq('org_id', orgId)
       }
 
-      return NextResponse.json({ data: { ...icp, sourcing_map } }, { status: 201 })
+      return NextResponse.json({ data: { ...icp, sourcing_map: sourcingMap } }, { status: 201 })
     } catch (e) {
       return handleSupabaseError(e as { code: string; message: string })
     }
