@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2, Send, MailCheck, Check, X, ChevronRight } from 'lucide-react'
+import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2, Send, MailCheck, Check, X, ChevronRight, FileQuestion } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ interface Match {
   gate_failures: { label?: string }[]
   red_flags: string[]
   rationale: string | null
+  data_incomplete?: boolean | null
   icp_version: number | null
   decision: string | null
   candidate: { id: string; name: string | null; current_title: string | null; location: string | null } | null
@@ -336,6 +337,12 @@ export function SourcingTab({ jobId }: { jobId: string }) {
                         {gated && (
                           <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
                             <ShieldAlert className="mr-0.5 inline h-2.5 w-2.5" />Missing must-have
+                          </span>
+                        )}
+                        {m.data_incomplete && (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                            title="No education or work history on file — we can't verify this candidate's background (e.g. whether they're an engineer). Enrich their profile to confirm.">
+                            <FileQuestion className="mr-0.5 inline h-2.5 w-2.5" />Background unverified
                           </span>
                         )}
                       </div>

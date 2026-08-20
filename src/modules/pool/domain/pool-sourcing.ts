@@ -111,7 +111,8 @@ export async function sourcePoolForIcp(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       chunk.map(async (p: any) => {
         try {
-          const fit = await scoreAgainstIcp(poolProfileToFitCandidate(p), icp, identity, undefined, { experiences: expsByProfile.get(p.id) ?? [] })
+          // Market candidates: assume complete vendor data → REJECT when it's missing.
+          const fit = await scoreAgainstIcp(poolProfileToFitCandidate(p), icp, identity, undefined, { experiences: expsByProfile.get(p.id) ?? [] }, 'reject')
           return {
             profile_id: p.id,
             name: p.display_name,

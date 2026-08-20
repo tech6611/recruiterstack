@@ -55,7 +55,8 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
 
   if (icp && icp.status === 'approved') {
     const histories = await getCandidatesHistory(supabase, orgId, [candidate.id])
-    const fit = await scoreAgainstIcp(candidate, icp, { orgId, userId }, undefined, histories.get(candidate.id))
+    // Applicant: FLAG missing background data (don't reject); the recruiter decides.
+    const fit = await scoreAgainstIcp(candidate, icp, { orgId, userId }, undefined, histories.get(candidate.id), 'flag')
     update.ai_score          = fit.score
     update.ai_recommendation = fit.recommendation
     update.ai_strengths      = fit.strengths
@@ -65,6 +66,7 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
     update.ai_fit_bucket     = fit.fit_bucket
     update.ai_gate_failures  = fit.gate_failures
     update.knockout_failed   = !fit.passed_gates
+    update.ai_data_incomplete = fit.data_incomplete
     update.ai_icp_id         = icp.id
     update.ai_icp_version    = icp.version
     criterionScores = fit.competencies.map(c => ({ name: c.name, rating: c.rating, weight: c.weight, evidence: c.evidence }))

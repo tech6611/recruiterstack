@@ -11,6 +11,20 @@ entries on top.
 
 ## 2026-08-21
 
+### Added
+- **Missing-data policy for background gates (Part B).** When a candidate has **no
+  education AND no work history** on file, a background/identity deal-breaker ("is this a
+  genuine engineer?") can't be verified — so:
+  - **Internal / applied candidates** are **flagged, not rejected**: an amber *"Background
+    unverified — no education or work history on file"* marker on the sourcing card and the
+    candidate's AI Assessment, so you can enrich or eyeball them (their CV was likely thin).
+  - **Market / sourced candidates** are **rejected** — vendor data is assumed complete, so
+    missing means genuinely absent. `scoreAgainstIcp` gains an `absentPolicy` (`flag` |
+    `reject`) + a `data_incomplete` flag on the result.
+  - **Schema:** migration **120** — `sourcing_matches.data_incomplete` +
+    `applications.ai_data_incomplete`. **⚠️ Apply migration 120; re-source / re-score to
+    populate the flag.**
+
 ### Fixed
 - **The Fit Engine now judges background deal-breakers on education + work history — not
   the current title.** A "genuine engineering background" gate was passing non-engineers
