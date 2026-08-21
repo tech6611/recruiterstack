@@ -1,25 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Radar, ShieldAlert, UserPlus, MapPin, RefreshCw, ThumbsUp, ThumbsDown, Sparkles, Wand2, Send, MailCheck, Check, X, ChevronRight, FileQuestion } from 'lucide-react'
+import { Radar, UserPlus, RefreshCw, Sparkles, Wand2, Send, MailCheck, Check, X, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { pickCalibrationSet } from '@/lib/ai/calibration'
-import { fitBucketFor } from '@/lib/ai/fit-bucket'
 import { PoolSourcingSection } from '@/components/req-jobs/PoolSourcingSection'
 import { ShortlistBrief } from '@/components/req-jobs/ShortlistBrief'
 import { LearningPanel } from '@/components/req-jobs/LearningPanel'
+import { SourcingMatrix, type MatrixIcp } from '@/components/req-jobs/SourcingMatrix'
 
 const CALIBRATION_SIZE = 15
 const MIN_DECISIONS = 5
-
-const BUCKET: Record<string, { label: string; cls: string }> = {
-  great: { label: 'Great fit', cls: 'bg-emerald-100 text-emerald-700' },
-  good: { label: 'Good fit', cls: 'bg-sky-100 text-sky-700' },
-  okay: { label: 'Okay fit', cls: 'bg-amber-100 text-amber-700' },
-  weak: { label: 'Weak fit', cls: 'bg-rose-100 text-rose-700' },
-}
 
 interface Match {
   candidate_id: string
@@ -28,10 +21,11 @@ interface Match {
   gate_failures: { label?: string }[]
   red_flags: string[]
   rationale: string | null
+  competencies: { name: string; rating: number; evidence?: string }[]
   data_incomplete?: boolean | null
   icp_version: number | null
   decision: string | null
-  candidate: { id: string; name: string | null; current_title: string | null; location: string | null } | null
+  candidate: { id: string; name: string | null; current_title: string | null; current_company: string | null; location: string | null } | null
 }
 
 interface PendingReview {
@@ -50,6 +44,7 @@ interface PendingReview {
  */
 export function SourcingTab({ jobId }: { jobId: string }) {
   const [matches, setMatches] = useState<Match[]>([])
+  const [icp, setIcp] = useState<MatrixIcp | null>(null)
   const [openInternal, setOpenInternal] = useState(true) // the primary section — open by default
   const [currentVersion, setCurrentVersion] = useState<number | null>(null)
   const [hasIcp, setHasIcp] = useState(false)
@@ -71,6 +66,7 @@ export function SourcingTab({ jobId }: { jobId: string }) {
     if (res.ok) {
       const { data } = await res.json()
       setMatches(data.matches ?? [])
+      setIcp(data.icp ?? null)
       setCurrentVersion(data.current_icp_version ?? null)
       setHasIcp(!!data.has_approved_icp)
     }
@@ -316,58 +312,19 @@ export function SourcingTab({ jobId }: { jobId: string }) {
                 Some matches were scored against an older ICP — re-source to refresh.
               </div>
             )}
-            <div className="overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100">
-              {shown.map((m) => {
-                // Derive the band from the score so a stale stored label can't misread a low score.
-                const b = BUCKET[fitBucketFor(m.score, m.gate_failures.length === 0)]
-                const gated = m.gate_failures.length > 0
-                return (
-                  <div key={m.candidate_id} className="flex items-start gap-3 px-3 py-2.5 hover:bg-slate-50">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(m.candidate_id)}
-                      onChange={() => toggle(m.candidate_id)}
-                      className="mt-1 h-3.5 w-3.5 shrink-0 accent-slate-700"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="text-sm font-medium text-slate-800">{m.candidate?.name ?? 'Unknown'}</span>
-                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">{m.score}/100</span>
-                        {b && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${b.cls}`}>{b.label}</span>}
-                        {gated && (
-                          <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
-                            <ShieldAlert className="mr-0.5 inline h-2.5 w-2.5" />Missing must-have
-                          </span>
-                        )}
-                        {m.data_incomplete && (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
-                            title="No education or work history on file — we can't verify this candidate's background (e.g. whether they're an engineer). Enrich their profile to confirm.">
-                            <FileQuestion className="mr-0.5 inline h-2.5 w-2.5" />Background unverified
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500">
-                        {m.candidate?.current_title && <span>{m.candidate.current_title}</span>}
-                        {m.candidate?.location && (
-                          <span className="inline-flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" />{m.candidate.location}</span>
-                        )}
-                      </div>
-                      {m.rationale && <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{m.rationale}</p>}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1 pt-0.5">
-                      <button type="button" onClick={() => decide(m.candidate_id, 'yes')} title="Good fit"
-                        className={`rounded p-1 ${m.decision === 'yes' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-300 hover:bg-slate-100 hover:text-emerald-600'}`}>
-                        <ThumbsUp className="h-3.5 w-3.5" />
-                      </button>
-                      <button type="button" onClick={() => decide(m.candidate_id, 'no')} title="Not a fit"
-                        className={`rounded p-1 ${m.decision === 'no' ? 'bg-red-100 text-red-700' : 'text-slate-300 hover:bg-slate-100 hover:text-red-600'}`}>
-                        <ThumbsDown className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            {icp ? (
+              <SourcingMatrix
+                matches={shown}
+                icp={icp}
+                selected={selected}
+                onToggle={toggle}
+                onDecide={decide}
+              />
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-xs text-slate-400">
+                Loading the ICP&apos;s ranking parameters…
+              </div>
+            )}
           </>
         )}
       </CardContent>

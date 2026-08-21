@@ -12,6 +12,29 @@ entries on top.
 ## 2026-08-21
 
 ### Added
+- **Sourcing comparison matrix — both pockets.** The "From your candidates" (ATS) and
+  "From the market" (Candidate Pool) sections now render every candidate as a row in one
+  shared **comparison matrix**: the ICP's **must-haves** as pass/fail gate columns (✓ / ✕)
+  and its weighted **competencies** as 1–4 rating-bar columns, so ATS and market candidates
+  read on the same axes. **Click a name** to expand inline evidence (rationale, red flags,
+  per-must-have status, per-competency rating + quote, and skills). New shared component
+  `SourcingMatrix.tsx` (`src/components/req-jobs/`). The ATS pocket keeps selection, 👍/👎
+  calibration decisions, and the "Missing must-have" / "Background unverified" / stale-ICP
+  states; the market pocket hides 👍/👎 (calibration is ATS-only), shows a **no-contact**
+  flag, and keeps unlock-&-add.
+- **`/sourcing-preview`** — a public, sample-data harness that renders the real
+  `SourcingMatrix` (both pockets) for local eyeballing without a live ICP + sourcing run.
+
+### Changed
+- **Sourcing GET routes** (`/api/jobs/[id]/source` and `.../source/pool`) now return the
+  approved ICP's `must_haves` and `competencies` (labels/names/weights) so the client can
+  build the matrix columns.
+- **`getSourcingMatches`** now also selects the candidate's `current_company` (shown on
+  each matrix row beside location); the client `Match` type now carries the stored
+  per-competency breakdown (which the API already returned).
+- **Pool matches** (`PoolMatch`) now persist the Fit Engine's per-competency ratings +
+  `red_flags` (previously computed then discarded). Stored as JSONB — no migration; older
+  cached matches simply lack them until re-sourced.
 - **Normalized education level on every parsed qualification.** Enrichment now tags each
   education entry with an ISCED-aligned **level** — `secondary` (10th/SSC) · `senior_secondary`
   (12th/HSC/A-levels) · `diploma` · `undergraduate` · `postgraduate` · `doctorate` ·

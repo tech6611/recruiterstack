@@ -36,6 +36,7 @@ export interface SourcingMatch {
     id: string
     name: string | null
     current_title: string | null
+    current_company: string | null
     location: string | null
     skills: string[] | null
     linkedin_url: string | null
@@ -55,7 +56,7 @@ export async function getSourcingMatches(
   const sb = supabase as unknown as LooseSb
   const { data, error } = await sb
     .from('sourcing_matches')
-    .select('*, candidate:candidates(id, name, current_title, location, skills, linkedin_url)')
+    .select('*, candidate:candidates(id, name, current_title, current_company, location, skills, linkedin_url)')
     .eq('org_id', orgId)
     .eq('job_id', jobId)
     .order('score', { ascending: false })

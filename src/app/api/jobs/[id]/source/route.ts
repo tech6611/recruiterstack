@@ -13,11 +13,19 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
       getSourcingMatches(supabase, orgId, params.id),
       getCurrentIcp(supabase, orgId, params.id).catch(() => null),
     ])
+    const approved = icp?.status === 'approved' ? icp : null
     return NextResponse.json({
       data: {
         matches,
-        current_icp_version: icp?.status === 'approved' ? icp.version : null,
-        has_approved_icp: icp?.status === 'approved',
+        current_icp_version: approved ? approved.version : null,
+        has_approved_icp: !!approved,
+        // The ICP's ranking parameters — used to build the matrix columns.
+        icp: approved
+          ? {
+              must_haves: approved.must_haves.map((m) => ({ id: m.id, label: m.label, attribute: m.attribute })),
+              competencies: approved.competencies.map((c) => ({ id: c.id, name: c.name, weight: c.weight })),
+            }
+          : null,
       },
     })
   } catch (e) {

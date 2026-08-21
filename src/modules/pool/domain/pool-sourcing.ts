@@ -31,6 +31,9 @@ export interface PoolMatch {
   fit_bucket: string
   rationale: string
   gate_failures: string[]
+  // Optional: older cached matches (scored before this was added) won't carry them.
+  competencies?: { name: string; rating: number; evidence?: string }[]
+  red_flags?: string[]
 }
 
 /** Build the Candidate shape the Fit Engine reads from a pool profile row. */
@@ -128,6 +131,8 @@ export async function sourcePoolForIcp(
             fit_bucket: fit.fit_bucket,
             rationale: fit.rationale,
             gate_failures: fit.gate_failures.map((g) => g.label),
+            competencies: fit.competencies.map((c) => ({ name: c.name, rating: c.rating, evidence: c.evidence })),
+            red_flags: fit.red_flags,
           } as PoolMatch
         } catch {
           return null
