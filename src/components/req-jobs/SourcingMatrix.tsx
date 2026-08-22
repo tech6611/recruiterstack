@@ -56,11 +56,22 @@ const RATING: Record<number, { bar: string; cls: string; label: string }> = {
 function mustPass(m: MatrixMatch, label: string): boolean {
   return !m.gate_failures.some((g) => (g.label ?? '') === label)
 }
-/** A compact column header from a long, often question-style ICP label:
- *  drop any parenthetical aside and trailing punctuation. The full label stays
- *  in the header tooltip and in the expanded row. */
+/** A compact column header from a long, often question-style ICP label. Drops the
+ *  parenthetical aside, then strips leading filler ("Has a genuine…", "At least 1
+ *  year of experience with…") so only the essential noun phrase remains. The full
+ *  label stays in the header tooltip and the expanded row.
+ *    "Has a genuine software-engineering background" → "Software-engineering background"
+ *    "Has at least 1 year of experience with direct people management responsibilities"
+ *      → "People management responsibilities"
+ */
+const LEADING_FILLER =
+  /^(?:has|have|is|are|can|able to|willing to|must|should|the|a|an|at least|genuine|proven|demonstrated|strong|solid|prior|relevant|significant|hands[- ]?on|direct|some|of|with|in|for|and|experience|background|track record|\d+\+?\s*(?:years?|yrs?|months?|mos?|weeks?))\b[\s,]*/i
 function shortLabel(label: string): string {
-  return label.split('(')[0].replace(/[?.:\s]+$/, '').trim() || label
+  const base = label.split('(')[0].replace(/[?.:;,]+\s*$/, '').trim()
+  let s = base
+  for (let prev = ''; s && s !== prev; ) { prev = s; s = s.replace(LEADING_FILLER, '') }
+  if (!s) s = base
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 // Stored competencies carry the same name as the ICP competency; fall back to index.
 function compFor(m: MatrixMatch, name: string, idx: number) {
@@ -112,22 +123,34 @@ export function SourcingMatrix({
     <div className="overflow-x-auto rounded-xl border border-slate-200">
       <table className="w-full border-collapse text-slate-700">
         <thead>
-          <tr className="bg-slate-50 text-slate-500">
-            <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2 text-left text-[11px] font-semibold">Candidate</th>
+          {/* group row — labels centered across each group */}
+          <tr className="bg-slate-50 text-[8px] font-bold uppercase tracking-wide text-slate-400">
+            <th className="sticky left-0 z-10 bg-slate-50" aria-hidden />
+            {icp.must_haves.length > 0 && (
+              <th colSpan={icp.must_haves.length} className="border-l-2 border-slate-200 px-2 pt-2 text-center">Must-have</th>
+            )}
+            {icp.competencies.length > 0 && (
+              <th colSpan={icp.competencies.length} className="border-l-2 border-slate-200 px-2 pt-2 text-center">Competency</th>
+            )}
+            <th className="border-l-2 border-slate-200" aria-hidden />
+            {onDecide && <th aria-hidden />}
+          </tr>
+          {/* column row */}
+          <tr className="bg-slate-50 align-bottom text-slate-500">
+            <th className="sticky left-0 z-10 bg-slate-50 px-3 pb-2 text-left text-[11px] font-semibold">Candidate</th>
             {icp.must_haves.map((m, i) => (
-              <th key={m.id} className={`px-2 py-2 align-bottom text-[10px] font-medium leading-tight ${i === 0 ? 'border-l-2 border-slate-200' : ''}`}>
-                {i === 0 && <span className="mb-0.5 block text-[8px] font-bold uppercase tracking-wide text-slate-400">Must-have</span>}
-                <span className="mx-auto block max-w-[112px] line-clamp-2" title={m.label}>{shortLabel(m.label)}</span>
+              <th key={m.id} className={`px-2 pb-2 text-center text-[10px] font-medium leading-tight ${i === 0 ? 'border-l-2 border-slate-200' : ''}`}>
+                <div className="mx-auto line-clamp-2 max-w-[112px]" title={m.label}>{shortLabel(m.label)}</div>
               </th>
             ))}
             {icp.competencies.map((c, i) => (
-              <th key={c.id} className={`px-2 py-2 align-bottom text-[10px] font-medium leading-tight ${i === 0 ? 'border-l-2 border-slate-200' : ''}`}>
-                <span className="mb-0.5 block text-[8px] font-bold uppercase tracking-wide text-slate-400">{i === 0 ? `Competency · ${c.weight}%` : `${c.weight}%`}</span>
-                <span className="mx-auto block max-w-[104px] line-clamp-2" title={c.name}>{shortLabel(c.name)}</span>
+              <th key={c.id} className={`px-2 pb-2 text-center text-[10px] font-medium leading-tight ${i === 0 ? 'border-l-2 border-slate-200' : ''}`}>
+                <div className="mx-auto line-clamp-2 max-w-[104px]" title={c.name}>{shortLabel(c.name)}</div>
+                <span className="mt-0.5 block text-[9px] font-normal text-slate-400">{c.weight}%</span>
               </th>
             ))}
-            <th className="border-l-2 border-slate-200 px-3 py-2 text-[10px] font-semibold">Fit</th>
-            {onDecide && <th className="px-2 py-2 text-[10px] font-semibold" />}
+            <th className="border-l-2 border-slate-200 px-3 pb-2 text-center text-[10px] font-semibold">Fit</th>
+            {onDecide && <th className="pb-2" aria-hidden />}
           </tr>
         </thead>
         <tbody>
