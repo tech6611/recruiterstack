@@ -9,6 +9,26 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-23 (Pipeline Plan polish)
+
+### Changed
+- **Pipeline Plan editor now uses the RecruiterStack palette.** Dropped the
+  Ashby-borrowed indigo/violet accents from `PipelinePlanEditor` and `StageRules`:
+  funnel-step selects, focus rings, "Add stage" hover and the zone-stepper icons
+  are pine `emerald-*`; the promotion-gate badge is `gold-*`. The "Save plan" and
+  "Save rule" buttons drop their colour override and use the standard `Button`
+  primary (bark).
+- **Zone stepper spans the full row.** Lead / Active / Offer / Completed cards are
+  `flex-1 basis-0`, so they divide the available width evenly with no trailing
+  gap, whatever the zone count. Labels truncate instead of forcing overflow.
+
+### Added
+- **Drag-and-drop stage reordering** in the Pipeline Plan editor. Each unlocked
+  stage row has a grip handle; dragging reorders within its own zone and persists
+  via the existing `reorder_stages` action. Locked stages (Lead zone, Hired /
+  Rejected / Archived) are neither draggable nor drop targets, and the up/down
+  chevrons remain as the keyboard-accessible path.
+
 ## 2026-08-21
 
 ### Added
