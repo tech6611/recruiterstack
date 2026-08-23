@@ -47,6 +47,7 @@ export type RuleField =
   | 'fit_bucket'
   | 'review_status'
   | 'has_feedback'
+  | 'feedback_result'
   | 'source'
   | 'missing_must_have'
 
@@ -72,6 +73,8 @@ export interface AutomationConfig {
   match?: ConditionMatch
   /** For action_type 'move_stage': where to move. */
   target_stage_id?: string | null
+  /** For action_type 'enrol_outreach': which sequence to add the candidate to. */
+  sequence_id?: string | null
   /** For action_type 'send_email' (later). */
   email_template_id?: string | null
   [k: string]: unknown

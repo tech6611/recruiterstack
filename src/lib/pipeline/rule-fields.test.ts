@@ -39,7 +39,7 @@ describe('rule fields', () => {
       expect(describeCondition('days_in_stage', 'gt', 3)).toBe('Days in stage greater than 3 days')
       expect(describeCondition('ai_score', 'gte', 70)).toBe('Fit score at least 70')
       expect(describeCondition('review_status', 'is', 'no')).toBe('Recruiter decision is No')
-      expect(describeCondition('has_feedback', 'is_true', undefined)).toBe('Interview feedback is submitted / yes')
+      expect(describeCondition('has_feedback', 'is_true', undefined)).toBe('Interview feedback submitted is yes')
     })
   })
 })

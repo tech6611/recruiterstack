@@ -35,7 +35,7 @@ export const automationGuardrailsSchema = z.object({
 })
 
 export const ruleFieldEnum = z.enum([
-  'days_in_stage', 'ai_score', 'fit_bucket', 'review_status', 'has_feedback', 'source', 'missing_must_have',
+  'days_in_stage', 'ai_score', 'fit_bucket', 'review_status', 'has_feedback', 'feedback_result', 'source', 'missing_must_have',
 ])
 export const ruleOperatorEnum = z.enum([
   'gt', 'gte', 'lt', 'lte', 'eq', 'neq', 'is', 'is_not', 'is_true', 'is_false',
@@ -54,6 +54,7 @@ export const automationConfigSchema = z.object({
   conditions: z.array(ruleConditionSchema).max(8).default([]),
   match: z.enum(['all', 'any']).default('all'),
   target_stage_id: z.string().uuid().nullish(),
+  sequence_id: z.string().uuid().nullish(),
   email_template_id: z.string().nullish(),
 }).passthrough()
 

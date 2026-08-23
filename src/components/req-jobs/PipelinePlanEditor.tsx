@@ -7,8 +7,6 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Select } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import type { StageZone } from '@/lib/pipeline/zones'
 import { ZONE_SEQUENCE } from '@/lib/pipeline/zones'
 import { FUNNEL_STEPS } from '@/lib/pipeline/funnel-steps'
@@ -21,12 +19,6 @@ const ZONE_META: Record<StageZone, { title: string; blurb: string; icon: typeof 
   offer:     { title: 'Offer',     blurb: 'Terms, approvals, and closing.',                              icon: FileSignature, addable: true },
   completed: { title: 'Completed', blurb: 'Final outcomes — hired or archived.',                          icon: CheckCircle2,  addable: false },
 }
-
-const REJECT_OPTIONS: { value: RejectDestination; label: string }[] = [
-  { value: 'archive', label: 'Archive' },
-  { value: 'hold', label: 'Hold' },
-  { value: 'review', label: 'Send to review' },
-]
 
 const STEP_GROUPS = ZONE_SEQUENCE.map(zone => ({ zone, steps: FUNNEL_STEPS.filter(s => s.zone === zone) })).filter(g => g.steps.length > 0)
 
@@ -225,13 +217,13 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
       ) : (
         <div className="divide-y divide-slate-100">
           {byZone.map(({ zone, stages: zoneStages }) => (
-            <section key={zone} className="px-5 py-4">
-              <div className="mb-1 flex items-baseline gap-2">
-                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{ZONE_META[zone].title}</h4>
-                <span className="text-[11px] text-slate-400">· {ZONE_META[zone].blurb}</span>
+            <section key={zone}>
+              <div className="flex items-baseline gap-2 border-l-[3px] border-[#221b14] bg-slate-100 px-5 py-2">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[#221b14]">{ZONE_META[zone].title}</h4>
+                <span className="text-[11px] text-slate-500">· {ZONE_META[zone].blurb}</span>
               </div>
 
-              <div className="flex items-center gap-3 px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+              <div className="flex items-center gap-3 px-7 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-slate-400">
                 <span className="flex-1">Stage</span>
                 <span className="w-44 shrink-0">Funnel step</span>
                 <span className="w-16 shrink-0 text-right">Cands.</span>
@@ -241,7 +233,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
               <div className="overflow-hidden rounded-lg border border-slate-200">
                 {zoneStages.map((s, idx) => {
                   const e = edits[s.id]
-                  const filled = !!(e?.entry_intent.trim() || e?.advance_criteria.trim())
+                  const filled = (rules[s.id]?.length ?? 0) > 0
                   const locked = isLocked(s)
                   return (
                     <div key={s.id} className={idx > 0 ? 'border-t border-slate-100' : ''}>
@@ -294,7 +286,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                           {s.is_promotion_gate && (
                             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-700 ring-1 ring-gold-200"><Flag className="h-2.5 w-2.5" /> Gate</span>
                           )}
-                          {filled && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" title="Plan set" />}
+                          {filled && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" title="Has automation rules" />}
                         </div>
 
                         {/* funnel step */}
@@ -329,16 +321,6 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
 
                       {open[s.id] && (
                         <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <Field label="When a candidate lands here" value={e?.entry_intent ?? ''} onChange={v => update(s.id, { entry_intent: v })} placeholder="e.g. Screen against the ideal-candidate profile" />
-                            <Field label="Rule for moving forward" value={e?.advance_criteria ?? ''} onChange={v => update(s.id, { advance_criteria: v })} placeholder="e.g. Strong fit, no missing must-haves → advance" />
-                          </div>
-                          <div className="mt-2 flex items-center gap-2">
-                            <span className="text-[11px] uppercase tracking-wide text-slate-400">If rejected</span>
-                            <Select value={e?.reject_to ?? 'archive'} onChange={ev => update(s.id, { reject_to: ev.target.value as RejectDestination })} className="h-8 w-40 text-sm">
-                              {REJECT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                            </Select>
-                          </div>
                           <StageRules
                             jobId={jobId}
                             stageId={s.id}
@@ -376,11 +358,18 @@ function ZoneStepper({ byZone }: { byZone: { zone: StageZone; stages: ZonedStage
         const candidates = stages.reduce((n, s) => n + s.candidate_count, 0)
         return (
           <Fragment key={zone}>
-            <div className="flex min-w-0 flex-1 basis-0 items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
-              <Icon className="h-4 w-4 shrink-0 text-[#221b14]" />
+            <div
+              className={[
+                'flex min-w-0 flex-1 basis-0 items-center gap-2.5 rounded-lg px-3 py-1.5',
+                'border border-[#221b14] bg-[#221b14]',
+                // gold underline marks the zones actually holding candidates
+                candidates > 0 ? 'shadow-[inset_0_-3px_0_0_#ebb137]' : '',
+              ].join(' ')}
+            >
+              <Icon className="h-4 w-4 shrink-0 text-slate-300" />
               <div className="min-w-0 leading-tight">
-                <div className="truncate text-[13px] font-semibold text-slate-800">{ZONE_META[zone].title}</div>
-                <div className="truncate text-[11px] text-slate-400">{candidates} candidate{candidates === 1 ? '' : 's'} · {stages.length} stage{stages.length === 1 ? '' : 's'}</div>
+                <div className="truncate text-[13px] font-semibold text-slate-50">{ZONE_META[zone].title}</div>
+                <div className="truncate text-[11px] text-slate-400">{candidates} candidate{candidates === 1 ? '' : 's'}</div>
               </div>
             </div>
             {i < byZone.length - 1 && (
@@ -391,15 +380,6 @@ function ZoneStepper({ byZone }: { byZone: { zone: StageZone; stages: ZonedStage
           </Fragment>
         )
       })}
-    </div>
-  )
-}
-
-function Field({ label, value, onChange, placeholder, rows = 2 }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; rows?: number }) {
-  return (
-    <div>
-      <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</label>
-      <Textarea rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   )
 }

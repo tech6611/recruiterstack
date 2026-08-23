@@ -12,6 +12,7 @@ export interface RuleFacts {
   fit_bucket?: string | null
   review_status?: string | null
   has_feedback?: boolean | null
+  feedback_result?: string | null
   source?: string | null
   missing_must_have?: boolean | null
 }
