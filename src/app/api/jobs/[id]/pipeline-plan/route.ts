@@ -3,7 +3,7 @@ import { withCapability, withScope, parseBody } from '@/lib/api/helpers'
 import { assertCanViewJob } from '@/lib/rbac'
 import { pipelinePlanPutSchema } from '@/lib/validations/pipeline-automations'
 import {
-  getZonedStages, upsertStagePlaybook, updateStageFunnelStep,
+  getZonedStages, upsertStagePlaybook, updateStageFunnelStep, updateStageInterviewPanel,
   createStage, renameStage, deleteStage, reorderStages,
 } from '@/modules/ats/domain/pipeline-automations'
 import type { StageZone } from '@/lib/pipeline/zones'
@@ -61,6 +61,10 @@ export const PUT = withCapability('recruiting:edit', async (req, orgId, supabase
     // funnel_step lives on the stage itself (Ashby's Stage Group mapping).
     if (pb.funnel_step !== undefined) {
       await updateStageFunnelStep(supabase, orgId, pb.stage_id, pb.funnel_step ?? null)
+    }
+    // interview_panel also lives on the stage (migration 132).
+    if (pb.interview_panel !== undefined) {
+      await updateStageInterviewPanel(supabase, orgId, pb.stage_id, pb.interview_panel ?? null)
     }
   }
 

@@ -112,12 +112,28 @@ async function scheduleScreeningCall(sb: LooseSb, app: AppRow): Promise<void> {
   const expires = new Date(); expires.setDate(expires.getDate() + 7)
   const placeholder = new Date(); placeholder.setDate(placeholder.getDate() + 7)
 
+  // Pull the stage's interview panel (migration 132) so the self-schedule link
+  // fits the whole panel's availability and calendar invites reach all of them.
+  let panel: Array<{ name: string; email: string }> | null = null
+  if (app.stage_id) {
+    const { data: st } = await sb.from('pipeline_stages')
+      .select('interview_panel').eq('org_id', app.org_id).eq('id', app.stage_id).maybeSingle()
+    const p = st?.interview_panel
+    if (Array.isArray(p) && p.length) {
+      panel = p.map((m: { name?: string; email?: string }) => ({ name: (m.name ?? '').trim(), email: (m.email ?? '').trim() }))
+        .filter((m: { email: string }) => m.email)
+      if (!panel.length) panel = null
+    }
+  }
+  const hasPanel = !!panel
+
   await createSelfScheduleInterview(sb as unknown as Supabase, app.org_id, {
     application_id: app.id, candidate_id: app.candidate_id, hiring_request_id: null,
-    interviewer_name: 'Screening', interview_type: 'phone',
-    scheduled_at: placeholder.toISOString(), duration_minutes: 30, status: 'scheduled',
-    self_schedule_token: token, self_schedule_expires_at: expires.toISOString(), panel: null,
-    interviewer_email: null,
+    interviewer_name: panel?.[0]?.name || 'Screening',
+    interview_type: hasPanel ? 'video' : 'phone',
+    scheduled_at: placeholder.toISOString(), duration_minutes: hasPanel ? 45 : 30, status: 'scheduled',
+    self_schedule_token: token, self_schedule_expires_at: expires.toISOString(),
+    panel, interviewer_email: panel?.[0]?.email ?? null,
   } as never)
 
   await recordApplicationEventSafe(sb as unknown as Supabase, {

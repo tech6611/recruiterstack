@@ -32,12 +32,12 @@ export async function getZonedStages(
   jobId: string,
 ): Promise<ZonedStage[]> {
   const sb = supabase as unknown as LooseSb
-  // Prefer the funnel_step column (migration 131); fall back without it if the
-  // column isn't present yet (deploy-safe before 131 is applied).
+  // Prefer the newer columns (funnel_step migration 131, interview_panel 132);
+  // fall back without them if they aren't present yet (deploy-safe pre-migration).
   let stages: unknown[] | null
   const primary = await sb
     .from('pipeline_stages')
-    .select('id, name, order_index, zone, is_promotion_gate, funnel_step')
+    .select('id, name, order_index, zone, is_promotion_gate, funnel_step, interview_panel')
     .eq('org_id', orgId)
     .eq('job_id', jobId)
     .order('order_index', { ascending: true })
@@ -49,7 +49,7 @@ export async function getZonedStages(
       .eq('job_id', jobId)
       .order('order_index', { ascending: true })
     if (fb.error) throw fb.error
-    stages = (fb.data ?? []).map((r: Record<string, unknown>) => ({ ...r, funnel_step: null }))
+    stages = (fb.data ?? []).map((r: Record<string, unknown>) => ({ ...r, funnel_step: null, interview_panel: null }))
   } else {
     stages = primary.data ?? []
   }
@@ -61,6 +61,7 @@ export async function getZonedStages(
     zone: StageZone
     is_promotion_gate: boolean
     funnel_step: string | null
+    interview_panel: import('@/lib/types/pipeline-automations').PanelMember[] | null
   }>
   if (rows.length === 0) return []
 
@@ -89,8 +90,32 @@ export async function getZonedStages(
     is_promotion_gate: r.is_promotion_gate,
     funnel_step: r.funnel_step ?? null,
     candidate_count: counts.get(r.id) ?? 0,
+    interview_panel: Array.isArray(r.interview_panel) ? r.interview_panel : null,
     playbook: byStage.get(r.id) ?? null,
   }))
+}
+
+/** Set (or clear) a stage's interview panel (migration 132). Tolerates the column
+ *  not existing yet (deploy-safe before 132 is applied). */
+export async function updateStageInterviewPanel(
+  supabase: Supabase,
+  orgId: string,
+  stageId: string,
+  panel: import('@/lib/types/pipeline-automations').PanelMember[] | null,
+): Promise<void> {
+  const sb = supabase as unknown as LooseSb
+  const { error } = await sb
+    .from('pipeline_stages')
+    .update({ interview_panel: panel && panel.length ? panel : null })
+    .eq('org_id', orgId)
+    .eq('id', stageId)
+  if (error) {
+    if (error.code === '42703' || /interview_panel/.test(error.message ?? '')) {
+      logger.warn('interview_panel column not present yet; skipping panel write', { stageId })
+      return
+    }
+    throw error
+  }
 }
 
 /** Set (or clear) the canonical funnel step a stage maps to (migration 131).

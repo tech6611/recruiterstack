@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import type { StageZone } from '@/lib/pipeline/zones'
 import { ZONE_SEQUENCE } from '@/lib/pipeline/zones'
 import { FUNNEL_STEPS } from '@/lib/pipeline/funnel-steps'
-import type { PipelineAutomation, RejectDestination, ZonedStage } from '@/lib/types/pipeline-automations'
+import type { PipelineAutomation, PanelMember, RejectDestination, ZonedStage } from '@/lib/types/pipeline-automations'
 import { StageRules } from '@/components/req-jobs/StageRules'
 
 const ZONE_META: Record<StageZone, { title: string; blurb: string; icon: typeof Users; addable: boolean }> = {
@@ -44,7 +44,23 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
   const [dragId, setDragId] = useState<string | null>(null)   // stage being dragged
   const [overId, setOverId] = useState<string | null>(null)   // stage it is hovering over
   const [armed, setArmed] = useState<string | null>(null)     // row armed for drag (grip pressed)
+  const [team, setTeam] = useState<PanelMember[]>([])          // org team members (name+email) for the panel picker
+  const [panels, setPanels] = useState<Record<string, PanelMember[]>>({})  // interview panel per stage
   const serverNames = useRef<Map<string, string>>(new Map())
+
+  // Team members (with emails) for the interview-panel picker.
+  useEffect(() => {
+    fetch('/api/team').then(r => r.json()).then(j => {
+      const rows = (j?.data ?? []) as Array<{ users?: { email?: string | null; full_name?: string | null; first_name?: string | null; last_name?: string | null } | null }>
+      const members = rows.map(r => {
+        const u = r.users
+        if (!u?.email) return null
+        const name = u.full_name || [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
+        return { name, email: u.email }
+      }).filter(Boolean) as PanelMember[]
+      setTeam(members)
+    }).catch(() => {})
+  }, [])
 
   // Automation rules, grouped by stage_id.
   const loadRules = useCallback(async () => {
@@ -63,12 +79,33 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
     setStages(list)
     serverNames.current = new Map(list.map(s => [s.id, s.name]))
     setEdits(prev => Object.fromEntries(list.map(s => [s.id, preserve && prev[s.id] ? prev[s.id] : editFrom(s)])))
+    setPanels(prev => Object.fromEntries(list.map(s => [s.id, preserve && prev[s.id] ? prev[s.id] : (s.interview_panel ?? [])])))
     setLoading(false)
   }, [jobId])
   useEffect(() => { load(); loadRules() }, [load, loadRules])
 
   const update = (id: string, patch: Partial<Edit>) => setEdits(e => ({ ...e, [id]: { ...e[id], ...patch } }))
   const toggle = (id: string) => setOpen(o => ({ ...o, [id]: !o[id] }))
+
+  // ── Interview panel per stage (saved with "Save plan") ──
+  const addPanelMember = (stageId: string, email: string) => {
+    const m = team.find(t => t.email === email)
+    if (!m) return
+    setPanels(p => ({ ...p, [stageId]: [...(p[stageId] ?? []).filter(x => x.email !== email), m] }))
+  }
+  const removePanelMember = (stageId: string, email: string) =>
+    setPanels(p => ({ ...p, [stageId]: (p[stageId] ?? []).filter(x => x.email !== email) }))
+  const copyAvailabilityLink = async (m: PanelMember) => {
+    try {
+      const res = await fetch('/api/interviewer-links', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: m.email, name: m.name }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.link) throw new Error(j.error || 'Failed')
+      await navigator.clipboard.writeText(j.link).catch(() => {})
+      toast.success(`Availability link copied — send it to ${m.name}`)
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Could not create availability link') }
+  }
 
   // ── Save playbooks + funnel mapping (batched) ──
   const save = async () => {
@@ -80,6 +117,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
         advance_criteria: edits[s.id]?.advance_criteria.trim() || null,
         reject_to: edits[s.id]?.reject_to ?? 'archive',
         funnel_step: edits[s.id]?.funnel_step ?? null,
+        interview_panel: panels[s.id] ?? [],
       }))
       const res = await fetch(`/api/jobs/${jobId}/pipeline-plan`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playbooks }),
@@ -322,6 +360,37 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
 
                       {open[s.id] && (
                         <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
+                          {(s.zone === 'active' || s.zone === 'offer') && (
+                            <div className="mb-3 border-b border-slate-200 pb-3">
+                              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                <Users className="h-3 w-3 text-slate-400" /> Interview panel
+                              </div>
+                              {(panels[s.id]?.length ?? 0) > 0 ? (
+                                <div className="mb-2 flex flex-wrap gap-1.5">
+                                  {panels[s.id].map(m => (
+                                    <span key={m.email} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[12px] text-slate-700">
+                                      {m.name}
+                                      <button onClick={() => copyAvailabilityLink(m)} className="text-[10px] font-medium text-[#221b14] hover:underline">availability link</button>
+                                      <button onClick={() => removePanelMember(s.id, m.email)} aria-label="Remove interviewer" className="text-slate-300 hover:text-red-500"><Trash2 className="h-3 w-3" /></button>
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="mb-1.5 text-[12px] text-slate-400">No interviewers yet — add who runs this interview.</p>
+                              )}
+                              <select
+                                value=""
+                                onChange={ev => { if (ev.target.value) addPanelMember(s.id, ev.target.value) }}
+                                className="h-8 w-56 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700"
+                              >
+                                <option value="">+ Add interviewer…</option>
+                                {team.filter(t => !(panels[s.id] ?? []).some(m => m.email === t.email)).map(t => (
+                                  <option key={t.email} value={t.email}>{t.name}</option>
+                                ))}
+                              </select>
+                              <p className="mt-1 text-[11px] text-slate-400">Each interviewer sets their hours via the availability link. When a rule auto-schedules this interview, the candidate’s self-schedule link fits the whole panel and everyone gets a calendar invite. Save with “Save plan”.</p>
+                            </div>
+                          )}
                           <StageRules
                             jobId={jobId}
                             stageId={s.id}

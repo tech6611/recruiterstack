@@ -165,6 +165,12 @@ export interface AutomationRun {
   created_at: string
 }
 
+/** A member of a stage's interview panel (migration 132). */
+export interface PanelMember {
+  name: string
+  email: string
+}
+
 /** An automation run enriched for the activity panel. */
 export interface AutomationRunView extends AutomationRun {
   candidate_name: string | null
@@ -181,5 +187,6 @@ export interface ZonedStage {
   is_promotion_gate: boolean
   funnel_step: string | null
   candidate_count: number
+  interview_panel: PanelMember[] | null
   playbook?: StagePlaybook | null
 }
