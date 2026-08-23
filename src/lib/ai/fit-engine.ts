@@ -233,12 +233,12 @@ When a deal-breaker is about PROFESSIONAL BACKGROUND or IDENTITY (e.g. "has a ge
 - Weigh institution pedigree and the actual work performed over titles or labels. A current title in a different function, or a few adjacent skills alone, is weak evidence — but a real role doing the work is strong evidence.
 - Mark "fail" only when the whole picture genuinely shows the candidate is not that kind of professional (no relevant study AND no relevant role). If the information is simply absent, default to "pass" — never reject purely on missing information.
 
-For EACH competency id, assign a rating 1–4 using its anchors (1 poor · 2 fair · 3 good · 4 excellent) and cite the specific evidence you based it on. Note any red flags (concrete concerns), and list this candidate's strengths and gaps for THIS role. Do NOT output an overall score — only the per-competency ratings and the per-gate verdicts.
+For EACH competency id, assign a rating 1–4 using its anchors (1 poor · 2 fair · 3 good · 4 excellent) and cite the specific evidence in ONE concise sentence of at most 20 words — the single strongest signal, no preamble or hedging. Note any red flags (concrete concerns), and list this candidate's strengths and gaps for THIS role. Do NOT output an overall score — only the per-competency ratings and the per-gate verdicts.
 
 Respond with ONLY valid JSON (no markdown):
 {
   "gate_results": [ { "id": "g-ai-0", "pass": true, "reason": "..." } ],
-  "competencies": [ { "id": "technical", "rating": 3, "evidence": "..." } ],
+  "competencies": [ { "id": "technical", "rating": 3, "evidence": "one concise sentence, ≤20 words" } ],
   "red_flags": ["..."],
   "strengths": ["..."],
   "gaps": ["..."],

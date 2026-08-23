@@ -255,7 +255,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
                       <span className="w-8 text-right text-[10px] font-medium text-slate-500">{c.rating}/4</span>
                     </div>
                     {evidence && (
-                      <p className="pl-[7.5rem] text-[10px] leading-relaxed text-slate-400">{evidence}</p>
+                      <p className="line-clamp-2 pl-[7.5rem] text-[10px] leading-relaxed text-slate-400" title={evidence}>{evidence}</p>
                     )}
                   </div>
                 )
