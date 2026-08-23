@@ -81,6 +81,10 @@ export const pipelinePlanPutSchema = z.object({
           .string()
           .refine(v => FUNNEL_STEP_IDS.includes(v), 'Unknown funnel step')
           .nullish(),
+        interview_panel: z
+          .array(z.object({ name: z.string().max(160), email: z.string().email() }))
+          .max(10)
+          .nullish(),
       }),
     )
     .max(50),
