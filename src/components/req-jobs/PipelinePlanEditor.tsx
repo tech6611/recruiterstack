@@ -12,7 +12,8 @@ import { Textarea } from '@/components/ui/textarea'
 import type { StageZone } from '@/lib/pipeline/zones'
 import { ZONE_SEQUENCE } from '@/lib/pipeline/zones'
 import { FUNNEL_STEPS } from '@/lib/pipeline/funnel-steps'
-import type { RejectDestination, ZonedStage } from '@/lib/types/pipeline-automations'
+import type { PipelineAutomation, RejectDestination, ZonedStage } from '@/lib/types/pipeline-automations'
+import { StageRules } from '@/components/req-jobs/StageRules'
 
 const ZONE_META: Record<StageZone, { title: string; blurb: string; icon: typeof Users; addable: boolean }> = {
   lead:      { title: 'Lead',      blurb: 'Sourced people you’re reaching out to — before they apply.', icon: UserPlus,      addable: false },
@@ -44,10 +45,20 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
   const [stages, setStages] = useState<ZonedStage[]>([])
   const [edits, setEdits] = useState<Record<string, Edit>>({})
   const [open, setOpen] = useState<Record<string, boolean>>({})
+  const [rules, setRules] = useState<Record<string, PipelineAutomation[]>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false) // a structural op is in flight
   const serverNames = useRef<Map<string, string>>(new Map())
+
+  // Automation rules, grouped by stage_id.
+  const loadRules = useCallback(async () => {
+    const res = await fetch(`/api/jobs/${jobId}/automations`).then(r => r.json()).catch(() => null)
+    const list = (res?.data?.rules ?? []) as PipelineAutomation[]
+    const byStage: Record<string, PipelineAutomation[]> = {}
+    for (const r of list) (byStage[r.stage_id] ??= []).push(r)
+    setRules(byStage)
+  }, [jobId])
 
   // Load stages; preserve any in-progress playbook/funnel edits (keyed by id).
   const load = useCallback(async (preserve = false) => {
@@ -59,7 +70,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
     setEdits(prev => Object.fromEntries(list.map(s => [s.id, preserve && prev[s.id] ? prev[s.id] : editFrom(s)])))
     setLoading(false)
   }, [jobId])
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(); loadRules() }, [load, loadRules])
 
   const update = (id: string, patch: Partial<Edit>) => setEdits(e => ({ ...e, [id]: { ...e[id], ...patch } }))
   const toggle = (id: string) => setOpen(o => ({ ...o, [id]: !o[id] }))
@@ -272,6 +283,13 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                               {REJECT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </Select>
                           </div>
+                          <StageRules
+                            jobId={jobId}
+                            stageId={s.id}
+                            stages={stages.map(x => ({ id: x.id, name: x.name }))}
+                            rules={rules[s.id] ?? []}
+                            onChanged={loadRules}
+                          />
                         </div>
                       )}
                     </div>
