@@ -282,3 +282,66 @@ export async function scanPipelineAutomations(
   if (acted || suggested) logger.info('Pipeline automations scanned', { acted, suggested, live })
   return { acted, suggested, live }
 }
+
+// ── Read-only diagnostic: "why aren't my rules firing?" ─────────────────────
+// Mirrors scanPipelineAutomations' exact queries + evaluation, but performs NO
+// action and SURFACES the errors the engine silently swallows. Pass an ADMIN
+// client (createAdminClient) so it sees exactly what the engine sees.
+export async function diagnoseJobAutomations(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<Record<string, unknown>> {
+  const sb = supabase as unknown as LooseSb
+  const live = process.env.PIPELINE_AUTOMATIONS_MODE === 'live'
+
+  // (1) rules — same query the engine runs (all enabled), + capture any error.
+  const rulesRes = await sb.from('pipeline_automations').select('*').eq('enabled', true)
+  const allRules = (rulesRes.data ?? []) as PipelineAutomation[]
+  const jobRules = allRules.filter(r => r.job_id === jobId)
+
+  // (2) apps — the engine's exact query (active apps in the rules' stages), + error.
+  const stageIds = Array.from(new Set(jobRules.map(r => r.stage_id)))
+  const appsRes = stageIds.length
+    ? await sb.from('applications').select(APP_COLS).in('stage_id', stageIds).eq('status', 'active').limit(APP_BATCH)
+    : { data: [], error: null }
+  const rawApps = (appsRes.data ?? []) as AppRow[]
+  const jobApps = rawApps.filter(a => a.job_id === jobId)
+
+  // (3) per candidate × rule: facts + matched/why.
+  const evaluations: Array<Record<string, unknown>> = []
+  for (const app of jobApps) {
+    let facts: RuleFacts
+    try { facts = await buildFacts(sb, app) } catch (err) {
+      evaluations.push({ application_id: app.id, facts_error: err instanceof Error ? err.message : String(err) })
+      continue
+    }
+    for (const rule of jobRules.filter(r => r.stage_id === app.stage_id && r.org_id === app.org_id)) {
+      evaluations.push({
+        application_id: app.id,
+        stage_id: app.stage_id,
+        rule_id: rule.id,
+        action: rule.action_type,
+        mode: rule.mode,
+        conditions: (rule.config?.conditions ?? []).map(c => describeCondition(c.field, c.operator, c.value)),
+        matched: evaluateConditions(facts, rule.config?.conditions, rule.config?.match ?? 'all'),
+        would_act_live: live && rule.mode === 'auto' && AUTO_ACTIONS.has(rule.action_type),
+        facts,
+      })
+    }
+  }
+
+  return {
+    live,
+    rules_query_error: rulesRes.error?.message ?? null,
+    apps_query_error: appsRes.error?.message ?? null,
+    rules_loaded_total: allRules.length,
+    rules_for_this_job: jobRules.length,
+    rule_stage_ids: stageIds,
+    active_apps_in_those_stages_raw: rawApps.length,
+    active_apps_for_this_job: jobApps.length,
+    org_id_seen: orgId,
+    sample_app_orgs: rawApps.slice(0, 5).map(a => ({ id: a.id, org_id: a.org_id, stage_id: a.stage_id, status_active_assumed: true })),
+    evaluations,
+  }
+}
