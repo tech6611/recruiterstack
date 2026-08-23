@@ -33,7 +33,14 @@ export const RULE_FIELDS: readonly RuleFieldDef[] = [
       { value: 'no', label: 'No' }, { value: 'unreviewed', label: 'Not reviewed' },
     ],
   },
-  { field: 'has_feedback', label: 'Interview feedback', type: 'boolean' },
+  { field: 'has_feedback', label: 'Interview feedback submitted', type: 'boolean' },
+  {
+    field: 'feedback_result', label: 'Interview feedback', type: 'choice',
+    options: [
+      { value: 'strong_yes', label: 'Strong yes' }, { value: 'yes', label: 'Yes' },
+      { value: 'maybe', label: 'Maybe' }, { value: 'no', label: 'No' },
+    ],
+  },
   {
     field: 'source', label: 'Source', type: 'choice',
     options: [
@@ -55,7 +62,7 @@ export const OPERATORS: Record<FieldType, { op: RuleOperator; label: string }[]>
     { op: 'eq', label: 'equals' }, { op: 'neq', label: 'is not' },
   ],
   choice: [{ op: 'is', label: 'is' }, { op: 'is_not', label: 'is not' }],
-  boolean: [{ op: 'is_true', label: 'is submitted / yes' }, { op: 'is_false', label: 'is missing / no' }],
+  boolean: [{ op: 'is_true', label: 'is yes' }, { op: 'is_false', label: 'is no' }],
 }
 
 /** Operators allowed for a given field (empty if unknown field). */

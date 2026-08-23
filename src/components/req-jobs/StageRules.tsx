@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Trash2, Loader2, Zap, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -9,18 +9,15 @@ import { Input } from '@/components/ui/input'
 import { RULE_FIELDS, ruleField, operatorsForField, isValidCondition, describeCondition } from '@/lib/pipeline/rule-fields'
 import type {
   PipelineAutomation, RuleCondition, RuleField, RuleOperator,
-  AutomationActionType, AutomationMode, AutomationTrigger, ConditionMatch,
+  AutomationActionType, AutomationMode, ConditionMatch,
 } from '@/lib/types/pipeline-automations'
 
-const WHEN_OPTS: { v: AutomationTrigger; l: string }[] = [
-  { v: 'stage_entry', l: 'When a candidate enters this stage' },
-  { v: 'sla_elapsed', l: 'Each day a candidate waits here' },
-]
 const ACTION_OPTS: { v: AutomationActionType; l: string }[] = [
   { v: 'move_stage', l: 'Move to…' },
+  { v: 'schedule_interview', l: 'Schedule a screening call' },
+  { v: 'enrol_outreach', l: 'Add to a sequence' },
   { v: 'archive', l: 'Archive (reject)' },
   { v: 'request_approval', l: 'Request approval' },
-  { v: 'send_email', l: 'Send an email' },
 ]
 const MODE_OPTS: { v: AutomationMode; l: string }[] = [
   { v: 'auto', l: 'Automatically' },
@@ -31,20 +28,26 @@ const actionLabel = (a: AutomationActionType) => ACTION_OPTS.find(o => o.v === a
 const modeLabel = (m: AutomationMode) => MODE_OPTS.find(o => o.v === m)?.l ?? m
 
 type Stage = { id: string; name: string }
+type Sequence = { id: string; name: string }
 type DraftCond = { field: RuleField; operator: RuleOperator; value: string }
 
 const firstOp = (field: RuleField): RuleOperator => operatorsForField(field)[0]?.op ?? 'is'
 const blankCond = (): DraftCond => ({ field: 'days_in_stage', operator: firstOp('days_in_stage'), value: '' })
 
-function describeRule(r: PipelineAutomation, stages: Stage[]): string {
-  const when = WHEN_OPTS.find(w => w.v === r.trigger)?.l ?? r.trigger
+function describeRule(r: PipelineAutomation, stages: Stage[], sequences: Sequence[]): string {
   const conds = r.config?.conditions ?? []
   const joiner = (r.config?.match ?? 'all') === 'all' ? ' and ' : ' or '
-  const ifText = conds.length ? `, if ${conds.map(c => describeCondition(c.field, c.operator, c.value)).join(joiner)}` : ''
-  const action = r.action_type === 'move_stage'
-    ? `move to ${stages.find(s => s.id === r.config?.target_stage_id)?.name ?? '—'}`
-    : actionLabel(r.action_type).toLowerCase()
-  return `${when}${ifText} → ${action}`
+  const ifText = conds.length ? `If ${conds.map(c => describeCondition(c.field, c.operator, c.value)).join(joiner)} → ` : ''
+  let action: string
+  if (r.action_type === 'move_stage') {
+    action = `move to ${stages.find(s => s.id === r.config?.target_stage_id)?.name ?? '—'}`
+  } else if (r.action_type === 'enrol_outreach') {
+    const nm = sequences.find(s => s.id === r.config?.sequence_id)?.name
+    action = `add to sequence${nm ? ` “${nm}”` : ''}`
+  } else {
+    action = actionLabel(r.action_type).toLowerCase()
+  }
+  return `${ifText}${action}`
 }
 
 export function StageRules({
@@ -59,25 +62,33 @@ export function StageRules({
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [sequences, setSequences] = useState<Sequence[]>([])
 
-  // draft rule state
-  const [trigger, setTrigger] = useState<AutomationTrigger>('stage_entry')
+  // draft rule state (no "when" — the engine fires whenever conditions hold)
   const [conds, setConds] = useState<DraftCond[]>([blankCond()])
   const [match, setMatch] = useState<ConditionMatch>('all')
   const [action, setAction] = useState<AutomationActionType>('move_stage')
   const [target, setTarget] = useState<string>('')
+  const [seqId, setSeqId] = useState<string>('')
   const [mode, setMode] = useState<AutomationMode>('suggest')
 
+  // Load sequences once (for the "Add to a sequence" picker + rule labels).
+  useEffect(() => {
+    fetch('/api/sequences').then(r => r.json()).then(j => {
+      const arr = Array.isArray(j) ? j : (j?.data ?? j?.sequences ?? [])
+      setSequences((arr as Array<{ id: string; name: string }>).map(s => ({ id: s.id, name: s.name })))
+    }).catch(() => {})
+  }, [])
+
   const resetDraft = () => {
-    setTrigger('stage_entry'); setConds([blankCond()]); setMatch('all')
-    setAction('move_stage'); setTarget(''); setMode('suggest'); setAdding(false)
+    setConds([blankCond()]); setMatch('all'); setAction('move_stage')
+    setTarget(''); setSeqId(''); setMode('suggest'); setAdding(false)
   }
 
   const setCond = (i: number, patch: Partial<DraftCond>) =>
     setConds(cs => cs.map((c, idx) => {
       if (idx !== i) return c
       const next = { ...c, ...patch }
-      // when the field changes, snap the operator to a valid one for the new type
       if (patch.field && patch.field !== c.field) next.operator = firstOp(patch.field)
       return next
     }))
@@ -89,7 +100,7 @@ export function StageRules({
     return c.value
   }
   const condsValid = conds.every(c => isValidCondition(c.field, c.operator, condValue(c)))
-  const actionValid = action !== 'move_stage' || !!target
+  const actionValid = (action !== 'move_stage' || !!target) && (action !== 'enrol_outreach' || !!seqId)
   const canSave = condsValid && actionValid && !saving
 
   const save = async () => {
@@ -100,8 +111,12 @@ export function StageRules({
         return v === undefined ? { field: c.field, operator: c.operator } : { field: c.field, operator: c.operator, value: v }
       })
       const rule = {
-        stage_id: stageId, trigger, action_type: action, mode, uses_agent: false, enabled: true,
-        config: { conditions, match, target_stage_id: action === 'move_stage' ? target : null },
+        stage_id: stageId, trigger: 'sla_elapsed', action_type: action, mode, uses_agent: false, enabled: true,
+        config: {
+          conditions, match,
+          target_stage_id: action === 'move_stage' ? target : null,
+          sequence_id: action === 'enrol_outreach' ? seqId : null,
+        },
         guardrails: {},
       }
       const res = await fetch(`/api/jobs/${jobId}/automations`, {
@@ -137,7 +152,7 @@ export function StageRules({
           {rules.map(r => (
             <li key={r.id} className="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] text-slate-700">
               <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">{modeLabel(r.mode)}</span>
-              <span className="flex-1">{describeRule(r, stages)}</span>
+              <span className="flex-1">{describeRule(r, stages, sequences)}</span>
               <button onClick={() => remove(r.id)} disabled={busyId === r.id} aria-label="Delete rule" className="mt-0.5 shrink-0 text-slate-300 hover:text-red-500 disabled:opacity-40">
                 {busyId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
               </button>
@@ -157,14 +172,6 @@ export function StageRules({
             <button onClick={resetDraft} aria-label="Cancel" className="text-slate-400 hover:text-slate-600"><X className="h-3.5 w-3.5" /></button>
           </div>
 
-          {/* WHEN */}
-          <label className="block">
-            <span className="mb-1 block text-[10px] uppercase tracking-wide text-slate-400">When</span>
-            <Select value={trigger} onChange={e => setTrigger(e.target.value as AutomationTrigger)} className="h-8 w-full text-sm">
-              {WHEN_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-            </Select>
-          </label>
-
           {/* IF */}
           <div>
             <span className="mb-1 block text-[10px] uppercase tracking-wide text-slate-400">If {conds.length > 1 ? <>({match === 'all' ? 'all' : 'any'} match)</> : null}</span>
@@ -183,7 +190,7 @@ export function StageRules({
                       <Input type="number" value={c.value} onChange={e => setCond(i, { value: e.target.value })} placeholder={def.unit} className="h-8 w-20 text-sm" />
                     )}
                     {def?.type === 'choice' && (
-                      <Select value={c.value} onChange={e => setCond(i, { value: e.target.value })} className="h-8 w-28 text-sm">
+                      <Select value={c.value} onChange={e => setCond(i, { value: e.target.value })} className="h-8 w-32 text-sm">
                         <option value="">—</option>
                         {def.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </Select>
@@ -220,6 +227,12 @@ export function StageRules({
                 {stages.filter(s => s.id !== stageId).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Select>
             )}
+            {action === 'enrol_outreach' && (
+              <Select value={seqId} onChange={e => setSeqId(e.target.value)} className="h-8 w-48 text-sm">
+                <option value="">choose sequence…</option>
+                {sequences.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </Select>
+            )}
           </div>
 
           {/* MODE */}
@@ -236,7 +249,7 @@ export function StageRules({
             </Button>
             <button onClick={resetDraft} className="text-xs text-slate-500 hover:text-slate-700">Cancel</button>
           </div>
-          <p className="text-[11px] text-slate-400">Rules are saved now; the engine that runs them ships next.</p>
+          <p className="text-[11px] text-slate-400">The engine checks rules every minute and fires as soon as the conditions hold.</p>
         </div>
       )}
     </div>

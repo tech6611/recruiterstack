@@ -7,18 +7,21 @@ import { fitBucketFor } from '@/lib/ai/fit-bucket'
 import {
   updateApplicationStage, updateApplicationStatusInOrg, recordApplicationEventSafe,
 } from '@/modules/ats/domain/applications'
+import { createSelfScheduleInterview } from '@/modules/ats/domain/interviews'
+import { enrollCandidate } from '@/modules/crm/domain/enroll'
 import { recordAutomationRunSafe } from '@/modules/ats/domain/pipeline-automations'
 import { logger } from '@/lib/logger'
 
 // Phase B: the engine that EVALUATES stage automation rules and (in live mode)
-// performs their actions. Runs on the /api/queue/process cron tick, alongside
-// scanAutomations. Safety-first:
-//   • DRY-RUN BY DEFAULT — unless env PIPELINE_AUTOMATIONS_MODE='live', every
-//     rule is only *recorded as a suggestion*; nothing is mutated. This lets us
-//     watch what it WOULD do on prod before letting it act.
-//   • Only mode:'auto' rules ever mutate (in live mode); suggest/approval always
-//     just record a pending run.
-//   • Idempotent (time-based rules skip candidates they've already acted on).
+// performs their actions. Runs on the /api/queue/process cron tick. Safety-first:
+//   • DRY-RUN BY DEFAULT — unless env PIPELINE_AUTOMATIONS_MODE='live', every rule
+//     is only *recorded as a suggestion*; nothing is mutated / no emails go out.
+//   • Only mode:'auto' rules ever act (in live mode); suggest/approval always just
+//     record a pending suggestion.
+//   • CONTINUOUS + idempotent: every enabled rule is re-checked each tick and fires
+//     the moment its conditions hold — once per candidacy (automation_runs ledger).
+//     So a rule's "when" no longer matters; conditions that become true later (e.g.
+//     "days in stage > 5", "feedback submitted") still fire.
 //   • Per-tick action cap. Every action is logged to automation_runs AND
 //     application_events (created_by 'automation'), so it's auditable + reversible.
 
@@ -26,16 +29,16 @@ type Supabase = SupabaseClient<Database>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseSb = any
 
-const EVENT_BATCH = 200
-const SLA_BATCH = 200
+const APP_BATCH = 300
 const MAX_ACTIONS_PER_TICK = 50
-// Actions the engine will actually perform in live mode. Others (send_email,
-// request_approval, screen, …) only ever record a suggestion for now.
-const AUTO_ACTIONS = new Set(['move_stage', 'archive'])
+// Actions the engine actually performs in live mode. request_approval (and any
+// future ones) only ever record a suggestion.
+const AUTO_ACTIONS = new Set(['move_stage', 'archive', 'enrol_outreach', 'schedule_interview'])
 
 interface AppRow {
   id: string
   org_id: string
+  candidate_id: string
   stage_id: string | null
   ai_score: number | null
   review_status: string | null
@@ -45,19 +48,7 @@ interface AppRow {
   job_id: string | null
 }
 
-const APP_COLS = 'id, org_id, stage_id, ai_score, review_status, source, applied_at, knockout_failed, job_id'
-
-// ── cursor (mirrors crm/automations.ts) ─────────────────────────────────────
-async function getCursor(sb: LooseSb, key: string): Promise<string> {
-  const { data } = await sb.from('automation_scan_state').select('last_scanned_at').eq('scan_key', key).maybeSingle()
-  if (data?.last_scanned_at) return data.last_scanned_at
-  const now = new Date().toISOString()
-  await sb.from('automation_scan_state').upsert({ scan_key: key, last_scanned_at: now, updated_at: now }, { onConflict: 'scan_key' })
-  return now
-}
-async function setCursor(sb: LooseSb, key: string, ts: string): Promise<void> {
-  await sb.from('automation_scan_state').upsert({ scan_key: key, last_scanned_at: ts, updated_at: new Date().toISOString() }, { onConflict: 'scan_key' })
-}
+const APP_COLS = 'id, org_id, candidate_id, stage_id, ai_score, review_status, source, applied_at, knockout_failed, job_id'
 
 // ── facts ───────────────────────────────────────────────────────────────────
 async function buildFacts(sb: LooseSb, app: AppRow): Promise<RuleFacts> {
@@ -72,24 +63,27 @@ async function buildFacts(sb: LooseSb, app: AppRow): Promise<RuleFacts> {
   }
   const days = since ? Math.floor((Date.now() - new Date(since).getTime()) / 86_400_000) : 0
 
-  const { count } = await sb.from('interviews')
-    .select('id', { count: 'exact', head: true }).eq('application_id', app.id).eq('status', 'completed')
+  // Interview feedback = a scorecard. Latest one gives the verdict; existence is
+  // "feedback submitted".
+  const { data: sc } = await sb.from('scorecards')
+    .select('recommendation').eq('application_id', app.id)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
   return {
     days_in_stage: days,
     ai_score: app.ai_score ?? null,
     fit_bucket: app.ai_score != null ? fitBucketFor(app.ai_score) : null,
     review_status: app.review_status ?? null,
-    has_feedback: (count ?? 0) > 0,
+    has_feedback: !!sc,
+    feedback_result: sc?.recommendation ?? null,
     source: app.source ?? null,
     missing_must_have: app.knockout_failed === true,
   }
 }
 
-/** Does a run in any of `states` already exist for (rule, candidacy)? Used for
- *  time-based idempotency. Mode-aware at the call site: a live action skips only
- *  on a prior COMMITTED run (so a dry-run suggestion never blocks a real action);
- *  a suggestion skips on any prior run (so dry-run doesn't spam every tick). */
+/** Does a run in any of `states` already exist for (rule, candidacy)? A live
+ *  action skips only on a prior COMMITTED run (a dry-run suggestion never blocks a
+ *  real action); a suggestion skips on any prior run (dry-run doesn't spam). */
 async function runExists(sb: LooseSb, orgId: string, ruleId: string, appId: string, states: string[]): Promise<boolean> {
   const { data } = await sb.from('automation_runs')
     .select('id').eq('org_id', orgId).eq('automation_id', ruleId).eq('application_id', appId)
@@ -99,32 +93,78 @@ async function runExists(sb: LooseSb, orgId: string, ruleId: string, appId: stri
 
 function rationaleFor(rule: PipelineAutomation): string {
   const conds = rule.config?.conditions ?? []
-  if (!conds.length) return `On ${rule.trigger === 'sla_elapsed' ? 'time in stage' : 'stage entry'}`
+  if (!conds.length) return 'In this stage'
   const joiner = (rule.config?.match ?? 'all') === 'all' ? ' and ' : ' or '
   return conds.map(c => describeCondition(c.field, c.operator, c.value)).join(joiner)
+}
+
+function intendedDecision(action: string): AutomationDecision {
+  if (action === 'move_stage') return 'advanced'
+  if (action === 'archive') return 'rejected'
+  if (action === 'request_approval') return 'escalated'
+  return 'acted'
+}
+
+// ── action: send a self-schedule screening invite + email the candidate ──────
+async function scheduleScreeningCall(sb: LooseSb, app: AppRow): Promise<void> {
+  const { randomBytes } = await import('crypto')
+  const token = randomBytes(20).toString('hex')
+  const expires = new Date(); expires.setDate(expires.getDate() + 7)
+  const placeholder = new Date(); placeholder.setDate(placeholder.getDate() + 7)
+
+  await createSelfScheduleInterview(sb as unknown as Supabase, app.org_id, {
+    application_id: app.id, candidate_id: app.candidate_id, hiring_request_id: null,
+    interviewer_name: 'Screening', interview_type: 'phone',
+    scheduled_at: placeholder.toISOString(), duration_minutes: 30, status: 'scheduled',
+    self_schedule_token: token, self_schedule_expires_at: expires.toISOString(), panel: null,
+    interviewer_email: null,
+  } as never)
+
+  await recordApplicationEventSafe(sb as unknown as Supabase, {
+    org_id: app.org_id, application_id: app.id, event_type: 'interview_scheduled',
+    note: 'Screening call self-schedule invite sent by an automation rule',
+    created_by: 'automation',
+  } as never)
+
+  // Email the candidate the link (best-effort; needs SendGrid + a candidate email).
+  const { data: c } = await sb.from('candidates')
+    .select('email, person:people(email)').eq('id', app.candidate_id).maybeSingle()
+  const email: string | null = c?.person?.email ?? c?.email ?? null
+  const apiKey = process.env.SENDGRID_API_KEY
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL
+  if (email && apiKey && fromEmail) {
+    try {
+      const sgMail = (await import('@sendgrid/mail')).default
+      sgMail.setApiKey(apiKey)
+      const link = `${process.env.NEXT_PUBLIC_APP_URL || ''}/schedule/${token}`
+      await sgMail.send({
+        to: email,
+        from: { email: fromEmail, name: 'RecruiterStack' },
+        subject: 'Schedule your screening call',
+        text: `Hi,\n\nWe'd love to set up a quick screening call. Please pick a time that works for you:\n\n${link}\n\nThanks!`,
+        html: `<p>Hi,</p><p>We'd love to set up a quick screening call. Please pick a time that works for you:</p><p style="margin:24px 0;"><a href="${link}" style="background:#4f46e5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Pick a time →</a></p><p style="color:#64748b;font-size:13px;">Or paste this link: ${link}</p>`,
+      })
+    } catch (err) {
+      logger.error('Screening-invite email failed', { err, appId: app.id })
+    }
+  }
 }
 
 type Outcome = 'acted' | 'suggested' | 'skip'
 
 // ── execute one rule against one candidacy ──────────────────────────────────
-async function executeRule(
-  sb: Supabase, rule: PipelineAutomation, app: AppRow, facts: RuleFacts, live: boolean,
-  checkIdempotency: boolean,
-): Promise<Outcome> {
+async function executeRule(sb: Supabase, rule: PipelineAutomation, app: AppRow, facts: RuleFacts, live: boolean): Promise<Outcome> {
   if (!evaluateConditions(facts, rule.config?.conditions, rule.config?.match ?? 'all')) return 'skip'
 
   const willAct = live && rule.mode === 'auto' && AUTO_ACTIONS.has(rule.action_type)
 
-  // Time-based idempotency: don't re-act / re-suggest on the same candidacy.
-  if (checkIdempotency) {
-    const lsb = sb as unknown as LooseSb
-    const already = await runExists(lsb, app.org_id, rule.id, app.id, willAct ? ['committed'] : ['committed', 'pending'])
-    if (already) return 'skip'
-  }
+  // Idempotency: don't re-act / re-suggest on the same candidacy.
+  const lsb = sb as unknown as LooseSb
+  if (await runExists(lsb, app.org_id, rule.id, app.id, willAct ? ['committed'] : ['committed', 'pending'])) return 'skip'
 
   const rationale = rationaleFor(rule)
 
-  // Suggestion path: dry-run, or non-auto mode, or a non-mutating action.
+  // Suggestion path: dry-run, non-auto mode, or a non-mutating action.
   if (!willAct) {
     await recordAutomationRunSafe(sb, app.org_id, {
       automation_id: rule.id, application_id: app.id, action_type: rule.action_type,
@@ -137,27 +177,49 @@ async function executeRule(
   // Live auto action.
   let decision: AutomationDecision = 'acted'
   try {
-    if (rule.action_type === 'move_stage') {
-      const target = rule.config?.target_stage_id
-      if (!target || target === app.stage_id) return 'skip'
-      const { error } = await updateApplicationStage(sb, app.org_id, app.id, String(target))
-      if (error) throw new Error(error.message)
-      await recordApplicationEventSafe(sb, {
-        org_id: app.org_id, application_id: app.id, event_type: 'stage_moved',
-        from_stage: app.stage_id, to_stage: String(target),
-        note: 'Moved by an automation rule', created_by: 'automation',
-      } as never)
-      decision = 'advanced'
-    } else if (rule.action_type === 'archive') {
-      await updateApplicationStatusInOrg(sb, app.org_id, app.id, 'rejected')
-      await recordApplicationEventSafe(sb, {
-        org_id: app.org_id, application_id: app.id, event_type: 'status_changed',
-        note: 'Archived by an automation rule', created_by: 'automation',
-      } as never)
-      decision = 'rejected'
+    switch (rule.action_type) {
+      case 'move_stage': {
+        const target = rule.config?.target_stage_id
+        if (!target || target === app.stage_id) return 'skip'
+        const { error } = await updateApplicationStage(sb, app.org_id, app.id, String(target))
+        if (error) throw new Error(error.message)
+        await recordApplicationEventSafe(sb, {
+          org_id: app.org_id, application_id: app.id, event_type: 'stage_moved',
+          from_stage: app.stage_id, to_stage: String(target),
+          note: 'Moved by an automation rule', created_by: 'automation',
+        } as never)
+        decision = 'advanced'
+        break
+      }
+      case 'archive': {
+        await updateApplicationStatusInOrg(sb, app.org_id, app.id, 'rejected')
+        await recordApplicationEventSafe(sb, {
+          org_id: app.org_id, application_id: app.id, event_type: 'status_changed',
+          note: 'Archived by an automation rule', created_by: 'automation',
+        } as never)
+        decision = 'rejected'
+        break
+      }
+      case 'enrol_outreach': {
+        const sequenceId = rule.config?.sequence_id
+        if (!sequenceId) return 'skip'
+        await enrollCandidate(lsb, {
+          orgId: app.org_id, sequenceId: String(sequenceId), candidateId: app.candidate_id,
+          applicationId: app.id, enrolledBy: 'automation',
+        })
+        decision = 'acted'
+        break
+      }
+      case 'schedule_interview': {
+        await scheduleScreeningCall(lsb, app)
+        decision = 'acted'
+        break
+      }
+      default:
+        return 'skip'
     }
   } catch (err) {
-    logger.error('Automation action failed', { err, ruleId: rule.id, appId: app.id })
+    logger.error('Automation action failed', { err, ruleId: rule.id, appId: app.id, action: rule.action_type })
     return 'skip'
   }
 
@@ -167,13 +229,6 @@ async function executeRule(
   })
   logger.info('Automation acted', { ruleId: rule.id, appId: app.id, action: rule.action_type, decision })
   return 'acted'
-}
-
-function intendedDecision(action: string): AutomationDecision {
-  if (action === 'move_stage') return 'advanced'
-  if (action === 'archive') return 'rejected'
-  if (action === 'request_approval') return 'escalated'
-  return 'held'
 }
 
 // ── the scan (called on the cron tick) ──────────────────────────────────────
@@ -187,52 +242,24 @@ export async function scanPipelineAutomations(
   const rules = (ruleRows ?? []) as PipelineAutomation[]
   if (!rules.length) return { acted: 0, suggested: 0, live }
 
-  const entryRules = rules.filter(r => r.trigger === 'stage_entry')
-  const slaRules = rules.filter(r => r.trigger === 'sla_elapsed')
   let acted = 0, suggested = 0
   const bump = (o: Outcome) => { if (o === 'acted') acted++; else if (o === 'suggested') suggested++ }
   const capped = () => acted + suggested >= MAX_ACTIONS_PER_TICK
 
-  // ENTRY rules: cursor scan of new stage-entry events. Each event is processed
-  // once (the cursor advances), so no per-run idempotency is needed here.
-  if (entryRules.length) {
-    const cursor = await getCursor(sb, 'pipeline_stage_entry')
-    const { data: events } = await sb.from('application_events')
-      .select('application_id, to_stage, created_at')
-      .in('event_type', ['stage_moved', 'applied']).gt('created_at', cursor)
-      .order('created_at', { ascending: true }).limit(EVENT_BATCH)
-    let maxTs = cursor
-    for (const ev of (events ?? [])) {
-      if (ev.created_at > maxTs) maxTs = ev.created_at
-      const forStage = entryRules.filter(r => r.stage_id === ev.to_stage)
-      if (!forStage.length || capped()) continue
-      const { data: app } = await sb.from('applications').select(APP_COLS).eq('id', ev.application_id).maybeSingle()
-      if (!app) continue
-      const facts = await buildFacts(sb, app as AppRow)
-      for (const rule of forStage) {
-        if (capped()) break
-        if (rule.org_id !== (app as AppRow).org_id) continue
-        bump(await executeRule(supabase, rule, app as AppRow, facts, live, false))
-      }
-    }
-    if ((events ?? []).length) await setCursor(sb, 'pipeline_stage_entry', maxTs)
-  }
+  // Every rule is evaluated continuously against the active candidacies sitting in
+  // its stage, and fires the moment its conditions hold (idempotent, once each).
+  const stageIds = Array.from(new Set(rules.map(r => r.stage_id)))
+  const { data: apps } = await sb.from('applications')
+    .select(APP_COLS).in('stage_id', stageIds).eq('status', 'active').limit(APP_BATCH)
 
-  // TIME-BASED rules: scan active candidacies sitting in stages that have such
-  // rules. Idempotent via automation_runs so a rule fires once per candidacy.
-  if (slaRules.length && !capped()) {
-    const stageIds = Array.from(new Set(slaRules.map(r => r.stage_id)))
-    const { data: apps } = await sb.from('applications')
-      .select(APP_COLS).in('stage_id', stageIds).eq('status', 'active').limit(SLA_BATCH)
-    for (const app of (apps ?? []) as AppRow[]) {
+  for (const app of (apps ?? []) as AppRow[]) {
+    if (capped()) break
+    const forStage = rules.filter(r => r.stage_id === app.stage_id && r.org_id === app.org_id)
+    if (!forStage.length) continue
+    const facts = await buildFacts(sb, app)
+    for (const rule of forStage) {
       if (capped()) break
-      const forStage = slaRules.filter(r => r.stage_id === app.stage_id && r.org_id === app.org_id)
-      if (!forStage.length) continue
-      const facts = await buildFacts(sb, app)
-      for (const rule of forStage) {
-        if (capped()) break
-        bump(await executeRule(supabase, rule, app, facts, live, true))
-      }
+      bump(await executeRule(supabase, rule, app, facts, live))
     }
   }
 
