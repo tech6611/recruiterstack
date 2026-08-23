@@ -223,7 +223,8 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                 <span className="text-[11px] text-slate-500">· {ZONE_META[zone].blurb}</span>
               </div>
 
-              <div className="flex items-center gap-3 px-7 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+              <div className="px-5 pb-4 pt-3">
+              <div className="flex items-center gap-3 px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
                 <span className="flex-1">Stage</span>
                 <span className="w-44 shrink-0">Funnel step</span>
                 <span className="w-16 shrink-0 text-right">Cands.</span>
@@ -340,6 +341,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                   <Plus className="h-3.5 w-3.5" /> Add {ZONE_META[zone].title.toLowerCase()} stage
                 </button>
               )}
+              </div>
             </section>
           ))}
         </div>
