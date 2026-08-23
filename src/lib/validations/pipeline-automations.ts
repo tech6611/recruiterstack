@@ -44,5 +44,13 @@ export const pipelineAutomationInputSchema = z.object({
   enabled: z.boolean().default(true),
 })
 
+/** Full-plan save: the client sends a playbook entry per stage it edited. */
+export const pipelinePlanPutSchema = z.object({
+  playbooks: z
+    .array(stagePlaybookInputSchema.extend({ stage_id: z.string().uuid() }))
+    .max(50),
+})
+
+export type PipelinePlanPutParsed = z.infer<typeof pipelinePlanPutSchema>
 export type StagePlaybookInputParsed = z.infer<typeof stagePlaybookInputSchema>
 export type PipelineAutomationInputParsed = z.infer<typeof pipelineAutomationInputSchema>
