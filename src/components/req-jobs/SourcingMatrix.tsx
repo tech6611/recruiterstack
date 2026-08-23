@@ -145,8 +145,8 @@ export function SourcingMatrix({
             ))}
             {icp.competencies.map((c, i) => (
               <th key={c.id} className={`px-2 pb-2 text-center text-[10px] font-medium leading-tight ${i === 0 ? 'border-l-2 border-slate-200' : ''}`}>
-                {/* Competency names are already concise — show as-is (no filler-trim). */}
-                <div className="mx-auto line-clamp-2 max-w-[104px]" title={c.name}>{c.name}</div>
+                {/* Competency names are already concise — show in full (no trim, no clamp). */}
+                <div className="mx-auto max-w-[112px]" title={c.name}>{c.name}</div>
                 <span className="mt-0.5 block text-[9px] font-normal text-slate-400">{c.weight}%</span>
               </th>
             ))}
