@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { JobTeamRoster } from '@/components/req-jobs/JobTeamRoster'
+import { PipelinePlanEditor } from '@/components/req-jobs/PipelinePlanEditor'
 import { teamMemberName, type TeamMember } from '@/lib/team-members'
 import type { InterviewType } from '@/lib/types/database'
 import type { InterviewPlanRound } from '@/lib/types/interview-plans'
@@ -123,6 +124,8 @@ export function InterviewPlanTab({ jobId }: { jobId: string }) {
 
   return (
     <div className="space-y-4">
+      <PipelinePlanEditor jobId={jobId} />
+
       <JobTeamRoster jobId={jobId} liveTeam={team} liveRounds={rosterRounds} />
 
       {pending ? (

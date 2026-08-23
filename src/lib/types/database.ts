@@ -847,6 +847,15 @@ export interface PipelineStage {
   name: string
   order_index: number
   color: StageColor
+  // Funnel zone + promotion gate (migration 123). `zone` defaults to 'active';
+  // seeded lead stages are 'lead'. `is_promotion_gate` marks the lead→active
+  // crossing point. Kept as a widening string for forward-compat with reads that
+  // predate the column.
+  zone: 'lead' | 'active' | 'offer' | 'completed'
+  is_promotion_gate: boolean
+  // Canonical funnel step this stage maps to (migration 131) — Ashby's "Stage
+  // Group". Null until set. Values from src/lib/pipeline/funnel-steps.ts.
+  funnel_step: string | null
   created_at: string
 }
 
@@ -856,6 +865,10 @@ export type ApplicationStatus = 'active' | 'on_hold' | 'rejected' | 'withdrawn' 
 
 export type ApplicationReviewStatus = 'unreviewed' | 'reviewed' | 'yes' | 'no' | 'maybe'
 export type ApplicationSource = 'manual' | 'applied' | 'imported' | 'sourced' | 'referral'
+// Funnel lifecycle (migration 123): 'lead' = pre-application (sourced/being
+// contacted), 'active' = in the real pipeline, 'completed' = terminal. Defaults
+// to 'active'; the Lead zone (Slice 5) sets sourced candidacies to 'lead'.
+export type ApplicationLifecycle = 'lead' | 'active' | 'completed'
 export type AiRecommendation = 'strong_yes' | 'yes' | 'maybe' | 'no'
 
 export interface Application {
@@ -870,6 +883,9 @@ export interface Application {
   opening_id: string | null
   stage_id: string | null
   status: ApplicationStatus
+  // Where this candidacy sits in the funnel (migration 123). Defaults to 'active'
+  // so every current create path is unchanged until the Lead zone ships (Slice 5).
+  lifecycle: ApplicationLifecycle
   review_status: ApplicationReviewStatus
   source: ApplicationSource
   source_detail: string | null
@@ -1488,11 +1504,15 @@ export interface HiringRequestInsert extends Omit<HiringRequest, 'id' | 'created
 
 export interface HiringRequestUpdate extends Partial<HiringRequestInsert> {}
 
-export interface PipelineStageInsert extends Omit<PipelineStage, 'id' | 'created_at' | 'hiring_request_id' | 'job_id'> {
+export interface PipelineStageInsert extends Omit<PipelineStage, 'id' | 'created_at' | 'hiring_request_id' | 'job_id' | 'zone' | 'is_promotion_gate' | 'funnel_step'> {
   id?: string
   created_at?: string
   hiring_request_id?: string | null
   job_id?: string | null
+  // DB-defaulted / nullable (migrations 123 + 131); optional on insert.
+  zone?: 'lead' | 'active' | 'offer' | 'completed'
+  is_promotion_gate?: boolean
+  funnel_step?: string | null
 }
 
 export interface PipelineStageUpdate extends Partial<PipelineStageInsert> {}
@@ -1500,10 +1520,12 @@ export interface PipelineStageUpdate extends Partial<PipelineStageInsert> {}
 // Application Row type (without optional joined relations)
 type ApplicationRow = Omit<Application, 'candidate' | 'stage' | 'hiring_request'>
 
-export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at' | 'resume_url' | 'cover_letter' | 'ai_score' | 'ai_recommendation' | 'ai_strengths' | 'ai_gaps' | 'ai_scored_at' | 'ai_criterion_scores' | 'source_detail' | 'credited_to' | 'stage_id' | 'review_status' | 'job_id' | 'opening_id' | 'hiring_request_id' | 'screening_answers' | 'eeo_answers' | 'knockout_failed'> {
+export interface ApplicationInsert extends Omit<ApplicationRow, 'id' | 'created_at' | 'applied_at' | 'resume_url' | 'cover_letter' | 'ai_score' | 'ai_recommendation' | 'ai_strengths' | 'ai_gaps' | 'ai_scored_at' | 'ai_criterion_scores' | 'source_detail' | 'credited_to' | 'stage_id' | 'review_status' | 'lifecycle' | 'job_id' | 'opening_id' | 'hiring_request_id' | 'screening_answers' | 'eeo_answers' | 'knockout_failed'> {
   id?: string
   created_at?: string
   applied_at?: string
+  // DB-defaulted to 'active' (migration 123); optional on insert.
+  lifecycle?: ApplicationLifecycle
   hiring_request_id?: string | null
   job_id?: string | null
   opening_id?: string | null

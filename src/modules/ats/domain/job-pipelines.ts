@@ -811,23 +811,42 @@ export async function listJobStages(
   return (data ?? []) as Pick<PipelineStage, 'id' | 'name' | 'order_index'>[]
 }
 
-/** First stage ('Applied') of a canonical job — the entry stage for new applications. */
+/** Entry stage for a NEW candidacy on a canonical job — the first ACTIVE-zone
+ *  stage ('Applied'), NOT the pre-application lead zone (migrations 123/130). So
+ *  applicants and sourced-into-pipeline candidates land in the active pipeline,
+ *  never in "New lead". Falls back to the absolute first stage if the zone column
+ *  isn't present yet (deploy-safe before migration 123 is applied). */
 export async function getFirstJobStage(
   supabase: Supabase,
   orgId: string,
   jobId: string,
 ): Promise<Pick<PipelineStage, 'id' | 'name'> | null> {
-  const { data, error } = await supabase
-    .from('pipeline_stages')
-    .select('id, name')
-    .eq('job_id', jobId)
-    .eq('org_id', orgId)
-    .order('order_index')
-    .limit(1)
-    .maybeSingle()
-
-  if (error) throw error
-  return data as Pick<PipelineStage, 'id' | 'name'> | null
+  try {
+    const { data, error } = await supabase
+      .from('pipeline_stages')
+      .select('id, name, order_index, zone')
+      .eq('job_id', jobId)
+      .eq('org_id', orgId)
+      .order('order_index')
+    if (error) throw error
+    const rows = (data ?? []) as Pick<PipelineStage, 'id' | 'name' | 'order_index' | 'zone'>[]
+    if (rows.length === 0) return null
+    // First active-zone stage; if a job somehow has none, fall back to the very
+    // first stage so a new candidacy always has somewhere to land.
+    const active = rows.find(r => r.zone === 'active') ?? rows[0]
+    return { id: active.id, name: active.name }
+  } catch {
+    // Pre-migration-123 fallback: no `zone` column — use the absolute first stage.
+    const { data } = await supabase
+      .from('pipeline_stages')
+      .select('id, name')
+      .eq('job_id', jobId)
+      .eq('org_id', orgId)
+      .order('order_index')
+      .limit(1)
+      .maybeSingle()
+    return (data as Pick<PipelineStage, 'id' | 'name'>) ?? null
+  }
 }
 
 // Lookup a single pipeline stage by id within the org (move_application_to_stage
