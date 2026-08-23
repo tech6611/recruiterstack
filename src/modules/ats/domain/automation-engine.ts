@@ -49,6 +49,25 @@ interface AppRow {
 }
 
 const APP_COLS = 'id, org_id, candidate_id, stage_id, ai_score, review_status, source, applied_at, knockout_failed, job_id'
+// Deploy-safe fallback: review_status (migration 030) may be absent on a DB that
+// missed that migration. Selecting a missing column by name makes PostgREST hard-
+// error and returns ZERO rows — silently disabling ALL automation. So if the full
+// select errors on review_status, retry without it (that one fact just reads null).
+const APP_COLS_NO_REVIEW = 'id, org_id, candidate_id, stage_id, ai_score, source, applied_at, knockout_failed, job_id'
+
+/** Fetch active candidacies in the given stages, tolerant of a missing
+ *  review_status column. Returns { data, error, degraded }. */
+async function fetchActiveApps(sb: LooseSb, stageIds: string[]): Promise<{ data: AppRow[]; error: string | null; degraded: boolean }> {
+  if (!stageIds.length) return { data: [], error: null, degraded: false }
+  const q = (cols: string) => sb.from('applications').select(cols).in('stage_id', stageIds).eq('status', 'active').limit(APP_BATCH)
+  let res = await q(APP_COLS)
+  let degraded = false
+  if (res.error && /review_status/.test(res.error.message ?? '')) {
+    degraded = true
+    res = await q(APP_COLS_NO_REVIEW)
+  }
+  return { data: (res.data ?? []) as AppRow[], error: res.error?.message ?? null, degraded }
+}
 
 // ── facts ───────────────────────────────────────────────────────────────────
 async function buildFacts(sb: LooseSb, app: AppRow): Promise<RuleFacts> {
@@ -265,10 +284,10 @@ export async function scanPipelineAutomations(
   // Every rule is evaluated continuously against the active candidacies sitting in
   // its stage, and fires the moment its conditions hold (idempotent, once each).
   const stageIds = Array.from(new Set(rules.map(r => r.stage_id)))
-  const { data: apps } = await sb.from('applications')
-    .select(APP_COLS).in('stage_id', stageIds).eq('status', 'active').limit(APP_BATCH)
+  const { data: apps, degraded } = await fetchActiveApps(sb, stageIds)
+  if (degraded) logger.warn('Pipeline engine running without review_status column (migration 030 not applied)')
 
-  for (const app of (apps ?? []) as AppRow[]) {
+  for (const app of apps) {
     if (capped()) break
     const forStage = rules.filter(r => r.stage_id === app.stage_id && r.org_id === app.org_id)
     if (!forStage.length) continue
@@ -302,10 +321,8 @@ export async function diagnoseJobAutomations(
 
   // (2) apps — the engine's exact query (active apps in the rules' stages), + error.
   const stageIds = Array.from(new Set(jobRules.map(r => r.stage_id)))
-  const appsRes = stageIds.length
-    ? await sb.from('applications').select(APP_COLS).in('stage_id', stageIds).eq('status', 'active').limit(APP_BATCH)
-    : { data: [], error: null }
-  const rawApps = (appsRes.data ?? []) as AppRow[]
+  const appsRes = await fetchActiveApps(sb, stageIds)
+  const rawApps = appsRes.data
   const jobApps = rawApps.filter(a => a.job_id === jobId)
 
   // (3) per candidate × rule: facts + matched/why.
@@ -334,7 +351,8 @@ export async function diagnoseJobAutomations(
   return {
     live,
     rules_query_error: rulesRes.error?.message ?? null,
-    apps_query_error: appsRes.error?.message ?? null,
+    apps_query_error: appsRes.error,
+    review_status_column_missing: appsRes.degraded,
     rules_loaded_total: allRules.length,
     rules_for_this_job: jobRules.length,
     rule_stage_ids: stageIds,
