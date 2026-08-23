@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { processJobs } from '@/lib/api/job-queue'
 import { createAdminClient } from '@/lib/supabase/server'
 import { scanAutomations } from '@/modules/crm/domain/automations'
+import { scanPipelineAutomations } from '@/modules/ats/domain/automation-engine'
 import { logger } from '@/lib/logger'
 
 // Register all handlers on first import
@@ -36,5 +37,14 @@ export async function POST(req: NextRequest) {
     logger.error('Automation scan failed', err)
   }
 
-  return NextResponse.json({ processed, automations })
+  // Pipeline automation rules (Phase B). Dry-run unless PIPELINE_AUTOMATIONS_MODE
+  // is 'live'. Never let a scan failure fail the queue drain.
+  let pipeline: { acted: number; suggested: number; live: boolean } | null = null
+  try {
+    pipeline = await scanPipelineAutomations(createAdminClient())
+  } catch (err) {
+    logger.error('Pipeline automation scan failed', err)
+  }
+
+  return NextResponse.json({ processed, automations, pipeline })
 }

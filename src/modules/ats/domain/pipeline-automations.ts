@@ -357,6 +357,40 @@ export async function listAutomationRuns(
   return (data ?? []) as AutomationRun[]
 }
 
+/** Recent automation runs across a whole job (for the activity panel), enriched
+ *  with the candidate's name. Reads runs for the job's rules, newest first. */
+export async function listJobAutomationRuns(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+  limit = 50,
+): Promise<import('@/lib/types/pipeline-automations').AutomationRunView[]> {
+  const sb = supabase as unknown as LooseSb
+  const { data: rules } = await sb
+    .from('pipeline_automations').select('id').eq('org_id', orgId).eq('job_id', jobId)
+  const ruleIds = ((rules ?? []) as Array<{ id: string }>).map(r => r.id)
+  if (!ruleIds.length) return []
+
+  const { data: runs, error } = await sb
+    .from('automation_runs').select('*')
+    .eq('org_id', orgId).in('automation_id', ruleIds)
+    .order('created_at', { ascending: false }).limit(limit)
+  if (error) throw error
+  const list = (runs ?? []) as AutomationRun[]
+  if (!list.length) return []
+
+  // Enrich with candidate names (identity lives on people; fall back to candidates).
+  const appIds = Array.from(new Set(list.map(r => r.application_id)))
+  const names = new Map<string, string>()
+  const { data: apps } = await sb
+    .from('applications').select('id, candidate:candidates(name, person:people(name))').in('id', appIds)
+  for (const a of (apps ?? []) as Array<{ id: string; candidate?: { name?: string | null; person?: { name?: string | null } | null } | null }>) {
+    const nm = a.candidate?.person?.name ?? a.candidate?.name ?? null
+    if (nm) names.set(a.id, nm)
+  }
+  return list.map(r => ({ ...r, candidate_name: names.get(r.application_id) ?? null }))
+}
+
 /** Best-effort logger for an automation run — never throws into the caller, so a
  *  logging failure can't break an action. (Used by the runtime in later slices;
  *  provided now so the write path has one home.) */

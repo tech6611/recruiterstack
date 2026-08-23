@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { JobTeamRoster } from '@/components/req-jobs/JobTeamRoster'
 import { PipelinePlanEditor } from '@/components/req-jobs/PipelinePlanEditor'
+import { AutomationActivity } from '@/components/req-jobs/AutomationActivity'
 import { teamMemberName, type TeamMember } from '@/lib/team-members'
 import type { InterviewType } from '@/lib/types/database'
 import type { InterviewPlanRound } from '@/lib/types/interview-plans'
@@ -125,6 +126,8 @@ export function InterviewPlanTab({ jobId }: { jobId: string }) {
   return (
     <div className="space-y-4">
       <PipelinePlanEditor jobId={jobId} />
+
+      <AutomationActivity jobId={jobId} />
 
       <JobTeamRoster jobId={jobId} liveTeam={team} liveRounds={rosterRounds} />
 
