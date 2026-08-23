@@ -9,6 +9,24 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-23 (Automation engine fires again)
+
+### Fixed
+- **Pipeline automation engine was silently acting on zero candidates.** Its
+  candidate query selected `review_status` by name; on a prod DB missing
+  migration 030 that column doesn't exist, so PostgREST hard-errored and the
+  query returned no rows — every rule saw an empty pipeline. The engine now
+  falls back to a query without `review_status` when that column is absent, so
+  all other rules (days-in-stage, AI score, feedback, etc.) fire normally.
+- Read-only diagnostic (`GET /api/jobs/:id/automation-debug`) now reports
+  `review_status_column_missing` so this class of schema drift is visible.
+
+### Schema
+- `133_restore_review_status.sql` — idempotently re-adds `applications.review_status`
+  (and its index) on any database that missed migration 030. Restores
+  "Recruiter decision" automation rules, ICP learning signals, and Yes/No/Maybe
+  triage.
+
 ## 2026-08-23 (Pipeline Plan zone headers)
 
 ### Changed
@@ -43,6 +61,151 @@ entries on top.
   via the existing `reorder_stages` action. Locked stages (Lead zone, Hired /
   Rejected / Archived) are neither draggable nor drop targets, and the up/down
   chevrons remain as the keyboard-accessible path.
+
+## 2026-08-23 (later)
+
+### Added
+- **Candidate Pool multi-vendor ingestion, Slice S1.** The spine only — no vendor
+  spend, no live API. `VendorAdapter` / `MappedRecord` / `Claim` contract
+  (`src/modules/pool/vendors/types.ts`): an adapter is PURE, emits *claims* rather
+  than facts, and is the only vendor-aware code in the pipeline.
+  - `vendors/mock/` — fixture-backed `vendor:mock` adapter shaped like Coresignal's
+    multi-source employee record, with fixtures for the cases that matter (a fresh
+    duplicate of an existing human, loose dates, LinkedIn-only reachability, and a
+    charged-but-worthless record).
+  - `vendors/registry.ts` — the only place that knows which adapters exist.
+  - `domain/identity.ts` — pure identifier normalization (Gmail dots/`+tags`,
+    LinkedIn slug across every URL shape, GitHub login, E.164 phone).
+  - `domain/fusion.ts` — pure claim fusion: `score = trust × recency_decay ×
+    confidence`, per-field policies (recency-dominant / trust-dominant / union), and
+    a dispute rule that only fires when recency did *not* settle the disagreement.
+  - `domain/rebuild.ts` — `rebuildProfile()` / `rebuildAllProfiles()`: the pure,
+    re-runnable projection from claims to `pool_profiles`, incl. `evidence_as_of`
+    and `tenure_verified_months`. Disabled sources are filtered before fusion (the
+    kill switch).
+  - `domain/vendor-ledger.ts` — `planBuy()` (pre-buy check), `claimVendorIds()`
+    (claim-before-fetch via `ON CONFLICT DO NOTHING`), `settleVendorRecord()`,
+    `releaseStaleClaims()`, run bookkeeping and the spend ledger.
+  - `domain/ingest.ts` — land → map → resolve → persist → rebuild. Deterministic
+    identity resolution only; every exit path settles the ledger.
+  - `npm run pool:s1-verify` — the S1 gate (`scripts/pool-s1-verify.ts`): rebuilds
+    the whole pool twice and asserts the second pass changes nothing; `--fixtures`
+    also runs the 5 mock records through the full spine; `--cleanup` removes them.
+- 52 new unit tests across identity, fusion and the mock adapter.
+
+### Schema
+- **Migration 122 `pool_vendor_ingest.sql`** (not yet applied). `pool_vendor_records`
+  — the payment ledger, separate from `pool_identities` because that table's
+  `profile_id` is NOT NULL and so cannot record a *charged* fetch that resolved to
+  nothing (which would be re-bought forever). Also `pool_ingest_runs`,
+  `pool_vendor_calls`, `pool_profile_views`, `pool_source_field_trust`; a unique
+  index on `pool_profile_fields (profile_id, field, source_key, observed_at)` for
+  re-run idempotency; `pool_documents.profile_id` / `vendor_updated_at` /
+  `ingest_run_id` (+ backfill of the 253 existing documents); lookup indexes on
+  `pool_contacts (kind, value)` and `pool_experiences (profile_id, source_key)`; and
+  `vendor:mock` / `vendor:coresignal` / `vendor:pdl` source rows, seeded **disabled**.
+
+### Fixed
+- Mock adapter skill de-duplication kept the *last* spelling (`new Map(pairs)`
+  semantics) instead of the first, so `['Go','go']` surfaced as `go`.
+- **`rebuildProfile` no longer derives freshness from claim dates.** The original pool
+  import stamped every claim's `observed_at` with the *import* time (all 183 github +
+  446 web:resume claims say 2026-08-16; all 159 upload:cv claims say 2026-08-20), so
+  deriving `evidence_as_of` from claims marked all 145 profiles fresh and collapsed
+  `tenure_verified_months` onto `current_tenure_months` (116/117 identical) —
+  re-creating the bug migration 117 exists to fix. Evidence now comes from
+  `pool_documents.vendor_updated_at`, falling back to claim dates only when those
+  actually vary. A source that cannot date itself yields NULL → freshness `unknown`.
+- **`rebuildProfile` no longer nulls a field no source has ever claimed.** The import
+  wrote `display_name` (145/145) and `headline` (97/145) straight onto `pool_profiles`
+  with no backing claims; a strict projection erased them. Claims from a *disabled*
+  source still null their field — that is the kill switch and it still works.
+- **The S1 gate was blind to the change it was making.** `changed` omitted
+  `evidence_as_of` / `evidence_source` / `tenure_verified_months`, so a rebuild that
+  rewrote the freshness of the entire pool still reported `changed: 0`. All three are
+  now tracked, and the before-snapshot selects them.
+
+### Added
+- `npm run pool:backfill-evidence` (`scripts/pool-backfill-evidence.ts`) — recovers
+  real source dates from the raw payloads into `pool_documents.vendor_updated_at`.
+  Dry run by default; `--apply` writes. Recovered 139/253 documents (github 108/108
+  via `payload.updated`, upload:cv 31/37 via `payload.doc_date`). web:resume 0/108 is
+  genuinely unrecoverable and is *not* back-computed from
+  `payload.movability.current_tenure_months`, which was itself calculated at import
+  time. Result: `evidence_as_of` spans 2022–2026 instead of a single import date, and
+  `tenure_verified == current_tenure` fell from 116/117 to 35/112, with 76 profiles
+  now showing a real tenure overstatement (median 5 months).
+
+## 2026-08-23
+
+### Added
+- **Pipeline Plans & Automation Agents — Slice 1a (data foundation).** The
+  substrate for an Ashby-style funnel a recruiter sketches once and agents walk
+  candidates down. No agents run yet and nothing user-visible changes. New pure
+  zone model (`src/lib/pipeline/zones.ts`, tested), types
+  (`src/lib/types/pipeline-automations.ts`), Zod schemas
+  (`src/lib/validations/pipeline-automations.ts`), and a facade
+  (`src/modules/ats/domain/pipeline-automations.ts`: stage playbook + automation
+  rules CRUD + run log). Facade is dormant until Slice 1b wires a UI.
+- **Pipeline Plans & Automation Agents — Slice 1b (Lead zone + plan editor).**
+  Seeds the three Ashby-style lead stages (New lead → Reached out → Replied) per
+  job, and adds a **Pipeline Plan** editor in the Interview Plan tab where a
+  recruiter writes, per stage, what happens on entry and the rule to advance
+  (`PipelinePlanEditor.tsx`; `GET/PUT /api/jobs/[id]/pipeline-plan`). Applicants
+  still land in the first active stage ("Applied") — `getFirstJobStage()` is now
+  zone-aware — so no candidacy enters the lead zone yet (that's Slice 5). Visible
+  effect: boards show three (empty) lead columns.
+
+### Schema
+- **Migration 123 (`123_pipeline_automations.sql`).** Adds `pipeline_stages.zone`
+  (lead|active|offer|completed, default 'active') + `is_promotion_gate`;
+  `applications.lifecycle` (lead|active|completed, default 'active' — no behaviour
+  change today); and three tables: `stage_playbook`, `pipeline_automations`
+  (generalizes `sequence_enrollment_rules`), `automation_runs` (append-only,
+  reversible). Additive + reversible; existing stages backfilled by category.
+- **Migration 130 (`130_seed_lead_stages.sql`).** Seeds the 3 lead stages for new
+  jobs (updated `create_default_job_pipeline_stages` trigger) and backfills them
+  into existing canonical jobs (non-destructive; negative order_index; "Replied"
+  is the promotion gate).
+
+### Docs
+- **Pool multi-vendor ingestion architecture** (`docs/pool-vendor-ingestion-architecture.md`) —
+  design for buying person data from N vendors and standardizing it into one pool. Six-stage
+  spine (acquire → land → map → resolve → fuse → materialize) with vendor-specific code
+  confined to the adapter; `VendorAdapter`/`MappedRecord`/`Claim` contracts; deterministic +
+  probabilistic identity resolution with a review queue; per-field trust and recency-decayed
+  fusion; the five standardization dimensions (two of which exist today); and a proposed
+  migration 122 (`pool_source_field_trust`, `pool_companies`, `pool_merge_candidates`,
+  `pool_ingest_runs`, `pool_vendor_calls`, plus `pool_documents.profile_id`). Design only.
+- **Pool acquisition model decided: demand-driven buy, shared retention.** Same doc, §1.
+  Buy only when a client searches; everything bought joins the shared pool permanently; never
+  pay for the same person twice. Consequences: Coresignal becomes the discovery vendor (free
+  `/search/es_dsl` returns IDs + `x-total-results`, so the pre-buy check against
+  `pool_identities` is possible) and PDL becomes enrichment-only (charges per record on
+  search, so it cannot support check-before-buy); free search funds a pre-flight cost estimate
+  in the UI; refresh is lazy-on-read via `pool_sources.retention_days` + a new
+  `last_refreshed_at`; cache-hit rate / cost-per-net-new / reuse factor become first-class
+  metrics (`pool_profile_views`); and the contract ask narrows to perpetual retention +
+  multi-tenant serving.
+- **Pool §1 rewritten as real-time acquisition mechanics.** Adds the `pool_vendor_records`
+  payment ledger — separate from `pool_identities` because that table's `profile_id` is NOT
+  NULL and so cannot record a *charged* fetch that produced no resolvable profile (which would
+  be re-bought forever); the claim-before-fetch `ON CONFLICT DO NOTHING` lock against
+  concurrent orgs double-buying the same id; the owned-vs-known-to-exist result tiering (free
+  search returns bare ids, so unbought records can't be ranked); base-vs-multi-source collect
+  triage with its 50%-keep-rate break-even; and the decoupling of collect-N (wide, shared,
+  permanent) from score-N (narrow, per-org, ephemeral) now that the Fit Engine — not the
+  vendor — is the latency bottleneck.
+
+## 2026-08-22
+
+### Docs
+- **Market data vendors research** (`docs/market-data-vendors-research.md`) — one-pager on
+  buying person data from People Data Labs / Coresignal into the cross-org Candidate Pool.
+  Covers vendor mechanics + credit economics (verified Aug 2026), the four missing pieces
+  on top of migration 115, the `sourcing_map.requirement_decomposition` → vendor-query
+  bridge, five live jobs to test coverage against, the PDL employment-use and resale
+  clauses that gate the design, and a V0–V4 build order. Research only — nothing built.
 
 ## 2026-08-21
 
