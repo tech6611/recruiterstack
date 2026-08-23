@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { FUNNEL_STEP_IDS } from '@/lib/pipeline/funnel-steps'
+import { isValidCondition } from '@/lib/pipeline/rule-fields'
 
 // Validation for the Slice 1a write paths: the per-stage playbook and the
 // pipeline-automation rules. Enum values must stay in lockstep with migration
@@ -33,6 +34,29 @@ export const automationGuardrailsSchema = z.object({
   daily_cap: z.number().int().min(0).max(10_000).optional(),
 })
 
+export const ruleFieldEnum = z.enum([
+  'days_in_stage', 'ai_score', 'fit_bucket', 'review_status', 'has_feedback', 'source', 'missing_must_have',
+])
+export const ruleOperatorEnum = z.enum([
+  'gt', 'gte', 'lt', 'lte', 'eq', 'neq', 'is', 'is_not', 'is_true', 'is_false',
+])
+
+/** One IF clause of a rule. Validated against the field/operator/value rules in
+ *  rule-fields.ts so a half-built or nonsensical clause can't be saved. */
+export const ruleConditionSchema = z.object({
+  field: ruleFieldEnum,
+  operator: ruleOperatorEnum,
+  value: z.union([z.string(), z.number()]).optional(),
+}).refine(c => isValidCondition(c.field, c.operator, c.value), { message: 'Invalid condition' })
+
+/** The structured config for a conditional stage rule. */
+export const automationConfigSchema = z.object({
+  conditions: z.array(ruleConditionSchema).max(8).default([]),
+  match: z.enum(['all', 'any']).default('all'),
+  target_stage_id: z.string().uuid().nullish(),
+  email_template_id: z.string().nullish(),
+}).passthrough()
+
 /** Create / update a trigger→action rule on a stage. */
 export const pipelineAutomationInputSchema = z.object({
   stage_id: z.string().uuid(),
@@ -40,7 +64,7 @@ export const pipelineAutomationInputSchema = z.object({
   action_type: automationActionTypeEnum,
   uses_agent: z.boolean().default(false),
   mode: automationModeEnum.default('auto'),
-  config: z.record(z.string(), z.unknown()).default({}),
+  config: automationConfigSchema.default({ conditions: [], match: 'all' }),
   guardrails: automationGuardrailsSchema.default({}),
   enabled: z.boolean().default(true),
 })

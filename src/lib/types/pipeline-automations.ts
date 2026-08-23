@@ -36,6 +36,47 @@ export type AutomationMode = 'auto' | 'suggest' | 'approval_required'
 /** Where a rejected candidate goes. */
 export type RejectDestination = 'archive' | 'hold' | 'review'
 
+// ── Conditional rules ("text operators") ────────────────────────────────────
+// A rule = WHEN (trigger) · IF (conditions) · THEN (action). The IF clauses are
+// stored in pipeline_automations.config; see rule-fields.ts for field metadata.
+
+/** A field a rule condition can test about a candidacy. */
+export type RuleField =
+  | 'days_in_stage'
+  | 'ai_score'
+  | 'fit_bucket'
+  | 'review_status'
+  | 'has_feedback'
+  | 'source'
+  | 'missing_must_have'
+
+/** Comparison operators — which apply depends on the field's type. */
+export type RuleOperator =
+  | 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'neq' // numbers
+  | 'is' | 'is_not'                             // choices
+  | 'is_true' | 'is_false'                      // yes/no
+
+/** How multiple conditions combine. */
+export type ConditionMatch = 'all' | 'any'
+
+/** One IF clause: field <operator> value. `value` is omitted for boolean ops. */
+export interface RuleCondition {
+  field: RuleField
+  operator: RuleOperator
+  value?: string | number
+}
+
+/** Structured contents of pipeline_automations.config for a conditional rule. */
+export interface AutomationConfig {
+  conditions?: RuleCondition[]
+  match?: ConditionMatch
+  /** For action_type 'move_stage': where to move. */
+  target_stage_id?: string | null
+  /** For action_type 'send_email' (later). */
+  email_template_id?: string | null
+  [k: string]: unknown
+}
+
 /** What an agent decided on a run. */
 export type AutomationDecision = 'advanced' | 'rejected' | 'held' | 'escalated' | 'acted'
 
@@ -86,7 +127,7 @@ export interface PipelineAutomation {
   action_type: AutomationActionType
   uses_agent: boolean
   mode: AutomationMode
-  config: Record<string, unknown>
+  config: AutomationConfig
   guardrails: AutomationGuardrails
   enabled: boolean
   created_by: string | null
@@ -101,7 +142,7 @@ export interface PipelineAutomationInput {
   action_type: AutomationActionType
   uses_agent?: boolean
   mode?: AutomationMode
-  config?: Record<string, unknown>
+  config?: AutomationConfig
   guardrails?: AutomationGuardrails
   enabled?: boolean
 }
