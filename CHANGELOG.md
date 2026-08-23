@@ -9,6 +9,19 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-23 (Pipeline Plan zone headers)
+
+### Changed
+- **The four pipeline zone boxes are now headers.** Lead / Active / Offer /
+  Completed render as solid coffee `#221b14` cards with cream text and a
+  sand-toned icon, and a gold `#ebb137` underline marks any zone currently
+  holding candidates (nothing is underlined when the pipeline is empty). Each
+  zone's label row below became a full-bleed sand band (`slate-100`) with a 3px
+  coffee left rule, so a zone visually owns the stages beneath it.
+- **Dropped the stage count from the zone boxes.** The sub-line reads
+  "4 candidates" rather than "4 candidates · 5 stages" — the stage list sits
+  directly below, so the count was redundant.
+
 ## 2026-08-23 (Pipeline Plan polish)
 
 ### Changed
