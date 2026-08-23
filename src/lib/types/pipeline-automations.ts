@@ -162,6 +162,11 @@ export interface AutomationRun {
   created_at: string
 }
 
+/** An automation run enriched for the activity panel. */
+export interface AutomationRunView extends AutomationRun {
+  candidate_name: string | null
+}
+
 /** A stage enriched with its zone + gate flag (migration 123), its canonical
  *  funnel step (migration 131), a live candidate count, and optionally its
  *  playbook. Used by the plan editor + Leads view. */

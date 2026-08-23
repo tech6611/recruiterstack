@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react'
 import {
   Loader2, Save, Flag, ChevronRight, ChevronDown, ArrowRight, ChevronUp,
-  UserPlus, Users, FileSignature, CheckCircle2, Lock, Trash2, Plus,
+  UserPlus, Users, FileSignature, CheckCircle2, Lock, Trash2, Plus, GripVertical,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,9 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false) // a structural op is in flight
+  const [dragId, setDragId] = useState<string | null>(null)   // stage being dragged
+  const [overId, setOverId] = useState<string | null>(null)   // stage it is hovering over
+  const [armed, setArmed] = useState<string | null>(null)     // row armed for drag (grip pressed)
   const serverNames = useRef<Map<string, string>>(new Map())
 
   // Automation rules, grouped by stage_id.
@@ -147,6 +150,15 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to delete') } finally { setBusy(false) }
   }
 
+  // Optimistically apply a new stage list, then persist the normalized order.
+  const persistOrder = async (next: ZonedStage[]) => {
+    setStages(next)
+    setBusy(true)
+    try { await callStages({ action: 'reorder_stages', order: normalizedOrder(next) }) }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to reorder'); await load(true) }
+    finally { setBusy(false) }
+  }
+
   const moveStage = async (s: ZonedStage, dir: -1 | 1) => {
     const zoneStages = stages.filter(x => x.zone === s.zone).sort((a, b) => a.order_index - b.order_index)
     const i = zoneStages.findIndex(x => x.id === s.id)
@@ -154,12 +166,32 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
     if (j < 0 || j >= zoneStages.length) return
     // swap order_index locally, then persist a normalized order
     const a = zoneStages[i], b = zoneStages[j]
-    const swapped = stages.map(x => x.id === a.id ? { ...x, order_index: b.order_index } : x.id === b.id ? { ...x, order_index: a.order_index } : x)
-    setStages(swapped)
-    setBusy(true)
-    try { await callStages({ action: 'reorder_stages', order: normalizedOrder(swapped) }) }
-    catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to reorder'); await load(true) }
-    finally { setBusy(false) }
+    await persistOrder(stages.map(x => x.id === a.id ? { ...x, order_index: b.order_index } : x.id === b.id ? { ...x, order_index: a.order_index } : x))
+  }
+
+  // ── Drag to reorder (within a zone only) ──
+  const canDrop = (target: ZonedStage) => {
+    if (!dragId || dragId === target.id || isLocked(target)) return false
+    const src = stages.find(x => x.id === dragId)
+    return !!src && src.zone === target.zone
+  }
+
+  const dropOn = async (target: ZonedStage) => {
+    const srcId = dragId
+    setDragId(null)
+    setOverId(null)
+    if (!srcId || !canDrop(target)) return
+    const zoneStages = stages.filter(x => x.zone === target.zone).sort((a, b) => a.order_index - b.order_index)
+    const from = zoneStages.findIndex(x => x.id === srcId)
+    const to = zoneStages.findIndex(x => x.id === target.id)
+    if (from < 0 || to < 0 || from === to) return
+    // Lift the dragged stage out and re-insert it at the target slot, then hand the
+    // zone's existing order_index slots back out in the new sequence.
+    const next = [...zoneStages]
+    next.splice(to, 0, next.splice(from, 1)[0])
+    const slots = zoneStages.map(x => x.order_index)
+    const remap = new Map(next.map((x, i) => [x.id, slots[i]]))
+    await persistOrder(stages.map(x => remap.has(x.id) ? { ...x, order_index: remap.get(x.id)! } : x))
   }
 
   const byZone = useMemo(
@@ -180,7 +212,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
           <h3 className="text-[15px] font-semibold text-slate-900">Pipeline Plan</h3>
           <p className="mt-0.5 text-xs text-slate-500">Add and arrange stages, map each to a funnel step, and sketch what happens there.</p>
         </div>
-        <Button size="sm" onClick={save} disabled={saving || busy} className="bg-indigo-600 hover:bg-indigo-700">
+        <Button size="sm" onClick={save} disabled={saving || busy}>
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
           Save plan
         </Button>
@@ -213,11 +245,35 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                   const locked = isLocked(s)
                   return (
                     <div key={s.id} className={idx > 0 ? 'border-t border-slate-100' : ''}>
-                      <div className="flex items-center gap-3 px-2 py-2 hover:bg-slate-50">
-                        {/* reorder */}
-                        <div className="flex flex-col">
-                          <button aria-label="Move up" disabled={locked || busy || idx === 0} onClick={() => moveStage(s, -1)} className="text-slate-300 hover:text-slate-600 disabled:opacity-20"><ChevronUp className="h-3 w-3" /></button>
-                          <button aria-label="Move down" disabled={locked || busy || idx === zoneStages.length - 1} onClick={() => moveStage(s, 1)} className="text-slate-300 hover:text-slate-600 disabled:opacity-20"><ChevronDown className="h-3 w-3" /></button>
+                      <div
+                        draggable={!locked && !busy && armed === s.id}
+                        onDragStart={ev => { if (locked || busy) return; setDragId(s.id); ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', s.id) }}
+                        onDragEnd={() => { setDragId(null); setOverId(null); setArmed(null) }}
+                        onDragOver={ev => { if (!canDrop(s)) return; ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; setOverId(s.id) }}
+                        onDragLeave={() => setOverId(o => (o === s.id ? null : o))}
+                        onDrop={ev => { ev.preventDefault(); setArmed(null); dropOn(s) }}
+                        className={[
+                          'flex items-center gap-3 px-2 py-2 transition-colors',
+                          dragId === s.id ? 'opacity-40' : 'hover:bg-slate-50',
+                          overId === s.id && canDrop(s) ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-300' : '',
+                        ].join(' ')}
+                      >
+                        {/* drag handle + reorder */}
+                        <div className="flex items-center gap-0.5">
+                          <span
+                            onMouseDown={() => { if (!locked && !busy) setArmed(s.id) }}
+                            onMouseUp={() => setArmed(null)}
+                            title={locked ? undefined : 'Drag to reorder'}
+                          >
+                            <GripVertical
+                              aria-hidden
+                              className={`h-4 w-4 ${locked ? 'text-transparent' : 'cursor-grab text-slate-300 hover:text-slate-500 active:cursor-grabbing'}`}
+                            />
+                          </span>
+                          <div className="flex flex-col">
+                            <button aria-label="Move up" disabled={locked || busy || idx === 0} onClick={() => moveStage(s, -1)} className="text-slate-300 hover:text-slate-600 disabled:opacity-20"><ChevronUp className="h-3 w-3" /></button>
+                            <button aria-label="Move down" disabled={locked || busy || idx === zoneStages.length - 1} onClick={() => moveStage(s, 1)} className="text-slate-300 hover:text-slate-600 disabled:opacity-20"><ChevronDown className="h-3 w-3" /></button>
+                          </div>
                         </div>
 
                         {/* name (editable unless locked) */}
@@ -232,11 +288,11 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                               onChange={ev => setStages(list => list.map(x => x.id === s.id ? { ...x, name: ev.target.value } : x))}
                               onBlur={ev => commitRename(s, ev.target.value)}
                               onKeyDown={ev => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur() }}
-                              className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-slate-800 hover:border-slate-200 focus:border-indigo-400 focus:bg-white focus:outline-none"
+                              className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-slate-800 hover:border-slate-200 focus:border-emerald-500 focus:bg-white focus:outline-none"
                             />
                           )}
                           {s.is_promotion_gate && (
-                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600 ring-1 ring-violet-200"><Flag className="h-2.5 w-2.5" /> Gate</span>
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-700 ring-1 ring-gold-200"><Flag className="h-2.5 w-2.5" /> Gate</span>
                           )}
                           {filled && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" title="Plan set" />}
                         </div>
@@ -245,7 +301,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                         <select
                           value={e?.funnel_step ?? ''}
                           onChange={ev => update(s.id, { funnel_step: ev.target.value || null })}
-                          className="w-44 shrink-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-[13px] font-medium text-indigo-600 hover:border-slate-300 focus:border-indigo-400 focus:outline-none"
+                          className="w-44 shrink-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-[13px] font-medium text-emerald-700 hover:border-slate-300 focus:border-emerald-500 focus:outline-none"
                         >
                           <option value="">— unmapped —</option>
                           {STEP_GROUPS.map(g => (
@@ -298,7 +354,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
               </div>
 
               {ZONE_META[zone].addable && (
-                <button onClick={() => addStage(zone)} disabled={busy} className="mt-2 flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-500 hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-50">
+                <button onClick={() => addStage(zone)} disabled={busy} className="mt-2 flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-500 hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-50">
                   <Plus className="h-3.5 w-3.5" /> Add {ZONE_META[zone].title.toLowerCase()} stage
                 </button>
               )}
@@ -312,21 +368,27 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
 
 function ZoneStepper({ byZone }: { byZone: { zone: StageZone; stages: ZonedStage[] }[] }) {
   return (
-    <div className="flex items-stretch gap-1 overflow-x-auto border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+    // Cards are `flex-1 basis-0`, so the row always fills the full width and every
+    // zone gets an identical slice of it, whatever the zone count.
+    <div className="flex items-stretch border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
       {byZone.map(({ zone, stages }, i) => {
         const Icon = ZONE_META[zone].icon
         const candidates = stages.reduce((n, s) => n + s.candidate_count, 0)
         return (
-          <div key={zone} className="flex items-center gap-1">
-            <div className="flex min-w-[140px] items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
-              <Icon className="h-4 w-4 shrink-0 text-indigo-500" />
-              <div className="leading-tight">
-                <div className="text-[13px] font-semibold text-slate-800">{ZONE_META[zone].title}</div>
-                <div className="text-[11px] text-slate-400">{candidates} candidate{candidates === 1 ? '' : 's'} · {stages.length} stage{stages.length === 1 ? '' : 's'}</div>
+          <Fragment key={zone}>
+            <div className="flex min-w-0 flex-1 basis-0 items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+              <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
+              <div className="min-w-0 leading-tight">
+                <div className="truncate text-[13px] font-semibold text-slate-800">{ZONE_META[zone].title}</div>
+                <div className="truncate text-[11px] text-slate-400">{candidates} candidate{candidates === 1 ? '' : 's'} · {stages.length} stage{stages.length === 1 ? '' : 's'}</div>
               </div>
             </div>
-            {i < byZone.length - 1 && <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />}
-          </div>
+            {i < byZone.length - 1 && (
+              <div className="flex w-6 shrink-0 items-center justify-center">
+                <ArrowRight className="h-3.5 w-3.5 text-slate-300" />
+              </div>
+            )}
+          </Fragment>
         )
       })}
     </div>
