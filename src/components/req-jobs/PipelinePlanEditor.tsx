@@ -255,7 +255,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                         className={[
                           'flex items-center gap-3 px-2 py-2 transition-colors',
                           dragId === s.id ? 'opacity-40' : 'hover:bg-slate-50',
-                          overId === s.id && canDrop(s) ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-300' : '',
+                          overId === s.id && canDrop(s) ? 'bg-slate-100 ring-1 ring-inset ring-slate-300' : '',
                         ].join(' ')}
                       >
                         {/* drag handle + reorder */}
@@ -288,7 +288,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                               onChange={ev => setStages(list => list.map(x => x.id === s.id ? { ...x, name: ev.target.value } : x))}
                               onBlur={ev => commitRename(s, ev.target.value)}
                               onKeyDown={ev => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur() }}
-                              className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-slate-800 hover:border-slate-200 focus:border-emerald-500 focus:bg-white focus:outline-none"
+                              className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-slate-800 hover:border-slate-200 focus:border-[#221b14] focus:bg-white focus:outline-none"
                             />
                           )}
                           {s.is_promotion_gate && (
@@ -301,7 +301,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                         <select
                           value={e?.funnel_step ?? ''}
                           onChange={ev => update(s.id, { funnel_step: ev.target.value || null })}
-                          className="w-44 shrink-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-[13px] font-medium text-emerald-700 hover:border-slate-300 focus:border-emerald-500 focus:outline-none"
+                          className="w-44 shrink-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-[13px] font-medium text-[#221b14] hover:border-slate-300 hover:bg-slate-50 focus:border-[#221b14] focus:outline-none"
                         >
                           <option value="">— unmapped —</option>
                           {STEP_GROUPS.map(g => (
@@ -354,7 +354,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
               </div>
 
               {ZONE_META[zone].addable && (
-                <button onClick={() => addStage(zone)} disabled={busy} className="mt-2 flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-500 hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-50">
+                <button onClick={() => addStage(zone)} disabled={busy} className="mt-2 flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-500 hover:border-[#221b14] hover:text-[#221b14] disabled:opacity-50">
                   <Plus className="h-3.5 w-3.5" /> Add {ZONE_META[zone].title.toLowerCase()} stage
                 </button>
               )}
@@ -377,7 +377,7 @@ function ZoneStepper({ byZone }: { byZone: { zone: StageZone; stages: ZonedStage
         return (
           <Fragment key={zone}>
             <div className="flex min-w-0 flex-1 basis-0 items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
-              <Icon className="h-4 w-4 shrink-0 text-emerald-600" />
+              <Icon className="h-4 w-4 shrink-0 text-[#221b14]" />
               <div className="min-w-0 leading-tight">
                 <div className="truncate text-[13px] font-semibold text-slate-800">{ZONE_META[zone].title}</div>
                 <div className="truncate text-[11px] text-slate-400">{candidates} candidate{candidates === 1 ? '' : 's'} · {stages.length} stage{stages.length === 1 ? '' : 's'}</div>

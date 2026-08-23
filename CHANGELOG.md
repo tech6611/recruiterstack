@@ -12,12 +12,14 @@ entries on top.
 ## 2026-08-23 (Pipeline Plan polish)
 
 ### Changed
-- **Pipeline Plan editor now uses the RecruiterStack palette.** Dropped the
-  Ashby-borrowed indigo/violet accents from `PipelinePlanEditor` and `StageRules`:
-  funnel-step selects, focus rings, "Add stage" hover and the zone-stepper icons
-  are pine `emerald-*`; the promotion-gate badge is `gold-*`. The "Save plan" and
-  "Save rule" buttons drop their colour override and use the standard `Button`
-  primary (bark).
+- **Pipeline Plan editor now uses the in-app coffee/beige palette.** Dropped the
+  Ashby-borrowed indigo/violet from `PipelinePlanEditor` and `StageRules`. The
+  funnel-step selects, zone-stepper icons, "Add stage" hover and focus borders use
+  the platform primary coffee `#221b14` (hover `#33271b`) — the same value as the
+  sidebar and primary buttons — not the marketing site's pine green. Drag-over
+  rows highlight in sand (`slate-100/300`) rather than a green wash; the
+  promotion-gate badge stays `gold-*`. The "Save plan" and "Save rule" buttons
+  drop their colour override and use the standard `Button` primary.
 - **Zone stepper spans the full row.** Lead / Active / Offer / Completed cards are
   `flex-1 basis-0`, so they divide the available width evenly with no trailing
   gap, whatever the zone count. Labels truncate instead of forcing overflow.

@@ -147,7 +147,7 @@ export function StageRules({
       )}
 
       {!adding ? (
-        <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 hover:text-emerald-800">
+        <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 text-xs font-medium text-[#221b14] hover:text-[#33271b]">
           <Plus className="h-3.5 w-3.5" /> Add rule
         </button>
       ) : (
@@ -196,7 +196,7 @@ export function StageRules({
               })}
             </div>
             <div className="mt-1.5 flex items-center gap-3">
-              <button onClick={() => setConds(cs => [...cs, blankCond()])} className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-emerald-700"><Plus className="h-3 w-3" /> condition</button>
+              <button onClick={() => setConds(cs => [...cs, blankCond()])} className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-[#221b14]"><Plus className="h-3 w-3" /> condition</button>
               {conds.length > 1 && (
                 <Select value={match} onChange={e => setMatch(e.target.value as ConditionMatch)} className="h-7 w-28 text-xs">
                   <option value="all">match all</option>
