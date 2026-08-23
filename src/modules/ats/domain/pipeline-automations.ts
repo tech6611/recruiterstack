@@ -118,6 +118,94 @@ export async function updateStageFunnelStep(
   }
 }
 
+// ── Canonical stage CRUD (job_id-based) ─────────────────────────────────────
+// The legacy /api/jobs/[id]/stages route is hiring_request_id-based and doesn't
+// touch canonical jobs, so the plan editor manages canonical stages here.
+
+/** Stages that can't be renamed or removed — the fixed lead ladder and the
+ *  terminal outcomes (Ashby locks these too). */
+export function isLockedStage(zone: string | null, name: string): boolean {
+  return zone === 'lead' || ['Hired', 'Rejected', 'Archived'].includes(name.trim())
+}
+
+/** Create a stage on a canonical job in a given zone. order_index is a temporary
+ *  end value; callers normally follow with reorderStages to place it precisely. */
+export async function createStage(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+  input: { name: string; zone: StageZone; color?: string },
+): Promise<{ id: string; name: string; order_index: number; zone: StageZone; is_promotion_gate: boolean; funnel_step: string | null }> {
+  const sb = supabase as unknown as LooseSb
+  const { data: max } = await sb
+    .from('pipeline_stages')
+    .select('order_index')
+    .eq('org_id', orgId).eq('job_id', jobId)
+    .order('order_index', { ascending: false }).limit(1).maybeSingle()
+  const nextIndex = (max?.order_index ?? -1) + 1
+  // Don't select funnel_step back — it may not exist yet (migration 131) and the
+  // caller reloads via getZonedStages anyway (which is resilient to that).
+  const { data, error } = await sb
+    .from('pipeline_stages')
+    .insert({ org_id: orgId, job_id: jobId, name: input.name, color: input.color ?? 'slate', zone: input.zone, order_index: nextIndex })
+    .select('id, name, order_index, zone, is_promotion_gate')
+    .single()
+  if (error) throw error
+  return { ...data, funnel_step: null }
+}
+
+/** Rename a stage (org+job scoped). Throws 'STAGE_LOCKED' for fixed stages. */
+export async function renameStage(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+  stageId: string,
+  name: string,
+): Promise<void> {
+  const sb = supabase as unknown as LooseSb
+  const { data: stage } = await sb
+    .from('pipeline_stages')
+    .select('zone, name').eq('org_id', orgId).eq('job_id', jobId).eq('id', stageId).maybeSingle()
+  if (!stage) throw new Error('STAGE_NOT_FOUND')
+  if (isLockedStage(stage.zone, stage.name)) throw new Error('STAGE_LOCKED')
+  const { error } = await sb
+    .from('pipeline_stages').update({ name }).eq('org_id', orgId).eq('job_id', jobId).eq('id', stageId)
+  if (error) throw error
+}
+
+/** Delete a stage (org+job scoped), detaching any applications first. Throws
+ *  'STAGE_LOCKED' for fixed stages. */
+export async function deleteStage(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+  stageId: string,
+): Promise<void> {
+  const sb = supabase as unknown as LooseSb
+  const { data: stage } = await sb
+    .from('pipeline_stages')
+    .select('zone, name').eq('org_id', orgId).eq('job_id', jobId).eq('id', stageId).maybeSingle()
+  if (!stage) throw new Error('STAGE_NOT_FOUND')
+  if (isLockedStage(stage.zone, stage.name)) throw new Error('STAGE_LOCKED')
+  await sb.from('applications').update({ stage_id: null }).eq('org_id', orgId).eq('job_id', jobId).eq('stage_id', stageId)
+  const { error } = await sb.from('pipeline_stages').delete().eq('org_id', orgId).eq('job_id', jobId).eq('id', stageId)
+  if (error) throw error
+}
+
+/** Bulk-set order_index for a job's stages (org+job scoped). */
+export async function reorderStages(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+  order: { id: string; order_index: number }[],
+): Promise<void> {
+  const sb = supabase as unknown as LooseSb
+  await Promise.all(order.map(o =>
+    sb.from('pipeline_stages').update({ order_index: o.order_index })
+      .eq('org_id', orgId).eq('job_id', jobId).eq('id', o.id),
+  ))
+}
+
 // ── Stage playbook ──────────────────────────────────────────────────────────
 
 /** The plain-English playbook for one stage, or null if none saved yet. */
