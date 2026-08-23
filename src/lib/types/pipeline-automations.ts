@@ -121,13 +121,16 @@ export interface AutomationRun {
   created_at: string
 }
 
-/** A stage enriched with its zone + gate flag (migration 123) and, optionally,
- *  its playbook. Used by the plan editor + Leads view. */
+/** A stage enriched with its zone + gate flag (migration 123), its canonical
+ *  funnel step (migration 131), a live candidate count, and optionally its
+ *  playbook. Used by the plan editor + Leads view. */
 export interface ZonedStage {
   id: string
   name: string
   order_index: number
   zone: StageZone
   is_promotion_gate: boolean
+  funnel_step: string | null
+  candidate_count: number
   playbook?: StagePlaybook | null
 }

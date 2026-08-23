@@ -853,6 +853,9 @@ export interface PipelineStage {
   // predate the column.
   zone: 'lead' | 'active' | 'offer' | 'completed'
   is_promotion_gate: boolean
+  // Canonical funnel step this stage maps to (migration 131) — Ashby's "Stage
+  // Group". Null until set. Values from src/lib/pipeline/funnel-steps.ts.
+  funnel_step: string | null
   created_at: string
 }
 
@@ -1501,14 +1504,15 @@ export interface HiringRequestInsert extends Omit<HiringRequest, 'id' | 'created
 
 export interface HiringRequestUpdate extends Partial<HiringRequestInsert> {}
 
-export interface PipelineStageInsert extends Omit<PipelineStage, 'id' | 'created_at' | 'hiring_request_id' | 'job_id' | 'zone' | 'is_promotion_gate'> {
+export interface PipelineStageInsert extends Omit<PipelineStage, 'id' | 'created_at' | 'hiring_request_id' | 'job_id' | 'zone' | 'is_promotion_gate' | 'funnel_step'> {
   id?: string
   created_at?: string
   hiring_request_id?: string | null
   job_id?: string | null
-  // DB-defaulted (migration 123); optional on insert.
+  // DB-defaulted / nullable (migrations 123 + 131); optional on insert.
   zone?: 'lead' | 'active' | 'offer' | 'completed'
   is_promotion_gate?: boolean
+  funnel_step?: string | null
 }
 
 export interface PipelineStageUpdate extends Partial<PipelineStageInsert> {}

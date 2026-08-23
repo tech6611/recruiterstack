@@ -32,13 +32,27 @@ export async function getZonedStages(
   jobId: string,
 ): Promise<ZonedStage[]> {
   const sb = supabase as unknown as LooseSb
-  const { data: stages, error } = await sb
+  // Prefer the funnel_step column (migration 131); fall back without it if the
+  // column isn't present yet (deploy-safe before 131 is applied).
+  let stages: unknown[] | null
+  const primary = await sb
     .from('pipeline_stages')
-    .select('id, name, order_index, zone, is_promotion_gate')
+    .select('id, name, order_index, zone, is_promotion_gate, funnel_step')
     .eq('org_id', orgId)
     .eq('job_id', jobId)
     .order('order_index', { ascending: true })
-  if (error) throw error
+  if (primary.error) {
+    const fb = await sb
+      .from('pipeline_stages')
+      .select('id, name, order_index, zone, is_promotion_gate')
+      .eq('org_id', orgId)
+      .eq('job_id', jobId)
+      .order('order_index', { ascending: true })
+    if (fb.error) throw fb.error
+    stages = (fb.data ?? []).map((r: Record<string, unknown>) => ({ ...r, funnel_step: null }))
+  } else {
+    stages = primary.data ?? []
+  }
 
   const rows = (stages ?? []) as Array<{
     id: string
@@ -46,19 +60,26 @@ export async function getZonedStages(
     order_index: number
     zone: StageZone
     is_promotion_gate: boolean
+    funnel_step: string | null
   }>
   if (rows.length === 0) return []
 
-  // Join playbooks in one round-trip.
-  const { data: books, error: bookErr } = await sb
-    .from('stage_playbook')
-    .select('*')
-    .eq('org_id', orgId)
-    .in('stage_id', rows.map(r => r.id))
+  // Playbooks + live candidate counts, in parallel.
+  const [{ data: books, error: bookErr }, { data: apps, error: appErr }] = await Promise.all([
+    sb.from('stage_playbook').select('*').eq('org_id', orgId).in('stage_id', rows.map(r => r.id)),
+    sb.from('applications').select('stage_id').eq('org_id', orgId).eq('job_id', jobId).eq('status', 'active'),
+  ])
   if (bookErr) throw bookErr
+  if (appErr) throw appErr
 
   const byStage = new Map<string, StagePlaybook>()
   for (const b of (books ?? []) as StagePlaybook[]) byStage.set(b.stage_id, b)
+
+  // Count active candidacies per stage (Ashby's "Candidates" column).
+  const counts = new Map<string, number>()
+  for (const a of (apps ?? []) as Array<{ stage_id: string | null }>) {
+    if (a.stage_id) counts.set(a.stage_id, (counts.get(a.stage_id) ?? 0) + 1)
+  }
 
   return rows.map(r => ({
     id: r.id,
@@ -66,8 +87,35 @@ export async function getZonedStages(
     order_index: r.order_index,
     zone: r.zone,
     is_promotion_gate: r.is_promotion_gate,
+    funnel_step: r.funnel_step ?? null,
+    candidate_count: counts.get(r.id) ?? 0,
     playbook: byStage.get(r.id) ?? null,
   }))
+}
+
+/** Set (or clear) the canonical funnel step a stage maps to (migration 131).
+ *  Org-scoped; the caller validates the step id against the canonical list. */
+export async function updateStageFunnelStep(
+  supabase: Supabase,
+  orgId: string,
+  stageId: string,
+  funnelStep: string | null,
+): Promise<void> {
+  const sb = supabase as unknown as LooseSb
+  const { error } = await sb
+    .from('pipeline_stages')
+    .update({ funnel_step: funnelStep })
+    .eq('org_id', orgId)
+    .eq('id', stageId)
+  if (error) {
+    // Tolerate the column not existing yet (deploy-safe before migration 131):
+    // the rest of the plan save still succeeds; funnel_step persists once applied.
+    if (error.code === '42703' || /funnel_step/.test(error.message ?? '')) {
+      logger.warn('funnel_step column not present yet; skipping mapping write', { stageId })
+      return
+    }
+    throw error
+  }
 }
 
 // ── Stage playbook ──────────────────────────────────────────────────────────

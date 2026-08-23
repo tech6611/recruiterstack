@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { withCapability, withScope, parseBody } from '@/lib/api/helpers'
 import { assertCanViewJob } from '@/lib/rbac'
 import { pipelinePlanPutSchema } from '@/lib/validations/pipeline-automations'
-import { getZonedStages, upsertStagePlaybook } from '@/modules/ats/domain/pipeline-automations'
+import { getZonedStages, upsertStagePlaybook, updateStageFunnelStep } from '@/modules/ats/domain/pipeline-automations'
 
 // The pipeline-plan surface (Slice 1b): the job's zoned stages, each with the
 // recruiter's plain-English playbook (entry_intent / advance_criteria / reject_to).
@@ -54,6 +54,10 @@ export const PUT = withCapability('recruiting:edit', async (req, orgId, supabase
       next_stage_id: pb.next_stage_id ?? null,
       reject_to: pb.reject_to,
     })
+    // funnel_step lives on the stage itself (Ashby's Stage Group mapping).
+    if (pb.funnel_step !== undefined) {
+      await updateStageFunnelStep(supabase, orgId, pb.stage_id, pb.funnel_step ?? null)
+    }
   }
 
   const refreshed = await getZonedStages(supabase, orgId, jobId)

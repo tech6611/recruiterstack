@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { FUNNEL_STEP_IDS } from '@/lib/pipeline/funnel-steps'
 
 // Validation for the Slice 1a write paths: the per-stage playbook and the
 // pipeline-automation rules. Enum values must stay in lockstep with migration
@@ -44,10 +45,19 @@ export const pipelineAutomationInputSchema = z.object({
   enabled: z.boolean().default(true),
 })
 
-/** Full-plan save: the client sends a playbook entry per stage it edited. */
+/** Full-plan save: the client sends a playbook entry per stage it edited, plus
+ *  the canonical funnel step the stage maps to (Ashby's "Stage Group"). */
 export const pipelinePlanPutSchema = z.object({
   playbooks: z
-    .array(stagePlaybookInputSchema.extend({ stage_id: z.string().uuid() }))
+    .array(
+      stagePlaybookInputSchema.extend({
+        stage_id: z.string().uuid(),
+        funnel_step: z
+          .string()
+          .refine(v => FUNNEL_STEP_IDS.includes(v), 'Unknown funnel step')
+          .nullish(),
+      }),
+    )
     .max(50),
 })
 
