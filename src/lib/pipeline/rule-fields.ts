@@ -54,6 +54,11 @@ export const RULE_FIELDS: readonly RuleFieldDef[] = [
   // Inbound Parse → the enrolment is marked 'replied'); the engine only reads it.
   { field: 'enrolled', label: 'Added to a sequence', type: 'boolean' },
   { field: 'replied', label: 'Replied to outreach', type: 'boolean' },
+  // AI phone-screen (Vobiz voice call) outcome. The call runs in the Django
+  // backend and writes voice_calls.ai_score/ai_recommendation; the engine reads
+  // the latest scored call for the candidacy.
+  { field: 'has_ai_call', label: 'AI call completed', type: 'boolean' },
+  { field: 'ai_call_score', label: 'AI call score', type: 'number', unit: '0–100' },
 ] as const
 
 const FIELD_BY_ID = new Map(RULE_FIELDS.map(f => [f.field, f]))

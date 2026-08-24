@@ -77,4 +77,19 @@ describe('evaluateConditions', () => {
     // Unknown outreach facts never fire (never act on missing data).
     expect(evaluateConditions({}, [c('replied', 'is_true')])).toBe(false)
   })
+
+  it('AI phone-screen: gate on "call completed" + score', () => {
+    // A scored call happened and cleared the bar → fire.
+    expect(evaluateConditions(
+      { has_ai_call: true, ai_call_score: 82 },
+      [c('has_ai_call', 'is_true'), c('ai_call_score', 'gte', 70)], 'all',
+    )).toBe(true)
+    // Call happened but scored below the bar → don't fire.
+    expect(evaluateConditions(
+      { has_ai_call: true, ai_call_score: 55 },
+      [c('ai_call_score', 'gte', 70)],
+    )).toBe(false)
+    // No call yet → a score condition can't fire (missing fact).
+    expect(evaluateConditions({}, [c('ai_call_score', 'gte', 70)])).toBe(false)
+  })
 })

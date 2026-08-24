@@ -17,6 +17,8 @@ export interface RuleFacts {
   missing_must_have?: boolean | null
   enrolled?: boolean | null
   replied?: boolean | null
+  has_ai_call?: boolean | null
+  ai_call_score?: number | null
 }
 
 const asNum = (v: unknown): number | null =>

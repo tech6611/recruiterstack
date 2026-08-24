@@ -15,6 +15,7 @@ import type {
 const ACTION_OPTS: { v: AutomationActionType; l: string }[] = [
   { v: 'move_stage', l: 'Move to…' },
   { v: 'promote_lead', l: 'Move into the interview pipeline' },
+  { v: 'ai_call', l: 'Call the candidate (AI phone screen)' },
   { v: 'schedule_interview', l: 'Schedule a screening call' },
   { v: 'enrol_outreach', l: 'Add to a sequence' },
   { v: 'archive', l: 'Archive (reject)' },

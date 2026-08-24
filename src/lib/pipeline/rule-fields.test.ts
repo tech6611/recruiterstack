@@ -55,4 +55,17 @@ describe('rule fields', () => {
       expect(describeCondition('replied', 'is_true', undefined)).toBe('Replied to outreach is yes')
     })
   })
+
+  describe('AI phone-screen fields', () => {
+    it('exposes has_ai_call (boolean) + ai_call_score (number)', () => {
+      expect(ruleField('has_ai_call')?.type).toBe('boolean')
+      expect(ruleField('ai_call_score')?.type).toBe('number')
+      expect(isValidCondition('has_ai_call', 'is_true', undefined)).toBe(true)
+      expect(isValidCondition('ai_call_score', 'gte', 70)).toBe(true)
+    })
+    it('renders readable AI-call conditions', () => {
+      expect(describeCondition('has_ai_call', 'is_true', undefined)).toBe('AI call completed is yes')
+      expect(describeCondition('ai_call_score', 'gte', 70)).toBe('AI call score at least 70')
+    })
+  })
 })
