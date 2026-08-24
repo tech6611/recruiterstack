@@ -9,6 +9,18 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-24 (Zone-organized candidate board — steps 1–2)
+
+### Added
+- **Ashby-style zone selector on the job Kanban board.** A Lead → Active → Offer →
+  Hired stepper (with live per-zone candidate counts) sits above the columns; the
+  board now shows one zone at a time and its columns are the interview-plan stages
+  of the selected zone, in plan order. Replaces the flat all-stages row. The board
+  opens on the first zone that holds candidates. New reusable
+  `ZoneSelector` component (`src/components/pipeline/ZoneSelector.tsx`); columns
+  and the rejected pane both filter by the selected zone to stay aligned.
+  (Steps 3+ — the "in stage since" badge — next.) No DB changes.
+
 ## 2026-08-24 (Lead → active conversion)
 
 ### Added

@@ -21,6 +21,8 @@ import { fmtRelative } from '@/lib/ui/date-utils'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
 import { avatarColor, initials } from '@/lib/ui/avatar'
 import { RECOMMENDATION_CONFIG, RATING_CONFIG } from '@/lib/ui/scorecard-config'
+import { ZoneSelector } from '@/components/pipeline/ZoneSelector'
+import { ZONE_SEQUENCE, type StageZone } from '@/lib/pipeline/zones'
 
 // ── Scorecard config (shared) ─────────────────────────────────────────────────
 
@@ -3784,6 +3786,15 @@ export default function JobPipelinePage() {
     searchParams.get('view') === 'ranked' ? 'ranked' : 'kanban'
   )
 
+  // Which funnel zone the board is showing (Ashby-style zone selector). The
+  // columns below are the interview-plan stages of this zone. Defaults to the
+  // first zone that actually holds candidates (see the effect below).
+  const zoneParam = searchParams.get('zone') as StageZone | null
+  const [selectedZone, setSelectedZone] = useState<StageZone>(
+    zoneParam && (ZONE_SEQUENCE as readonly string[]).includes(zoneParam) ? zoneParam : 'active'
+  )
+  const didAutoZone = useRef(false)
+
   // Autopilot drawer
   const [showAutopilot, setShowAutopilot] = useState(false)
   // Job-level scoring criteria modal (rubric used to judge candidates on this job)
@@ -3919,6 +3930,35 @@ export default function JobPipelinePage() {
     return acc
   }, {})
   const unstaged = activeApps.filter(a => !a.stage_id)
+
+  // Active-candidate count per zone (for the zone selector) + the stages that
+  // belong to the currently-selected zone (the board's columns).
+  const stageZoneById = useMemo(() => {
+    const m = new Map<string, StageZone>()
+    for (const s of job?.pipeline_stages ?? []) m.set(s.id, s.zone as StageZone)
+    return m
+  }, [job])
+  const zoneCounts = useMemo(() => {
+    const c: Record<StageZone, number> = { lead: 0, active: 0, offer: 0, completed: 0 }
+    for (const a of activeApps) {
+      const z = a.stage_id ? stageZoneById.get(a.stage_id) : undefined
+      if (z) c[z] += 1
+    }
+    return c
+  }, [activeApps, stageZoneById])
+  const zoneStages = useMemo(
+    () => (job?.pipeline_stages ?? []).filter(s => (s.zone as StageZone) === selectedZone),
+    [job, selectedZone]
+  )
+
+  // One-time smart default: if the URL didn't pin a zone, open on the first zone
+  // (lead → active → offer → hired) that actually has candidates.
+  useEffect(() => {
+    if (didAutoZone.current || !job || zoneParam) return
+    didAutoZone.current = true
+    const firstWithPeople = ZONE_SEQUENCE.find(z => zoneCounts[z] > 0)
+    if (firstWithPeople && firstWithPeople !== selectedZone) setSelectedZone(firstWithPeople)
+  }, [job, zoneParam, zoneCounts, selectedZone])
 
   // Helper: apply all active filters to a flat array of applications
   const applyFilters = useCallback((apps: Application[]) => {
@@ -4686,6 +4726,9 @@ export default function JobPipelinePage() {
       {viewMode === 'kanban' && (
       <div className="flex flex-col flex-1 min-w-0">
 
+      {/* Zone selector — pick which funnel zone's stages the board shows. */}
+      <ZoneSelector counts={zoneCounts} selected={selectedZone} onSelect={setSelectedZone} />
+
       {/* ── Single horizontal scroll — Active + Rejected share same container ── */}
       <div className="flex flex-row flex-1 items-stretch min-h-0">
       <div className="flex flex-col flex-1 overflow-x-auto">
@@ -4717,7 +4760,9 @@ export default function JobPipelinePage() {
           />
         </div>
 
-        {job.pipeline_stages.map((stage, stageIndex) => {
+        {zoneStages.map((stage) => {
+          // Global index so "next stage" / "is last" still cross zone boundaries.
+          const stageIndex = job.pipeline_stages.findIndex(s => s.id === stage.id)
           const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
           return (
           <div
@@ -4856,6 +4901,16 @@ export default function JobPipelinePage() {
           </div>
         )})}
 
+        {/* Empty zone — no stages mapped to this zone in the interview plan. */}
+        {zoneStages.length === 0 && (
+          <div className="flex flex-1 items-center justify-center px-6 py-10">
+            <p className="max-w-xs text-center text-sm text-slate-400">
+              No stages in the {selectedZone === 'completed' ? 'Hired' : selectedZone[0].toUpperCase() + selectedZone.slice(1)} zone yet.
+              Add them in the Interview Plan and they’ll appear here.
+            </p>
+          </div>
+        )}
+
         {/* Add-stage panel — always visible in edit mode */}
         {editMode && (
           <div className="flex-1 min-w-[160px] max-w-[220px] px-3 flex flex-col">
@@ -4935,7 +4990,7 @@ export default function JobPipelinePage() {
           />
         </div>
 
-        {job.pipeline_stages.map(stage => {
+        {zoneStages.map(stage => {
           const rejApps = rejectedGrouped[stage.id] ?? []
           const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
           return (
