@@ -9,6 +9,21 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-24 (Lead → active conversion)
+
+### Added
+- **New rule action "Move into the interview pipeline" (`promote_lead`)** — the
+  conversion trigger that graduates a sourced lead into the active pipeline.
+  Recruiters wire it like any rule (e.g. on "Replied": if replied is yes →
+  Move into the interview pipeline). The engine moves the candidacy to the job's
+  first active stage ("Applied") **and** flips `lifecycle` lead → active, so the
+  interview-plan automations (fit gate, scheduling, etc.) take over. Skips
+  candidates already active. This completes the sourced → lead → engage →
+  convert → interview flow.
+- `promoteLeadToActive()` in `applications.ts` (sets stage + lifecycle together).
+  The engine's candidate query now also reads `lifecycle` so conversion is
+  idempotent. `promote_lead` was a reserved action type in the schema; now wired.
+
 ## 2026-08-24 (Lead-zone outreach automation)
 
 ### Added
