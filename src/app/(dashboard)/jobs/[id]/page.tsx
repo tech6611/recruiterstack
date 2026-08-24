@@ -3851,7 +3851,26 @@ export default function JobPipelinePage() {
     if (scoringRef.current) return
     const res = await fetch(`/api/jobs/${id}`, { cache: 'no-store' })
     const json = await res.json()
-    setJob(json.data ?? null)
+    let jobData = json.data ?? null
+    // /api/jobs/:id is proxied to the Django backend in prod, whose response
+    // omits the `zone` column on pipeline_stages. The board groups columns by
+    // zone, so back-fill it from the zoned-stages endpoint (served by Next.js)
+    // — without it every zone is empty and no columns render.
+    if (jobData?.pipeline_stages?.some((s: PipelineStage) => s.zone == null)) {
+      try {
+        const pj = await (await fetch(`/api/jobs/${id}/pipeline-plan`)).json()
+        const zoneById = new Map<string, StageZone>(
+          (pj?.data?.stages ?? []).map((s: { id: string; zone: StageZone }) => [s.id, s.zone])
+        )
+        jobData = {
+          ...jobData,
+          pipeline_stages: jobData.pipeline_stages.map((s: PipelineStage) => ({
+            ...s, zone: s.zone ?? zoneById.get(s.id) ?? 'active',
+          })),
+        }
+      } catch { /* leave stages as-is; the zone selector falls back to 'active' */ }
+    }
+    setJob(jobData)
     setLoading(false)
   }, [id])
 
