@@ -47,6 +47,10 @@ function isClerkBypassed(req: NextRequest): boolean {
   return (
     req.nextUrl.pathname.startsWith('/api/queue') ||
     req.nextUrl.pathname.startsWith('/api/sequences/process') ||
+    // Internal service-to-service endpoints (e.g. the Django voice service
+    // fetching a phone-screen briefing) authenticate via INTERNAL_API_SECRET
+    // (X-Internal-Secret) in the route itself, not Clerk.
+    req.nextUrl.pathname.startsWith('/api/internal') ||
     // Extension endpoints authenticate via API key (withApiKey), not Clerk.
     req.nextUrl.pathname.startsWith('/api/ext') ||
     req.nextUrl.pathname.startsWith('/api/webhooks/clerk') ||
