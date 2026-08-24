@@ -6,7 +6,9 @@ import { describeCondition } from '@/lib/pipeline/rule-fields'
 import { fitBucketFor } from '@/lib/ai/fit-bucket'
 import {
   updateApplicationStage, updateApplicationStatusInOrg, recordApplicationEventSafe,
+  promoteLeadToActive,
 } from '@/modules/ats/domain/applications'
+import { getFirstJobStage } from '@/modules/ats/domain/job-pipelines'
 import { createSelfScheduleInterview } from '@/modules/ats/domain/interviews'
 import { enrollCandidate } from '@/modules/crm/domain/enroll'
 import { recordAutomationRunSafe } from '@/modules/ats/domain/pipeline-automations'
@@ -33,7 +35,7 @@ const APP_BATCH = 300
 const MAX_ACTIONS_PER_TICK = 50
 // Actions the engine actually performs in live mode. request_approval (and any
 // future ones) only ever record a suggestion.
-const AUTO_ACTIONS = new Set(['move_stage', 'archive', 'enrol_outreach', 'schedule_interview'])
+const AUTO_ACTIONS = new Set(['move_stage', 'archive', 'enrol_outreach', 'schedule_interview', 'promote_lead'])
 
 interface AppRow {
   id: string
@@ -46,14 +48,15 @@ interface AppRow {
   applied_at: string | null
   knockout_failed: boolean | null
   job_id: string | null
+  lifecycle: string | null
 }
 
-const APP_COLS = 'id, org_id, candidate_id, stage_id, ai_score, review_status, source, applied_at, knockout_failed, job_id'
+const APP_COLS = 'id, org_id, candidate_id, stage_id, ai_score, review_status, source, applied_at, knockout_failed, job_id, lifecycle'
 // Deploy-safe fallback: review_status (migration 030) may be absent on a DB that
 // missed that migration. Selecting a missing column by name makes PostgREST hard-
 // error and returns ZERO rows — silently disabling ALL automation. So if the full
 // select errors on review_status, retry without it (that one fact just reads null).
-const APP_COLS_NO_REVIEW = 'id, org_id, candidate_id, stage_id, ai_score, source, applied_at, knockout_failed, job_id'
+const APP_COLS_NO_REVIEW = 'id, org_id, candidate_id, stage_id, ai_score, source, applied_at, knockout_failed, job_id, lifecycle'
 
 /** Fetch active candidacies in the given stages, tolerant of a missing
  *  review_status column. Returns { data, error, degraded }. */
@@ -132,7 +135,7 @@ function rationaleFor(rule: PipelineAutomation): string {
 }
 
 function intendedDecision(action: string): AutomationDecision {
-  if (action === 'move_stage') return 'advanced'
+  if (action === 'move_stage' || action === 'promote_lead') return 'advanced'
   if (action === 'archive') return 'rejected'
   if (action === 'request_approval') return 'escalated'
   return 'acted'
@@ -262,6 +265,24 @@ async function executeRule(sb: Supabase, rule: PipelineAutomation, app: AppRow, 
       case 'schedule_interview': {
         await scheduleScreeningCall(lsb, app)
         decision = 'acted'
+        break
+      }
+      case 'promote_lead': {
+        // Convert a sourced lead into the active interview pipeline: move to the
+        // job's first active stage ("Applied") AND flip lifecycle to 'active'.
+        if (app.lifecycle === 'active') return 'skip' // already in the pipeline
+        if (!app.job_id) return 'skip'
+        const active = await getFirstJobStage(sb, app.org_id, app.job_id).catch(() => null)
+        if (!active) return 'skip'
+        const { error } = await promoteLeadToActive(sb, app.org_id, app.id, active.id)
+        if (error) throw new Error(error.message)
+        await recordApplicationEventSafe(sb, {
+          org_id: app.org_id, application_id: app.id, event_type: 'stage_moved',
+          from_stage: app.stage_id, to_stage: active.id,
+          note: 'Converted from lead to the interview pipeline by an automation rule',
+          created_by: 'automation',
+        } as never)
+        decision = 'advanced'
         break
       }
       default:

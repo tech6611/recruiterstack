@@ -302,6 +302,26 @@ export async function updateApplicationStage(
   return { error: error as any }
 }
 
+/** Promote a sourced lead into the active interview pipeline: move it to the
+ *  given (active-zone) stage AND flip lifecycle 'lead' → 'active', so the
+ *  interview-plan automations take over. A plain stage move wouldn't change the
+ *  lifecycle, leaving a candidate in "Applied" still tagged as a lead. */
+export async function promoteLeadToActive(
+  supabase: Supabase,
+  orgId: string,
+  applicationId: string,
+  stageId: string,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase
+    .from('applications')
+    .update({ stage_id: stageId, lifecycle: 'active' } as never)
+    .eq('id', applicationId)
+    .eq('org_id', orgId)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { error: error as any }
+}
+
 /** One application with candidate name and job title (org-scoped).
  *  Returns { data, error } to preserve the caller's existence check.
  *  Used by addNoteToApplication. */
