@@ -849,6 +849,36 @@ export async function getFirstJobStage(
   }
 }
 
+/** Entry stage for a SOURCED candidacy — the first LEAD-zone stage ('New lead',
+ *  migrations 123/130). Sourced prospects are engaged in the lead funnel first and
+ *  only convert into the active interview pipeline when they reply/apply (the
+ *  Ashby model). Lead stages sort first (negative order_index), so the earliest
+ *  lead stage is "New lead". Returns { stage, lifecycle }; if the job has no lead
+ *  stages (older jobs, un-migrated DBs), falls back to the active entry stage with
+ *  lifecycle 'active' so a sourced candidacy always has somewhere valid to land. */
+export async function getFirstLeadStage(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<{ stage: Pick<PipelineStage, 'id' | 'name'> | null; lifecycle: 'lead' | 'active' }> {
+  try {
+    const { data, error } = await supabase
+      .from('pipeline_stages')
+      .select('id, name, order_index, zone')
+      .eq('job_id', jobId)
+      .eq('org_id', orgId)
+      .order('order_index')
+    if (error) throw error
+    const rows = (data ?? []) as Pick<PipelineStage, 'id' | 'name' | 'order_index' | 'zone'>[]
+    const lead = rows.find(r => r.zone === 'lead')
+    if (lead) return { stage: { id: lead.id, name: lead.name }, lifecycle: 'lead' }
+  } catch {
+    // zone column absent (pre-migration-123) — fall through to the active entry.
+  }
+  const active = await getFirstJobStage(supabase, orgId, jobId).catch(() => null)
+  return { stage: active, lifecycle: 'active' }
+}
+
 // Lookup a single pipeline stage by id within the org (move_application_to_stage
 // + bulk_move_to_stage agent tools). Returns null when the stage does not exist
 // in this org; callers emit their own not-found message.

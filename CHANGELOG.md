@@ -9,6 +9,27 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-24 (Sourced candidates enter the lead funnel)
+
+### Changed
+- **Sourced prospects now land in "New lead" (lead zone), not "Applied."** The
+  lead zone existed in the schema but no code ever routed anyone into it — every
+  new candidacy, sourced or applied, went straight to the active interview
+  pipeline. Now the candidate's `source` decides the entry: `sourced` →
+  first lead stage with `lifecycle='lead'`; applicants → active pipeline
+  (unchanged). Applies to the Source tab (add + pool unlock) and the AI Copilot
+  "add to pipeline" tool. This restores the Ashby-style flow: engage sourced
+  people in the lead funnel first; they convert to the interview pipeline only
+  when they reply/apply. (Conversion trigger + lead-zone automation are the next
+  pieces.)
+- Sourced candidacies now log a `sourced` application event (was `applied`), so
+  people who never applied no longer inflate "applied" counts.
+
+### Added
+- `getFirstLeadStage()` in `job-pipelines.ts` — resolves a sourced candidacy's
+  lead entry stage, falling back to the active entry stage for jobs without a
+  lead zone. Unit-tested.
+
 ## 2026-08-23 (Automation engine fires again)
 
 ### Fixed

@@ -19,6 +19,7 @@ import {
   getCanonicalJobById,
   getCanonicalJobScoringContext,
   getFirstJobStage,
+  getFirstLeadStage,
   getPipelineStageById,
   listCanonicalJobBoardSummaries,
   updateCanonicalJob,
@@ -2007,14 +2008,21 @@ async function bulkAddToPipeline(
     return 'Error: candidate_ids must be a non-empty array'
   }
 
-  // Get first pipeline stage for the job
-  let stage
+  // Entry stage depends on how they arrive: sourced prospects land in the lead
+  // funnel ("New lead", lifecycle 'lead'); everyone else in the active pipeline.
+  let firstStage: { id: string; name: string } | null
+  let lifecycle: 'lead' | 'active'
   try {
-    stage = await getFirstJobStage(supabase, orgId, job_id)
+    if (source === 'sourced') {
+      const r = await getFirstLeadStage(supabase, orgId, job_id)
+      firstStage = r.stage; lifecycle = r.lifecycle
+    } else {
+      firstStage = await getFirstJobStage(supabase, orgId, job_id)
+      lifecycle = 'active'
+    }
   } catch (err) {
     return `Error fetching pipeline stages: ${err instanceof Error ? err.message : 'Unknown error'}`
   }
-  const firstStage = stage
 
   // Check for existing applications (skip duplicates)
   const existing = await listExistingApplicationCandidateIds(supabase, orgId, job_id, candidate_ids)
@@ -2033,13 +2041,14 @@ async function bulkAddToPipeline(
       jobId: job_id,
       stageId: firstStage?.id ?? null,
       source,
+      lifecycle,
     })
 
     if (appErr || !app) continue
 
     await supabase.from('application_events').insert({
       application_id: app.id,
-      event_type:     'applied',
+      event_type:     lifecycle === 'lead' ? 'sourced' : 'applied',
       note:           `Added to pipeline by AI Copilot (source: ${source})`,
       created_by:     'AI Copilot',
       org_id:         orgId,
