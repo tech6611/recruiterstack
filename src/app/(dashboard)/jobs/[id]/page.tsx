@@ -89,6 +89,13 @@ function daysSince(dateStr: string) {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
 }
 
+// How long the candidacy has been in its CURRENT stage (Ashby's "in stage since"),
+// from the board facade's stage_entered_at; falls back to applied_at.
+function daysInStage(app: Application) {
+  const since = app.stage_entered_at ?? app.applied_at
+  return since ? daysSince(since) : 0
+}
+
 // Suggested-action sort priority (module-level so RankedView can reference it)
 function actionSortKey(a: { ai_score: number | null; ai_recommendation: string | null }): number {
   if (a.ai_score === null) return 4
@@ -221,7 +228,10 @@ function CandidateCard({
             )}
             {show('ai_score') && app.ai_score !== null && <ScorePill score={app.ai_score} />}
             {show('days') && (
-              <span className="text-[9px] text-slate-400">{daysSince(app.applied_at)}d</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-px text-[9px] font-semibold text-emerald-700" title="Time in current stage">
+                <span className="h-1 w-1 rounded-full bg-emerald-500" />
+                {daysInStage(app)}d in stage
+              </span>
             )}
           </div>
         </div>

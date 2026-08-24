@@ -9,6 +9,15 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-24 (Candidate board — "in stage" badge, step 3)
+
+### Added
+- **"N days in stage" badge on candidate cards** (Ashby's "in stage since").
+  Replaces the old "days since applied" figure with time in the *current* stage.
+  The board facade (`getCanonicalJobBoardDetail`) now computes `stage_entered_at`
+  per candidacy from the latest `stage_moved` event (falling back to applied_at),
+  robust to the id-vs-name inconsistency in how `to_stage` is recorded.
+
 ## 2026-08-24 (Zone-organized candidate board — steps 1–2)
 
 ### Added

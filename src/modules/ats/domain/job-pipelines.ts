@@ -343,6 +343,28 @@ export async function getCanonicalJobBoardDetail(
     }
   }) as unknown as (Application & { candidate: Candidate })[]
 
+  // "In stage since": when each candidacy last entered its current stage = the
+  // most recent stage_moved event, falling back to applied_at. We deliberately do
+  // NOT match on to_stage (it's stored as a stage id in some write paths and a
+  // stage name in others) — the latest stage change is when they entered the
+  // stage they're in now, whatever its label.
+  const appIds = (applications as unknown as { id: string }[]).map(a => a.id)
+  if (appIds.length) {
+    const { data: evs } = await (supabase as any)
+      .from('application_events')
+      .select('application_id, created_at')
+      .in('application_id', appIds)
+      .eq('event_type', 'stage_moved')
+      .order('created_at', { ascending: false })
+    const enteredAt = new Map<string, string>()
+    for (const e of (evs ?? []) as { application_id: string; created_at: string }[]) {
+      if (!enteredAt.has(e.application_id)) enteredAt.set(e.application_id, e.created_at) // desc → first is latest
+    }
+    for (const a of applications as unknown as { id: string; applied_at: string | null; stage_entered_at?: string | null }[]) {
+      a.stage_entered_at = enteredAt.get(a.id) ?? a.applied_at ?? null
+    }
+  }
+
   return {
     ...canonicalJobToHiringRequest(jobRes.data as CanonicalJobRow),
     pipeline_stages: (stagesRes.data ?? []) as PipelineStage[],
