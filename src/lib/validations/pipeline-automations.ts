@@ -11,7 +11,7 @@ export const rejectDestinationEnum = z.enum(['archive', 'hold', 'review'])
 export const automationTriggerEnum = z.enum(['stage_entry', 'feedback_complete', 'sla_elapsed'])
 
 export const automationActionTypeEnum = z.enum([
-  'enrol_outreach', 'promote_lead', 'screen', 'send_email', 'send_assessment',
+  'enrol_outreach', 'promote_lead', 'ai_call', 'screen', 'send_email', 'send_assessment',
   'schedule_interview', 'request_availability', 'handoff_to_hm', 'move_stage',
   'create_offer', 'archive', 'request_approval',
 ])
@@ -35,7 +35,7 @@ export const automationGuardrailsSchema = z.object({
 })
 
 export const ruleFieldEnum = z.enum([
-  'days_in_stage', 'ai_score', 'fit_bucket', 'review_status', 'has_feedback', 'feedback_result', 'source', 'missing_must_have', 'enrolled', 'replied',
+  'days_in_stage', 'ai_score', 'fit_bucket', 'review_status', 'has_feedback', 'feedback_result', 'source', 'missing_must_have', 'enrolled', 'replied', 'has_ai_call', 'ai_call_score',
 ])
 export const ruleOperatorEnum = z.enum([
   'gt', 'gte', 'lt', 'lte', 'eq', 'neq', 'is', 'is_not', 'is_true', 'is_false',

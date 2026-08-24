@@ -35,7 +35,7 @@ const APP_BATCH = 300
 const MAX_ACTIONS_PER_TICK = 50
 // Actions the engine actually performs in live mode. request_approval (and any
 // future ones) only ever record a suggestion.
-const AUTO_ACTIONS = new Set(['move_stage', 'archive', 'enrol_outreach', 'schedule_interview', 'promote_lead'])
+const AUTO_ACTIONS = new Set(['move_stage', 'archive', 'enrol_outreach', 'schedule_interview', 'promote_lead', 'ai_call'])
 
 interface AppRow {
   id: string
@@ -103,6 +103,14 @@ async function buildFacts(sb: LooseSb, app: AppRow): Promise<RuleFacts> {
     replied = statuses.includes('replied')
   }
 
+  // AI phone-screen outcome (Vobiz voice call, dispatched via Django). We read the
+  // latest SCORED call for this candidacy — a queued/in-progress call (no score
+  // yet) doesn't count, so "AI call completed" means a result is actually in.
+  const { data: call } = await sb.from('voice_calls')
+    .select('ai_score').eq('org_id', app.org_id).eq('application_id', app.id)
+    .not('ai_score', 'is', null)
+    .order('created_at', { ascending: false }).limit(1).maybeSingle()
+
   return {
     days_in_stage: days,
     ai_score: app.ai_score ?? null,
@@ -114,6 +122,8 @@ async function buildFacts(sb: LooseSb, app: AppRow): Promise<RuleFacts> {
     missing_must_have: app.knockout_failed === true,
     enrolled,
     replied,
+    has_ai_call: !!call,
+    ai_call_score: (call as { ai_score: number | null } | null)?.ai_score ?? null,
   }
 }
 
@@ -202,6 +212,52 @@ async function scheduleScreeningCall(sb: LooseSb, app: AppRow): Promise<void> {
   }
 }
 
+// ── action: place an AI phone-screen call (Vobiz, via the Django backend) ─────
+// Same dispatch the recruiter's manual "call" button uses (/api/voice/calls),
+// but server-to-server: authenticated with INTERNAL_API_SECRET (the established
+// X-Internal-Secret pattern, e.g. office-to-pdf). The call result lands in
+// voice_calls, which buildFacts reads back as has_ai_call / ai_call_score.
+async function placeAiCall(sb: LooseSb, app: AppRow): Promise<void> {
+  const djangoUrl = process.env.DJANGO_API_URL
+  const secret = process.env.INTERNAL_API_SECRET
+  if (!djangoUrl || !secret) {
+    logger.error('AI call not configured (need DJANGO_API_URL + INTERNAL_API_SECRET)', { appId: app.id })
+    return
+  }
+  const { data: c } = await sb.from('candidates')
+    .select('phone, person:people(phone)').eq('id', app.candidate_id).maybeSingle()
+  const phone: string | null = c?.person?.phone ?? c?.phone ?? null
+  if (!phone) {
+    logger.warn('AI call skipped — candidate has no phone number', { appId: app.id })
+    return
+  }
+  try {
+    const res = await fetch(`${djangoUrl}/api/voice/calls`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Internal-Secret': secret },
+      body: JSON.stringify({
+        candidate_id: app.candidate_id,
+        application_id: app.id,
+        job_id: app.job_id ?? undefined,
+        phone_number: phone,
+        agent_type: 'phone_screen',
+      }),
+    })
+    if (!res.ok) {
+      logger.error('AI call dispatch failed', { appId: app.id, status: res.status })
+      return
+    }
+  } catch (err) {
+    logger.error('AI call dispatch error', { err, appId: app.id })
+    return
+  }
+  await recordApplicationEventSafe(sb as unknown as Supabase, {
+    org_id: app.org_id, application_id: app.id, event_type: 'note',
+    note: 'AI phone-screen call placed by an automation rule',
+    created_by: 'automation',
+  } as never)
+}
+
 type Outcome = 'acted' | 'suggested' | 'skip'
 
 // ── execute one rule against one candidacy ──────────────────────────────────
@@ -264,6 +320,11 @@ async function executeRule(sb: Supabase, rule: PipelineAutomation, app: AppRow, 
       }
       case 'schedule_interview': {
         await scheduleScreeningCall(lsb, app)
+        decision = 'acted'
+        break
+      }
+      case 'ai_call': {
+        await placeAiCall(lsb, app)
         decision = 'acted'
         break
       }

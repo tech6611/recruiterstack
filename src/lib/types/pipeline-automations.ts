@@ -18,6 +18,7 @@ export type AutomationTrigger = 'stage_entry' | 'feedback_complete' | 'sla_elaps
 export type AutomationActionType =
   | 'enrol_outreach'
   | 'promote_lead'
+  | 'ai_call'
   | 'screen'
   | 'send_email'
   | 'send_assessment'
@@ -52,6 +53,8 @@ export type RuleField =
   | 'missing_must_have'
   | 'enrolled'
   | 'replied'
+  | 'has_ai_call'
+  | 'ai_call_score'
 
 /** Comparison operators — which apply depends on the field's type. */
 export type RuleOperator =

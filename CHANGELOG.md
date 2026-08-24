@@ -9,6 +9,25 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-24 (AI phone-screen in the automation engine)
+
+### Added
+- **"Call the candidate (AI phone screen)" rule action** (`ai_call`). When a
+  candidacy meets a rule (auto + live mode), the engine dispatches the same Vobiz
+  voice call the recruiter's manual button uses — server-to-server to the Django
+  backend (`POST {DJANGO_API_URL}/api/voice/calls`, authenticated with
+  `INTERNAL_API_SECRET` via the `X-Internal-Secret` pattern already used for
+  office-to-pdf). Skips if the candidate has no phone or the integration env
+  isn't set. The manual call button is unchanged.
+- **"AI call completed" + "AI call score" rule conditions** (`has_ai_call`,
+  `ai_call_score`). `buildFacts` reads the latest *scored* `voice_calls` row for
+  the candidacy, so a rule can branch on the call outcome (e.g. *AI call score ≥
+  70 → move to Hiring Manager*). Unit-tested.
+
+Together these let a stage auto-ring the candidate, then advance them based on
+the call result. Requires `DJANGO_API_URL` + `INTERNAL_API_SECRET`, and the
+Django `/api/voice/calls` endpoint accepting the internal secret.
+
 ## 2026-08-24 (Candidate board — "in stage" badge, step 3)
 
 ### Added
