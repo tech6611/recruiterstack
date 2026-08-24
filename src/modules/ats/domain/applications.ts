@@ -346,11 +346,13 @@ export async function listExistingApplicationCandidateIds(
 
 /** Insert one application into a canonical job pipeline and return its id.
  *  Returns { data, error } so the caller can `continue` on failure exactly
- *  as before. Sets applied_at to now and status to 'active'. */
+ *  as before. Sets applied_at to now and status to 'active'. `lifecycle`
+ *  defaults to 'active' (a real applicant); sourced prospects pass 'lead' so
+ *  they enter the lead funnel rather than the active interview pipeline. */
 export async function insertPipelineApplication(
   supabase: Supabase,
   orgId: string,
-  input: { candidateId: string; jobId: string; stageId: string | null; source: string },
+  input: { candidateId: string; jobId: string; stageId: string | null; source: string; lifecycle?: 'lead' | 'active' | 'completed' },
 ): Promise<{ data: { id: string } | null; error: { message: string } | null }> {
   const { data, error } = await supabase
     .from('applications')
@@ -359,6 +361,7 @@ export async function insertPipelineApplication(
       job_id:            input.jobId,
       stage_id:          input.stageId,
       status:            'active',
+      lifecycle:         input.lifecycle ?? 'active',
       source:            input.source,
       org_id:            orgId,
       applied_at:        new Date().toISOString(),

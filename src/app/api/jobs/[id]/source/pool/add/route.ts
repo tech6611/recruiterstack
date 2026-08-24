@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withCapability, parseBody, handleSupabaseError } from '@/lib/api/helpers'
-import { getFirstJobStage } from '@/modules/ats/domain/job-pipelines'
+import { getFirstLeadStage } from '@/modules/ats/domain/job-pipelines'
 import { insertPipelineApplication, listExistingApplicationCandidateIds } from '@/modules/ats/domain/applications'
 import { findOrCreateCandidateProfile } from '@/modules/ats/domain/candidates'
 import { unlockPoolProfile } from '@/modules/pool/domain/pool-unlock'
@@ -18,7 +18,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
   const jobId = params.id
 
   try {
-    const stage = await getFirstJobStage(supabase, orgId, jobId).catch(() => null)
+    const { stage, lifecycle } = await getFirstLeadStage(supabase, orgId, jobId)
 
     let added = 0
     let unlocked = 0
@@ -44,12 +44,15 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
         jobId,
         stageId: stage?.id ?? null,
         source: 'sourced',
+        lifecycle,
       })
       if (error || !app) continue
       await supabase.from('application_events').insert({
         application_id: app.id,
-        event_type: 'applied',
-        note: 'Unlocked from the Candidate Pool + added to pipeline',
+        event_type: 'sourced',
+        note: lifecycle === 'lead'
+          ? 'Unlocked from the Candidate Pool + added to the lead funnel'
+          : 'Unlocked from the Candidate Pool + added to pipeline',
         created_by: 'Sourcing',
         org_id: orgId,
       } as never)
