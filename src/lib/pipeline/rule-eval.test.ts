@@ -66,4 +66,15 @@ describe('evaluateConditions', () => {
     expect(evaluateConditions({ days_in_stage: 4 }, [c('days_in_stage', 'gt', 3)])).toBe(true)
     expect(evaluateConditions({ days_in_stage: 2 }, [c('days_in_stage', 'gt', 3)])).toBe(false)
   })
+
+  it('lead-funnel outreach: "not yet enrolled" and "replied" facts', () => {
+    // New lead, not yet in a sequence → an "enrol" rule should fire.
+    expect(evaluateConditions({ enrolled: false }, [c('enrolled', 'is_false')])).toBe(true)
+    expect(evaluateConditions({ enrolled: true }, [c('enrolled', 'is_false')])).toBe(false)
+    // Reached out, candidate replied → a "move to Replied" rule should fire.
+    expect(evaluateConditions({ replied: true }, [c('replied', 'is_true')])).toBe(true)
+    expect(evaluateConditions({ replied: false }, [c('replied', 'is_true')])).toBe(false)
+    // Unknown outreach facts never fire (never act on missing data).
+    expect(evaluateConditions({}, [c('replied', 'is_true')])).toBe(false)
+  })
 })

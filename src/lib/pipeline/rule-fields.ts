@@ -49,6 +49,11 @@ export const RULE_FIELDS: readonly RuleFieldDef[] = [
     ],
   },
   { field: 'missing_must_have', label: 'Missing a must-have', type: 'boolean' },
+  // Lead-funnel outreach vocabulary: whether the candidate is in an outreach
+  // sequence, and whether they've replied. Reply is set externally (SendGrid
+  // Inbound Parse → the enrolment is marked 'replied'); the engine only reads it.
+  { field: 'enrolled', label: 'Added to a sequence', type: 'boolean' },
+  { field: 'replied', label: 'Replied to outreach', type: 'boolean' },
 ] as const
 
 const FIELD_BY_ID = new Map(RULE_FIELDS.map(f => [f.field, f]))

@@ -15,6 +15,8 @@ export interface RuleFacts {
   feedback_result?: string | null
   source?: string | null
   missing_must_have?: boolean | null
+  enrolled?: boolean | null
+  replied?: boolean | null
 }
 
 const asNum = (v: unknown): number | null =>
