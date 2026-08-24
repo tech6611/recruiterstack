@@ -893,6 +893,10 @@ export interface Application {
   cover_letter: string | null
   applied_at: string
   created_at: string
+  // When the candidacy last entered its current stage (computed by the board
+  // facade from the latest stage_moved event; falls back to applied_at). Only
+  // populated on the job-board read; optional elsewhere.
+  stage_entered_at?: string | null
   // AI scoring (null until scored)
   ai_score:          number | null
   ai_recommendation: AiRecommendation | null
