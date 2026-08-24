@@ -42,4 +42,17 @@ describe('rule fields', () => {
       expect(describeCondition('has_feedback', 'is_true', undefined)).toBe('Interview feedback submitted is yes')
     })
   })
+
+  describe('lead-funnel outreach fields', () => {
+    it('exposes enrolled + replied as boolean fields', () => {
+      expect(ruleField('enrolled')?.type).toBe('boolean')
+      expect(ruleField('replied')?.type).toBe('boolean')
+      expect(isValidCondition('enrolled', 'is_false', undefined)).toBe(true)
+      expect(isValidCondition('replied', 'is_true', undefined)).toBe(true)
+    })
+    it('renders readable outreach conditions', () => {
+      expect(describeCondition('enrolled', 'is_false', undefined)).toBe('Added to a sequence is no')
+      expect(describeCondition('replied', 'is_true', undefined)).toBe('Replied to outreach is yes')
+    })
+  })
 })

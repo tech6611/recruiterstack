@@ -9,6 +9,20 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-24 (Lead-zone outreach automation)
+
+### Added
+- **Two new automation conditions for the lead funnel: "Added to a sequence" and
+  "Replied to outreach."** These let recruiters build the engage-then-convert
+  flow with rules on lead stages, e.g. "New lead, if not added to a sequence →
+  Add to a sequence," "New lead, if added to a sequence → move to Reached out,"
+  and "Reached out, if replied → move to Replied." The rule builder already
+  renders on lead stages, so the new fields appear there automatically.
+- Engine `buildFacts` now computes `enrolled` / `replied` per candidate from
+  `sequence_enrollments` (reply is set externally via SendGrid Inbound Parse;
+  the engine only reads `status='replied'`). Surfaced in the automation-debug
+  diagnostic too. Unit-tested (rule-fields + rule-eval).
+
 ## 2026-08-24 (Sourced candidates enter the lead funnel)
 
 ### Changed

@@ -50,6 +50,8 @@ export type RuleField =
   | 'feedback_result'
   | 'source'
   | 'missing_must_have'
+  | 'enrolled'
+  | 'replied'
 
 /** Comparison operators — which apply depends on the field's type. */
 export type RuleOperator =

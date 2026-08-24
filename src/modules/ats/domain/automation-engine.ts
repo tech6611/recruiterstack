@@ -88,6 +88,18 @@ async function buildFacts(sb: LooseSb, app: AppRow): Promise<RuleFacts> {
     .select('recommendation').eq('application_id', app.id)
     .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
+  // Outreach state for the lead funnel. Enrolments are keyed by candidate (not
+  // application): 'enrolled' = in any sequence; 'replied' = they wrote back
+  // (set externally via SendGrid Inbound Parse → enrolment.status='replied').
+  let enrolled = false, replied = false
+  if (app.candidate_id) {
+    const { data: enrs } = await sb.from('sequence_enrollments')
+      .select('status').eq('org_id', app.org_id).eq('candidate_id', app.candidate_id)
+    const statuses = ((enrs ?? []) as { status: string | null }[]).map(e => e.status)
+    enrolled = statuses.length > 0
+    replied = statuses.includes('replied')
+  }
+
   return {
     days_in_stage: days,
     ai_score: app.ai_score ?? null,
@@ -97,6 +109,8 @@ async function buildFacts(sb: LooseSb, app: AppRow): Promise<RuleFacts> {
     feedback_result: sc?.recommendation ?? null,
     source: app.source ?? null,
     missing_must_have: app.knockout_failed === true,
+    enrolled,
+    replied,
   }
 }
 

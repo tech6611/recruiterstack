@@ -35,7 +35,7 @@ export const automationGuardrailsSchema = z.object({
 })
 
 export const ruleFieldEnum = z.enum([
-  'days_in_stage', 'ai_score', 'fit_bucket', 'review_status', 'has_feedback', 'feedback_result', 'source', 'missing_must_have',
+  'days_in_stage', 'ai_score', 'fit_bucket', 'review_status', 'has_feedback', 'feedback_result', 'source', 'missing_must_have', 'enrolled', 'replied',
 ])
 export const ruleOperatorEnum = z.enum([
   'gt', 'gte', 'lt', 'lte', 'eq', 'neq', 'is', 'is_not', 'is_true', 'is_false',
