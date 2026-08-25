@@ -4108,11 +4108,18 @@ export default function JobPipelinePage() {
   }
 
   const handleDeleteStage = async (stageId: string) => {
-    if (!confirm('Delete this stage? Candidates in it will become unstaged.')) return
+    // Candidates in a deleted stage move to an adjacent stage (previous, or next
+    // if this is the first) — never left without a stage. Mirrors the backend.
+    const ordered = [...(job?.pipeline_stages ?? [])].sort((a, b) => a.order_index - b.order_index)
+    const idx = ordered.findIndex(s => s.id === stageId)
+    if (idx < 0) return
+    const target = idx > 0 ? ordered[idx - 1] : ordered[idx + 1]
+    if (!target) { alert('Can’t delete the only stage — add another stage first.'); return }
+    if (!confirm(`Delete this stage? Its candidates will move to “${target.name}”.`)) return
     setJob(prev => prev ? {
       ...prev,
       pipeline_stages: prev.pipeline_stages.filter(s => s.id !== stageId),
-      applications: prev.applications.map(a => a.stage_id === stageId ? { ...a, stage_id: null } : a),
+      applications: prev.applications.map(a => a.stage_id === stageId ? { ...a, stage_id: target.id } : a),
     } : prev)
     await callStagesApi({ action: 'delete', id: stageId })
   }

@@ -209,10 +209,20 @@ export async function deleteStage(
   const sb = supabase as unknown as LooseSb
   const { data: stage } = await sb
     .from('pipeline_stages')
-    .select('zone, name').eq('org_id', orgId).eq('job_id', jobId).eq('id', stageId).maybeSingle()
+    .select('zone, name, order_index').eq('org_id', orgId).eq('job_id', jobId).eq('id', stageId).maybeSingle()
   if (!stage) throw new Error('STAGE_NOT_FOUND')
   if (isLockedStage(stage.zone, stage.name)) throw new Error('STAGE_LOCKED')
-  await sb.from('applications').update({ stage_id: null }).eq('org_id', orgId).eq('job_id', jobId).eq('stage_id', stageId)
+  // Every application must always have a stage. Reassign candidates in this stage
+  // to an adjacent one — the previous stage by order_index, or the next if this is
+  // the first — instead of blanking them (which stranded them as "unstaged").
+  const { data: siblingRows } = await sb
+    .from('pipeline_stages')
+    .select('id, order_index').eq('org_id', orgId).eq('job_id', jobId).neq('id', stageId).order('order_index')
+  const siblings = (siblingRows ?? []) as { id: string; order_index: number }[]
+  if (siblings.length === 0) throw new Error('STAGE_ONLY')
+  const earlier = siblings.filter(s => s.order_index <= stage.order_index)
+  const target = earlier.length ? earlier[earlier.length - 1] : siblings[0]
+  await sb.from('applications').update({ stage_id: target.id }).eq('org_id', orgId).eq('job_id', jobId).eq('stage_id', stageId)
   const { error } = await sb.from('pipeline_stages').delete().eq('org_id', orgId).eq('job_id', jobId).eq('id', stageId)
   if (error) throw error
 }
