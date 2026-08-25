@@ -9,6 +9,16 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-25 (Zone stepper — green underline restyle)
+
+### Changed
+- **Pipeline board zone stepper (`ZoneSelector`) restyled** to match the candidate
+  page's tab treatment. Boxes are more compact (`px-3 py-2`); the selected zone now
+  shows a **3px green inset underline** (`#2f9e7b`, same as CenterPanel's
+  Summary/Activities tabs) instead of a gold ring + gold underline bar; the chevrons
+  between boxes are bolder and gold-highlighted (`h-5 w-5`, `strokeWidth 2.75`,
+  `#ebb137`) so the freed space carries the funnel flow. Focus ring is now green.
+
 ## 2026-08-25 (Application Review zone — Slice A3: bulk-triage review page)
 
 ### Added

@@ -9,6 +9,10 @@ import { ZONE_SEQUENCE } from '@/lib/pipeline/zones'
 // zone filters the board to that zone's interview-plan stages. The five zones and
 // their order come from ZONE_SEQUENCE (lead → application_review → active → offer →
 // completed), so this stays in lock-step with the pipeline plan.
+//
+// Selected state uses the candidate-page tab treatment — a 3px green inset underline
+// (#2f9e7b, matching CenterPanel's Summary/Activities tabs) rather than a gold ring.
+// Boxes are compact so the bold gold chevrons between them carry the funnel flow.
 const ZONE_META: Record<StageZone, { label: string; Icon: typeof Users }> = {
   lead:               { label: 'Lead',               Icon: Users },
   application_review: { label: 'Application Review',  Icon: ClipboardCheck },
@@ -36,8 +40,8 @@ export function ZoneSelector({
               type="button"
               onClick={() => onSelect(z)}
               aria-pressed={sel}
-              className={`flex min-w-0 flex-1 basis-0 flex-col gap-0.5 rounded-xl bg-[#221b14] px-3.5 py-3 text-left transition-transform hover:-translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ebb137] ${
-                sel ? 'ring-2 ring-[#ebb137]' : 'ring-2 ring-transparent'
+              className={`flex min-w-0 flex-1 basis-0 flex-col gap-0.5 rounded-xl bg-[#221b14] px-3 py-2 text-left transition-transform hover:-translate-y-px focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2f9e7b] ${
+                sel ? 'shadow-[inset_0_-3px_0_0_#2f9e7b]' : ''
               }`}
             >
               <div className="flex items-center gap-2">
@@ -49,11 +53,10 @@ export function ZoneSelector({
                 </span>
               </div>
               <span className="pl-8 text-[11.5px] text-[#c9bda9]">{n} candidate{n === 1 ? '' : 's'}</span>
-              <span className={`ml-8 mt-1.5 h-[3px] rounded ${sel ? 'bg-[#ebb137]' : 'bg-transparent'}`} />
             </button>
             {i < ZONE_SEQUENCE.length - 1 && (
-              <span className="hidden items-center px-1.5 text-slate-300 sm:flex">
-                <ChevronRight className="h-4 w-4" />
+              <span className="hidden items-center px-2.5 text-[#ebb137] sm:flex">
+                <ChevronRight className="h-5 w-5" strokeWidth={2.75} />
               </span>
             )}
           </Fragment>
