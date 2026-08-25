@@ -4758,6 +4758,23 @@ export default function JobPipelinePage() {
       {/* Zone selector — pick which funnel zone's stages the board shows. */}
       <ZoneSelector counts={zoneCounts} selected={selectedZone} onSelect={setSelectedZone} />
 
+      {/* Application Review: offer the dedicated bulk-triage page. */}
+      {selectedZone === 'application_review' && zoneCounts.application_review > 0 && (
+        <button
+          type="button"
+          onClick={() => router.push(`/jobs/${id}/review`)}
+          className="mb-3 flex w-full items-center justify-between rounded-xl border border-[#e6e0d6] bg-[#221b14] px-4 py-2.5 text-left text-white transition-transform hover:-translate-y-px"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <ClipboardList className="h-4 w-4 text-[#ebb137]" />
+            Bulk-review {zoneCounts.application_review} application{zoneCounts.application_review === 1 ? '' : 's'} — select, advance, or reject many at once
+          </span>
+          <span className="flex items-center gap-1 text-xs font-semibold text-[#ebb137]">
+            Open review <ExternalLink className="h-3.5 w-3.5" />
+          </span>
+        </button>
+      )}
+
       {/* ── Single horizontal scroll — Active + Rejected share same container ── */}
       <div className="flex flex-row flex-1 items-stretch min-h-0">
       <div className="flex flex-col flex-1 overflow-x-auto">

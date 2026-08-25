@@ -9,6 +9,21 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-25 (Application Review zone — Slice A3: bulk-triage review page)
+
+### Added
+- **Dedicated Application Review page** at `/jobs/[id]/review` — an Ashby-style
+  bulk-triage table listing every active applicant in the `application_review`
+  zone. Select many (or all), then **Advance** into the first Active interview
+  stage or **Reject** — a sticky action bar drives the batch; per-row Advance/Reject
+  too. Shows avatar, source, AI score, fit badge, and time waiting. Reads
+  authoritative zones from `/api/jobs/[id]/pipeline-plan` (not the Django
+  `/api/jobs/[id]` payload, which omits zone), so filtering and the advance target
+  are Django-independent. Bulk actions fan out `PATCH /api/applications/[id]`
+  (`{ stage_id }` / `{ status: 'rejected' }`) with optimistic updates.
+- **Entry point on the board:** when the Application Review zone is selected and
+  has candidates, a banner links to the bulk-review page.
+
 ## 2026-08-25 (Application Review zone — Slice A2: routing safety)
 
 ### Changed
