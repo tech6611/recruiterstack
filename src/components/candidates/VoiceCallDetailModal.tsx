@@ -1,13 +1,31 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Phone, Clock, Calendar, Loader2, MessageSquare, Sparkles, Mic } from 'lucide-react'
+import { X, Phone, Clock, Calendar, Loader2, MessageSquare, Sparkles, Mic, Target, ShieldAlert, AlertTriangle } from 'lucide-react'
 import { fmtDateTime } from '@/lib/ui/date-utils'
 import { ScoreRing } from '@/components/ui/ScoreRing'
 
 interface TranscriptTurn {
   role: 'assistant' | 'user' | string
   content: string
+}
+
+interface CompetencyScore {
+  id: string
+  name: string
+  weight: number
+  rating: number // 1–4
+  evidence: string
+}
+
+interface CompetencyScorecard {
+  competencies: CompetencyScore[]
+  mustHaves?: { label: string; met: boolean | null }[]
+  gateFailures?: { label: string }[]
+  verdict?: 'advance' | 'review' | 'reject'
+  fit_bucket?: string
+  redFlags?: string[]
+  summary?: string
 }
 
 interface VoiceCallDetail {
@@ -22,8 +40,31 @@ interface VoiceCallDetail {
   summary: string | null
   ai_score: number | null
   ai_recommendation: string | null
+  metadata: { competency_scorecard?: CompetencyScorecard } | null
   candidate: { name: string; email: string } | null
   hiring_request: { position_title: string; department: string | null } | null
+}
+
+const VERDICT_CONFIG: Record<string, { label: string; color: string; bg: string; ring: string }> = {
+  advance: { label: 'Advance', color: 'text-emerald-700', bg: 'bg-emerald-100', ring: 'ring-emerald-200' },
+  review:  { label: 'Review',  color: 'text-amber-700',   bg: 'bg-amber-100',   ring: 'ring-amber-200'   },
+  reject:  { label: 'Reject',  color: 'text-red-700',     bg: 'bg-red-100',     ring: 'ring-red-200'     },
+}
+
+/** 1–4 rating shown as four segments, filled + coloured to the rating. */
+function RatingBars({ rating }: { rating: number }) {
+  const r = Math.max(0, Math.min(4, Math.round(rating)))
+  const color = r >= 4 ? 'bg-emerald-500' : r === 3 ? 'bg-slate-400' : r === 2 ? 'bg-amber-400' : 'bg-red-400'
+  return (
+    <div className="flex items-center gap-1.5 shrink-0" title={`${r} / 4`}>
+      <div className="flex gap-0.5">
+        {[1, 2, 3, 4].map((n) => (
+          <span key={n} className={`h-3.5 w-1.5 rounded-full ${n <= r ? color : 'bg-slate-200'}`} />
+        ))}
+      </div>
+      <span className="text-xs font-bold text-slate-600 tabular-nums w-2.5 text-right">{r}</span>
+    </div>
+  )
 }
 
 const REC_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -77,6 +118,8 @@ export default function VoiceCallDetailModal({ callId, onClose }: Props) {
 
   const statusCfg = call ? (STATUS_CONFIG[call.status] ?? { label: call.status, color: 'text-slate-600', bg: 'bg-slate-100' }) : null
   const recCfg    = call?.ai_recommendation ? (REC_CONFIG[call.ai_recommendation] ?? null) : null
+  const scorecard  = call?.metadata?.competency_scorecard ?? null
+  const verdictCfg = scorecard?.verdict ? (VERDICT_CONFIG[scorecard.verdict] ?? null) : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -162,6 +205,66 @@ export default function VoiceCallDetailModal({ callId, onClose }: Props) {
                       </p>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Competency Scorecard */}
+              {scorecard && scorecard.competencies?.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-3.5 w-3.5 text-slate-500" />
+                      <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Competency Scorecard</p>
+                    </div>
+                    {verdictCfg && (
+                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ring-1 ${verdictCfg.bg} ${verdictCfg.color} ${verdictCfg.ring}`}>
+                        {verdictCfg.label}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                    {scorecard.competencies.map((c) => (
+                      <div key={c.id} className="px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-800">
+                            {c.name}
+                            {c.weight != null && <span className="ml-1.5 text-xs font-normal text-slate-400">{c.weight}%</span>}
+                          </p>
+                          <RatingBars rating={c.rating} />
+                        </div>
+                        {c.evidence && (
+                          <p className="mt-1 text-xs text-slate-500 leading-relaxed italic">“{c.evidence}”</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Missing must-haves (hard gate failures) */}
+                  {scorecard.gateFailures && scorecard.gateFailures.length > 0 && (
+                    <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <ShieldAlert className="h-3.5 w-3.5 text-red-600" />
+                        <p className="text-xs font-semibold text-red-700 uppercase tracking-wide">Missing Must-Haves</p>
+                      </div>
+                      {scorecard.gateFailures.map((g, i) => (
+                        <p key={i} className="text-xs text-red-600 leading-relaxed">{g.label}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Red flags */}
+                  {scorecard.redFlags && scorecard.redFlags.length > 0 && (
+                    <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3 space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                        <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Red Flags</p>
+                      </div>
+                      {scorecard.redFlags.map((f, i) => (
+                        <p key={i} className="text-xs text-amber-700 leading-relaxed">{f}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
