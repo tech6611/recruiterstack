@@ -12,8 +12,9 @@ describe('funnel steps', () => {
   it('has unique ids and every step sits in a valid zone', () => {
     const ids = FUNNEL_STEPS.map(s => s.id)
     expect(new Set(ids).size).toBe(ids.length)
-    const zones = new Set(['lead', 'active', 'offer', 'completed'])
+    const zones = new Set(['lead', 'application_review', 'active', 'offer', 'completed'])
     expect(FUNNEL_STEPS.every(s => zones.has(s.zone))).toBe(true)
+    expect(funnelStep('application_review')?.zone).toBe('application_review')
     expect(FUNNEL_STEP_IDS).toContain('recruiter_screen')
   })
 

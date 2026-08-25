@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'rea
 import {
   Loader2, Save, Flag, ChevronRight, ChevronDown, ArrowRight, ChevronUp,
   UserPlus, Users, FileSignature, CheckCircle2, Lock, Trash2, Plus, GripVertical,
+  ClipboardCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -14,16 +15,17 @@ import type { PipelineAutomation, PanelMember, RejectDestination, ZonedStage } f
 import { StageRules } from '@/components/req-jobs/StageRules'
 
 const ZONE_META: Record<StageZone, { title: string; blurb: string; icon: typeof Users; addable: boolean }> = {
-  lead:      { title: 'Lead',      blurb: 'Sourced people you’re reaching out to — before they apply.', icon: UserPlus,      addable: false },
-  active:    { title: 'Active',    blurb: 'Candidates moving through screening and interviews.',         icon: Users,         addable: true },
-  offer:     { title: 'Offer',     blurb: 'Terms, approvals, and closing.',                              icon: FileSignature, addable: true },
-  completed: { title: 'Completed', blurb: 'Final outcomes — hired or archived.',                          icon: CheckCircle2,  addable: false },
+  lead:               { title: 'Lead',               blurb: 'Sourced people you’re reaching out to — before they apply.', icon: UserPlus,      addable: false },
+  application_review: { title: 'Application Review', blurb: 'Triage inbound applicants before the interview process.',      icon: ClipboardCheck, addable: false },
+  active:             { title: 'Active',             blurb: 'Candidates moving through screening and interviews.',         icon: Users,         addable: true },
+  offer:              { title: 'Offer',              blurb: 'Terms, approvals, and closing.',                              icon: FileSignature, addable: true },
+  completed:          { title: 'Completed',          blurb: 'Final outcomes — hired or archived.',                          icon: CheckCircle2,  addable: false },
 }
 
 const STEP_GROUPS = ZONE_SEQUENCE.map(zone => ({ zone, steps: FUNNEL_STEPS.filter(s => s.zone === zone) })).filter(g => g.steps.length > 0)
 
 const LOCKED_NAMES = new Set(['Hired', 'Rejected', 'Archived'])
-const isLocked = (s: ZonedStage) => s.zone === 'lead' || LOCKED_NAMES.has(s.name.trim())
+const isLocked = (s: ZonedStage) => s.zone === 'lead' || s.zone === 'application_review' || LOCKED_NAMES.has(s.name.trim())
 
 type Edit = { entry_intent: string; advance_criteria: string; reject_to: RejectDestination; funnel_step: string | null }
 const editFrom = (s: ZonedStage): Edit => ({

@@ -833,11 +833,13 @@ export async function listJobStages(
   return (data ?? []) as Pick<PipelineStage, 'id' | 'name' | 'order_index'>[]
 }
 
-/** Entry stage for a NEW candidacy on a canonical job — the first ACTIVE-zone
- *  stage ('Applied'), NOT the pre-application lead zone (migrations 123/130). So
- *  applicants and sourced-into-pipeline candidates land in the active pipeline,
- *  never in "New lead". Falls back to the absolute first stage if the zone column
- *  isn't present yet (deploy-safe before migration 123 is applied). */
+/** First ACTIVE-zone interview stage of a job ("Screening" after migration 134
+ *  moved "Applied" into the application_review zone). This is the stage a SOURCED
+ *  LEAD converts INTO when promoted (promote_lead) — leads skip Application Review
+ *  and enter the interview pipeline directly, matching Ashby. For where a fresh
+ *  INBOUND applicant lands, use getFirstApplicationStage instead. Falls back to the
+ *  absolute first stage if the zone column isn't present yet (deploy-safe before
+ *  migration 123 is applied). */
 export async function getFirstJobStage(
   supabase: Supabase,
   orgId: string,
@@ -871,13 +873,55 @@ export async function getFirstJobStage(
   }
 }
 
+/** Entry stage for an INBOUND applicant — the first APPLICATION_REVIEW-zone stage
+ *  ("Applied", migration 134), where applications are triaged BEFORE entering the
+ *  interview process (the Ashby model). Falls back to the first ACTIVE stage, then
+ *  the absolute first stage, so a candidacy always has somewhere to land. This is
+ *  deploy-safe across migration 134: before it runs no stage is 'application_review'
+ *  so it falls to the first active stage — which is still "Applied" — so applicants
+ *  keep landing in "Applied" whether or not 134 has been applied. */
+export async function getFirstApplicationStage(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<Pick<PipelineStage, 'id' | 'name'> | null> {
+  try {
+    const { data, error } = await supabase
+      .from('pipeline_stages')
+      .select('id, name, order_index, zone')
+      .eq('job_id', jobId)
+      .eq('org_id', orgId)
+      .order('order_index')
+    if (error) throw error
+    const rows = (data ?? []) as Pick<PipelineStage, 'id' | 'name' | 'order_index' | 'zone'>[]
+    if (rows.length === 0) return null
+    const entry =
+      rows.find(r => r.zone === 'application_review') ??
+      rows.find(r => r.zone === 'active') ??
+      rows[0]
+    return { id: entry.id, name: entry.name }
+  } catch {
+    // Pre-migration-123 fallback: no `zone` column — use the absolute first stage.
+    const { data } = await supabase
+      .from('pipeline_stages')
+      .select('id, name')
+      .eq('job_id', jobId)
+      .eq('org_id', orgId)
+      .order('order_index')
+      .limit(1)
+      .maybeSingle()
+    return (data as Pick<PipelineStage, 'id' | 'name'>) ?? null
+  }
+}
+
 /** Entry stage for a SOURCED candidacy — the first LEAD-zone stage ('New lead',
  *  migrations 123/130). Sourced prospects are engaged in the lead funnel first and
  *  only convert into the active interview pipeline when they reply/apply (the
  *  Ashby model). Lead stages sort first (negative order_index), so the earliest
  *  lead stage is "New lead". Returns { stage, lifecycle }; if the job has no lead
- *  stages (older jobs, un-migrated DBs), falls back to the active entry stage with
- *  lifecycle 'active' so a sourced candidacy always has somewhere valid to land. */
+ *  stages (older jobs, un-migrated DBs), falls back to the application-review entry
+ *  stage ("Applied") with lifecycle 'active' so a sourced candidacy always has
+ *  somewhere valid to land. */
 export async function getFirstLeadStage(
   supabase: Supabase,
   orgId: string,
@@ -895,10 +939,10 @@ export async function getFirstLeadStage(
     const lead = rows.find(r => r.zone === 'lead')
     if (lead) return { stage: { id: lead.id, name: lead.name }, lifecycle: 'lead' }
   } catch {
-    // zone column absent (pre-migration-123) — fall through to the active entry.
+    // zone column absent (pre-migration-123) — fall through to the application entry.
   }
-  const active = await getFirstJobStage(supabase, orgId, jobId).catch(() => null)
-  return { stage: active, lifecycle: 'active' }
+  const entry = await getFirstApplicationStage(supabase, orgId, jobId).catch(() => null)
+  return { stage: entry, lifecycle: 'active' }
 }
 
 // Lookup a single pipeline stage by id within the org (move_application_to_stage

@@ -12,7 +12,7 @@ import { createApplication, recordApplicationEvent } from '@/modules/ats/domain/
 import {
   getCanonicalApplyJobByToken,
   getCanonicalApplyJobPreview,
-  getFirstJobStage,
+  getFirstApplicationStage,
 } from '@/modules/ats/domain/job-pipelines'
 import {
   getJobScreeningForm,
@@ -118,7 +118,9 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Get first pipeline stage ──────────────────────────────────────────────
-  const firstStage = await getFirstJobStage(supabase, job.org_id, job.id)
+  // Inbound applicants land in the Application Review zone ("Applied", migration
+  // 134) to be triaged before the interview process (the Ashby model).
+  const firstStage = await getFirstApplicationStage(supabase, job.org_id, job.id)
 
   // ── Create application ────────────────────────────────────────────────────
   let appId: string

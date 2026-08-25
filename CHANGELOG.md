@@ -9,6 +9,64 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-25 (Application Review zone — Slice A3: bulk-triage review page)
+
+### Added
+- **Dedicated Application Review page** at `/jobs/[id]/review` — an Ashby-style
+  bulk-triage table listing every active applicant in the `application_review`
+  zone. Select many (or all), then **Advance** into the first Active interview
+  stage or **Reject** — a sticky action bar drives the batch; per-row Advance/Reject
+  too. Shows avatar, source, AI score, fit badge, and time waiting. Reads
+  authoritative zones from `/api/jobs/[id]/pipeline-plan` (not the Django
+  `/api/jobs/[id]` payload, which omits zone), so filtering and the advance target
+  are Django-independent. Bulk actions fan out `PATCH /api/applications/[id]`
+  (`{ stage_id }` / `{ status: 'rejected' }`) with optimistic updates.
+- **Entry point on the board:** when the Application Review zone is selected and
+  has candidates, a banner links to the bulk-review page.
+
+## 2026-08-25 (Application Review zone — Slice A2: routing safety)
+
+### Changed
+- **Inbound applicants now land in the Application Review zone.** New
+  `getFirstApplicationStage()` returns the first `application_review`-zone stage
+  ("Applied"), falling back to the first active stage then the absolute first — so
+  it returns "Applied" whether or not migration 134 has run (behaviour-preserving
+  across the migration boundary). The public **apply** route and the **copilot**
+  bulk-add (non-sourced branch) now use it, and `getFirstLeadStage`'s no-lead-zone
+  fallback routes to it too.
+- **Sourced-lead promotion skips Application Review.** `getFirstJobStage()` still
+  returns the first ACTIVE-zone stage — which is now "Screening" (since "Applied"
+  moved to the review zone) — so the `promote_lead` automation converts leads
+  straight into the interview pipeline, matching Ashby. No logic change, just the
+  now-correct target; docs/comments updated.
+- The zone board (ZoneSelector, `?zone=` param, smart-default, Django zone
+  back-fill) reads `ZONE_SEQUENCE`/`stage.zone` dynamically and needs no change to
+  show the new zone once migration 134 is applied.
+
+## 2026-08-25 (Application Review zone — Slice A1: data foundation)
+
+### Schema
+- **Migration 134 (`134_application_review_zone.sql`)** adds Ashby's
+  **Application Review** zone between Lead and Active
+  (`lead → application_review → active → offer → completed`). Widens the
+  `pipeline_stages.zone` CHECK to allow `application_review`, re-zones existing
+  **"Applied"** stages from `active` to `application_review` (relabel only — no
+  candidate moves), and updates the `create_default_job_pipeline_stages()` trigger
+  so new jobs seed "Applied" in the review zone. Additive, idempotent, reversible.
+  `applications.lifecycle` unchanged (a review-zone candidacy is still `active`).
+
+### Changed
+- **Zone model now has five zones.** `src/lib/pipeline/zones.ts` — `StageZone` and
+  `ZONE_SEQUENCE` include `application_review` (rank 1); `defaultZoneForStageName`
+  maps "Applied" → `application_review`. `funnel-steps.ts` moves the
+  `application_review` funnel step into its own zone group. Types in `database.ts`
+  widened. Zone-keyed UI maps updated (ZoneSelector + PipelinePlanEditor render the
+  new zone with a ClipboardCheck icon; the review stage is locked, Ashby-style).
+
+> Slice A1 is the invisible data foundation. Routing safety (Django zone
+> back-fill, `promote_lead` targeting the first Active stage) is Slice A2; the
+> dedicated bulk-triage review page is Slice A3.
+
 ## 2026-08-24 (AI phone-screen in the automation engine)
 
 ### Added

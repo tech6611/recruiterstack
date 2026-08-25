@@ -330,7 +330,8 @@ async function executeRule(sb: Supabase, rule: PipelineAutomation, app: AppRow, 
       }
       case 'promote_lead': {
         // Convert a sourced lead into the active interview pipeline: move to the
-        // job's first active stage ("Applied") AND flip lifecycle to 'active'.
+        // job's first ACTIVE-zone stage ("Screening" after migration 134 — leads
+        // skip Application Review, matching Ashby) AND flip lifecycle to 'active'.
         if (app.lifecycle === 'active') return 'skip' // already in the pipeline
         if (!app.job_id) return 'skip'
         const active = await getFirstJobStage(sb, app.org_id, app.job_id).catch(() => null)

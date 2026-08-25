@@ -19,8 +19,9 @@ export const FUNNEL_STEPS: readonly FunnelStep[] = [
   { id: 'sourced',            label: 'Sourced',            zone: 'lead' },
   { id: 'outreach',           label: 'Outreach',           zone: 'lead' },
   { id: 'engaged',            label: 'Engaged',            zone: 'lead' },
+  // Application review zone (migration 134) — triage of inbound applicants.
+  { id: 'application_review', label: 'Application Review',  zone: 'application_review' },
   // Active zone
-  { id: 'application_review', label: 'Application Review',  zone: 'active' },
   { id: 'recruiter_screen',   label: 'Recruiter Screen',   zone: 'active' },
   { id: 'assessment',         label: 'Assessment',         zone: 'active' },
   { id: 'technical',          label: 'Technical Interview', zone: 'active' },
