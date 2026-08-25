@@ -847,11 +847,12 @@ export interface PipelineStage {
   name: string
   order_index: number
   color: StageColor
-  // Funnel zone + promotion gate (migration 123). `zone` defaults to 'active';
-  // seeded lead stages are 'lead'. `is_promotion_gate` marks the lead→active
-  // crossing point. Kept as a widening string for forward-compat with reads that
-  // predate the column.
-  zone: 'lead' | 'active' | 'offer' | 'completed'
+  // Funnel zone + promotion gate (migration 123; 'application_review' added in
+  // migration 134). `zone` defaults to 'active'; seeded lead stages are 'lead' and
+  // the "Applied" stage is 'application_review'. `is_promotion_gate` marks the
+  // lead→active crossing point. Kept as a widening string for forward-compat with
+  // reads that predate the column.
+  zone: 'lead' | 'application_review' | 'active' | 'offer' | 'completed'
   is_promotion_gate: boolean
   // Canonical funnel step this stage maps to (migration 131) — Ashby's "Stage
   // Group". Null until set. Values from src/lib/pipeline/funnel-steps.ts.
@@ -1513,8 +1514,8 @@ export interface PipelineStageInsert extends Omit<PipelineStage, 'id' | 'created
   created_at?: string
   hiring_request_id?: string | null
   job_id?: string | null
-  // DB-defaulted / nullable (migrations 123 + 131); optional on insert.
-  zone?: 'lead' | 'active' | 'offer' | 'completed'
+  // DB-defaulted / nullable (migrations 123 + 131 + 134); optional on insert.
+  zone?: 'lead' | 'application_review' | 'active' | 'offer' | 'completed'
   is_promotion_gate?: boolean
   funnel_step?: string | null
 }

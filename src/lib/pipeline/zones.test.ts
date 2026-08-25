@@ -8,16 +8,19 @@ import {
 } from './zones'
 
 describe('pipeline zones', () => {
-  it('orders zones lead → active → offer → completed', () => {
-    expect(ZONE_SEQUENCE).toEqual(['lead', 'active', 'offer', 'completed'])
+  it('orders zones lead → application_review → active → offer → completed', () => {
+    expect(ZONE_SEQUENCE).toEqual(['lead', 'application_review', 'active', 'offer', 'completed'])
     expect(zoneRank('lead')).toBe(0)
-    expect(zoneRank('completed')).toBe(3)
+    expect(zoneRank('application_review')).toBe(1)
+    expect(zoneRank('completed')).toBe(4)
   })
 
   it('allows forward and same-zone moves, blocks backward ones', () => {
-    expect(isForwardZoneMove('lead', 'active')).toBe(true)
+    expect(isForwardZoneMove('lead', 'application_review')).toBe(true)
+    expect(isForwardZoneMove('application_review', 'active')).toBe(true)
     expect(isForwardZoneMove('active', 'active')).toBe(true)
     expect(isForwardZoneMove('offer', 'completed')).toBe(true)
+    expect(isForwardZoneMove('active', 'application_review')).toBe(false)
     expect(isForwardZoneMove('active', 'lead')).toBe(false)
     expect(isForwardZoneMove('completed', 'offer')).toBe(false)
   })
@@ -27,7 +30,7 @@ describe('pipeline zones', () => {
       expect(defaultZoneForStageName('New lead')).toBe('lead')
       expect(defaultZoneForStageName('reached out')).toBe('lead')
       expect(defaultZoneForStageName('Replied')).toBe('lead')
-      expect(defaultZoneForStageName('Applied')).toBe('active')
+      expect(defaultZoneForStageName('Applied')).toBe('application_review')
       expect(defaultZoneForStageName('Phone Screen')).toBe('active')
       expect(defaultZoneForStageName('Offer')).toBe('offer')
       expect(defaultZoneForStageName('Hired')).toBe('completed')

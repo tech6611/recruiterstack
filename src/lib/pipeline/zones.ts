@@ -1,17 +1,19 @@
 // Pipeline zones — the Ashby-style shape of a job's funnel.
 //
-// A job's stages are grouped into ordered zones: a pre-application LEAD zone, the
-// ACTIVE interview pipeline, an OFFER zone, and terminal COMPLETED outcomes. This
-// module is the single, pure source of truth for that shape — no DB, no I/O — so
-// the migration/backfill, the facade, the guardrails, and the UI all agree on
-// zone ordering and on what the seeded lead stages look like.
+// A job's stages are grouped into ordered zones: a pre-application LEAD zone, an
+// APPLICATION_REVIEW triage zone (Ashby's "Application Review" — where inbound
+// applicants are screened before entering the interview process), the ACTIVE
+// interview pipeline, an OFFER zone, and terminal COMPLETED outcomes. This module
+// is the single, pure source of truth for that shape — no DB, no I/O — so the
+// migration/backfill, the facade, the guardrails, and the UI all agree on zone
+// ordering and on what the seeded lead stages look like.
 
 import type { StageColor } from '@/lib/types/database'
 
-export type StageZone = 'lead' | 'active' | 'offer' | 'completed'
+export type StageZone = 'lead' | 'application_review' | 'active' | 'offer' | 'completed'
 
 /** Zones in funnel order — earlier = earlier in the candidate journey. */
-export const ZONE_SEQUENCE: readonly StageZone[] = ['lead', 'active', 'offer', 'completed'] as const
+export const ZONE_SEQUENCE: readonly StageZone[] = ['lead', 'application_review', 'active', 'offer', 'completed'] as const
 
 /** Position of a zone in the funnel (0 = earliest). */
 export function zoneRank(zone: StageZone): number {
@@ -31,6 +33,7 @@ export function isForwardZoneMove(from: StageZone, to: StageZone): boolean {
 export function defaultZoneForStageName(name: string): StageZone {
   const n = name.trim().toLowerCase()
   if (n === 'new lead' || n === 'reached out' || n === 'replied') return 'lead'
+  if (n === 'applied') return 'application_review'
   if (n === 'offer') return 'offer'
   if (n === 'hired' || n === 'rejected' || n === 'archived') return 'completed'
   return 'active'

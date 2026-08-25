@@ -3968,7 +3968,7 @@ export default function JobPipelinePage() {
     return m
   }, [job])
   const zoneCounts = useMemo(() => {
-    const c: Record<StageZone, number> = { lead: 0, active: 0, offer: 0, completed: 0 }
+    const c: Record<StageZone, number> = { lead: 0, application_review: 0, active: 0, offer: 0, completed: 0 }
     for (const a of activeApps) {
       const z = a.stage_id ? stageZoneById.get(a.stage_id) : undefined
       if (z) c[z] += 1

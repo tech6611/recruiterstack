@@ -1,19 +1,20 @@
 'use client'
 
 import { Fragment } from 'react'
-import { Users, MessagesSquare, FileText, UserCheck, ChevronRight } from 'lucide-react'
+import { Users, ClipboardCheck, MessagesSquare, FileText, UserCheck, ChevronRight } from 'lucide-react'
 import type { StageZone } from '@/lib/pipeline/zones'
 import { ZONE_SEQUENCE } from '@/lib/pipeline/zones'
 
 // Ashby-style zone stepper used as a SELECTOR on the candidate board. Clicking a
-// zone filters the board to that zone's interview-plan stages. The four zones and
-// their order come from ZONE_SEQUENCE (lead → active → offer → completed), so this
-// stays in lock-step with the pipeline plan.
+// zone filters the board to that zone's interview-plan stages. The five zones and
+// their order come from ZONE_SEQUENCE (lead → application_review → active → offer →
+// completed), so this stays in lock-step with the pipeline plan.
 const ZONE_META: Record<StageZone, { label: string; Icon: typeof Users }> = {
-  lead:      { label: 'Lead',   Icon: Users },
-  active:    { label: 'Active', Icon: MessagesSquare },
-  offer:     { label: 'Offer',  Icon: FileText },
-  completed: { label: 'Hired',  Icon: UserCheck },
+  lead:               { label: 'Lead',               Icon: Users },
+  application_review: { label: 'Application Review',  Icon: ClipboardCheck },
+  active:             { label: 'Active',             Icon: MessagesSquare },
+  offer:              { label: 'Offer',              Icon: FileText },
+  completed:          { label: 'Hired',              Icon: UserCheck },
 }
 
 export function ZoneSelector({
