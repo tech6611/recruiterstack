@@ -9,6 +9,25 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-25 (Application Review zone — Slice A2: routing safety)
+
+### Changed
+- **Inbound applicants now land in the Application Review zone.** New
+  `getFirstApplicationStage()` returns the first `application_review`-zone stage
+  ("Applied"), falling back to the first active stage then the absolute first — so
+  it returns "Applied" whether or not migration 134 has run (behaviour-preserving
+  across the migration boundary). The public **apply** route and the **copilot**
+  bulk-add (non-sourced branch) now use it, and `getFirstLeadStage`'s no-lead-zone
+  fallback routes to it too.
+- **Sourced-lead promotion skips Application Review.** `getFirstJobStage()` still
+  returns the first ACTIVE-zone stage — which is now "Screening" (since "Applied"
+  moved to the review zone) — so the `promote_lead` automation converts leads
+  straight into the interview pipeline, matching Ashby. No logic change, just the
+  now-correct target; docs/comments updated.
+- The zone board (ZoneSelector, `?zone=` param, smart-default, Django zone
+  back-fill) reads `ZONE_SEQUENCE`/`stage.zone` dynamically and needs no change to
+  show the new zone once migration 134 is applied.
+
 ## 2026-08-25 (Application Review zone — Slice A1: data foundation)
 
 ### Schema

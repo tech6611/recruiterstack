@@ -18,7 +18,7 @@ import {
   getCanonicalJobBoardDetail,
   getCanonicalJobById,
   getCanonicalJobScoringContext,
-  getFirstJobStage,
+  getFirstApplicationStage,
   getFirstLeadStage,
   getPipelineStageById,
   listCanonicalJobBoardSummaries,
@@ -2009,7 +2009,8 @@ async function bulkAddToPipeline(
   }
 
   // Entry stage depends on how they arrive: sourced prospects land in the lead
-  // funnel ("New lead", lifecycle 'lead'); everyone else in the active pipeline.
+  // funnel ("New lead", lifecycle 'lead'); everyone else enters as an applicant in
+  // the Application Review zone ("Applied", lifecycle 'active').
   let firstStage: { id: string; name: string } | null
   let lifecycle: 'lead' | 'active'
   try {
@@ -2017,7 +2018,7 @@ async function bulkAddToPipeline(
       const r = await getFirstLeadStage(supabase, orgId, job_id)
       firstStage = r.stage; lifecycle = r.lifecycle
     } else {
-      firstStage = await getFirstJobStage(supabase, orgId, job_id)
+      firstStage = await getFirstApplicationStage(supabase, orgId, job_id)
       lifecycle = 'active'
     }
   } catch (err) {
