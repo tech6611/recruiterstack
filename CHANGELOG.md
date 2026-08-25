@@ -9,6 +9,25 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-25 (Invariant: every application always has a stage)
+
+### Fixed
+- **Candidates can no longer become "unstaged."** Deleting a stage now **moves its
+  candidates to an adjacent stage** (the previous one, or the next if it was the
+  first) instead of blanking `stage_id` — which had stranded them in a phantom
+  "Unstaged" column shown on every zone. Fixed in the Next.js `deleteStage` facade
+  and the board's optimistic delete + confirmation copy; deleting the only stage is
+  blocked. The main board delete + apply + stage-move live in the Django backend
+  (`recruiterstack-api`) and are fixed there in a paired PR.
+
+### Schema
+- **Migration 135 (`135_backfill_application_stage.sql`)** — one-time repair: assigns
+  a real stage to every application with a NULL or orphaned `stage_id` (job's first
+  Application Review / Active stage). Idempotent; safe to run anytime.
+- **Migration 136 (`136_lock_application_stage.sql`)** — the DB-level lock: `stage_id`
+  becomes `NOT NULL` and its FK switches to `ON DELETE RESTRICT`. **Apply LAST**,
+  only after the Django + Next.js code that stops blanking stages is deployed.
+
 ## 2026-08-25 (Zone stepper — green underline restyle)
 
 ### Changed

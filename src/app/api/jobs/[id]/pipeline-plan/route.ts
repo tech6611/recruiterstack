@@ -120,6 +120,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed'
     if (msg === 'STAGE_LOCKED') return NextResponse.json({ error: 'This stage is fixed and can’t be renamed or removed.' }, { status: 400 })
+    if (msg === 'STAGE_ONLY') return NextResponse.json({ error: 'Can’t delete the only stage — add another stage first.' }, { status: 400 })
     if (msg === 'STAGE_NOT_FOUND') return NextResponse.json({ error: 'Stage not found.' }, { status: 404 })
     return NextResponse.json({ error: msg }, { status: 500 })
   }
