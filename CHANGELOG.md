@@ -9,6 +9,15 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-26 (Board — manual condition builder)
+
+### Added
+- **Manual "+ Add condition" builder** in the board's Filters panel (Ashby's "Add
+  Field to Match"), on the same `board-filters` engine as the AI assistant. Pick a
+  field → operator → value; it appends to the shared condition list (chips). AI and
+  manual conditions live together; a match **all of / any of** toggle appears when
+  there are ≥2 conditions; "Clear all conditions" resets them.
+
 ## 2026-08-26 (Board — AI filter assistant)
 
 ### Added
