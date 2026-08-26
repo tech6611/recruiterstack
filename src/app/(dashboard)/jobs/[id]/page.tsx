@@ -2189,7 +2189,7 @@ function RankedView({
   let scoredRank = 0
 
   return (
-    <div className="px-8 py-6 flex-1">
+    <div className="px-[43px] py-6 flex-1">
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         <table className="w-full">
           <thead>
@@ -4360,7 +4360,7 @@ export default function JobPipelinePage() {
   return (
     <div className="flex flex-col min-h-full">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-8 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-slate-50 to-white sticky top-0 z-30">
+      <div className="flex items-center justify-between px-[43px] py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-slate-50 to-white sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push('/jobs')}
@@ -4402,29 +4402,6 @@ export default function JobPipelinePage() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* View toggle */}
-          <div className="flex items-center rounded-xl border border-slate-200 p-0.5 bg-slate-50">
-            <button
-              onClick={() => switchView('kanban')}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                viewMode === 'kanban' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <Kanban className="h-3.5 w-3.5" />
-              Kanban
-            </button>
-            <button
-              onClick={() => switchView('ranked')}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                viewMode === 'ranked' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <LayoutList className="h-3.5 w-3.5" />
-              Ranked
-            </button>
-          </div>
-
-          <div className="h-5 w-px bg-slate-200 hidden xl:block" />
 
           {/* Autopilot — inline on xl+ */}
           <button
@@ -4547,7 +4524,7 @@ export default function JobPipelinePage() {
 
       {/* Score progress / result banner */}
       {(scoring || scoreResult || scoreError) && (
-        <div className={`px-8 py-3 border-b flex items-center gap-3 text-sm ${
+        <div className={`px-[43px] py-3 border-b flex items-center gap-3 text-sm ${
           scoreError                                          ? 'bg-red-50 border-red-200 text-red-700'         :
           scoreResult && scoreResult.errors > 0 && scoreResult.scored === 0 ? 'bg-red-50 border-red-200 text-red-700' :
           scoreResult && scoreResult.errors > 0              ? 'bg-amber-50 border-amber-200 text-amber-800'   :
@@ -4603,8 +4580,16 @@ export default function JobPipelinePage() {
         </div>
       )}
 
+      {/* Zone stepper — sits in the job view above the filters (Ashby: stepper →
+          filters → columns). Kanban-only; the Ranked view is a flat list. */}
+      {viewMode === 'kanban' && (
+        <div className="px-[43px] pt-3">
+          <ZoneSelector counts={zoneCounts} selected={selectedZone} onSelect={setSelectedZone} />
+        </div>
+      )}
+
       {/* Filter / sort bar */}
-      <div className="flex items-center gap-2 px-8 py-2.5 border-b border-slate-100 bg-slate-50/70 flex-wrap">
+      <div className="flex items-center gap-2 px-[43px] py-2.5 border-b border-slate-100 bg-slate-50/70 flex-wrap">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
@@ -4888,6 +4873,26 @@ export default function JobPipelinePage() {
             Clear filters
           </button>
         )}
+
+        {/* View toggle — lives in the job view now (Ashby), not the page top bar. */}
+        <div className="ml-auto flex items-center rounded-xl border border-slate-200 p-0.5 bg-slate-50">
+          <button
+            onClick={() => switchView('kanban')}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              viewMode === 'kanban' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Kanban className="h-3.5 w-3.5" /> Kanban
+          </button>
+          <button
+            onClick={() => switchView('ranked')}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              viewMode === 'ranked' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <LayoutList className="h-3.5 w-3.5" /> Ranked
+          </button>
+        </div>
       </div>
 
       {/* Ranked view */}
@@ -4924,10 +4929,7 @@ export default function JobPipelinePage() {
 
       {/* Kanban */}
       {viewMode === 'kanban' && (
-      <div className="flex flex-col flex-1 min-w-0 px-8 pt-3">
-
-      {/* Zone selector — pick which funnel zone's stages the board shows. */}
-      <ZoneSelector counts={zoneCounts} selected={selectedZone} onSelect={setSelectedZone} />
+      <div className="flex flex-col flex-1 min-w-0 px-[43px]">
 
       {/* Application Review: offer the dedicated bulk-triage page. */}
       {selectedZone === 'application_review' && zoneCounts.application_review > 0 && (
@@ -4961,10 +4963,9 @@ export default function JobPipelinePage() {
             (job.pipeline_stages ?? [])
               .filter(s => (archivedByStage[s.id]?.length ?? 0) > 0)
               .map(stage => {
-                const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
                 const arApps = archivedByStage[stage.id] ?? []
                 return (
-                  <div key={stage.id} className={`flex-1 min-w-[200px] px-3 pt-[18px] pb-5 ${stColStyle.barTop}`}>
+                  <div key={stage.id} className="flex-1 min-w-[200px] px-3 pt-[18px] pb-5">
                     <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 bg-[#221b14] border-2 border-[#2c2419]`}>
                       <span className="truncate text-sm font-semibold text-[#f4ede2]">{stage.name}</span>
                       <span className="text-[11px] font-bold text-[#c9bda9] tabular-nums">{arApps.length}</span>
@@ -4991,11 +4992,10 @@ export default function JobPipelinePage() {
         {selectedZone !== 'archived' && zoneStages.map((stage) => {
           // Global index so "next stage" / "is last" still cross zone boundaries.
           const stageIndex = job.pipeline_stages.findIndex(s => s.id === stage.id)
-          const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
           return (
           <div
             key={stage.id}
-            className={`flex-1 min-w-[200px] px-3 pt-[18px] pb-5 transition-colors ${stColStyle.barTop} ${
+            className={`flex-1 min-w-[200px] px-3 pt-[18px] pb-5 transition-colors ${
               editMode ? 'cursor-grab active:cursor-grabbing' : ''
             }`}
             draggable={editMode}

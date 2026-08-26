@@ -9,6 +9,18 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-26 (Board — layout polish 2)
+
+### Changed
+- **Page gap widened to 43px** — the top bar, filter bar, zone stepper, columns,
+  and ranked view all inset at `px-[43px]` (was `px-8`), kept aligned.
+- **Dropped the grey rule** (`border-t-4 barTop`) that ran across the top of the
+  columns under the stepper.
+- **Filters + view toggle moved into the job view (Ashby-style).** The Kanban/Ranked
+  toggle left the page top bar and now sits on the right of the filter row. In
+  Kanban the order is zone stepper → search/filters → columns; in Ranked it's
+  filters → the ranked list. (Stepper stays Kanban-only; Ranked is a flat list.)
+
 ## 2026-08-26 (Board — layout polish)
 
 ### Changed
