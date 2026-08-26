@@ -8,7 +8,7 @@ import {
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
   Settings2, LayoutList, Kanban, SlidersHorizontal,
-  ArrowUp, ArrowDown, ArrowDownUp, GripVertical, FileUp, Ban,
+  ArrowUp, ArrowDown, ArrowDownUp, GripVertical, FileUp, Ban, Sparkles,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
@@ -23,6 +23,7 @@ import { avatarColor, initials } from '@/lib/ui/avatar'
 import { RECOMMENDATION_CONFIG, RATING_CONFIG } from '@/lib/ui/scorecard-config'
 import { ZoneSelector, type BoardZone } from '@/components/pipeline/ZoneSelector'
 import { ZONE_SEQUENCE, type StageZone } from '@/lib/pipeline/zones'
+import { applyBoardConditions, describeBoardCondition, type BoardFilterCondition } from '@/lib/pipeline/board-filters'
 
 // ── Scorecard config (shared) ─────────────────────────────────────────────────
 
@@ -3781,11 +3782,17 @@ export default function JobPipelinePage() {
   const [filterAction,  setFilterAction]  = useState('all')   // 'all' | 'score_needed' | 'advance' | 'reject'
   const [filterPanelOpen, setFilterPanelOpen] = useState(false)
   const filterPanelRef = useRef<HTMLDivElement>(null)
-  // Count of non-default filter dropdowns (not counting search)
+  // AI filter assistant — plain-English → structured board-filter conditions.
+  const [aiQuery, setAiQuery] = useState('')
+  const [aiConditions, setAiConditions] = useState<BoardFilterCondition[]>([])
+  const [aiMatch, setAiMatch] = useState<'all' | 'any'>('all')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  // Count of non-default filter dropdowns + AI conditions (not counting search)
   const activeFilterCount = [
     filterSource !== 'all', filterStage !== 'all', filterScore !== 'all',
     filterSignal !== 'all', filterAction !== 'all',
-  ].filter(Boolean).length
+  ].filter(Boolean).length + aiConditions.length
   const [openStageMenu, setOpenStageMenu] = useState<string | null>(null)
   const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set())
 
@@ -3984,8 +3991,42 @@ export default function JobPipelinePage() {
         return true
       })
     }
+    // AI Assistant / condition-builder filters (board-filters engine).
+    if (aiConditions.length > 0) {
+      filtered = applyBoardConditions(filtered, aiConditions, aiMatch, { daysInStage })
+    }
     return filtered
-  }, [filterSearch, filterSource, filterStage, filterScore, filterSignal, filterAction, job])
+  }, [filterSearch, filterSource, filterStage, filterScore, filterSignal, filterAction, aiConditions, aiMatch, job])
+
+  // AI filter assistant: send the plain-English query to Gemini, apply the
+  // structured conditions it returns (validated server-side against this job).
+  const runAiFilter = useCallback(async () => {
+    const q = aiQuery.trim()
+    if (!q) return
+    setAiLoading(true); setAiError(null)
+    try {
+      const res = await fetch(`/api/jobs/${id}/filter-assist`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setAiError(json?.error ?? 'Could not build a filter.'); return }
+      const conds = (json?.data?.conditions ?? []) as BoardFilterCondition[]
+      if (conds.length === 0) { setAiError('No matching filter — try rephrasing.'); return }
+      setAiConditions(conds)
+      setAiMatch(json?.data?.match === 'any' ? 'any' : 'all')
+    } catch {
+      setAiError('Something went wrong. Try again.')
+    } finally {
+      setAiLoading(false)
+    }
+  }, [aiQuery, id])
+  const removeAiCondition = (i: number) => setAiConditions(cs => cs.filter((_, idx) => idx !== i))
+  const stageNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const s of job?.pipeline_stages ?? []) m.set(s.id, s.name)
+    return m
+  }, [job])
 
   // Filtered flat list for Ranked view (sort happens inside RankedView via column headers)
   const filteredApps = useMemo(() => applyFilters(activeApps), [activeApps, applyFilters])
@@ -4572,7 +4613,55 @@ export default function JobPipelinePage() {
           </button>
 
           {filterPanelOpen && (
-            <div className="absolute left-0 top-full mt-1 z-50 w-72 bg-white border border-slate-200 rounded-xl shadow-xl p-4 space-y-3">
+            <div className="absolute left-0 top-full mt-1 z-50 w-80 bg-white border border-slate-200 rounded-xl shadow-xl p-4 space-y-3">
+              {/* AI Assistant — plain-English filter (Phase 2) */}
+              <div className="space-y-1.5 pb-3 border-b border-slate-100">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  <Sparkles className="h-3.5 w-3.5 text-[#1f7a5a]" /> AI Assistant
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    value={aiQuery}
+                    onChange={e => { setAiQuery(e.target.value); setAiError(null) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void runAiFilter() } }}
+                    placeholder="e.g. sourced engineers scoring 75+"
+                    className="flex-1 min-w-0 text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void runAiFilter()}
+                    disabled={aiLoading || !aiQuery.trim()}
+                    className="flex shrink-0 items-center justify-center rounded-lg bg-[#1f7a5a] px-2.5 py-1.5 text-white hover:brightness-110 disabled:opacity-40"
+                    title="Build filter from your description"
+                  >
+                    {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  </button>
+                </div>
+                {aiError && <p className="text-[11px] text-red-500">{aiError}</p>}
+                {aiConditions.length > 0 && (
+                  <div className="space-y-1.5 pt-0.5">
+                    <p className="text-[10.5px] text-slate-400">Matching {aiMatch === 'all' ? 'all of' : 'any of'}:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {aiConditions.map((c, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                          {describeBoardCondition(c, (f, v) => f === 'stage' ? (stageNameById.get(String(v)) ?? String(v)) : String(v))}
+                          <button type="button" onClick={() => removeAiCondition(i)} className="text-emerald-500 hover:text-emerald-800" title="Remove">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setAiConditions([]); setAiQuery(''); setAiError(null) }}
+                      className="text-[11px] text-slate-400 hover:text-slate-600"
+                    >
+                      Clear AI filter
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Source */}
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">Source</label>
@@ -4656,6 +4745,7 @@ export default function JobPipelinePage() {
                   onClick={() => {
                     setFilterSource('all'); setFilterStage('all'); setFilterScore('all')
                     setFilterSignal('all'); setFilterAction('all')
+                    setAiConditions([]); setAiQuery(''); setAiError(null)
                     setFilterPanelOpen(false)
                   }}
                   className="w-full text-xs text-slate-600 hover:text-slate-800 font-medium py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
