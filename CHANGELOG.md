@@ -9,6 +9,18 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-26 (Board — layout polish)
+
+### Changed
+- **Board inset from the page edge** — the zone stepper + columns now sit at `px-8`,
+  aligned with the top/filter bars (was flush-left).
+- **Stage columns fill the full width** — removed the 320px column cap so a few
+  stages no longer leave half the board empty.
+- **Removed the redundant job-title row** above the columns (the title is already
+  in the top bar).
+- **Stage header boxes restyled to solid dark** (`#221b14` + cream text + gold dot),
+  matching the zone stepper. Applies to active + archived columns.
+
 ## 2026-08-26 (Board — manual condition builder)
 
 ### Added

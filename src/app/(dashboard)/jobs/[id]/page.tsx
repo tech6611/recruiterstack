@@ -427,7 +427,7 @@ function StageColumn({
       onDrop={() => { setOver(false); onDrop(stage.id) }}
     >
       {/* Column header */}
-      <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${style.header} border-2 ${style.border}`}>
+      <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 bg-[#221b14] border-2 border-[#2c2419]`}>
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {showDragHandle && (
             <GripVertical className="h-4 w-4 text-slate-300 shrink-0 cursor-grab" />
@@ -451,7 +451,7 @@ function StageColumn({
           )}
           <button
             onClick={() => editMode && setShowColors(!showColors)}
-            className={`h-2.5 w-2.5 rounded-full shrink-0 ${style.dot} ${editMode ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-slate-400' : ''}`}
+            className={`h-2.5 w-2.5 rounded-full shrink-0 bg-[#ebb137] ${editMode ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-slate-400' : ''}`}
           />
           {editing ? (
             <input
@@ -463,7 +463,7 @@ function StageColumn({
               className="text-sm font-semibold text-slate-700 bg-transparent border-b border-slate-400 outline-none w-full"
             />
           ) : (
-            <span className={`${editMode ? 'text-xs text-slate-600' : 'text-sm font-semibold text-slate-700'} flex-1 min-w-0 truncate`}>
+            <span className={`${editMode ? 'text-xs text-slate-600' : 'text-sm font-semibold text-[#f4ede2]'} flex-1 min-w-0 truncate`}>
               {stage.name}
             </span>
           )}
@@ -472,7 +472,7 @@ function StageColumn({
         <div className="flex items-center gap-1 shrink-0">
           {/* Count — compact, hidden in edit mode */}
           {!editMode && (
-            <span className="text-[11px] font-bold text-slate-400 tabular-nums shrink-0 leading-none">
+            <span className="text-[11px] font-bold text-[#c9bda9] tabular-nums shrink-0 leading-none">
               {apps.length}
             </span>
           )}
@@ -503,7 +503,7 @@ function StageColumn({
                 className={`p-1 rounded-lg transition-colors ${
                   isMenuOpen
                     ? 'bg-slate-200 text-slate-700'
-                    : 'text-slate-400 hover:text-slate-700 hover:bg-white/70'
+                    : 'text-[#c9bda9] hover:text-white hover:bg-white/10'
                 }`}
                 title="Stage actions"
               >
@@ -4924,7 +4924,7 @@ export default function JobPipelinePage() {
 
       {/* Kanban */}
       {viewMode === 'kanban' && (
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 px-8 pt-3">
 
       {/* Zone selector — pick which funnel zone's stages the board shows. */}
       <ZoneSelector counts={zoneCounts} selected={selectedZone} onSelect={setSelectedZone} />
@@ -4946,16 +4946,6 @@ export default function JobPipelinePage() {
         </button>
       )}
 
-      {/* Job / interview-plan header row (Ashby-style), directly above the columns. */}
-      <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-100 px-1 pb-2">
-        <div className="min-w-0">
-          <h2 className="truncate text-[15px] font-bold tracking-tight text-slate-900">{job.position_title}</h2>
-          <p className="truncate text-[11.5px] text-slate-500">
-            {[job.department, job.location, 'Default Interview Plan'].filter(Boolean).join(' · ')}
-          </p>
-        </div>
-      </div>
-
       {/* ── Candidate columns (Ashby-style: zone stepper → stage columns) ── */}
       <div className="flex flex-col flex-1 overflow-x-auto">
 
@@ -4974,10 +4964,10 @@ export default function JobPipelinePage() {
                 const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
                 const arApps = archivedByStage[stage.id] ?? []
                 return (
-                  <div key={stage.id} className={`flex-1 min-w-[180px] max-w-[320px] px-3 pt-[18px] pb-5 ${stColStyle.barTop}`}>
-                    <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${stColStyle.header} border-2 ${stColStyle.border}`}>
-                      <span className="truncate text-sm font-semibold text-slate-700">{stage.name}</span>
-                      <span className="text-[11px] font-bold text-slate-400 tabular-nums">{arApps.length}</span>
+                  <div key={stage.id} className={`flex-1 min-w-[200px] px-3 pt-[18px] pb-5 ${stColStyle.barTop}`}>
+                    <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 bg-[#221b14] border-2 border-[#2c2419]`}>
+                      <span className="truncate text-sm font-semibold text-[#f4ede2]">{stage.name}</span>
+                      <span className="text-[11px] font-bold text-[#c9bda9] tabular-nums">{arApps.length}</span>
                     </div>
                     <div className="flex flex-col gap-2 pt-2">
                       {arApps.map(app => (
@@ -5005,7 +4995,7 @@ export default function JobPipelinePage() {
           return (
           <div
             key={stage.id}
-            className={`flex-1 min-w-[180px] max-w-[320px] px-3 pt-[18px] pb-5 transition-colors ${stColStyle.barTop} ${
+            className={`flex-1 min-w-[200px] px-3 pt-[18px] pb-5 transition-colors ${stColStyle.barTop} ${
               editMode ? 'cursor-grab active:cursor-grabbing' : ''
             }`}
             draggable={editMode}
