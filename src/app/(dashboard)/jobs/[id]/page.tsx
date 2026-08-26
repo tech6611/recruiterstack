@@ -8,7 +8,7 @@ import {
   UserPlus, Search, ChevronDown, MoreHorizontal,
   Loader2, AlertCircle, ExternalLink, ClipboardList, Star, Trash2,
   Settings2, LayoutList, Kanban, SlidersHorizontal,
-  ArrowUp, ArrowDown, ArrowDownUp, GripVertical, FileUp,
+  ArrowUp, ArrowDown, ArrowDownUp, GripVertical, FileUp, Ban,
 } from 'lucide-react'
 import type {
   JobWithPipeline, PipelineStage, Application, Candidate, StageColor,
@@ -597,9 +597,13 @@ function StageColumn({
           )
         })}
         {apps.length === 0 && (
-          <div className={`flex-1 rounded-xl border-2 border-dashed min-h-[80px] transition-colors ${
+          <div className={`flex-1 flex items-start justify-center rounded-xl border-2 border-dashed min-h-[80px] px-3 py-6 transition-colors ${
             over ? style.border : 'border-slate-100'
-          }`} />
+          }`}>
+            <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+              <Ban className="h-3.5 w-3.5" /> No candidates in this stage
+            </span>
+          </div>
         )}
       </div>
     </div>
@@ -3732,7 +3736,9 @@ export default function JobPipelinePage() {
 
   const [job, setJob] = useState<JobWithPipeline | null>(null)
   const [loading, setLoading] = useState(true)
-  const [editMode, setEditMode] = useState(false)
+  // Inline stage editing lives in the Interview Plan tab now (Ashby-style); the
+  // board is view-only, so editMode stays false and its gated affordances never show.
+  const [editMode] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [newStageName, setNewStageName] = useState('')
   const [addingStage, setAddingStage] = useState(false)
@@ -3741,51 +3747,7 @@ export default function JobPipelinePage() {
   const dragId      = useRef<string | null>(null)
   const dragStageId = useRef<string | null>(null)
 
-  // Split-pane: active (top) / rejected (bottom)
-  const [splitHeight, setSplitHeight] = useState<number | null>(null)
-  const splitDragRef  = useRef<{ startY: number; startH: number } | null>(null)
-  const activeAreaRef = useRef<HTMLDivElement>(null)
-
-  // Status column resizable width
-  const [statusColWidth, setStatusColWidth] = useState(165)
-  const statusDragRef = useRef<{ startX: number; startW: number } | null>(null)
-
-  const handleStatusColMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    statusDragRef.current = { startX: e.clientX, startW: statusColWidth }
-    const onMove = (me: MouseEvent) => {
-      if (!statusDragRef.current) return
-      const delta = me.clientX - statusDragRef.current.startX
-      setStatusColWidth(Math.max(90, Math.min(280, statusDragRef.current.startW + delta)))
-    }
-    const onUp = () => {
-      statusDragRef.current = null
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }
-
-  const handleSplitMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault()
-    const h = activeAreaRef.current?.getBoundingClientRect().height ?? 400
-    splitDragRef.current = { startY: e.clientY, startH: h }
-    const onMove = (me: MouseEvent) => {
-      if (!splitDragRef.current) return
-      const delta = me.clientY - splitDragRef.current.startY
-      const next = Math.max(180, Math.min(window.innerHeight * 0.82, splitDragRef.current.startH + delta))
-      setSplitHeight(next)
-    }
-    const onUp = () => {
-      splitDragRef.current = null
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }
+  // (Rejected split-pane + status column removed — Ashby-style single board.)
   // Prevents load() from overwriting scored state with stale server data.
   // Set to true at scoring start; cleared 5 s after scoring ends so that
   // the visibilitychange / switchView refetch guards don't live forever.
@@ -4026,14 +3988,6 @@ export default function JobPipelinePage() {
     return result
   }, [grouped, applyFilters])
 
-  // Rejected apps grouped by stage (for the bottom rejected pane)
-  const rejectedGrouped = useMemo(() =>
-    (job?.pipeline_stages ?? []).reduce<Record<string, Application[]>>((acc, s) => {
-      acc[s.id] = (job?.applications ?? []).filter(a => a.status === 'rejected' && a.stage_id === s.id)
-      return acc
-    }, {}),
-  [job])
-  const totalRejected = Object.values(rejectedGrouped).reduce((n, a) => n + a.length, 0)
 
   // ── Drag & Drop ──────────────────────────────────────────────────────────
   const handleDrop = async (newStageId: string) => {
@@ -4782,36 +4736,10 @@ export default function JobPipelinePage() {
         </button>
       )}
 
-      {/* ── Single horizontal scroll — Active + Rejected share same container ── */}
-      <div className="flex flex-row flex-1 items-stretch min-h-0">
+      {/* ── Candidate columns (Ashby-style: zone stepper → stage columns) ── */}
       <div className="flex flex-col flex-1 overflow-x-auto">
 
-      {/* ── Active candidates ──────────────────────────────────────────── */}
-      <div
-        ref={activeAreaRef}
-        style={splitHeight !== null ? { height: splitHeight, flexShrink: 0 } : { minHeight: '55vh', flexShrink: 0 }}
-        className={`flex items-stretch shrink-0 divide-x transition-colors ${
-          editMode ? 'divide-slate-100 bg-slate-50/20' : 'divide-slate-300 bg-transparent'
-        }`}
-      >
-        {/* Status column — sticky, not tied to stages */}
-        <div
-          className="sticky left-0 z-10 shrink-0 flex flex-col border-t-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
-          style={{ width: statusColWidth }}
-        >
-          <div className="rounded-xl bg-slate-50 border-2 border-slate-300 px-2.5 py-2.5 flex items-center gap-1.5 mb-1 min-w-0">
-            <div className="h-2 w-2 rounded-full bg-slate-500 shrink-0" />
-            <span className="text-xs font-bold text-slate-700 flex-1 min-w-0 truncate">Active</span>
-            <span className="text-xs font-bold text-slate-600 bg-white rounded-full px-1.5 border border-slate-200 shrink-0">{activeApps.length}</span>
-          </div>
-          <p className="text-[10px] text-slate-400 px-0.5 mt-1 leading-tight truncate">Status from HM intake form</p>
-          {/* Resize handle — right edge */}
-          <div
-            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-slate-300 active:bg-slate-400 transition-colors z-20"
-            onMouseDown={handleStatusColMouseDown}
-            title="Drag to resize"
-          />
-        </div>
+      <div className="flex items-stretch flex-1 min-h-[55vh] divide-x divide-slate-300">
 
         {zoneStages.map((stage) => {
           // Global index so "next stage" / "is last" still cross zone boundaries.
@@ -5014,90 +4942,9 @@ export default function JobPipelinePage() {
           </div>
         )}
       </div>
-      {/* ── end active candidates ── */}
+      {/* ── end candidate columns ── */}
 
-      {/* Draggable fill-line divider — same visual language as column bar borders */}
-      <div
-        className="shrink-0 h-[4px] bg-slate-300 hover:bg-slate-400 cursor-row-resize transition-colors select-none"
-        onMouseDown={handleSplitMouseDown}
-        title="Drag to resize"
-      />
-
-      {/* ── Rejected candidates ────────────────────────────────────────── */}
-      <div className="flex items-stretch divide-x divide-slate-300 min-h-[160px] bg-red-50/10 flex-1 overflow-y-auto">
-        {/* Status column — sticky, mirrors active section */}
-        <div
-          className="sticky left-0 z-10 shrink-0 flex flex-col border-b-4 border-slate-200 bg-white px-3 py-5 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)] relative"
-          style={{ width: statusColWidth }}
-        >
-          <div className="rounded-xl bg-red-50 border-2 border-red-300 px-2.5 py-2.5 flex items-center gap-1.5 min-w-0">
-            <div className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
-            <span className="text-xs font-bold text-red-700 flex-1 min-w-0 truncate">Rejected</span>
-            <span className="text-xs font-bold text-red-600 bg-white rounded-full px-1.5 border border-red-200 shrink-0">{totalRejected}</span>
-          </div>
-          {/* Resize handle — right edge */}
-          <div
-            className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-red-300 active:bg-red-400 transition-colors z-20"
-            onMouseDown={handleStatusColMouseDown}
-            title="Drag to resize"
-          />
-        </div>
-
-        {zoneStages.map(stage => {
-          const rejApps = rejectedGrouped[stage.id] ?? []
-          const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
-          return (
-            <div key={stage.id} className={`flex-1 min-w-[180px] max-w-[320px] px-3 py-4 ${stColStyle.barBottom}`}>
-              {/* No column header — already shown in active section above */}
-              <div className="flex flex-col gap-2">
-                {rejApps.map(app => (
-                  <CandidateCard
-                    key={app.id}
-                    app={app}
-                    onDragStart={id => { dragId.current = id }}
-                    onClick={setSelectedApp}
-                    isSelected={false}
-                    onToggleSelect={() => {}}
-                    cardFields={cardFields}
-                  />
-                ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      {/* ── end rejected candidates ── */}
-
-      </div>{/* end shared scroll container (flex flex-col flex-1 overflow-x-auto) */}
-
-      {/* Edit Pipeline toggle — outside scroll, spans full height of Active + Rejected */}
-      <div className={`shrink-0 flex flex-col gap-1.5 items-stretch px-3 pt-5 border-t-4 ${
-        editMode ? 'border-slate-200 bg-slate-50/20' : 'border-slate-200 bg-transparent'
-      }`}>
-        <button
-          onClick={() => setEditMode(e => !e)}
-          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${
-            editMode
-              ? 'border-slate-300 bg-slate-600 text-white hover:bg-slate-500 shadow-sm'
-              : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 bg-white'
-          }`}
-        >
-          {editMode
-            ? <><Check className="h-3.5 w-3.5" /> Done</>
-            : <><Pencil className="h-3.5 w-3.5" /> Edit</>
-          }
-        </button>
-        {editMode && (
-          <button
-            onClick={() => { setEditMode(false); setNewStageName(''); load() }}
-            className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-500 transition-colors"
-          >
-            <X className="h-3 w-3" /> Discard
-          </button>
-        )}
-      </div>
-
-      </div>{/* end outer flex-row wrapper (flex flex-row flex-1 items-stretch min-h-0) */}
+      </div>{/* end scroll container */}
 
       </div>
       )} {/* end viewMode === 'kanban' */}

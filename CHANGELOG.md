@@ -9,6 +9,17 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-26 (Board cleanup — closer to Ashby)
+
+### Changed
+- **Candidate board simplified toward Ashby's pipeline layout.** Removed the far-right
+  **"Edit" toggle** (inline stage editing lives in the Interview Plan tab now — the
+  board is view-only), the bottom **"Rejected" split-pane**, and the vestigial left
+  **"Status" column** ("Active / Status from HM intake form"). The board is now just
+  the zone stepper → the selected zone's stage columns. Empty columns show a
+  "No candidates in this stage" placeholder (Ashby-style). Removed the now-dead
+  split-height / status-column resize state and rejected memos.
+
 ## 2026-08-25 (Invariant: every application always has a stage)
 
 ### Fixed
