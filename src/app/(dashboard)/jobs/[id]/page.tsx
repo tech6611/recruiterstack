@@ -23,7 +23,11 @@ import { avatarColor, initials } from '@/lib/ui/avatar'
 import { RECOMMENDATION_CONFIG, RATING_CONFIG } from '@/lib/ui/scorecard-config'
 import { ZoneSelector, type BoardZone } from '@/components/pipeline/ZoneSelector'
 import { ZONE_SEQUENCE, type StageZone } from '@/lib/pipeline/zones'
-import { applyBoardConditions, describeBoardCondition, type BoardFilterCondition } from '@/lib/pipeline/board-filters'
+import {
+  applyBoardConditions, describeBoardCondition, isValidBoardCondition,
+  BOARD_FILTER_FIELDS, boardFilterField, operatorsForBoardField, optionsForBoardField,
+  type BoardFilterCondition, type BoardFilterOp,
+} from '@/lib/pipeline/board-filters'
 
 // ── Scorecard config (shared) ─────────────────────────────────────────────────
 
@@ -4028,6 +4032,25 @@ export default function JobPipelinePage() {
     return m
   }, [job])
 
+  // Manual condition builder — same engine as the AI assistant, click-to-build.
+  const stageOptions = useMemo(() => (job?.pipeline_stages ?? []).map(s => ({ value: s.id, label: s.name })), [job])
+  const stageIds = useMemo(() => (job?.pipeline_stages ?? []).map(s => s.id), [job])
+  const [showAddCond, setShowAddCond] = useState(false)
+  const [draft, setDraft] = useState<{ field: string; operator: string; value: string }>({ field: '', operator: '', value: '' })
+  const draftCondition = (): BoardFilterCondition | null => {
+    const def = boardFilterField(draft.field)
+    if (!def || !draft.operator) return null
+    const value = def.type === 'number' ? Number(draft.value) : def.type === 'boolean' ? undefined : draft.value
+    return { field: draft.field, operator: draft.operator as BoardFilterOp, value }
+  }
+  const addManualCondition = () => {
+    const c = draftCondition()
+    if (!c || !isValidBoardCondition(c, stageIds)) return
+    setAiConditions(cs => [...cs, c])
+    setDraft({ field: '', operator: '', value: '' })
+    setShowAddCond(false)
+  }
+
   // Filtered flat list for Ranked view (sort happens inside RankedView via column headers)
   const filteredApps = useMemo(() => applyFilters(activeApps), [activeApps, applyFilters])
 
@@ -4638,28 +4661,114 @@ export default function JobPipelinePage() {
                   </button>
                 </div>
                 {aiError && <p className="text-[11px] text-red-500">{aiError}</p>}
-                {aiConditions.length > 0 && (
-                  <div className="space-y-1.5 pt-0.5">
-                    <p className="text-[10.5px] text-slate-400">Matching {aiMatch === 'all' ? 'all of' : 'any of'}:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {aiConditions.map((c, i) => (
-                        <span key={i} className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
-                          {describeBoardCondition(c, (f, v) => f === 'stage' ? (stageNameById.get(String(v)) ?? String(v)) : String(v))}
-                          <button type="button" onClick={() => removeAiCondition(i)} className="text-emerald-500 hover:text-emerald-800" title="Remove">
-                            <X className="h-3 w-3" />
+
+                {/* Active conditions (AI or manual) + the manual condition builder */}
+                <div className="space-y-1.5 pt-0.5">
+                  {aiConditions.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-1 text-[10.5px] text-slate-400">
+                        Matching
+                        {aiConditions.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => setAiMatch(m => (m === 'all' ? 'any' : 'all'))}
+                            className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-semibold text-slate-600 hover:bg-slate-50"
+                          >
+                            {aiMatch === 'all' ? 'all of' : 'any of'}
                           </button>
-                        </span>
-                      ))}
+                        ) : <span className="font-semibold text-slate-600">all of</span>}
+                        :
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {aiConditions.map((c, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                            {describeBoardCondition(c, (f, v) => f === 'stage' ? (stageNameById.get(String(v)) ?? String(v)) : String(v))}
+                            <button type="button" onClick={() => removeAiCondition(i)} className="text-emerald-500 hover:text-emerald-800" title="Remove">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {showAddCond ? (
+                    <div className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
+                      <select
+                        value={draft.field}
+                        onChange={e => { const f = e.target.value; setDraft({ field: f, operator: operatorsForBoardField(f)[0]?.op ?? '', value: '' }) }}
+                        className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                      >
+                        <option value="">Choose a field…</option>
+                        {BOARD_FILTER_FIELDS.map(f => <option key={f.field} value={f.field}>{f.label}</option>)}
+                      </select>
+                      {(() => {
+                        const def = boardFilterField(draft.field)
+                        if (!def) return null
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              value={draft.operator}
+                              onChange={e => setDraft(d => ({ ...d, operator: e.target.value }))}
+                              className="rounded border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-700"
+                            >
+                              {operatorsForBoardField(draft.field).map(o => <option key={o.op} value={o.op}>{o.label}</option>)}
+                            </select>
+                            {def.type !== 'boolean' && (def.type === 'choice' ? (
+                              <select
+                                value={draft.value}
+                                onChange={e => setDraft(d => ({ ...d, value: e.target.value }))}
+                                className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-700"
+                              >
+                                <option value="">Value…</option>
+                                {optionsForBoardField(draft.field, stageOptions).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              </select>
+                            ) : (
+                              <input
+                                type={def.type === 'number' ? 'number' : 'text'}
+                                value={draft.value}
+                                onChange={e => setDraft(d => ({ ...d, value: e.target.value }))}
+                                placeholder={def.unit ?? 'Value'}
+                                className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-700"
+                              />
+                            ))}
+                          </div>
+                        )
+                      })()}
+                      <div className="flex items-center gap-1.5">
+                        {(() => {
+                          const c = draftCondition()
+                          const ok = !!c && isValidBoardCondition(c, stageIds)
+                          return (
+                            <button type="button" onClick={addManualCondition} disabled={!ok}
+                              className="rounded bg-[#1f7a5a] px-2 py-1 text-[11px] font-semibold text-white hover:brightness-110 disabled:opacity-40">
+                              Add
+                            </button>
+                          )
+                        })()}
+                        <button type="button" onClick={() => { setShowAddCond(false); setDraft({ field: '', operator: '', value: '' }) }}
+                          className="text-[11px] text-slate-400 hover:text-slate-600">
+                          Cancel
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <button type="button" onClick={() => setShowAddCond(true)}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-[#1f7a5a] hover:underline">
+                      <Plus className="h-3 w-3" /> Add condition
+                    </button>
+                  )}
+
+                  {aiConditions.length > 0 && (
                     <button
                       type="button"
                       onClick={() => { setAiConditions([]); setAiQuery(''); setAiError(null) }}
-                      className="text-[11px] text-slate-400 hover:text-slate-600"
+                      className="block text-[11px] text-slate-400 hover:text-slate-600"
                     >
-                      Clear AI filter
+                      Clear all conditions
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Source */}
