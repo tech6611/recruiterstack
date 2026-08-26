@@ -9,6 +9,18 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-26 (Board — job header row + Archived zone)
+
+### Added
+- **Job / interview-plan header row** above the board columns (Ashby-style):
+  job title + "department · location · Default Interview Plan" subtitle.
+- **"Archived" zone tab** on the pipeline stepper — a 6th, display-only tab
+  (`BoardZone = StageZone | 'archived'`, not a real DB zone) that lists
+  **rejected / withdrawn** candidates grouped by their last stage. This gives
+  those candidates a home again after the Rejected split-pane was removed. Tab
+  count = rejected+withdrawn; deep-linkable via `?zone=archived`; kept out of
+  ZONE_SEQUENCE so it's never the smart-default.
+
 ## 2026-08-26 (Board cleanup — closer to Ashby)
 
 ### Changed

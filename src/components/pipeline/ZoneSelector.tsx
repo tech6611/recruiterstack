@@ -1,36 +1,41 @@
 'use client'
 
 import { Fragment } from 'react'
-import { Users, ClipboardCheck, MessagesSquare, FileText, UserCheck, ChevronRight } from 'lucide-react'
+import { Users, ClipboardCheck, MessagesSquare, FileText, UserCheck, Archive, ChevronRight } from 'lucide-react'
 import type { StageZone } from '@/lib/pipeline/zones'
 import { ZONE_SEQUENCE } from '@/lib/pipeline/zones'
 
+// The board's tab is a funnel zone plus a display-only "Archived" tab (rejected /
+// withdrawn candidates). 'archived' is NOT a real StageZone — it lives only here.
+export type BoardZone = StageZone | 'archived'
+const TAB_SEQUENCE: readonly BoardZone[] = [...ZONE_SEQUENCE, 'archived']
+
 // Ashby-style zone stepper used as a SELECTOR on the candidate board. Clicking a
-// zone filters the board to that zone's interview-plan stages. The five zones and
-// their order come from ZONE_SEQUENCE (lead → application_review → active → offer →
-// completed), so this stays in lock-step with the pipeline plan.
+// zone filters the board to that zone's interview-plan stages (or, for Archived,
+// to rejected/withdrawn candidates). The funnel order comes from ZONE_SEQUENCE.
 //
 // Selected state uses the candidate-page tab treatment — a 3px green inset underline
 // (#2f9e7b, matching CenterPanel's Summary/Activities tabs) rather than a gold ring.
 // Boxes are compact so the bold gold chevrons between them carry the funnel flow.
-const ZONE_META: Record<StageZone, { label: string; Icon: typeof Users }> = {
+const ZONE_META: Record<BoardZone, { label: string; Icon: typeof Users }> = {
   lead:               { label: 'Lead',               Icon: Users },
   application_review: { label: 'Application Review',  Icon: ClipboardCheck },
   active:             { label: 'Active',             Icon: MessagesSquare },
   offer:              { label: 'Offer',              Icon: FileText },
   completed:          { label: 'Hired',              Icon: UserCheck },
+  archived:           { label: 'Archived',           Icon: Archive },
 }
 
 export function ZoneSelector({
   counts, selected, onSelect,
 }: {
-  counts: Record<StageZone, number>
-  selected: StageZone
-  onSelect: (z: StageZone) => void
+  counts: Record<BoardZone, number>
+  selected: BoardZone
+  onSelect: (z: BoardZone) => void
 }) {
   return (
     <div className="mb-3 flex items-stretch rounded-2xl border border-[#e6e0d6] bg-slate-100/70 p-2">
-      {ZONE_SEQUENCE.map((z, i) => {
+      {TAB_SEQUENCE.map((z, i) => {
         const { label, Icon } = ZONE_META[z]
         const n = counts[z] ?? 0
         const sel = z === selected
@@ -54,7 +59,7 @@ export function ZoneSelector({
               </div>
               <span className="pl-8 text-[11.5px] text-[#c9bda9]">{n} candidate{n === 1 ? '' : 's'}</span>
             </button>
-            {i < ZONE_SEQUENCE.length - 1 && (
+            {i < TAB_SEQUENCE.length - 1 && (
               <span className="hidden items-center px-2.5 text-[#ebb137] sm:flex">
                 <ChevronRight className="h-5 w-5" strokeWidth={2.75} />
               </span>
