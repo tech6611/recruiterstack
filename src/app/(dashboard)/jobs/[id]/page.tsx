@@ -21,7 +21,7 @@ import { fmtRelative } from '@/lib/ui/date-utils'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
 import { avatarColor, initials } from '@/lib/ui/avatar'
 import { RECOMMENDATION_CONFIG, RATING_CONFIG } from '@/lib/ui/scorecard-config'
-import { ZoneSelector } from '@/components/pipeline/ZoneSelector'
+import { ZoneSelector, type BoardZone } from '@/components/pipeline/ZoneSelector'
 import { ZONE_SEQUENCE, type StageZone } from '@/lib/pipeline/zones'
 
 // ── Scorecard config (shared) ─────────────────────────────────────────────────
@@ -3761,9 +3761,9 @@ export default function JobPipelinePage() {
   // Which funnel zone the board is showing (Ashby-style zone selector). The
   // columns below are the interview-plan stages of this zone. Defaults to the
   // first zone that actually holds candidates (see the effect below).
-  const zoneParam = searchParams.get('zone') as StageZone | null
-  const [selectedZone, setSelectedZone] = useState<StageZone>(
-    zoneParam && (ZONE_SEQUENCE as readonly string[]).includes(zoneParam) ? zoneParam : 'active'
+  const zoneParam = searchParams.get('zone') as BoardZone | null
+  const [selectedZone, setSelectedZone] = useState<BoardZone>(
+    zoneParam && [...(ZONE_SEQUENCE as readonly string[]), 'archived'].includes(zoneParam) ? zoneParam : 'active'
   )
   const didAutoZone = useRef(false)
 
@@ -3905,6 +3905,17 @@ export default function JobPipelinePage() {
     [job]
   )
 
+  // Archived tab = rejected / withdrawn candidates (they keep their last stage_id).
+  const archivedApps = useMemo(
+    () => job?.applications.filter(a => a.status === 'rejected' || a.status === 'withdrawn') ?? [],
+    [job]
+  )
+  const archivedByStage = useMemo(() => {
+    const m: Record<string, Application[]> = {}
+    for (const a of archivedApps) (m[a.stage_id ?? '__none__'] ??= []).push(a)
+    return m
+  }, [archivedApps])
+
   // Determine if selection spans multiple stages (to grey Suggested Action column)
   const selectedStageIds = useMemo(() => {
     const ids = new Set<string>()
@@ -3929,14 +3940,14 @@ export default function JobPipelinePage() {
     for (const s of job?.pipeline_stages ?? []) m.set(s.id, s.zone as StageZone)
     return m
   }, [job])
-  const zoneCounts = useMemo(() => {
-    const c: Record<StageZone, number> = { lead: 0, application_review: 0, active: 0, offer: 0, completed: 0 }
+  const zoneCounts = useMemo<Record<BoardZone, number>>(() => {
+    const c: Record<BoardZone, number> = { lead: 0, application_review: 0, active: 0, offer: 0, completed: 0, archived: archivedApps.length }
     for (const a of activeApps) {
       const z = a.stage_id ? stageZoneById.get(a.stage_id) : undefined
       if (z) c[z] += 1
     }
     return c
-  }, [activeApps, stageZoneById])
+  }, [activeApps, stageZoneById, archivedApps])
   const zoneStages = useMemo(
     () => (job?.pipeline_stages ?? []).filter(s => (s.zone as StageZone) === selectedZone),
     [job, selectedZone]
@@ -4736,12 +4747,59 @@ export default function JobPipelinePage() {
         </button>
       )}
 
+      {/* Job / interview-plan header row (Ashby-style), directly above the columns. */}
+      <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-100 px-1 pb-2">
+        <div className="min-w-0">
+          <h2 className="truncate text-[15px] font-bold tracking-tight text-slate-900">{job.position_title}</h2>
+          <p className="truncate text-[11.5px] text-slate-500">
+            {[job.department, job.location, 'Default Interview Plan'].filter(Boolean).join(' · ')}
+          </p>
+        </div>
+      </div>
+
       {/* ── Candidate columns (Ashby-style: zone stepper → stage columns) ── */}
       <div className="flex flex-col flex-1 overflow-x-auto">
 
       <div className="flex items-stretch flex-1 min-h-[55vh] divide-x divide-slate-300">
 
-        {zoneStages.map((stage) => {
+        {/* Archived tab lists rejected / withdrawn candidates by their last stage. */}
+        {selectedZone === 'archived' && (
+          archivedApps.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center py-20 text-sm text-slate-400">
+              No archived candidates.
+            </div>
+          ) : (
+            (job.pipeline_stages ?? [])
+              .filter(s => (archivedByStage[s.id]?.length ?? 0) > 0)
+              .map(stage => {
+                const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
+                const arApps = archivedByStage[stage.id] ?? []
+                return (
+                  <div key={stage.id} className={`flex-1 min-w-[180px] max-w-[320px] px-3 pt-[18px] pb-5 ${stColStyle.barTop}`}>
+                    <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${stColStyle.header} border-2 ${stColStyle.border}`}>
+                      <span className="truncate text-sm font-semibold text-slate-700">{stage.name}</span>
+                      <span className="text-[11px] font-bold text-slate-400 tabular-nums">{arApps.length}</span>
+                    </div>
+                    <div className="flex flex-col gap-2 pt-2">
+                      {arApps.map(app => (
+                        <CandidateCard
+                          key={app.id}
+                          app={app}
+                          onDragStart={() => {}}
+                          onClick={setSelectedApp}
+                          isSelected={false}
+                          onToggleSelect={() => {}}
+                          cardFields={cardFields}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })
+          )
+        )}
+
+        {selectedZone !== 'archived' && zoneStages.map((stage) => {
           // Global index so "next stage" / "is last" still cross zone boundaries.
           const stageIndex = job.pipeline_stages.findIndex(s => s.id === stage.id)
           const stColStyle = STAGE_STYLES[stage.color] ?? STAGE_STYLES.slate
@@ -4883,7 +4941,7 @@ export default function JobPipelinePage() {
         )})}
 
         {/* Empty zone — no stages mapped to this zone in the interview plan. */}
-        {zoneStages.length === 0 && (
+        {selectedZone !== 'archived' && zoneStages.length === 0 && (
           <div className="flex flex-1 items-center justify-center px-6 py-10">
             <p className="max-w-xs text-center text-sm text-slate-400">
               No stages in the {selectedZone === 'completed' ? 'Hired' : selectedZone[0].toUpperCase() + selectedZone.slice(1)} zone yet.
@@ -4918,7 +4976,7 @@ export default function JobPipelinePage() {
         )}
 
         {/* Unstaged bucket */}
-        {unstaged.length > 0 && (
+        {selectedZone !== 'archived' && unstaged.length > 0 && (
           <div className="flex-1 min-w-[180px] max-w-[260px] px-3">
             <div className="flex items-center justify-between rounded-xl px-4 py-3 bg-slate-50 border border-slate-100">
               <span className="text-sm font-semibold text-slate-400 italic">Unstaged</span>
