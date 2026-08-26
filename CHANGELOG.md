@@ -9,6 +9,19 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-26 (Board — AI filter assistant)
+
+### Added
+- **AI filter assistant** on the candidate board (Ashby-style). In the Filters
+  panel, type a filter in plain English ("sourced engineers scoring 75+ not yet
+  reviewed") and Gemini turns it into structured conditions that filter the board.
+  New pure `src/lib/pipeline/board-filters.ts` engine (field + operator + value,
+  evaluated client-side over Applications; name/source/stage/AI-score/fit-signal/
+  days-in-stage/review-status/scored; 13 tests) + `POST /api/jobs/[id]/filter-assist`
+  (Gemini 2.5 Flash, JSON mode, server-validates every condition against the job's
+  fields + stages). Conditions render as removable chips (match all/any); the count
+  folds into the Filters badge; "Clear all filters" resets them.
+
 ## 2026-08-26 (Board — job header row + Archived zone)
 
 ### Added
