@@ -46,6 +46,7 @@ const isPublic = createRouteMatcher([
 function isClerkBypassed(req: NextRequest): boolean {
   return (
     req.nextUrl.pathname.startsWith('/api/queue') ||
+    req.nextUrl.pathname.startsWith('/api/cron') ||
     req.nextUrl.pathname.startsWith('/api/sequences/process') ||
     // Internal service-to-service endpoints (e.g. the Django voice service
     // fetching a phone-screen briefing) authenticate via INTERNAL_API_SECRET

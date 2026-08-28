@@ -1,0 +1,41 @@
+name: Pipeline Automations Cron
+
+# Ticks the pipeline-automation engine on a schedule. The engine itself lives in
+# the app (scanPipelineAutomations); this workflow just calls its endpoint. Kept
+# in GitHub Actions (not vercel.json) so it works on any Vercel plan without
+# risking the production deploy.
+#
+# SAFETY: the scan is a dry run (fires nothing) until PIPELINE_AUTOMATIONS_MODE
+# is set to 'live' on the app. So enabling this workflow changes nothing for
+# candidates on its own.
+#
+# SETUP (one-time): add a repo secret CRON_SECRET matching the CRON_SECRET env on
+# Vercel. If CRON_SECRET is unset on Vercel the endpoint is open and this still
+# works, but setting it on both is recommended.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # every 5 minutes (GitHub's minimum; timing is best-effort)
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+# Never let overlapping ticks pile up.
+concurrency:
+  group: pipeline-automations-cron
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger pipeline-automation scan
+        run: |
+          code=$(curl -sS -o /tmp/resp.json -w '%{http_code}' \
+            -X POST "https://www.recruiterstack.in/api/cron/pipeline-automations" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          echo "HTTP $code"
+          cat /tmp/resp.json || true
+          echo
+          # Fail the run on a non-2xx so a broken cron is visible in the Actions tab.
+          case "$code" in 2*) exit 0 ;; *) echo "::error::pipeline scan returned $code"; exit 1 ;; esac
