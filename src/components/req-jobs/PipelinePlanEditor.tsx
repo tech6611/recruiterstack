@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'rea
 import {
   Loader2, Save, Flag, ChevronRight, ChevronDown, ArrowRight, ChevronUp,
   UserPlus, Users, FileSignature, CheckCircle2, Lock, Trash2, Plus, GripVertical,
-  ClipboardCheck,
+  ClipboardCheck, LayoutTemplate,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import type { PlanTemplate } from '@/lib/pipeline/plan-templates'
 import type { StageZone } from '@/lib/pipeline/zones'
 import { ZONE_SEQUENCE } from '@/lib/pipeline/zones'
 import { FUNNEL_STEPS } from '@/lib/pipeline/funnel-steps'
@@ -49,6 +50,17 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
   const [team, setTeam] = useState<PanelMember[]>([])          // org team members (name+email) for the panel picker
   const [panels, setPanels] = useState<Record<string, PanelMember[]>>({})  // interview panel per stage
   const serverNames = useRef<Map<string, string>>(new Map())
+
+  // ── Interview-plan templates ──
+  const [templates, setTemplates] = useState<PlanTemplate[]>([])
+  const [tplMenu, setTplMenu] = useState(false)
+  const [tplName, setTplName] = useState('')
+  const [tplBusy, setTplBusy] = useState(false)
+  const loadTemplates = useCallback(async () => {
+    const res = await fetch('/api/plan-templates').then(r => r.json()).catch(() => null)
+    setTemplates((res?.data ?? []) as PlanTemplate[])
+  }, [])
+  useEffect(() => { void loadTemplates() }, [loadTemplates])
 
   // Team members (with emails) for the interview-panel picker.
   useEffect(() => {
@@ -131,6 +143,49 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to save plan')
     } finally { setSaving(false) }
+  }
+
+  const saveAsTemplate = async () => {
+    const name = tplName.trim()
+    if (!name) return
+    setTplBusy(true)
+    try {
+      const res = await fetch('/api/plan-templates', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, name }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Failed to save template')
+      toast.success(`Saved template “${name}”.`)
+      setTplName('')
+      await loadTemplates()
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to save template') }
+    finally { setTplBusy(false) }
+  }
+
+  const applyTemplate = async (t: PlanTemplate) => {
+    if (!confirm(`Apply “${t.name}”? This replaces this job's Active & Offer stages; any candidates in a replaced stage move back to “Applied”.`)) return
+    setTplBusy(true)
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/apply-plan-template`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template_id: t.id }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Failed to apply template')
+      toast.success(`Applied “${t.name}”.`)
+      setTplMenu(false)
+      await load(); await loadRules()
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to apply template') }
+    finally { setTplBusy(false) }
+  }
+
+  const deleteTemplate = async (t: PlanTemplate) => {
+    if (!confirm(`Delete template “${t.name}”?`)) return
+    try {
+      await fetch(`/api/plan-templates/${t.id}`, { method: 'DELETE' })
+      await loadTemplates()
+    } catch { toast.error('Could not delete template') }
   }
 
   // ── Structural stage edits (immediate) ──
@@ -244,10 +299,70 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
           <h3 className="text-[15px] font-semibold text-slate-900">Pipeline Plan</h3>
           <p className="mt-0.5 text-xs text-slate-500">Add and arrange stages, map each to a funnel step, and sketch what happens there.</p>
         </div>
-        <Button size="sm" onClick={save} disabled={saving || busy}>
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-          Save plan
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Templates — save this plan or apply a saved one */}
+          <div className="relative">
+            <Button size="sm" variant="outline" onClick={() => setTplMenu(v => !v)} disabled={saving || busy}>
+              <LayoutTemplate className="h-3.5 w-3.5" /> Templates
+            </Button>
+            {tplMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setTplMenu(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Save current plan</p>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      value={tplName}
+                      onChange={e => setTplName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void saveAsTemplate() } }}
+                      placeholder="Template name…"
+                      className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    />
+                    <button
+                      onClick={() => void saveAsTemplate()}
+                      disabled={tplBusy || !tplName.trim()}
+                      className="shrink-0 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-40"
+                    >
+                      Save
+                    </button>
+                  </div>
+                  <div className="my-2.5 border-t border-slate-100" />
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Apply a template</p>
+                  {templates.length === 0 ? (
+                    <p className="py-1 text-xs text-slate-400">No templates yet — save one above.</p>
+                  ) : (
+                    <div className="max-h-56 space-y-1 overflow-y-auto">
+                      {templates.map(t => (
+                        <div key={t.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium text-slate-700">{t.name}</div>
+                            <div className="text-[10.5px] text-slate-400">{t.stages.length} stage{t.stages.length === 1 ? '' : 's'}</div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              onClick={() => void applyTemplate(t)}
+                              disabled={tplBusy}
+                              className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+                            >
+                              Apply
+                            </button>
+                            <button onClick={() => void deleteTemplate(t)} title="Delete template" className="rounded-md p-1 text-slate-300 hover:text-red-500">
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+          <Button size="sm" onClick={save} disabled={saving || busy}>
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            Save plan
+          </Button>
+        </div>
       </div>
 
       <ZoneStepper byZone={byZone} />

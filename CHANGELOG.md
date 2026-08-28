@@ -9,6 +9,26 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-28 (Interview-plan templates)
+
+### Added
+- **Save & apply interview-plan templates.** In a job's Interview Plan (the Pipeline
+  Plan editor), a new **Templates** menu saves the plan's custom (Active + Offer)
+  stages — names, colours, order, funnel-step mappings, and playbook text — as a
+  named, org-wide template, and applies a saved template to another job. Applying
+  replaces the job's Active/Offer stages with the template's; candidates in a
+  replaced stage move to "Applied" first (no one left without a stage), and the
+  fixed framework stages (Lead ladder, Application Review, Hired/Archived) are
+  preserved.
+
+### Schema
+- **Migration 137 (`137_plan_templates.sql`)** — `plan_templates` table (JSONB
+  stage snapshot, org-scoped, service-role RLS). Mirrors `role_templates`.
+
+Pure snapshot/remap logic in `src/lib/pipeline/plan-templates.ts` (6 tests); facade
+`src/modules/ats/domain/plan-templates.ts`; routes `GET/POST /api/plan-templates`,
+`DELETE /api/plan-templates/[id]`, `POST /api/jobs/[id]/apply-plan-template`.
+
 ## 2026-08-26 (Board — layout polish 2)
 
 ### Changed
