@@ -430,7 +430,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                         {/* name (editable unless locked) */}
                         <div className="flex min-w-0 flex-1 items-center gap-2">
                           {locked ? (
-                            <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-sm font-medium text-slate-700">
+                            <span className="flex shrink items-center gap-1.5 truncate text-sm font-medium text-slate-700">
                               <Lock className="h-3 w-3 shrink-0 text-slate-300" />{s.name}
                             </span>
                           ) : (
@@ -444,7 +444,8 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                               spellCheck={false}
                               data-1p-ignore
                               data-lpignore="true"
-                              className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-sm font-medium text-slate-800 hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#221b14]"
+                              size={Math.max((s.name?.length ?? 1), 4)}
+                              className="max-w-full rounded bg-transparent px-1 py-0.5 text-sm font-medium text-slate-800 [field-sizing:content] hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#221b14]"
                             />
                           )}
                           {s.is_promotion_gate && (
