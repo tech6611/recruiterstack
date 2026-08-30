@@ -430,7 +430,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                         {/* name (editable unless locked) */}
                         <div className="flex min-w-0 flex-1 items-center gap-2">
                           {locked ? (
-                            <span className="flex items-center gap-1.5 truncate text-sm font-medium text-slate-700">
+                            <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-sm font-medium text-slate-700">
                               <Lock className="h-3 w-3 shrink-0 text-slate-300" />{s.name}
                             </span>
                           ) : (
@@ -554,14 +554,7 @@ function ZoneStepper({ byZone }: { byZone: { zone: StageZone; stages: ZonedStage
         const candidates = stages.reduce((n, s) => n + s.candidate_count, 0)
         return (
           <Fragment key={zone}>
-            <div
-              className={[
-                'flex min-w-0 flex-1 basis-0 items-center gap-2.5 rounded-lg px-3 py-1.5',
-                'border border-[#221b14] bg-[#221b14]',
-                // gold underline marks the zones actually holding candidates
-                candidates > 0 ? 'shadow-[inset_0_-3px_0_0_#ebb137]' : '',
-              ].join(' ')}
-            >
+            <div className="flex min-w-0 flex-1 basis-0 items-center gap-2.5 rounded-lg border border-[#221b14] bg-[#221b14] px-3 py-1.5">
               <Icon className="h-4 w-4 shrink-0 text-slate-300" />
               <div className="min-w-0 leading-tight">
                 <div className="truncate text-[13px] font-semibold text-slate-50">{ZONE_META[zone].title}</div>

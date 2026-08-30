@@ -9,6 +9,16 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-30 (Plan editor — zone underline + dot alignment)
+
+### Fixed
+- **Removed the gold "zones with candidates" underline** on the plan editor's zone
+  stepper (the `#ebb137` inset shadow gated on `candidates > 0`) — it looked like an
+  inconsistent underline on only some zones.
+- **Aligned the "has automation rules" green dots.** Locked stage names now fill the
+  same width as editable ones, so the dot sits at the same position for every stage
+  (was next-to-text for locked stages like "Applied", far-right for editable ones).
+
 ## 2026-08-30 (Archived — a real pipeline stage, Ashby parity)
 
 ### Schema
