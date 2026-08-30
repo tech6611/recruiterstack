@@ -3960,7 +3960,10 @@ export default function JobPipelinePage() {
     return c
   }, [activeApps, stageZoneById, archivedApps])
   const zoneStages = useMemo(
-    () => (job?.pipeline_stages ?? []).filter(s => (s.zone as StageZone) === selectedZone),
+    // The Archived stage lives in the completed zone (Ashby: Completed = Hired +
+    // Archived) but has its own board tab, so keep it out of the Hired columns.
+    () => (job?.pipeline_stages ?? []).filter(s =>
+      (s.zone as StageZone) === selectedZone && s.name.trim() !== 'Archived'),
     [job, selectedZone]
   )
 
@@ -4953,7 +4956,8 @@ export default function JobPipelinePage() {
 
       <div className="flex items-stretch flex-1 min-h-[55vh] divide-x divide-slate-300">
 
-        {/* Archived tab lists rejected / withdrawn candidates by their last stage. */}
+        {/* Archived tab lists rejected / withdrawn candidates — after migration 138
+            they all sit on the real "Archived" stage, so this collapses to one column. */}
         {selectedZone === 'archived' && (
           archivedApps.length === 0 ? (
             <div className="flex-1 flex items-center justify-center py-20 text-sm text-slate-400">

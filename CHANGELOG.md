@@ -9,6 +9,22 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-30 (Archived — a real pipeline stage, Ashby parity)
+
+### Schema
+- **Migration 138 (`138_archived_stage.sql`)** — makes "Archived" a real, locked
+  stage in the Completed zone (Ashby: Completed = Hired + Archived): seeds it for
+  new jobs, backfills it into existing jobs, moves existing rejected/withdrawn
+  candidates onto it, and adds a `BEFORE INSERT/UPDATE` trigger that moves any
+  candidate to the Archived stage the moment their status becomes rejected/withdrawn
+  — covering every reject path (Django, Next.js, copilot, autopilot) at the DB level.
+
+### Changed
+- Board: the **Archived** tab now collapses rejected/withdrawn candidates into a
+  single "Archived" column (they share the real stage); the **Archived** stage is
+  excluded from the Hired (completed) tab's columns. The Pipeline Plan editor shows
+  **Archived** as a locked row under Completed automatically (no code change).
+
 ## 2026-08-28 (Plan editor — uniform stage-name fields)
 
 ### Fixed
