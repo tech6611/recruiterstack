@@ -9,6 +9,16 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-08-28 (Plan editor — uniform stage-name fields)
+
+### Fixed
+- **Consistent stage-name fields in the Pipeline Plan editor.** Removed the box
+  border that made editable stage names look inconsistent, and turned off browser /
+  password-manager autofill on them (`autoComplete="off"`, `data-1p-ignore`,
+  `data-lpignore`) — that autofill highlighting was the "underline on some boxes."
+  Editable stage names now read as plain text with a subtle hover/focus affordance,
+  matching the locked framework stages. Same guard on the template-name input.
+
 ## 2026-08-28 (Interview-plan templates)
 
 ### Added

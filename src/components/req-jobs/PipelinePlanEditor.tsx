@@ -316,6 +316,9 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                       onChange={e => setTplName(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void saveAsTemplate() } }}
                       placeholder="Template name…"
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
                       className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                     />
                     <button
@@ -436,7 +439,12 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                               onChange={ev => setStages(list => list.map(x => x.id === s.id ? { ...x, name: ev.target.value } : x))}
                               onBlur={ev => commitRename(s, ev.target.value)}
                               onKeyDown={ev => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur() }}
-                              className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-slate-800 hover:border-slate-200 focus:border-[#221b14] focus:bg-white focus:outline-none"
+                              autoComplete="off"
+                              autoCorrect="off"
+                              spellCheck={false}
+                              data-1p-ignore
+                              data-lpignore="true"
+                              className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-sm font-medium text-slate-800 hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#221b14]"
                             />
                           )}
                           {s.is_promotion_gate && (
