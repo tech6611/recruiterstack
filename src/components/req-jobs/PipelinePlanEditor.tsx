@@ -156,7 +156,14 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Failed to save template')
+      const skipped = (j?.data?.skippedRules ?? []) as string[]
       toast.success(`Saved template “${name}”.`)
+      if (skipped.length) {
+        toast.warning(
+          `${skipped.length} rule${skipped.length === 1 ? '' : 's'} not copied (they reference a specific sequence or panel): ${skipped.join('; ')}`,
+          { duration: 8000 },
+        )
+      }
       setTplName('')
       await loadTemplates()
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to save template') }
