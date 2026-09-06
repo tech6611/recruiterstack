@@ -9,6 +9,18 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-06 (Plan templates now copy automation rules)
+
+### Added
+- **Interview-plan templates now capture each stage's automation rules** and
+  recreate them on the target job when applied. Stage references inside a rule
+  (e.g. a move_stage's destination) are stored as ordinals and **remapped to the
+  target job's new stage ids**, so a copied rule operates on the target job's
+  equivalent stages — same behaviour, different job. Rules whose action references
+  something job-specific that can't transfer (a specific sequence → `enrol_outreach`,
+  or a people panel → `schedule_interview`/`request_availability`) are **skipped and
+  flagged** in a toast when the template is saved, rather than copied broken.
+
 ## 2026-08-30 (Plan editor — zone underline + dot alignment)
 
 ### Fixed
