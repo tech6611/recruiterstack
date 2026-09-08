@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import type { StageZone } from '@/lib/pipeline/zones'
 import type { PlanTemplate } from '@/lib/pipeline/plan-templates'
-import { serializePlanStages, resolveNextStageId, resolveRuleTargetStageId, isTemplatableStage } from '@/lib/pipeline/plan-templates'
+import { serializePlanStages, serializePlanRules, resolveNextStageId, resolveStageRef, isTemplatableStage } from '@/lib/pipeline/plan-templates'
 import {
   getZonedStages, createStage, deleteStage, reorderStages,
   updateStageFunnelStep, upsertStagePlaybook, isLockedStage,
@@ -55,20 +55,22 @@ export async function createPlanTemplateFromJob(
   const colorById = new Map<string, string>((colorRows ?? []).map((r: { id: string; color: string }) => [r.id, r.color]))
   const withColor = zoned.map(s => ({ ...s, color: colorById.get(s.id) ?? 'slate' }))
 
-  // Group this job's automation rules by stage, so the template can capture them.
+  const stages = serializePlanStages(withColor)
+  if (stages.length === 0) throw new Error('TEMPLATE_EMPTY')
+
+  // Capture automation rules from EVERY stage (framework stages like "Applied"
+  // included — that's where the important first-stage rules live).
   const allRules = await listJobAutomations(supabase, orgId, jobId)
   const rulesByStage = new Map<string, typeof allRules>()
   for (const r of allRules) {
     const arr = rulesByStage.get(r.stage_id) ?? []
     arr.push(r); rulesByStage.set(r.stage_id, arr)
   }
-
-  const { stages, skippedRules } = serializePlanStages(withColor, rulesByStage)
-  if (stages.length === 0) throw new Error('TEMPLATE_EMPTY')
+  const { rules, skippedRules } = serializePlanRules(withColor, rulesByStage)
 
   const { data, error } = await sb
     .from('plan_templates')
-    .insert({ org_id: orgId, name, description, stages, source_job_id: jobId, created_by: createdBy })
+    .insert({ org_id: orgId, name, description, stages, rules, source_job_id: jobId, created_by: createdBy })
     .select('*').single()
   if (error) throw error
   return { ...(data as PlanTemplate), skippedRules }
@@ -84,7 +86,7 @@ export async function applyPlanTemplateToJob(
   supabase: Supabase,
   orgId: string,
   jobId: string,
-  template: Pick<PlanTemplate, 'stages'>,
+  template: Pick<PlanTemplate, 'stages' | 'rules'>,
 ): Promise<void> {
   const sb = supabase as unknown as LooseSb
   const before = await getZonedStages(supabase, orgId, jobId)
@@ -103,8 +105,7 @@ export async function applyPlanTemplateToJob(
     createdIds.push(created.id)
   }
 
-  // 2. Funnel step + playbook + automation rules onto the new stages (remap every
-  //    stage reference from a template ordinal → the freshly-created stage id).
+  // 2. Funnel step + playbook onto the new custom stages (remap next_stage → new id).
   for (let i = 0; i < tStages.length; i++) {
     const t = tStages[i]
     if (t.funnel_step) await updateStageFunnelStep(supabase, orgId, createdIds[i], t.funnel_step)
@@ -116,25 +117,6 @@ export async function applyPlanTemplateToJob(
         next_stage_id: resolveNextStageId(tStages, createdIds, i),
       })
     }
-    for (const rule of (t.rules ?? [])) {
-      const targetId = resolveRuleTargetStageId(createdIds, rule.target_stage_index)
-      // Drop a move_stage rule whose destination didn't survive into the target.
-      if (rule.action_type === 'move_stage' && !targetId) continue
-      try {
-        await createAutomation(supabase, orgId, jobId, {
-          stage_id: createdIds[i],
-          trigger: rule.trigger,
-          action_type: rule.action_type,
-          mode: rule.mode,
-          uses_agent: rule.uses_agent,
-          enabled: rule.enabled,
-          guardrails: rule.guardrails,
-          config: { ...rule.config, ...(targetId ? { target_stage_id: targetId } : {}) },
-        })
-      } catch (err) {
-        logger.warn('applyPlanTemplate: could not recreate rule', { stageId: createdIds[i], action: rule.action_type, err })
-      }
-    }
   }
 
   // 3. Move candidates out of the old custom stages → Applied, then delete them.
@@ -145,6 +127,35 @@ export async function applyPlanTemplateToJob(
     for (const s of oldCustom) {
       try { await deleteStage(supabase, orgId, jobId, s.id) }
       catch (err) { logger.warn('applyPlanTemplate: could not delete old stage', { stageId: s.id, err }) }
+    }
+  }
+
+  // 4. Recreate the template's automation rules so the target job behaves like the
+  //    template. Replace the job's existing rules (the apply already replaced the
+  //    stages), remapping every StageRef → the target job's stage ids. Framework
+  //    stages (Applied etc.) persist, so their names resolve against `before`.
+  const frameworkIdByName = new Map<string, string>(
+    before.filter(s => !isTemplatableStage(s.zone)).map(s => [s.name, s.id]),
+  )
+  await sb.from('pipeline_automations').delete().eq('org_id', orgId).eq('job_id', jobId)
+  for (const rule of (template.rules ?? [])) {
+    const onStageId = resolveStageRef(rule.on_stage, createdIds, frameworkIdByName)
+    if (!onStageId) continue // host stage didn't survive into the target
+    const targetId = resolveStageRef(rule.target_stage, createdIds, frameworkIdByName)
+    if (rule.action_type === 'move_stage' && !targetId) continue // move with no destination
+    try {
+      await createAutomation(supabase, orgId, jobId, {
+        stage_id: onStageId,
+        trigger: rule.trigger,
+        action_type: rule.action_type,
+        mode: rule.mode,
+        uses_agent: rule.uses_agent,
+        enabled: rule.enabled,
+        guardrails: rule.guardrails,
+        config: { ...rule.config, ...(targetId ? { target_stage_id: targetId } : {}) },
+      })
+    } catch (err) {
+      logger.warn('applyPlanTemplate: could not recreate rule', { stageId: onStageId, action: rule.action_type, err })
     }
   }
 

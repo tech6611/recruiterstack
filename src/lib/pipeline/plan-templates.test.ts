@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { serializePlanStages, resolveNextStageId, resolveRuleTargetStageId, isTemplatableStage } from './plan-templates'
+import { serializePlanStages, serializePlanRules, resolveNextStageId, resolveStageRef, isTemplatableStage } from './plan-templates'
 import type { ZonedStage, PipelineAutomation } from '@/lib/types/pipeline-automations'
 
 const mk = (over: Partial<ZonedStage> & { id: string; zone: ZonedStage['zone']; order_index: number }): ZonedStage => ({
@@ -37,44 +37,47 @@ const rule = (over: Partial<PipelineAutomation>): PipelineAutomation => ({
 
 describe('serializePlanStages', () => {
   it('keeps only active + offer stages, in order', () => {
-    const { stages } = serializePlanStages(STAGES)
+    const stages = serializePlanStages(STAGES)
     expect(stages.map(s => s.name)).toEqual(['Screening', 'Technical', 'Offer'])
     expect(stages.map(s => s.zone)).toEqual(['active', 'active', 'offer'])
   })
 
   it('renormalises order_index to 0..n', () => {
-    expect(serializePlanStages(STAGES).stages.map(s => s.order_index)).toEqual([0, 1, 2])
+    expect(serializePlanStages(STAGES).map(s => s.order_index)).toEqual([0, 1, 2])
   })
 
   it('carries funnel_step + playbook, remapping next_stage_id to an ordinal', () => {
-    const { stages } = serializePlanStages(STAGES)
+    const stages = serializePlanStages(STAGES)
     expect(stages[0].funnel_step).toBe('recruiter_screen')
     expect(stages[0].playbook).toEqual({
       entry_intent: 'Call them', advance_criteria: 'fit>70', reject_to: 'archive', next_stage_index: 1, // 'tech' is index 1
     })
     expect(stages[1].playbook).toBeNull()
   })
+})
 
-  it('sets next_stage_index null when the pointer is outside the templated set', () => {
-    // 'tech' → next points at 'hired' (completed, not templated) → null
-    const withPtr = STAGES.map(s => s.id === 'tech'
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? mk({ id: 'tech', zone: 'active', order_index: 2, name: 'Technical', playbook: { id: 'p2', org_id: 'o', stage_id: 'tech', entry_intent: null, advance_criteria: null, next_stage_id: 'hired', reject_to: 'archive', created_at: '', updated_at: '' } as any })
-      : s)
-    const { stages } = serializePlanStages(withPtr)
-    expect(stages[1].playbook?.next_stage_index).toBeNull()
-  })
-
-  it('captures transferable rules, remapping a move target to an ordinal', () => {
+describe('serializePlanRules', () => {
+  it('captures a custom-stage rule, referencing host + target by ordinal', () => {
     const rules = new Map<string, PipelineAutomation[]>([['screen', [
       rule({ stage_id: 'screen', action_type: 'move_stage', config: { conditions: [{ field: 'ai_score', operator: 'gte', value: 75 }], target_stage_id: 'tech' } }),
     ]]])
-    const { stages, skippedRules } = serializePlanStages(STAGES, rules)
+    const { rules: out, skippedRules } = serializePlanRules(STAGES, rules)
     expect(skippedRules).toEqual([])
-    expect(stages[0].rules).toHaveLength(1)
-    expect(stages[0].rules[0].target_stage_index).toBe(1) // 'tech'
-    expect(stages[0].rules[0].config).not.toHaveProperty('target_stage_id')
-    expect(stages[0].rules[0].config.conditions?.[0]).toMatchObject({ field: 'ai_score', value: 75 })
+    expect(out).toHaveLength(1)
+    expect(out[0].on_stage).toEqual({ custom_index: 0 })   // Screening
+    expect(out[0].target_stage).toEqual({ custom_index: 1 }) // Technical
+    expect(out[0].config).not.toHaveProperty('target_stage_id')
+    expect(out[0].config.conditions?.[0]).toMatchObject({ field: 'ai_score', value: 75 })
+  })
+
+  it('captures a FRAMEWORK-stage rule (e.g. on Applied), referencing it by name', () => {
+    const rules = new Map<string, PipelineAutomation[]>([['app', [
+      rule({ stage_id: 'app', action_type: 'move_stage', config: { conditions: [{ field: 'ai_score', operator: 'gte', value: 80 }], target_stage_id: 'screen' } }),
+    ]]])
+    const { rules: out } = serializePlanRules(STAGES, rules)
+    expect(out).toHaveLength(1)
+    expect(out[0].on_stage).toEqual({ framework: 'Applied' })  // by name — survives copy
+    expect(out[0].target_stage).toEqual({ custom_index: 0 })   // Screening
   })
 
   it('skips-and-flags rules that reference a sequence or a panel', () => {
@@ -82,28 +85,42 @@ describe('serializePlanStages', () => {
       ['screen', [rule({ stage_id: 'screen', action_type: 'enrol_outreach', config: { sequence_id: 'seq1' } })]],
       ['tech',   [rule({ stage_id: 'tech', action_type: 'schedule_interview' })]],
     ])
-    const { stages, skippedRules } = serializePlanStages(STAGES, rules)
-    expect(stages[0].rules).toHaveLength(0)
-    expect(stages[1].rules).toHaveLength(0)
+    const { rules: out, skippedRules } = serializePlanRules(STAGES, rules)
+    expect(out).toHaveLength(0)
     expect(skippedRules).toEqual(['Screening: enrol outreach', 'Technical: schedule interview'])
+  })
+
+  it('drops the target ref when it points outside the current stages (stale id)', () => {
+    const rules = new Map<string, PipelineAutomation[]>([['screen', [
+      rule({ stage_id: 'screen', action_type: 'move_stage', config: { target_stage_id: 'ghost' } }),
+    ]]])
+    const { rules: out } = serializePlanRules(STAGES, rules)
+    expect(out[0].target_stage).toBeNull()
   })
 })
 
 describe('resolveNextStageId', () => {
   it('maps a stage ordinal back to a created stage id', () => {
-    const { stages } = serializePlanStages(STAGES)
+    const stages = serializePlanStages(STAGES)
     const created = ['id_screen', 'id_tech', 'id_offer']
     expect(resolveNextStageId(stages, created, 0)).toBe('id_tech') // Screening → Technical
     expect(resolveNextStageId(stages, created, 1)).toBeNull()
   })
 })
 
-describe('resolveRuleTargetStageId', () => {
-  it('maps a rule target ordinal to a created id, null when absent', () => {
-    const created = ['id_screen', 'id_tech', 'id_offer']
-    expect(resolveRuleTargetStageId(created, 1)).toBe('id_tech')
-    expect(resolveRuleTargetStageId(created, null)).toBeNull()
-    expect(resolveRuleTargetStageId(created, 9)).toBeNull()
+describe('resolveStageRef', () => {
+  const created = ['id_screen', 'id_tech', 'id_offer']
+  const fw = new Map([['Applied', 'id_applied'], ['Hired', 'id_hired']])
+  it('resolves a custom ordinal to the created stage id', () => {
+    expect(resolveStageRef({ custom_index: 1 }, created, fw)).toBe('id_tech')
+  })
+  it('resolves a framework name to the target job stage id', () => {
+    expect(resolveStageRef({ framework: 'Applied' }, created, fw)).toBe('id_applied')
+  })
+  it('returns null for null, out-of-range ordinal, or missing framework name', () => {
+    expect(resolveStageRef(null, created, fw)).toBeNull()
+    expect(resolveStageRef({ custom_index: 9 }, created, fw)).toBeNull()
+    expect(resolveStageRef({ framework: 'Nope' }, created, fw)).toBeNull()
   })
 })
 

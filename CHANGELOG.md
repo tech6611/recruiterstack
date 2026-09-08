@@ -9,6 +9,22 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-08 (Fix: templates copy rules on framework stages too)
+
+### Fixed
+- **Plan templates now capture automation rules from every stage, not just the
+  custom Active/Offer ones.** The important first-stage rules typically live on
+  **"Applied"** (a framework stage), so the previous version copied zero rules for
+  most real plans. Rules are now stored at the template level with portable stage
+  references — a custom stage by ordinal, a framework stage (Applied, Lead ladder,
+  Hired, Archived) by its stable name — and remapped to the target job on apply.
+  Applying a template now replaces the target job's rules so it behaves like the
+  template.
+
+### Schema
+- **Migration 139 (`139_plan_template_rules.sql`)** — adds `plan_templates.rules`
+  (jsonb, default `[]`). Additive; existing templates apply unchanged.
+
 ## 2026-09-06 (Plan templates now copy automation rules)
 
 ### Added
