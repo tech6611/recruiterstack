@@ -85,11 +85,20 @@ async function buildFacts(sb: LooseSb, app: AppRow): Promise<RuleFacts> {
   }
   const days = since ? Math.floor((Date.now() - new Date(since).getTime()) / 86_400_000) : 0
 
-  // Interview feedback = a scorecard. Latest one gives the verdict; existence is
-  // "feedback submitted".
-  const { data: sc } = await sb.from('scorecards')
-    .select('recommendation').eq('application_id', app.id)
-    .order('created_at', { ascending: false }).limit(1).maybeSingle()
+  // Interview feedback = a scorecard for the candidate's CURRENT round. Scoping it
+  // to the current stage (scorecards are tagged with stage_name) makes "cleared this
+  // round" mean feedback FOR this round — so a positive verdict from an earlier round
+  // can't satisfy a later round's gate (no cascade down a feedback-gated funnel).
+  // Falls back to the latest scorecard overall if the current stage name is unknown.
+  let currentStageName: string | null = null
+  if (app.stage_id) {
+    const { data: st } = await sb.from('pipeline_stages')
+      .select('name').eq('org_id', app.org_id).eq('id', app.stage_id).maybeSingle()
+    currentStageName = st?.name ?? null
+  }
+  let scQ = sb.from('scorecards').select('recommendation').eq('application_id', app.id)
+  if (currentStageName) scQ = scQ.eq('stage_name', currentStageName)
+  const { data: sc } = await scQ.order('created_at', { ascending: false }).limit(1).maybeSingle()
 
   // Outreach state for the lead funnel. Enrolments are keyed by candidate (not
   // application): 'enrolled' = in any sequence; 'replied' = they wrote back
