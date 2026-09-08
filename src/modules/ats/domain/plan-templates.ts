@@ -39,13 +39,9 @@ export async function deletePlanTemplate(supabase: Supabase, orgId: string, id: 
   if (error) throw error
 }
 
-/** Save a job's current pipeline plan (its Active + Offer stages) as a template. */
-export async function createPlanTemplateFromJob(
-  supabase: Supabase,
-  orgId: string,
-  params: { name: string; description?: string | null; jobId: string; createdBy?: string | null },
-): Promise<PlanTemplate & { skippedRules: string[] }> {
-  const { name, description = null, jobId, createdBy = null } = params
+/** Snapshot a job's current plan (custom stages + rules) into the shape a template
+ *  stores. Shared by create + update. Throws TEMPLATE_EMPTY if no custom stages. */
+async function snapshotJobPlan(supabase: Supabase, orgId: string, jobId: string) {
   const zoned = await getZonedStages(supabase, orgId, jobId)
 
   // getZonedStages omits color; fetch it so templates preserve stage colours.
@@ -67,12 +63,44 @@ export async function createPlanTemplateFromJob(
     arr.push(r); rulesByStage.set(r.stage_id, arr)
   }
   const { rules, skippedRules } = serializePlanRules(withColor, rulesByStage)
+  return { stages, rules, skippedRules }
+}
 
+/** Save a job's current pipeline plan (its Active + Offer stages) as a template. */
+export async function createPlanTemplateFromJob(
+  supabase: Supabase,
+  orgId: string,
+  params: { name: string; description?: string | null; jobId: string; createdBy?: string | null },
+): Promise<PlanTemplate & { skippedRules: string[] }> {
+  const { name, description = null, jobId, createdBy = null } = params
+  const { stages, rules, skippedRules } = await snapshotJobPlan(supabase, orgId, jobId)
+  const sb = supabase as unknown as LooseSb
   const { data, error } = await sb
     .from('plan_templates')
     .insert({ org_id: orgId, name, description, stages, rules, source_job_id: jobId, created_by: createdBy })
     .select('*').single()
   if (error) throw error
+  return { ...(data as PlanTemplate), skippedRules }
+}
+
+/** Refresh an existing template in place from a job's CURRENT plan — same template
+ *  id and name, updated stages + rules. Lets a recruiter push a job's latest plan
+ *  into a saved template without delete-and-recreate. */
+export async function updatePlanTemplateFromJob(
+  supabase: Supabase,
+  orgId: string,
+  templateId: string,
+  jobId: string,
+): Promise<PlanTemplate & { skippedRules: string[] }> {
+  const { stages, rules, skippedRules } = await snapshotJobPlan(supabase, orgId, jobId)
+  const sb = supabase as unknown as LooseSb
+  const { data, error } = await sb
+    .from('plan_templates')
+    .update({ stages, rules, source_job_id: jobId })
+    .eq('org_id', orgId).eq('id', templateId)
+    .select('*').single()
+  if (error) throw error
+  if (!data) throw new Error('TEMPLATE_NOT_FOUND')
   return { ...(data as PlanTemplate), skippedRules }
 }
 
