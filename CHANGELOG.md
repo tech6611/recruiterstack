@@ -9,6 +9,16 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-08 (Plan templates: "Update" a template from the current job)
+
+### Added
+- **"Update" button per template** in the Pipeline Plan editor's Templates menu:
+  refreshes a saved template in place from the current job's plan (stages + rules),
+  same template + name — no more delete-and-re-save to capture changes. New
+  `PUT /api/plan-templates/[id] { job_id }` + `updatePlanTemplateFromJob` facade
+  (shares the snapshot logic with save; skip-and-flag preserved). Template rows now
+  also show the rule count.
+
 ## 2026-09-08 (Plan editor: "Save plan" only enabled when there are unsaved edits)
 
 ### Changed

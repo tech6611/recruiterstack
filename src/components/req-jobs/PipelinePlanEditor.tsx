@@ -205,6 +205,29 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
     finally { setTplBusy(false) }
   }
 
+  const updateTemplateFromJob = async (t: PlanTemplate) => {
+    if (!confirm(`Update “${t.name}” with this job's current plan (stages + rules)? The template's existing contents are replaced.`)) return
+    setTplBusy(true)
+    try {
+      const res = await fetch(`/api/plan-templates/${t.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Failed to update template')
+      const skipped = (j?.data?.skippedRules ?? []) as string[]
+      toast.success(`Updated “${t.name}” from this job.`)
+      if (skipped.length) {
+        toast.warning(
+          `${skipped.length} rule${skipped.length === 1 ? '' : 's'} not copied (they reference a specific sequence or panel): ${skipped.join('; ')}`,
+          { duration: 8000 },
+        )
+      }
+      await loadTemplates()
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to update template') }
+    finally { setTplBusy(false) }
+  }
+
   const deleteTemplate = async (t: PlanTemplate) => {
     if (!confirm(`Delete template “${t.name}”?`)) return
     try {
@@ -367,9 +390,20 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
                         <div key={t.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50">
                           <div className="min-w-0">
                             <div className="truncate text-sm font-medium text-slate-700">{t.name}</div>
-                            <div className="text-[10.5px] text-slate-400">{t.stages.length} stage{t.stages.length === 1 ? '' : 's'}</div>
+                            <div className="text-[10.5px] text-slate-400">
+                              {t.stages.length} stage{t.stages.length === 1 ? '' : 's'}
+                              {(t.rules?.length ?? 0) > 0 && ` · ${t.rules.length} rule${t.rules.length === 1 ? '' : 's'}`}
+                            </div>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              onClick={() => void updateTemplateFromJob(t)}
+                              disabled={tplBusy}
+                              title="Refresh this template with this job's current plan"
+                              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                            >
+                              Update
+                            </button>
                             <button
                               onClick={() => void applyTemplate(t)}
                               disabled={tplBusy}
