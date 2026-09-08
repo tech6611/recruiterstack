@@ -130,22 +130,34 @@ export async function applyPlanTemplateToJob(
     }
   }
 
-  // 4. Recreate the template's automation rules so the target job behaves like the
-  //    template. Replace the job's existing rules (the apply already replaced the
-  //    stages), remapping every StageRef → the target job's stage ids. Framework
-  //    stages (Applied etc.) persist, so their names resolve against `before`.
+  // 4. Recreate the template's automation rules, remapping every StageRef → the
+  //    target job's stage ids. Framework stages (Applied etc.) persist, so their
+  //    names resolve against `before`.
+  //
+  //    SURGICAL, not scorched-earth: only clear existing rules on the stages this
+  //    template actually writes to — never wipe the whole job's rules. So applying
+  //    a template can't destroy rules on stages it doesn't manage (e.g. an "Applied"
+  //    rule survives a template that has no Applied rule), and re-applying the same
+  //    template is idempotent (clear-then-set the same stages, no duplicates).
   const frameworkIdByName = new Map<string, string>(
     before.filter(s => !isTemplatableStage(s.zone)).map(s => [s.name, s.id]),
   )
-  await sb.from('pipeline_automations').delete().eq('org_id', orgId).eq('job_id', jobId)
-  for (const rule of (template.rules ?? [])) {
+  const resolved = (template.rules ?? []).map(rule => {
     const onStageId = resolveStageRef(rule.on_stage, createdIds, frameworkIdByName)
-    if (!onStageId) continue // host stage didn't survive into the target
     const targetId = resolveStageRef(rule.target_stage, createdIds, frameworkIdByName)
+    return { rule, onStageId, targetId }
+  }).filter(x => x.onStageId != null) // host stage must survive into the target
+
+  const touchedStageIds = Array.from(new Set(resolved.map(x => x.onStageId as string)))
+  if (touchedStageIds.length) {
+    await sb.from('pipeline_automations').delete()
+      .eq('org_id', orgId).eq('job_id', jobId).in('stage_id', touchedStageIds)
+  }
+  for (const { rule, onStageId, targetId } of resolved) {
     if (rule.action_type === 'move_stage' && !targetId) continue // move with no destination
     try {
       await createAutomation(supabase, orgId, jobId, {
-        stage_id: onStageId,
+        stage_id: onStageId as string,
         trigger: rule.trigger,
         action_type: rule.action_type,
         mode: rule.mode,
