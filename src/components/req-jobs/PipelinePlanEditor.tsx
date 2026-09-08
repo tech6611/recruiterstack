@@ -36,6 +36,18 @@ const editFrom = (s: ZonedStage): Edit => ({
   funnel_step: s.funnel_step ?? null,
 })
 
+/** Stable serialization of everything "Save plan" persists (per-stage playbook +
+ *  funnel step + interview panel), so we can tell whether there are unsaved edits. */
+function serializePlan(edits: Record<string, Edit>, panels: Record<string, PanelMember[]>): string {
+  return JSON.stringify(
+    Object.keys(edits).sort().map(id => ({
+      id,
+      e: [edits[id].entry_intent, edits[id].advance_criteria, edits[id].reject_to, edits[id].funnel_step],
+      p: (panels[id] ?? []).map(m => m.email).sort(),
+    })),
+  )
+}
+
 export function PipelinePlanEditor({ jobId }: { jobId: string }) {
   const [stages, setStages] = useState<ZonedStage[]>([])
   const [edits, setEdits] = useState<Record<string, Edit>>({})
@@ -50,6 +62,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
   const [team, setTeam] = useState<PanelMember[]>([])          // org team members (name+email) for the panel picker
   const [panels, setPanels] = useState<Record<string, PanelMember[]>>({})  // interview panel per stage
   const serverNames = useRef<Map<string, string>>(new Map())
+  const savedPlan = useRef<string>('') // baseline of the last-saved plan (for dirty check)
 
   // ── Interview-plan templates ──
   const [templates, setTemplates] = useState<PlanTemplate[]>([])
@@ -94,6 +107,11 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
     serverNames.current = new Map(list.map(s => [s.id, s.name]))
     setEdits(prev => Object.fromEntries(list.map(s => [s.id, preserve && prev[s.id] ? prev[s.id] : editFrom(s)])))
     setPanels(prev => Object.fromEntries(list.map(s => [s.id, preserve && prev[s.id] ? prev[s.id] : (s.interview_panel ?? [])])))
+    // Baseline = what's persisted on the server (used to detect unsaved edits).
+    savedPlan.current = serializePlan(
+      Object.fromEntries(list.map(s => [s.id, editFrom(s)])),
+      Object.fromEntries(list.map(s => [s.id, s.interview_panel ?? []])),
+    )
     setLoading(false)
   }, [jobId])
   useEffect(() => { load(); loadRules() }, [load, loadRules])
@@ -295,6 +313,9 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
     [stages],
   )
 
+  // Unsaved playbook/funnel/panel edits? (Structural stage edits save immediately.)
+  const dirty = serializePlan(edits, panels) !== savedPlan.current
+
   if (loading) {
     return <div className="rounded-xl border border-slate-200 bg-white"><div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div></div>
   }
@@ -368,9 +389,14 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
               </>
             )}
           </div>
-          <Button size="sm" onClick={save} disabled={saving || busy}>
+          <Button
+            size="sm"
+            onClick={save}
+            disabled={saving || busy || !dirty}
+            title={dirty ? 'Save your changes' : 'No unsaved changes'}
+          >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            Save plan
+            {saving ? 'Saving…' : dirty ? 'Save plan' : 'Saved'}
           </Button>
         </div>
       </div>

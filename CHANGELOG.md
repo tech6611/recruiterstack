@@ -9,6 +9,14 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-08 (Plan editor: "Save plan" only enabled when there are unsaved edits)
+
+### Changed
+- The **"Save plan" button in the Pipeline Plan editor is now a dirty-state button**:
+  disabled (and labelled "Saved") when nothing has changed, enabled ("Save plan")
+  only when there are unsaved playbook / funnel-step / interview-panel edits. Prevents
+  confusing no-op saves. (Structural stage edits still save immediately, as before.)
+
 ## 2026-09-08 (Automation: interview-feedback gates are round-scoped)
 
 ### Fixed
