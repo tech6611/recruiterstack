@@ -1,92 +1,66 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { Users, Loader2 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { teamMemberName, nameInitials, type TeamMember } from '@/lib/team-members'
-
-const TYPE_LABEL: Record<string, string> = {
-  video: 'Video', phone: 'Phone', in_person: 'In person', panel: 'Panel', technical: 'Technical', assessment: 'Assessment',
-}
-
-/** Minimal round shape the roster needs (satisfied by both saved + in-editor rounds). */
-export type RosterRound = {
-  name: string
-  interview_type: string
-  duration_minutes: number
-  interviewer_user_id: string | null
-  interviewer_name: string | null
-  interviewer_role: string | null
-}
+import { nameInitials } from '@/lib/team-members'
+import type { ZonedStage } from '@/lib/types/pipeline-automations'
 
 /**
- * "Team on this job" — built from the interview plan. Pass `liveRounds`/`liveTeam`
- * to render from an in-progress editor (updates as you type); omit them and the
- * component fetches the saved plan itself (used on the Overview tab).
+ * "Team on this job" — built from the per-stage interview panels saved in the
+ * pipeline plan (Interview plan tab → expand a stage → "Interview panel"), plus
+ * the resolved hiring manager. One row per person; each is tagged with the
+ * stage(s) they interview on. Shown in the Overview sidebar.
  */
-export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }: {
+export function JobTeamRoster({ jobId, hmRefreshKey = 0 }: {
   jobId: string
-  liveRounds?: RosterRound[]
-  liveTeam?: TeamMember[]
   /** Bump to re-fetch the resolved hiring manager (e.g. after the HM picker changes). */
   hmRefreshKey?: number
 }) {
-  const isLive = liveRounds !== undefined
-  const [fetchedRounds, setFetchedRounds] = useState<RosterRound[]>([])
-  const [fetchedTeam, setFetchedTeam]     = useState<TeamMember[]>([])
-  const [hm, setHm]                       = useState<{ user_id: string | null; name: string | null; email: string | null; source: string } | null>(null)
-  const [loading, setLoading]             = useState(!isLive)
+  const [stages, setStages]   = useState<ZonedStage[]>([])
+  const [hm, setHm]           = useState<{ user_id: string | null; name: string | null; email: string | null; source: string } | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    let alive = true
     setLoading(true)
-    const [plan, tm] = await Promise.all([
-      fetch(`/api/jobs/${jobId}/interview-plan`).then(r => r.json()).catch(() => null),
-      fetch('/api/team').then(r => r.json()).catch(() => null),
-    ])
-    setFetchedRounds((plan?.data?.rounds ?? []) as RosterRound[])
-    setFetchedTeam((tm?.data ?? []) as TeamMember[])
-    setLoading(false)
+    fetch(`/api/jobs/${jobId}/pipeline-plan`).then(r => r.json())
+      .then(j => { if (alive) setStages((j?.data?.stages ?? []) as ZonedStage[]) })
+      .catch(() => { if (alive) setStages([]) })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
   }, [jobId])
-  useEffect(() => { if (!isLive) load() }, [isLive, load])
 
-  // Resolve the hiring manager (assigned real user, else intake) — in both modes.
+  // Resolve the hiring manager (assigned real user, else intake).
   useEffect(() => {
     fetch(`/api/jobs/${jobId}/hiring-manager`).then(r => r.json())
       .then(j => setHm(j?.data ? { user_id: j.data.user_id ?? null, name: j.data.name ?? null, email: j.data.email ?? null, source: j.data.source ?? 'none' } : null))
       .catch(() => setHm(null))
   }, [jobId, hmRefreshKey])
 
-  const rounds = isLive ? liveRounds! : fetchedRounds
-  const team   = isLive ? (liveTeam ?? []) : fetchedTeam
-  const memberById = new Map(team.map(m => [m.user_id, m]))
-
-  // Group rounds by the person (or role) that runs them, preserving round order.
+  // Group panel members by email (case-insensitive), preserving stage order.
   const order: string[] = []
-  const groups = new Map<string, { name: string; rounds: { round: RosterRound; n: number }[] }>()
-  rounds.forEach((r, idx) => {
-    const key = r.interviewer_user_id ?? (r.interviewer_role ? `role:${r.interviewer_role}` : null)
-    if (!key) return
-    const name = r.interviewer_user_id
-      ? (memberById.get(r.interviewer_user_id) ? teamMemberName(memberById.get(r.interviewer_user_id)!) : (r.interviewer_name ?? 'Interviewer'))
-      : (r.interviewer_role || 'Interviewer')
-    if (!groups.has(key)) { groups.set(key, { name, rounds: [] }); order.push(key) }
-    groups.get(key)!.rounds.push({ round: r, n: idx + 1 })
-  })
-  const hmName = hm?.name ?? null
+  const groups = new Map<string, { name: string; stages: string[] }>()
+  for (const s of stages) {
+    for (const m of s.interview_panel ?? []) {
+      const key = m.email.trim().toLowerCase()
+      if (!key) continue
+      if (!groups.has(key)) { groups.set(key, { name: m.name || m.email, stages: [] }); order.push(key) }
+      const g = groups.get(key)!
+      if (!g.stages.includes(s.name)) g.stages.push(s.name)
+    }
+  }
+
+  const hmName  = hm?.name ?? null
   const hmEmail = hm?.email ?? null
-  const hasHM = !!(hmName || hmEmail)
-  const hmPill = hm?.source === 'assigned' ? 'hiring manager' : 'from intake'
-  const hmKey = hm?.user_id ?? null
+  const hasHM   = !!(hmName || hmEmail)
+  const hmPill  = hm?.source === 'assigned' ? 'hiring manager' : 'from intake'
+  const hmKey   = hmEmail ? hmEmail.trim().toLowerCase() : null
   const hmIsInterviewer = !!(hmKey && groups.has(hmKey))
 
-  const roundsSub = (rs: { round: RosterRound; n: number }[]) =>
-    rs.map(x => `${x.round.name} · ${TYPE_LABEL[x.round.interview_type] ?? x.round.interview_type} · ${x.round.duration_minutes}m`).join('  ·  ')
-
-  // One row per person. A hiring manager who also runs a round is merged into that
-  // round's row. Everyone — including the HM — is tagged by the round they run
-  // (e.g. "Round 2"), not their role: the HM is already identified on the Overview,
-  // so re-tagging them "hiring manager" here just duplicates that. Only a HM who
-  // runs no round at all keeps the "hiring manager" tag (there's no round to show).
+  // One row per person. A hiring manager who also sits on a panel is merged into
+  // that row and tagged by their stage(s); only a HM on no panel keeps the
+  // "hiring manager" tag (the HM is already identified on the Overview anyway).
   const rows: { key: string; name: string; sub: string; pill: string }[] = []
   if (hasHM && !hmIsInterviewer) {
     rows.push({ key: 'hm', name: hmName || hmEmail || 'Hiring manager', sub: hmEmail && hmName ? hmEmail : 'Hiring manager', pill: hmPill })
@@ -94,8 +68,8 @@ export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }:
   for (const k of order) {
     const g = groups.get(k)!
     rows.push({
-      key: k, name: g.name, sub: roundsSub(g.rounds),
-      pill: g.rounds.length === 1 ? `Round ${g.rounds[0].n}` : `${g.rounds.length} rounds`,
+      key: k, name: g.name, sub: g.stages.join('  ·  '),
+      pill: g.stages.length === 1 ? g.stages[0] : `${g.stages.length} stages`,
     })
   }
 
@@ -108,7 +82,7 @@ export function JobTeamRoster({ jobId, liveRounds, liveTeam, hmRefreshKey = 0 }:
         {loading ? (
           <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-slate-400" /></div>
         ) : rows.length === 0 ? (
-          <p className="py-2 text-sm text-slate-400">Assign interviewers in the Interview Plan to build the team.</p>
+          <p className="py-2 text-sm text-slate-400">Add interviewers to a stage’s panel in the Interview plan tab to build the team.</p>
         ) : (
           <div className="divide-y divide-slate-100">
             {rows.map(r => (

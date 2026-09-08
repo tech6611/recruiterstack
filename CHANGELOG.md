@@ -9,6 +9,21 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-08 (Interview plan tab: drop rounds editor + inline roster)
+
+### Removed
+- **"Team on this job" and the rounds-based "Interview Plan" editor no longer
+  appear on the job's Interview plan tab.** The tab is now just the pipeline plan
+  editor (stages, per-stage interview panel, rules) and the automation activity
+  log. The roster still lives in the Overview sidebar.
+
+### Changed
+- **"Team on this job" (Overview sidebar) now reads from the per-stage interview
+  panels** saved in the pipeline plan, instead of the old rounds-based interview
+  plan. People are grouped by email and tagged with the stage(s) they interview on
+  (e.g. "Culture Fit"), so the card stays in sync with the plan editor. The rounds
+  API is untouched.
+
 ## 2026-09-08 (Fix: templates copy rules on framework stages too)
 
 ### Fixed
