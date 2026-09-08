@@ -171,7 +171,7 @@ export function PipelinePlanEditor({ jobId }: { jobId: string }) {
   }
 
   const applyTemplate = async (t: PlanTemplate) => {
-    if (!confirm(`Apply “${t.name}”? This replaces this job's Active & Offer stages; any candidates in a replaced stage move back to “Applied”.`)) return
+    if (!confirm(`Apply “${t.name}”? This replaces this job's Active & Offer stages and its automation rules; any candidates in a replaced stage move back to “Applied”.`)) return
     setTplBusy(true)
     try {
       const res = await fetch(`/api/jobs/${jobId}/apply-plan-template`, {

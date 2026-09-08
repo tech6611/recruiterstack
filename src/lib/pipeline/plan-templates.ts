@@ -24,21 +24,28 @@ export interface PlanTemplateStagePlaybook {
   next_stage_index: number | null
 }
 
-/** A rule captured in a template. Any stage reference (which stage it moves people
- *  to) is stored as an ordinal into the template's stages array, so apply can remap
- *  it to the target job's freshly-created stage ids. */
+/** A portable reference to a stage that survives copying between jobs. A CUSTOM
+ *  stage (Active/Offer) is referenced by its ordinal in the template's stages array
+ *  (its name may be edited); a FRAMEWORK stage (Lead ladder, Applied, Hired,
+ *  Archived) is referenced by its stable name, since every job has it. */
+export type StageRef = { custom_index: number } | { framework: string }
+
+/** A rule captured in a template. Both the stage it lives on and (for move_stage)
+ *  its destination are stored as portable StageRefs, remapped to the target job's
+ *  stage ids on apply — so a copied rule runs on the target job's equivalent stages.
+ *  Rules are captured on ALL stages, not just the custom ones (the important
+ *  first-stage rules typically live on "Applied", a framework stage). */
 export interface PlanTemplateRule {
+  on_stage: StageRef
+  target_stage: StageRef | null
   trigger: AutomationTrigger
   action_type: AutomationActionType
   mode: AutomationMode
   uses_agent: boolean
   enabled: boolean
   guardrails: AutomationGuardrails
-  /** Rule config with target_stage_id stripped (it's stored as target_stage_index
-   *  and remapped on apply). Typed as the full config for convenience. */
+  /** Rule config with target_stage_id stripped (stored as target_stage above). */
   config: AutomationConfig
-  /** move_stage destination, as an ordinal into the template's stages (or null). */
-  target_stage_index: number | null
 }
 
 export interface PlanTemplateStage {
@@ -49,7 +56,6 @@ export interface PlanTemplateStage {
   is_promotion_gate: boolean
   funnel_step: string | null
   playbook: PlanTemplateStagePlaybook | null
-  rules: PlanTemplateRule[]
 }
 
 /** Actions that reference something outside the plan (a specific sequence, or an
@@ -68,6 +74,7 @@ export interface PlanTemplate {
   name: string
   description: string | null
   stages: PlanTemplateStage[]
+  rules: PlanTemplateRule[]
   source_job_id: string | null
   created_by: string | null
   created_at: string
@@ -78,37 +85,79 @@ export function isTemplatableStage(zone: string): zone is TemplateZone {
   return zone === 'active' || zone === 'offer'
 }
 
-export interface SerializePlanResult {
-  stages: PlanTemplateStage[]
+/** Snapshot a job's zoned stages into template stages — the CUSTOM Active/Offer
+ *  flow only, in order, with funnel-step + playbook (next_stage as an ordinal). */
+export function serializePlanStages(stages: ZonedStage[]): PlanTemplateStage[] {
+  const custom = stages
+    .filter(s => isTemplatableStage(s.zone))
+    .sort((a, b) => a.order_index - b.order_index)
+  const indexById = new Map(custom.map((s, i) => [s.id, i]))
+
+  return custom.map((s, i) => ({
+    name: s.name,
+    zone: s.zone as TemplateZone,
+    order_index: i, // renormalise to 0..n within the template
+    color: (s as { color?: string }).color ?? 'slate',
+    is_promotion_gate: s.is_promotion_gate,
+    funnel_step: s.funnel_step ?? null,
+    playbook: s.playbook
+      ? {
+          entry_intent: s.playbook.entry_intent ?? null,
+          advance_criteria: s.playbook.advance_criteria ?? null,
+          reject_to: s.playbook.reject_to,
+          next_stage_index: s.playbook.next_stage_id != null
+            ? (indexById.get(s.playbook.next_stage_id) ?? null)
+            : null,
+        }
+      : null,
+  }))
+}
+
+export interface SerializeRulesResult {
+  rules: PlanTemplateRule[]
   /** Names of rules skipped because their action can't be copied across jobs. */
   skippedRules: string[]
 }
 
-/** Snapshot a job's zoned stages (custom Active/Offer only) into template stages,
- *  including their automation rules. next_stage_id and each move rule's target are
- *  stored as ordinals into the template so apply can remap them. Rules whose action
- *  references something job-specific (a sequence / a people panel) are skipped and
- *  reported, not copied broken. `rulesByStage` maps a stage id → its rules. */
-export function serializePlanStages(
+/** Build a portable StageRef for a stage id, given the job's stages. Custom
+ *  (Active/Offer) stages → ordinal in the custom list; framework stages → name.
+ *  Null when the id isn't a current stage (e.g. a stale/deleted reference). */
+function stageRefFor(stageId: string, stages: ZonedStage[]): StageRef | null {
+  const s = stages.find(x => x.id === stageId)
+  if (!s) return null
+  if (isTemplatableStage(s.zone)) {
+    const custom = stages.filter(x => isTemplatableStage(x.zone)).sort((a, b) => a.order_index - b.order_index)
+    const idx = custom.findIndex(x => x.id === stageId)
+    return idx >= 0 ? { custom_index: idx } : null
+  }
+  return { framework: s.name }
+}
+
+/** Snapshot a job's automation rules — from EVERY stage (framework rules like the
+ *  first-stage "Applied → Screening if score high" matter most) — into portable
+ *  template rules. Each stage reference becomes a StageRef so apply can remap it.
+ *  Rules whose action references something job-specific (a sequence / a people
+ *  panel) are skipped and reported. `rulesByStage` maps a stage id → its rules. */
+export function serializePlanRules(
   stages: ZonedStage[],
-  rulesByStage: Map<string, PipelineAutomation[]> = new Map(),
-): SerializePlanResult {
-  const custom = stages
-    .filter(s => isTemplatableStage(s.zone))
-    .sort((a, b) => a.order_index - b.order_index)
-
-  const indexById = new Map(custom.map((s, i) => [s.id, i]))
+  rulesByStage: Map<string, PipelineAutomation[]>,
+): SerializeRulesResult {
+  const rules: PlanTemplateRule[] = []
   const skippedRules: string[] = []
+  const nameById = new Map(stages.map(s => [s.id, s.name]))
 
-  const outStages = custom.map((s, i) => {
-    const rules: PlanTemplateRule[] = []
-    for (const r of rulesByStage.get(s.id) ?? []) {
+  for (const [stageId, stageRules] of Array.from(rulesByStage.entries())) {
+    const onStage = stageRefFor(stageId, stages)
+    if (!onStage) continue // rule on a stage that no longer exists
+    for (const r of stageRules) {
       if (!isTransferableRule(r.action_type)) {
-        skippedRules.push(`${s.name}: ${r.action_type.replace(/_/g, ' ')}`)
+        skippedRules.push(`${nameById.get(stageId) ?? 'stage'}: ${r.action_type.replace(/_/g, ' ')}`)
         continue
       }
       const { target_stage_id, ...restConfig } = r.config ?? {}
       rules.push({
+        on_stage: onStage,
+        target_stage: target_stage_id != null ? stageRefFor(target_stage_id, stages) : null,
         trigger: r.trigger,
         action_type: r.action_type,
         mode: r.mode,
@@ -116,39 +165,23 @@ export function serializePlanStages(
         enabled: r.enabled,
         guardrails: r.guardrails ?? {},
         config: restConfig,
-        target_stage_index: target_stage_id != null ? (indexById.get(target_stage_id) ?? null) : null,
       })
     }
-    return {
-      name: s.name,
-      zone: s.zone as TemplateZone,
-      order_index: i, // renormalise to 0..n within the template
-      color: (s as { color?: string }).color ?? 'slate',
-      is_promotion_gate: s.is_promotion_gate,
-      funnel_step: s.funnel_step ?? null,
-      playbook: s.playbook
-        ? {
-            entry_intent: s.playbook.entry_intent ?? null,
-            advance_criteria: s.playbook.advance_criteria ?? null,
-            reject_to: s.playbook.reject_to,
-            next_stage_index: s.playbook.next_stage_id != null
-              ? (indexById.get(s.playbook.next_stage_id) ?? null)
-              : null,
-          }
-        : null,
-      rules,
-    }
-  })
-  return { stages: outStages, skippedRules }
+  }
+  return { rules, skippedRules }
 }
 
-/** Resolve a template rule's target_stage_index to a created stage id (or null). */
-export function resolveRuleTargetStageId(
-  createdIdsInOrder: string[],
-  targetStageIndex: number | null,
+/** Resolve a StageRef against a target job: custom → the created stage id at that
+ *  ordinal; framework → the target job's stage with that name. Null if unresolvable
+ *  (e.g. the target job lacks that framework stage). */
+export function resolveStageRef(
+  ref: StageRef | null,
+  createdCustomIds: string[],
+  frameworkIdByName: Map<string, string>,
 ): string | null {
-  if (targetStageIndex == null) return null
-  return createdIdsInOrder[targetStageIndex] ?? null
+  if (!ref) return null
+  if ('custom_index' in ref) return createdCustomIds[ref.custom_index] ?? null
+  return frameworkIdByName.get(ref.framework) ?? null
 }
 
 /** Given the template's stages (in order) and the ids of the stages just created
