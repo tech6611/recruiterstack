@@ -9,6 +9,16 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-08 (Automation: interview-feedback gates are round-scoped)
+
+### Fixed
+- **A rule's "interview feedback" now reads a scorecard for the candidate's CURRENT
+  stage**, not the latest scorecard overall. Previously a positive verdict from one
+  round (e.g. Hiring Manager) satisfied every later feedback gate too, so a single
+  scorecard could cascade a candidate straight down a feedback-gated funnel. Feedback
+  gates are now per-round, so each advancement genuinely requires that round's
+  feedback. (Falls back to the latest scorecard if the current stage name is unknown.)
+
 ## 2026-09-08 (Interview plan tab: drop rounds editor + inline roster)
 
 ### Removed
