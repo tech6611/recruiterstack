@@ -24,6 +24,17 @@ entries on top.
   (e.g. "Culture Fit"), so the card stays in sync with the plan editor. The rounds
   API is untouched.
 
+## 2026-09-08 (Fix: applying a template no longer wipes unrelated rules)
+
+### Fixed
+- **Applying a plan template is no longer destructive to automation rules it doesn't
+  manage.** The prior version deleted ALL of the job's rules on apply
+  (`DELETE … WHERE job_id`) before recreating from the template — so applying an
+  empty/partial template silently wiped rules on stages like "Applied". Apply now
+  only clears rules on the specific stages the template defines rules for, leaving
+  every other stage's rules intact; re-applying stays idempotent. (This was the
+  cause of automation rules "disappearing" from jobs.)
+
 ## 2026-09-08 (Fix: templates copy rules on framework stages too)
 
 ### Fixed
