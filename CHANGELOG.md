@@ -37,6 +37,24 @@ entries on top.
   gates are now per-round, so each advancement genuinely requires that round's
   feedback. (Falls back to the latest scorecard if the current stage name is unknown.)
 
+## 2026-09-10 (Team on this job: auto-assembled from the job’s own records)
+
+### Added
+- **`GET /api/jobs/:id/team`** — read-only roster assembled from records the job
+  already has: the assigned (or intake) hiring manager, the hiring manager’s
+  manager from the HRIS reporting line as **Skip-level**, the **Recruiter** named
+  on each linked requisition (else the job’s creator), extra hiring managers on
+  linked requisitions, and every stage’s interview panel. People are merged by
+  email so one person shows once with all their tags. Pure assembly lives in
+  `src/modules/ats/domain/job-team.ts` with unit tests.
+
+### Changed
+- **"Team on this job" (Overview sidebar) now reads that endpoint** instead of
+  only the stage panels. Change the requisition, the HM picker, or a stage panel
+  and the card follows on next load; nothing on the card is edited directly.
+  Tags carry a hover hint saying where each came from. Approvers and requesters
+  are deliberately left off (the Approval card already shows them).
+
 ## 2026-09-08 (Interview plan tab: drop rounds editor + inline roster)
 
 ### Removed

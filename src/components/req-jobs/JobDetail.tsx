@@ -175,7 +175,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   // a just-committed status change (e.g. an approval that just landed).
   const [job, setJob]                 = useState<Job>(initialJob)
   const [tab, setTab]                 = useState<Tab>('overview')
-  const [hmKey, setHmKey]             = useState(0)  // bump to refresh the roster's hiring manager
+  const [hmKey, setHmKey]             = useState(0)  // bump to re-fetch the team roster (HM / requisition changes)
   const [submitting, setSubmitting]   = useState(false)
   const [publishing, setPublishing]   = useState(false)
   const [pausing, setPausing]         = useState(false)
@@ -431,6 +431,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
       return
     }
     toast.success('Unlinked')
+    setHmKey(k => k + 1)
     router.refresh()
   }
 
@@ -879,7 +880,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
         <LinkOpeningDialog
           jobId={job.id}
           alreadyLinked={new Set(linkedOpenings.map(o => o.id))}
-          onClose={(linked) => { setLinkOpen(false); if (linked) router.refresh() }}
+          onClose={(linked) => { setLinkOpen(false); if (linked) { setHmKey(k => k + 1); router.refresh() } }}
         />
       )}
 
