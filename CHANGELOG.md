@@ -45,7 +45,9 @@ entries on top.
   manager from the HRIS reporting line as **Skip-level**, the **Recruiter** named
   on each linked requisition (else the job’s creator), extra hiring managers on
   linked requisitions, and every stage’s interview panel. People are merged by
-  email so one person shows once with all their tags. Pure assembly lives in
+  email so one person shows once with all their tags. People are resolved from
+  `users` directly (not via org membership), so a requisition's recruiter who
+  isn't a member of this org still appears. Pure assembly lives in
   `src/modules/ats/domain/job-team.ts` with unit tests.
 
 ### Changed

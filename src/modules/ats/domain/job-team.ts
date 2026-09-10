@@ -131,7 +131,7 @@ export function assembleJobTeam(input: JobTeamInput): JobTeamRow[] {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Loose = any
 
-type UserRow = { user_id: string; users: TeamMember['users'] }
+type UserRow = { id: string } & NonNullable<TeamMember['users']>
 
 export async function loadJobTeam(supabase: SupabaseClient, orgId: string, jobId: string): Promise<JobTeamRow[]> {
   const sb = supabase as unknown as Loose
@@ -173,13 +173,17 @@ export async function loadJobTeam(supabase: SupabaseClient, orgId: string, jobId
   const ids = new Set<string>()
   for (const id of [job.hiring_manager_user_id, job.created_by, skipLevelUserId]) if (id) ids.add(id)
   for (const o of openings) { if (o.hiring_manager_id) ids.add(o.hiring_manager_id); if (o.recruiter_id) ids.add(o.recruiter_id) }
+  // Resolve from `users` directly (not via org_members): a requisition's
+  // recruiter or a job's creator may not be an org member — e.g. a user
+  // provisioned in another org, or a duplicate user row for the same email —
+  // and they should still show. The ids come from this org's own records.
   const people = new Map<string, TeamPerson>()
   if (ids.size) {
-    const usersRes = await sb.from('org_members')
-      .select('user_id, users:user_id (full_name, first_name, last_name, email)')
-      .eq('org_id', orgId).in('user_id', Array.from(ids))
-    for (const m of (usersRes.data ?? []) as UserRow[]) {
-      people.set(m.user_id, { user_id: m.user_id, name: teamMemberName(m), email: m.users?.email ?? null })
+    const usersRes = await sb.from('users')
+      .select('id, full_name, first_name, last_name, email')
+      .in('id', Array.from(ids))
+    for (const u of (usersRes.data ?? []) as UserRow[]) {
+      people.set(u.id, { user_id: u.id, name: teamMemberName({ user_id: u.id, users: u }), email: u.email ?? null })
     }
   }
   const person = (id: string | null): TeamPerson | null => (id ? people.get(id) ?? null : null)
