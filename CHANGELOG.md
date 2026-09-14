@@ -9,6 +9,17 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-14 (Job setup screen: actions collapsed into a pencil menu)
+
+### Changed
+- On the job setup screen (`/req-jobs/[id]`), the row of action buttons (Edit,
+  Submit for approval, Publish, Pause, Resume, Withdraw, New version, Archive) is
+  **collapsed into a dropdown** opened by a small **circular pencil button next to
+  the status tag**. The menu has a "Manage job" heading and shows destructive
+  actions (Withdraw, Archive) in red below a divider. **View pipeline** stays as a
+  standalone top-right button; **Save / Discard** still appear top-right in edit
+  mode. (`src/components/req-jobs/JobDetail.tsx`)
+
 ## 2026-09-14 (Sidebar: breathing room when the pane is folded)
 
 ### Changed

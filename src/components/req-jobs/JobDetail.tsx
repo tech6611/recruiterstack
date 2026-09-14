@@ -191,6 +191,9 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   // job goes live (screening questions, a scoring rubric) — guides them there
   // without blocking. Null = nothing missing / not shown.
   const [nudge, setNudge] = useState<{ screening: boolean; rubric: boolean } | null>(null)
+  // Job-actions dropdown (Edit / Pause / Withdraw / New version / Archive …),
+  // opened by the pencil button next to the status tag.
+  const [showActions, setShowActions] = useState(false)
 
   const intake = readIntake(job)
 
@@ -435,6 +438,35 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
     router.refresh()
   }
 
+  const hasActions =
+    (canEdit && !editing) || canSubmit || canPublish || canPause || canResume ||
+    canWithdraw || (canNewVersion && !editing) || job.status !== 'archived'
+  // Destructive actions (Withdraw / Archive) render red and sit below a divider.
+  const actionItem = (
+    Icon: typeof Pencil, label: string, onClick: () => void,
+    loading = false, destructive = false,
+  ) => {
+    const red = destructive
+    return (
+      <button
+        key={label}
+        onClick={() => { setShowActions(false); onClick() }}
+        disabled={loading}
+        className={cn(
+          'flex w-full items-center gap-2.5 px-3 py-2.5 text-sm transition-colors disabled:opacity-50',
+          red ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-50',
+        )}
+      >
+        <Icon className={cn('h-4 w-4', red ? 'text-red-400' : 'text-slate-400')} />
+        {label}
+      </button>
+    )
+  }
+
+  // Circular pencil trigger (matches the sidebar's fold button).
+  const actionsTrigger =
+    'flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-colors'
+
   return (
     <>
       <Link href="/jobs" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 mb-4">
@@ -448,6 +480,40 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
             <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize', STATUS_BADGE[job.status])}>
               {job.status.replace('_', ' ')}
             </span>
+
+            {/* Pencil → job-actions dropdown, sitting right next to the status tag. */}
+            {hasActions && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowActions(s => !s)}
+                  aria-label="Job actions"
+                  aria-haspopup="menu"
+                  aria-expanded={showActions}
+                  className={actionsTrigger}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                {showActions && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowActions(false)} />
+                    <div className="absolute left-0 top-full mt-1 z-50 w-52 rounded-2xl border border-slate-200 bg-white py-1 shadow-xl">
+                      <p className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Manage job</p>
+                      {canEdit && !editing && actionItem(Pencil, 'Edit', () => { setForm(initForm(job)); setEditing(true); setTab('overview') })}
+                      {canSubmit && actionItem(Send, 'Submit for approval', submitForApproval, submitting)}
+                      {canPublish && actionItem(Globe, 'Publish', publish, publishing)}
+                      {canPause && actionItem(PauseCircle, 'Pause', pause, pausing)}
+                      {canResume && actionItem(PlayCircle, 'Resume', resume, resuming)}
+                      {canNewVersion && !editing && actionItem(Copy, 'New version', newVersion, cloning)}
+                      {(canWithdraw || job.status !== 'archived') && <div className="my-1 border-t border-slate-100" />}
+                      {canWithdraw && actionItem(Ban, 'Withdraw', withdraw, withdrawing, true)}
+                      {job.status !== 'archived' && actionItem(Archive, 'Archive', archive, archiving, true)}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {job.confidentiality === 'confidential' && (
               <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Confidential</span>
             )}
@@ -455,17 +521,14 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           <p className="text-xs text-slate-400 mt-1">Created {new Date(job.created_at).toLocaleDateString()}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {/* View pipeline stays as a standalone button; all other job actions
+              now live in the pencil dropdown next to the status tag above. */}
           {isLive && (
             <Link href={`/jobs/${job.id}`}>
               <Button variant="outline" size="sm">
                 <LayoutGrid className="h-4 w-4" /> View pipeline
               </Button>
             </Link>
-          )}
-          {canEdit && !editing && (
-            <Button variant="outline" size="sm" onClick={() => { setForm(initForm(job)); setEditing(true); setTab('overview') }}>
-              <Pencil className="h-4 w-4" /> Edit
-            </Button>
           )}
           {editing && (
             <>
@@ -474,41 +537,6 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                 <X className="h-4 w-4" /> Discard
               </Button>
             </>
-          )}
-          {canSubmit && (
-            <Button size="sm" onClick={submitForApproval} loading={submitting}>
-              <Send className="h-4 w-4" /> Submit for approval
-            </Button>
-          )}
-          {canPublish && (
-            <Button size="sm" onClick={publish} loading={publishing}>
-              <Globe className="h-4 w-4" /> Publish
-            </Button>
-          )}
-          {canPause && (
-            <Button variant="outline" size="sm" onClick={pause} loading={pausing}>
-              <PauseCircle className="h-4 w-4" /> Pause
-            </Button>
-          )}
-          {canResume && (
-            <Button size="sm" onClick={resume} loading={resuming}>
-              <PlayCircle className="h-4 w-4" /> Resume
-            </Button>
-          )}
-          {canWithdraw && (
-            <Button variant="outline" size="sm" onClick={withdraw} loading={withdrawing}>
-              <Ban className="h-4 w-4" /> Withdraw
-            </Button>
-          )}
-          {canNewVersion && !editing && (
-            <Button variant="outline" size="sm" onClick={newVersion} loading={cloning}>
-              <Copy className="h-4 w-4" /> New version
-            </Button>
-          )}
-          {job.status !== 'archived' && (
-            <Button variant="ghost" size="sm" onClick={archive} loading={archiving}>
-              <Archive className="h-4 w-4" /> Archive
-            </Button>
           )}
         </div>
       </div>
