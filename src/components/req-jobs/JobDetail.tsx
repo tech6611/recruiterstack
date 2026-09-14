@@ -539,22 +539,35 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
         </div>
       )}
 
-      <div className="border-b border-slate-200 mb-4">
-        <nav className="flex gap-4">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        {/* Job sections live in a left-hand menu (Ashby-style) so every option
+            has a full-width label that's easy to scan. On < lg screens it
+            collapses to a horizontal, scrollable row so nothing is hidden. */}
+        <nav
+          aria-label="Job sections"
+          className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-2 lg:w-56 lg:shrink-0 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r lg:pb-0 lg:pr-4"
+        >
+          <p className="hidden px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400 lg:block">
+            Manage this job
+          </p>
           {(['overview', 'postings', 'screening', 'scoring', 'source', 'plan', 'audit'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
+              aria-current={tab === t ? 'page' : undefined}
               className={cn(
-                'border-b-2 px-1 pb-2 text-sm font-medium transition-colors',
-                tab === t ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-900',
+                'whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
+                tab === t
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
               )}
             >
               {TAB_LABELS[t]}
             </button>
           ))}
         </nav>
-      </div>
+
+        <div className="min-w-0 flex-1">
 
       {tab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -875,6 +888,9 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
       {tab === 'plan' && <InterviewPlanTab jobId={job.id} />}
 
       {tab === 'audit' && <AuditLogTab targetType="job" targetId={job.id} />}
+
+        </div>
+      </div>
 
       {linkOpen && (
         <LinkOpeningDialog

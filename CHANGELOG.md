@@ -9,6 +9,17 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-14 (Job setup screen: sections moved to a left-hand menu)
+
+### Changed
+- The **job setup screen (`/req-jobs/[id]`) now uses a left-hand vertical menu**
+  for its sections (Overview, Postings, Application form, Scoring, Source,
+  Interview plan, Audit log) instead of a horizontal tab bar across the top —
+  an Ashby-style layout that's easier for new users to scan. Section content now
+  fills the column to the right; header actions (Edit, Publish, etc.) unchanged.
+  On < lg screens the menu collapses to a scrollable horizontal row.
+  (`src/components/req-jobs/JobDetail.tsx`)
+
 ## 2026-09-08 (Plan templates: "Update" a template from the current job)
 
 ### Added
