@@ -9,6 +9,18 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-14 (Hiring manager flows from the requisition onto the job)
+
+### Changed
+- **The requisition's hiring manager now lands on the job as the real account
+  link** (`jobs.hiring_manager_user_id`), not just as name/email text. Set when a
+  job is created from an approved requisition (UI and copilot paths) and when a
+  requisition is linked to an existing job that has no hiring manager yet. That
+  link is what grants the HM access to the job and routes interview-plan
+  approvals, so it no longer has to be picked by hand. The Overview "Hiring
+  manager" picker stays as an override: a hiring manager already set on the job
+  is never overwritten by a later link. (`src/modules/ats/domain/job-hiring-manager.ts`)
+
 ## 2026-09-14 (Job setup screen: actions collapsed into a pencil menu)
 
 ### Changed

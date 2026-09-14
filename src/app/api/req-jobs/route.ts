@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
 
   const { data: linkedOpening } = await supabase
     .from('openings')
-    .select('id, status, hiring_manager_name, hiring_manager_email')
+    .select('id, status, hiring_manager_id, hiring_manager_name, hiring_manager_email')
     .eq('id', body.link_opening_id)
     .eq('org_id', orgId)
     .maybeSingle()
@@ -136,6 +136,7 @@ export async function POST(req: NextRequest) {
   }
   const opening = linkedOpening as {
     status: string
+    hiring_manager_id: string | null
     hiring_manager_name: string | null
     hiring_manager_email: string | null
   }
@@ -148,7 +149,9 @@ export async function POST(req: NextRequest) {
 
   const departmentId = await findOrCreateDepartment(supabase, orgId, body.department)
 
-  // Flow the hiring manager down from the approved requisition onto the job's
+  // Flow the hiring manager down from the approved requisition: the account link
+  // (jobs.hiring_manager_user_id — gates job access + routes plan approvals; the
+  // Overview picker can override it later) and the name/email onto the job's
   // top-level custom_fields — this is the single place the {{hiring_manager_calendar}}
   // token reads from. A user-edited value in the intake payload (hm_name/hm_email)
   // wins over the requisition's default so "same HM by default, editable" holds.
@@ -171,7 +174,8 @@ export async function POST(req: NextRequest) {
       custom_fields:   customFields,
       status:          'draft',
       created_by:      userId,
-    })
+      hiring_manager_user_id: opening.hiring_manager_id ?? null,
+    } as never)
     .select()
     .single()
 

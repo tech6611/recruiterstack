@@ -4,12 +4,14 @@ import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { linkOpeningSchema } from '@/lib/validations/jobs'
+import { flowHiringManagerFromOpening } from '@/modules/ats/domain/job-hiring-manager'
 
 /**
  * POST /api/req-jobs/:id/link-opening — link an opening to this job.
  *
  * Both the job and the opening must belong to the caller's org. M2M dupes
  * are blocked by the composite PK on job_openings; we surface 409 cleanly.
+ * If the job has no hiring manager yet, the opening's HM flows onto it.
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
@@ -42,5 +44,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
     return handleSupabaseError(error)
   }
-  return NextResponse.json({ ok: true })
+  const hiring_manager_user_id = await flowHiringManagerFromOpening(supabase, orgId, params.id, body.opening_id)
+  return NextResponse.json({ ok: true, hiring_manager_user_id })
 }

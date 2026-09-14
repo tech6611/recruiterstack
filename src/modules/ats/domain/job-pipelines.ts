@@ -1039,7 +1039,7 @@ export async function createCanonicalJobFromApprovedOpening(
 ): Promise<{ id: string; title: string }> {
   const { data: opening, error: openingErr } = await supabase
     .from('openings')
-    .select('id, status')
+    .select('id, status, hiring_manager_id')
     .eq('id', openingId)
     .eq('org_id', orgId)
     .maybeSingle()
@@ -1061,6 +1061,8 @@ export async function createCanonicalJobFromApprovedOpening(
       status:        'draft',
       org_id:        orgId,
       created_by:    linkedBy ?? null,
+      // HM account link flows from the requisition (see job-hiring-manager.ts).
+      hiring_manager_user_id: (opening as { hiring_manager_id?: string | null }).hiring_manager_id ?? null,
     })
     .select('id, title')
     .single()

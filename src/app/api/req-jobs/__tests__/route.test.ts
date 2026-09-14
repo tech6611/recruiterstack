@@ -27,6 +27,19 @@ describe('/api/req-jobs', () => {
     expect(res.status).toBe(201)
   })
 
+  it('flows the requisition hiring manager onto the new job as the account link', async () => {
+    mock.results.set('openings', { data: { id: OPENING_UUID, status: 'approved', hiring_manager_id: 'u-hm' }, error: null })
+    mock.results.set('jobs', { data: { id: 'j1', title: 'Eng', status: 'draft' }, error: null })
+    const req = createMockRequest('POST', 'http://localhost:3000/api/req-jobs', { title: 'Eng', link_opening_id: OPENING_UUID })
+    const res = await CREATE(req)
+    expect(res.status).toBe(201)
+    const jobsBuilder = mock.client.from.mock.results
+      .map(r => r.value as { insert: { mock: { calls: unknown[][] } } })
+      .find(b => b.insert.mock.calls.length && (b.insert.mock.calls[0][0] as { title?: string }).title === 'Eng')
+    expect(jobsBuilder).toBeDefined()
+    expect(jobsBuilder!.insert.mock.calls[0][0]).toMatchObject({ hiring_manager_user_id: 'u-hm' })
+  })
+
   it('rejects a job with no requisition linked', async () => {
     const req = createMockRequest('POST', 'http://localhost:3000/api/req-jobs', { title: 'Eng' })
     const res = await CREATE(req)
