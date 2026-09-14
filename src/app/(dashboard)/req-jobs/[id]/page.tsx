@@ -35,8 +35,11 @@ export default async function JobDetailPage({ params }: { params: { id: string }
     ? await supabase.from('openings').select('id, title, status, comp_min, comp_max, comp_currency, target_start_date').in('id', linkedIds)
     : { data: [] }
 
+  // Full-width, flush against the app sidebar — the job screen is a 3-column
+  // layout (left menu · content · info rail) that needs the room, so no
+  // max-width cap / centering here.
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6">
       <JobDetail
         job={job}
         department={deptRow as Pick<Department, 'id' | 'name'> | null}

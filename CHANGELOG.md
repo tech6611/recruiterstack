@@ -19,6 +19,10 @@ entries on top.
   fills the column to the right; header actions (Edit, Publish, etc.) unchanged.
   On < lg screens the menu collapses to a scrollable horizontal row.
   (`src/components/req-jobs/JobDetail.tsx`)
+- The job setup screen is now **full-width and flush-left** against the app
+  sidebar, instead of capped at `max-w-5xl` and centered — the old cap left a
+  large empty margin on either side of the new 3-column layout.
+  (`src/app/(dashboard)/req-jobs/[id]/page.tsx`)
 
 ## 2026-09-08 (Plan templates: "Update" a template from the current job)
 
