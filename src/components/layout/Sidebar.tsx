@@ -353,7 +353,10 @@ export function Sidebar() {
       {/* Wrapper hosts the collapsible pane plus the edge disc that toggles it.
           The disc lives outside the pane's clip box so it stays visible (as an
           "expand" handle) even when the pane is fully collapsed to zero width. */}
-      <div className="relative hidden h-full shrink-0 md:flex">
+      {/* When the pane is folded, keep a uniform 24px gap (md:mr-6) between it
+          and the page content on every page — so content never butts against
+          the screen edge / fold handle. No gap when expanded. */}
+      <div className={`relative hidden h-full shrink-0 md:flex transition-[margin] duration-300 ease-in-out ${collapsed ? 'md:mr-6' : ''}`}>
       <aside
         className={`flex h-full flex-col bg-[#221b14] transition-[width] duration-300 ease-in-out ${
           collapsed

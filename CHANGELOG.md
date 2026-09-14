@@ -9,6 +9,15 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-14 (Sidebar: breathing room when the pane is folded)
+
+### Changed
+- When the desktop nav pane is **collapsed/folded**, page content now keeps a
+  uniform **24px gap** from the folded edge on every page, instead of butting
+  against the screen edge / fold handle. Applied once at the app-shell level
+  (`md:mr-6` on the collapsed rail wrapper), so it's consistent platform-wide;
+  no change when the pane is expanded. (`src/components/layout/Sidebar.tsx`)
+
 ## 2026-09-14 (Job setup screen: sections moved to a left-hand menu)
 
 ### Changed
