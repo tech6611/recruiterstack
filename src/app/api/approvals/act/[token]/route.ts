@@ -4,6 +4,7 @@ import { checkRateLimit } from '@/lib/api/rate-limit'
 import { resolveStepToken, consumeStepToken } from '@/lib/approvals/tokens'
 import { decideOnStep, ApprovalError } from '@/lib/approvals/engine'
 import type { ApprovalTargetType } from '@/lib/types/approvals'
+import { openingForChange } from '@/lib/openings/change-requests'
 
 /**
  * Public, no-login Approve/Reject from an email button.
@@ -72,6 +73,10 @@ function resultPage(decision: 'approved' | 'rejected'): NextResponse {
 
 async function getTargetTitle(targetType: ApprovalTargetType, targetId: string): Promise<string> {
   const supabase = createAdminClient()
+  if (targetType === 'opening_change') {
+    const o = await openingForChange(targetId)
+    return o ? `a change to ${o.title}` : 'this requisition change'
+  }
   if (targetType === 'opening') {
     const { data } = await supabase.from('openings').select('title').eq('id', targetId).maybeSingle()
     return (data as { title: string } | null)?.title ?? 'this requisition'

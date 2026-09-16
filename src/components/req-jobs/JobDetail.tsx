@@ -24,7 +24,6 @@ import { ScoringRubricSummary } from '@/components/req-jobs/ScoringRubricSummary
 import { InterviewPlanTab } from '@/components/req-jobs/InterviewPlanTab'
 import { readScoringCriteria } from '@/lib/scoring'
 import { JobTeamRoster } from '@/components/req-jobs/JobTeamRoster'
-import { JobHiringManagerPicker } from '@/components/req-jobs/JobHiringManagerPicker'
 import { cn } from '@/lib/utils'
 import { RichText } from '@/components/RichText'
 import { RichTextEditor, isHtmlEmpty } from '@/components/RichTextEditor'
@@ -808,7 +807,6 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           </div>
 
           <div className="space-y-4">
-            <JobHiringManagerPicker jobId={job.id} onChange={() => setHmKey(k => k + 1)} />
             <JobTeamRoster jobId={job.id} hmRefreshKey={hmKey} />
 
             {/* Linked requisitions — moved from the main column into the sidebar. */}

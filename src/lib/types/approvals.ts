@@ -30,7 +30,7 @@ export type Condition = ConditionLeaf | ConditionAll | ConditionAny | ConditionN
 
 // ── Approval target + status ─────────────────────────────────
 
-export type ApprovalTargetType = 'opening' | 'job' | 'offer'
+export type ApprovalTargetType = 'opening' | 'job' | 'offer' | 'opening_change'
 export type ApprovalStatus     = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
 export type ApprovalStepStatus =

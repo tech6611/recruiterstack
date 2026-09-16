@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
       required:    body.required,
       order_index: body.order_index,
       is_active:   body.is_active,
+      require_reapproval: body.require_reapproval,
     })
     .select()
     .single()

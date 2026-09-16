@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
+import { openingFieldLabel } from '@/lib/openings/reapproval'
 
 interface Entry {
   id:           string
@@ -33,6 +34,12 @@ const ACTION_LABEL: Record<string, string> = {
   edit_cancelled:   'Cancelled by edit',
   sla_breach:       'SLA breached',
   auto_approved:    'Auto-approved',
+  // Ashby-style post-approval edits (see lib/openings/reapproval.ts).
+  edited:           'Edited',
+  change_requested: 'Change submitted for re-approval',
+  change_applied:   'Change approved & applied',
+  change_rejected:  'Change rejected',
+  change_cancelled: 'Change withdrawn',
 }
 
 // Per-entity badge colours so a job's timeline visibly separates its
@@ -112,5 +119,9 @@ function formatMeta(m: Record<string, unknown>): string | null {
   if ('decision'   in m && typeof m.decision === 'string') parts.push(`Decision: ${m.decision}`)
   if ('comment'    in m && typeof m.comment === 'string' && m.comment) parts.push(`“${m.comment}”`)
   if ('reason'     in m && typeof m.reason === 'string') parts.push(`Reason: ${m.reason}`)
+  // Field-level edits carry the list of requisition fields that changed.
+  if (Array.isArray(m.fields) && m.fields.length > 0) {
+    parts.push(`Fields: ${(m.fields as unknown[]).map(f => openingFieldLabel(String(f))).join(', ')}`)
+  }
   return parts.length > 0 ? parts.join(' · ') : null
 }

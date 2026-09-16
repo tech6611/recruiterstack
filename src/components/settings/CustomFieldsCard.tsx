@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ListPlus, Plus, Trash2, X } from 'lucide-react'
+import { ListPlus, Plus, ShieldAlert, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -76,6 +76,14 @@ export function CustomFieldsCard() {
                     {d.required && <span className="ml-1 text-red-600">*</span>}
                   </button>
                   <span className="ml-2 text-xs text-slate-500">{d.field_type} · {d.field_key}</span>
+                  {d.object_type === 'opening' && d.require_reapproval && (
+                    <span
+                      className="ml-2 inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800"
+                      title="Editing this field on an approved requisition sends the change back through its approval chain."
+                    >
+                      <ShieldAlert className="h-3 w-3" /> re-approval
+                    </span>
+                  )}
                   {!d.is_active && <span className="ml-2 text-[10px] uppercase font-semibold text-slate-400">archived</span>}
                 </div>
                 {d.is_active && (
@@ -114,6 +122,7 @@ function FieldDialog({ mode, row, defaultObjectType, onClose }: {
     required:    row?.required    ?? false,
     is_active:   row?.is_active   ?? true,
     order_index: row?.order_index ?? 0,
+    require_reapproval: row?.require_reapproval ?? false,
   })
   const [options, setOptions] = useState<OptionDraft[]>(row?.options ?? [])
   const [submitting, setSubmitting] = useState(false)
@@ -140,6 +149,8 @@ function FieldDialog({ mode, row, defaultObjectType, onClose }: {
       required:    form.required,
       is_active:   form.is_active,
       order_index: form.order_index,
+      // Only requisition fields can be gated; never send true for other objects.
+      require_reapproval: form.object_type === 'opening' ? form.require_reapproval : false,
     }
     if (needsOptions) payload.options = options
     else              payload.options = null
@@ -219,6 +230,24 @@ function FieldDialog({ mode, row, defaultObjectType, onClose }: {
               </label>
             )}
           </div>
+          {form.object_type === 'opening' && (
+            <label className="flex items-start gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={form.require_reapproval}
+                onChange={e => setForm({ ...form, require_reapproval: e.target.checked })}
+              />
+              <span>
+                <span className="inline-flex items-center gap-1">
+                  <ShieldAlert className="h-3.5 w-3.5 text-amber-600" /> Requires re-approval
+                </span>
+                <span className="block text-[11px] text-slate-500">
+                  Editing this on an approved requisition sends the change back through its approval chain.
+                </span>
+              </span>
+            </label>
+          )}
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>

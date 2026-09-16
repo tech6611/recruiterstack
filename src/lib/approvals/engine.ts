@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { selectChain } from './chain-selector'
 import { resolveApprovers } from './approver-resolver'
 import { evaluateCondition } from './condition'
+import { applyOpeningChange, rejectOpeningChange, cancelOpeningChange, recordApprovedVersion } from '@/lib/openings/change-requests'
 import { writeAudit } from './audit'
 import { captureApprovedSubstance } from '@/lib/jobs/substance'
 import { notifyStepActivated, notifyStepDecided, notifyApprovalCompleted } from './notifications'
@@ -37,6 +38,9 @@ interface SubmitInput {
   targetId:    string
   target:      Record<string, unknown>     // the full target row used for condition eval
   requesterId: string
+  /** Chain to select when it differs from the instance type — e.g. an
+   *  'opening_change' instance re-runs the 'opening' chain on the diff. */
+  chainTargetType?: ApprovalTargetType
 }
 
 export interface SubmitResult {
@@ -59,7 +63,7 @@ export async function submitForApproval(input: SubmitInput): Promise<SubmitResul
   const supabase = createAdminClient()
 
   // Chain selection
-  const chain = await selectChain(input.orgId, input.targetType, input.target)
+  const chain = await selectChain(input.orgId, input.chainTargetType ?? input.targetType, input.target)
   if (!chain) {
     throw new ApprovalError('No approval chain matches this target. Configure a chain in Settings.', 422)
   }
@@ -516,8 +520,12 @@ export async function cancelApproval(approvalId: string, userId: string): Promis
 
 async function applyApprovedToTarget(targetType: ApprovalTargetType, targetId: string): Promise<void> {
   const supabase = createAdminClient()
-  if (targetType === 'opening') {
+  if (targetType === 'opening_change') {
+    // Gated requisition edit approved → write the proposed values onto the opening.
+    await applyOpeningChange(targetId)
+  } else if (targetType === 'opening') {
     await supabase.from('openings').update({ status: 'approved' }).eq('id', targetId)
+    await recordApprovedVersion(targetId)   // version 1 (or next) = the approved baseline
   } else if (targetType === 'job') {
     await supabase.from('jobs').update({ status: 'approved' }).eq('id', targetId)
     // Re-baseline the approved snapshot to the content that was just signed off,
@@ -538,7 +546,9 @@ async function fetchRequester(approvalId: string): Promise<string> {
 
 async function applyRejectedToTarget(targetType: ApprovalTargetType, targetId: string): Promise<void> {
   const supabase = createAdminClient()
-  if (targetType === 'opening') {
+  if (targetType === 'opening_change') {
+    await rejectOpeningChange(targetId)   // opening itself stays approved, untouched
+  } else if (targetType === 'opening') {
     await supabase.from('openings').update({ status: 'draft', approval_id: null }).eq('id', targetId)
   } else if (targetType === 'job') {
     await supabase.from('jobs').update({ status: 'draft', approval_id: null }).eq('id', targetId)
@@ -548,7 +558,9 @@ async function applyRejectedToTarget(targetType: ApprovalTargetType, targetId: s
 }
 async function applyDraftToTarget(targetType: ApprovalTargetType, targetId: string): Promise<void> {
   const supabase = createAdminClient()
-  if (targetType === 'opening') {
+  if (targetType === 'opening_change') {
+    await cancelOpeningChange(targetId)
+  } else if (targetType === 'opening') {
     await supabase.from('openings').update({ status: 'draft', approval_id: null }).eq('id', targetId)
   } else if (targetType === 'job') {
     await supabase.from('jobs').update({ status: 'draft', approval_id: null }).eq('id', targetId)

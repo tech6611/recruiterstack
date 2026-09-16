@@ -14,6 +14,8 @@ const baseShape = z.object({
   required:     z.boolean().optional().default(false),
   order_index:  z.number().int().min(0).optional().default(0),
   is_active:    z.boolean().optional().default(true),
+  // Ashby "Require Reapproval": editing this field on an approved opening starts a new approval cycle.
+  require_reapproval: z.boolean().optional().default(false),
 })
 
 // On create, select/multi_select must come with at least one option.

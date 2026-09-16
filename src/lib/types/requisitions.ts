@@ -393,6 +393,10 @@ export interface CustomFieldDefinition {
   required: boolean
   order_index: number
   is_active: boolean
+  // Ashby "Require Reapproval" — editing this field on an approved requisition
+  // sends the change through its approval chain (migration 140; optional in
+  // the type so older rows/fixtures without the column still type-check).
+  require_reapproval?: boolean
   created_at: string
   updated_at: string
 }

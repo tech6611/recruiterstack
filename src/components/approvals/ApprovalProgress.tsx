@@ -34,6 +34,27 @@ interface StepRow {
 interface ChainStepMeta { id: string; name: string }
 interface ApproverMeta  { id: string; full_name: string | null; email: string }
 
+// Present only when the approval is for a gated requisition edit
+// (target_type 'opening_change'): the before/after the approvers decide on.
+interface ChangeMeta {
+  change_request_id: string
+  status:            string
+  note:              string | null
+  opening_id:        string
+  opening_title:     string | null
+  diff:              Array<{ field: string; label: string; before: unknown; after: unknown }>
+}
+
+/** Render a diff value: nulls as a dash, numbers with separators, everything else as-is. */
+function formatDiffValue(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '—'
+  if (typeof v === 'number') return v.toLocaleString()
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+  if (Array.isArray(v)) return v.map(x => String(x)).join(', ') || '—'
+  if (typeof v === 'object') return JSON.stringify(v)
+  return String(v)
+}
+
 export function ApprovalProgress({ approvalId, onDecided }: { approvalId: string; onDecided?: () => void }) {
   const router = useRouter()
   const [data, setData] = useState<{
@@ -41,6 +62,7 @@ export function ApprovalProgress({ approvalId, onDecided }: { approvalId: string
     steps:    StepRow[]
     chain_steps: ChainStepMeta[]
     approvers:   ApproverMeta[]
+    change?:     ChangeMeta | null
   } | null>(null)
   const [loaded, setLoaded] = useState(false)
   // If the current user has a pending decision on THIS approval, the inbox
@@ -67,14 +89,50 @@ export function ApprovalProgress({ approvalId, onDecided }: { approvalId: string
   if (!data)   return <p className="text-xs text-slate-400">No approval data.</p>
 
   const { steps, chain_steps, approvers } = data
+  const change = data.change ?? null
   const stepName = (id: string) => chain_steps.find(c => c.id === id)?.name ?? `Step`
   const approverName = (id: string) => {
     const u = approvers.find(a => a.id === id)
     return u?.full_name ?? u?.email ?? id.slice(0, 6)
   }
+  const changeTitle = change ? `Change to ${change.opening_title ?? 'requisition'}` : null
 
   return (
     <>
+    {/* Gated requisition edit → show approvers exactly what would change. */}
+    {change && (
+      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+        <p className="text-xs font-semibold text-amber-900 mb-2">
+          Proposed change to {change.opening_title ?? 'this requisition'}
+        </p>
+        {change.diff.length === 0 ? (
+          <p className="text-xs text-slate-500">No field differences recorded.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wide text-slate-400">
+                  <th className="text-left font-semibold pb-1 pr-2">Field</th>
+                  <th className="text-left font-semibold pb-1 pr-2">Before</th>
+                  <th className="text-left font-semibold pb-1">After</th>
+                </tr>
+              </thead>
+              <tbody>
+                {change.diff.map(d => (
+                  <tr key={d.field} className="border-t border-amber-100 align-top">
+                    <td className="py-1 pr-2 font-medium text-slate-700">{d.label}</td>
+                    <td className="py-1 pr-2 text-slate-500 line-through decoration-slate-300 break-words">{formatDiffValue(d.before)}</td>
+                    <td className="py-1 text-slate-900 font-medium break-words">{formatDiffValue(d.after)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {change.note && <p className="mt-2 text-xs text-slate-600 italic">“{change.note}”</p>}
+      </div>
+    )}
+
     <ol className="space-y-3">
       {steps.map(s => {
         const isCurrent  = data.approval.status === 'pending' && s.status === 'pending' && s.activated_at != null
@@ -141,7 +199,7 @@ export function ApprovalProgress({ approvalId, onDecided }: { approvalId: string
       <DecisionModal
         approvalId={myStep.approval_id}
         stepId={myStep.step_id}
-        title={myStep.target_title}
+        title={changeTitle ?? myStep.target_title}
         onClose={(decided) => {
           setDeciding(false)
           // load() refreshes this approval card; onDecided() re-reads the parent job so

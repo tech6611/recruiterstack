@@ -11,6 +11,8 @@
  * a deactivated user falls out automatically. Phase G adds delegation lookup.
  */
 
+import type { ApprovalTargetType } from '@/lib/types/approvals'
+import { openingForChange } from '@/lib/openings/change-requests'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { ApproverType, ApproverValue, ResolvedApprover } from '@/lib/types/approvals'
 
@@ -54,7 +56,7 @@ async function applyDelegationToList(userIds: string[]): Promise<string[]> {
 
 interface ResolveContext {
   orgId:       string
-  targetType:  'opening' | 'job' | 'offer'
+  targetType:  ApprovalTargetType
   targetId:    string
   // requester's user_id — used by approver_type='manager' to walk the HRIS
   // reporting structure to the requester's manager at activation time.
@@ -66,6 +68,12 @@ export async function resolveApprovers(
   value:   ApproverValue,
   ctx:     ResolveContext,
 ): Promise<ResolvedApprover[]> {
+  // A gated requisition edit ('opening_change') routes exactly like its requisition:
+  // resolve the change request to its opening before any role lookups.
+  if (ctx.targetType === 'opening_change') {
+    const o = await openingForChange(ctx.targetId)
+    if (o) ctx = { ...ctx, targetType: 'opening', targetId: o.id }
+  }
   // 1) Compute raw user_ids per approver type
   const raw = await rawApproverIds(type, value, ctx)
   // 2) Apply OOO/deactivation delegation; dedupe; wrap as ResolvedApprover

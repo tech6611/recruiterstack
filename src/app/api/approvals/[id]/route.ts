@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope } from '@/lib/rbac'
+import { mapsToChanges, openingFieldLabel } from '@/lib/openings/reapproval'
 
 // GET /api/approvals/:id — full approval state including steps + chain step metadata.
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -53,12 +54,34 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     ? await supabase.from('users').select('id, full_name, email').in('id', Array.from(allApproverIds))
     : { data: [] }
 
+  // A gated requisition edit: give approvers the before/after so they decide on the diff.
+  let change: Record<string, unknown> | null = null
+  const ap = approvalRaw as { target_type: string; target_id: string }
+  if (ap.target_type === 'opening_change') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+    const { data: cr } = await sb.from('opening_change_requests').select('id, opening_id, previous, proposed, status, note').eq('id', ap.target_id).maybeSingle()
+    if (cr) {
+      const [{ data: opening }, { data: defs }] = await Promise.all([
+        sb.from('openings').select('id, title').eq('id', cr.opening_id).maybeSingle(),
+        sb.from('custom_field_definitions').select('field_key, label').eq('org_id', orgId).eq('object_type', 'opening'),
+      ])
+      const customLabels = Object.fromEntries(((defs ?? []) as Array<{ field_key: string; label: string }>).map(d => [d.field_key, d.label]))
+      change = {
+        change_request_id: cr.id, status: cr.status, note: cr.note,
+        opening_id: cr.opening_id, opening_title: opening?.title ?? null,
+        diff: mapsToChanges(cr.previous ?? {}, cr.proposed ?? {}).map(c => ({ ...c, label: openingFieldLabel(c.field, customLabels) })),
+      }
+    }
+  }
+
   return NextResponse.json({
     data: {
       approval:    approvalRaw,
       steps:       stepsRaw ?? [],
       chain_steps: chainStepsRaw ?? [],
       approvers:   approverUsers ?? [],
+      change,
     },
   })
 }

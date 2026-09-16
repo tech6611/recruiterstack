@@ -88,7 +88,7 @@ export default async function EditChainPage({ params }: { params: { id: string }
         initial={{
           name:        c.name,
           description: c.description ?? '',
-          target_type: c.target_type,
+          target_type: c.target_type as 'opening' | 'job' | 'offer',   // chains are never typed 'opening_change'
           is_active:   c.is_active,
           steps,
         }}

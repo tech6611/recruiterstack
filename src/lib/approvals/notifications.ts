@@ -20,13 +20,15 @@ import {
 import { notifySlackDM } from '@/lib/notifications'
 import { createNotification } from '@/lib/api/notify'
 import type { ApprovalTargetType } from '@/lib/types/approvals'
+import { openingForChange } from '@/lib/openings/change-requests'
 
 // Friendly noun for the in-app notification copy (matches the user-facing
 // rename: an 'opening' reads as "Requisition").
 const TARGET_NOUN: Record<ApprovalTargetType, string> = {
-  opening: 'requisition',
-  job:     'job',
-  offer:   'offer',
+  opening:        'requisition',
+  job:            'job',
+  offer:          'offer',
+  opening_change: 'requisition change',
 }
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL ?? 'https://recruiterstack.in'
@@ -47,8 +49,21 @@ async function getUsers(ids: string[]): Promise<UserLite[]> {
   return (data ?? []) as UserLite[]
 }
 
+/** Email deep-links point at a page; a change request's page is its opening. */
+async function linkTarget(targetType: ApprovalTargetType, targetId: string): Promise<{ targetType: 'opening' | 'job' | 'offer'; targetId: string }> {
+  if (targetType === 'opening_change') {
+    const o = await openingForChange(targetId)
+    return { targetType: 'opening', targetId: o?.id ?? targetId }
+  }
+  return { targetType, targetId }
+}
+
 async function getTargetTitle(targetType: ApprovalTargetType, targetId: string): Promise<string> {
   const supabase = createAdminClient()
+  if (targetType === 'opening_change') {
+    const o = await openingForChange(targetId)
+    return o ? `Change to ${o.title}` : 'Requisition change'
+  }
   if (targetType === 'opening') {
     const { data } = await supabase.from('openings').select('title').eq('id', targetId).maybeSingle()
     return (data as { title: string } | null)?.title ?? 'Opening'
@@ -133,11 +148,12 @@ export async function notifyStepActivated(input: {
       hasSlackInstalled(input.orgId),
     ])
     const targetTitle = await getTargetTitle(input.targetType, input.targetId)
+    const link = await linkTarget(input.targetType, input.targetId)
     const requesterName = requester?.full_name ?? requester?.email ?? 'A teammate'
 
     for (const a of approvers) {
       const tpl = renderApprovalRequested({
-        appUrl: APP_URL(), targetTitle, targetType: input.targetType, targetId: input.targetId,
+        appUrl: APP_URL(), targetTitle, ...link,
         approverName: a.full_name ?? a.email, requesterName,
         stepName: input.stepName, approvalId: input.approvalId, stepId: input.stepId,
         dueAt: input.dueAt,
@@ -185,8 +201,9 @@ export async function notifyStepDecided(input: {
     ])
     if (!requester) return
     const targetTitle = await getTargetTitle(input.targetType, input.targetId)
+    const link = await linkTarget(input.targetType, input.targetId)
     const tpl = renderApprovalStepDecided({
-      appUrl: APP_URL(), targetTitle, targetType: input.targetType, targetId: input.targetId,
+      appUrl: APP_URL(), targetTitle, ...link,
       requesterName: requester.full_name ?? requester.email,
       approverName: approver?.full_name ?? approver?.email ?? 'An approver',
       stepName: input.stepName, decision: input.decision, comment: input.comment,
@@ -223,8 +240,9 @@ export async function notifyApprovalCompleted(input: {
     const requester = (await getUsers([input.requesterId]))[0]
     if (!requester) return
     const targetTitle = await getTargetTitle(input.targetType, input.targetId)
+    const link = await linkTarget(input.targetType, input.targetId)
     const tpl = renderApprovalCompleted({
-      appUrl: APP_URL(), targetTitle, targetType: input.targetType, targetId: input.targetId,
+      appUrl: APP_URL(), targetTitle, ...link,
       requesterName: requester.full_name ?? requester.email,
     })
     await sendEmail({ to: requester.email, subject: tpl.subject, html: tpl.html })
@@ -261,12 +279,13 @@ export async function notifySlaBreach(input: {
       getUsers([input.requesterId]).then(u => u[0]),
     ])
     const targetTitle = await getTargetTitle(input.targetType, input.targetId)
+    const link = await linkTarget(input.targetType, input.targetId)
     const slackOn = await hasSlackInstalled(input.orgId)
 
     // Approver(s)
     for (const a of approvers) {
       const tpl = renderApprovalSlaBreach({
-        appUrl: APP_URL(), targetTitle, targetType: input.targetType, targetId: input.targetId,
+        appUrl: APP_URL(), targetTitle, ...link,
         recipientName: a.full_name ?? a.email,
         recipientRole: 'approver',
         approverName: a.full_name ?? a.email,
@@ -280,7 +299,7 @@ export async function notifySlaBreach(input: {
     // Requester
     if (requester) {
       const tpl = renderApprovalSlaBreach({
-        appUrl: APP_URL(), targetTitle, targetType: input.targetType, targetId: input.targetId,
+        appUrl: APP_URL(), targetTitle, ...link,
         recipientName: requester.full_name ?? requester.email,
         recipientRole: 'requester',
         approverName: approvers[0]?.full_name ?? approvers[0]?.email ?? 'an approver',

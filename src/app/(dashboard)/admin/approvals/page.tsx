@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChainRowActions } from '@/components/approvals/ChainRowActions'
+import { OpeningReapprovalFieldsCard } from '@/components/approvals/OpeningReapprovalFieldsCard'
 import { cn } from '@/lib/utils'
 
 type TargetType = 'opening' | 'job' | 'offer'
@@ -168,6 +169,11 @@ export default function ApprovalChainsListPage() {
         <Link href="/admin/approvals/new">
           <Button><Plus className="h-4 w-4" /> New chain</Button>
         </Link>
+      </div>
+
+      {/* Which requisition fields re-trigger approval when edited after approval. */}
+      <div className="mb-6">
+        <OpeningReapprovalFieldsCard />
       </div>
 
       {/* Fallback-gap banners — one per target_type with scoped chains but no catch-all. */}

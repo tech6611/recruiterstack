@@ -60,6 +60,21 @@ export async function GET() {
   for (const o of (openingsRaw ?? [])) titleById.set((o as { id: string }).id, (o as { title: string }).title)
   for (const j of (jobsRaw ?? []))     titleById.set((j as { id: string }).id, (j as { title: string }).title)
 
+  // Gated requisition edits: title = "Change to <requisition>", link = the requisition.
+  const changeIds = approvals.filter(a => a.target_type === 'opening_change').map(a => a.target_id)
+  const linkTargetById = new Map<string, { target_type: string; target_id: string }>()
+  if (changeIds.length) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: crs } = await (supabase as any).from('opening_change_requests').select('id, opening_id').in('id', changeIds)
+    const crOpeningIds = ((crs ?? []) as Array<{ opening_id: string }>).map(c => c.opening_id)
+    const { data: crOpenings } = crOpeningIds.length ? await supabase.from('openings').select('id, title').in('id', crOpeningIds) : { data: [] }
+    const crTitle = new Map(((crOpenings ?? []) as Array<{ id: string; title: string }>).map(o => [o.id, o.title]))
+    for (const c of (crs ?? []) as Array<{ id: string; opening_id: string }>) {
+      titleById.set(c.id, `Change to ${crTitle.get(c.opening_id) ?? 'requisition'}`)
+      linkTargetById.set(c.id, { target_type: 'opening', target_id: c.opening_id })
+    }
+  }
+
   // Resolve requester names so the card can say who asked for the decision.
   const requesterIds = Array.from(new Set(approvals.map(a => a.requested_by).filter(Boolean)))
   const { data: usersRaw } = requesterIds.length
@@ -74,9 +89,10 @@ export async function GET() {
 
   // Human label for the kind of thing being approved.
   const TYPE_LABEL: Record<string, string> = {
-    opening: 'Requisition',
-    job:     'Job posting',
-    offer:   'Offer',
+    opening:        'Requisition',
+    job:            'Job posting',
+    offer:          'Offer',
+    opening_change: 'Requisition change',
   }
 
   const items = steps
@@ -91,6 +107,9 @@ export async function GET() {
         step_index:         (s as { step_index: number }).step_index,
         target_type:        a.target_type,
         target_id:          a.target_id,
+        // Where the row should link (a change request links to its requisition).
+        link_target_type:   linkTargetById.get(a.target_id)?.target_type ?? a.target_type,
+        link_target_id:     linkTargetById.get(a.target_id)?.target_id ?? a.target_id,
         target_title:       title,
         target_type_label:  label,
         requested_by_name:  requesterName.get(a.requested_by) ?? null,

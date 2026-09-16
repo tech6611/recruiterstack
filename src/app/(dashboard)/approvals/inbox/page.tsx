@@ -17,6 +17,8 @@ interface InboxItem {
   step_index:         number
   target_type:        string
   target_id:          string
+  link_target_type?:  string
+  link_target_id?:    string
   target_title:       string
   target_type_label:  string
   requested_by_name:  string | null
@@ -197,7 +199,7 @@ export default function ApprovalInboxPage() {
                                 <span className="inline-flex shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                                   {item.target_type_label}
                                 </span>
-                                <Link href={targetHref(item.target_type, item.target_id)} className="truncate text-sm font-semibold text-slate-900 hover:text-emerald-700">
+                                <Link href={targetHref(item.link_target_type ?? item.target_type, item.link_target_id ?? item.target_id)} className="truncate text-sm font-semibold text-slate-900 hover:text-emerald-700">
                                   {item.target_title}
                                 </Link>
                               </div>

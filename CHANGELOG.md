@@ -9,6 +9,52 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-16 (Parity plan · Phase 1: requisitions stay editable after approval)
+
+Ashby's model, adopted: **approval protects specific fields, never the whole
+record.** An approved requisition is no longer frozen.
+
+### Added
+- **Field-level re-approval on requisitions.** Editing an approved (or open)
+  requisition now works. Ordinary fields save immediately. Fields in the org's
+  gated set create an `opening_change_request` that re-runs the requisition's
+  approval chain on the diff; the requisition **stays Approved** meanwhile so
+  linked jobs are undisturbed. Approve → the change is applied; reject or
+  withdraw → discarded. Default gated set: compensation min/max/currency/band,
+  target start date, employment type, department. Hiring manager is *not* gated
+  by default (Admin → Approvals → "Requisition fields that need re-approval").
+  Custom fields get a per-field "Requires re-approval" checkbox.
+  (`src/lib/openings/reapproval.ts`, `src/lib/openings/change-requests.ts`,
+  `PATCH /api/openings/:id`, `GET /api/openings/:id/changes`,
+  `POST /api/openings/:id/changes/:cid/cancel`, `GET/PUT /api/admin/opening-reapproval-fields`)
+- **Requisition versions.** Every approval, immediate edit and applied change
+  writes a numbered snapshot to `opening_versions` (shown as `v{n}` on the
+  requisition and listed under its Audit log).
+- **Approvers see the diff.** Requisition-change approvals show a before → after
+  table in the approval card, the inbox ("Change to <requisition>"), and email /
+  Slack notifications link to the requisition.
+- **Team card pencil.** The standalone "Hiring manager" dropdown card is gone
+  from the job Overview. The hiring manager row on "Team on this job" has a
+  pencil: with a linked requisition it edits the requisition (the job follows,
+  gated or not per org setting); without one it edits the job directly.
+- Audit actions `edited`, `change_requested`, `change_applied`,
+  `change_rejected`, `change_cancelled` on requisitions.
+
+### Fixed
+- `manager` approver type (HRIS reporting line) was accepted by code but rejected
+  by the database check constraint; now allowed.
+- Requisition edit error no longer says "Unarchive first" for every status.
+
+### Schema
+- `140_opening_change_requests.sql` — `opening_change_requests`,
+  `opening_versions`, `custom_field_definitions.require_reapproval`,
+  `org_settings.opening_reapproval_fields`, approvals target type
+  `opening_change`, `manager` approver type. **Must be applied before gated
+  edits work; code degrades gracefully (503 with a clear message) until then.**
+
+### Docs
+- Design + full comparison: "Jobs & Requisitions Parity Plan" (artifact).
+
 ## 2026-09-14 (Hiring manager flows from the requisition onto the job)
 
 ### Changed
