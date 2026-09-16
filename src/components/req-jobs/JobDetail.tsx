@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Archive, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid, PauseCircle, PlayCircle, Copy, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Archive, ArchiveRestore, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid, PauseCircle, PlayCircle, Copy, AlertTriangle, CheckCircle2, CircleSlash } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ApprovalProgress } from '@/components/approvals/ApprovalProgress'
 import { AuditLogTab } from '@/components/approvals/AuditLogTab'
 import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
+import { CloseJobDialog } from '@/components/req-jobs/CloseJobDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { ScoringTab } from '@/components/req-jobs/ScoringTab'
@@ -23,6 +24,7 @@ import { JobPostReview } from '@/components/req-jobs/JobPostReview'
 import { ScoringRubricSummary } from '@/components/req-jobs/ScoringRubricSummary'
 import { InterviewPlanTab } from '@/components/req-jobs/InterviewPlanTab'
 import { readScoringCriteria } from '@/lib/scoring'
+import { summarizeSeats, JOB_CLOSE_REASONS, type JobCloseReason } from '@/lib/openings/seat-math'
 import { JobTeamRoster } from '@/components/req-jobs/JobTeamRoster'
 import { cn } from '@/lib/utils'
 import { RichText } from '@/components/RichText'
@@ -44,11 +46,16 @@ const OPENING_BADGE: Record<OpeningStatus, string> = {
   draft:            'bg-slate-100 text-slate-700',
   pending_approval: 'bg-amber-100 text-amber-800',
   approved:         'bg-emerald-100 text-emerald-800',
-  open:             'bg-slate-100 text-slate-800',
-  filled:           'bg-slate-100 text-slate-800',
+  open:             'bg-amber-100 text-amber-800',    // seat is live: a published job is filling it
+  filled:           'bg-emerald-100 text-emerald-800', // seat taken by a hire
   closed:           'bg-slate-200 text-slate-600',
   archived:         'bg-slate-100 text-slate-400',
 }
+
+// Job close reasons are stored as codes; show the human label in the header.
+const JOB_CLOSE_REASON_LABEL: Record<string, string> = Object.fromEntries(
+  JOB_CLOSE_REASONS.map(r => [r.value, r.label]),
+)
 
 interface Props {
   job:             Job
@@ -182,6 +189,9 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   const [withdrawing, setWithdrawing] = useState(false)
   const [cloning, setCloning]         = useState(false)
   const [archiving, setArchiving]     = useState(false)
+  const [restoring, setRestoring]     = useState(false)
+  // Close-job dialog: null = hidden, otherwise the reason to pre-select.
+  const [closeReason, setCloseReason] = useState<JobCloseReason | null>(null)
   const [linkOpen, setLinkOpen]       = useState(false)
   const [editing, setEditing]         = useState(false)
   const [saving, setSaving]           = useState(false)
@@ -195,6 +205,12 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   const [showActions, setShowActions] = useState(false)
 
   const intake = readIntake(job)
+  // Headcount seats this job fills — one per linked requisition (archived ones
+  // don't count). Drives the "n/m seats filled" chip and the all-filled nudge.
+  const seats = summarizeSeats(linkedOpenings.map(o => o.status))
+  // Closed jobs carry when/why they ended; the columns are newer than the Job
+  // type so read them loosely.
+  const closedInfo = job as { closed_at?: string | null; close_reason?: string | null }
 
   // Re-read the job from the server and update local state. Called after any action
   // that changes status (approve, submit, publish, withdraw) so the badge + buttons
@@ -235,6 +251,14 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   const canPause    = job.status === 'open'    // reversible freeze
   const canResume   = job.status === 'paused'  // un-freeze, same link
   const canWithdraw = job.status === 'open' || job.status === 'paused'  // terminal kill
+  // Normal end-of-life: seats filled, budget pulled, etc. Postings come down
+  // and the public link stops; candidates stay in the pipeline.
+  const canClose    = ['open', 'paused', 'approved'].includes(job.status)
+  // An archived job can come back (a formerly open one returns paused).
+  const canRestore  = job.status === 'archived'
+  // Every seat is taken but the job is still live — nudge to close it.
+  const allSeatsFilled =
+    (job.status === 'open' || job.status === 'paused') && seats.total > 0 && seats.remaining === 0
   // Post-approval states carry a signed-off baseline: wording edits to the JD /
   // requirements re-trigger approval (formatting is free). Surfaced as a banner.
   const lockedSubstance = ['approved', 'open', 'paused'].includes(job.status)
@@ -420,6 +444,21 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
     router.push('/jobs')
   }
 
+  async function restore() {
+    setRestoring(true)
+    const res = await fetch(`/api/req-jobs/${job.id}/unarchive`, { method: 'POST' })
+    setRestoring(false)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) { toast.error(body.error ?? 'Restore failed'); return }
+    toast.success(
+      body.status === 'paused'
+        ? 'Job restored. It comes back paused — resume it when you are ready to take applications again.'
+        : 'Job restored.',
+    )
+    refreshJob()
+    router.refresh()
+  }
+
   async function unlinkOpening(openingId: string) {
     if (!confirm('Unlink this requisition from the pipeline?')) return
     const res = await fetch(`/api/req-jobs/${job.id}/unlink-opening`, {
@@ -439,8 +478,10 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
 
   const hasActions =
     (canEdit && !editing) || canSubmit || canPublish || canPause || canResume ||
-    canWithdraw || (canNewVersion && !editing) || job.status !== 'archived'
-  // Destructive actions (Withdraw / Archive) render red and sit below a divider.
+    canWithdraw || canClose || canRestore || (canNewVersion && !editing) || job.status !== 'archived'
+  // End-of-life actions (Close / Withdraw / Archive) sit below a divider; the
+  // irreversible ones (Withdraw / Archive) render red, Close does not — closing
+  // is the normal way a job ends.
   const actionItem = (
     Icon: typeof Pencil, label: string, onClick: () => void,
     loading = false, destructive = false,
@@ -479,6 +520,14 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
             <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize', STATUS_BADGE[job.status])}>
               {job.status.replace('_', ' ')}
             </span>
+            {seats.total > 0 && (
+              <span
+                className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium tabular-nums text-slate-500"
+                title="Headcount seats from the linked requisitions"
+              >
+                {seats.filled}/{seats.total} seats filled
+              </span>
+            )}
 
             {/* Pencil → job-actions dropdown, sitting right next to the status tag. */}
             {hasActions && (
@@ -504,7 +553,9 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                       {canPause && actionItem(PauseCircle, 'Pause', pause, pausing)}
                       {canResume && actionItem(PlayCircle, 'Resume', resume, resuming)}
                       {canNewVersion && !editing && actionItem(Copy, 'New version', newVersion, cloning)}
-                      {(canWithdraw || job.status !== 'archived') && <div className="my-1 border-t border-slate-100" />}
+                      {canRestore && actionItem(ArchiveRestore, 'Restore', restore, restoring)}
+                      {(canClose || canWithdraw || job.status !== 'archived') && <div className="my-1 border-t border-slate-100" />}
+                      {canClose && actionItem(CircleSlash, 'Close', () => setCloseReason(allSeatsFilled ? 'filled' : 'other'))}
                       {canWithdraw && actionItem(Ban, 'Withdraw', withdraw, withdrawing, true)}
                       {job.status !== 'archived' && actionItem(Archive, 'Archive', archive, archiving, true)}
                     </div>
@@ -517,7 +568,16 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
               <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Confidential</span>
             )}
           </div>
-          <p className="text-xs text-slate-400 mt-1">Created {new Date(job.created_at).toLocaleDateString()}</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Created {new Date(job.created_at).toLocaleDateString()}
+            {job.status === 'closed' && (closedInfo.closed_at || closedInfo.close_reason) && (
+              <>
+                {' · Closed'}
+                {closedInfo.closed_at ? ` ${new Date(closedInfo.closed_at).toLocaleDateString()}` : ''}
+                {closedInfo.close_reason ? ` — ${JOB_CLOSE_REASON_LABEL[closedInfo.close_reason] ?? closedInfo.close_reason}` : ''}
+              </>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* View pipeline stays as a standalone button; all other job actions
@@ -551,6 +611,21 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
             Every job should be backed by an approved requisition. This one isn&apos;t — link an approved
             requisition in the <span className="font-medium">Requisitions</span> section below.
           </div>
+        </div>
+      )}
+
+      {/* Every headcount seat is taken but the job is still live — offer to
+          close it (pre-selecting "All seats filled" as the reason). */}
+      {allSeatsFilled && (
+        <div className="mb-5 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-900">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+          <div className="flex-1">
+            <span className="font-medium">All {seats.total} {seats.total === 1 ? 'seat is' : 'seats are'} filled.</span>{' '}
+            Close this job?
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setCloseReason('filled')}>
+            Close job
+          </Button>
         </div>
       )}
 
@@ -923,6 +998,18 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           jobId={job.id}
           alreadyLinked={new Set(linkedOpenings.map(o => o.id))}
           onClose={(linked) => { setLinkOpen(false); if (linked) { setHmKey(k => k + 1); router.refresh() } }}
+        />
+      )}
+
+      {closeReason && (
+        <CloseJobDialog
+          jobId={job.id}
+          seatTotal={seats.total}
+          initialReason={closeReason}
+          onClose={(closed) => {
+            setCloseReason(null)
+            if (closed) { refreshJob(); router.refresh() }
+          }}
         />
       )}
 

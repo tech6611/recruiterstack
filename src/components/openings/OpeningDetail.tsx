@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Archive, Pencil, X, Send, FileText, ShieldAlert, Undo2, History } from 'lucide-react'
+import { ArrowLeft, Archive, ArchiveRestore, Pencil, X, Send, FileText, ShieldAlert, Undo2, History, CircleSlash } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,8 @@ import { ApprovalProgress } from '@/components/approvals/ApprovalProgress'
 import { AuditLogTab } from '@/components/approvals/AuditLogTab'
 import { cn } from '@/lib/utils'
 import { openingFieldLabel } from '@/lib/openings/reapproval'
+import { OPENING_CLOSE_REASONS } from '@/lib/openings/seat-math'
+import { CloseOpeningDialog } from '@/components/openings/CloseOpeningDialog'
 import type { OpeningChangeRequest } from '@/lib/openings/change-requests'
 import type {
   Opening,
@@ -62,10 +64,23 @@ const STATUS_BADGE: Record<Opening['status'], string> = {
   draft:            'bg-slate-100 text-slate-700',
   pending_approval: 'bg-amber-100 text-amber-800',
   approved:         'bg-emerald-100 text-emerald-800',
-  open:             'bg-slate-100 text-slate-800',
-  filled:           'bg-slate-100 text-slate-800',
+  open:             'bg-amber-100 text-amber-800',    // a published job is filling this seat
+  filled:           'bg-emerald-100 text-emerald-800', // taken by a hire
   closed:           'bg-slate-200 text-slate-600',
   archived:         'bg-slate-100 text-slate-400',
+}
+
+// Close reasons are stored as codes; show the human label from the dialog's list.
+const CLOSE_REASON_LABEL: Record<string, string> = Object.fromEntries(
+  OPENING_CLOSE_REASONS.map(r => [r.value, r.label]),
+)
+
+// Lifecycle columns added after the Opening type was written — read loosely.
+type LifecycleCols = {
+  filled_at?:    string | null
+  closed_at?:    string | null
+  close_reason?: string | null
+  close_note?:   string | null
 }
 
 export function OpeningDetail({ opening, departments, locations, compBands, users }: Props) {
@@ -77,7 +92,10 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
   const [submitting, setSubmitting] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [withdrawing, setWithdrawing] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const [closeOpen, setCloseOpen] = useState(false)
   const [tab, setTab] = useState<'overview' | 'audit'>('overview')
+  const lifecycle = opening as LifecycleCols
   // Ashby model: which fields need re-approval, the change in flight (if any), version history.
   const [changes, setChanges] = useState<ChangesState>({ gated_fields: [], pending_change: null, versions: [] })
 
@@ -89,6 +107,10 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
   const canCancel = opening.status === 'pending_approval' && opening.approval_id != null
   // Approved requisition → next step is creating the job + writing its JD.
   const canCreateJob = opening.status === 'approved'
+  // Retire a seat that won't be filled through this requisition. A seat taken
+  // by a hire becomes `filled` via the hire flow, so it isn't closable here.
+  const canClose   = ['draft', 'pending_approval', 'approved', 'open'].includes(opening.status)
+  const canRestore = opening.status === 'archived'
 
   const userById = useMemo(() => new Map(users.map(u => [u.id, u])), [users])
   const deptById = useMemo(() => new Map(departments.map(d => [d.id, d])), [departments])
@@ -230,6 +252,20 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
     router.push('/openings')
   }
 
+  async function restore() {
+    setRestoring(true)
+    const res = await fetch(`/api/openings/${opening.id}/unarchive`, { method: 'POST' })
+    setRestoring(false)
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      toast.error(body.error ?? 'Restore failed')
+      return
+    }
+    toast.success('Requisition restored')
+    router.refresh()
+    loadChanges()
+  }
+
   async function submitForApproval() {
     setSubmitting(true)
     const res = await fetch(`/api/openings/${opening.id}/submit`, { method: 'POST' })
@@ -337,6 +373,16 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
               <Pencil className="h-4 w-4" /> Edit
             </Button>
           )}
+          {canClose && (
+            <Button variant="outline" size="sm" onClick={() => setCloseOpen(true)}>
+              <CircleSlash className="h-4 w-4" /> Close
+            </Button>
+          )}
+          {canRestore && (
+            <Button variant="outline" size="sm" onClick={restore} loading={restoring}>
+              <ArchiveRestore className="h-4 w-4" /> Restore
+            </Button>
+          )}
           {opening.status !== 'archived' && (
             <Button variant="ghost" size="sm" onClick={archive} loading={archiving}>
               <Archive className="h-4 w-4" /> Archive
@@ -344,6 +390,16 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
           )}
         </div>
       </div>
+
+      {closeOpen && (
+        <CloseOpeningDialog
+          openingId={opening.id}
+          onClose={(closed) => {
+            setCloseOpen(false)
+            if (closed) { router.refresh(); loadChanges() }
+          }}
+        />
+      )}
 
       <div className="border-b border-slate-200 mb-4">
         <nav className="flex gap-4">
@@ -392,6 +448,22 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
                   <DetailRow label="Recruiter">{recruiter?.full_name ?? recruiter?.email ?? '—'}</DetailRow>
                   <DetailRow label="HM name">{opening.hiring_manager_name ?? '—'}</DetailRow>
                   <DetailRow label="HM email">{opening.hiring_manager_email ?? '—'}</DetailRow>
+                  {opening.status === 'filled' && (
+                    <DetailRow label="Filled">
+                      {lifecycle.filled_at ? new Date(lifecycle.filled_at).toLocaleDateString() : 'Yes'}
+                    </DetailRow>
+                  )}
+                  {opening.status === 'closed' && (
+                    <DetailRow label="Closed">
+                      {lifecycle.closed_at ? new Date(lifecycle.closed_at).toLocaleDateString() : 'Yes'}
+                      {lifecycle.close_reason && (
+                        <span className="text-slate-500"> — {CLOSE_REASON_LABEL[lifecycle.close_reason] ?? lifecycle.close_reason}</span>
+                      )}
+                      {lifecycle.close_note && (
+                        <span className="mt-0.5 block text-xs italic text-slate-500">“{lifecycle.close_note}”</span>
+                      )}
+                    </DetailRow>
+                  )}
                 </dl>
               ) : (
                 <>

@@ -9,6 +9,34 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-16 (Parity plan · Phase 2: close the loop — seats, hires, job close-out)
+
+### Added
+- **Seats have real states.** A requisition goes **Open** when a linked job is
+  published, **Filled** when a candidate on that job is hired (marked Hired,
+  offer accepted, or moved into the Hired stage), back to **Approved** if the
+  job is withdrawn unfilled, and **Closed** with a reason (filled another way,
+  cancelled, budget withdrawn, on hold, duplicate, other). Previously
+  open/filled/closed were never set by any code.
+- **Job close-out.** Pencil menu → **Close** (open/paused/approved) with a reason
+  and optional note; postings come down, the public link stops, open seats close
+  too (optional). **Restore** brings an archived job or requisition back to its
+  prior status (a live job comes back paused). (`POST /api/req-jobs/:id/close`,
+  `/unarchive`, `POST /api/openings/:id/close`, `/unarchive`)
+- **Headcount is real.** Job header shows "{filled}/{total} seats filled"; the
+  jobs board Headcount column shows seats filled/total instead of a hard-coded 1;
+  when every seat is filled an "All seats are filled — close this job?" banner
+  appears. Offers now record which seat they filled (`offers.opening_id`).
+- **Audit rows for every status change** — published, paused, resumed,
+  withdrawn, closed, archived, restored on jobs; opened, released, filled,
+  closed on seats — with reasons. Previously these only emitted webhooks.
+
+### Schema
+- `141_close_the_loop.sql` — `openings.opened_at/filled_at/filled_by_application_id/closed_at/close_reason/close_note/status_before_archive`,
+  `jobs.closed_at/close_reason/close_note/status_before_archive`, `offers.opening_id`,
+  and a one-off backfill marking seats behind already-published jobs as Open.
+  Code tolerates the migration not being applied (writes fall back to status only).
+
 ## 2026-09-16 (Parity plan · Phase 1: requisitions stay editable after approval)
 
 Ashby's model, adopted: **approval protects specific fields, never the whole

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { openingFieldLabel } from '@/lib/openings/reapproval'
+import { JOB_CLOSE_REASONS, OPENING_CLOSE_REASONS } from '@/lib/openings/seat-math'
 
 interface Entry {
   id:           string
@@ -40,7 +41,27 @@ const ACTION_LABEL: Record<string, string> = {
   change_applied:   'Change approved & applied',
   change_rejected:  'Change rejected',
   change_cancelled: 'Change withdrawn',
+  // Job lifecycle (publish → pause/resume → withdraw/close → archive).
+  published:        'Published',
+  paused:           'Paused',
+  resumed:          'Resumed',
+  withdrawn:        'Withdrawn',
+  closed:           'Closed',
+  archived:         'Archived',
+  unarchived:       'Restored from archive',
+  // Requisition seat lifecycle (opened by a published job → filled by a hire /
+  // released when the job is withdrawn / closed with a reason).
+  opened:           'Seat opened (job published)',
+  released:         'Seat released (job withdrawn)',
+  filled:           'Seat filled by a hire',
 }
+
+// Close reasons are stored as codes; show the human label from the same lists
+// the close dialogs offer (job + requisition reasons share a few codes, so
+// either list may resolve it).
+const CLOSE_REASON_LABEL: Record<string, string> = Object.fromEntries(
+  [...JOB_CLOSE_REASONS, ...OPENING_CLOSE_REASONS].map(r => [r.value, r.label]),
+)
 
 // Per-entity badge colours so a job's timeline visibly separates its
 // requisition phase from its job phase.
@@ -118,7 +139,10 @@ function formatMeta(m: Record<string, unknown>): string | null {
   if ('step_index' in m && m.step_index !== undefined) parts.push(`#${Number(m.step_index) + 1}`)
   if ('decision'   in m && typeof m.decision === 'string') parts.push(`Decision: ${m.decision}`)
   if ('comment'    in m && typeof m.comment === 'string' && m.comment) parts.push(`“${m.comment}”`)
-  if ('reason'     in m && typeof m.reason === 'string') parts.push(`Reason: ${m.reason}`)
+  if ('reason'     in m && typeof m.reason === 'string') parts.push(`Reason: ${CLOSE_REASON_LABEL[m.reason] ?? m.reason}`)
+  if ('note'       in m && typeof m.note === 'string' && m.note.trim()) parts.push(`“${m.note.trim()}”`)
+  if ('seats_opened'   in m && typeof m.seats_opened   === 'number' && m.seats_opened   > 0) parts.push(`${m.seats_opened} seat${m.seats_opened === 1 ? '' : 's'} opened`)
+  if ('seats_released' in m && typeof m.seats_released === 'number' && m.seats_released > 0) parts.push(`${m.seats_released} seat${m.seats_released === 1 ? '' : 's'} released`)
   // Field-level edits carry the list of requisition fields that changed.
   if (Array.isArray(m.fields) && m.fields.length > 0) {
     parts.push(`Fields: ${(m.fields as unknown[]).map(f => openingFieldLabel(String(f))).join(', ')}`)
