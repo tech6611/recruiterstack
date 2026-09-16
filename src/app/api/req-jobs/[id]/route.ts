@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { canSeeJob } from '@/lib/jobs/confidential'
 import { archiveEntity } from '@/lib/openings/seats'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
@@ -14,7 +15,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   const { orgId, userId } = auth
 
   const supabase = createAdminClient()
-  const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'recruiting:view')
+  const scope = await getViewerScope(supabase, orgId, userId)
+  const denied = assertCapability(scope, 'recruiting:view')
   if (denied) return denied
 
   const { data, error } = await supabase
@@ -24,6 +26,10 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     .eq('org_id', orgId)
     .single()
   if (error) return handleSupabaseError(error)
+  // Confidential jobs read as 'not found' for anyone not on them.
+  if (!(await canSeeJob(supabase, orgId, scope, data as { id: string; confidentiality?: string | null }))) {
+    return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  }
   return NextResponse.json({ data })
 }
 

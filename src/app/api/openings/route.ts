@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { diffRoles, notifyRoleChanges } from '@/lib/openings/roles'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
   // manager for, or (rare) the named recruiter on. `openings:view` alone would
   // otherwise return every requisition in the org.
   if (scope.isHiringManager) {
-    q = q.or(`hiring_manager_id.eq.${userId},recruiter_id.eq.${userId}`)
+    q = q.or(`hiring_manager_id.eq.${userId},recruiter_id.eq.${userId},coordinator_id.eq.${userId},sourcer_id.eq.${userId}`)
   }
 
   const { data, error, count } = await q
@@ -137,6 +138,11 @@ export async function POST(req: NextRequest) {
       hiring_manager_name:  body.hiring_manager_name ?? null,
       hiring_manager_email: body.hiring_manager_email ?? null,
       recruiter_id:      body.recruiter_id ?? userId,          // default: current user
+      coordinator_id:    body.coordinator_id ?? null,
+      sourcer_id:        body.sourcer_id ?? null,
+      is_backfill:       body.is_backfill ?? false,
+      backfill_for:      body.backfill_for ?? null,
+      target_hire_date:  body.target_hire_date ?? null,
       justification:     body.justification ?? null,
       external_id:       body.external_id ?? null,
       custom_fields:     body.custom_fields ?? {},
@@ -147,5 +153,8 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return handleSupabaseError(error)
+  // Tell the assigned hiring team (skips the creator themselves).
+  const created = data as unknown as Record<string, unknown>
+  await notifyRoleChanges(supabase, orgId, { id: String(created.id), title: String(created.title) }, diffRoles({}, created), userId)
   return NextResponse.json({ data }, { status: 201 })
 }

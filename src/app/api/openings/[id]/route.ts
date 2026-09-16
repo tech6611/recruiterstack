@@ -74,7 +74,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Zod's .partial() leaves absent keys undefined — strip them so they don't
   // read as "set to null" in the diff.
   const patch: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(body)) if (v !== undefined) patch[k] = v
+  const { reassign_in_flight, ...fields } = body
+  for (const [k, v] of Object.entries(fields)) if (v !== undefined) patch[k] = v
 
   // ── Approved / open: field-level gating ─────────────────────────────
   if (row.status === 'approved' || row.status === 'open') {
@@ -135,7 +136,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     let updated: Record<string, unknown> = row
     if (immediate.length > 0) {
       updated = await applyOpeningPatch(supabase, orgId, row.id, changesToPatch(immediate, row), {
-        actorUserId: userId, reason: 'edited', changedFields: immediate.map(c => c.field),
+        actorUserId: userId, reason: 'edited', changedFields: immediate.map(c => c.field), reassignInFlight: reassign_in_flight,
       })
       await writeAudit({
         org_id: orgId, target_type: 'opening', target_id: row.id, actor_user_id: userId,

@@ -32,6 +32,9 @@ const NONE = ''
 export function HiringManagerEditDialog({ jobId, mode, openingId, currentUserId, team, onClose }: Props) {
   const [value, setValue]   = useState<string>(currentUserId ?? NONE)
   const [saving, setSaving] = useState(false)
+  // Requisition mode only: move pending approval steps + plan sign-offs from
+  // the old hiring manager to the new one (server default is true).
+  const [reassign, setReassign] = useState(true)
 
   const members = team.filter(m => m.is_active !== false)
   const userId  = value === NONE ? null : value
@@ -44,7 +47,7 @@ export function HiringManagerEditDialog({ jobId, mode, openingId, currentUserId,
         const res  = await fetch(`/api/openings/${openingId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ hiring_manager_id: userId }),
+          body: JSON.stringify({ hiring_manager_id: userId, reassign_in_flight: reassign }),
         })
         const body = await res.json().catch(() => ({}))
         if (!res.ok) { toast.error(body.error ?? 'Could not update the hiring manager'); return }
@@ -83,6 +86,19 @@ export function HiringManagerEditDialog({ jobId, mode, openingId, currentUserId,
             <option key={m.user_id} value={m.user_id}>{teamMemberName(m)}</option>
           ))}
         </Select>
+
+        {mode === 'opening' && (
+          <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs text-slate-600">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              checked={reassign}
+              disabled={saving}
+              onChange={e => setReassign(e.target.checked)}
+            />
+            <span>Also move pending approvals and plan sign-offs to the new hiring manager</span>
+          </label>
+        )}
 
         <p className="mt-3 text-xs text-slate-500">
           {mode === 'opening'

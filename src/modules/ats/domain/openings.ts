@@ -71,6 +71,11 @@ export interface CreateOpeningInput {
   compCurrency?: string
   targetStartDate?: string | null       // YYYY-MM-DD
   justification?: string | null
+  coordinatorId?: string | null
+  sourcerId?: string | null
+  isBackfill?: boolean
+  backfillFor?: string | null
+  targetHireDate?: string | null
 }
 
 /** Create a draft requisition (opening). Mirrors the insert in
@@ -99,6 +104,11 @@ export async function createOpening(
       comp_currency:     input.compCurrency ?? 'USD',
       target_start_date: input.targetStartDate ?? null,
       recruiter_id:      createdBy,
+      coordinator_id:    input.coordinatorId ?? null,
+      sourcer_id:        input.sourcerId ?? null,
+      is_backfill:       input.isBackfill ?? false,
+      backfill_for:      input.backfillFor ?? null,
+      target_hire_date:  input.targetHireDate ?? null,
       justification:     input.justification ?? null,
       status:            'draft',
       created_by:        createdBy,

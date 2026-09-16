@@ -31,7 +31,7 @@ export const GET = withScope(async (_req, orgId, supabase, { params }, scope, us
   const sb = supabase as unknown as Loose
   const jobId = params.id
 
-  const { data: job } = await sb.from('jobs').select('status, hiring_manager_user_id').eq('id', jobId).eq('org_id', orgId).maybeSingle()
+  const { data: job } = await sb.from('jobs').select('id, status, hiring_manager_user_id').eq('id', jobId).eq('org_id', orgId).maybeSingle()
   // Broad recruiting view, or the assigned hiring manager for THIS job (so they
   // can see the plan they're being asked to approve).
   const denied = assertCanViewJob(scope, job)
@@ -63,7 +63,7 @@ export const PUT = withCapability('recruiting:edit', async (req, orgId, supabase
   const body = await parseBody(req, interviewPlanPutSchema)
   if (body instanceof NextResponse) return body
 
-  const { data: job } = await sb.from('jobs').select('status, hiring_manager_user_id').eq('id', jobId).eq('org_id', orgId).maybeSingle()
+  const { data: job } = await sb.from('jobs').select('id, status, hiring_manager_user_id').eq('id', jobId).eq('org_id', orgId).maybeSingle()
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
   // Ensure a plan row exists (one per job); keep jobs.interview_plan_id linked.

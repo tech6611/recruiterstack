@@ -13,7 +13,7 @@ type Loose = any
 export const GET = withScope(async (_req, orgId, supabase, { params }, scope) => {
   const sb = supabase as unknown as Loose
   const jobId = params.id
-  const { data: job } = await sb.from('jobs').select('status, hiring_manager_user_id').eq('id', jobId).eq('org_id', orgId).maybeSingle()
+  const { data: job } = await sb.from('jobs').select('id, status, hiring_manager_user_id').eq('id', jobId).eq('org_id', orgId).maybeSingle()
   const denied = assertCanViewJob(scope, job)
   if (denied) return denied
 

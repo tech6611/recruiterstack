@@ -5,7 +5,7 @@
 export const GATEABLE_OPENING_FIELDS = [
   'title', 'department_id', 'location_id', 'employment_type',
   'comp_min', 'comp_max', 'comp_currency', 'comp_band_id',
-  'target_start_date', 'hiring_manager_id', 'recruiter_id',
+  'target_start_date', 'target_hire_date', 'hiring_manager_id', 'recruiter_id', 'coordinator_id', 'sourcer_id', 'is_backfill',
 ] as const
 export type GateableField = typeof GATEABLE_OPENING_FIELDS[number]
 
@@ -19,12 +19,12 @@ export const OPENING_FIELD_LABEL: Record<string, string> = {
   title: 'Title', department_id: 'Department', location_id: 'Location', employment_type: 'Employment type',
   comp_min: 'Compensation min', comp_max: 'Compensation max', comp_currency: 'Currency', comp_band_id: 'Compensation band',
   target_start_date: 'Target start date', hiring_manager_id: 'Hiring manager', hiring_manager_name: 'Hiring manager name',
-  hiring_manager_email: 'Hiring manager email', recruiter_id: 'Recruiter', justification: 'Justification',
-  external_id: 'External id', out_of_band: 'Out of band',
+  hiring_manager_email: 'Hiring manager email', recruiter_id: 'Recruiter', coordinator_id: 'Recruiting coordinator', sourcer_id: 'Sourcer', justification: 'Justification',
+  external_id: 'External id', out_of_band: 'Out of band', target_hire_date: 'Target hire date', is_backfill: 'Backfill', backfill_for: 'Backfill for', number: 'Number',
 }
 
 /** Fields never diffed / never gated (server-derived or identity). */
-const IGNORED = new Set(['id', 'org_id', 'status', 'approval_id', 'created_by', 'created_at', 'updated_at', 'out_of_band'])
+const IGNORED = new Set(['id', 'org_id', 'status', 'approval_id', 'created_by', 'created_at', 'updated_at', 'out_of_band', 'number', 'opened_at', 'filled_at', 'filled_by_application_id', 'closed_at', 'close_reason', 'close_note', 'status_before_archive'])
 
 export type FieldChange = { field: string; before: unknown; after: unknown }
 

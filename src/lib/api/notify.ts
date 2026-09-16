@@ -18,6 +18,9 @@ export type NotificationType =
   | 'approval_requested'    // sent to each approver when an approval step activates and awaits their decision
   | 'approval_decided'      // sent to the requester when an approver approves/rejects a step
   | 'approval_completed'    // sent to the requester when every step is approved
+  // Hiring-team notifications (src/lib/openings/roles.ts):
+  | 'role_assigned'         // sent when someone becomes hiring manager / recruiter / coordinator / sourcer on a requisition or job
+  | 'role_removed'          // sent when they are taken off
 
 interface CreateNotificationParams {
   orgId: string

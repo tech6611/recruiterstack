@@ -177,7 +177,7 @@ function Row({ row, action }: { row: JobTeamRow; action?: ReactNode }) {
         <p className="truncate text-sm font-semibold text-slate-800">{row.name}</p>
         {sub && <p className="truncate text-xs text-slate-500">{sub}</p>}
       </div>
-      <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1">
+      <div className="ml-auto flex max-w-[60%] flex-wrap items-center justify-end gap-1">
         {row.tags.map(t => (
           <span key={t.role} title={t.from} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">{t.label}</span>
         ))}

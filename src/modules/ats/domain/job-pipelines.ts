@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { summarizeSeats, type SeatSummary } from '@/lib/openings/seat-math'
+import { fillJobFromOpening } from '@/lib/jobs/inherit'
 import type {
   Application,
   Candidate,
@@ -733,6 +734,7 @@ export async function getCareersPageBySlug(
   const { data: jobRows, error: jobsErr } = await (supabase as any)
     .from('jobs')
     .select('title, apply_token, custom_fields, department:departments(name)')
+    .neq('confidentiality', 'confidential')   // confidential jobs never reach the public page
     .eq('org_id', org.org_id)
     .eq('status', 'open')
     .not('apply_token', 'is', null)
@@ -1087,6 +1089,9 @@ export async function createCanonicalJobFromApprovedOpening(
     .from('job_openings')
     .insert({ job_id: job.id, opening_id: openingId, linked_by: linkedBy ?? null })
   if (linkErr && linkErr.code !== '23505') throw linkErr
+
+  // Comp + location flow down from the requisition (migration 143).
+  await fillJobFromOpening(supabase, orgId, job.id, openingId)
 
   return job
 }

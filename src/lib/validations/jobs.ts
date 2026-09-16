@@ -40,6 +40,8 @@ export const jobIntakeCreateSchema = z.object({
   confidentiality: z.enum(['public', 'confidential']).optional().default('public'),
   comp_min:        compNumOrNull.optional().default(null),
   comp_max:        compNumOrNull.optional().default(null),
+  comp_currency:   z.string().trim().length(3).optional().nullable(),
+  location_id:     uuidOrNull.optional().default(null),
   remote_ok:       z.boolean().optional().default(false),
   openings:        z.array(jobIntakeOpeningSchema).max(20).optional().default([]),
   intake:          z.record(z.string(), z.unknown()).optional().default({}),

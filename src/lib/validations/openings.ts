@@ -42,6 +42,11 @@ const openingBase = z.object({
   hiring_manager_name:  z.string().trim().max(200).optional().nullable(),
   hiring_manager_email: emailOrNull.optional().default(null),
   recruiter_id:      uuidOrNull.optional().default(null),
+  coordinator_id:    uuidOrNull.optional().default(null),
+  sourcer_id:        uuidOrNull.optional().default(null),
+  is_backfill:       z.boolean().optional().default(false),
+  backfill_for:      z.string().trim().max(200).optional().nullable(),
+  target_hire_date:  dateIsoOrNull.optional().default(null),
   justification:     z.string().trim().max(5000).optional().nullable(),
   external_id:       z.string().trim().max(200).optional().nullable(),
   custom_fields:     z.record(z.string(), z.unknown()).optional().default({}),
@@ -55,7 +60,10 @@ export const openingCreateSchema = openingBase.refine(
 // Update: every field optional, no defaults coerced on missing keys.
 // Zod's .partial() on the base produces an all-optional object we can
 // safely spread in the handler.
-export const openingUpdateSchema = openingBase.partial()
+export const openingUpdateSchema = openingBase.partial().extend({
+  /** When the hiring manager changes: also move pending approvals / plan sign-offs to the new one (default true). */
+  reassign_in_flight: z.boolean().optional(),
+})
 
 export type OpeningCreateInput = z.infer<typeof openingCreateSchema>
 export type OpeningUpdateInput = z.infer<typeof openingUpdateSchema>

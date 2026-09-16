@@ -32,6 +32,9 @@ export interface ViewerScope {
   capabilities: Set<Capability> // effective per-member capabilities (RBAC Slice 1)
   employeeId:   string | null   // the viewer's own employee_profile id, if bridged
   reportIds:    Set<string>     // employee_profile ids of the viewer's direct reports
+  /** Jobs the viewer holds a role on (assigned HM, or HM/recruiter/coordinator/sourcer on a
+   *  linked requisition). Only computed for viewers WITHOUT broad recruiting:view. */
+  jobIds:       Set<string>
 }
 
 export async function getViewerScope(
@@ -74,6 +77,27 @@ export async function getViewerScope(
 
   const activeRole = memberRow?.is_active === true ? (memberRow?.role ?? null) : null
 
+  // Role-based job access (Phase 3): a limited viewer sees the jobs they're on.
+  const jobIds = new Set<string>()
+  if (!capabilities.has('recruiting:view')) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+    const [{ data: hmJobs }, openingsRes] = await Promise.all([
+      sb.from('jobs').select('id').eq('org_id', orgId).eq('hiring_manager_user_id', userId),
+      sb.from('openings').select('id').eq('org_id', orgId)
+        .or(`hiring_manager_id.eq.${userId},recruiter_id.eq.${userId},coordinator_id.eq.${userId},sourcer_id.eq.${userId}`)
+        .then((r: { error: unknown }) => r.error
+          ? sb.from('openings').select('id').eq('org_id', orgId).or(`hiring_manager_id.eq.${userId},recruiter_id.eq.${userId}`)
+          : r),
+    ])
+    for (const j of (hmJobs ?? []) as Array<{ id: string }>) jobIds.add(j.id)
+    const openingIds = ((openingsRes.data ?? []) as Array<{ id: string }>).map(o => o.id)
+    if (openingIds.length) {
+      const { data: links } = await sb.from('job_openings').select('job_id').in('opening_id', openingIds)
+      for (const l of (links ?? []) as Array<{ job_id: string }>) jobIds.add(l.job_id)
+    }
+  }
+
   return {
     userId,
     role:       activeRole,
@@ -83,6 +107,7 @@ export async function getViewerScope(
     capabilities,
     employeeId,
     reportIds,
+    jobIds,
   }
 }
 
@@ -127,17 +152,19 @@ export function assertAdmin(scope: ViewerScope): NextResponse | null {
  */
 export function canViewJob(
   scope: ViewerScope,
-  job: { hiring_manager_user_id?: string | null } | null | undefined,
+  job: { id?: string; hiring_manager_user_id?: string | null } | null | undefined,
 ): boolean {
   if (scope.capabilities.has('recruiting:view')) return true
   if (job?.hiring_manager_user_id && job.hiring_manager_user_id === scope.userId) return true
+  // Any role on a linked requisition (recruiter / coordinator / sourcer / HM) grants access.
+  if (job?.id && scope.jobIds?.has(job.id)) return true
   return false
 }
 
 /** 403 to return-as-is, or null if the viewer may read this job. */
 export function assertCanViewJob(
   scope: ViewerScope,
-  job: { hiring_manager_user_id?: string | null } | null | undefined,
+  job: { id?: string; hiring_manager_user_id?: string | null } | null | undefined,
 ): NextResponse | null {
   return canViewJob(scope, job) ? null : forbidden()
 }

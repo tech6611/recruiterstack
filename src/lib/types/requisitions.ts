@@ -174,6 +174,12 @@ export interface Opening {
   hiring_manager_name: string | null           // free-typed HM contact (flows to job)
   hiring_manager_email: string | null          // free-typed HM contact (flows to job)
   recruiter_id: string | null
+  coordinator_id?: string | null           // migration 142
+  sourcer_id?: string | null               // migration 142
+  is_backfill?: boolean                    // migration 143
+  backfill_for?: string | null             // migration 143
+  target_hire_date?: string | null         // migration 143 (YYYY-MM-DD)
+  number?: number | null                   // migration 143 — human-readable per-org number
   justification: string | null
   status: OpeningStatus
   approval_id: string | null
@@ -245,6 +251,11 @@ export interface Job {
   // fields, normalized). Set when approval completes; used to detect material
   // edits that require re-approval. Null for jobs approved before migration 075.
   approved_snapshot: import('@/lib/jobs/substance').ApprovedSnapshot | null
+  // migration 143 — inherited from the requisition, overridable
+  location_id?: string | null
+  comp_min?: number | null
+  comp_max?: number | null
+  comp_currency?: string | null
   created_by: string
   created_at: string
   updated_at: string
@@ -303,6 +314,15 @@ export interface JobPosting {
   is_live: boolean
   published_at: string | null
   unpublished_at: string | null
+  // migration 143
+  visibility?: 'listed' | 'unlisted'
+  location_id?: string | null
+  show_compensation?: boolean
+  comp_min?: number | null
+  comp_max?: number | null
+  comp_currency?: string | null
+  social_description?: string | null
+  public_token?: string | null
   created_by: string
   created_at: string
   updated_at: string

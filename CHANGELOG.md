@@ -9,6 +9,40 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-16 (Parity plan · Phase 3: hiring team parity)
+
+### Added
+- **Four hiring-team roles on the requisition.** Recruiting coordinator and
+  sourcer join hiring manager and recruiter (`openings.coordinator_id`,
+  `openings.sourcer_id`). "Team on this job" derives all four from the linked
+  requisition, so the job never disagrees with it. The copilot can set them by
+  email (`coordinator`, `sourcer`).
+- **Roles grant access.** Anyone holding a role on a linked requisition (or set
+  as the job's hiring manager) can open that job's plan, team, automations and
+  approvals even without broad recruiting access; removing the role removes
+  the access. (`ViewerScope.jobIds`, `canViewJob`)
+- **Assignment notifications.** In-app + email when someone is added to a
+  requisition's hiring team ("You're now the recruiter on …"), in-app when
+  removed. Also when a job's hiring manager is set directly.
+- **Candidates in flight follow the new hiring manager.** When the hiring
+  manager changes, pending approval steps naming the old one and a pending
+  interview-plan sign-off are moved to the new one (checkbox, default on —
+  Ashby's "current and future" prompt). Audit row `reassigned_in_flight`.
+- **Confidential jobs are enforced.** Only admins, the job's creator, and
+  people with a role on the job (its hiring manager, or any role on a linked
+  requisition) can list or open a confidential job; everyone else gets "not
+  found". Confidential jobs never appear on the public careers page.
+  (`src/lib/jobs/confidential.ts`, job list/detail routes, job page)
+
+### Schema
+- `142_opening_roles_and_job_access.sql` — `openings.coordinator_id`,
+  `openings.sourcer_id` (+ indexes). Reads fall back gracefully until applied.
+- `143_job_setup_breadth.sql` (groundwork for Phase 4, shipped early): job
+  comp/location columns, posting visibility/comp/location/public token, the
+  `job_templates` table, requisition backfill / target hire date / per-org
+  number (trigger + backfill). Jobs created from a requisition now inherit its
+  comp range and location; linking a requisition fills them where empty.
+
 ## 2026-09-16 (Parity plan · Phase 2: close the loop — seats, hires, job close-out)
 
 ### Added

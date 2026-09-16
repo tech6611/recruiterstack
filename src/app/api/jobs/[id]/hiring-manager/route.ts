@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createNotification } from '@/lib/api/notify'
 import { withCapability, withScope } from '@/lib/api/helpers'
 import { assertCanViewJob } from '@/lib/rbac'
 import { teamMemberName, type TeamMember } from '@/lib/team-members'
@@ -13,12 +14,12 @@ type Loose = any
 export const GET = withScope(async (_req, orgId, supabase, { params }, scope) => {
   const sb = supabase as unknown as Loose
   const first = await sb
-    .from('jobs').select('hiring_manager_user_id, custom_fields').eq('id', params.id).eq('org_id', orgId).maybeSingle()
+    .from('jobs').select('id, hiring_manager_user_id, custom_fields').eq('id', params.id).eq('org_id', orgId).maybeSingle()
   let job = first.data
   if (first.error) {
     // Pre-migration-100 the column may not exist yet — fall back to intake only.
     const r = await sb.from('jobs').select('custom_fields').eq('id', params.id).eq('org_id', orgId).maybeSingle()
-    job = r.data ? { hiring_manager_user_id: null, custom_fields: r.data.custom_fields } : null
+    job = r.data ? { id: params.id, hiring_manager_user_id: null, custom_fields: r.data.custom_fields } : null
   }
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   // Broad recruiting view, or the assigned hiring manager for THIS job (so their
@@ -54,9 +55,17 @@ export const PUT = withCapability('recruiting:edit', async (req, orgId, supabase
     if (!member) return NextResponse.json({ error: 'Not an active member of this org' }, { status: 400 })
   }
 
+  const { data: before } = await sb.from('jobs').select('title, hiring_manager_user_id').eq('id', params.id).eq('org_id', orgId).maybeSingle()
   const { error } = await sb
     .from('jobs').update({ hiring_manager_user_id: userId }).eq('id', params.id).eq('org_id', orgId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (userId && userId !== before?.hiring_manager_user_id) {
+    await createNotification({
+      orgId, userId, type: 'role_assigned', title: `You're now the hiring manager on ${before?.title ?? 'a job'}`,
+      body: 'You can see this job, its interview plan and its approvals from now on.', resourceType: 'job', resourceId: params.id,
+    })
+  }
 
   return NextResponse.json({ data: { user_id: userId } })
 })

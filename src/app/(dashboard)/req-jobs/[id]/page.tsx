@@ -1,6 +1,8 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
-import { getOrgId } from '@/lib/auth'
+import { getOrgId, resolveUserIdFromClerk } from '@/lib/auth'
+import { getViewerScope } from '@/lib/rbac'
+import { canSeeJob } from '@/lib/jobs/confidential'
 import { createAdminClient } from '@/lib/supabase/server'
 import { JobDetail } from '@/components/req-jobs/JobDetail'
 import type { Job, Department, Opening } from '@/lib/types/requisitions'
@@ -20,6 +22,14 @@ export default async function JobDetailPage({ params }: { params: { id: string }
 
   const job = jobRow as Job | null
   if (!job) notFound()
+
+  // Confidential jobs read as 'not found' for anyone not on them (admins, the
+  // creator, and hiring-team members on the job or its requisitions may see it).
+  if (job.confidentiality === 'confidential') {
+    const viewer = await resolveUserIdFromClerk(userId)
+    const scope = await getViewerScope(supabase, orgId, viewer)
+    if (!(await canSeeJob(supabase, orgId, scope, job))) notFound()
+  }
 
   const [{ data: deptRow }, { data: allDepts }, { data: linkedRaw }] = await Promise.all([
     job.department_id

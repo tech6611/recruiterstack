@@ -149,7 +149,7 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
     if (field === 'department_id')     return deptById.get(String(v))?.name ?? String(v)
     if (field === 'location_id')       return locById.get(String(v))?.name ?? String(v)
     if (field === 'comp_band_id')      return bandById.get(String(v))?.name ?? String(v)
-    if (field === 'hiring_manager_id' || field === 'recruiter_id') {
+    if (field === 'hiring_manager_id' || field === 'recruiter_id' || field === 'coordinator_id' || field === 'sourcer_id') {
       const u = userById.get(String(v))
       return u?.full_name ?? u?.email ?? String(v)
     }
@@ -170,10 +170,15 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
 
   async function save() {
     setSaving(true)
+    // Only send the reassignment flag when the hiring manager actually changes —
+    // the server moves pending approvals / plan sign-offs to the new person when true.
+    const savedHm = opening.hiring_manager_id ?? ''
+    const hmChanged = form.hiring_manager_id !== savedHm
     const res = await fetch(`/api/openings/${opening.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        ...(hmChanged ? { reassign_in_flight: form.reassign_in_flight } : {}),
         title:             form.title.trim(),
         department_id:     form.department_id || null,
         location_id:       form.location_id   || null,
@@ -187,6 +192,8 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
         hiring_manager_name:  form.hiring_manager_name.trim() || null,
         hiring_manager_email: form.hiring_manager_email.trim() || null,
         recruiter_id:      form.recruiter_id || null,
+        coordinator_id:    form.coordinator_id || null,
+        sourcer_id:        form.sourcer_id || null,
         justification:     form.justification.trim() || null,
       }),
     })
@@ -315,6 +322,8 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
 
   const hm        = opening.hiring_manager_id ? userById.get(opening.hiring_manager_id) : null
   const recruiter = opening.recruiter_id      ? userById.get(opening.recruiter_id)      : null
+  const coordinator = opening.coordinator_id  ? userById.get(opening.coordinator_id)    : null
+  const sourcer   = opening.sourcer_id        ? userById.get(opening.sourcer_id)        : null
   const dept      = opening.department_id     ? deptById.get(opening.department_id)     : null
   const loc       = opening.location_id       ? locById.get(opening.location_id)        : null
   const band      = opening.comp_band_id      ? bandById.get(opening.comp_band_id)      : null
@@ -446,6 +455,8 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
                   <DetailRow label="Comp band">{band?.name ?? '—'}</DetailRow>
                   <DetailRow label="Hiring manager (approver)">{hm?.full_name ?? hm?.email ?? '—'}</DetailRow>
                   <DetailRow label="Recruiter">{recruiter?.full_name ?? recruiter?.email ?? '—'}</DetailRow>
+                  <DetailRow label="Coordinator">{coordinator?.full_name ?? coordinator?.email ?? '—'}</DetailRow>
+                  <DetailRow label="Sourcer">{sourcer?.full_name ?? sourcer?.email ?? '—'}</DetailRow>
                   <DetailRow label="HM name">{opening.hiring_manager_name ?? '—'}</DetailRow>
                   <DetailRow label="HM email">{opening.hiring_manager_email ?? '—'}</DetailRow>
                   {opening.status === 'filled' && (
@@ -481,6 +492,7 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
                     departments={departments} locations={locations} compBands={compBands} users={users}
                     gatedFields={isPostApproval ? gatedSet : EMPTY_SET}
                     gatedLocked={isPostApproval && pending != null}
+                    savedHiringManagerId={opening.hiring_manager_id ?? ''}
                   />
                 </>
               )}
@@ -646,6 +658,8 @@ interface EditFormProps {
   gatedFields: ReadonlySet<string>
   /** A change is already awaiting approval → gated fields are read-only. */
   gatedLocked: boolean
+  /** Hiring manager currently saved on the requisition — drives the reassignment checkbox. */
+  savedHiringManagerId: string
 }
 
 interface EditFormState {
@@ -662,7 +676,11 @@ interface EditFormState {
   hiring_manager_name:  string
   hiring_manager_email: string
   recruiter_id:      string
+  coordinator_id:    string
+  sourcer_id:        string
   justification:     string
+  /** When the hiring manager changes: also move pending approvals / plan sign-offs to the new person. */
+  reassign_in_flight: boolean
 }
 
 function initFormFromOpening(o: Opening): EditFormState {
@@ -680,7 +698,10 @@ function initFormFromOpening(o: Opening): EditFormState {
     hiring_manager_name:  o.hiring_manager_name  ?? '',
     hiring_manager_email: o.hiring_manager_email ?? '',
     recruiter_id:      o.recruiter_id      ?? '',
+    coordinator_id:    o.coordinator_id    ?? '',
+    sourcer_id:        o.sourcer_id        ?? '',
     justification:     o.justification     ?? '',
+    reassign_in_flight: true,
   }
 }
 
@@ -700,10 +721,11 @@ function GateHint({ locked }: { locked: boolean }) {
   )
 }
 
-function EditForm({ form, setForm, departments, locations, compBands, users, gatedFields, gatedLocked }: EditFormProps) {
+function EditForm({ form, setForm, departments, locations, compBands, users, gatedFields, gatedLocked, savedHiringManagerId }: EditFormProps) {
   const gated    = (k: string) => gatedFields.has(k)
   const locked   = (k: string) => gatedLocked && gatedFields.has(k)
   const hint     = (k: string) => (gated(k) ? <GateHint locked={gatedLocked} /> : null)
+  const hmChanged = form.hiring_manager_id !== savedHiringManagerId
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -744,6 +766,17 @@ function EditForm({ form, setForm, departments, locations, compBands, users, gat
             {users.map(u => <option key={u.id} value={u.id}>{u.full_name ?? u.email}</option>)}
           </Select>
           <p className="text-[11px] text-slate-400">Used for approval routing. Optional.</p>
+          {hmChanged && (
+            <label className="flex cursor-pointer items-start gap-2 pt-1 text-[11px] text-slate-600">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                checked={form.reassign_in_flight}
+                onChange={e => setForm(f => ({ ...f, reassign_in_flight: e.target.checked }))}
+              />
+              <span>Also move pending approvals to the new hiring manager</span>
+            </label>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label>Recruiter{hint('recruiter_id')}</Label>
@@ -751,6 +784,24 @@ function EditForm({ form, setForm, departments, locations, compBands, users, gat
             <option value="">—</option>
             {users.map(u => <option key={u.id} value={u.id}>{u.full_name ?? u.email}</option>)}
           </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label>Coordinator{hint('coordinator_id')}</Label>
+          <Select value={form.coordinator_id} disabled={locked('coordinator_id')} onChange={e => setForm(f => ({ ...f, coordinator_id: e.target.value }))}>
+            <option value="">— none —</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.full_name ?? u.email}</option>)}
+          </Select>
+          <p className="text-[11px] text-slate-400">Recruiting coordinator — schedules interviews. Optional.</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Sourcer{hint('sourcer_id')}</Label>
+          <Select value={form.sourcer_id} disabled={locked('sourcer_id')} onChange={e => setForm(f => ({ ...f, sourcer_id: e.target.value }))}>
+            <option value="">— none —</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.full_name ?? u.email}</option>)}
+          </Select>
+          <p className="text-[11px] text-slate-400">Finds and reaches out to candidates. Optional.</p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">

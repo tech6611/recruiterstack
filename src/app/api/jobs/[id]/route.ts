@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server'
+import { canSeeJob } from '@/lib/jobs/confidential'
 import { withCapability } from '@/lib/api/helpers'
 import { getCanonicalJobBoardDetail } from '@/modules/ats/domain/job-pipelines'
 
 // GET /api/jobs/[id] — canonical job with pipeline stages + applications (candidates joined) (Phase 3 / C4)
-export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
+export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }, scope) => {
   const { id } = params
+
+  // Confidential jobs read as 'not found' for anyone not on them.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: gate } = await (supabase as any).from('jobs').select('id, confidentiality').eq('id', id).eq('org_id', orgId).maybeSingle()
+  if (gate && !(await canSeeJob(supabase, orgId, scope, gate))) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
   let data
   try {

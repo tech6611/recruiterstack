@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { writeAudit } from '@/lib/approvals/audit'
 import { logger } from '@/lib/logger'
 import { DEFAULT_OPENING_REAPPROVAL_FIELDS, changesToPatch, mapsToChanges, type FieldChange } from './reapproval'
+import { diffRoles, notifyRoleChanges, reassignInFlight } from './roles'
 
 // openings/jobs columns added after the generated types; cast like the rest of the module.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,7 +102,7 @@ export async function propagateHiringManagerToJobs(
  */
 export async function applyOpeningPatch(
   supabase: SupabaseClient, orgId: string, openingId: string, patch: Record<string, unknown>,
-  opts: { actorUserId: string | null; reason: 'edited' | 'change_applied'; changeRequestId?: string | null; changedFields: string[] },
+  opts: { actorUserId: string | null; reason: 'edited' | 'change_applied'; changeRequestId?: string | null; changedFields: string[]; reassignInFlight?: boolean },
 ): Promise<Record<string, unknown>> {
   const sb = supabase as unknown as Loose
   const { data: current } = await sb.from('openings').select('*').eq('id', openingId).eq('org_id', orgId).single()
@@ -135,6 +136,19 @@ export async function applyOpeningPatch(
       name: (row.hiring_manager_name as string | null) ?? null,
       email: (row.hiring_manager_email as string | null) ?? null,
     })
+  }
+
+  // Hiring-team changes: tell the people involved; move in-flight approvals to a new HM.
+  const roleChanges = diffRoles(cur, row)
+  if (roleChanges.length) {
+    await notifyRoleChanges(supabase, orgId, { id: openingId, title: String(row.title ?? '') }, roleChanges, opts.actorUserId)
+    const hm = roleChanges.find(c => c.role === 'hiring_manager_id')
+    if (hm && opts.reassignInFlight !== false) {
+      const moved = await reassignInFlight(supabase, orgId, openingId, hm.from, hm.to)
+      if (moved.plan_approvals || moved.approval_steps) {
+        await writeAudit({ org_id: orgId, target_type: 'opening', target_id: openingId, actor_user_id: opts.actorUserId, action: 'reassigned_in_flight', from_state: null, to_state: null, metadata: { from_user_id: hm.from, to_user_id: hm.to, ...moved } })
+      }
+    }
   }
   return row
 }

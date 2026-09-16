@@ -44,7 +44,7 @@ export interface OpeningFieldDef {
   /** Plain-English label + description (the description is what the agent sees,
    *  so it includes any dependency hint that helps it ask good questions). */
   description: string
-  type: 'string' | 'number'
+  type: 'string' | 'number' | 'boolean'
   required?: boolean
   enumValues?: readonly string[]
   /** When present, the agent supplies a human value (name/email) that must be
@@ -96,6 +96,51 @@ export const OPENING_FIELDS = [
       if (!user) throw new FieldResolutionError(`No org member with email "${value}" was found. Invite them first, or leave the hiring manager out.`)
       return user.id
     },
+  },
+  {
+    key: 'coordinator',
+    column: 'coordinator_id',
+    inputKey: 'coordinatorId',
+    description: "Recruiting coordinator's email address (optional — must be a member of this org)",
+    type: 'string',
+    resolve: async (ctx, value) => {
+      const user = await findUserByEmail(ctx.supabase, ctx.orgId, value)
+      if (!user) throw new FieldResolutionError(`No org member with email "${value}" was found. Invite them first, or leave the coordinator out.`)
+      return user.id
+    },
+  },
+  {
+    key: 'sourcer',
+    column: 'sourcer_id',
+    inputKey: 'sourcerId',
+    description: "Sourcer's email address (optional — must be a member of this org)",
+    type: 'string',
+    resolve: async (ctx, value) => {
+      const user = await findUserByEmail(ctx.supabase, ctx.orgId, value)
+      if (!user) throw new FieldResolutionError(`No org member with email "${value}" was found. Invite them first, or leave the sourcer out.`)
+      return user.id
+    },
+  },
+  {
+    key: 'is_backfill',
+    column: 'is_backfill',
+    inputKey: 'isBackfill',
+    description: 'true when this seat replaces someone who left (a backfill) rather than adding headcount',
+    type: 'boolean',
+  },
+  {
+    key: 'backfill_for',
+    column: 'backfill_for',
+    inputKey: 'backfillFor',
+    description: 'Who is being replaced, when this is a backfill (free text, optional)',
+    type: 'string',
+  },
+  {
+    key: 'target_hire_date',
+    column: 'target_hire_date',
+    inputKey: 'targetHireDate',
+    description: 'Date by which the offer should be accepted (YYYY-MM-DD, optional; distinct from the start date)',
+    type: 'string',
   },
   {
     key: 'hiring_manager_name',
@@ -177,6 +222,7 @@ export const EXCLUDED_OPENING_COLUMNS = [
   'approval_id',      // set by the approval engine
   'custom_fields',    // free-form escape hatch, not a first-class field
   'created_by',
+  'number',           // assigned by the DB (migration 143 trigger)
   'created_at',
   'updated_at',
 ] as const satisfies readonly (keyof Opening)[]

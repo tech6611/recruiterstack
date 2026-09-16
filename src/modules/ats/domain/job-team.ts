@@ -15,13 +15,13 @@ import { teamMemberName, type TeamMember } from '@/lib/team-members'
 
 export type TeamPerson = { user_id: string | null; name: string | null; email: string | null }
 
-export type JobTeamRole = 'hiring_manager' | 'skip_level' | 'recruiter'
+export type JobTeamRole = 'hiring_manager' | 'skip_level' | 'recruiter' | 'coordinator' | 'sourcer'
 
 export type JobTeamInput = {
   hiringManager: (TeamPerson & { source: 'assigned' | 'intake' | 'none' }) | null
   skipLevel: TeamPerson | null
   /** Linked requisitions with their named people (already resolved to name/email). */
-  openings: Array<{ id: string; title: string; hiring_manager: TeamPerson | null; recruiter: TeamPerson | null }>
+  openings: Array<{ id: string; title: string; hiring_manager: TeamPerson | null; recruiter: TeamPerson | null; coordinator?: TeamPerson | null; sourcer?: TeamPerson | null }>
   /** Fallback recruiter when no linked requisition names one. */
   jobCreator: TeamPerson | null
   stages: Array<{ name: string; interview_panel: Array<{ name: string; email: string }> | null }>
@@ -44,9 +44,9 @@ export type JobTeamRow = {
 }
 
 const ROLE_LABEL: Record<JobTeamRole, string> = {
-  hiring_manager: 'Hiring manager', skip_level: 'Skip-level', recruiter: 'Recruiter',
+  hiring_manager: 'Hiring manager', skip_level: 'Skip-level', recruiter: 'Recruiter', coordinator: 'Coordinator', sourcer: 'Sourcer',
 }
-const ROLE_ORDER: Record<JobTeamRole, number> = { hiring_manager: 0, skip_level: 1, recruiter: 2 }
+const ROLE_ORDER: Record<JobTeamRole, number> = { hiring_manager: 0, skip_level: 1, recruiter: 2, coordinator: 3, sourcer: 4 }
 
 const keyFor = (p: { email: string | null; user_id?: string | null }): string | null => {
   const e = p.email?.trim().toLowerCase()
@@ -110,6 +110,11 @@ export function assembleJobTeam(input: JobTeamInput): JobTeamRow[] {
     const row = upsert(input.jobCreator, 'Recruiter')
     if (row) tag(row, 'recruiter', 'created this job')
   }
+  // 3b. Coordinator / sourcer from requisitions
+  for (const o of input.openings) {
+    if (o.coordinator) { const r = upsert(o.coordinator, 'Coordinator'); if (r) tag(r, 'coordinator', reqFrom(o)) }
+    if (o.sourcer)     { const r = upsert(o.sourcer, 'Sourcer');         if (r) tag(r, 'sourcer', reqFrom(o)) }
+  }
 
   // 4. Interviewers from stage panels
   for (const s of input.stages) {
@@ -149,10 +154,14 @@ export async function loadJobTeam(supabase: SupabaseClient, orgId: string, jobId
   const openingIds = ((linksRes.data ?? []) as Array<{ opening_id: string }>).map(l => l.opening_id)
 
   const openingsRes = openingIds.length
-    ? await sb.from('openings').select('id, title, hiring_manager_id, recruiter_id, hiring_manager_name, hiring_manager_email').eq('org_id', orgId).in('id', openingIds)
+    ? await sb.from('openings').select('id, title, hiring_manager_id, recruiter_id, coordinator_id, sourcer_id, hiring_manager_name, hiring_manager_email').eq('org_id', orgId).in('id', openingIds)
+        .then((r: Loose) => r.error   // pre-migration-142: retry without the new columns
+          ? sb.from('openings').select('id, title, hiring_manager_id, recruiter_id, hiring_manager_name, hiring_manager_email').eq('org_id', orgId).in('id', openingIds)
+          : r)
     : { data: [] }
   const openings = (openingsRes.data ?? []) as Array<{
     id: string; title: string; hiring_manager_id: string | null; recruiter_id: string | null
+    coordinator_id?: string | null; sourcer_id?: string | null
     hiring_manager_name: string | null; hiring_manager_email: string | null
   }>
 
@@ -172,7 +181,7 @@ export async function loadJobTeam(supabase: SupabaseClient, orgId: string, jobId
   // Resolve every referenced user id to name/email in one query.
   const ids = new Set<string>()
   for (const id of [job.hiring_manager_user_id, job.created_by, skipLevelUserId]) if (id) ids.add(id)
-  for (const o of openings) { if (o.hiring_manager_id) ids.add(o.hiring_manager_id); if (o.recruiter_id) ids.add(o.recruiter_id) }
+  for (const o of openings) { for (const id of [o.hiring_manager_id, o.recruiter_id, o.coordinator_id, o.sourcer_id]) if (id) ids.add(id) }
   // Resolve from `users` directly (not via org_members): a requisition's
   // recruiter or a job's creator may not be an org member — e.g. a user
   // provisioned in another org, or a duplicate user row for the same email —
@@ -207,6 +216,8 @@ export async function loadJobTeam(supabase: SupabaseClient, orgId: string, jobId
       hiring_manager: person(o.hiring_manager_id) ?? (o.hiring_manager_name || o.hiring_manager_email
         ? { user_id: null, name: o.hiring_manager_name, email: o.hiring_manager_email } : null),
       recruiter: person(o.recruiter_id),
+      coordinator: person(o.coordinator_id ?? null),
+      sourcer: person(o.sourcer_id ?? null),
     })),
     jobCreator: person(job.created_by),
     stages: ((stagesRes.data ?? []) as Array<{ name: string; interview_panel: Array<{ name: string; email: string }> | null }>)

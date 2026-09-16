@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { confidentialFilter, jobVisible } from '@/lib/jobs/confidential'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { jobIntakeCreateSchema } from '@/lib/validations/jobs'
+import { findOrCreateLocation } from '@/lib/jobs/inherit'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /** Find an org-scoped department by name, creating it if absent. */
@@ -49,7 +51,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
   const { orgId, userId } = auth
 
-  const denied = assertCapability(await getViewerScope(createAdminClient(), orgId, userId), 'recruiting:view')
+  const scope = await getViewerScope(createAdminClient(), orgId, userId)
+  const denied = assertCapability(scope, 'recruiting:view')
   if (denied) return denied
 
   const { searchParams } = req.nextUrl
@@ -77,9 +80,13 @@ export async function GET(req: NextRequest) {
 
   const { data, error, count } = await q
   if (error) return handleSupabaseError(error)
+  // Confidential jobs: only admins, the creator, and people with a role on the job.
+  const cf = await confidentialFilter(supabase, orgId, scope)
+  const visible = ((data ?? []) as Array<{ id: string; confidentiality?: string | null }>).filter(j => jobVisible(cf, j))
+  const hidden = (data?.length ?? 0) - visible.length
 
   // Eager load linked openings count for the list display.
-  const ids = (data ?? []).map((j: { id: string }) => j.id)
+  const ids = visible.map(j => j.id)
   const counts = new Map<string, number>()
   if (ids.length > 0) {
     const { data: links } = await supabase
@@ -92,8 +99,8 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    data: (data ?? []).map((j: { id: string }) => ({ ...j, opening_count: counts.get(j.id) ?? 0 })),
-    count: count ?? 0,
+    data: visible.map(j => ({ ...j, opening_count: counts.get(j.id) ?? 0 })),
+    count: Math.max(0, (count ?? 0) - hidden),
     limit,
     offset,
   })
@@ -127,7 +134,7 @@ export async function POST(req: NextRequest) {
 
   const { data: linkedOpening } = await supabase
     .from('openings')
-    .select('id, status, hiring_manager_id, hiring_manager_name, hiring_manager_email')
+    .select('id, status, hiring_manager_id, hiring_manager_name, hiring_manager_email, comp_min, comp_max, comp_currency, location_id')
     .eq('id', body.link_opening_id)
     .eq('org_id', orgId)
     .maybeSingle()
@@ -139,6 +146,7 @@ export async function POST(req: NextRequest) {
     hiring_manager_id: string | null
     hiring_manager_name: string | null
     hiring_manager_email: string | null
+    comp_min: number | null; comp_max: number | null; comp_currency: string | null; location_id: string | null
   }
   if (opening.status !== 'approved') {
     return NextResponse.json(
@@ -163,21 +171,36 @@ export async function POST(req: NextRequest) {
   if (hmName)  customFields.hiring_manager_name  = hmName
   if (hmEmail) customFields.hiring_manager_email = hmEmail
 
-  const { data: job, error } = await supabase
+  // Comp + location: what the recruiter typed wins, else inherit from the requisition
+  // (migration 143). Location text from the form is matched/created in `locations`.
+  const compMin = body.comp_min ?? opening.comp_min ?? null
+  const compMax = body.comp_max ?? opening.comp_max ?? null
+  const compCurrency = body.comp_currency ?? opening.comp_currency ?? null
+  const locationId = body.location_id
+    ?? (await findOrCreateLocation(supabase, orgId, typeof intake.location === 'string' ? intake.location : null))
+    ?? opening.location_id ?? null
+
+  const baseRow = {
+    org_id:          orgId,
+    title:           body.title,
+    department_id:   departmentId,
+    description:     body.description || null,
+    confidentiality: body.confidentiality,
+    custom_fields:   customFields,
+    status:          'draft',
+    created_by:      userId,
+    hiring_manager_user_id: opening.hiring_manager_id ?? null,
+  }
+  let inserted = await supabase
     .from('jobs')
-    .insert({
-      org_id:          orgId,
-      title:           body.title,
-      department_id:   departmentId,
-      description:     body.description || null,
-      confidentiality: body.confidentiality,
-      custom_fields:   customFields,
-      status:          'draft',
-      created_by:      userId,
-      hiring_manager_user_id: opening.hiring_manager_id ?? null,
-    } as never)
+    .insert({ ...baseRow, comp_min: compMin, comp_max: compMax, comp_currency: compCurrency, location_id: locationId } as never)
     .select()
     .single()
+  // Pre-migration-143 database: retry without the new columns.
+  if (inserted.error?.code === '42703') {
+    inserted = await supabase.from('jobs').insert(baseRow as never).select().single()
+  }
+  const { data: job, error } = inserted
 
   if (error) return handleSupabaseError(error)
   const jobRow = job as { id: string }

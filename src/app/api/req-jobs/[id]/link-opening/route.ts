@@ -5,6 +5,7 @@ import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { linkOpeningSchema } from '@/lib/validations/jobs'
 import { flowHiringManagerFromOpening } from '@/modules/ats/domain/job-hiring-manager'
+import { fillJobFromOpening } from '@/lib/jobs/inherit'
 
 /**
  * POST /api/req-jobs/:id/link-opening — link an opening to this job.
@@ -45,5 +46,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return handleSupabaseError(error)
   }
   const hiring_manager_user_id = await flowHiringManagerFromOpening(supabase, orgId, params.id, body.opening_id)
+  await fillJobFromOpening(supabase, orgId, params.id, body.opening_id)   // comp + location, where the job has none
   return NextResponse.json({ ok: true, hiring_manager_user_id })
 }

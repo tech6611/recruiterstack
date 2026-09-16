@@ -39,6 +39,8 @@ interface FormState {
   hiring_manager_name:  string
   hiring_manager_email: string
   recruiter_id:      string
+  coordinator_id:    string
+  sourcer_id:        string
   justification:     string
 }
 
@@ -49,6 +51,7 @@ const EMPTY: FormState = {
   target_start_date: '',
   hiring_manager_id: '', hiring_manager_name: '', hiring_manager_email: '',
   recruiter_id: '',
+  coordinator_id: '', sourcer_id: '',
   justification: '',
 }
 
@@ -157,6 +160,8 @@ export function NewOpeningForm() {
       hiring_manager_name:  form.hiring_manager_name.trim() || null,
       hiring_manager_email: form.hiring_manager_email.trim() || null,
       recruiter_id:      form.recruiter_id || null,
+      coordinator_id:    form.coordinator_id || null,
+      sourcer_id:        form.sourcer_id || null,
       justification:     form.justification.trim() || null,
       custom_fields:     customValues,
     }
@@ -246,6 +251,29 @@ export function NewOpeningForm() {
                   <option key={m.id} value={m.users?.id ?? ''}>{m.users?.full_name ?? m.users?.email ?? 'Unknown'}</option>
                 ))}
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Recruiting coordinator</Label>
+              <Select value={form.coordinator_id} onChange={e => setForm(f => ({ ...f, coordinator_id: e.target.value }))}>
+                <option value="">— none —</option>
+                {members.map(m => (
+                  <option key={m.id} value={m.users?.id ?? ''}>{m.users?.full_name ?? m.users?.email ?? 'Unknown'}</option>
+                ))}
+              </Select>
+              <p className="text-[11px] text-slate-400">Schedules interviews and keeps the process moving. Optional.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sourcer</Label>
+              <Select value={form.sourcer_id} onChange={e => setForm(f => ({ ...f, sourcer_id: e.target.value }))}>
+                <option value="">— none —</option>
+                {members.map(m => (
+                  <option key={m.id} value={m.users?.id ?? ''}>{m.users?.full_name ?? m.users?.email ?? 'Unknown'}</option>
+                ))}
+              </Select>
+              <p className="text-[11px] text-slate-400">Finds and reaches out to candidates. Optional.</p>
             </div>
           </div>
 

@@ -23,7 +23,7 @@ export const GET = withScope(async (_req, orgId, supabase, { params }, scope) =>
 
   const { data: job } = await sb
     .from('jobs')
-    .select('status, hiring_manager_user_id')
+    .select('id, status, hiring_manager_user_id')
     .eq('id', jobId)
     .eq('org_id', orgId)
     .maybeSingle()
