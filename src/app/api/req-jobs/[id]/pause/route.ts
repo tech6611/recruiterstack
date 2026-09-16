@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auditJobStatus } from '@/lib/openings/seats'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
@@ -64,6 +65,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     logger.error('[req-jobs pause] failed to unpublish postings', postingsError)
   }
 
+  await auditJobStatus(orgId, params.id, userId, 'paused', 'open', 'paused')
   emitWebhook(orgId, 'job.paused', { job_id: params.id })
     .catch(e => logger.error('[req-jobs pause] emit failed', e))
 

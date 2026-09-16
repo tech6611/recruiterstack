@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
+import { recordHire } from '@/lib/openings/seats'
 import { notifySlack, notifySlackDM } from '@/lib/notifications'
 import { dispatchSlackEvent } from '@/lib/slack/dispatch'
 import { applicationStatusEnum } from '@/lib/validations/common'
@@ -76,23 +77,30 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
 
     // Get new stage name for event
     let newStageName: string | null = null
+    let movedToHired = false
     if (stage_id) {
-      const { data: newStage } = await supabase
-        .from('pipeline_stages')
-        .select('name')
-        .eq('id', stage_id)
-        .single()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stageRes = await (supabase as any).from('pipeline_stages').select('name, funnel_step').eq('id', stage_id).single()
+      const newStage = stageRes.error
+        ? (await supabase.from('pipeline_stages').select('name').eq('id', stage_id).single()).data
+        : stageRes.data
       newStageName = newStage?.name ?? null
+      // Landing in the Hired stage IS the hire (Ashby: moving to Hired marks the candidate hired).
+      movedToHired = (newStage as { funnel_step?: string | null } | null)?.funnel_step === 'hired'
+        || (newStageName ?? '').trim().toLowerCase() === 'hired'
     }
 
     const { data, error } = await supabase
       .from('applications')
-      .update({ stage_id } as ApplicationUpdate)
+      .update(({ stage_id, ...(movedToHired ? { status: 'hired' } : {}) }) as ApplicationUpdate)
       .eq('id', params.id)
       .select('*')
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // A hire fills one seat on the job (idempotent per application).
+    const hire = movedToHired ? await recordHire(supabase, orgId, params.id, userId).catch(() => null) : null
 
     // Record event
     await supabase
@@ -114,7 +122,7 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
     // per the org's per-event config). Don't block the API response on Slack.
     void dispatchSlackEvent({ orgId, event: 'stage_moved', text: stageMsg, applicationId: params.id })
 
-    return NextResponse.json({ data })
+    return NextResponse.json({ data, hire })
   }
 
   // ── Status change ─────────────────────────────────────────────────────────
@@ -136,6 +144,9 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    // A hire fills one seat on the job (idempotent per application).
+    const hire = status === 'hired' ? await recordHire(supabase, orgId, params.id, userId).catch(() => null) : null
 
     await supabase
       .from('application_events')
@@ -168,7 +179,7 @@ export const PATCH = withCapability('recruiting:edit', async (request, orgId, su
       ])
     }
 
-    return NextResponse.json({ data })
+    return NextResponse.json({ data, hire })
   }
 
   // ── Add note ──────────────────────────────────────────────────────────────

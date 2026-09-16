@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { summarizeSeats, type SeatSummary } from '@/lib/openings/seat-math'
 import type {
   Application,
   Candidate,
@@ -50,6 +51,8 @@ export interface LegacyJobPipelineSummary extends HiringRequest {
   // no approved requisition behind it — surfaced as a warning badge on the board
   // (every job is now supposed to trace back to an approved requisition).
   opening_count: number
+  // Seat counts from the linked requisitions (Phase 2): filled / total / remaining.
+  seats?: SeatSummary
   // True while a "Send to HM" intake job is waiting on the hiring manager to
   // submit (custom_fields.intake.awaiting_hm). Drives the "Awaiting HM's input"
   // badge; cleared when the HM submits (see submitCanonicalIntakeJob).
@@ -238,10 +241,11 @@ export async function listCanonicalJobBoardSummaries(
       .select('id, job_id, stage_id, status')
       .eq('org_id', orgId)
       .not('job_id', 'is', null),
-    // Linked requisitions per job — used to flag req-less jobs on the board.
+    // Linked requisitions per job — used to flag req-less jobs on the board
+    // and to count seats (status of each linked opening).
     (supabase as any)
       .from('job_openings')
-      .select('job_id'),
+      .select('job_id, opening:openings(status)'),
   ])
 
   if (jobsRes.error) throw jobsRes.error
@@ -256,8 +260,10 @@ export async function listCanonicalJobBoardSummaries(
     Pick<Application, 'id' | 'job_id' | 'stage_id' | 'status'>
   >
   const openingCountByJob = new Map<string, number>()
-  for (const l of (linksRes.data ?? []) as Array<{ job_id: string }>) {
+  const seatStatusesByJob = new Map<string, string[]>()
+  for (const l of (linksRes.data ?? []) as Array<{ job_id: string; opening?: { status: string } | null }>) {
     openingCountByJob.set(l.job_id, (openingCountByJob.get(l.job_id) ?? 0) + 1)
+    if (l.opening?.status) seatStatusesByJob.set(l.job_id, [...(seatStatusesByJob.get(l.job_id) ?? []), l.opening.status])
   }
 
   return ((jobsRes.data ?? []) as CanonicalJobRow[]).map(row => {
@@ -268,8 +274,12 @@ export async function listCanonicalJobBoardSummaries(
     const activeApps = jobApps.filter(a => a.status === 'active')
     const intakeBag = readIntakeBag(row.custom_fields ?? null)
 
+    const seats = summarizeSeats(seatStatusesByJob.get(row.id) ?? [])
     return {
       ...canonicalJobToHiringRequest(row),
+      // Real headcount: seats behind this job (filled / total), not a hard-coded 1.
+      headcount: seats.total || (readIntakeBag(row.custom_fields ?? null).headcount as number | undefined) || 1,
+      seats,
       total_candidates: jobApps.length,
       opening_count: openingCountByJob.get(row.id) ?? 0,
       awaiting_hm: intakeBag.awaiting_hm === true,

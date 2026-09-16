@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { releaseSeatsForJob, auditJobStatus } from '@/lib/openings/seats'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
@@ -62,6 +63,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   if (postingsError) {
     logger.error('[req-jobs withdraw] failed to unpublish postings', postingsError)
   }
+
+  // Unfilled open seats go back to approved — the headcount survives the job.
+  const released = await releaseSeatsForJob(supabase, orgId, params.id, userId)
+  await auditJobStatus(orgId, params.id, userId, 'withdrawn', j.status, 'withdrawn', { seats_released: released })
 
   emitWebhook(orgId, 'job.withdrawn', { job_id: params.id })
     .catch(e => logger.error('[req-jobs withdraw] emit failed', e))

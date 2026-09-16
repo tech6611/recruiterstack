@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withCapability, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { offerUpdateSchema } from '@/lib/validations/offers'
+import { recordHire } from '@/lib/openings/seats'
 
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   const { data, error } = await supabase
@@ -24,7 +25,7 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
   return NextResponse.json({ data: { ...data, hiring_request } })
 })
 
-export const PATCH = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
+export const PATCH = withCapability('recruiting:edit', async (req, orgId, supabase, { params }, _scope, userId) => {
   const parsed = await parseBody(req, offerUpdateSchema)
   if (parsed instanceof NextResponse) return parsed
 
@@ -65,13 +66,15 @@ export const PATCH = withCapability('recruiting:edit', async (req, orgId, supaba
       created_by:     orgId,
     })
 
-    // Sync candidate status when offer accepted
+    // Sync candidate status when offer accepted, and fill a seat on the job.
     if (parsed.status === 'accepted') {
       await supabase
         .from('candidates')
         .update({ status: 'hired', updated_at: new Date().toISOString() })
         .eq('id', offer.candidate_id)
         .eq('org_id', orgId)
+      await supabase.from('applications').update({ status: 'hired' } as never).eq('id', offer.application_id).eq('org_id', orgId)
+      await recordHire(supabase, orgId, offer.application_id, userId).catch(() => null)
     }
   }
 

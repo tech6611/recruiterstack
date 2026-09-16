@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auditJobStatus } from '@/lib/openings/seats'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
@@ -50,6 +51,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     .eq('org_id', orgId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  await auditJobStatus(orgId, params.id, userId, 'resumed', 'paused', 'open')
   emitWebhook(orgId, 'job.resumed', { job_id: params.id })
     .catch(e => logger.error('[req-jobs resume] emit failed', e))
 

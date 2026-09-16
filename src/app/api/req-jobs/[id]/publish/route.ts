@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { openSeatsForJob, auditJobStatus } from '@/lib/openings/seats'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
@@ -79,6 +80,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     .eq('id', params.id)
     .eq('org_id', orgId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Seats behind this job are now open headcount; log the status change too.
+  const opened = await openSeatsForJob(supabase, orgId, params.id, userId)
+  await auditJobStatus(orgId, params.id, userId, 'published', j.status, 'open', { seats_opened: opened })
 
   emitWebhook(orgId, 'job.published', { job_id: params.id })
     .catch(e => logger.error('[req-jobs publish] emit failed', e))

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { archiveEntity } from '@/lib/openings/seats'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
@@ -111,13 +112,9 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
   const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'recruiting:edit')
   if (denied) return denied
 
-  const { data, error } = await supabase
-    .from('jobs')
-    .update({ status: 'archived' })
-    .eq('id', params.id)
-    .eq('org_id', orgId)
-    .select()
-    .single()
+  const ok = await archiveEntity(supabase, orgId, 'jobs', params.id, userId)
+  if (!ok) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  const { data, error } = await supabase.from('jobs').select('*').eq('id', params.id).eq('org_id', orgId).single()
   if (error) return handleSupabaseError(error)
   return NextResponse.json({ data })
 }

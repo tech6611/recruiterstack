@@ -1514,8 +1514,17 @@ export default function JobsPage() {
         return <td key={colId} className="px-3 py-3.5 text-sm text-slate-600">{job.location ?? <span className="text-slate-300">—</span>}</td>
       case 'level':
         return <td key={colId} className="px-3 py-3.5 text-sm text-slate-600">{job.level ?? <span className="text-slate-300">—</span>}</td>
-      case 'headcount':
-        return <td key={colId} className="px-3 py-3.5 text-sm text-slate-600">{job.headcount ?? <span className="text-slate-300">—</span>}</td>
+      case 'headcount': {
+        // Seats filled / total from the linked requisitions (Phase 2); falls back to the intake number.
+        const seats = (job as { seats?: { filled: number; total: number } }).seats
+        return (
+          <td key={colId} className="px-3 py-3.5 text-sm text-slate-600 tabular-nums">
+            {seats && seats.total > 0
+              ? <span title={`${seats.filled} of ${seats.total} seats filled`}>{seats.filled}/{seats.total}</span>
+              : (job.headcount ?? <span className="text-slate-300">—</span>)}
+          </td>
+        )
+      }
       case 'actions':
         return (
           <td key={colId} className="px-3 py-3.5" onClick={e => e.stopPropagation()}>
