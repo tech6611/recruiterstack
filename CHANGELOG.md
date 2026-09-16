@@ -21,6 +21,11 @@ entries on top.
   manager" picker stays as an override: a hiring manager already set on the job
   is never overwritten by a later link. (`src/modules/ats/domain/job-hiring-manager.ts`)
 
+### Fixed
+- **Rich text editor no longer throws "SSR has been detected" in dev** (blocked the
+  New Job form locally): `useEditor` now sets `immediatelyRender: false` so the
+  editor mounts client-side only. (`src/components/RichTextEditor.tsx`)
+
 ## 2026-09-14 (Job setup screen: actions collapsed into a pencil menu)
 
 ### Changed

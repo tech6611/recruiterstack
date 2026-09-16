@@ -194,6 +194,9 @@ export function RichTextEditor({
   onEditorReady,
 }: RichTextEditorProps) {
   const editor = useEditor({
+    // Render only in the browser: Tiptap throws in dev when it detects SSR
+    // without this set, and it avoids hydration mismatches in prod.
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Underline,
