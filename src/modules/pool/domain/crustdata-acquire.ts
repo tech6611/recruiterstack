@@ -47,6 +47,13 @@ import {
 } from '@/modules/pool/vendors/crustdata/client'
 import { ingestVendorRecords, type BatchIngestTotals } from '@/modules/pool/domain/ingest'
 import { startIngestRun, finishIngestRun, recordVendorCall } from '@/modules/pool/domain/vendor-ledger'
+import {
+  buildCrustdataQueryFromIcp,
+  isQueryable,
+  type CrustdataQueryContext,
+  type CrustdataQueryBuild,
+} from '@/modules/pool/vendors/crustdata/query'
+import type { Icp } from '@/lib/types/icp'
 
 type Supabase = SupabaseClient<Database>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -185,4 +192,40 @@ export async function sourceFromCrustdata(
     )
     throw err
   }
+}
+
+/** Thrown when an ICP produces no usable Crustdata filters, so a search would be wasteful. */
+export class EmptyIcpQueryError extends Error {
+  constructor(readonly build: CrustdataQueryBuild) {
+    super('ICP produced no Crustdata-searchable filters; nothing to source on')
+    this.name = 'EmptyIcpQueryError'
+  }
+}
+
+export interface SourceFromIcpResult extends SourceFromCrustdataResult {
+  /** How the ICP translated — which requirements became filters and which were skipped. */
+  query: CrustdataQueryBuild
+}
+
+/**
+ * Source candidates for a role directly from its ICP (Slice 3). Translates the ICP's
+ * must-haves (+ job title) into a Crustdata query, then runs it through
+ * sourceFromCrustdata. Throws EmptyIcpQueryError if the ICP yields no filters, so we
+ * never spend a search on an empty query.
+ */
+export async function sourceFromIcp(
+  supabase: Supabase,
+  icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'job_id'>>,
+  ctx: CrustdataQueryContext = {},
+  opts: Omit<SourceFromCrustdataInput, 'filters'> = {},
+): Promise<SourceFromIcpResult> {
+  const query = buildCrustdataQueryFromIcp(icp, ctx)
+  if (!isQueryable(query)) throw new EmptyIcpQueryError(query)
+
+  const result = await sourceFromCrustdata(supabase, {
+    ...opts,
+    filters: query.filters,
+    jobId: opts.jobId ?? icp.job_id ?? null,
+  })
+  return { ...result, query }
 }

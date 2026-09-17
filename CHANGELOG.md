@@ -9,6 +9,25 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-17 (Crustdata sourcing — Slice 3: ICP → query translator)
+
+### Added
+- **ICP → Crustdata query translator** (`src/modules/pool/vendors/crustdata/query.ts`)
+  — `buildCrustdataQueryFromIcp()`, a pure function mapping an ICP's structured
+  must-haves (+ job title) into a `/person/search` filter group. Maps title, location
+  (geo_distance), min-experience (`=>`), skills (`in`), seniority & function
+  (normalized to Crustdata's closed value sets via alias tables). Returns a
+  mapped/unmapped breakdown; fuzzy attributes (industry, background, culture) are
+  deliberately routed to post-fetch ranking, not forced into hard filters that would
+  wrongly exclude candidates. 13 unit tests; verified against real ICPs in the DB.
+- **`sourceFromIcp()`** (`crustdata-acquire.ts`) — translates an ICP then runs
+  `sourceFromCrustdata`; throws `EmptyIcpQueryError` if the ICP yields no filters, so
+  no search is spent on an empty query.
+
+### Changed
+- Filter-shape types (`CrustdataCondition`, `CrustdataFilterGroup`) now live in
+  `client.ts`; `CrustdataFilters` accepts the structured group or a loose record.
+
 ## 2026-09-17 (Crustdata sourcing — Slice 2: live Acquire client + orchestrator)
 
 ### Added

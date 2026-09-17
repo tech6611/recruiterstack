@@ -28,8 +28,22 @@ export const CRUSTDATA_MAX_PAGE = 1000
  */
 export const CRUSTDATA_DEFAULT_LIMIT = 1
 
-/** A Crustdata filter group. Kept loose here; the ICP→query translator (Slice 3) builds it. */
-export type CrustdataFilters = Record<string, unknown>
+/** One leaf filter condition, e.g. { field, type: '(.)', value }. */
+export interface CrustdataCondition {
+  field: string
+  type: string
+  value: unknown
+}
+/** A logical group of conditions (and/or), the shape /person/search expects for `filters`. */
+export interface CrustdataFilterGroup {
+  op: 'and' | 'or'
+  conditions: (CrustdataCondition | CrustdataFilterGroup)[]
+}
+/**
+ * The `filters` payload. The structured group is what the ICP→query translator
+ * (Slice 3) produces; the loose record is accepted for hand-written / ad-hoc queries.
+ */
+export type CrustdataFilters = CrustdataFilterGroup | Record<string, unknown>
 
 export interface CrustdataSearchOptions {
   /** Records to return this page. Clamped to [1, CRUSTDATA_MAX_PAGE]. Default 1. */
