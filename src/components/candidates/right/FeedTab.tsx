@@ -1,107 +1,62 @@
 'use client'
 
-import {
-  Send, ChevronRight, FileText, AlertCircle, Calendar,
-  BadgeCheck, Ban, Gift, ClipboardList, Clock, MessageCircle,
-} from 'lucide-react'
+import { Clock, ArrowRight } from 'lucide-react'
 import type { ApplicationEvent } from '@/lib/types/database'
-import { fmtRelative, fmtDate } from '@/lib/ui/date-utils'
-
-const EVENT_CONFIG: Record<string, { label: (e: ApplicationEvent) => string; icon: React.ReactNode; color: string }> = {
-  applied: {
-    label: e => `Applied · entered ${e.to_stage ?? 'pipeline'}`,
-    icon: <Send className="h-3.5 w-3.5" />,
-    color: 'bg-slate-50 text-emerald-600',
-  },
-  stage_moved: {
-    label: e => `Moved to ${e.to_stage ?? '?'}${e.from_stage ? ` from ${e.from_stage}` : ''}`,
-    icon: <ChevronRight className="h-3.5 w-3.5" />,
-    color: 'bg-slate-50 text-slate-600',
-  },
-  note_added: {
-    label: () => 'Note added',
-    icon: <FileText className="h-3.5 w-3.5" />,
-    color: 'bg-amber-50 text-amber-600',
-  },
-  status_changed: {
-    label: e => `Status → ${e.to_stage ?? '?'}`,
-    icon: <AlertCircle className="h-3.5 w-3.5" />,
-    color: 'bg-slate-100 text-slate-600',
-  },
-  email_sent: {
-    label: () => 'Email sent',
-    icon: <Send className="h-3.5 w-3.5" />,
-    color: 'bg-slate-50 text-emerald-600',
-  },
-  interview_scheduled: {
-    label: e => `Interview scheduled — ${e.note ? '' : 'see details'}`,
-    icon: <Calendar className="h-3.5 w-3.5" />,
-    color: 'bg-amber-50 text-amber-600',
-  },
-  interview_completed: {
-    label: () => 'Interview completed',
-    icon: <BadgeCheck className="h-3.5 w-3.5" />,
-    color: 'bg-emerald-50 text-emerald-600',
-  },
-  interview_cancelled: {
-    label: () => 'Interview cancelled',
-    icon: <Ban className="h-3.5 w-3.5" />,
-    color: 'bg-red-50 text-red-600',
-  },
-  offer_created: {
-    label: () => 'Offer created',
-    icon: <Gift className="h-3.5 w-3.5" />,
-    color: 'bg-slate-50 text-slate-600',
-  },
-  offer_approved: {
-    label: () => 'Offer approved',
-    icon: <BadgeCheck className="h-3.5 w-3.5" />,
-    color: 'bg-emerald-50 text-emerald-600',
-  },
-  offer_sent: {
-    label: () => 'Offer sent to candidate',
-    icon: <Send className="h-3.5 w-3.5" />,
-    color: 'bg-slate-50 text-emerald-600',
-  },
-  offer_accepted: {
-    label: () => 'Offer accepted 🎉',
-    icon: <BadgeCheck className="h-3.5 w-3.5" />,
-    color: 'bg-emerald-100 text-emerald-700',
-  },
-  offer_declined: {
-    label: () => 'Offer declined',
-    icon: <Ban className="h-3.5 w-3.5" />,
-    color: 'bg-red-50 text-red-600',
-  },
-  assessment_sent: {
-    label: () => 'Assessment sent',
-    icon: <ClipboardList className="h-3.5 w-3.5" />,
-    color: 'bg-amber-50 text-amber-600',
-  },
-  rejected: {
-    label: e => `Rejected${e.note ? '' : ''}`,
-    icon: <Ban className="h-3.5 w-3.5" />,
-    color: 'bg-red-50 text-red-600',
-  },
-  whatsapp_sent: {
-    label: () => 'WhatsApp message sent',
-    icon: <MessageCircle className="h-3.5 w-3.5" />,
-    color: 'bg-emerald-50 text-emerald-600',
-  },
-  whatsapp_received: {
-    label: () => 'WhatsApp reply received',
-    icon: <MessageCircle className="h-3.5 w-3.5" />,
-    color: 'bg-emerald-50 text-emerald-700',
-  },
-  whatsapp_opt_out: {
-    label: () => 'Opted out of WhatsApp',
-    icon: <Ban className="h-3.5 w-3.5" />,
-    color: 'bg-red-50 text-red-600',
-  },
-}
+import { fmtRelative, fmtDateTime } from '@/lib/ui/date-utils'
+import { avatarColor, initials } from '@/lib/ui/avatar'
+import {
+  getEventDisplay, getActorDisplay, isBoilerplateNote, TONE_SOFT, SystemActorIcon,
+} from '../event-display'
 
 interface FeedTabProps {
   events: ApplicationEvent[]
+}
+
+/** "Today" / "Yesterday" / "12 Sep 2026" — used as section headers. */
+function dayLabel(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const diffDays = Math.round((startOf(now) - startOf(d)) / 86400000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' })
+}
+
+function groupByDay(events: ApplicationEvent[]): { label: string; items: ApplicationEvent[] }[] {
+  const sorted = [...events].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  const groups: { label: string; items: ApplicationEvent[] }[] = []
+  for (const e of sorted) {
+    const label = dayLabel(e.created_at)
+    const last = groups[groups.length - 1]
+    if (last && last.label === label) last.items.push(e)
+    else groups.push({ label, items: [e] })
+  }
+  return groups
+}
+
+function StageChip({ name }: { name: string }) {
+  return (
+    <span className="inline-flex max-w-[9rem] items-center truncate rounded-md bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200">
+      {name}
+    </span>
+  )
+}
+
+function ActorAvatar({ createdBy }: { createdBy: string | null }) {
+  const actor = getActorDisplay(createdBy)
+  if (actor.isSystem) {
+    return (
+      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-slate-500" aria-hidden>
+        <SystemActorIcon className="h-2.5 w-2.5" />
+      </span>
+    )
+  }
+  return (
+    <span className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold ${avatarColor(actor.label)}`} aria-hidden>
+      {initials(actor.label)}
+    </span>
+  )
 }
 
 export default function FeedTab({ events }: FeedTabProps) {
@@ -114,32 +69,62 @@ export default function FeedTab({ events }: FeedTabProps) {
     )
   }
 
+  const groups = groupByDay(events)
+
   return (
-    <div className="p-4 space-y-4">
-      {events.map(event => {
-        const cfg = EVENT_CONFIG[event.event_type]
-        return (
-          <div key={event.id} className="flex gap-3">
-            <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${cfg?.color ?? 'bg-slate-100 text-slate-600'}`}>
-              {cfg?.icon ?? <Clock className="h-3.5 w-3.5" />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-slate-700">
-                {cfg?.label(event) ?? event.event_type}
-                {event.note && (
-                  <span className="block mt-1 text-sm text-slate-500 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
-                    {event.note}
-                  </span>
-                )}
-              </p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {event.created_by} · {fmtRelative(event.created_at)}
-                <span className="ml-1 text-slate-300">· {fmtDate(event.created_at)}</span>
-              </p>
-            </div>
+    <div className="flex-1 overflow-y-auto px-4 py-3">
+      {groups.map(group => (
+        <section key={group.label} className="mb-4 last:mb-0">
+          <div className="sticky top-0 z-10 -mx-4 mb-2 bg-white/95 px-4 py-1 backdrop-blur">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{group.label}</span>
           </div>
-        )
-      })}
+
+          <ol className="relative">
+            {/* connecting line */}
+            <div className="absolute left-[15px] top-2 bottom-2 w-px bg-slate-100" aria-hidden />
+
+            {group.items.map(event => {
+              const d = getEventDisplay(event)
+              const actor = getActorDisplay(event.created_by)
+              const note = event.note && !isBoilerplateNote(event.note) ? event.note : null
+              return (
+                <li key={event.id} className="relative flex gap-3 pb-4 last:pb-0">
+                  <div className={`relative z-10 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ${TONE_SOFT[d.tone]}`}>
+                    <d.Icon className="h-4 w-4" />
+                  </div>
+
+                  <div className="min-w-0 flex-1 pt-1">
+                    <p className="text-sm font-medium leading-snug text-slate-800">{d.title}</p>
+
+                    {d.stageMove && (d.stageMove.from || d.stageMove.to) && (
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        {d.stageMove.from && <StageChip name={d.stageMove.from} />}
+                        {d.stageMove.from && d.stageMove.to && <ArrowRight className="h-3 w-3 text-slate-300" aria-hidden />}
+                        {d.stageMove.to && <StageChip name={d.stageMove.to} />}
+                      </div>
+                    )}
+
+                    {d.detail && <p className="mt-0.5 text-xs text-slate-500">{d.detail}</p>}
+
+                    {note && (
+                      <p className="mt-1.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+                        {note}
+                      </p>
+                    )}
+
+                    <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-400" title={fmtDateTime(event.created_at)}>
+                      <ActorAvatar createdBy={event.created_by} />
+                      <span className="truncate">{actor.label}</span>
+                      <span aria-hidden>·</span>
+                      <span className="shrink-0">{fmtRelative(event.created_at)}</span>
+                    </p>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        </section>
+      ))}
     </div>
   )
 }

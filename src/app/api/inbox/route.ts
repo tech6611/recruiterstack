@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withCapability } from '@/lib/api/helpers'
+import { resolveEventDisplayFields } from '@/modules/ats/domain/event-display'
 
 // GET /api/inbox — recent activity feed + needs-attention queue
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase) => {
@@ -39,6 +40,8 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
       .order('applied_at', { ascending: true })
       .limit(50),
   ])
+
+  await resolveEventDisplayFields(supabase, eventsRes.data ?? [])
 
   return NextResponse.json({
     data: {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withCapability, parseBody } from '@/lib/api/helpers'
 import { candidateUpdateSchema } from '@/lib/validations/candidates'
 import { recordCandidateEventSafe } from '@/modules/ats/domain/applications'
+import { resolveEventDisplayFields } from '@/modules/ats/domain/event-display'
 
 // GET /api/candidates/:id — candidate + all applications (with job + stage) + all events + tags + tasks + referrals
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
@@ -73,6 +74,9 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
         .in('application_id', appIds)
         .order('created_at', { ascending: false })
     : { data: [] }
+
+  // Stage ids → names, Clerk user ids → people, so the feed never shows raw ids.
+  await resolveEventDisplayFields(supabase, events ?? [])
 
   return NextResponse.json({
     data: {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Briefcase, GraduationCap, RefreshCw, Loader2, Clock } from 'lucide-react'
 import { toast } from 'sonner'
+import { useCandidateProfile } from '../CandidateProfileContext'
 
 interface Exp { title: string | null; employer: string | null; location: string | null; start_date: string | null; end_date: string | null; is_current: boolean }
 interface Edu { degree: string | null; field: string | null; school: string | null; year: number | null }
@@ -26,6 +27,9 @@ export function CandidateHistoryPanel({ candidateId }: { candidateId: string }) 
   const [h, setH] = useState<History | null>(null)
   const [loading, setLoading] = useState(true)
   const [enriching, setEnriching] = useState(false)
+  // Enrichment also fills current_title / current_company on the candidate row —
+  // reload the profile so the header (left panel) picks them up right away.
+  const { reload: reloadProfile } = useCandidateProfile()
 
   const load = useCallback(() => {
     fetch(`/api/candidates/${candidateId}/enrich`)
@@ -45,7 +49,7 @@ export function CandidateHistoryPanel({ candidateId }: { candidateId: string }) 
       toast.error('Enrichment failed — is the résumé a text-readable PDF?')
       return
     }
-    if (j.data?.status === 'enriched') { toast.success(`Extracted ${j.data.roles} roles from the résumé.`); load() }
+    if (j.data?.status === 'enriched') { toast.success(`Extracted ${j.data.roles} roles from the résumé.`); load(); void reloadProfile() }
     else toast(`Skipped: ${j.data?.reason?.replace(/_/g, ' ') ?? 'no résumé to read'}.`)
   }
 

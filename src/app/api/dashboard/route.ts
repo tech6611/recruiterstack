@@ -6,6 +6,7 @@ import { getViewerScope } from '@/lib/rbac'
 import { cached, cacheKey } from '@/lib/api/cache'
 import { checkAuthRateLimit } from '@/lib/api/rate-limit'
 import { fetchCanonicalDashboardInputs } from '@/modules/ats/domain/reporting'
+import { resolveEventDisplayFields } from '@/modules/ats/domain/event-display'
 import type { CandidateStatus, StageColor } from '@/lib/types/database'
 
 const INTERVIEW_KEYWORDS = ['interview', 'screen', 'technical', 'phone', 'video', 'onsite', 'call']
@@ -375,8 +376,9 @@ export async function GET() {
   })
 
   // ── Recent activity (first 10 events with joins) ─────────────────────────────
+  const recentEvents = await resolveEventDisplayFields(supabase, events.slice(0, 10))
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recent_activity = events.slice(0, 10).map((e: any) => ({
+  const recent_activity = recentEvents.map((e: any) => ({
     id:             e.id,
     event_type:     e.event_type,
     candidate_id:   e.applications?.candidate_id                    ?? null,

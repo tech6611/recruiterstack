@@ -35,6 +35,7 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
     email: candidate?.email ?? '',
     phone: candidate?.phone ?? '',
     current_title: candidate?.current_title ?? '',
+    current_company: candidate?.current_company ?? '',
     location: candidate?.location ?? '',
     experience_years: candidate?.experience_years ?? 0,
     skills: candidate?.skills.join(', ') ?? '',
@@ -83,6 +84,7 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
       email:            p.email            ?? f.email,
       phone:            p.phone            ?? f.phone,
       current_title:    p.current_title    ?? f.current_title,
+      current_company:  p.current_company  ?? f.current_company,
       location:         p.location         ?? f.location,
       experience_years: p.experience_years ?? f.experience_years,
       skills:           Array.isArray(p.skills) ? p.skills.join(', ') : f.skills,
@@ -105,6 +107,7 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
         .filter(Boolean),
       phone: form.phone || null,
       current_title: form.current_title || null,
+      current_company: form.current_company || null,
       location: form.location || null,
       resume_url: form.resume_url || null,
     }
@@ -265,6 +268,19 @@ export function CandidateForm({ candidate, onSuccess }: CandidateFormProps) {
             value={form.current_title}
             onChange={(e) => set('current_title', e.target.value)}
             placeholder="Senior Software Engineer"
+            className={inputCls}
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label htmlFor="candidate-company" className="block text-xs font-semibold text-slate-500 mb-1.5">
+            Current Company
+          </label>
+          <input
+            id="candidate-company"
+            value={form.current_company}
+            onChange={(e) => set('current_company', e.target.value)}
+            placeholder="Acme Corp"
             className={inputCls}
           />
         </div>

@@ -9,6 +9,39 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-17 (Candidate profile — readable activity feed + current company)
+
+### Changed
+- **Activity feed redesigned** (`right/FeedTab.tsx`) — every action now has its own
+  icon + colour (applied, stage move, note, email sent/received, interview
+  scheduled/completed/cancelled, AI phone screen started/completed, offers, WhatsApp,
+  scorecards, referrals, triage…), events are grouped by day, stage moves render as
+  `from → to` chips, and each row shows who did it (initials or a robot glyph for
+  automations) with a relative time. One shared config (`candidates/event-display.tsx`)
+  drives the Feed and the pipeline timeline (`center/FunnelTab.tsx`) so they match.
+- **Names, not ids, in the feed** — "Moved to 72774910-c06c-…" and
+  "user_3Goya…" are gone. Every event read path (candidate profile, inbox, dashboard
+  recent activity — Next.js and Django) resolves stray stage UUIDs → stage names and
+  Clerk user ids → the person's name (`modules/ats/domain/event-display.ts`,
+  Django `hiring/event_display.py`). Client fallbacks: `automation` → "Automation
+  rule", `Seed` → "Seed data", unresolvable `user_*` → "Team member".
+- **Current company on the profile** — shown as a chip under the title in the left
+  panel, from the candidate's CV. The CV parser now extracts it (`parse-cv`), the
+  candidate form has a "Current Company" field, and the Django candidate API now
+  reads/writes `current_company` (it silently dropped the column before, which is
+  why the profile never showed it even when enrichment had filled it in).
+
+### Fixed
+- **Stage automation wrote stage ids into `application_events`**
+  (`automation-engine.ts` `move_stage`) — now stores stage names like every other
+  writer.
+- "Extract from résumé" in Career history now refreshes the profile header so the
+  newly found title/company show immediately.
+
+### Schema
+- **145** `backfill_application_event_stage_names.sql` — one-off data fix: rewrites
+  existing `from_stage`/`to_stage` UUIDs to their stage names. Idempotent.
+
 ## 2026-09-17 (Candidate page: "not found" only on a real 404)
 
 ### Fixed

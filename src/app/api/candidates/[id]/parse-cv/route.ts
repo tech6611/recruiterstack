@@ -11,7 +11,7 @@ import { RESUME_BUCKET, resumeStoragePath } from '@/lib/storage/resume'
  * POST /api/candidates/[id]/parse-cv
  *
  * Reads the candidate's stored CV, extracts structured fields with Gemini, and
- * fills in ONLY the blanks — title, location, years, skills, LinkedIn, phone.
+ * fills in ONLY the blanks — title, company, location, years, skills, LinkedIn, phone.
  * Anything the candidate (or a recruiter) already entered is left untouched, so
  * this is safe to run automatically and to re-run.
  *
@@ -24,13 +24,14 @@ export const maxDuration = 60 // Gemini PDF extraction can take a while
 
 // Only fields the extractor may fill. Kept narrow on purpose.
 const CANDIDATE_FIELDS =
-  'id, current_title, location, experience_years, skills, linkedin_url, phone, resume_url'
+  'id, current_title, current_company, location, experience_years, skills, linkedin_url, phone, resume_url'
 
 const MODEL = 'gemini-2.5-pro' // → gemini-2.5-pro; best extraction quality
 
 const EXTRACTION_PROMPT = `Extract candidate information from this CV/resume. Respond with ONLY valid JSON (no markdown, no explanation):
 {
   "current_title": "<most recent job title, or null>",
+  "current_company": "<employer at the most recent job (the company name only), or null>",
   "location": "<city, country, or null>",
   "experience_years": <total years of professional experience as a number, or null>,
   "skills": [<technical skills, frameworks, tools, and relevant domain skills — up to 25>],
@@ -59,6 +60,7 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
   const c = candidate as unknown as {
     id: string
     current_title: string | null
+    current_company: string | null
     location: string | null
     experience_years: number | null
     skills: string[] | null
@@ -113,6 +115,7 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
   // ── 4. Fill blanks only (never overwrite existing data) ────────────────────
   const update: Record<string, unknown> = {}
   if (!c.current_title && parsed.current_title) update.current_title = parsed.current_title
+  if (!c.current_company && parsed.current_company) update.current_company = parsed.current_company
   if (!c.location && parsed.location) update.location = parsed.location
   if ((c.experience_years ?? 0) === 0 && parsed.experience_years) {
     update.experience_years = Math.round(parsed.experience_years)

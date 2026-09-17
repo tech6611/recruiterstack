@@ -269,6 +269,16 @@ async function placeAiCall(sb: LooseSb, app: AppRow): Promise<void> {
 
 type Outcome = 'acted' | 'suggested' | 'skip'
 
+/** id → name for the given pipeline stages (org-scoped). Unknown ids are absent. */
+async function stageNames(sb: Supabase, orgId: string, ids: Array<string | null>): Promise<Map<string, string>> {
+  const want = ids.filter((x): x is string => !!x)
+  const out = new Map<string, string>()
+  if (!want.length) return out
+  const { data } = await sb.from('pipeline_stages').select('id, name').eq('org_id', orgId).in('id', want)
+  for (const s of (data ?? []) as Array<{ id: string; name: string }>) out.set(s.id, s.name)
+  return out
+}
+
 // ── execute one rule against one candidacy ──────────────────────────────────
 async function executeRule(sb: Supabase, rule: PipelineAutomation, app: AppRow, facts: RuleFacts, live: boolean): Promise<Outcome> {
   if (!evaluateConditions(facts, rule.config?.conditions, rule.config?.match ?? 'all')) return 'skip'
@@ -300,9 +310,12 @@ async function executeRule(sb: Supabase, rule: PipelineAutomation, app: AppRow, 
         if (!target || target === app.stage_id) return 'skip'
         const { error } = await updateApplicationStage(sb, app.org_id, app.id, String(target))
         if (error) throw new Error(error.message)
+        // Store stage NAMES like every other writer — the feed shows this row verbatim.
+        const names = await stageNames(sb, app.org_id, [app.stage_id, String(target)])
         await recordApplicationEventSafe(sb, {
           org_id: app.org_id, application_id: app.id, event_type: 'stage_moved',
-          from_stage: app.stage_id, to_stage: String(target),
+          from_stage: (app.stage_id && names.get(app.stage_id)) ?? null,
+          to_stage:   names.get(String(target)) ?? null,
           note: 'Moved by an automation rule', created_by: 'automation',
         } as never)
         decision = 'advanced'

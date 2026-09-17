@@ -6,14 +6,11 @@
  * appear here in chronological order as a rich visual timeline.
  */
 
-import {
-  Send, ChevronRight, FileText, Calendar,
-  BadgeCheck, Ban, Gift, ClipboardList, Clock,
-  AlertCircle, Mail, Users, GitBranch, MessageCircle,
-} from 'lucide-react'
+import { GitBranch, ArrowRight } from 'lucide-react'
 import type { ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import { fmtRelative, fmtDateTime } from '@/lib/ui/date-utils'
 import { Card } from '@/components/ui/card'
+import { getEventDisplay, getActorDisplay, isBoilerplateNote, TONE_SOLID } from '../event-display'
 
 type ApplicationWithJob = Application & {
   pipeline_stages: { name: string; color: string } | null
@@ -31,32 +28,11 @@ interface TimelineEvent {
   icon: React.ReactNode
   iconBg: string
   title: string
-  subtitle?: string
+  detail?: string
+  stageMove?: { from: string | null; to: string | null }
+  actor: string
   note?: string
   jobTitle?: string
-}
-
-const EVENT_ICON: Record<string, { icon: React.ReactNode; bg: string; title: (e: ApplicationEvent) => string }> = {
-  applied:              { icon: <Send className="h-3.5 w-3.5" />,         bg: 'bg-slate-500',    title: e => `Applied — entered ${e.to_stage ?? 'pipeline'}` },
-  stage_moved:          { icon: <ChevronRight className="h-3.5 w-3.5" />, bg: 'bg-slate-500',  title: e => `Moved to ${e.to_stage ?? '?'}${e.from_stage ? ` from ${e.from_stage}` : ''}` },
-  note_added:           { icon: <FileText className="h-3.5 w-3.5" />,     bg: 'bg-amber-500',   title: () => 'Note added' },
-  status_changed:       { icon: <AlertCircle className="h-3.5 w-3.5" />,  bg: 'bg-slate-500',   title: e => `Status changed → ${e.to_stage ?? '?'}` },
-  email_sent:           { icon: <Mail className="h-3.5 w-3.5" />,         bg: 'bg-slate-500',    title: e => `Email sent${(e.metadata as { subject?: string })?.subject ? ` · ${(e.metadata as { subject?: string }).subject}` : ''}` },
-  interview_scheduled:  { icon: <Calendar className="h-3.5 w-3.5" />,     bg: 'bg-amber-500',   title: () => 'Interview scheduled' },
-  interview_completed:  { icon: <BadgeCheck className="h-3.5 w-3.5" />,   bg: 'bg-emerald-500', title: () => 'Interview completed' },
-  interview_cancelled:  { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-400',     title: () => 'Interview cancelled' },
-  offer_created:        { icon: <Gift className="h-3.5 w-3.5" />,         bg: 'bg-slate-500',  title: () => 'Offer created' },
-  offer_approved:       { icon: <BadgeCheck className="h-3.5 w-3.5" />,   bg: 'bg-emerald-500', title: () => 'Offer approved' },
-  offer_sent:           { icon: <Send className="h-3.5 w-3.5" />,         bg: 'bg-slate-500',    title: () => 'Offer sent to candidate' },
-  offer_accepted:       { icon: <BadgeCheck className="h-3.5 w-3.5" />,   bg: 'bg-emerald-600', title: () => 'Offer accepted 🎉' },
-  offer_declined:       { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-500',     title: () => 'Offer declined' },
-  assessment_sent:      { icon: <ClipboardList className="h-3.5 w-3.5" />,bg: 'bg-amber-500',   title: () => 'Assessment sent' },
-  rejected:             { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-500',     title: () => 'Application rejected' },
-  scorecard_added:      { icon: <ClipboardList className="h-3.5 w-3.5" />,bg: 'bg-slate-500',  title: () => 'Scorecard submitted' },
-  referral_added:       { icon: <Users className="h-3.5 w-3.5" />,        bg: 'bg-slate-500',    title: () => 'Referral added' },
-  whatsapp_sent:        { icon: <MessageCircle className="h-3.5 w-3.5" />,bg: 'bg-emerald-500',   title: () => 'WhatsApp message sent' },
-  whatsapp_received:    { icon: <MessageCircle className="h-3.5 w-3.5" />,bg: 'bg-emerald-600',   title: () => 'WhatsApp reply received' },
-  whatsapp_opt_out:     { icon: <Ban className="h-3.5 w-3.5" />,          bg: 'bg-red-400',     title: () => 'Opted out of WhatsApp' },
 }
 
 // Build a synthetic "added to pipeline" event per application
@@ -68,16 +44,19 @@ function buildTimelineItems(
   for (const a of applications) appById[a.id] = a
 
   const items: TimelineEvent[] = events.map(e => {
-    const cfg = EVENT_ICON[e.event_type]
+    const d   = getEventDisplay(e)
     const app = appById[e.application_id]
     return {
-      id:       e.id,
-      date:     e.created_at,
-      icon:     cfg?.icon ?? <Clock className="h-3.5 w-3.5" />,
-      iconBg:   cfg?.bg   ?? 'bg-slate-400',
-      title:    cfg ? cfg.title(e) : e.event_type,
-      note:     e.note ?? undefined,
-      jobTitle: app?.hiring_requests?.position_title ?? undefined,
+      id:        e.id,
+      date:      e.created_at,
+      icon:      <d.Icon className="h-3.5 w-3.5" />,
+      iconBg:    TONE_SOLID[d.tone],
+      title:     d.title,
+      detail:    d.detail,
+      stageMove: d.stageMove,
+      actor:     getActorDisplay(e.created_by).label,
+      note:      e.note && !isBoilerplateNote(e.note) ? e.note : undefined,
+      jobTitle:  app?.hiring_requests?.position_title ?? undefined,
     }
   })
 
@@ -169,6 +148,14 @@ export default function FunnelTab({ events, applications }: FunnelTabProps) {
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-slate-800">{item.title}</p>
+                            {item.stageMove && (item.stageMove.from || item.stageMove.to) && (
+                              <div className="mt-1 flex flex-wrap items-center gap-1">
+                                {item.stageMove.from && <span className="rounded-md bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200">{item.stageMove.from}</span>}
+                                {item.stageMove.from && item.stageMove.to && <ArrowRight className="h-3 w-3 text-slate-300" aria-hidden />}
+                                {item.stageMove.to && <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-100">{item.stageMove.to}</span>}
+                              </div>
+                            )}
+                            {item.detail && <p className="text-xs text-slate-500 mt-0.5">{item.detail}</p>}
                             {item.jobTitle && (
                               <p className="text-[10px] text-slate-500 font-medium mt-0.5">{item.jobTitle}</p>
                             )}
@@ -181,6 +168,7 @@ export default function FunnelTab({ events, applications }: FunnelTabProps) {
                           <div className="shrink-0 text-right">
                             <p className="text-[10px] text-slate-400 whitespace-nowrap">{fmtRelative(item.date)}</p>
                             <p className="text-[9px] text-slate-300 mt-0.5 whitespace-nowrap">{fmtDateTime(item.date)}</p>
+                            <p className="text-[9px] text-slate-400 mt-0.5 whitespace-nowrap">by {item.actor}</p>
                           </div>
                         </div>
                       </Card>

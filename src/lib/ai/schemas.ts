@@ -74,6 +74,7 @@ export type EmailDraftResponse = z.infer<typeof emailDraftResponseSchema>
 
 export const parsedCvSchema = z.object({
   current_title:    z.string().nullable().catch(null),
+  current_company:  z.string().nullable().catch(null),
   location:         z.string().nullable().catch(null),
   experience_years: z.number().min(0).max(60).nullable().catch(null),
   skills:           z.array(z.string()).catch([]),
