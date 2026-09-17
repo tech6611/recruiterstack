@@ -5,6 +5,7 @@ import { Wand2, Mail, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import { fmtDateTime } from '@/lib/ui/date-utils'
 import { Card } from '@/components/ui/card'
+import { getActorDisplay } from '../event-display'
 
 type ApplicationWithHiringRequest = Application & {
   hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number'> | null
@@ -38,7 +39,7 @@ function EmailCard({ event }: { event: ApplicationEvent }) {
   const bodyHtml  = meta.body_html || null
   const bodyText  = meta.body      || null
   const hasBody   = !!(bodyHtml || bodyText)
-  const fromName  = meta.from_name || event.created_by || 'Recruiter'
+  const fromName  = meta.from_name || (event.created_by ? getActorDisplay(event.created_by).label : 'Recruiter')
   const fromEmail = meta.from_email || null
   const toList    = meta.to_emails?.length ? meta.to_emails : (meta.to_email ? [meta.to_email] : [])
   const toName    = meta.to_name   || null

@@ -37,6 +37,8 @@ entries on top.
   writer.
 - "Extract from résumé" in Career history now refreshes the profile header so the
   newly found title/company show immediately.
+- Inbox activity list, profile Notes tab and Emails tab now show actors through the
+  same label helper as the Feed (no raw `user_*` / lowercase `automation`).
 - Feed rows whose stage was later deleted (legacy automation rows pointing at
   rebuilt stage ids) now read "Moved to another stage · that stage has since been
   removed" instead of showing the raw id. Migration 145 is a no-op on the live DB

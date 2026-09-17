@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Send, Loader2, FileText } from 'lucide-react'
 import type { ApplicationEvent } from '@/lib/types/database'
+import { getActorDisplay } from '../event-display'
 
 interface NotesTabProps {
   applicationId: string | null  // first active application id
@@ -37,7 +38,7 @@ export default function NotesTab({ applicationId, notes, onNoteAdded }: NotesTab
         ) : notes.map(n => (
           <div key={n.id} className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
             <p className="text-sm text-slate-700 whitespace-pre-line">{n.note}</p>
-            <p className="text-[10px] text-slate-400 mt-1.5">{n.created_by} · {new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+            <p className="text-[10px] text-slate-400 mt-1.5">{getActorDisplay(n.created_by).label} · {new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
           </div>
         ))}
       </div>

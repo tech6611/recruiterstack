@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { StageColor } from '@/lib/types/database'
 import { timeAgo } from '@/lib/ui/date-utils'
+import { getActorDisplay } from '@/components/candidates/event-display'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -253,7 +254,7 @@ export default function InboxPage() {
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <span className="text-xs text-slate-400">{timeAgo(event.created_at)}</span>
                   {event.created_by && (
-                    <span className="text-[10px] text-slate-300">{event.created_by}</span>
+                    <span className="text-[10px] text-slate-300">{getActorDisplay(event.created_by).label}</span>
                   )}
                 </div>
               </div>
