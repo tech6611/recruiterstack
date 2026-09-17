@@ -207,7 +207,10 @@ export async function embedPoolProfiles(supabase: Supabase, profileIds: string[]
       .from('pool_profiles')
       .select('id, current_title, current_company, skills')
       .in('id', batch)
-    const profiles = (rows ?? []) as { id: string; current_title: string | null; current_company: string | null; skills: string[] | null }[]
+    // A profile with no title, company or skills has nothing to embed — and Gemini
+    // rejects the WHOLE batch on one empty part, so drop those before the call.
+    const profiles = ((rows ?? []) as { id: string; current_title: string | null; current_company: string | null; skills: string[] | null }[])
+      .filter((p) => candidateEmbeddingText(p).length > 0)
     if (!profiles.length) continue
 
     try {

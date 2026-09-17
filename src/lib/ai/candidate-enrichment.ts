@@ -142,6 +142,34 @@ function monthsBetween(a: string, b: Date): number {
   return (b.getFullYear() - d.getFullYear()) * 12 + (b.getMonth() - d.getMonth())
 }
 
+const INTERNSHIP_RE = /\b(?:intern(?:ship)?|trainee|apprentice|summer\s+analyst|industrial\s+training)\b/i
+
+/** Months covered by the union of dated role intervals, internships excluded. PURE. */
+export function employedMonths(experiences: EnrichedExperience[], now: Date): number | null {
+  const toIndex = (iso: string) => {
+    const d = new Date(iso)
+    return d.getFullYear() * 12 + d.getMonth()
+  }
+  const nowIdx = now.getFullYear() * 12 + now.getMonth()
+  const spans = experiences
+    .filter((e) => e.start_date && !INTERNSHIP_RE.test(e.title ?? ''))
+    .map((e) => {
+      const start = toIndex(e.start_date!)
+      const end = e.is_current || !e.end_date ? nowIdx : toIndex(e.end_date)
+      return [start, Math.max(start, Math.min(end, nowIdx))] as [number, number]
+    })
+    .sort((a, b) => a[0] - b[0])
+  if (!spans.length) return null
+  let total = 0
+  let [curStart, curEnd] = spans[0]
+  for (const [s, e] of spans.slice(1)) {
+    if (s <= curEnd) curEnd = Math.max(curEnd, e)
+    else { total += curEnd - curStart; [curStart, curEnd] = [s, e] }
+  }
+  total += curEnd - curStart
+  return total
+}
+
 export interface Movability {
   num_roles: number
   current_tenure_months: number | null
@@ -160,10 +188,14 @@ export function deriveMovability(experiences: EnrichedExperience[], now: Date): 
   // Most recent first, by start date.
   const sorted = [...withStart].sort((a, b) => (a.start_date! < b.start_date! ? 1 : -1))
   const mostRecent = sorted.find((e) => e.is_current) ?? sorted[0]
-  const earliest = sorted[sorted.length - 1]
 
   const current_tenure_months = mostRecent.start_date ? Math.max(0, monthsBetween(mostRecent.start_date, now)) : null
-  const total_experience_months = earliest.start_date ? Math.max(0, monthsBetween(earliest.start_date, now)) : null
+  // Total experience = months actually EMPLOYED: the union of dated role intervals
+  // (overlaps merged, gaps excluded), ignoring internships/traineeships. It used to be
+  // calendar time since the earliest role, which turned a two-month 2016 internship
+  // into "ten years of experience" and put people well over an ICP's ceiling that a
+  // vendor's own count (and any recruiter) would place inside it.
+  const total_experience_months = employedMonths(withStart, now)
   const last_move_months_ago = sorted[0].start_date ? Math.max(0, monthsBetween(sorted[0].start_date, now)) : null
   const avg_tenure_months = total_experience_months != null && num_roles > 0 ? Math.round(total_experience_months / num_roles) : null
 

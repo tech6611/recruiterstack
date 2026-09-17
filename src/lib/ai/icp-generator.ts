@@ -21,6 +21,7 @@ import { DEFAULT_SCORING_CRITERIA } from '@/lib/scoring'
 import type { HiringRequest, ScoringCriterion } from '@/lib/types/database'
 import type { IcpCompetency, IcpDraftInput, IcpMustHave, RecruiterBrief, SourcingMap } from '@/lib/types/icp'
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
+import { experienceBandGate, yearsFloorFromLabel } from '@/lib/icp-gates'
 
 const DEFAULT_RUBRIC_IDS = DEFAULT_SCORING_CRITERIA.map((c) => c.id).sort().join(',')
 
@@ -133,6 +134,11 @@ const recruiterBriefSchema = z.object({
   niche: z.string().default(''),
   persona: z.string().default(''),
   market: z.string().nullish(),
+  experience_band: z.object({
+    min_years: z.number().nullish(),
+    max_years: z.number().nullish(),
+    rationale: z.string().nullish(),
+  }).nullish(),
   feeder_pools: z.array(z.object({
     label: z.string(),
     companies: z.array(z.string()).default([]),
@@ -512,6 +518,7 @@ Work in this exact order, and let each step drive the next:
 0) recruiter_brief — BEFORE anything else, decide WHICH specialist recruiter you are for this search, given the role, the level, the hiring company and its industry/stage, and the market. Name the niche precisely (e.g. "Strategy & Operations / BizOps recruiter for scaling SaaS, Bengaluru", not "business recruiter") and write the brief you would hand a junior on your desk:
    - niche, persona: who you are and the 2–3 things you screen on first.
    - market: the hiring market as you understand it — city/country, on-site vs remote, whether relocation and visa-sponsored pools are realistic here.
+   - experience_band: the realistic years-of-experience FLOOR and CEILING for this seat, from the level, the budget, the team size and the JD. The ceiling is as real as the floor: a Bain partner with 12 years is NOT a candidate for a 2–6 year Strategy & Ops seat — they won't take it, won't stay, and are out of budget. Over-seniority is a mismatch, never a bonus. Give min_years, max_years and a one-line rationale. Your feeder_pools must then name role types INSIDE that band (Analyst/Associate, not Partner).
    - feeder_pools: where you would search FIRST, in priority order (priority 1 = first). Each pool names REAL employers AND the role types you'd pull from them, local to this market. Think like your niche: a strategy recruiter starts at top consulting, IB, VC/PE and in-house Strategy & Ops / BizOps / Chief of Staff teams; a GTM recruiter starts at quota carriers at comparable deal size and segment; an engineering recruiter at product companies solving comparable problems. Be concrete; name companies.
    - title_families: the titles that are the SAME search as this role.
    - market_gates: which of the JD's requirements are TRUE gates in this market and why (e.g. institute tier is a real filter in Indian strategy hiring; a degree barely matters in engineering).
@@ -541,6 +548,7 @@ Respond with ONLY valid JSON (no markdown), with the fields in this order:
 {
   "recruiter_brief": {
     "niche": "", "persona": "", "market": "",
+    "experience_band": { "min_years": 2, "max_years": 6, "rationale": "" },
     "feeder_pools": [ { "label": "", "companies": [""], "role_types": [""], "priority": 1, "rationale": "" } ],
     "title_families": [""],
     "market_gates": [ { "requirement": "", "why": "" } ],
@@ -576,11 +584,18 @@ export function sourcingMapFromReasoning(g: ReasoningFirstGeneration, recruiterC
   }
 }
 
-function draftFromReasoning(g: ReasoningFirstGeneration): IcpDraftInput {
-  const must_haves: IcpMustHave[] = g.must_haves
+/** Build the draft. The brief's experience band becomes ONE structured gate (floor +
+ *  ceiling) that the search plan can send and the Fit Engine can enforce
+ *  deterministically; any plain "N+ years" gate the model also wrote is subsumed by
+ *  it so the same floor isn't judged twice. PURE + tested. */
+export function draftFromReasoning(g: ReasoningFirstGeneration): IcpDraftInput {
+  const band = g.recruiter_brief?.experience_band
+  const bandGate = band ? experienceBandGate(band.min_years ?? null, band.max_years ?? null) : null
+  const modelGates: IcpMustHave[] = g.must_haves
     .map((m, i) => ({ id: `g-ai-${i}`, label: m.label.trim(), attribute: '', operator: '', value: '' }))
     .filter((m) => m.label)
-    .slice(0, MAX_GATES)
+    .filter((m) => !(bandGate && yearsFloorFromLabel(m.label) != null))
+  const must_haves = (bandGate ? [...modelGates, bandGate] : modelGates).slice(0, MAX_GATES)
   return { must_haves, competencies: competenciesFromGeneration(g.competencies), source: 'intake' }
 }
 
@@ -599,7 +614,10 @@ export async function generateIcpWithReasoning(
 ): Promise<{ draft: IcpDraftInput; sourcingMap: SourcingMap | null }> {
   try {
     const { text, usage, model } = await withRetry(
-      () => generateText(buildReasoningFirstPrompt(job, intakeNotes, opts), { model: MODEL, maxTokens: 8192, json: true }),
+      // The brief (feeder pools, norms, translations) roughly doubled the payload, and
+      // Gemini 2.5 Pro's hidden thinking tokens count against this cap — 8192 truncated
+      // mid-JSON in the wild. Give it real headroom.
+      () => generateText(buildReasoningFirstPrompt(job, intakeNotes, opts), { model: MODEL, maxTokens: 20000, json: true }),
       { label: 'ICP Generator (reasoning-first)' },
     )
     trackUsage('icp-generator', model, usage, identity)

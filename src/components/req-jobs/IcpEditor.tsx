@@ -411,6 +411,16 @@ export function IcpEditor({
                   {b?.market && (
                     <div className="text-xs"><span className="font-semibold uppercase tracking-wide text-[10px] text-slate-400">Market · </span><span className="text-slate-600">{b.market}</span></div>
                   )}
+                  {b?.experience_band && (b.experience_band.min_years != null || b.experience_band.max_years != null) && (
+                    <div className="text-xs">
+                      <span className="font-semibold uppercase tracking-wide text-[10px] text-slate-400">Experience band · </span>
+                      <span className="font-medium text-slate-700">
+                        {b.experience_band.min_years ?? '?'}–{b.experience_band.max_years ?? '?'} years
+                      </span>
+                      {b.experience_band.rationale && <span className="text-slate-500"> — {b.experience_band.rationale}</span>}
+                      <span className="ml-1.5 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-700">ceiling enforced</span>
+                    </div>
+                  )}
 
                   {pools.length > 0 && (
                     <div>

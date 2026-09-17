@@ -191,3 +191,30 @@ describe('sourcingMapFromReasoning', () => {
     expect(sourcingMapFromReasoning({ ...gen, recruiter_brief: null }, null).recruiter_brief).toBeNull()
   })
 })
+
+// ── Experience band → one structured gate ─────────────────────────────────────
+import { draftFromReasoning } from './icp-generator'
+
+describe('draftFromReasoning (experience band)', () => {
+  const base: ReasoningFirstGeneration = {
+    recruiter_brief: {
+      niche: 'n', persona: 'p', market: 'm', experience_band: { min_years: 2, max_years: 6, rationale: 'IC seat' },
+      feeder_pools: [], title_families: [], market_gates: [], jd_translations: [], market_norms: [], normal_red_flags: [], unsure_about: [],
+    },
+    reasoning: '', requirement_decomposition: [], unwritten_filters: [], archetypes: [],
+    competencies: [{ name: 'A', weight: 100, behaviours: [] }],
+    must_haves: [{ label: 'Has at least 2 full years of experience?' }, { label: 'Mentions SQL?' }],
+  }
+  it("turns the brief's band into a structured gate and drops the plain years gate it subsumes", () => {
+    const d = draftFromReasoning(base)
+    expect(d.must_haves.map((g) => g.label)).toEqual([
+      'Mentions SQL?',
+      'Has between 2 and 6 years of professional experience — not over-senior for this role?',
+    ])
+    expect(d.must_haves[1]).toMatchObject({ attribute: 'experience_band', value: ['2', '6'] })
+  })
+  it('keeps plain gates untouched when the brief has no band', () => {
+    const d = draftFromReasoning({ ...base, recruiter_brief: { ...base.recruiter_brief!, experience_band: null } })
+    expect(d.must_haves.map((g) => g.label)).toEqual(['Has at least 2 full years of experience?', 'Mentions SQL?'])
+  })
+})

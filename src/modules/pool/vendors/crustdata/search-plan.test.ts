@@ -98,3 +98,18 @@ describe('buildSearchPlan', () => {
     expect(wider.lanes[0].key).not.toBe(plan.lanes[0].key)
   })
 })
+
+describe('buildSearchPlan (experience band)', () => {
+  it('sends the band as a floor AND a ceiling on years_of_experience_raw', () => {
+    const plan = buildSearchPlan(
+      { must_haves: [{ id: 'g-band', label: 'Has between 2 and 6 years…', attribute: 'experience_band', operator: 'between', value: ['2', '6'] }] },
+      { title: 'T' },
+    )
+    expect(plan.common.map((c) => c.label)).toEqual(['2–6 years of experience', 'no more than 6 years (not over-senior)'])
+    expect(plan.common.map((c) => c.condition)).toEqual([
+      { field: 'years_of_experience_raw', type: '=>', value: 2 },
+      { field: 'years_of_experience_raw', type: '=<', value: 6 },
+    ])
+    expect(plan.unmapped).toEqual([])
+  })
+})

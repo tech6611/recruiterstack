@@ -32,6 +32,8 @@ import {
   type CrustdataCondition,
   type CrustdataFilterGroup,
 } from '@/modules/pool/vendors/crustdata/query'
+import { experienceBandFromGate, yearsFloorFromLabel } from '@/lib/icp-gates'
+export { yearsFloorFromLabel }
 
 export type LaneKind = 'feeder' | 'titles' | 'title'
 
@@ -116,15 +118,6 @@ function roleTerms(entry: string): string[] {
   return entry.split(/\s*(?:,|\/|;|\bor\b)\s*/i).map((t) => t.trim()).filter((t) => t.length >= 2)
 }
 
-/** A years floor from a plain-sentence gate ("at least 2 full years…", "5+ years"). */
-export function yearsFloorFromLabel(label: string): number | null {
-  if (!/\b(?:years?|yrs)\b/i.test(label)) return null
-  const m = label.match(/(\d+(?:\.\d+)?)\s*\+?\s*(?:full[- ]?time\s+|full\s+)?(?:years?|yrs)/i)
-  if (!m) return null
-  const n = Number(m[1])
-  return Number.isFinite(n) && n > 0 && n < 60 ? n : null
-}
-
 function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'lane'
 }
@@ -171,10 +164,17 @@ export function buildSearchPlan(
   // Gates: a years floor from plain sentences; structured gates via the Slice-3 mapper;
   // everything else is honestly reported as post-fetch.
   let yearsFloor: number | null = null
+  let yearsCeil: number | null = null
   const structured = buildCrustdataQueryFromIcp({ must_haves: icp.must_haves }, {})
   const structuredByReq = new Map(structured.mapped.map((m) => [m.requirement, m.condition]))
   for (const mh of icp.must_haves ?? []) {
     const req = mh.label || mh.attribute
+    const band = experienceBandFromGate(mh)
+    if (band) {
+      if (band.min != null) yearsFloor = Math.max(yearsFloor ?? 0, band.min)
+      if (band.max != null) yearsCeil = yearsCeil == null ? band.max : Math.min(yearsCeil, band.max)
+      continue
+    }
     const cond = structuredByReq.get(req)
     if (cond && cond.field !== FIELD.currentTitle) {
       if (cond.field === FIELD.location && loc) continue // market already covers it
@@ -189,7 +189,13 @@ export function buildSearchPlan(
     unmapped.push({ requirement: req, reason: 'plain-language gate — judged by the Fit Engine after fetch, not searchable' })
   }
   if (yearsFloor != null) {
-    common.push({ label: `${yearsFloor}+ years of experience`, condition: { field: FIELD.years, type: '=>', value: yearsFloor } })
+    common.push({
+      label: yearsCeil != null ? `${yearsFloor}–${yearsCeil} years of experience` : `${yearsFloor}+ years of experience`,
+      condition: { field: FIELD.years, type: '=>', value: yearsFloor },
+    })
+  }
+  if (yearsCeil != null) {
+    common.push({ label: `no more than ${yearsCeil} years (not over-senior)`, condition: { field: FIELD.years, type: '=<', value: yearsCeil } })
   }
 
   const commonConds = common.map((c) => c.condition)

@@ -23,6 +23,7 @@ import { icpFitResponseSchema } from '@/lib/ai/schemas'
 import type { Candidate } from '@/lib/types/database'
 import type { Icp, IcpMustHave } from '@/lib/types/icp'
 import { fitBucketFor, type FitBucket } from '@/lib/ai/fit-bucket'
+import { experienceBandFromGate } from '@/lib/icp-gates'
 
 const MODEL = 'gemini-2.5-flash' // bulk per-candidate scoring — speed/cost, like the Sifter
 
@@ -105,6 +106,22 @@ function gateFails(candidate: Candidate, g: IcpMustHave): boolean {
     if (!loc) return false
     const vals = toTokens(g.value)
     return vals.length > 0 && !vals.some((v) => loc.includes(v) || v.includes(loc))
+  }
+
+  // Experience band [min, max]: over-seniority is a real mismatch, so the CEILING is
+  // enforced as hard as the floor whenever the years are actually known. Our years
+  // are derived from dated roles (internships and overlaps included) and a vendor's
+  // own count can differ by a year or two at the margin, so only a CLEAR breach fails
+  // here — a 12-year partner against a 2–6 band, not a 6.5 against a 6. The judge,
+  // which is told about the band and reads titles, rules on the margin.
+  const band = experienceBandFromGate(g)
+  if (band) {
+    const yrs = candidate.experience_years
+    if (yrs == null) return false
+    const tol = (bound: number) => Math.max(1, bound * 0.25)
+    if (band.min != null && yrs < band.min - tol(band.min)) return true
+    if (band.max != null && yrs > band.max + tol(band.max)) return true
+    return false
   }
 
   if (attr === 'min_experience' || op === 'gte') {
@@ -237,6 +254,8 @@ When a deal-breaker is about PROFESSIONAL BACKGROUND or IDENTITY (e.g. "has a ge
 - Weigh institution pedigree and the actual work performed over titles or labels. A current title in a different function, or a few adjacent skills alone, is weak evidence — but a real role doing the work is strong evidence.
 - Mark "fail" only when the whole picture genuinely shows the candidate is not that kind of professional (no relevant study AND no relevant role). If the information is simply absent, default to "pass" — never reject purely on missing information.
 
+OVER-SENIORITY IS A MISMATCH, NOT A BONUS. When a must-have sets an experience band or ceiling, a candidate well above it — or holding executive titles (Partner, CXO, VP, Regional CEO, Co-founder of a scaled company) for a seat scoped as an individual contributor or first-line manager — FAILS that gate: they will not take the role, will not stay, and are outside its budget. Judge this from years AND titles.
+
 For EACH competency id, assign a rating 1–4 using its anchors (1 poor · 2 fair · 3 good · 4 excellent) and cite the specific evidence in ONE concise sentence of at most 20 words — the single strongest signal, no preamble or hedging. Note any red flags (concrete concerns), and list this candidate's strengths and gaps for THIS role. Do NOT output an overall score — only the per-competency ratings and the per-gate verdicts.
 
 Respond with ONLY valid JSON (no markdown):
@@ -279,8 +298,11 @@ export async function scoreAgainstIcp(
   // Deal-breakers are judged by the model reading the candidate's real background —
   // a must-have fails only when the judge explicitly returned pass=false for its id.
   const verdictById = new Map(judged.gate_results.map((r) => [r.id, r]))
-  const gate_failures = gates.filter((g) => verdictById.get(g.id)?.pass === false)
-  const gate_unknown = gates.filter((g) => verdictById.get(g.id)?.pass === null)
+  // Deterministic checks (the experience band, structured min-years) can fail a gate
+  // even when the judge waved it through; the judge can fail anything it has evidence for.
+  const hardFails = new Set(evaluateGates(candidate, gates).map((g) => g.id))
+  const gate_failures = gates.filter((g) => hardFails.has(g.id) || verdictById.get(g.id)?.pass === false)
+  const gate_unknown = gates.filter((g) => !hardFails.has(g.id) && verdictById.get(g.id)?.pass === null)
 
   // No education AND no work history → a background gate can't be verified. Internal
   // candidates get flagged; market candidates get rejected (a synthetic gate failure so

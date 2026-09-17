@@ -9,6 +9,34 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-17 (ICP experience band — the ceiling is as real as the floor)
+
+### Added
+- **`experience_band`** on the recruiter brief: the prompt now asks for the realistic
+  years FLOOR and CEILING for the seat (from level, budget, team size, JD) and to name
+  feeder role types inside it ("Analyst/Associate, not Partner"). The band becomes one
+  structured `experience_band` gate on the ICP (`src/lib/icp-gates.ts`), subsuming any
+  plain "N+ years" gate the model also wrote. From there it flows everywhere: the
+  Crustdata plan sends it as `=>`/`=<` on `years_of_experience_raw`; the Fit Engine
+  rejects deterministically when the years are known (and the judge is told
+  over-seniority — Partner/CXO/VP titles for an IC seat — is a mismatch, not a bonus).
+  Shown on the ICP page as "Experience band · 2–6 years · ceiling enforced".
+
+### Fixed
+- Fit Engine now unions deterministic gate checks with the judge's verdicts, so a
+  structured gate the judge waves through can still fail on hard evidence. The band
+  check itself only hard-fails a CLEAR breach (25% / 1-year tolerance); the judge,
+  told that over-seniority is a mismatch, rules on the margin.
+- **Total experience was calendar time since the earliest dated role** (gaps and a
+  2016 internship included), so vendor profiles Crustdata placed inside a 2–6 year
+  ceiling showed 7–11 years here and were rejected. `deriveMovability` now counts
+  EMPLOYED months — the union of role spans, internships excluded — via the new
+  `employedMonths()`. Rebuilt the 21 Crustdata pool profiles (20 changed).
+- `embedPoolProfiles` skips profiles with nothing to embed; one empty text made Gemini
+  reject the whole batch, leaving every newly sourced profile invisible to recall.
+- Reasoning-first ICP call gets a 20k output-token cap (the brief made 8k truncate
+  mid-JSON and silently fall back to the seed).
+
 ## 2026-09-17 (Niche-recruiter sourcing — Step 2: the ICP drives the Crustdata search)
 
 ### Added
@@ -132,6 +160,14 @@ entries on top.
   thrown fetch, treats only a real 404 as "not found", and otherwise shows
   "Couldn’t load this candidate" with a **Try again** button.
   (`src/lib/hooks/useCandidate.ts`, `CandidateProfileContent.tsx`; hook tests added)
+
+## 2026-09-17 (AI sourcing competitor research)
+
+### Docs
+- Added a sourced deep-dive into leading AI sourcers' intake, company targeting,
+  search calibration, candidate evaluation, feedback, and data freshness, with
+  detailed vendor appendices and a proposed comparison trial. Earlier Crustdata
+  code findings are marked historical pending review of the updated implementation.
 
 ## 2026-09-17 (Crustdata sourcing — Slice 4: trigger route + matrix button)
 

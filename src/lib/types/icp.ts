@@ -61,6 +61,13 @@ export interface RecruiterBrief {
   persona: string
   /** The hiring market as understood: city/country, work model, relocation/visa realism. */
   market?: string | null
+  /**
+   * The realistic experience band for THIS role — floor AND ceiling. A Bain partner
+   * with 12 years is not a candidate for a 2–6 year Strategy & Ops seat: over-seniority
+   * is a mismatch (won't take it, won't stay, out of budget), not a bonus. Becomes a
+   * structured `experience_band` gate, a Crustdata filter, and a deterministic reject.
+   */
+  experience_band?: { min_years?: number | null; max_years?: number | null; rationale?: string | null } | null
   /** Where to search FIRST, in priority order — named employers + role types. */
   feeder_pools: {
     label: string
