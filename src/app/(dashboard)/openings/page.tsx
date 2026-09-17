@@ -14,6 +14,10 @@ import {
 } from '@/components/panes/pane-controls'
 import type { Opening, Department, Location as LocationRow } from '@/lib/types/requisitions'
 
+/** Human-readable requisition number prefix (org setting `opening_number_prefix`; "REQ" until it's surfaced). */
+const OPENING_NUMBER_PREFIX = 'REQ'
+const reqNumber = (o: Opening) => (typeof o.number === 'number' ? `${OPENING_NUMBER_PREFIX}-${o.number}` : '')
+
 // Per-status badge config — mirrors the Jobs page (src/app/(dashboard)/jobs/page.tsx
 // STATUS_CONFIG) so requisition status pills look identical: colored bg + border,
 // small icon, and a friendly label.
@@ -92,7 +96,7 @@ function OpeningsBlock({
 
   // CSV grid for this pane's Download button — exactly the rows on screen.
   const csvRows = useMemo(() => {
-    const header = ['Title', 'Status', 'Department', 'Location', 'Comp', 'Target start', 'Created']
+    const header = ['#', 'Title', 'Status', 'Department', 'Location', 'Comp', 'Target start', 'Created']
     const body = rows.map(o => {
       const dept = o.department_id ? deptById.get(o.department_id) : null
       const loc  = o.location_id   ? locById.get(o.location_id)    : null
@@ -100,7 +104,7 @@ function OpeningsBlock({
         ? `${o.comp_currency} ${Number(o.comp_min).toLocaleString()}–${Number(o.comp_max).toLocaleString()}`
         : ''
       return [
-        o.title, STATUS_CONFIG[o.status].label, dept?.name ?? '', loc?.name ?? '',
+        reqNumber(o), o.title, STATUS_CONFIG[o.status].label, dept?.name ?? '', loc?.name ?? '',
         comp, o.target_start_date ?? '', o.created_at?.slice(0, 10) ?? '',
       ]
     })
@@ -149,6 +153,7 @@ function OpeningsBlock({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-slate-500">
+                  <th className="text-left pl-4 pr-2 py-3 font-medium">#</th>
                   <th className="text-left px-4 py-3 font-medium">Title</th>
                   <th className="text-left px-4 py-3 font-medium">Status</th>
                   <th className="text-left px-4 py-3 font-medium">Department</th>
@@ -164,6 +169,7 @@ function OpeningsBlock({
                   const sc   = STATUS_CONFIG[o.status]
                   return (
                     <tr key={o.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                      <td className="pl-4 pr-2 py-3.5 text-xs text-slate-400 tabular-nums whitespace-nowrap">{reqNumber(o) || '—'}</td>
                       <td className="px-4 py-3.5">
                         <Link href={`/openings/${o.id}`} className="font-medium text-slate-900 hover:text-emerald-700">
                           {o.title}
@@ -263,7 +269,7 @@ export default function OpeningsListPage() {
       if (needle) {
         const deptName = o.department_id ? (deptById.get(o.department_id)?.name ?? '') : ''
         const locName  = o.location_id   ? (locById.get(o.location_id)?.name  ?? '') : ''
-        const hay = `${o.title} ${deptName} ${locName}`.toLowerCase()
+        const hay = `${reqNumber(o)} ${o.title} ${deptName} ${locName}`.toLowerCase()
         if (!hay.includes(needle)) return false
       }
       if (!withinRange(o.created_at, range)) return false
@@ -332,7 +338,7 @@ export default function OpeningsListPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
-                {['Title', 'Status', 'Department', 'Location', 'Comp', 'Target start'].map(h => (
+                {['#', 'Title', 'Status', 'Department', 'Location', 'Comp', 'Target start'].map(h => (
                   <th key={h} className="text-left px-4 py-3 font-medium text-slate-500">{h}</th>
                 ))}
               </tr>
@@ -340,7 +346,7 @@ export default function OpeningsListPage() {
             <tbody>
               {Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-slate-100 last:border-0">
-                  {Array.from({ length: 6 }).map((_, j) => (
+                  {Array.from({ length: 7 }).map((_, j) => (
                     <td key={j} className="px-4 py-3.5"><div className="h-3 w-24 rounded bg-slate-100 animate-pulse" /></td>
                   ))}
                 </tr>

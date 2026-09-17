@@ -15,6 +15,7 @@ import type {
 } from '@/lib/types/database'
 import { getOrgScreeningTemplate } from '@/modules/ats/domain/screening'
 import { captureApprovedSubstance } from '@/lib/jobs/substance'
+import { applyPathFor, formatCompensation, isUndefinedColumn } from '@/lib/postings/format'
 
 type Supabase = SupabaseClient<Database>
 
@@ -586,7 +587,21 @@ export interface CareersPageJob {
   employment_type: string | null
   remote_ok: boolean | null
   level: string | null
+  /** The JOB's apply token (kept for backward compatibility — prefer apply_url). */
   apply_token: string
+  /** Where the card links: /apply/p/<posting token> when the posting has one, else /apply/<apply_token>. */
+  apply_url: string
+  /** Public comp text ("USD 120,000–150,000") when the posting shows it, else null. */
+  compensation: string | null
+  // ── Feed-only extras (migration 143). Optional so older callers keep compiling. ──
+  /** job_postings.id, or the job id when the entry is synthesized from a job with no postings. */
+  posting_id?: string
+  /** ISO timestamp the posting went live (job created_at for synthesized entries). */
+  published_at?: string | null
+  /** Public JD: the posting's description, else the job's. */
+  description?: string | null
+  city?: string | null
+  country?: string | null
 }
 
 export interface CareersPage {
@@ -730,62 +745,161 @@ export async function getCareersPageBySlug(
   // toggled-off page is hidden rather than showing an empty shell.
   if (!org || !org.careers_public) return null
 
+  const branding: CareersPageBranding = {
+    company_name: org.company_name ?? null,
+    tagline: org.tagline ?? null,
+    about: org.about ?? null,
+    logo_url: org.logo_url ?? null,
+    hero_image_url: org.hero_image_url ?? null,
+    brand_color: org.brand_color ?? null,
+    accent_color: org.accent_color ?? null,
+    brand_font: org.brand_font ?? null,
+    hero_headline: org.hero_headline ?? null,
+    hero_subheadline: org.hero_subheadline ?? null,
+    nav_links: sanitizeNavLinks(org.nav_links),
+    nav_cta_label: org.nav_cta_label ?? null,
+    nav_cta_url: org.nav_cta_url ?? null,
+    show_powered_by: org.show_powered_by ?? true,
+    content_sections: sanitizeContentSections(org.content_sections),
+  }
+
+  // ── Open, non-confidential jobs (the universe the public may see) ─────────
+  // location_id / comp_* arrived with migration 143; retry without them when the
+  // live DB predates it.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: jobRows, error: jobsErr } = await (supabase as any)
+  const db = supabase as any
+  const jobsQuery = (cols: string) => db
     .from('jobs')
-    .select('title, apply_token, custom_fields, department:departments(name)')
+    .select(cols)
     .neq('confidentiality', 'confidential')   // confidential jobs never reach the public page
     .eq('org_id', org.org_id)
     .eq('status', 'open')
     .not('apply_token', 'is', null)
     .order('created_at', { ascending: false })
+  let jobsRes = await jobsQuery('id, title, description, apply_token, custom_fields, created_at, location_id, comp_min, comp_max, comp_currency, department:departments(name)')
+  if (jobsRes.error && isUndefinedColumn(jobsRes.error)) {
+    jobsRes = await jobsQuery('id, title, description, apply_token, custom_fields, created_at, department:departments(name)')
+  }
+  if (jobsRes.error) throw jobsRes.error
 
-  if (jobsErr) throw jobsErr
-
-  const jobs: CareersPageJob[] = ((jobRows ?? []) as Array<{
+  type JobRow = {
+    id: string
     title: string
+    description: string | null
     apply_token: string | null
     custom_fields: Record<string, unknown> | null
+    created_at: string
+    location_id?: string | null
+    comp_min?: number | string | null
+    comp_max?: number | string | null
+    comp_currency?: string | null
     department: { name: string } | null
-  }>)
-    .filter(r => !!r.apply_token)
-    .map(r => {
-      const intake = (r.custom_fields?.intake ?? {}) as Record<string, unknown>
-      const loc = intake.location
-      const empType = intake.employment_type
-      const lvl = intake.level
-      const remote = intake.remote_ok
-      return {
-        title: r.title,
-        department: r.department?.name ?? null,
-        location: typeof loc === 'string' && loc.trim() ? loc : null,
-        employment_type: typeof empType === 'string' && empType.trim() ? empType : null,
-        remote_ok: typeof remote === 'boolean' ? remote : null,
-        level: typeof lvl === 'string' && lvl.trim() ? lvl : null,
-        apply_token: r.apply_token as string,
-      }
-    })
-
-  return {
-    branding: {
-      company_name: org.company_name ?? null,
-      tagline: org.tagline ?? null,
-      about: org.about ?? null,
-      logo_url: org.logo_url ?? null,
-      hero_image_url: org.hero_image_url ?? null,
-      brand_color: org.brand_color ?? null,
-      accent_color: org.accent_color ?? null,
-      brand_font: org.brand_font ?? null,
-      hero_headline: org.hero_headline ?? null,
-      hero_subheadline: org.hero_subheadline ?? null,
-      nav_links: sanitizeNavLinks(org.nav_links),
-      nav_cta_label: org.nav_cta_label ?? null,
-      nav_cta_url: org.nav_cta_url ?? null,
-      show_powered_by: org.show_powered_by ?? true,
-      content_sections: sanitizeContentSections(org.content_sections),
-    },
-    jobs,
   }
+  const jobRows = ((jobsRes.data ?? []) as JobRow[]).filter(r => !!r.apply_token)
+  if (jobRows.length === 0) return { branding, jobs: [] }
+
+  // ── Postings: the public face of each job (migration 143) ─────────────────
+  // Fetch every posting of these jobs (not only live ones) so we can tell "has
+  // no postings at all" (→ synthesize from the job, no regression for existing
+  // customers) from "has postings but none live+listed" (→ hidden).
+  type PostingRow = {
+    id: string
+    job_id: string
+    title: string
+    description: string | null
+    location_text: string | null
+    is_live: boolean
+    published_at: string | null
+    visibility?: 'listed' | 'unlisted' | null
+    location_id?: string | null
+    show_compensation?: boolean | null
+    comp_min?: number | string | null
+    comp_max?: number | string | null
+    comp_currency?: string | null
+    public_token?: string | null
+  }
+  const { data: postingData, error: postingsErr } = await db
+    .from('job_postings')
+    .select('*')
+    .in('job_id', jobRows.map(j => j.id))
+    .order('published_at', { ascending: false, nullsFirst: false })
+  if (postingsErr) throw postingsErr
+  const postingsByJob = new Map<string, PostingRow[]>()
+  for (const p of (postingData ?? []) as PostingRow[]) {
+    const list = postingsByJob.get(p.job_id) ?? []
+    list.push(p)
+    postingsByJob.set(p.job_id, list)
+  }
+
+  // ── Location names for every referenced location_id, in one read ──────────
+  const locationIds = new Set<string>()
+  for (const j of jobRows) if (j.location_id) locationIds.add(j.location_id)
+  // Array.from: the TS target here doesn't allow iterating a MapIterator directly.
+  for (const list of Array.from(postingsByJob.values())) for (const p of list) if (p.location_id) locationIds.add(p.location_id)
+  const locations = new Map<string, { name: string; city: string | null; country: string | null }>()
+  if (locationIds.size > 0) {
+    const { data: locRows } = await db
+      .from('locations').select('id, name, city, country').in('id', Array.from(locationIds))
+    for (const l of (locRows ?? []) as Array<{ id: string; name: string; city: string | null; country: string | null }>) {
+      locations.set(l.id, { name: l.name, city: l.city, country: l.country })
+    }
+  }
+
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+
+  const jobs: CareersPageJob[] = []
+  for (const r of jobRows) {
+    const intake = (r.custom_fields?.intake ?? {}) as Record<string, unknown>
+    const remote = intake.remote_ok
+    const jobLoc = r.location_id ? locations.get(r.location_id) ?? null : null
+    const base = {
+      department: r.department?.name ?? null,
+      employment_type: text(intake.employment_type),
+      remote_ok: typeof remote === 'boolean' ? remote : null,
+      level: text(intake.level),
+      apply_token: r.apply_token as string,
+    }
+    const jobComp = formatCompensation(r.comp_min, r.comp_max, r.comp_currency)
+    const jobLocationLabel = jobLoc?.name ?? text(intake.location)
+
+    const all = postingsByJob.get(r.id) ?? []
+    if (all.length === 0) {
+      // No postings at all → the job itself is the listing (pre-143 behaviour).
+      jobs.push({
+        ...base,
+        title: r.title,
+        location: jobLocationLabel,
+        apply_url: applyPathFor(null, base.apply_token),
+        compensation: intake.show_salary === false ? null : jobComp,
+        posting_id: r.id,
+        published_at: r.created_at,
+        description: r.description,
+        city: jobLoc?.city ?? null,
+        country: jobLoc?.country ?? null,
+      })
+      continue
+    }
+    for (const p of all) {
+      if (!p.is_live || p.visibility === 'unlisted') continue   // draft / unlisted never list
+      const pLoc = p.location_id ? locations.get(p.location_id) ?? null : null
+      const showComp = p.show_compensation !== false
+      const postingComp = formatCompensation(p.comp_min, p.comp_max, p.comp_currency ?? r.comp_currency)
+      jobs.push({
+        ...base,
+        title: p.title,
+        location: pLoc?.name ?? text(p.location_text) ?? jobLocationLabel,
+        apply_url: applyPathFor(p.public_token, base.apply_token),
+        compensation: showComp ? (postingComp ?? jobComp) : null,
+        posting_id: p.id,
+        published_at: p.published_at,
+        description: text(p.description) ?? r.description,
+        city: pLoc?.city ?? jobLoc?.city ?? null,
+        country: pLoc?.country ?? jobLoc?.country ?? null,
+      })
+    }
+  }
+
+  return { branding, jobs }
 }
 
 /** Resolve a canonical job by its public apply_token, or null. Mirrors

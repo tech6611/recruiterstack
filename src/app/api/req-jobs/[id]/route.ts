@@ -33,7 +33,29 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   return NextResponse.json({ data })
 }
 
-/** PATCH — strict: only allowed when status='draft'. */
+// Job-level location + comp (migration 143): editable at any status. On a DB
+// that hasn't run the migration yet, Postgres rejects the unknown columns with
+// 42703 (undefined_column) — retry the write without them so the rest lands.
+const JOB_ATTRIBUTE_KEYS = ['location_id', 'comp_min', 'comp_max', 'comp_currency'] as const
+type JobAttributeKey = typeof JOB_ATTRIBUTE_KEYS[number]
+
+async function updateJobTolerant(
+  supabase: ReturnType<typeof createAdminClient>,
+  orgId: string,
+  jobId: string,
+  patch: Record<string, unknown>,
+): Promise<{ code: string; message: string } | null> {
+  const { error } = await supabase.from('jobs').update(patch).eq('id', jobId).eq('org_id', orgId)
+  if (!error) return null
+  const hasAttrs = JOB_ATTRIBUTE_KEYS.some(k => k in patch)
+  if (error.code !== '42703' || !hasAttrs) return error
+  const rest = Object.fromEntries(Object.entries(patch).filter(([k]) => !(JOB_ATTRIBUTE_KEYS as readonly string[]).includes(k)))
+  if (Object.keys(rest).length === 0) return null
+  const retry = await supabase.from('jobs').update(rest).eq('id', jobId).eq('org_id', orgId)
+  return retry.error ?? null
+}
+
+/** PATCH — identity fields only while status='draft'; JD, location/comp, status and custom_fields at any status. */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
   if (auth instanceof NextResponse) return auth
@@ -58,7 +80,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // confidentiality). The JD body (`description`) is deliberately editable at any
   // status — recruiters keep refining the posting after approval — so it's pulled
   // out of the structural set and written on the always-allowed path below.
-  const { status, custom_fields, description, ...structural } = body
+  // Location + comp are job attributes, not identity — they're inherited from
+  // the requisition and may be overridden at any status, so they're split out
+  // of the structural set and written alongside the JD.
+  const { status, custom_fields, description, location_id, comp_min, comp_max, comp_currency, ...structural } = body
+  const attributes: Partial<Record<JobAttributeKey, unknown>> = {}
+  if (location_id   !== undefined) attributes.location_id   = location_id
+  if (comp_min      !== undefined) attributes.comp_min      = comp_min
+  if (comp_max      !== undefined) attributes.comp_max      = comp_max
+  if (comp_currency !== undefined) attributes.comp_currency = comp_currency
   const editsStructuralFields = Object.keys(structural).length > 0
   if (editsStructuralFields && row.status !== 'draft') {
     return NextResponse.json({ error: `Cannot edit a job with status '${row.status}'.` }, { status: 409 })
@@ -70,11 +100,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // The board writers only send status + custom_fields (never the structural
   // edit-form fields), so any structural fields are written by the regular path.
   if (custom_fields !== undefined) {
-    const directWrite: Record<string, unknown> = { ...structural }
+    const directWrite: Record<string, unknown> = { ...structural, ...attributes }
     if (description !== undefined) directWrite.description = description
     if (Object.keys(directWrite).length > 0) {
-      const { error } = await supabase
-        .from('jobs').update(directWrite).eq('id', params.id).eq('org_id', orgId)
+      const error = await updateJobTolerant(supabase, orgId, params.id, directWrite)
       if (error) return handleSupabaseError(error)
     }
     try {
@@ -83,9 +112,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return handleSupabaseError(e as { code: string; message: string })
     }
   } else {
-    const { error } = await supabase
-      .from('jobs').update(body).eq('id', params.id).eq('org_id', orgId)
-    if (error) return handleSupabaseError(error)
+    const directWrite: Record<string, unknown> = { ...structural, ...attributes }
+    if (description !== undefined) directWrite.description = description
+    if (status !== undefined) directWrite.status = status
+    if (Object.keys(directWrite).length > 0) {
+      const error = await updateJobTolerant(supabase, orgId, params.id, directWrite)
+      if (error) return handleSupabaseError(error)
+    }
   }
 
   // ── Re-approval gate ─────────────────────────────────────────────────────

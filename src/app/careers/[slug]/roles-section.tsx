@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { MapPin, ArrowRight, Briefcase, Home, BarChart3, Search } from 'lucide-react'
+import { MapPin, ArrowRight, Briefcase, Home, BarChart3, Search, Wallet } from 'lucide-react'
 import { readableTextOn } from '@/lib/branding/contrast'
 import type { CareersPageJob } from '@/modules/ats/domain/job-pipelines'
 
@@ -107,7 +107,7 @@ export function RolesSection({
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map(job => (
-            <li key={job.apply_token}>
+            <li key={job.posting_id ?? job.apply_url}>
               <JobCard job={job} brand={brand} accent={accent} />
             </li>
           ))}
@@ -129,7 +129,7 @@ function JobCard({ job, brand, accent }: { job: CareersPageJob; brand: string; a
   const deptColor = brandIsLight ? '#334155' : brand
   return (
     <Link
-      href={`/apply/${job.apply_token}`}
+      href={job.apply_url || `/apply/${job.apply_token}`}
       className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-white px-5 pb-5 pt-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
     >
       {job.department && (
@@ -147,6 +147,7 @@ function JobCard({ job, brand, accent }: { job: CareersPageJob; brand: string; a
         {job.employment_type && <MetaChip icon={Briefcase} label={job.employment_type} />}
         {job.remote_ok !== null && <MetaChip icon={Home} label={job.remote_ok ? 'Remote' : 'On-site'} />}
         {job.level && <MetaChip icon={BarChart3} label={job.level} />}
+        {job.compensation && <MetaChip icon={Wallet} label={job.compensation} />}
       </div>
 
       <div className="mt-auto pt-5">

@@ -10,7 +10,7 @@ import {
   CalendarDays, SlidersHorizontal, Pencil, AlertTriangle,
 } from 'lucide-react'
 import type { JobListItem, HiringRequestStatus, StageColor } from '@/lib/types/database'
-import type { Opening, Department, Location as LocationRow } from '@/lib/types/requisitions'
+import type { Opening, Department, Location as LocationRow, JobTemplate } from '@/lib/types/requisitions'
 import type { Editor } from '@tiptap/react'
 import EditHMModal from '@/components/EditHMModal'
 import { RichTextEditor, stripHtml, isHtmlEmpty } from '@/components/RichTextEditor'
@@ -241,6 +241,63 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // "Start from a template": the org's job templates (fields + JD + comp +
+  // plan + draft posting). Picking one prefills the form; the server applies
+  // the linked plan template + draft posting after the job is created.
+  // Departments/locations are fetched so a template's ids resolve to the
+  // names this form works in.
+  const [templates, setTemplates] = useState<JobTemplate[]>([])
+  const [templateId, setTemplateId] = useState('')
+  const [tplDepts, setTplDepts] = useState<Department[]>([])
+  const [tplLocs, setTplLocs] = useState<LocationRow[]>([])
+  useEffect(() => {
+    let cancelled = false
+    const grab = <T,>(url: string): Promise<T[]> =>
+      fetch(url).then(r => r.json()).then(d => (d.data ?? []) as T[]).catch(() => [] as T[])
+    Promise.all([grab<JobTemplate>('/api/job-templates'), grab<Department>('/api/departments'), grab<LocationRow>('/api/locations')])
+      .then(([t, d, l]) => { if (!cancelled) { setTemplates(t); setTplDepts(d); setTplLocs(l) } })
+    return () => { cancelled = true }
+  }, [])
+
+  const applyTemplate = (id: string) => {
+    setTemplateId(id)
+    const t = templates.find(x => x.id === id)
+    if (!t) return
+    // Requisition-provided fields (title, department, location, employment
+    // type, comp) are the source of truth when the drawer was opened from an
+    // approved requisition — the template only fills what's still blank there.
+    const fillOrKeep = (current: string, next: string | null | undefined, set: (v: string) => void) => {
+      if (next == null || next === '') return
+      if (fromOpening && current.trim()) return
+      set(next)
+    }
+    fillOrKeep(positionTitle, t.title, setPositionTitle)
+    fillOrKeep(department, t.department_id ? tplDepts.find(d => d.id === t.department_id)?.name : null, setDepartment)
+    fillOrKeep(location, t.location_id ? tplLocs.find(l => l.id === t.location_id)?.name : null, setLocation)
+    fillOrKeep(employmentType, t.employment_type ? (EMPLOYMENT_TYPE_FROM_OPENING[t.employment_type] ?? t.employment_type) : null, setEmploymentType)
+    fillOrKeep(String(budgetMin), t.comp_min != null ? String(t.comp_min) : null, setBudgetMin)
+    fillOrKeep(String(budgetMax), t.comp_max != null ? String(t.comp_max) : null, setBudgetMax)
+    // Everything else is template-owned: overwrite with what the template has.
+    if (t.level)      setLevel(t.level)
+    if (t.work_model) setWorkModel(t.work_model)
+    const intake = t.intake ?? {}
+    if (typeof intake.team_context === 'string')     setTeamContext(intake.team_context)
+    if (typeof intake.key_requirements === 'string') setKeyReqs(intake.key_requirements)
+    if (typeof intake.nice_to_have === 'string')     setNiceToHave(intake.nice_to_have)
+    if (Array.isArray(intake.target_companies))      setTargetCompanies(intake.target_companies)
+    if (typeof intake.notes === 'string' && intake.notes) setNotes(intake.notes)
+    if (t.jd) {
+      // The JD box here is plain text; the template stores rich HTML. Show a
+      // readable text version (the detail page re-wraps it into paragraphs).
+      setJd(stripHtml(t.jd))
+      setJdMode('manual')
+    }
+  }
+
+  // The id of the org location whose name matches what's typed (a template
+  // pick or a manually typed known location), so the job links to it.
+  const matchedLocationId = tplLocs.find(l => l.name.trim().toLowerCase() === location.trim().toLowerCase())?.id ?? null
+
   const append = (setter: React.Dispatch<React.SetStateAction<string>>) => (text: string) =>
     setter(prev => prev ? prev + '\n\n' + text : text)
 
@@ -339,6 +396,10 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
         comp_min:    budgetMin ? Number(budgetMin) : null,
         comp_max:    budgetMax ? Number(budgetMax) : null,
         remote_ok:   workModel === 'remote',
+        // Started from a job template: the server applies its interview-plan
+        // template + draft posting once the job row exists.
+        template_id: templateId || null,
+        location_id: matchedLocationId,
         // When linking an approved requisition, don't mint new seats — the
         // existing opening is linked server-side via link_opening_id.
         link_opening_id: fromOpening?.id ?? null,
@@ -477,6 +538,20 @@ function NewJobDrawer({ onClose, onCreated, fromOpening }: { onClose: () => void
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+          {templates.length > 0 && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-2">
+              <label className={labelCls + ' text-emerald-800'}>Start from a template <span className="font-normal text-emerald-700/70">(optional)</span></label>
+              <select value={templateId} onChange={e => applyTemplate(e.target.value)} className={inputCls + ' bg-white'}>
+                <option value="">No template — start blank</option>
+                {templates.map(t => <option key={t.id} value={t.id}>{t.name}{t.title ? ` · ${t.title}` : ''}</option>)}
+              </select>
+              <p className="text-xs text-emerald-800/80">
+                Prefills the fields below{fromOpening ? ' (the requisition’s title, department, location and pay stay as they are)' : ''}.
+                {' '}Its interview plan and draft posting are added once the job is created. You can edit anything before saving.
+              </p>
+            </div>
+          )}
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</p>

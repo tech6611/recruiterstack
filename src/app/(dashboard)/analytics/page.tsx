@@ -183,6 +183,13 @@ export default function AnalyticsPage() {
           {updatedAt && (
             <span className="text-xs text-slate-400">Updated {timeAgo(updatedAt)}</span>
           )}
+          <Link
+            href="/analytics/headcount"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <Briefcase className="h-3.5 w-3.5" />
+            Headcount
+          </Link>
           {can('compliance:view') && (
             <Link
               href="/analytics/eeo"

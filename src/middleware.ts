@@ -31,6 +31,7 @@ const isPublic = createRouteMatcher([
   // NB: no trailing slash before (.*) — must match the bare `/api/apply`
   // (job load + submission), not just `/api/apply/upload`.
   '/api/apply(.*)',
+  '/api/postings/public(.*)',   // per-posting public JSON (careers + external boards)
   '/api/intake(.*)',
   '/api/schedule(.*)',
   '/api/phone-screen(.*)',

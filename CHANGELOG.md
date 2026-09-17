@@ -9,6 +9,42 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-16 (Parity plan · Phase 5: headcount reporting)
+
+### Added
+- **Headcount analytics** at `/analytics/headcount` (linked from Analytics):
+  seats open / filled / closed / awaiting approval, seats opened-filled-closed
+  per month, median time to fill (approval → hire) and time to start (hire →
+  target start) overall and by department, open jobs with seats remaining
+  sorted by longest-open seat, and a list of seats open 60+ days. CSV export.
+  (`GET /api/analytics/headcount`, `src/modules/ats/domain/headcount-reporting.ts`)
+- HRIS sync remains deferred by design (`openings.external_id` is the hook).
+
+## 2026-09-16 (Parity plan · Phase 4: job setup breadth)
+
+### Added
+- **Postings that actually post.** The public careers page now lists live,
+  listed **postings** (title, location, compensation when shown) instead of
+  jobs; each posting has its own apply link (`/apply/p/<token>`); **Unlisted**
+  postings are reachable only by that link. Per-posting location, compensation
+  display and social description. An Indeed-style XML feed at
+  `/careers/<slug>/feed.xml` for external boards. Jobs with no postings still
+  appear (synthesised from the job) so nothing regresses.
+- **Compensation and location on the job**, inherited from the requisition at
+  creation and when a requisition is linked, editable at any status; the New
+  Job drawer's salary fields are no longer discarded.
+- **Full job templates** (Jobs → Job templates): title, department, location,
+  employment type, work model, level, compensation, JD, intake defaults,
+  interview-plan template and a draft posting. "Start from a template" in the
+  New Job drawer; "Save as template…" in a job's pencil menu. Jobs created
+  from a template are independent afterwards (Ashby semantics).
+- **Requisition fields:** backfill flag (+ who is being replaced), target hire
+  date, and a human-readable number (`REQ-42`, per-org counter assigned by the
+  database) shown on the list, the detail header and linked-requisition cards.
+
+### Schema
+- `143_job_setup_breadth.sql` (shipped with Phase 3): see that entry.
+
 ## 2026-09-16 (Parity plan · Phase 3: hiring team parity)
 
 ### Added

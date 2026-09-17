@@ -35,6 +35,9 @@ interface FormState {
   comp_max:          string
   comp_currency:     string
   target_start_date: string
+  target_hire_date:  string
+  is_backfill:       boolean
+  backfill_for:      string
   hiring_manager_id:    string
   hiring_manager_name:  string
   hiring_manager_email: string
@@ -48,7 +51,8 @@ const EMPTY: FormState = {
   title: '', department_id: '', location_id: '',
   employment_type: 'full_time',
   comp_band_id: '', comp_min: '', comp_max: '', comp_currency: 'USD',
-  target_start_date: '',
+  target_start_date: '', target_hire_date: '',
+  is_backfill: false, backfill_for: '',
   hiring_manager_id: '', hiring_manager_name: '', hiring_manager_email: '',
   recruiter_id: '',
   coordinator_id: '', sourcer_id: '',
@@ -156,6 +160,9 @@ export function NewOpeningForm() {
       comp_max:          form.comp_max ? Number(form.comp_max) : null,
       comp_currency:     form.comp_currency,
       target_start_date: form.target_start_date || null,
+      target_hire_date:  form.target_hire_date  || null,
+      is_backfill:       form.is_backfill,
+      backfill_for:      form.is_backfill ? (form.backfill_for.trim() || null) : null,
       hiring_manager_id:    form.hiring_manager_id || null,
       hiring_manager_name:  form.hiring_manager_name.trim() || null,
       hiring_manager_email: form.hiring_manager_email.trim() || null,
@@ -340,9 +347,41 @@ export function NewOpeningForm() {
             </p>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Target start date</Label>
-            <Input type="date" value={form.target_start_date} onChange={e => setForm(f => ({ ...f, target_start_date: e.target.value }))} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Target start date</Label>
+              <Input type="date" value={form.target_start_date} onChange={e => setForm(f => ({ ...f, target_start_date: e.target.value }))} />
+              <p className="text-[11px] text-slate-400">When the new hire should be in the seat.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Target hire date</Label>
+              <Input type="date" value={form.target_hire_date} onChange={e => setForm(f => ({ ...f, target_hire_date: e.target.value }))} />
+              <p className="text-[11px] text-slate-400">When you want the offer accepted by.</p>
+            </div>
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-slate-200 p-3">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300"
+                checked={form.is_backfill}
+                onChange={e => setForm(f => ({ ...f, is_backfill: e.target.checked }))}
+              />
+              This is a backfill
+            </label>
+            {form.is_backfill && (
+              <div className="space-y-1.5">
+                <Label htmlFor="backfill-for">Replacing</Label>
+                <Input
+                  id="backfill-for"
+                  placeholder="Name or role of the person being replaced"
+                  value={form.backfill_for}
+                  maxLength={200}
+                  onChange={e => setForm(f => ({ ...f, backfill_for: e.target.value }))}
+                />
+              </div>
+            )}
           </div>
 
           <CustomFieldsBlock definitions={defs} values={customValues} onChange={setCustomValues} />

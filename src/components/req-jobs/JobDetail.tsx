@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Archive, ArchiveRestore, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid, PauseCircle, PlayCircle, Copy, AlertTriangle, CheckCircle2, CircleSlash } from 'lucide-react'
+import { ArrowLeft, Archive, ArchiveRestore, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid, LayoutTemplate, PauseCircle, PlayCircle, Copy, AlertTriangle, CheckCircle2, CircleSlash } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { ApprovalProgress } from '@/components/approvals/ApprovalProgress'
 import { AuditLogTab } from '@/components/approvals/AuditLogTab'
 import { LinkOpeningDialog } from '@/components/req-jobs/LinkOpeningDialog'
 import { CloseJobDialog } from '@/components/req-jobs/CloseJobDialog'
+import { SaveAsTemplateDialog } from '@/components/req-jobs/SaveAsTemplateDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
 import { ScoringTab } from '@/components/req-jobs/ScoringTab'
@@ -29,7 +30,16 @@ import { JobTeamRoster } from '@/components/req-jobs/JobTeamRoster'
 import { cn } from '@/lib/utils'
 import { RichText } from '@/components/RichText'
 import { RichTextEditor, isHtmlEmpty } from '@/components/RichTextEditor'
-import type { Job, Department, Opening, JobStatus, OpeningStatus } from '@/lib/types/requisitions'
+import type { Job, Department, Opening, JobStatus, OpeningStatus, Location as LocationRow } from '@/lib/types/requisitions'
+
+/** Human-readable requisition number prefix (org setting `opening_number_prefix`; "REQ" until it's surfaced). */
+const OPENING_NUMBER_PREFIX = 'REQ'
+
+/** "USD 120,000–150,000" for a comp range; null when either end is missing. */
+function formatComp(c: { comp_min?: number | null; comp_max?: number | null; comp_currency?: string | null }): string | null {
+  if (c.comp_min === null || c.comp_min === undefined || c.comp_max === null || c.comp_max === undefined) return null
+  return `${c.comp_currency ?? ''} ${Number(c.comp_min).toLocaleString()}–${Number(c.comp_max).toLocaleString()}`.trim()
+}
 
 const STATUS_BADGE: Record<JobStatus, string> = {
   draft:            'bg-slate-100 text-slate-700',
@@ -61,7 +71,9 @@ interface Props {
   job:             Job
   department:      Pick<Department, 'id' | 'name'> | null
   departments:     Pick<Department, 'id' | 'name'>[]
-  linkedOpenings:  Pick<Opening, 'id' | 'title' | 'status' | 'comp_min' | 'comp_max' | 'comp_currency' | 'target_start_date'>[]
+  /** Org locations — powers the Location picker and resolves job.location_id to a name. */
+  locations?:      Pick<LocationRow, 'id' | 'name'>[]
+  linkedOpenings:  Pick<Opening, 'id' | 'title' | 'status' | 'comp_min' | 'comp_max' | 'comp_currency' | 'target_start_date' | 'number'>[]
 }
 
 type Tab = 'overview' | 'postings' | 'screening' | 'scoring' | 'source' | 'plan' | 'audit'
@@ -83,6 +95,12 @@ function initForm(job: Job) {
     department_id:     job.department_id ?? '',
     description:       descriptionToEditorHtml(job.description),
     confidentiality:   job.confidentiality ?? 'public',
+    // Job-level location + comp (migration 143). Inherited from the requisition
+    // at creation; editable at any status — they're not approval-locked identity.
+    location_id:       job.location_id ?? '',
+    comp_min:          job.comp_min !== null && job.comp_min !== undefined ? String(job.comp_min) : '',
+    comp_max:          job.comp_max !== null && job.comp_max !== undefined ? String(job.comp_max) : '',
+    comp_currency:     job.comp_currency ?? '',
     // Full JD / intake fields — rich HTML so bullets & formatting survive.
     level:             intake.level ?? '',
     employment_type:   intake.employment_type ?? '',
@@ -172,7 +190,7 @@ function IntakeSection({ title, body }: { title: string; body: string | null }) 
   )
 }
 
-export function JobDetail({ job: initialJob, department, departments, linkedOpenings }: Props) {
+export function JobDetail({ job: initialJob, department, departments, locations = [], linkedOpenings }: Props) {
   const router = useRouter()
   // The job lives in local state so status-driven UI (the title badge and the
   // action buttons) can update live without a full page refresh. The server prop
@@ -193,6 +211,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   // Close-job dialog: null = hidden, otherwise the reason to pre-select.
   const [closeReason, setCloseReason] = useState<JobCloseReason | null>(null)
   const [linkOpen, setLinkOpen]       = useState(false)
+  const [templateOpen, setTemplateOpen] = useState(false)
   const [editing, setEditing]         = useState(false)
   const [saving, setSaving]           = useState(false)
   const [form, setForm]               = useState(initForm(job))
@@ -205,6 +224,14 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   const [showActions, setShowActions] = useState(false)
 
   const intake = readIntake(job)
+  // Location: the job's own location_id (migration 143) resolved to a name, falling
+  // back to the free-text intake location for jobs created before the column existed.
+  const jobLocationName = (job.location_id && locations.find(l => l.id === job.location_id)?.name) || intake.location || null
+  // Compensation: the job's own range; flagged "from requisition" when it still
+  // matches the first linked requisition's range (i.e. inherited, not overridden).
+  const jobComp   = formatComp(job)
+  const firstReq  = linkedOpenings[0]
+  const compFromReq = !!jobComp && !!firstReq && formatComp(firstReq) === jobComp
   // Headcount seats this job fills — one per linked requisition (archived ones
   // don't count). Drives the "n/m seats filled" chip and the all-filled nudge.
   const seats = summarizeSeats(linkedOpenings.map(o => o.status))
@@ -264,6 +291,8 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
   const lockedSubstance = ['approved', 'open', 'paused'].includes(job.status)
   // Materially different role → spin off a fresh draft rather than rewrite this one.
   const canNewVersion = ['approved', 'open', 'paused', 'withdrawn'].includes(job.status)
+  // Snapshot a settled job (past approval) into a reusable job template.
+  const canSaveTemplate = ['approved', 'open', 'paused', 'closed'].includes(job.status)
 
   async function save() {
     if (!form.title.trim()) { toast.error('Title is required'); return }
@@ -294,6 +323,11 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
         },
       },
     }
+    // Location + comp are NOT identity fields — the server accepts them at any status.
+    payload.location_id   = form.location_id || null
+    payload.comp_min      = form.comp_min !== '' ? Number(form.comp_min) : null
+    payload.comp_max      = form.comp_max !== '' ? Number(form.comp_max) : null
+    payload.comp_currency = form.comp_currency.trim() ? form.comp_currency.trim().toUpperCase() : null
     // Identity fields are only sent while the job is still a Draft; once approved
     // the server rejects them (409) so we don't even include them.
     if (!lockIdentity) {
@@ -553,6 +587,7 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                       {canPause && actionItem(PauseCircle, 'Pause', pause, pausing)}
                       {canResume && actionItem(PlayCircle, 'Resume', resume, resuming)}
                       {canNewVersion && !editing && actionItem(Copy, 'New version', newVersion, cloning)}
+                      {canSaveTemplate && actionItem(LayoutTemplate, 'Save as template…', () => setTemplateOpen(true))}
                       {canRestore && actionItem(ArchiveRestore, 'Restore', restore, restoring)}
                       {(canClose || canWithdraw || job.status !== 'archived') && <div className="my-1 border-t border-slate-100" />}
                       {canClose && actionItem(CircleSlash, 'Close', () => setCloseReason(allSeatsFilled ? 'filled' : 'other'))}
@@ -744,9 +779,16 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                       </div>
                       <div className="space-y-1.5">
                         <Label>Location</Label>
-                        <Input value={form.location}
-                          onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                          placeholder="Bengaluru, India" />
+                        {locations.length > 0 ? (
+                          <Select value={form.location_id} onChange={e => setForm(f => ({ ...f, location_id: e.target.value }))}>
+                            <option value="">{form.location ? `— (${form.location})` : '—'}</option>
+                            {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                          </Select>
+                        ) : (
+                          <Input value={form.location}
+                            onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                            placeholder="Bengaluru, India" />
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <Label>Work model</Label>
@@ -755,6 +797,20 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                           {WORK_MODELS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
                         </Select>
                       </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Compensation</Label>
+                      <div className="grid grid-cols-3 gap-3">
+                        <Input type="number" min={0} placeholder="Min" value={form.comp_min}
+                          onChange={e => setForm(f => ({ ...f, comp_min: e.target.value }))} />
+                        <Input type="number" min={0} placeholder="Max" value={form.comp_max}
+                          onChange={e => setForm(f => ({ ...f, comp_max: e.target.value }))} />
+                        <Input placeholder="USD" maxLength={3} value={form.comp_currency}
+                          onChange={e => setForm(f => ({ ...f, comp_currency: e.target.value.toUpperCase().slice(0, 3) }))} />
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Inherited from the linked requisition{firstReq && formatComp(firstReq) ? ` (${formatComp(firstReq)})` : ''}; override here for this job only.
+                      </p>
                     </div>
                     <label className="flex items-start gap-2.5 cursor-pointer">
                       <input type="checkbox" checked={!!form.show_salary}
@@ -828,12 +884,17 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                         <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Confidentiality</dt>
                         <dd className="text-slate-800 mt-0.5 capitalize">{job.confidentiality}</dd>
                       </div>
-                      {intake.location && (
-                        <div>
-                          <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Location</dt>
-                          <dd className="text-slate-800 mt-0.5">{intake.location}</dd>
-                        </div>
-                      )}
+                      <div>
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Location</dt>
+                        <dd className="text-slate-800 mt-0.5">{jobLocationName ?? '—'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Compensation</dt>
+                        <dd className="text-slate-800 mt-0.5">
+                          {jobComp ?? '—'}
+                          {compFromReq && <span className="ml-2 text-xs text-slate-400">from requisition</span>}
+                        </dd>
+                      </div>
                       {intake.employment_type && (
                         <div>
                           <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Employment type</dt>
@@ -906,6 +967,9 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
                       <div key={o.id} className="flex items-center justify-between py-2.5">
                         <div className="min-w-0 flex-1">
                           <Link href={`/openings/${o.id}`} className="text-sm font-medium text-slate-900 hover:text-emerald-700">
+                            {typeof o.number === 'number' && (
+                              <span className="mr-1.5 font-mono text-xs font-normal text-slate-400 tabular-nums">{OPENING_NUMBER_PREFIX}-{o.number}</span>
+                            )}
                             {o.title}
                           </Link>
                           <div className="text-xs text-slate-500 mt-0.5">
@@ -998,6 +1062,14 @@ export function JobDetail({ job: initialJob, department, departments, linkedOpen
           jobId={job.id}
           alreadyLinked={new Set(linkedOpenings.map(o => o.id))}
           onClose={(linked) => { setLinkOpen(false); if (linked) { setHmKey(k => k + 1); router.refresh() } }}
+        />
+      )}
+
+      {templateOpen && (
+        <SaveAsTemplateDialog
+          jobId={job.id}
+          initialName={job.title}
+          onClose={() => setTemplateOpen(false)}
         />
       )}
 

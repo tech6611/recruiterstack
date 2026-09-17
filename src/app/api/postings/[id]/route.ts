@@ -3,7 +3,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
-import { postingUpdateSchema } from '@/lib/validations/postings'
+import { postingUpdateSchema, withoutPosting143Keys } from '@/lib/validations/postings'
+import { isUndefinedColumn } from '@/lib/postings/format'
 
 /** Helper: confirm a posting belongs to a job in the caller's org. */
 async function checkPostingOrg(postingId: string, orgId: string) {
@@ -49,12 +50,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body instanceof NextResponse) return body
 
   const supabase = createAdminClient()
-  const { data, error } = await supabase
-    .from('job_postings')
-    .update(body)
-    .eq('id', params.id)
-    .select()
-    .single()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let result = await (supabase as any).from('job_postings').update(body).eq('id', params.id).select().single()
+  // Live DB predates migration 143 → retry with only the original columns.
+  if (result.error && isUndefinedColumn(result.error)) {
+    const legacy = withoutPosting143Keys(body as Record<string, unknown>)
+    result = Object.keys(legacy).length === 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? await (supabase as any).from('job_postings').select('*').eq('id', params.id).single()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      : await (supabase as any).from('job_postings').update(legacy).eq('id', params.id).select().single()
+  }
+  const { data, error } = result
   if (error) return handleSupabaseError(error)
   return NextResponse.json({ data })
 }

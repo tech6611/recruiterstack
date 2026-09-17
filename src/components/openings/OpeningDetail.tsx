@@ -28,6 +28,9 @@ import type {
   EmploymentType,
 } from '@/lib/types/requisitions'
 
+/** Human-readable requisition number prefix (org setting `opening_number_prefix`; "REQ" until it's surfaced). */
+const OPENING_NUMBER_PREFIX = 'REQ'
+
 interface Props {
   opening:     Opening
   departments: Pick<Department, 'id' | 'name'>[]
@@ -188,6 +191,9 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
         comp_max:          form.comp_max ? Number(form.comp_max) : null,
         comp_currency:     form.comp_currency,
         target_start_date: form.target_start_date || null,
+        target_hire_date:  form.target_hire_date  || null,
+        is_backfill:       form.is_backfill,
+        backfill_for:      form.is_backfill ? (form.backfill_for.trim() || null) : null,
         hiring_manager_id:    form.hiring_manager_id || null,
         hiring_manager_name:  form.hiring_manager_name.trim() || null,
         hiring_manager_email: form.hiring_manager_email.trim() || null,
@@ -338,6 +344,11 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
+            {typeof opening.number === 'number' && (
+              <span className="shrink-0 font-mono text-sm text-slate-400 tabular-nums" title="Requisition number">
+                {OPENING_NUMBER_PREFIX}-{opening.number}
+              </span>
+            )}
             <h1 className="text-2xl font-semibold text-slate-900 truncate">{opening.title}</h1>
             <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize', STATUS_BADGE[opening.status])}>
               {opening.status.replace('_', ' ')}
@@ -447,6 +458,12 @@ export function OpeningDetail({ opening, departments, locations, compBands, user
                   <DetailRow label="Location">{loc?.name ?? '—'}</DetailRow>
                   <DetailRow label="Employment type">{opening.employment_type.replace('_', ' ')}</DetailRow>
                   <DetailRow label="Target start">{opening.target_start_date ?? '—'}</DetailRow>
+                  <DetailRow label="Target hire">{opening.target_hire_date ?? '—'}</DetailRow>
+                  <DetailRow label="Backfill">
+                    {opening.is_backfill
+                      ? (opening.backfill_for ? `Yes — replacing ${opening.backfill_for}` : 'Yes')
+                      : 'No'}
+                  </DetailRow>
                   <DetailRow label="Comp">
                     {opening.comp_min !== null && opening.comp_max !== null
                       ? `${opening.comp_currency} ${Number(opening.comp_min).toLocaleString()}–${Number(opening.comp_max).toLocaleString()}`
@@ -672,6 +689,9 @@ interface EditFormState {
   comp_max:          string
   comp_currency:     string
   target_start_date: string
+  target_hire_date:  string
+  is_backfill:       boolean
+  backfill_for:      string
   hiring_manager_id: string
   hiring_manager_name:  string
   hiring_manager_email: string
@@ -694,6 +714,9 @@ function initFormFromOpening(o: Opening): EditFormState {
     comp_max:          o.comp_max !== null ? String(o.comp_max) : '',
     comp_currency:     o.comp_currency,
     target_start_date: o.target_start_date ?? '',
+    target_hire_date:  o.target_hire_date  ?? '',
+    is_backfill:       o.is_backfill === true,
+    backfill_for:      o.backfill_for      ?? '',
     hiring_manager_id: o.hiring_manager_id ?? '',
     hiring_manager_name:  o.hiring_manager_name  ?? '',
     hiring_manager_email: o.hiring_manager_email ?? '',
@@ -861,9 +884,39 @@ function EditForm({ form, setForm, departments, locations, compBands, users, gat
           </div>
         </div>
       </div>
-      <div className="space-y-1.5">
-        <Label>Target start{hint('target_start_date')}</Label>
-        <Input type="date" value={form.target_start_date} disabled={locked('target_start_date')} onChange={e => setForm(f => ({ ...f, target_start_date: e.target.value }))} />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label>Target start{hint('target_start_date')}</Label>
+          <Input type="date" value={form.target_start_date} disabled={locked('target_start_date')} onChange={e => setForm(f => ({ ...f, target_start_date: e.target.value }))} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Target hire{hint('target_hire_date')}</Label>
+          <Input type="date" value={form.target_hire_date} disabled={locked('target_hire_date')} onChange={e => setForm(f => ({ ...f, target_hire_date: e.target.value }))} />
+        </div>
+      </div>
+      <div className="space-y-2 rounded-lg border border-slate-200 p-3">
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300"
+            checked={form.is_backfill}
+            disabled={locked('is_backfill')}
+            onChange={e => setForm(f => ({ ...f, is_backfill: e.target.checked }))}
+          />
+          This is a backfill{hint('is_backfill')}
+        </label>
+        {form.is_backfill && (
+          <div className="space-y-1.5">
+            <Label>Replacing{hint('backfill_for')}</Label>
+            <Input
+              placeholder="Name or role of the person being replaced"
+              value={form.backfill_for}
+              maxLength={200}
+              disabled={locked('backfill_for')}
+              onChange={e => setForm(f => ({ ...f, backfill_for: e.target.value }))}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

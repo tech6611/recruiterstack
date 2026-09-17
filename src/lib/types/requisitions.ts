@@ -347,6 +347,58 @@ export interface JobPostingInsert extends Omit<JobPosting,
 
 export interface JobPostingUpdate extends Partial<JobPostingInsert> {}
 
+// ── Job Templates (migration 143) ────────────────────────────
+// A full job template: job fields + JD + comp + a linked interview-plan
+// template + a draft posting. Jobs created from one are independent afterwards.
+
+export type JobWorkModel = 'remote' | 'hybrid' | 'onsite'
+
+/** The softer intake pieces the New Job drawer collects (same keys as
+ *  jobs.custom_fields.intake so a template round-trips cleanly). */
+export interface JobTemplateIntake {
+  team_context?: string | null
+  key_requirements?: string | null
+  nice_to_have?: string | null
+  target_companies?: string[]
+  notes?: string | null
+  [key: string]: unknown
+}
+
+/** Draft posting created under a job when the template is applied. */
+export interface JobTemplatePosting {
+  title?: string | null          // defaults to the job title
+  description?: string | null
+  channel?: PostingChannel
+  visibility?: 'listed' | 'unlisted'
+}
+
+export interface JobTemplate {
+  id: string
+  org_id: string
+  name: string
+  description: string | null
+  title: string | null
+  department_id: string | null
+  location_id: string | null
+  employment_type: string | null
+  work_model: JobWorkModel | null
+  level: string | null
+  confidentiality: JobConfidentiality
+  comp_min: number | null
+  comp_max: number | null
+  comp_currency: string | null
+  jd: string | null
+  intake: JobTemplateIntake
+  custom_fields: Record<string, unknown>
+  plan_template_id: string | null
+  posting: JobTemplatePosting | null
+  is_active: boolean
+  source_job_id: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 // ── Hiring Teams ─────────────────────────────────────────────
 
 export type HiringTeamRole = 'hiring_manager' | 'recruiter' | 'recruiting_coordinator' | 'sourcer' | 'interviewer'

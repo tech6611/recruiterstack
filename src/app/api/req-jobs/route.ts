@@ -6,6 +6,8 @@ import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { jobIntakeCreateSchema } from '@/lib/validations/jobs'
 import { findOrCreateLocation } from '@/lib/jobs/inherit'
+import { getJobTemplate, applyJobTemplateToJob } from '@/modules/ats/domain/job-templates'
+import { logger } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /** Find an org-scoped department by name, creating it if absent. */
@@ -212,6 +214,22 @@ export async function POST(req: NextRequest) {
     .from('job_openings')
     .insert({ job_id: jobRow.id, opening_id: body.link_opening_id, linked_by: userId })
   if (linkErr && linkErr.code !== '23505') return handleSupabaseError(linkErr)
+
+  // Started from a job template? Apply its linked pieces (interview-plan
+  // template + draft posting) now that the job exists. The scalar fields were
+  // prefilled client-side so the recruiter could edit them before creating.
+  // Best-effort: the job is already created, so a template hiccup is logged,
+  // not surfaced as a failed create.
+  const templateId = 'template_id' in body && typeof body.template_id === 'string' ? body.template_id : null
+  if (templateId) {
+    try {
+      const template = await getJobTemplate(supabase, orgId, templateId)
+      if (template) await applyJobTemplateToJob(supabase, orgId, jobRow.id, template, userId)
+      else logger.warn('[req-jobs] template not found for org; skipped', { templateId, jobId: jobRow.id })
+    } catch (err) {
+      logger.warn('[req-jobs] apply job template failed', { templateId, jobId: jobRow.id, err })
+    }
+  }
 
   return NextResponse.json({ data: job }, { status: 201 })
 }

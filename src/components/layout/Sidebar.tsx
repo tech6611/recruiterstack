@@ -25,6 +25,7 @@ import {
   Mail,
   Target,
   Database,
+  LayoutTemplate,
   Menu,
   X,
   ChevronLeft,
@@ -72,6 +73,9 @@ const NAV_SECTIONS: NavSection[] = [
       // their own requisitions; the /openings routes row-scope to their reqs.
       { href: '/openings',   label: 'Requisitions', icon: ClipboardList, cap: 'openings:view' },
       { href: '/jobs',       label: 'Jobs',       icon: Briefcase,     cap: 'recruiting:view' },
+      // Full job templates (fields + JD + comp + plan + draft posting) — the
+      // recipes the New Job drawer starts from. Same gate as Jobs.
+      { href: '/jobs/templates', label: 'Job templates', icon: LayoutTemplate, cap: 'recruiting:view' },
       { href: '/candidates', label: 'Candidates', icon: Users,         cap: 'recruiting:view' },
       { href: '/sourcing',   label: 'Sourcing',   icon: Search,        cap: 'recruiting:view' },
       // The pool is a cross-org candidate database an org subscribes to — it sits
@@ -112,6 +116,7 @@ const NAV_SECTIONS: NavSection[] = [
     icon:    BarChart2,
     items: [
       { href: '/analytics',        label: 'Analytics',        icon: BarChart2, cap: 'analytics:view' },
+      { href: '/analytics/headcount', label: 'Headcount',     icon: BarChart2, cap: 'analytics:view' },
       { href: '/analytics/people', label: 'People analytics', icon: BarChart2, cap: 'people:view' },
     ],
   },
