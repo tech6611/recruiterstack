@@ -9,6 +9,39 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-17 (Niche-recruiter sourcing — Step 2: the ICP drives the Crustdata search)
+
+### Added
+- **Search plan** (`vendors/crustdata/search-plan.ts`, pure + tested): the ICP's recruiter
+  brief becomes several small Crustdata LANES run in priority order — one **feeder lane**
+  per feeder pool (employer matched across ANY role, past or current, by all-words on
+  normalised company names, narrowed by the pool's role types) and a **titles lane**
+  (job title + title families on the current title). Every lane shares the **market
+  as a geo radius** (50 km of the job's structured location; skipped for remote), a
+  **years floor** parsed from plain-sentence gates, and any structured gate the old
+  translator can still map. Plain-sentence gates are reported honestly as
+  "checked after fetch, not searchable". Grammar verified live against Crustdata.
+- **Multi-lane orchestrator** (`sourceFromIcp` in `crustdata-acquire.ts`): one ingest
+  run, one budget spread across lanes (unspent share rolls forward), cross-lane
+  de-dup by LinkedIn URL, per-lane totals/credits/errors recorded, and **cursor
+  continuity** — each lane's `next_cursor` is saved on the run so the next click pages
+  forward instead of re-buying page 1 (was: every run re-bought the same 3 people).
+- **Unknown gate verdicts** in the Fit Engine: the judge may now answer `null` for a
+  specific-skill/credential gate the data can't establish (Crustdata search returns no
+  skills), surfaced as an amber "?" instead of a rejection. Previously every Crustdata
+  profile failed "mentions SQL" and was capped at 20.
+- **Richer evidence for market profiles**: role descriptions (`pool_experiences.summary`)
+  and education (`pool_profile_fields`) now reach the judge; matches carry `sources`
+  and the matrix shows a "Crustdata · new" badge so vendor hits are distinguishable
+  from pool recall.
+- **"What was sent to Crustdata" panel** in the sourcing section: each lane with its
+  filter chips, vendor total, fetched/duplicate counts, credits, resumed flag; plus the
+  requirements that were checked after fetch.
+
+### Changed
+- Crustdata run default is 10 profiles (was 3), spread across lanes; cap stays 25.
+- Employer filter field is the documented `…company_name` (was `…name`; both accepted).
+
 ## 2026-09-17 (Niche-recruiter ICP — Phase 1: the recruiter brief)
 
 ### Added

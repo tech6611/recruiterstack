@@ -49,7 +49,7 @@ const FIELD = {
   skills: 'skills.professional_network_skills',
   seniority: 'experience.employment_details.current.seniority_level',
   function: 'experience.employment_details.current.function_category',
-  company: 'experience.employment_details.current.name',
+  company: 'experience.employment_details.current.company_name',
 } as const
 
 const DEFAULT_RADIUS_KM = 50

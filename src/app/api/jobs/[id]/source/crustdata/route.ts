@@ -5,11 +5,13 @@ import type { Icp } from '@/lib/types/icp'
 import { sourceFromIcp, EmptyIcpQueryError } from '@/modules/pool/domain/crustdata-acquire'
 import { CrustdataConfigError } from '@/modules/pool/vendors/crustdata/client'
 import { sourcePoolForIcp, savePoolMatches, embedPoolProfiles } from '@/modules/pool/domain/pool-sourcing'
+import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 
 export const maxDuration = 300 // live vendor fetch + embed + Fit-Engine scoring
 
-/** Default people fetched per run — kept low on purpose; capped so a bad request can't overspend. */
-const DEFAULT_COUNT = 3
+/** Default people fetched per run, spread across the plan's lanes (~0.03 credit each);
+ *  capped so a bad request can't overspend. */
+const DEFAULT_COUNT = 10
 const MAX_COUNT = 25
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,20 +52,20 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
       /* no body — use the default */
     }
 
-    // The role title lives on the job, not the ICP — it anchors the query.
-    const { data: job } = await (supabase as unknown as LooseSb)
-      .from('jobs')
-      .select('title')
-      .eq('id', params.id)
-      .maybeSingle()
+    // The role title lives on the job, not the ICP — it anchors the titles lane; the
+    // market (structured location) becomes every lane's geo radius.
+    const [{ data: job }, roleContext] = await Promise.all([
+      (supabase as unknown as LooseSb).from('jobs').select('title').eq('id', params.id).maybeSingle(),
+      getJobRoleContext(supabase, orgId, params.id),
+    ])
 
-    // 1. Fetch + ingest fresh Crustdata people for this ICP.
+    // 1. Run the ICP's search plan (feeder lanes + title families) and ingest the people.
     let sourced
     try {
       sourced = await sourceFromIcp(
         supabase,
         icp,
-        { title: job?.title ?? null },
+        { title: job?.title ?? null, roleContext },
         { perPage: count, maxRecords: count, orgId, jobId: params.id },
       )
     } catch (err) {
@@ -72,7 +74,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
       }
       if (err instanceof EmptyIcpQueryError) {
         return NextResponse.json(
-          { error: 'This ICP has no Crustdata-searchable requirements yet — add a title, location, or experience gate.' },
+          { error: 'This ICP has nothing Crustdata can search on yet — regenerate it so it carries a recruiter brief (feeder pools, title families), or add a title.' },
           { status: 400 },
         )
       }
@@ -88,8 +90,9 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     // 2. Embed the newly ingested profiles so semantic recall can find them.
     await embedPoolProfiles(supabase, sourced.ingest.needsReembed).catch(() => {})
 
-    // 3. Rank the refreshed pool against the ICP, and cache the shortlist.
-    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId })
+    // 3. Rank the refreshed pool against the ICP — every profile bought this run is
+    //    scored whether or not semantic recall would have surfaced it — and cache.
+    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: sourced.profileIds })
     if (result.status === 'ok') {
       await savePoolMatches(supabase, orgId, params.id, icp.version, result.matches).catch(() => {})
     }
@@ -102,7 +105,9 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
           creditsUsed: sourced.creditsUsed,
           created: sourced.ingest.created,
           merged: sourced.ingest.merged,
-          unmappedRequirements: sourced.query.unmapped,
+          unmappedRequirements: sourced.plan.unmapped,
+          plan: sourced.plan,
+          profileIds: sourced.profileIds,
         },
         ...result,
         icp: icpColumns(icp),

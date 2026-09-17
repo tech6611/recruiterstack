@@ -34,6 +34,10 @@ export interface PoolMatch {
   // Optional: older cached matches (scored before this was added) won't carry them.
   competencies?: { name: string; rating: number; evidence?: string }[]
   red_flags?: string[]
+  /** Gates the judge couldn't establish from the data on file ("unverified"). */
+  gate_unknown?: string[]
+  /** Where this profile came from (pool_identities.source_key), e.g. 'vendor:crustdata'. */
+  sources?: string[]
 }
 
 /** Build the Candidate shape the Fit Engine reads from a pool profile row. */
@@ -59,6 +63,10 @@ export async function sourcePoolForIcp(
   orgId: string,
   icp: Icp,
   identity: UsageIdentity = {},
+  // Profile ids that must be scored regardless of semantic recall — e.g. everything a
+  // Crustdata run just bought. A bought profile that never gets scored is money spent
+  // on a person the recruiter never sees.
+  opts: { includeIds?: string[] } = {},
 ): Promise<{ status: 'ok' | 'no_access' | 'empty'; matches: PoolMatch[] }> {
   const access = await getPoolAccess(supabase, orgId)
   if (!access.hasAccess) return { status: 'no_access', matches: [] }
@@ -80,8 +88,11 @@ export async function sourcePoolForIcp(
     ids = (data ?? []).map((r: { id: string }) => r.id)
   } catch (err) {
     logger.warn('Pool semantic recall failed', { error: err instanceof Error ? err.message : String(err) })
-    return { status: 'ok', matches: [] }
+    if (!opts.includeIds?.length) return { status: 'ok', matches: [] }
   }
+  // Union in the must-score ids (bought this run), de-duplicated, excluding unlocked.
+  const excluded = new Set(excludeIds)
+  for (const id of opts.includeIds ?? []) if (id && !excluded.has(id) && !ids.includes(id)) ids.push(id)
   if (!ids.length) return { status: 'empty', matches: [] }
 
   const { data: profiles } = await sb
@@ -94,17 +105,42 @@ export async function sourcePoolForIcp(
 
   // Dated work history per profile, so background deal-breakers are judged on real
   // roles held — not the current title alone (market profiles are often the thinnest).
-  const { data: pexps } = await sb
-    .from('pool_experiences')
-    .select('profile_id, title, employer, start_date, end_date, is_current, sort_order')
-    .in('profile_id', ids).order('sort_order', { ascending: true })
+  // Role descriptions (summary) ride along as free-text evidence: that is where a
+  // vendor profile mentions SQL, team size, scale — the things the skills list lacks.
+  const [{ data: pexps }, { data: pedu }, { data: pids }] = await Promise.all([
+    sb
+      .from('pool_experiences')
+      .select('profile_id, title, employer, start_date, end_date, is_current, sort_order, summary')
+      .in('profile_id', ids).order('sort_order', { ascending: true }),
+    sb.from('pool_profile_fields').select('profile_id, value, confidence').eq('field', 'education').in('profile_id', ids),
+    sb.from('pool_identities').select('profile_id, source_key').in('profile_id', ids),
+  ])
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const expsByProfile = new Map<string, any[]>()
+  const textByProfile = new Map<string, string[]>()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const e of (pexps ?? []) as any[]) {
     const arr = expsByProfile.get(e.profile_id) ?? []
     arr.push({ title: e.title, employer: e.employer, start_date: e.start_date, end_date: e.end_date, is_current: e.is_current })
     expsByProfile.set(e.profile_id, arr)
+    if (typeof e.summary === 'string' && e.summary.trim()) {
+      const t = textByProfile.get(e.profile_id) ?? []
+      t.push(`${[e.title, e.employer].filter(Boolean).join(' at ')}: ${e.summary.trim()}`)
+      textByProfile.set(e.profile_id, t)
+    }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const eduByProfile = new Map<string, any[]>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (pedu ?? []) as any[]) {
+    if (eduByProfile.has(r.profile_id) || !Array.isArray(r.value)) continue
+    eduByProfile.set(r.profile_id, r.value)
+  }
+  const sourcesByProfile = new Map<string, string[]>()
+  for (const r of (pids ?? []) as { profile_id: string; source_key: string }[]) {
+    const arr = sourcesByProfile.get(r.profile_id) ?? []
+    if (!arr.includes(r.source_key)) arr.push(r.source_key)
+    sourcesByProfile.set(r.profile_id, arr)
   }
 
   const matches: PoolMatch[] = []
@@ -115,7 +151,12 @@ export async function sourcePoolForIcp(
       chunk.map(async (p: any) => {
         try {
           // Market candidates: assume complete vendor data → REJECT when it's missing.
-          const fit = await scoreAgainstIcp(poolProfileToFitCandidate(p), icp, identity, undefined, { experiences: expsByProfile.get(p.id) ?? [] }, 'reject')
+          const profileText = (textByProfile.get(p.id) ?? []).join('\n').slice(0, 4000) || undefined
+          const fit = await scoreAgainstIcp(
+            poolProfileToFitCandidate(p), icp, identity, profileText,
+            { experiences: expsByProfile.get(p.id) ?? [], education: eduByProfile.get(p.id) ?? [] },
+            'reject',
+          )
           return {
             profile_id: p.id,
             name: p.display_name,
@@ -131,8 +172,10 @@ export async function sourcePoolForIcp(
             fit_bucket: fit.fit_bucket,
             rationale: fit.rationale,
             gate_failures: fit.gate_failures.map((g) => g.label),
+            gate_unknown: fit.gate_unknown.map((g) => g.label),
             competencies: fit.competencies.map((c) => ({ name: c.name, rating: c.rating, evidence: c.evidence })),
             red_flags: fit.red_flags,
+            sources: sourcesByProfile.get(p.id) ?? [],
           } as PoolMatch
         } catch {
           return null

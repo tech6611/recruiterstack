@@ -20,6 +20,10 @@ export interface MatrixMatch {
   candidate_id: string
   score: number
   gate_failures: { label?: string }[]
+  /** Gates the judge couldn't establish from the data on file — shown as "?", never a fail. */
+  gate_unknown?: { label?: string }[]
+  /** Small chip next to the name, e.g. "Crustdata · new". */
+  source_badge?: string | null
   red_flags: string[]
   rationale: string | null
   data_incomplete?: boolean | null
@@ -56,6 +60,19 @@ const RATING: Record<number, { bar: string; cls: string; label: string }> = {
 function mustPass(m: MatrixMatch, label: string): boolean {
   return !m.gate_failures.some((g) => (g.label ?? '') === label)
 }
+function mustUnknown(m: MatrixMatch, label: string): boolean {
+  return (m.gate_unknown ?? []).some((g) => (g.label ?? '') === label)
+}
+const GATE_CELL = {
+  pass: 'bg-emerald-100 text-emerald-700',
+  fail: 'bg-rose-100 text-rose-700',
+  unknown: 'bg-amber-100 text-amber-700',
+} as const
+function gateState(m: MatrixMatch, label: string): keyof typeof GATE_CELL {
+  if (!mustPass(m, label)) return 'fail'
+  return mustUnknown(m, label) ? 'unknown' : 'pass'
+}
+const GATE_GLYPH: Record<keyof typeof GATE_CELL, string> = { pass: '✓', fail: '✕', unknown: '?' }
 /** A compact column header from a long, often question-style ICP label. Drops the
  *  parenthetical aside, then strips leading filler ("Has a genuine…", "At least 1
  *  year of experience with…") so only the essential noun phrase remains. The full
@@ -180,6 +197,9 @@ export function SourcingMatrix({
                           {m.data_incomplete && (
                             <FileQuestion className="h-3 w-3 shrink-0 text-amber-500" aria-label="Background unverified" />
                           )}
+                          {m.source_badge && (
+                            <span className="inline-flex shrink-0 items-center rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold text-sky-700">{m.source_badge}</span>
+                          )}
                           {m.unreachable && (
                             <span className="inline-flex shrink-0 items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-600">no contact</span>
                           )}
@@ -193,11 +213,11 @@ export function SourcingMatrix({
                   </td>
                   {/* must-have gates */}
                   {icp.must_haves.map((mh, i) => {
-                    const pass = mustPass(m, mh.label)
+                    const st = gateState(m, mh.label)
                     return (
                       <td key={mh.id} className={`px-2 py-2.5 text-center ${i === 0 ? 'border-l-2 border-slate-100' : ''}`}>
-                        <span className={`inline-grid h-6 w-6 place-items-center rounded-md text-[13px] font-bold ${pass ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                          {pass ? '✓' : '✕'}
+                        <span title={st === 'unknown' ? 'Not verifiable from the data on file' : undefined} className={`inline-grid h-6 w-6 place-items-center rounded-md text-[13px] font-bold ${GATE_CELL[st]}`}>
+                          {GATE_GLYPH[st]}
                         </span>
                       </td>
                     )
@@ -260,15 +280,15 @@ export function SourcingMatrix({
                         )}
                         <div className="grid gap-x-10 gap-y-1 md:grid-cols-2">
                           {icp.must_haves.map((mh) => {
-                            const pass = mustPass(m, mh.label)
+                            const st = gateState(m, mh.label)
                             return (
                               <div key={mh.id} className="flex items-start gap-2.5 border-t border-slate-200/70 py-2 first:border-0 md:[&:nth-child(2)]:border-0">
-                                <span className={`inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] font-bold ${pass ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                                  {pass ? '✓' : '✕'}
+                                <span className={`inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] font-bold ${GATE_CELL[st]}`}>
+                                  {GATE_GLYPH[st]}
                                 </span>
                                 <div className="min-w-0">
                                   <div className="text-[13px] font-medium text-slate-700">{mh.label}</div>
-                                  <div className="text-[11px] text-slate-400">Must-have{pass ? '' : ' · missing'}</div>
+                                  <div className="text-[11px] text-slate-400">Must-have{st === 'fail' ? ' · missing' : st === 'unknown' ? ' · not verifiable from the data on file' : ''}</div>
                                 </div>
                               </div>
                             )

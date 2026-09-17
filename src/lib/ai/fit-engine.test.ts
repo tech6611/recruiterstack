@@ -91,3 +91,23 @@ describe('combineFit', () => {
     expect(combineFit([{ rating: 1, weight: 100 }], [gate({})]).recommendation).toBe('no')
   })
 })
+
+// ── UNKNOWN gate verdicts (Step 2: thin vendor profiles) ────────────────────────
+import { icpFitResponseSchema } from './schemas'
+
+describe('icpFitResponseSchema gate_results', () => {
+  it('accepts null as an UNKNOWN verdict and keeps true/false intact', () => {
+    const parsed = icpFitResponseSchema.parse({
+      competencies: [],
+      gate_results: [{ id: 'a', pass: true, reason: '' }, { id: 'b', pass: false, reason: 'no' }, { id: 'c', pass: null, reason: 'no skills listed' }],
+      red_flags: [], strengths: [], gaps: [], rationale: '',
+    })
+    expect(parsed.gate_results.map((g) => g.pass)).toEqual([true, false, null])
+  })
+  it('never turns a malformed verdict into a rejection', () => {
+    const parsed = icpFitResponseSchema.parse({
+      competencies: [], gate_results: [{ id: 'a', pass: 'maybe', reason: '' }], red_flags: [], strengths: [], gaps: [], rationale: '',
+    })
+    expect(parsed.gate_results[0].pass).toBe(true)
+  })
+})
