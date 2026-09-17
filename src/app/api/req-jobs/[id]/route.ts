@@ -33,7 +33,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   return NextResponse.json({ data })
 }
 
-// Job-level location + comp (migration 143): editable at any status. On a DB
+// Job-level location + comp (migration 144): editable at any status. On a DB
 // that hasn't run the migration yet, Postgres rejects the unknown columns with
 // 42703 (undefined_column) — retry the write without them so the rest lands.
 const JOB_ATTRIBUTE_KEYS = ['location_id', 'comp_min', 'comp_max', 'comp_currency'] as const

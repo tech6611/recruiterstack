@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
   if (hmEmail) customFields.hiring_manager_email = hmEmail
 
   // Comp + location: what the recruiter typed wins, else inherit from the requisition
-  // (migration 143). Location text from the form is matched/created in `locations`.
+  // (migration 144). Location text from the form is matched/created in `locations`.
   const compMin = body.comp_min ?? opening.comp_min ?? null
   const compMax = body.comp_max ?? opening.comp_max ?? null
   const compCurrency = body.comp_currency ?? opening.comp_currency ?? null
@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
     .insert({ ...baseRow, comp_min: compMin, comp_max: compMax, comp_currency: compCurrency, location_id: locationId } as never)
     .select()
     .single()
-  // Pre-migration-143 database: retry without the new columns.
+  // Pre-migration-144 database: retry without the new columns.
   if (inserted.error?.code === '42703') {
     inserted = await supabase.from('jobs').insert(baseRow as never).select().single()
   }

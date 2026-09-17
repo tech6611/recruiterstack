@@ -222,7 +222,7 @@ export const EXCLUDED_OPENING_COLUMNS = [
   'approval_id',      // set by the approval engine
   'custom_fields',    // free-form escape hatch, not a first-class field
   'created_by',
-  'number',           // assigned by the DB (migration 143 trigger)
+  'number',           // assigned by the DB (migration 144 trigger)
   'created_at',
   'updated_at',
 ] as const satisfies readonly (keyof Opening)[]

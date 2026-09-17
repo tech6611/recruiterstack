@@ -43,7 +43,7 @@ entries on top.
   database) shown on the list, the detail header and linked-requisition cards.
 
 ### Schema
-- `143_job_setup_breadth.sql` (shipped with Phase 3): see that entry.
+- `144_job_setup_breadth.sql` (shipped with Phase 3): see that entry.
 
 ## 2026-09-16 (Parity plan · Phase 3: hiring team parity)
 
@@ -71,9 +71,9 @@ entries on top.
   (`src/lib/jobs/confidential.ts`, job list/detail routes, job page)
 
 ### Schema
-- `142_opening_roles_and_job_access.sql` — `openings.coordinator_id`,
+- `143_opening_roles_and_job_access.sql` — `openings.coordinator_id`,
   `openings.sourcer_id` (+ indexes). Reads fall back gracefully until applied.
-- `143_job_setup_breadth.sql` (groundwork for Phase 4, shipped early): job
+- `144_job_setup_breadth.sql` (groundwork for Phase 4, shipped early): job
   comp/location columns, posting visibility/comp/location/public token, the
   `job_templates` table, requisition backfill / target hire date / per-org
   number (trigger + backfill). Jobs created from a requisition now inherit its
@@ -102,7 +102,7 @@ entries on top.
   closed on seats — with reasons. Previously these only emitted webhooks.
 
 ### Schema
-- `141_close_the_loop.sql` — `openings.opened_at/filled_at/filled_by_application_id/closed_at/close_reason/close_note/status_before_archive`,
+- `142_close_the_loop.sql` — `openings.opened_at/filled_at/filled_by_application_id/closed_at/close_reason/close_note/status_before_archive`,
   `jobs.closed_at/close_reason/close_note/status_before_archive`, `offers.opening_id`,
   and a one-off backfill marking seats behind already-published jobs as Open.
   Code tolerates the migration not being applied (writes fall back to status only).
@@ -144,7 +144,7 @@ record.** An approved requisition is no longer frozen.
 - Requisition edit error no longer says "Unarchive first" for every status.
 
 ### Schema
-- `140_opening_change_requests.sql` — `opening_change_requests`,
+- `141_opening_change_requests.sql` — `opening_change_requests`,
   `opening_versions`, `custom_field_definitions.require_reapproval`,
   `org_settings.opening_reapproval_fields`, approvals target type
   `opening_change`, `manager` approver type. **Must be applied before gated

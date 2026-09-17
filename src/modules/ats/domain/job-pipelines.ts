@@ -593,7 +593,7 @@ export interface CareersPageJob {
   apply_url: string
   /** Public comp text ("USD 120,000–150,000") when the posting shows it, else null. */
   compensation: string | null
-  // ── Feed-only extras (migration 143). Optional so older callers keep compiling. ──
+  // ── Feed-only extras (migration 144). Optional so older callers keep compiling. ──
   /** job_postings.id, or the job id when the entry is synthesized from a job with no postings. */
   posting_id?: string
   /** ISO timestamp the posting went live (job created_at for synthesized entries). */
@@ -764,7 +764,7 @@ export async function getCareersPageBySlug(
   }
 
   // ── Open, non-confidential jobs (the universe the public may see) ─────────
-  // location_id / comp_* arrived with migration 143; retry without them when the
+  // location_id / comp_* arrived with migration 144; retry without them when the
   // live DB predates it.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any
@@ -798,7 +798,7 @@ export async function getCareersPageBySlug(
   const jobRows = ((jobsRes.data ?? []) as JobRow[]).filter(r => !!r.apply_token)
   if (jobRows.length === 0) return { branding, jobs: [] }
 
-  // ── Postings: the public face of each job (migration 143) ─────────────────
+  // ── Postings: the public face of each job (migration 144) ─────────────────
   // Fetch every posting of these jobs (not only live ones) so we can tell "has
   // no postings at all" (→ synthesize from the job, no regression for existing
   // customers) from "has postings but none live+listed" (→ hidden).
@@ -1204,7 +1204,7 @@ export async function createCanonicalJobFromApprovedOpening(
     .insert({ job_id: job.id, opening_id: openingId, linked_by: linkedBy ?? null })
   if (linkErr && linkErr.code !== '23505') throw linkErr
 
-  // Comp + location flow down from the requisition (migration 143).
+  // Comp + location flow down from the requisition (migration 144).
   await fillJobFromOpening(supabase, orgId, job.id, openingId)
 
   return job

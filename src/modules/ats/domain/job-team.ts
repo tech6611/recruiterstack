@@ -155,7 +155,7 @@ export async function loadJobTeam(supabase: SupabaseClient, orgId: string, jobId
 
   const openingsRes = openingIds.length
     ? await sb.from('openings').select('id, title, hiring_manager_id, recruiter_id, coordinator_id, sourcer_id, hiring_manager_name, hiring_manager_email').eq('org_id', orgId).in('id', openingIds)
-        .then((r: Loose) => r.error   // pre-migration-142: retry without the new columns
+        .then((r: Loose) => r.error   // pre-migration-143: retry without the new columns
           ? sb.from('openings').select('id, title, hiring_manager_id, recruiter_id, hiring_manager_name, hiring_manager_email').eq('org_id', orgId).in('id', openingIds)
           : r)
     : { data: [] }

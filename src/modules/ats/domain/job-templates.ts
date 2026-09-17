@@ -7,7 +7,7 @@ import { applyPlanTemplateToJob } from '@/modules/ats/domain/plan-templates'
 import { logger } from '@/lib/logger'
 
 type Supabase = SupabaseClient<Database>
-// job_templates (migration 143) isn't in the generated Supabase types yet.
+// job_templates (migration 144) isn't in the generated Supabase types yet.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseSb = any
 
@@ -15,7 +15,7 @@ type LooseSb = any
 // interview-plan template + a draft posting. Picked from the New Job drawer;
 // the created job is a plain job afterwards (no live link back to the template).
 //
-// Reads tolerate the table not existing yet (pre-migration-143 database):
+// Reads tolerate the table not existing yet (pre-migration-144 database):
 // list returns [] and get returns null instead of throwing, so the New Job
 // drawer and the Job templates page degrade to "no templates".
 
@@ -193,7 +193,7 @@ export async function createJobTemplateFromJob(
   let jobRes = await sb.from('jobs')
     .select('id, title, department_id, description, confidentiality, custom_fields, location_id, comp_min, comp_max, comp_currency')
     .eq('id', jobId).eq('org_id', orgId).maybeSingle()
-  // Pre-migration-143 database: retry without the new columns.
+  // Pre-migration-144 database: retry without the new columns.
   if (jobRes.error?.code === '42703') {
     jobRes = await sb.from('jobs')
       .select('id, title, department_id, description, confidentiality, custom_fields')
@@ -312,7 +312,7 @@ export async function applyJobTemplateToJob(
       }
       let ins = await sb.from('job_postings')
         .insert({ ...base, visibility: template.posting.visibility ?? 'listed' }).select('id').single()
-      // Pre-migration-143 database: retry without `visibility`.
+      // Pre-migration-144 database: retry without `visibility`.
       if (ins.error?.code === '42703') ins = await sb.from('job_postings').insert(base).select('id').single()
       if (ins.error) throw ins.error
       postingId = (ins.data?.id as string) ?? null

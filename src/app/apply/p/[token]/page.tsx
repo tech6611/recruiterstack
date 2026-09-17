@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getPublicPostingByToken } from '@/lib/postings/public'
 import { ApplyExperience, ApplyLinkInvalid } from '../../ApplyPage'
 
-// Per-posting apply link: /apply/p/<job_postings.public_token> (migration 143).
+// Per-posting apply link: /apply/p/<job_postings.public_token> (migration 144).
 // The posting is resolved server-side (the token is the credential — no login),
 // then the shared apply experience renders against the JOB's apply token with
 // the posting's title / public JD / location / comp layered on top. Unlisted

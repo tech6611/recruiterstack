@@ -121,7 +121,7 @@ function JdSection({ title, body }: { title: string; body: string | null }) {
   )
 }
 
-/** Presentation overrides supplied by a per-posting link (migration 143). */
+/** Presentation overrides supplied by a per-posting link (migration 144). */
 export interface ApplyOverrides {
   title?: string
   /** Posting's own public JD. When set it REPLACES the job's JD sections. */

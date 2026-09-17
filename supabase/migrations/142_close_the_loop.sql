@@ -1,5 +1,5 @@
 -- ============================================================
--- 141: Close the loop — seats have real states, hires fill them,
+-- 142: Close the loop — seats have real states, hires fill them,
 -- jobs close with a reason (Ashby parity, Phase 2).
 --
 --   openings: approved → open (when a linked job is published)

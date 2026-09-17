@@ -29,7 +29,7 @@ const STATUS_PILL: Record<PostingStatus, { label: string; className: string }> =
 interface LocationOption { id: string; name: string }
 
 /** Public link for a live posting: /apply/p/<public_token>. Null before
- *  migration 143 (no token yet) or while the posting is a draft. */
+ *  migration 144 (no token yet) or while the posting is a draft. */
 function postingLink(p: JobPosting): string | null {
   if (!p.is_live || !p.public_token) return null
   if (typeof window === 'undefined') return `/apply/p/${p.public_token}`

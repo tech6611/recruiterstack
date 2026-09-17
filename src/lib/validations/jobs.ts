@@ -48,7 +48,7 @@ export const jobIntakeCreateSchema = z.object({
   // When the job is created from an already-approved requisition, we link that
   // existing opening instead of minting new ones (see /api/req-jobs POST).
   link_opening_id: uuidOrNull.optional().default(null),
-  // Start from a saved job template (migration 143) — the server copies its
+  // Start from a saved job template (migration 144) — the server copies its
   // fields / JD / plan template onto the new job.
   template_id:     uuidOrNull.optional().default(null),
 })
@@ -94,7 +94,7 @@ export const jobUpdateSchema = z
     confidentiality: z.enum(['public', 'confidential']),
     custom_fields:   z.record(z.string(), z.unknown()),
     status:          z.enum(['draft', 'pending_approval', 'approved', 'open', 'paused', 'withdrawn', 'closed', 'archived']),
-    // Job-level location + comp (migration 143). Not identity fields — the PATCH
+    // Job-level location + comp (migration 144). Not identity fields — the PATCH
     // route accepts them at any status. No defaults: an omitted key stays absent.
     location_id:     uuidOrNull.optional(),
     comp_min:        compNumOrNull.optional(),

@@ -2,7 +2,7 @@
 // the XML job feed. No I/O here — keep this importable from anywhere.
 
 /** Posting status trio derived from the boolean `is_live` + `visibility`
- *  (migration 143): draft = not live, live = live and listed, unlisted = live
+ *  (migration 144): draft = not live, live = live and listed, unlisted = live
  *  but reachable only via its direct link. */
 export type PostingStatus = 'draft' | 'live' | 'unlisted'
 
@@ -38,7 +38,7 @@ export function toNum(v: unknown): number | null {
 }
 
 /** Path of the public apply page for a posting: the per-posting link when the
- *  posting has a public token (migration 143), else the job-level apply link. */
+ *  posting has a public token (migration 144), else the job-level apply link. */
 export function applyPathFor(publicToken: string | null | undefined, jobApplyToken: string): string {
   return publicToken ? `/apply/p/${publicToken}` : `/apply/${jobApplyToken}`
 }

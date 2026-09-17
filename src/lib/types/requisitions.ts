@@ -174,12 +174,12 @@ export interface Opening {
   hiring_manager_name: string | null           // free-typed HM contact (flows to job)
   hiring_manager_email: string | null          // free-typed HM contact (flows to job)
   recruiter_id: string | null
-  coordinator_id?: string | null           // migration 142
-  sourcer_id?: string | null               // migration 142
-  is_backfill?: boolean                    // migration 143
-  backfill_for?: string | null             // migration 143
-  target_hire_date?: string | null         // migration 143 (YYYY-MM-DD)
-  number?: number | null                   // migration 143 — human-readable per-org number
+  coordinator_id?: string | null           // migration 143
+  sourcer_id?: string | null               // migration 143
+  is_backfill?: boolean                    // migration 144
+  backfill_for?: string | null             // migration 144
+  target_hire_date?: string | null         // migration 144 (YYYY-MM-DD)
+  number?: number | null                   // migration 144 — human-readable per-org number
   justification: string | null
   status: OpeningStatus
   approval_id: string | null
@@ -251,7 +251,7 @@ export interface Job {
   // fields, normalized). Set when approval completes; used to detect material
   // edits that require re-approval. Null for jobs approved before migration 075.
   approved_snapshot: import('@/lib/jobs/substance').ApprovedSnapshot | null
-  // migration 143 — inherited from the requisition, overridable
+  // migration 144 — inherited from the requisition, overridable
   location_id?: string | null
   comp_min?: number | null
   comp_max?: number | null
@@ -314,7 +314,7 @@ export interface JobPosting {
   is_live: boolean
   published_at: string | null
   unpublished_at: string | null
-  // migration 143
+  // migration 144
   visibility?: 'listed' | 'unlisted'
   location_id?: string | null
   show_compensation?: boolean
@@ -347,7 +347,7 @@ export interface JobPostingInsert extends Omit<JobPosting,
 
 export interface JobPostingUpdate extends Partial<JobPostingInsert> {}
 
-// ── Job Templates (migration 143) ────────────────────────────
+// ── Job Templates (migration 144) ────────────────────────────
 // A full job template: job fields + JD + comp + a linked interview-plan
 // template + a draft posting. Jobs created from one are independent afterwards.
 
@@ -466,7 +466,7 @@ export interface CustomFieldDefinition {
   order_index: number
   is_active: boolean
   // Ashby "Require Reapproval" — editing this field on an approved requisition
-  // sends the change through its approval chain (migration 140; optional in
+  // sends the change through its approval chain (migration 141; optional in
   // the type so older rows/fixtures without the column still type-check).
   require_reapproval?: boolean
   created_at: string

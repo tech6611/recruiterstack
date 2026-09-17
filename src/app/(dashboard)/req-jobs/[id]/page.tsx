@@ -43,7 +43,7 @@ export default async function JobDetailPage({ params }: { params: { id: string }
   ])
 
   const linkedIds = (linkedRaw ?? []).map(r => (r as { opening_id: string }).opening_id)
-  // `number` (migration 143) may not exist on a pre-migration DB — retry without it.
+  // `number` (migration 144) may not exist on a pre-migration DB — retry without it.
   let linkedOpeningsRaw: unknown[] = []
   if (linkedIds.length > 0) {
     const cols = 'id, title, status, comp_min, comp_max, comp_currency, target_start_date'

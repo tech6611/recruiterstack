@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Migration 143 posting fields (visibility, location, comp display, social
+// Migration 144 posting fields (visibility, location, comp display, social
 // description). Everything is optional so pre-143 clients keep working.
 const postingBase = z.object({
   title:        z.string().trim().min(1).max(200),
@@ -33,7 +33,7 @@ export const postingUpdateSchema = postingBase.partial().superRefine(compRangeCh
 export type PostingCreateInput = z.infer<typeof postingCreateSchema>
 export type PostingUpdateInput = z.infer<typeof postingUpdateSchema>
 
-/** Keys added by migration 143. Routes strip these and retry when the live DB
+/** Keys added by migration 144. Routes strip these and retry when the live DB
  *  predates the migration (Postgres 42703 undefined_column). */
 export const POSTING_143_KEYS = [
   'visibility', 'location_id', 'show_compensation',

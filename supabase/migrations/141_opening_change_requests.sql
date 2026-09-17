@@ -1,5 +1,5 @@
 -- ============================================================
--- 140: Requisition (opening) changes after approval — Ashby model.
+-- 141: Requisition (opening) changes after approval — Ashby model.
 --
 -- "Approval protects specific fields, never the whole record."
 --   * Ordinary fields on an APPROVED opening save immediately (+ audit + version).

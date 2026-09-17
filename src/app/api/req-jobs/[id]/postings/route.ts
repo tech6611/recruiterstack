@@ -54,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     channel:        body.channel,
     channel_config: body.channel_config ?? {},
     created_by:     userId,
-    // migration 143
+    // migration 144
     visibility:         body.visibility ?? 'listed',
     location_id:        body.location_id ?? null,
     show_compensation:  body.show_compensation ?? true,
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let result = await (supabase as any).from('job_postings').insert(row).select().single()
-  // Live DB predates migration 143 → retry with only the original columns.
+  // Live DB predates migration 144 → retry with only the original columns.
   if (result.error && isUndefinedColumn(result.error)) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     result = await (supabase as any).from('job_postings').insert(withoutPosting143Keys(row)).select().single()

@@ -12,11 +12,11 @@ import { summarizeSeats, pickSeatToFill, type SeatSummary, type JobCloseReason, 
 export { summarizeSeats, pickSeatToFill, JOB_CLOSE_REASONS, OPENING_CLOSE_REASONS } from './seat-math'
 export type { SeatSummary, JobCloseReason, OpeningCloseReason } from './seat-math'
 
-// Columns from migration 141 aren't in the generated types.
+// Columns from migration 142 aren't in the generated types.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Loose = any
 
-/** Update that tolerates migration 141 not being applied yet (drops unknown columns). */
+/** Update that tolerates migration 142 not being applied yet (drops unknown columns). */
 async function updateTolerant(sb: Loose, table: string, patch: Record<string, unknown>, id: string): Promise<boolean> {
   const { error } = await sb.from(table).update(patch).eq('id', id)
   if (!error) return true

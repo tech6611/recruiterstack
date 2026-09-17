@@ -52,7 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const supabase = createAdminClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let result = await (supabase as any).from('job_postings').update(body).eq('id', params.id).select().single()
-  // Live DB predates migration 143 → retry with only the original columns.
+  // Live DB predates migration 144 → retry with only the original columns.
   if (result.error && isUndefinedColumn(result.error)) {
     const legacy = withoutPosting143Keys(body as Record<string, unknown>)
     result = Object.keys(legacy).length === 0

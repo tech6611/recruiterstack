@@ -95,7 +95,7 @@ function initForm(job: Job) {
     department_id:     job.department_id ?? '',
     description:       descriptionToEditorHtml(job.description),
     confidentiality:   job.confidentiality ?? 'public',
-    // Job-level location + comp (migration 143). Inherited from the requisition
+    // Job-level location + comp (migration 144). Inherited from the requisition
     // at creation; editable at any status — they're not approval-locked identity.
     location_id:       job.location_id ?? '',
     comp_min:          job.comp_min !== null && job.comp_min !== undefined ? String(job.comp_min) : '',
@@ -224,7 +224,7 @@ export function JobDetail({ job: initialJob, department, departments, locations 
   const [showActions, setShowActions] = useState(false)
 
   const intake = readIntake(job)
-  // Location: the job's own location_id (migration 143) resolved to a name, falling
+  // Location: the job's own location_id (migration 144) resolved to a name, falling
   // back to the free-text intake location for jobs created before the column existed.
   const jobLocationName = (job.location_id && locations.find(l => l.id === job.location_id)?.name) || intake.location || null
   // Compensation: the job's own range; flagged "from requisition" when it still

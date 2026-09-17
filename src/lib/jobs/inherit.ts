@@ -1,4 +1,4 @@
-// A job inherits compensation + location from its requisition (migration 143),
+// A job inherits compensation + location from its requisition (migration 144),
 // at creation and when a requisition is linked. Overridable on the job later.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -18,7 +18,7 @@ export async function inheritedFromOpening(supabase: SupabaseClient, orgId: stri
   }
 }
 
-/** Fill the job's comp/location from the opening where the job has none. Tolerates migration 143 not applied. */
+/** Fill the job's comp/location from the opening where the job has none. Tolerates migration 144 not applied. */
 export async function fillJobFromOpening(supabase: SupabaseClient, orgId: string, jobId: string, openingId: string): Promise<void> {
   const sb = supabase as unknown as Loose
   const { data: job, error } = await sb.from('jobs').select('comp_min, comp_max, comp_currency, location_id').eq('id', jobId).eq('org_id', orgId).maybeSingle()

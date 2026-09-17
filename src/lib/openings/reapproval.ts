@@ -9,7 +9,7 @@ export const GATEABLE_OPENING_FIELDS = [
 ] as const
 export type GateableField = typeof GATEABLE_OPENING_FIELDS[number]
 
-/** Default gated set (migration 140). Hiring manager deliberately not included. */
+/** Default gated set (migration 141). Hiring manager deliberately not included. */
 export const DEFAULT_OPENING_REAPPROVAL_FIELDS: GateableField[] = [
   'comp_min', 'comp_max', 'comp_currency', 'comp_band_id',
   'target_start_date', 'employment_type', 'department_id',

@@ -101,7 +101,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         .select().single()
       if (crErr?.code === '42P01') {
         return NextResponse.json(
-          { error: 'Re-approval of requisition changes needs database migration 140 (opening_change_requests). Ask an admin to apply it, then try again.' },
+          { error: 'Re-approval of requisition changes needs database migration 141 (opening_change_requests). Ask an admin to apply it, then try again.' },
           { status: 503 },
         )
       }

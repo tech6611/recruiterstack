@@ -57,7 +57,7 @@ interface JobRow {
 }
 
 /** Read the job's public-facing columns, tolerating a DB that predates
- *  migration 143 (no location_id / comp_* on jobs). */
+ *  migration 144 (no location_id / comp_* on jobs). */
 export async function loadJobPublicRow(supabase: Supabase, jobId: string): Promise<JobRow | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any
