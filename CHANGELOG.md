@@ -9,6 +9,30 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-17 (Crustdata sourcing — Slice 2: live Acquire client + orchestrator)
+
+### Added
+- **Crustdata HTTP client** (`src/modules/pool/vendors/crustdata/client.ts`) —
+  `searchPeople()` calls `POST /person/search` with auth + version headers, clamps
+  `limit` to [1, 1000] (defaults to **1** for credit safety), parses profiles /
+  cursor / total plus the `x-credits-used` and `x-ratelimit-remaining` headers.
+  Typed `CrustdataConfigError` / `CrustdataApiError`. 8 unit tests (mocked fetch).
+- **Source orchestrator** (`src/modules/pool/domain/crustdata-acquire.ts`) —
+  `sourceFromCrustdata()` wires the client to the ingest spine: startIngestRun →
+  search (paginated up to `maxRecords`, default one page) → recordVendorCall →
+  ingestVendorRecords → finishIngestRun. Refuses to run while the source is disabled
+  unless `allowDisabled` is passed.
+- Dev gate script `scripts/crustdata-source-once.ts` (fetches ONE person; `--cleanup`).
+  Verified live end-to-end: 1 real person ingested for 0.03 credits, projected
+  correctly once the source is enabled.
+
+### Changed
+- **"Never buy twice" (pre-buy ledger) deliberately left out of this slice.** The
+  orchestrator fetches/ingests every matched profile unconditionally; `planBuy` /
+  `claimVendorIds` are not called yet (documented in `crustdata-acquire.ts`). Ingest
+  still dedupes humans by identity; only credit re-spend is unguarded. Spend remains
+  visible via `pool_vendor_calls` / `pool_ingest_runs`.
+
 ## 2026-09-17 (Crustdata sourcing — Slice 1: adapter + source registration)
 
 ### Added
