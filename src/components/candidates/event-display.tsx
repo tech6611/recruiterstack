@@ -52,6 +52,13 @@ const metaStr = (m: Meta, key: string): string | null => {
   return typeof v === 'string' && v.trim() ? v.trim() : null
 }
 
+const STAGE_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+/** A stage value fit to show. Legacy rows may still hold a stage id whose stage
+ *  has since been deleted (nothing to resolve it to) — never show that. */
+const readableStage = (v: string | null | undefined): string | null =>
+  v && !STAGE_UUID_RE.test(v) ? v : null
+const REMOVED_STAGE = 'That stage has since been removed from the job'
+
 /** "phone_screen_started" → "Phone screen started". */
 export function humanizeEventType(type: string): string {
   const s = type.replace(/[_-]+/g, ' ').trim()
@@ -69,23 +76,31 @@ export const isBoilerplateNote = (note: string | null | undefined): boolean =>
 export function getEventDisplay(e: ApplicationEvent): EventDisplay {
   const m = e.metadata as Meta
   switch (e.event_type) {
-    case 'applied':
-      return { Icon: Send, tone: 'success', title: 'Applied', detail: e.to_stage ? `Entered ${e.to_stage}` : undefined }
-    case 'sourced':
-      return { Icon: UserPlus, tone: 'neutral', title: 'Added from sourcing', detail: e.to_stage ? `Entered ${e.to_stage}` : undefined }
-    case 'stage_moved':
+    case 'applied': {
+      const to = readableStage(e.to_stage)
+      return { Icon: Send, tone: 'success', title: 'Applied', detail: to ? `Entered ${to}` : undefined }
+    }
+    case 'sourced': {
+      const to = readableStage(e.to_stage)
+      return { Icon: UserPlus, tone: 'neutral', title: 'Added from sourcing', detail: to ? `Entered ${to}` : undefined }
+    }
+    case 'stage_moved': {
+      const from = readableStage(e.from_stage), to = readableStage(e.to_stage)
+      const orphaned = (!!e.to_stage && !to) || (!!e.from_stage && !from)
       return {
         Icon: ArrowRight, tone: 'neutral',
-        title: e.to_stage ? `Moved to ${e.to_stage}` : 'Stage changed',
-        stageMove: { from: e.from_stage, to: e.to_stage },
+        title: to ? `Moved to ${to}` : 'Moved to another stage',
+        detail: orphaned ? REMOVED_STAGE : undefined,
+        stageMove: { from, to },
       }
+    }
     case 'status_changed': {
-      const s = (e.to_stage ?? '').toLowerCase()
+      const s = (readableStage(e.to_stage) ?? '').toLowerCase()
       if (s === 'hired')     return { Icon: Trophy,  tone: 'success', title: 'Marked as hired' }
       if (s === 'rejected')  return { Icon: XCircle, tone: 'danger',  title: 'Rejected' }
       if (s === 'withdrawn') return { Icon: LogOut,  tone: 'neutral', title: 'Candidate withdrew' }
       if (s === 'archived')  return { Icon: Archive, tone: 'neutral', title: 'Archived' }
-      return { Icon: Flag, tone: 'neutral', title: e.to_stage ? `Status changed to ${e.to_stage}` : 'Status changed' }
+      return { Icon: Flag, tone: 'neutral', title: s ? `Status changed to ${readableStage(e.to_stage)}` : 'Status changed' }
     }
     case 'rejected':
       return { Icon: XCircle, tone: 'danger', title: 'Rejected' }

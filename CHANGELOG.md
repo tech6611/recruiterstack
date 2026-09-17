@@ -37,6 +37,10 @@ entries on top.
   writer.
 - "Extract from résumé" in Career history now refreshes the profile header so the
   newly found title/company show immediately.
+- Feed rows whose stage was later deleted (legacy automation rows pointing at
+  rebuilt stage ids) now read "Moved to another stage · that stage has since been
+  removed" instead of showing the raw id. Migration 145 is a no-op on the live DB
+  for the same reason (verified 2026-09-17: 5 such rows, 0 resolvable).
 
 ### Schema
 - **145** `backfill_application_event_stage_names.sql` — one-off data fix: rewrites

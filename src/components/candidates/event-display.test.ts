@@ -16,6 +16,14 @@ describe('getEventDisplay', () => {
     expect(d.tone).toBe('neutral')
   })
 
+  it('never shows a stage id whose stage was deleted (nothing to resolve it to)', () => {
+    const d = getEventDisplay(ev({ from_stage: 'fa37baa8-62dd-4e8f-a63e-f7ad06bac04d', to_stage: '72774910-c06c-475a-9fd7-4cf39e5e962a' }))
+    expect(d.title).toBe('Moved to another stage')
+    expect(d.detail).toMatch(/removed/)
+    expect(d.stageMove).toEqual({ from: null, to: null })
+    expect(getEventDisplay(ev({ event_type: 'applied', to_stage: '72774910-c06c-475a-9fd7-4cf39e5e962a' })).detail).toBeUndefined()
+  })
+
   it('status changes read as outcomes, not raw values', () => {
     expect(getEventDisplay(ev({ event_type: 'status_changed', to_stage: 'hired' })).title).toBe('Marked as hired')
     expect(getEventDisplay(ev({ event_type: 'status_changed', to_stage: 'rejected' })).tone).toBe('danger')
