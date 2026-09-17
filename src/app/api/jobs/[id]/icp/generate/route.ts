@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { withCapability, handleSupabaseError } from '@/lib/api/helpers'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
 import { generateIcpWithReasoning } from '@/lib/ai/icp-generator'
-import { createIcpDraft } from '@/modules/ats/domain/icp'
+import { createIcpDraft, getLatestIcp } from '@/modules/ats/domain/icp'
+import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 
 export const maxDuration = 120 // one deep reasoning-first Gemini pass (reasoning → weights)
 
@@ -38,7 +39,17 @@ export const POST = withCapability(
       // One reasoning-first pass: the recruiter's brain reasons about the role, then
       // the weighted competencies + deal-breakers fall out of that reasoning. The same
       // pass produces the sourcing_map (reasoning/decomposition/archetypes).
-      const { draft, sourcingMap } = await generateIcpWithReasoning(context.job, { orgId, userId }, intakeNotes)
+      // Phase 1 (niche recruiter): the market + company decide WHICH recruiter the
+      // model is; the recruiter's corrections on the previous brief are house
+      // knowledge that override the model's defaults and survive regeneration.
+      const [roleContext, previous] = await Promise.all([
+        getJobRoleContext(supabase, orgId, params.id),
+        getLatestIcp(supabase, orgId, params.id).catch(() => null),
+      ])
+      const recruiterCorrections = previous?.sourcing_map?.recruiter_brief?.corrections ?? null
+      const { draft, sourcingMap } = await generateIcpWithReasoning(
+        context.job, { orgId, userId }, intakeNotes, { roleContext, recruiterCorrections },
+      )
       const icp = await createIcpDraft(supabase, orgId, params.id, draft, { createdBy: userId })
 
       if (sourcingMap) {

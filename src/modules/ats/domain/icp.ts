@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
-import type { Icp, IcpChangelogEntry, IcpCompetency, IcpDraftInput, IcpMustHave } from '@/lib/types/icp'
+import type { Icp, IcpChangelogEntry, IcpCompetency, IcpDraftInput, IcpMustHave, RecruiterBrief, SourcingMap } from '@/lib/types/icp'
 import { embedText } from '@/lib/ai/llm'
 import { icpEmbeddingText } from '@/lib/ai/embeddings'
 import { logger } from '@/lib/logger'
@@ -198,6 +198,48 @@ export async function updateIcpDraft(
     .maybeSingle()
   if (error) throw error
   if (!data) throw new Error('Draft ICP not found or not editable')
+  return data as Icp
+}
+
+/**
+ * Save the recruiter's corrections to an ICP's recruiter brief (Phase 1 of niche
+ * recruiter ICPs). Allowed on ANY status — corrections are house knowledge, not a
+ * change to gates/weights, and they must survive on an approved ICP so the next
+ * "Regenerate" starts from them. Merged into sourcing_map.recruiter_brief.corrections;
+ * an ICP with no brief yet gets a minimal one so the corrections still persist.
+ */
+export async function setIcpRecruiterCorrections(
+  supabase: Supabase,
+  orgId: string,
+  icpId: string,
+  corrections: string,
+): Promise<Icp> {
+  const sb = supabase as unknown as LooseSb
+  const { data: row, error: readErr } = await sb
+    .from('icps')
+    .select('sourcing_map')
+    .eq('org_id', orgId)
+    .eq('id', icpId)
+    .maybeSingle()
+  if (readErr) throw readErr
+  if (!row) throw new Error('ICP not found')
+  const sm = (row.sourcing_map ?? {}) as Partial<SourcingMap>
+  const brief: RecruiterBrief = {
+    niche: '', persona: '', feeder_pools: [], title_families: [], market_gates: [],
+    jd_translations: [], market_norms: [], normal_red_flags: [], unsure_about: [],
+    ...(sm.recruiter_brief ?? {}),
+    corrections: corrections.trim() || null,
+  }
+  const sourcing_map = { reasoning: '', requirement_decomposition: [], unwritten_filters: [], ...sm, recruiter_brief: brief }
+  const { data, error } = await sb
+    .from('icps')
+    .update({ sourcing_map, updated_at: new Date().toISOString() })
+    .eq('org_id', orgId)
+    .eq('id', icpId)
+    .select()
+    .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error('ICP not found')
   return data as Icp
 }
 

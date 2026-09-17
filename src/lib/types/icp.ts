@@ -45,10 +45,53 @@ export interface IcpChangelogEntry {
 }
 
 /**
+ * The recruiter brief (Phase 1 of "niche recruiter" ICPs). Before reasoning about
+ * the role, the model decides WHICH specialist recruiter it is for this search — the
+ * niche, the market, the company — and writes down the house knowledge that persona
+ * works from: where to look first, what is a true gate in this market, how JD phrases
+ * translate here, market norms. Everything downstream (weights, archetypes, gates)
+ * is reasoned in that persona. Stored on the ICP so the persona is decided once per
+ * job and reused; `corrections` is the recruiter's own overrides, carried across
+ * regenerations and fed back into the prompt as house knowledge.
+ */
+export interface RecruiterBrief {
+  /** The precise niche, e.g. "Strategy & Operations / BizOps recruiter, Bengaluru". */
+  niche: string
+  /** 1–2 sentences: who this recruiter is and what they screen on first. */
+  persona: string
+  /** The hiring market as understood: city/country, work model, relocation/visa realism. */
+  market?: string | null
+  /** Where to search FIRST, in priority order — named employers + role types. */
+  feeder_pools: {
+    label: string
+    companies: string[]
+    role_types: string[]
+    priority?: number | null
+    rationale?: string | null
+  }[]
+  /** Titles that are the same search as this role. */
+  title_families: string[]
+  /** Which requirements are TRUE gates in this market, and why. */
+  market_gates: { requirement: string; why?: string | null }[]
+  /** How JD phrases translate for this market ("2:1" → "tier-1 institute" in India). */
+  jd_translations: { phrase: string; means_here: string }[]
+  /** Comp sanity, notice periods, visa/relocation, title inflation, findability. */
+  market_norms: { topic: string; norm: string }[]
+  /** Patterns that look bad elsewhere but are normal in this niche — don't penalise. */
+  normal_red_flags: string[]
+  /** Where the model wants a human to check its assumptions. */
+  unsure_about: string[]
+  /** The recruiter's corrections to the brief — house knowledge that overrides defaults. */
+  corrections?: string | null
+}
+
+/**
  * The reasoning behind an ICP (Sourcing Brain, Slice 1) — how a recruiter dissected
  * the JD. Explains the ICP and drives sourcing. Stored on the ICP; regenerated with it.
  */
 export interface SourcingMap {
+  /** Which specialist recruiter reasoned this ICP, and their house knowledge (Phase 1). */
+  recruiter_brief?: RecruiterBrief | null
   /** The "why this ICP" narrative — what the role really is and how it was weighted. */
   reasoning: string
   /** Every requirement resolved into one of three buckets. */

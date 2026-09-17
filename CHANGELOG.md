@@ -9,6 +9,47 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-17 (Niche-recruiter ICP — Phase 1: the recruiter brief)
+
+### Added
+- **Recruiter brief** in the reasoning-first ICP prompt (`icp-generator.ts`): before
+  reasoning about the role, the model must decide WHICH specialist recruiter it is for
+  this search (niche × market × company) and write the brief it would hand a junior —
+  feeder pools (named employers + role types, in priority order), title families, what
+  is a TRUE gate in this market, JD translations for the market ("2:1" → tier-1
+  institute in India), market norms (comp sanity, notice, visa/relocation,
+  findability), normal red flags, and where it wants a human check. Everything after
+  is reasoned in that persona. Stored as `icps.sourcing_map.recruiter_brief` (no
+  migration — existing JSONB).
+- **Market + company context** fed to the prompt (`job-role-context.ts`): structured
+  location (city/state/country/timezone/work model from `locations` + intake) and org
+  profile (name, industry, size, website, about). Both existed in the DB but never
+  reached a prompt — the model only ever saw the site nickname.
+- **Recruiter corrections** — a "Correct this brief" box on the ICP page; saved via
+  `PATCH /api/jobs/[id]/icp/[icpId]` into `recruiter_brief.corrections` (any status),
+  carried across regenerations and injected as `<recruiter_corrections>` that
+  override the model's defaults. The seed of a house recruiting knowledge base.
+- ICP page shows "Reasoning as: <niche>" with the brief, and now surfaces the model's
+  own "don't apply" verdict on unwritten filters (was stored but hidden).
+
+### Changed
+- Removed the engineering-flavoured defaults from the shared ICP prompt
+  ("software-engineering background", "product-vs-services", "Payments domain depth"
+  as the only example) so a non-tech role isn't reasoned through a tech recruiter's lens.
+
+## 2026-09-17 (AI prompts were blind to canonical job requirements)
+
+### Fixed
+- **`canonicalJobToHiringRequest()`** (`job-pipelines.ts`) hardcoded `key_requirements`,
+  `nice_to_haves`, `team_context`, `level`, `location`, `target_companies`, budget and
+  `generated_jd` to null, so EVERY AI feature on a canonical job — ICP generator,
+  Sifter scoring, screening, shortlist brief, enroll, copilot — saw "Key Requirements:
+  Not specified" / "Job description: Not provided" and invented requirements (e.g. the
+  Strategy & Ops ICP listed "5+ years" and "MBA preferred" while the real JD's 2:1
+  degree and SQL/Python/R never reached the model). Now reads the whole
+  `custom_fields.intake` bag + `jobs.description`, converted from Tiptap HTML to
+  prompt-ready plain text via the new exported `htmlToPromptText()` (bullets kept).
+  The three selects feeding the mapper now include `description`. Tests added.
 ## 2026-09-17 (Candidate profile — readable activity feed + current company)
 
 ### Changed
