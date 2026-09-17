@@ -9,6 +9,26 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-17 (Crustdata sourcing — Slice 1: adapter + source registration)
+
+### Added
+- **Crustdata vendor adapter** (`src/modules/pool/vendors/crustdata/`) — a pure
+  `map()` that translates a Crustdata `POST /person/search` profile into the
+  source-neutral `MappedRecord`, mirroring `vendor:mock`. Handles the live-response
+  quirks: multiple concurrent "current" roles (primary chosen by `is_default`),
+  absent `years_of_experience_raw`, and no skills/emails from search. Fixtures are
+  based on a real live response; 16 unit tests, all passing.
+- Registered `crustdataAdapter` in the vendor registry
+  (`src/modules/pool/vendors/registry.ts`).
+
+### Schema
+- `140_crustdata_source.sql` — registers `vendor:crustdata` in `pool_sources`
+  (**disabled** until the live "Acquire" client lands in Slice 2) plus its
+  per-field trust overrides in `pool_source_field_trust`.
+
+### Docs
+- Added `CRUSTDATA_API_KEY` to `.env.example`.
+
 ## 2026-09-16 (Parity plan · Phase 5: headcount reporting)
 
 ### Added
