@@ -9,6 +9,25 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-17 (Crustdata sourcing — Slice 4: trigger route + matrix button)
+
+### Added
+- **`POST /api/jobs/[id]/source/crustdata`** — sources NEW people from Crustdata for a
+  job's approved ICP, then re-ranks the refreshed pool: translate ICP → fetch (default
+  **3**, hard-capped 25) → ingest → embed → semantic recall + Fit-Engine score → cache.
+  Degrades cleanly (409 `source_disabled`, 503 not-configured, 400 empty-ICP).
+- **`embedPoolProfiles()`** (`pool-sourcing.ts`) — writes `pool_profiles.embedding` for
+  freshly ingested profiles (reuses `candidateEmbeddingText`); previously nothing wrote
+  pool embeddings, so sourced people were invisible to semantic recall.
+- **"Source from Crustdata" button** in the market sourcing panel
+  (`PoolSourcingSection.tsx`) — pulls new profiles, shows fetched count + credits,
+  handles the not-enabled state gracefully.
+
+### Notes
+- **Staged / not yet live:** `vendor:crustdata` remains `enabled=false`, so the route
+  returns 409 and the button no-ops until the source is switched on (a deliberate final
+  step). Verified: the flow refuses before any fetch while disabled — zero credit spend.
+
 ## 2026-09-17 (Crustdata sourcing — Slice 3: ICP → query translator)
 
 ### Added

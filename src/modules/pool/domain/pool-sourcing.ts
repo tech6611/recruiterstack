@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Candidate, Database } from '@/lib/types/database'
 import type { Icp } from '@/lib/types/icp'
-import { icpEmbeddingText } from '@/lib/ai/embeddings'
-import { embedText } from '@/lib/ai/llm'
+import { icpEmbeddingText, candidateEmbeddingText } from '@/lib/ai/embeddings'
+import { embedText, embedTexts } from '@/lib/ai/llm'
 import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
 import { getPoolAccess } from '@/modules/pool/domain/pool'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
@@ -143,6 +143,43 @@ export async function sourcePoolForIcp(
   }
   matches.sort((a, b) => b.score - a.score)
   return { status: 'ok', matches }
+}
+
+/**
+ * Write embeddings for the given pool profiles so semantic recall (match_pool_profiles)
+ * can find them. Nothing else in the pipeline writes pool_profiles.embedding, so newly
+ * ingested profiles are invisible to sourcing until this runs — call it with the
+ * `needsReembed` set an ingest returns. Best-effort and batched: a failed embed leaves
+ * that row's embedding as-is rather than throwing. Returns how many were written.
+ */
+export async function embedPoolProfiles(supabase: Supabase, profileIds: string[]): Promise<number> {
+  const ids = Array.from(new Set(profileIds.filter(Boolean)))
+  if (!ids.length) return 0
+  const sb = supabase as unknown as LooseSb
+
+  let embedded = 0
+  for (let i = 0; i < ids.length; i += 100) {
+    const batch = ids.slice(i, i + 100)
+    const { data: rows } = await sb
+      .from('pool_profiles')
+      .select('id, current_title, current_company, skills')
+      .in('id', batch)
+    const profiles = (rows ?? []) as { id: string; current_title: string | null; current_company: string | null; skills: string[] | null }[]
+    if (!profiles.length) continue
+
+    try {
+      const vectors = await embedTexts(profiles.map((p) => candidateEmbeddingText(p)))
+      for (let j = 0; j < profiles.length; j++) {
+        const v = vectors[j]
+        if (!v || v.length === 0) continue
+        const { error } = await sb.from('pool_profiles').update({ embedding: v }).eq('id', profiles[j].id)
+        if (!error) embedded++
+      }
+    } catch (err) {
+      logger.warn('Pool profile embedding failed', { error: err instanceof Error ? err.message : String(err), count: profiles.length })
+    }
+  }
+  return embedded
 }
 
 /** Persist the market shortlist so it survives a refresh (and avoids re-scoring). */

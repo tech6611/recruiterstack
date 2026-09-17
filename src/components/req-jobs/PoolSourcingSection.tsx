@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Globe, Lock, Sparkles, ChevronRight } from 'lucide-react'
+import { Globe, Lock, Sparkles, ChevronRight, Radar } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { SourcingMatrix, type MatrixIcp, type MatrixMatch } from '@/components/req-jobs/SourcingMatrix'
@@ -59,6 +59,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   const [adding, setAdding] = useState(false)
   const [stale, setStale] = useState(false)
   const [open, setOpen] = useState(false)
+  const [sourcing, setSourcing] = useState(false)
 
   // Load the cached market shortlist so it survives a refresh (no re-scoring).
   useEffect(() => {
@@ -87,6 +88,30 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
     setIcp(data.icp ?? null)
     setMatches(data.matches ?? [])
     setState((data.matches ?? []).length ? 'ok' : 'empty')
+  }
+
+  // Pull NEW people from Crustdata for this ICP, then re-rank the refreshed pool.
+  async function sourceFromCrustdata() {
+    setSourcing(true)
+    const res = await fetch(`/api/jobs/${jobId}/source/crustdata`, { method: 'POST' })
+    setSourcing(false)
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      if (res.status === 409 || j.code === 'source_disabled') {
+        toast('Crustdata sourcing isn’t switched on for your workspace yet.')
+        return
+      }
+      toast.error(j.error ?? 'Could not source from Crustdata')
+      return
+    }
+    const { data } = await res.json()
+    if (data.status === 'no_access') { setState('no_access'); return }
+    setStale(false)
+    setIcp(data.icp ?? null)
+    setMatches(data.matches ?? [])
+    setState((data.matches ?? []).length ? 'ok' : 'empty')
+    const s = data.sourced
+    toast.success(`Sourced ${s?.fetched ?? 0} new profile(s) from Crustdata (${s?.creditsUsed ?? 0} credits).`)
   }
 
   async function startTrial() {
@@ -140,9 +165,14 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
         <div className="flex items-center gap-2">
           <Link href="/pool/usage" className="text-[11px] text-slate-400 hover:text-slate-600">Unlock usage</Link>
           {state !== 'no_access' && (
-            <Button size="sm" variant="outline" onClick={search} loading={state === 'loading'}>
-              <Sparkles className="h-3.5 w-3.5" /> {state === 'idle' ? 'Search the market' : 'Re-search'}
-            </Button>
+            <>
+              <Button size="sm" variant="outline" onClick={sourceFromCrustdata} loading={sourcing}>
+                <Radar className="h-3.5 w-3.5" /> Source from Crustdata
+              </Button>
+              <Button size="sm" variant="outline" onClick={search} loading={state === 'loading'}>
+                <Sparkles className="h-3.5 w-3.5" /> {state === 'idle' ? 'Search the market' : 'Re-search'}
+              </Button>
+            </>
           )}
         </div>
       </div>
