@@ -7,7 +7,7 @@ import { useTags } from '@/lib/hooks/useTags'
 import { useTasks } from '@/lib/hooks/useTasks'
 import { useReferrals } from '@/lib/hooks/useReferrals'
 import { useModals } from '@/lib/hooks/useModals'
-import type { CandidateWithPipeline } from '@/lib/hooks/useCandidate'
+import type { CandidateWithPipeline, CandidateLoadError } from '@/lib/hooks/useCandidate'
 import type { CandidateTag, CandidateTask, CandidateReferral, Scorecard } from '@/lib/types/database'
 import type { JobOption } from '@/lib/hooks/useModals'
 
@@ -15,6 +15,8 @@ interface CandidateProfileContextValue {
   // useCandidate
   candidate: CandidateWithPipeline | null
   loading: boolean
+  /** Set when there is no candidate to show: a real 404, or a failed load. */
+  error: CandidateLoadError | null
   selectedAppId: string | null
   setSelectedAppId: (id: string | null) => void
   setCandidate: React.Dispatch<React.SetStateAction<CandidateWithPipeline | null>>

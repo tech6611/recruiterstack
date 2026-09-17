@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, AlertCircle, ArrowLeft, Plus } from 'lucide-react'
+import { Loader2, AlertCircle, ArrowLeft, Plus, RefreshCw } from 'lucide-react'
 import { useCandidateProfile } from './CandidateProfileContext'
 import LeftPanel from './LeftPanel'
 import CenterPanel from './CenterPanel'
@@ -40,11 +40,23 @@ export default function CandidateProfileContent() {
     )
   }
 
+  // Only a real 404 is "not found". Anything else (auth token mid-refresh, rate
+  // limit, cold start, network drop) is a failed load the user can retry.
   if (!ctx.candidate) {
+    const notFound = ctx.error === 'not_found'
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-sm gap-2">
         <AlertCircle className="h-6 w-6" />
-        Candidate not found.
+        {notFound ? 'Candidate not found.' : 'Couldn’t load this candidate.'}
+        {!notFound && (
+          <button
+            type="button"
+            onClick={() => { void ctx.reload() }}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Try again
+          </button>
+        )}
       </div>
     )
   }

@@ -9,6 +9,17 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-17 (Candidate page: "not found" only on a real 404)
+
+### Fixed
+- **Candidate profile no longer says "Candidate not found" for transient
+  failures.** Any non-OK reply (session token mid-refresh, rate limit, cold
+  start, dropped connection) used to render as "not found" until a manual
+  refresh. The loader now retries once after 800ms on 401/403/429/5xx or a
+  thrown fetch, treats only a real 404 as "not found", and otherwise shows
+  "Couldn’t load this candidate" with a **Try again** button.
+  (`src/lib/hooks/useCandidate.ts`, `CandidateProfileContent.tsx`; hook tests added)
+
 ## 2026-09-17 (Crustdata sourcing — Slice 4: trigger route + matrix button)
 
 ### Added
