@@ -14,6 +14,24 @@ entries on top.
 ### Docs
 - Added an evidence-grounded review of the Gemini ICP prompt, with a proposed hiring-situation packet, prompt structure, propagation plan, and acceptance tests.
 
+## 2026-09-18 (Sourcing views cut down to controls, not prose)
+
+### Changed
+- **Search plan editor** (`SearchSpecEditor.tsx`) is now a control panel: one "Everyone"
+  row of must-have chips, then one compact row per level — L-badge, name, an inline
+  chip summary ("Now at McKinsey, Bain +1 · Title Associate +2"), the people count, and
+  what the last run took from it (+n / done). Click a row to edit chips, rename, reorder
+  or delete. Count / Save / **Find people** live in its header; "checks after fetch" is a
+  collapsed one-liner. All explanatory paragraphs removed (hover titles instead).
+- **Sourcing panel**: the separate "What the last run searched" panel is gone (its stats
+  moved onto the level rows); the header button is now "Rank the pool / Re-rank"
+  (re-scores without acquiring). Acquisition auto-saves unsaved plan edits first.
+- **Recruiter brief on the Scoring tab** collapses to a single header line — niche ·
+  years band · top feeder pools as chips · "+n titles" — with details on demand
+  (persona clamped to two lines, feeder pools as chip rows, gates/translations/norms as
+  a two-column list, corrections box shrunk to two rows). "How this ICP was reasoned"
+  now starts collapsed.
+
 ## 2026-09-18 (Search plan — the recruiter's ladder, editable, vendor-neutral)
 
 ### Added

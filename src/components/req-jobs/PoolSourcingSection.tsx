@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Globe, Lock, Sparkles, ChevronRight, Radar, ListTree } from 'lucide-react'
+import { Globe, Lock, Sparkles, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { SourcingMatrix, type MatrixIcp, type MatrixMatch } from '@/components/req-jobs/SourcingMatrix'
-import { SearchSpecEditor } from '@/components/req-jobs/SearchSpecEditor'
+import { SearchSpecEditor, type LevelRunStat } from '@/components/req-jobs/SearchSpecEditor'
 
 interface PoolMatch {
   profile_id: string
@@ -135,7 +135,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
     setPlan(s?.plan ?? null)
     setNewIds(new Set<string>(s?.profileIds ?? []))
     const lanes = s?.plan?.results?.length ?? 0
-    toast.success(`Searched ${lanes} level${lanes === 1 ? '' : 's'} — ${s?.fetched ?? 0} profile(s) fetched, ${s?.created ?? 0} new to the pool (${(s?.creditsUsed ?? 0).toFixed(2)} credits).`)
+    toast.success(`${s?.fetched ?? 0} people found across ${lanes} level${lanes === 1 ? '' : 's'} · ${(s?.creditsUsed ?? 0).toFixed(2)} credits`)
   }
 
   async function startTrial() {
@@ -190,18 +190,18 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
           <Link href="/pool/usage" className="text-[11px] text-slate-400 hover:text-slate-600">Unlock usage</Link>
           {state !== 'no_access' && (
             <>
-              <Button size="sm" variant="outline" onClick={sourceFromCrustdata} loading={sourcing}>
-                <Radar className="h-3.5 w-3.5" /> Find people
-              </Button>
-              <Button size="sm" variant="outline" onClick={search} loading={state === 'loading'}>
-                <Sparkles className="h-3.5 w-3.5" /> {state === 'idle' ? 'Search the market' : 'Re-search'}
+              <Button size="sm" variant="ghost" onClick={search} loading={state === 'loading'} title="Re-rank everyone already in the pool against the ICP — no acquisition">
+                <Sparkles className="h-3.5 w-3.5" /> {state === 'idle' ? 'Rank the pool' : 'Re-rank'}
               </Button>
             </>
           )}
         </div>
       </div>
       {open && (<>
-      {state !== 'no_access' && <SearchSpecEditor jobId={jobId} />}
+      {state !== 'no_access' && (
+        <SearchSpecEditor jobId={jobId} onFind={sourceFromCrustdata} finding={sourcing}
+          lastRun={plan?.results.map((r): LevelRunStat => ({ key: r.key, fetched: r.fetched, total: r.total, exhausted: r.exhausted, error: r.error })) ?? null} />
+      )}
       {state === 'no_access' && (
         <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-4 text-center">
           <p className="text-xs text-slate-500">Search beyond your own candidates — the cross-org Candidate Pool, ranked against this job’s ICP.</p>
@@ -213,46 +213,6 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
 
       {state === 'ok' && stale && (
         <p className="mt-2 text-[11px] text-amber-600">The ICP has changed since this search — re-search for fresh matches.</p>
-      )}
-
-      {plan && (
-        <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50/50 px-3 py-2.5">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-            <ListTree className="h-3.5 w-3.5 text-sky-600" /> What the last run searched, level by level
-          </div>
-          {plan.common.length > 0 && (
-            <div className="mt-1 text-[11px] text-slate-500">Every lane: {plan.common.join(' · ')}</div>
-          )}
-          <ol className="mt-2 space-y-1.5">
-            {plan.lanes.map((lane, i) => {
-              const r = plan.results.find((x) => x.key === lane.key)
-              return (
-                <li key={lane.key} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium text-slate-800">{i + 1}. {lane.label} <span className="font-normal text-slate-400">({lane.kind})</span></span>
-                    {r && (
-                      <span className="text-[11px] text-slate-500">
-                        {r.error ? <span className="text-rose-600">failed: {r.error}</span> : <>
-                          {r.total != null ? `${r.total.toLocaleString()} match${r.total === 1 ? '' : 'es'}` : 'matches n/a'} · fetched {r.fetched}
-                          {r.duplicates > 0 && ` (+${r.duplicates} already seen)`} · {r.creditsUsed.toFixed(2)} cr{r.resumed ? ' · resumed' : ''}{r.exhausted ? ' · exhausted' : ''}
-                        </>}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap gap-1">
-                    {lane.summary.map((sm) => <span key={sm} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{sm}</span>)}
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
-          {plan.unmapped.length > 0 && (
-            <div className="mt-2 text-[11px] text-slate-500">
-              <span className="font-medium text-slate-600">Checked after fetch, not searchable:</span>{' '}
-              {plan.unmapped.map((u) => u.requirement).join(' · ')}
-            </div>
-          )}
-        </div>
       )}
 
       {state === 'ok' && (
