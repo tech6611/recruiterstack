@@ -3,6 +3,7 @@ import { withCapability, handleSupabaseError } from '@/lib/api/helpers'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import type { Icp } from '@/lib/types/icp'
 import { sourcePoolForIcp, savePoolMatches, getCachedPoolMatches } from '@/modules/pool/domain/pool-sourcing'
+import { loadAcquiredLevels } from '@/modules/pool/domain/crustdata-acquire'
 
 export const maxDuration = 300 // Fit-Engine scores the pool shortlist
 
@@ -34,7 +35,9 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
     if (!icp || icp.status !== 'approved') {
       return NextResponse.json({ error: 'Approve an ICP for this job before sourcing the market.' }, { status: 400 })
     }
-    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId })
+    // People already acquired for this job keep their ladder level and are always scored.
+    const acquired = await loadAcquiredLevels(supabase, params.id)
+    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired })
     if (result.status === 'ok') {
       await savePoolMatches(supabase, orgId, params.id, icp.version, result.matches).catch(() => {})
     }

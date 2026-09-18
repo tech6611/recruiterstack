@@ -220,6 +220,15 @@ function mapToClosedSet(
   return { matched: Array.from(matched), unmatched }
 }
 
+/** Map free-text seniority phrasings onto Crustdata's closed set (unmatched reported). */
+export function mapSeniorityValues(values: string[]): { matched: string[]; unmatched: string[] } {
+  return mapToClosedSet(values, SENIORITY_ALIASES, SENIORITY_SET)
+}
+/** Map free-text function phrasings onto Crustdata's closed set (unmatched reported). */
+export function mapFunctionValues(values: string[]): { matched: string[]; unmatched: string[] } {
+  return mapToClosedSet(values, FUNCTION_ALIASES, FUNCTION_SET)
+}
+
 /** Build one condition (or an unmapped reason) from a single must-have. */
 function conditionForMustHave(
   mh: IcpMustHave,

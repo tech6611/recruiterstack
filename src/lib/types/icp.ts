@@ -68,6 +68,12 @@ export interface RecruiterBrief {
    * structured `experience_band` gate, a Crustdata filter, and a deterministic reject.
    */
   experience_band?: { min_years?: number | null; max_years?: number | null; rationale?: string | null } | null
+  /**
+   * The school lists this recruiter treats as tier-1 / tier-2 for THIS market — house
+   * knowledge, not vendor data (no source knows what "tier 1" means). Literal search
+   * terms; a generic institution name covers every campus.
+   */
+  target_schools?: { tier1: string[]; tier2: string[] } | null
   /** Where to search FIRST, in priority order — named employers + role types. */
   feeder_pools: {
     label: string
@@ -99,6 +105,8 @@ export interface RecruiterBrief {
 export interface SourcingMap {
   /** Which specialist recruiter reasoned this ICP, and their house knowledge (Phase 1). */
   recruiter_brief?: RecruiterBrief | null
+  /** The recruiter-edited acquisition ladder (vendor-neutral). Absent = derive from the brief. */
+  search_spec?: import('@/lib/types/search-spec').SearchSpec | null
   /** The "why this ICP" narrative — what the role really is and how it was weighted. */
   reasoning: string
   /** Every requirement resolved into one of three buckets. */

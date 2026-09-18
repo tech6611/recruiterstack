@@ -6,6 +6,7 @@ import { Globe, Lock, Sparkles, ChevronRight, Radar, ListTree } from 'lucide-rea
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { SourcingMatrix, type MatrixIcp, type MatrixMatch } from '@/components/req-jobs/SourcingMatrix'
+import { SearchSpecEditor } from '@/components/req-jobs/SearchSpecEditor'
 
 interface PoolMatch {
   profile_id: string
@@ -26,14 +27,15 @@ interface PoolMatch {
   red_flags?: string[]
   gate_unknown?: string[]
   sources?: string[]
+  acquired?: { level: number; label: string } | null
 }
 
-/** What the last Crustdata run did, lane by lane (from POST /source/crustdata). */
+/** What the last acquisition run did, lane by lane (from POST /source/crustdata). */
 interface SearchPlanReport {
   lanes: { key: string; kind: string; label: string; summary: string[]; rationale: string | null }[]
   common: string[]
   unmapped: { requirement: string; reason: string }[]
-  results: { key: string; label: string; total: number | null; fetched: number; duplicates: number; creditsUsed: number; resumed: boolean; error?: string | null }[]
+  results: { key: string; label: string; total: number | null; fetched: number; duplicates: number; creditsUsed: number; resumed: boolean; exhausted?: boolean; error?: string | null }[]
 }
 
 const SOURCE_BADGE: Record<string, string> = { 'vendor:crustdata': 'Crustdata', 'upload:cv': 'CV upload', github: 'GitHub' }
@@ -47,6 +49,7 @@ function toMatrixMatch(m: PoolMatch, newIds?: Set<string>): MatrixMatch {
     gate_failures: (m.gate_failures ?? []).map((label) => ({ label })),
     gate_unknown: (m.gate_unknown ?? []).map((label) => ({ label })),
     source_badge: badge ? (newIds?.has(m.profile_id) ? `${badge} · new` : badge) : null,
+    level_badge: m.acquired ? `L${m.acquired.level}${m.acquired.level === 1 ? ' · full match' : ''}` : null,
     red_flags: m.red_flags ?? [],
     rationale: m.rationale ?? null,
     competencies: m.competencies ?? [],
@@ -132,7 +135,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
     setPlan(s?.plan ?? null)
     setNewIds(new Set<string>(s?.profileIds ?? []))
     const lanes = s?.plan?.results?.length ?? 0
-    toast.success(`Ran ${lanes} search lane${lanes === 1 ? '' : 's'} on Crustdata — ${s?.fetched ?? 0} profile(s) fetched, ${s?.created ?? 0} new to the pool (${(s?.creditsUsed ?? 0).toFixed(2)} credits).`)
+    toast.success(`Searched ${lanes} level${lanes === 1 ? '' : 's'} — ${s?.fetched ?? 0} profile(s) fetched, ${s?.created ?? 0} new to the pool (${(s?.creditsUsed ?? 0).toFixed(2)} credits).`)
   }
 
   async function startTrial() {
@@ -188,7 +191,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
           {state !== 'no_access' && (
             <>
               <Button size="sm" variant="outline" onClick={sourceFromCrustdata} loading={sourcing}>
-                <Radar className="h-3.5 w-3.5" /> Source from Crustdata
+                <Radar className="h-3.5 w-3.5" /> Find people
               </Button>
               <Button size="sm" variant="outline" onClick={search} loading={state === 'loading'}>
                 <Sparkles className="h-3.5 w-3.5" /> {state === 'idle' ? 'Search the market' : 'Re-search'}
@@ -198,7 +201,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
         </div>
       </div>
       {open && (<>
-
+      {state !== 'no_access' && <SearchSpecEditor jobId={jobId} />}
       {state === 'no_access' && (
         <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-4 text-center">
           <p className="text-xs text-slate-500">Search beyond your own candidates — the cross-org Candidate Pool, ranked against this job’s ICP.</p>
@@ -215,7 +218,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
       {plan && (
         <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50/50 px-3 py-2.5">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-            <ListTree className="h-3.5 w-3.5 text-sky-600" /> What was sent to Crustdata
+            <ListTree className="h-3.5 w-3.5 text-sky-600" /> What the last run searched, level by level
           </div>
           {plan.common.length > 0 && (
             <div className="mt-1 text-[11px] text-slate-500">Every lane: {plan.common.join(' · ')}</div>
@@ -231,7 +234,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
                       <span className="text-[11px] text-slate-500">
                         {r.error ? <span className="text-rose-600">failed: {r.error}</span> : <>
                           {r.total != null ? `${r.total.toLocaleString()} match${r.total === 1 ? '' : 'es'}` : 'matches n/a'} · fetched {r.fetched}
-                          {r.duplicates > 0 && ` (+${r.duplicates} already seen)`} · {r.creditsUsed.toFixed(2)} cr{r.resumed ? ' · resumed' : ''}
+                          {r.duplicates > 0 && ` (+${r.duplicates} already seen)`} · {r.creditsUsed.toFixed(2)} cr{r.resumed ? ' · resumed' : ''}{r.exhausted ? ' · exhausted' : ''}
                         </>}
                       </span>
                     )}

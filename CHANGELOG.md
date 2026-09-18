@@ -9,6 +9,51 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-18
+
+### Docs
+- Added an evidence-grounded review of the Gemini ICP prompt, with a proposed hiring-situation packet, prompt structure, propagation plan, and acceptance tests.
+
+## 2026-09-18 (Search plan — the recruiter's ladder, editable, vendor-neutral)
+
+### Added
+- **Search spec** (`src/lib/types/search-spec.ts`): the vendor-neutral, recruiter-editable
+  description of who to acquire — a must-have line (market radius, years band, an IC
+  seniority ceiling) plus ordered LEVELS, each a set of typed criteria (school lists,
+  current/former/any employer, titles, seniority, function, years, graduation year,
+  location, skill). Stored on the ICP as `sourcing_map.search_spec` (JSONB, no
+  migration); recruiter edits win over regeneration until reset. Never names a vendor.
+- **Derivation from the brief** (`modules/pool/search/spec-from-brief.ts`, pure): the
+  100% match first — tier-1 school × currently in the top feeder pool (consulting
+  function) × analyst/associate titles — then formerly-in, the next pools, the tier-2
+  school variants, and title families last; each level names what it relaxes. School
+  tiers are HOUSE KNOWLEDGE (`search/school-tiers.ts`, IN/GB/AE seeds; the brief's
+  `target_schools` override) — no vendor knows what "tier 1" means. Items no source
+  can search (SQL on the CV, structured thinking, consulting tenure/recency) are listed
+  as post-fetch checks with how they're verified.
+- **Crustdata compiler** (`vendors/crustdata/compile-spec.ts`, pure): spec → one lane per
+  level; criteria this source can't express are returned as `unsupported` (shown as
+  "checked after fetch on this source"), never silently dropped. First of N compilers
+  (PDL / Coresignal / the client's own pool later).
+- **Exhaust-before-relax acquisition**: `sourceFromIcp` asks level 1 for the whole
+  budget, opens level 2 only when level 1 returns short with no next page, and saves
+  per-level cursor + `exhausted` on the run. Every acquired profile is labelled with
+  its level (`acquired` map; `loadAcquiredLevels` rebuilds it from recent runs), the
+  matrix shows "L1 · full match", and ranking sorts gates-passed → level → score.
+- **Search-plan editor** (`SearchSpecEditor.tsx`) on the Source tab — the Juicebox-style
+  surface: chips per criterion (add/remove), levels reorderable/deletable/addable, the
+  must-have line, "Count" (one probe per level, ~0.03 credit each; unsaved edits
+  included), Save / Reset. Routes: `GET/PATCH/DELETE /api/jobs/[id]/source/spec`,
+  `POST …/spec/counts`. The acquisition button is now "Find people".
+- `ingestVendorRecords` returns per-payload `outcomes` so callers know which profile
+  each record became.
+
+### Changed
+- Employer-term parsing: a short parenthetical is an alias ("(BCG)"), a descriptive one
+  is dropped ("Google (Strategy/BizOps teams)" → Google) — was becoming extra employers.
+- Live on the Strategy & Ops job: level 1 = 150 people; the first 10 acquired were all
+  level 1 (Bain/McKinsey/BCG associates and consultants), 7 of 10 passing every gate.
+
 ## 2026-09-17 (ICP experience band — the ceiling is as real as the floor)
 
 ### Added
