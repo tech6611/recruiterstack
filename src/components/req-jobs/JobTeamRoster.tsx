@@ -178,6 +178,9 @@ function Row({ row, action }: { row: JobTeamRow; action?: ReactNode }) {
         {sub && <p className="truncate text-xs text-slate-500">{sub}</p>}
       </div>
       <div className="ml-auto flex max-w-[60%] flex-wrap items-center justify-end gap-1">
+        {row.inactive && (
+          <span title="No longer an active member of this workspace (or their login moved). They can't act on this job — reassign their role." className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">No access</span>
+        )}
         {row.tags.map(t => (
           <span key={t.role} title={t.from} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">{t.label}</span>
         ))}

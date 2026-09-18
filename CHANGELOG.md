@@ -14,6 +14,37 @@ entries on top.
 ### Docs
 - Added an evidence-grounded review of the Gemini ICP prompt, with a proposed hiring-situation packet, prompt structure, propagation plan, and acceptance tests.
 
+## 2026-09-18 (One person, one record — approvals never wait on a ghost)
+
+### Fixed
+- **Same email, new login → same person.** A Clerk-instance migration in July recreated
+  every account under new ids; the webhook inserted them as NEW users, so approvals,
+  team seats and requisitions kept pointing at rows that could no longer sign in
+  ("ghosts") and the funnel stalled silently. `syncUserFromClerk` now RELINKS an
+  existing same-email row when its old login is confirmed gone in this Clerk instance
+  (`decideSyncAction`, `clerkUserExists`) — the row id stays stable, so everything
+  pointing at it carries over. Unknown lookups never relink.
+
+### Added
+- **Approver reachability** (`lib/approvals/reachability.ts`): only active org members
+  with a live login can be assigned. At step activation unreachable approvers are
+  dropped (audit `approvers_unreachable`); a step left with nobody is flagged (org-wide
+  `approval_needs_approver` notification) instead of waiting forever. When a member is
+  removed (Clerk `organizationMembership.deleted`) their pending steps are re-checked
+  immediately.
+- **Admins see and fix stalled steps**: the Approvals inbox lists pending steps with no
+  approver ("Needs an approver") and an inline Assign control →
+  `POST /api/approvals/[id]/steps/[step_id]/reassign` (validates reachability, mints
+  tokens, notifies, audits `step_reassigned`).
+- **Job team roster** flags people who can no longer act (`TeamPerson.inactive`).
+
+### Schema
+- **146_merge_duplicate_users.sql** — merges duplicate `users` rows per email (most
+  recent login is canonical): re-points every FK to users(id) (row-by-row where a seat
+  collides), rewrites JSON approver references, deactivates the ghost with a delegate
+  to the canonical row, then adds a partial unique index on `lower(email)` for active
+  rows. Apply by hand as usual.
+
 ## 2026-09-18 (Sourcing views cut down to controls, not prose)
 
 ### Changed

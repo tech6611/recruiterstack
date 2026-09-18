@@ -40,7 +40,29 @@ export interface ClerkMembershipPayload {
  * Upsert a Clerk user into our users table. Idempotent on clerk_user_id.
  * Returns the upserted row's id (our internal UUID).
  */
-export async function syncUserFromClerk(clerkUser: ClerkUserPayload): Promise<string> {
+/** Injectable for tests: does this Clerk user id still exist in the CURRENT instance? null = unknown. */
+export type SyncDeps = { clerkUserExists?: (clerkUserId: string) => Promise<boolean | null> }
+
+/** PURE decision: relink an existing same-email row only when its old login is gone for sure. */
+export function decideSyncAction(oldLoginExists: boolean | null): 'relink' | 'insert' {
+  return oldLoginExists === false ? 'relink' : 'insert'
+}
+
+/** Ask Clerk whether a user id exists in this instance. 404 → false; 200 → true; anything else → null. */
+export async function clerkUserExists(clerkUserId: string): Promise<boolean | null> {
+  const secret = process.env.CLERK_SECRET_KEY
+  if (!secret) return null
+  try {
+    const res = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`, { headers: { Authorization: `Bearer ${secret}` } })
+    if (res.status === 404) return false
+    if (res.ok) return true
+    return null
+  } catch {
+    return null
+  }
+}
+
+export async function syncUserFromClerk(clerkUser: ClerkUserPayload, deps: SyncDeps = {}): Promise<string> {
   const supabase = createAdminClient()
 
   const primaryEmail = clerkUser.email_addresses.find(e => e.id === clerkUser.primary_email_address_id)
@@ -82,6 +104,49 @@ export async function syncUserFromClerk(clerkUser: ClerkUserPayload): Promise<st
       throw claimErr
     }
     return pendingId
+  }
+
+  // Same PERSON, new LOGIN. A row with this email already exists under a different
+  // clerk id — typically after a login-system (Clerk instance) migration, or an
+  // account deleted and recreated. If that old login no longer exists in this Clerk
+  // instance, RELINK the existing row (its id stays stable, so every approval, team
+  // seat and requisition pointing at it carries over) instead of inserting a second
+  // person with the same email. Unknown (lookup failed) is treated conservatively as
+  // "still exists" so we never steal a row from a live login.
+  const { data: sameEmail } = await supabase
+    .from('users')
+    .select('id, clerk_user_id')
+    .ilike('email', primaryEmail.email_address)
+    .neq('clerk_user_id', clerkUser.id)
+    .is('deactivated_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (sameEmail) {
+    const row = sameEmail as { id: string; clerk_user_id: string }
+    const oldLoginExists = await (deps.clerkUserExists ?? clerkUserExists)(row.clerk_user_id)
+    if (decideSyncAction(oldLoginExists) === 'relink') {
+      const { error: relinkErr } = await supabase
+        .from('users')
+        .update({
+          clerk_user_id: clerkUser.id,
+          email: primaryEmail.email_address,
+          first_name: clerkUser.first_name,
+          last_name: clerkUser.last_name,
+          full_name,
+          avatar_url: clerkUser.image_url,
+        })
+        .eq('id', row.id)
+      if (relinkErr) {
+        logger.error('Failed to relink existing user to new Clerk login', relinkErr, { clerkUserId: clerkUser.id, userId: row.id })
+        throw relinkErr
+      }
+      logger.info('Relinked existing user to a new Clerk login', { userId: row.id, from: row.clerk_user_id, to: clerkUser.id })
+      return row.id
+    }
+    logger.warn('A different live login already uses this email — inserting a separate users row', {
+      email: primaryEmail.email_address, existingClerkUserId: row.clerk_user_id, newClerkUserId: clerkUser.id,
+    })
   }
 
   const { data, error } = await supabase

@@ -1,3 +1,5 @@
+import { createAdminClient } from '@/lib/supabase/server'
+import { dropApproverFromPendingSteps } from '@/lib/approvals/reachability'
 import { NextResponse } from 'next/server'
 import { Webhook } from 'svix'
 import { logger } from '@/lib/logger'
@@ -21,6 +23,15 @@ type ClerkEvent =
   | { type: 'organizationMembership.updated'; data: ClerkMembershipPayload }
   | { type: 'organizationMembership.deleted'; data: ClerkMembershipPayload }
   | { type: string; data: unknown }           // catch-all for future event types
+
+async function dropPendingApprovalsForClerkUser(orgId: string, clerkUserId: string): Promise<void> {
+  const supabase = createAdminClient()
+  const { data: u } = await supabase.from('users').select('id').eq('clerk_user_id', clerkUserId).maybeSingle()
+  const userId = (u as { id: string } | null)?.id
+  if (!userId) return
+  const r = await dropApproverFromPendingSteps(supabase, orgId, userId)
+  if (r.steps) logger.info('Removed departed member from pending approval steps', { orgId, userId, ...r })
+}
 
 export async function POST(req: Request) {
   const secret = process.env.CLERK_WEBHOOK_SIGNING_SECRET
@@ -71,6 +82,11 @@ export async function POST(req: Request) {
       case 'organizationMembership.deleted': {
         const m = event.data as ClerkMembershipPayload
         await deactivateMembership(m.organization.id, m.public_user_data.user_id)
+        // The person can no longer act here: take them off pending approval steps in
+        // this org and flag any step left with nobody, so the funnel never stalls on them.
+        await dropPendingApprovalsForClerkUser(m.organization.id, m.public_user_data.user_id).catch((e) =>
+          logger.error('Clerk webhook: re-check pending approvals after membership removal', e),
+        )
         break
       }
 
