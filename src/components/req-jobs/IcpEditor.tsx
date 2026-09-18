@@ -50,10 +50,10 @@ export function IcpEditor({
   // Component 04 — optional intake-call notes to enrich generation with verbatim.
   const [intakeNotes, setIntakeNotes] = useState('')
   const [showIntake, setShowIntake] = useState(false)
-  const [showReasoning, setShowReasoning] = useState(true)
+  const [showReasoning, setShowReasoning] = useState(false)
   // Phase 1 (niche recruiter) — the brief the model reasoned in, and the recruiter's
   // corrections to it (house knowledge fed into the next Regenerate).
-  const [showBrief, setShowBrief] = useState(true)
+  const [showBrief, setShowBrief] = useState(false)
   const [corrections, setCorrections] = useState('')
   const [savingCorrections, setSavingCorrections] = useState(false)
 
@@ -387,130 +387,62 @@ export function IcpEditor({
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* ── Recruiter brief (Phase 1, niche recruiter) — WHO reasoned this ICP ── */}
+        {/* ── Recruiter brief — WHO reasoned this ICP. Compact: one header line; details on demand. ── */}
         {icp.sourcing_map && (icp.sourcing_map.recruiter_brief || icp.status === 'draft') && (() => {
           const b = icp.sourcing_map.recruiter_brief
           const pools = [...(b?.feeder_pools ?? [])].sort((x, y) => (x.priority ?? 99) - (y.priority ?? 99))
+          const band = b?.experience_band
+          const Chip = ({ children, tone = 'slate', title }: { children: React.ReactNode; tone?: 'slate' | 'indigo' | 'rose'; title?: string }) => (
+            <span title={title} className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] ${tone === 'indigo' ? 'bg-indigo-50 text-indigo-800' : tone === 'rose' ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>{children}</span>
+          )
           return (
-            <section className="rounded-xl border border-indigo-200 bg-indigo-50/40">
-              <button type="button" onClick={() => setShowBrief((v) => !v)}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-xs font-semibold text-slate-700">
-                {showBrief ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                <Compass className="h-3.5 w-3.5 text-indigo-600" />
-                {b?.niche ? <>Reasoning as: <span className="text-indigo-700">{b.niche}</span></> : 'Recruiter brief'}
+            <section className="rounded-xl border border-slate-200 bg-white">
+              <button type="button" onClick={() => setShowBrief((v) => !v)} className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-left text-xs">
+                {showBrief ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
+                <Compass className="h-3.5 w-3.5 shrink-0 text-indigo-600" />
+                <span className="font-semibold text-slate-700">{b?.niche ? b.niche : 'Recruiter brief'}</span>
+                {band && (band.min_years != null || band.max_years != null) && <Chip tone="rose" title={band.rationale ?? 'Ceiling enforced'}>{band.min_years ?? '?'}–{band.max_years ?? '?'} yrs</Chip>}
+                {!showBrief && pools.slice(0, 3).map((pool) => <Chip key={pool.label} tone="indigo" title={pool.companies.join(', ')}>{pool.label}</Chip>)}
+                {!showBrief && (b?.title_families?.length ?? 0) > 0 && <Chip title={b!.title_families.join(', ')}>+{b!.title_families.length} titles</Chip>}
               </button>
               {showBrief && (
-                <div className="space-y-3 px-3 pb-3">
-                  {!b && (
-                    <p className="text-xs text-slate-500">
-                      This ICP was generated before recruiter briefs existed. Regenerate to have the model decide which
-                      specialist recruiter it is for this search, or write corrections below to steer it.
-                    </p>
-                  )}
-                  {b?.persona && <p className="text-xs leading-relaxed text-slate-700">{b.persona}</p>}
-                  {b?.market && (
-                    <div className="text-xs"><span className="font-semibold uppercase tracking-wide text-[10px] text-slate-400">Market · </span><span className="text-slate-600">{b.market}</span></div>
-                  )}
-                  {b?.experience_band && (b.experience_band.min_years != null || b.experience_band.max_years != null) && (
-                    <div className="text-xs">
-                      <span className="font-semibold uppercase tracking-wide text-[10px] text-slate-400">Experience band · </span>
-                      <span className="font-medium text-slate-700">
-                        {b.experience_band.min_years ?? '?'}–{b.experience_band.max_years ?? '?'} years
-                      </span>
-                      {b.experience_band.rationale && <span className="text-slate-500"> — {b.experience_band.rationale}</span>}
-                      <span className="ml-1.5 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-700">ceiling enforced</span>
-                    </div>
-                  )}
+                <div className="space-y-2.5 border-t border-slate-100 px-3 py-2.5">
+                  {!b && <p className="text-xs text-slate-500">Generated before recruiter briefs existed — regenerate, or steer it below.</p>}
+                  {b?.persona && <p className="line-clamp-2 text-xs text-slate-600" title={b.persona}>{b.persona}</p>}
 
                   {pools.length > 0 && (
-                    <div>
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Where to look first</div>
-                      <ol className="space-y-1.5">
-                        {pools.map((pool, i) => (
-                          <li key={i} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs">
-                            <div className="font-medium text-slate-800">{pool.priority ?? i + 1}. {pool.label}</div>
-                            {pool.companies.length > 0 && (
-                              <div className="mt-0.5 flex flex-wrap gap-1">
-                                {pool.companies.map((c) => <span key={c} className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] text-indigo-800">{c}</span>)}
-                              </div>
-                            )}
-                            {pool.role_types.length > 0 && <div className="mt-0.5 text-[11px] text-slate-500">Roles: {pool.role_types.join(' · ')}</div>}
-                            {pool.rationale && <div className="text-[11px] text-slate-400">{pool.rationale}</div>}
-                          </li>
-                        ))}
-                      </ol>
+                    <div className="space-y-1">
+                      {pools.map((pool, i) => (
+                        <div key={i} className="flex flex-wrap items-center gap-1 text-xs" title={pool.rationale ?? undefined}>
+                          <span className="w-4 shrink-0 text-[10px] font-bold text-indigo-700">{pool.priority ?? i + 1}</span>
+                          <span className="mr-1 font-medium text-slate-700">{pool.label}</span>
+                          {pool.companies.map((c) => <Chip key={c} tone="indigo">{c}</Chip>)}
+                          {pool.role_types.length > 0 && <span className="text-[10px] text-slate-400">as {pool.role_types.join(' · ')}</span>}
+                        </div>
+                      ))}
                     </div>
                   )}
 
                   {(b?.title_families?.length ?? 0) > 0 && (
-                    <div>
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Same search, other titles</div>
-                      <div className="flex flex-wrap gap-1">
-                        {b!.title_families.map((t) => <span key={t} className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-700">{t}</span>)}
-                      </div>
-                    </div>
+                    <div className="flex flex-wrap items-center gap-1 text-xs"><span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Titles</span>{b!.title_families.map((t) => <Chip key={t}>{t}</Chip>)}</div>
                   )}
 
-                  {(b?.market_gates?.length ?? 0) > 0 && (
-                    <div>
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">True gates in this market</div>
-                      <ul className="space-y-1">
-                        {b!.market_gates.map((g, i) => (
-                          <li key={i} className="text-xs"><span className="font-medium text-slate-700">{g.requirement}</span>{g.why && <span className="text-slate-500"> — {g.why}</span>}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <div className="grid gap-x-6 gap-y-1 text-[11px] md:grid-cols-2">
+                    {b?.market && <div><span className="font-semibold text-slate-500">Market · </span><span className="text-slate-600">{b.market}</span></div>}
+                    {b?.market_gates?.map((g, i) => <div key={`g${i}`} title={g.why ?? undefined}><span className="font-semibold text-slate-500">Gate here · </span><span className="text-slate-700">{g.requirement}</span></div>)}
+                    {b?.jd_translations?.map((t, i) => <div key={`t${i}`}><span className="text-slate-400">“{t.phrase}”</span> <span className="text-slate-400">→</span> <span className="text-slate-700">{t.means_here}</span></div>)}
+                    {b?.market_norms?.map((n, i) => <div key={`n${i}`}><span className="font-semibold text-slate-500">{n.topic} · </span><span className="text-slate-600">{n.norm}</span></div>)}
+                    {(b?.normal_red_flags?.length ?? 0) > 0 && <div><span className="font-semibold text-slate-500">Normal here · </span><span className="text-slate-600">{b!.normal_red_flags.join(' · ')}</span></div>}
+                    {(b?.unsure_about?.length ?? 0) > 0 && <div><span className="font-semibold text-amber-600">Check with HM · </span><span className="text-amber-800">{b!.unsure_about.join(' · ')}</span></div>}
+                  </div>
 
-                  {(b?.jd_translations?.length ?? 0) > 0 && (
-                    <div>
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">How the JD reads here</div>
-                      <ul className="space-y-1">
-                        {b!.jd_translations.map((t, i) => (
-                          <li key={i} className="text-xs"><span className="text-slate-500">“{t.phrase}”</span> <span className="text-slate-400">→</span> <span className="text-slate-700">{t.means_here}</span></li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {(b?.market_norms?.length ?? 0) > 0 && (
-                    <div>
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Market norms</div>
-                      <ul className="space-y-1">
-                        {b!.market_norms.map((n, i) => (
-                          <li key={i} className="text-xs"><span className="font-medium text-slate-700">{n.topic}: </span><span className="text-slate-600">{n.norm}</span></li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {(b?.normal_red_flags?.length ?? 0) > 0 && (
-                    <div className="text-xs"><span className="font-semibold uppercase tracking-wide text-[10px] text-slate-400">Normal in this niche (don&apos;t penalise) · </span><span className="text-slate-600">{b!.normal_red_flags.join(' · ')}</span></div>
-                  )}
-                  {(b?.unsure_about?.length ?? 0) > 0 && (
-                    <div className="text-xs"><span className="font-semibold uppercase tracking-wide text-[10px] text-amber-600">Wants a human check · </span><span className="text-amber-800">{b!.unsure_about.join(' · ')}</span></div>
-                  )}
-
-                  <div className="rounded-lg border border-slate-200 bg-white p-2.5">
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Correct this brief</div>
-                    <p className="mb-1.5 text-[11px] text-slate-500">
-                      Write what this recruiter got wrong or missed — feeder companies, what is really a gate here,
-                      market norms. Saved corrections override the model&apos;s defaults on the next Regenerate.
-                    </p>
-                    <textarea
-                      value={corrections}
-                      onChange={(e) => setCorrections(e.target.value)}
-                      rows={3}
-                      maxLength={4000}
-                      placeholder="e.g. In Bengaluru strategy hiring, also search IB analysts at Avendus/Kotak and PE associates; treat ISB/IIM-A/B/C as tier-1; 60–90 day notice is normal."
-                      className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none"
-                    />
-                    <div className="mt-1.5 flex justify-end">
-                      <Button size="sm" variant="outline" onClick={saveCorrections}
-                        disabled={savingCorrections || corrections === (b?.corrections ?? '')}>
-                        <Save className="mr-1.5 h-3.5 w-3.5" /> {savingCorrections ? 'Saving…' : 'Save corrections'}
-                      </Button>
-                    </div>
+                  <div className="flex items-start gap-2">
+                    <textarea value={corrections} onChange={(e) => setCorrections(e.target.value)} rows={2} maxLength={4000}
+                      placeholder="Correct this brief — companies to add or drop, what is really a gate here, market norms. Applied on the next Regenerate."
+                      className="flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none" />
+                    <Button size="sm" variant="outline" onClick={saveCorrections} disabled={savingCorrections || corrections === (b?.corrections ?? '')}>
+                      <Save className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
               )}
@@ -524,7 +456,7 @@ export function IcpEditor({
             <button type="button" onClick={() => setShowReasoning((s) => !s)}
               className="flex w-full items-center gap-2 px-3 py-2.5 text-xs font-semibold text-slate-600">
               {showReasoning ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              <Brain className="h-3.5 w-3.5 text-indigo-500" /> How this ICP was reasoned
+              <Brain className="h-3.5 w-3.5 text-indigo-500" /> Reasoning, requirement breakdown &amp; archetypes
             </button>
             {showReasoning && (
               <div className="space-y-3 px-3 pb-3">
