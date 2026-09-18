@@ -27,7 +27,7 @@ function builderFor(result: { data: unknown; error: unknown }) {
   const calls: { op: string; args: unknown[] }[] = []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const b: any = {}
-  for (const m of ['select', 'insert', 'update', 'upsert', 'eq', 'is', 'ilike']) {
+  for (const m of ['select', 'insert', 'update', 'upsert', 'eq', 'neq', 'is', 'ilike', 'order', 'limit']) {
     b[m] = (...args: unknown[]) => { calls.push({ op: m, args }); return b }
   }
   b.single = () => Promise.resolve(result)
@@ -66,10 +66,36 @@ describe('syncUserFromClerk — pending-user backfill', () => {
     expect(update._calls.some((c: { op: string; args: unknown[] }) => c.op === 'eq' && c.args[1] === 'pending-uuid')).toBe(true)
   })
 
+  it('relinks an existing same-email row (keeping its id) when the old login is confirmed gone', async () => {
+    const pendingLookup = builderFor({ data: null, error: null })
+    const sameEmail = builderFor({ data: { id: 'june-row', clerk_user_id: 'user_old' }, error: null })
+    const update = builderFor({ data: null, error: null })
+    fromMock.mockReturnValueOnce(pendingLookup).mockReturnValueOnce(sameEmail).mockReturnValueOnce(update)
+
+    const id = await syncUserFromClerk(CLERK_USER, { clerkUserExists: async () => false })
+
+    expect(id).toBe('june-row')
+    expect(update._calls.some((c: { op: string }) => c.op === 'update')).toBe(true)
+    expect(update._calls.some((c: { op: string }) => c.op === 'upsert')).toBe(false)
+  })
+
+  it('does NOT relink when the old login still exists — inserts a separate row', async () => {
+    const pendingLookup = builderFor({ data: null, error: null })
+    const sameEmail = builderFor({ data: { id: 'june-row', clerk_user_id: 'user_old' }, error: null })
+    const upsert = builderFor({ data: { id: 'fresh-uuid' }, error: null })
+    fromMock.mockReturnValueOnce(pendingLookup).mockReturnValueOnce(sameEmail).mockReturnValueOnce(upsert)
+
+    const id = await syncUserFromClerk(CLERK_USER, { clerkUserExists: async () => true })
+
+    expect(id).toBe('fresh-uuid')
+    expect(upsert._calls.some((c: { op: string }) => c.op === 'upsert')).toBe(true)
+  })
+
   it('falls back to the upsert path when no pending row exists', async () => {
     const lookup = builderFor({ data: null, error: null })
     const upsert = builderFor({ data: { id: 'fresh-uuid' }, error: null })
-    fromMock.mockReturnValueOnce(lookup).mockReturnValueOnce(upsert)
+    // Three queries now: pending-row lookup, same-email (different login) lookup, then the upsert.
+    fromMock.mockReturnValueOnce(lookup).mockReturnValueOnce(lookup).mockReturnValueOnce(upsert)
 
     const id = await syncUserFromClerk(CLERK_USER)
 

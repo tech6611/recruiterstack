@@ -17,6 +17,7 @@ import { mintStepTokens } from './tokens'
 import { enqueue } from '@/lib/api/job-queue'
 import { emitWebhook } from '@/lib/webhooks/emit'
 import { logger } from '@/lib/logger'
+import { filterReachableApprovers, notifyStepUnassigned } from './reachability'
 import type {
   ApprovalChainStep,
   ApprovalStep,
@@ -244,12 +245,25 @@ async function activateNextStep(approvalId: string, requesterId: string): Promis
   for (const step of block) {
     const cs = chainStepById.get(step.chain_step_id)
     if (!cs) continue
-    const approvers = await resolveApprovers(cs.approver_type, cs.approver_value, {
+    const resolved = await resolveApprovers(cs.approver_type, cs.approver_value, {
       orgId:       approval.org_id,
       targetType:  approval.target_type,
       targetId:    approval.target_id,
       requesterId,
     })
+    // Only people who can actually act: active members of this org with a live login.
+    // A chain may still name someone who left or whose login moved — never let a step
+    // wait on them silently.
+    const { reachable, dropped } = await filterReachableApprovers(supabase, approval.org_id, resolved.map(a => a.user_id))
+    const approvers = reachable.map(user_id => ({ user_id }))
+    if (dropped.length) {
+      await writeAudit({
+        org_id: approval.org_id, approval_id: approvalId,
+        target_type: approval.target_type, target_id: approval.target_id,
+        action: 'approvers_unreachable',
+        metadata: { step_index: step.step_index, name: cs.name, dropped },
+      })
+    }
     const due = cs.sla_hours ? new Date(Date.now() + cs.sla_hours * 3600 * 1000).toISOString() : null
     await supabase
       .from('approval_steps')
@@ -265,6 +279,17 @@ async function activateNextStep(approvalId: string, requesterId: string): Promis
         parallel_group_id: step.parallel_group_id ?? null,
       },
     })
+    if (!approvers.length) {
+      // Nobody can act on this step: flag it for admins instead of waiting on a ghost.
+      await notifyStepUnassigned({
+        orgId: approval.org_id, approvalId, stepId: step.id, stepName: cs.name,
+        targetType: approval.target_type, targetId: approval.target_id,
+        reason: dropped.length
+          ? 'The people this step names can no longer act in this workspace.'
+          : 'The chain step resolved to no approver.',
+      })
+      continue
+    }
     // Mint one-time email-approval tokens per approver so the notification can
     // drop a no-login Approve/Reject link into each inbox. Best-effort: a mint
     // failure must not block activation — the login-gated inbox still works.

@@ -24,6 +24,8 @@ interface InboxItem {
   requested_by_name:  string | null
   activated_at:       string
   due_at:             string | null
+  /** Admin-only: nobody can act on this step (approvers left / can't sign in) — reassign it. */
+  needs_reassignment?: boolean
 }
 
 interface HistoryItem {
@@ -73,6 +75,38 @@ type PaneTone = { bar: string; title: string; chevron: string; badge: string }
 const PANE_TINT: { pending: PaneTone; history: PaneTone } = {
   pending: { bar: 'bg-[#fbe7bc] hover:bg-[#f7dfae]', title: 'text-[#6f450f]', chevron: 'text-[#b97e14]', badge: 'text-[#8a5a14]' },
   history: { bar: 'bg-[#eae6dd] hover:bg-[#e0dbce]', title: 'text-[#4f483d]', chevron: 'text-[#9a8f7d]', badge: 'text-[#8a7f6f]' },
+}
+
+/** Admin control on a step nobody can act on: pick an active member and hand it to them. */
+function ReassignControl({ item, onDone }: { item: InboxItem; onDone: () => void }) {
+  const [members, setMembers] = useState<Array<{ user_id: string; name: string }>>([])
+  const [pick, setPick] = useState('')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    fetch('/api/team').then(r => (r.ok ? r.json() : { data: [] })).then(({ data }) => {
+      const rows = (data ?? []) as Array<{ user_id: string; is_active: boolean; users?: { full_name?: string | null; email?: string | null } | null }>
+      setMembers(rows.filter(m => m.is_active).map(m => ({ user_id: m.user_id, name: m.users?.full_name || m.users?.email || 'Member' })))
+    }).catch(() => {})
+  }, [])
+  async function assign() {
+    if (!pick) return
+    setBusy(true)
+    const res = await fetch(`/api/approvals/${item.approval_id}/steps/${item.step_id}/reassign`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_ids: [pick] }),
+    })
+    setBusy(false)
+    if (!res.ok) { const j = await res.json().catch(() => ({})); alert(j.error ?? 'Could not reassign'); return }
+    onDone()
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <select value={pick} onChange={e => setPick(e.target.value)} className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700">
+        <option value="">Assign to…</option>
+        {members.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
+      </select>
+      <Button size="sm" onClick={assign} disabled={!pick || busy}>{busy ? 'Assigning…' : 'Assign'}</Button>
+    </div>
+  )
 }
 
 export default function ApprovalInboxPage() {
@@ -199,6 +233,11 @@ export default function ApprovalInboxPage() {
                                 <span className="inline-flex shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                                   {item.target_type_label}
                                 </span>
+                                {item.needs_reassignment && (
+                                  <span title="Everyone this step named has left or can no longer sign in. Pick someone who can act." className="inline-flex shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                    Needs an approver
+                                  </span>
+                                )}
                                 <Link href={targetHref(item.link_target_type ?? item.target_type, item.link_target_id ?? item.target_id)} className="truncate text-sm font-semibold text-slate-900 hover:text-emerald-700">
                                   {item.target_title}
                                 </Link>
@@ -213,7 +252,9 @@ export default function ApprovalInboxPage() {
                                 )}
                               </div>
                             </div>
-                            <Button onClick={() => setOpen(item)} size="sm">Decide</Button>
+                            {item.needs_reassignment
+                              ? <ReassignControl item={item} onDone={refresh} />
+                              : <Button onClick={() => setOpen(item)} size="sm">Decide</Button>}
                           </div>
                         </CardContent>
                       </Card>

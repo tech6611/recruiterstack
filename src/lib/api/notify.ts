@@ -9,6 +9,7 @@ export type NotificationType =
   | 'offer_extended'
   | 'task_due'
   | 'system'
+  | 'approval_needs_approver' // sent org-wide when a pending approval step has no approver who can act
   // HRIS notifications (wired from the HRIS domain write paths):
   | 'time_off_requested'    // sent to the assigned approver when a request is submitted
   | 'time_off_decided'      // sent to the requester when their request is approved/rejected/cancelled

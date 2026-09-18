@@ -1,3 +1,5 @@
+import { getViewerScope } from '@/lib/rbac'
+import { listUnassignedSteps } from '@/lib/approvals/reachability'
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
@@ -32,11 +34,24 @@ export async function GET() {
     .order('activated_at', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const steps = (stepsRaw ?? []).filter(s => {
+  const mine = (stepsRaw ?? []).filter(s => {
     const decisions = (s as { decisions: Array<{ user_id: string }> }).decisions ?? []
     return !decisions.some(d => d.user_id === userId)
   })
 
+  // Admins also see steps that are waiting on NOBODY (every named approver left or
+  // can't sign in), so a stalled request is visible and can be reassigned here.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const steps: any[] = [...mine]
+  const scope = await getViewerScope(supabase, orgId, userId)
+  if (scope.isAdmin || scope.isOwner) {
+    const unassigned = await listUnassignedSteps(supabase, orgId)
+    const seen = new Set(mine.map(s => (s as { id: string }).id))
+    for (const u of unassigned) {
+      if (seen.has(u.step_id)) continue
+      steps.push({ id: u.step_id, approval_id: u.approval_id, step_index: u.step_index, approvers: [], decisions: [], activated_at: u.activated_at, due_at: u.due_at, needs_reassignment: true })
+    }
+  }
   if (steps.length === 0) return NextResponse.json({ data: [] })
 
   // Filter to current user's org and join approval + target.
@@ -115,6 +130,8 @@ export async function GET() {
         requested_by_name:  requesterName.get(a.requested_by) ?? null,
         activated_at:       (s as { activated_at: string }).activated_at,
         due_at:             (s as { due_at: string | null }).due_at,
+        // True when no one can act on this step — shown to admins with a reassign control.
+        needs_reassignment: Boolean((s as { needs_reassignment?: boolean }).needs_reassignment),
       }
     })
 

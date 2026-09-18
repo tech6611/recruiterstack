@@ -13,7 +13,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { teamMemberName, type TeamMember } from '@/lib/team-members'
 
-export type TeamPerson = { user_id: string | null; name: string | null; email: string | null }
+export type TeamPerson = { user_id: string | null; name: string | null; email: string | null; /** True when this person is no longer an active member of the org (or has no live login) — they can't act. */ inactive?: boolean }
 
 export type JobTeamRole = 'hiring_manager' | 'skip_level' | 'recruiter' | 'coordinator' | 'sourcer'
 
@@ -41,6 +41,8 @@ export type JobTeamRow = {
   tags: JobTeamTag[]
   /** Stage names this person interviews on, in pipeline order. */
   stages: string[]
+  /** This person can no longer act here (left the org / login moved) — shown as a warning. */
+  inactive?: boolean
 }
 
 const ROLE_LABEL: Record<JobTeamRole, string> = {
@@ -70,6 +72,7 @@ export function assembleJobTeam(input: JobTeamInput): JobTeamRow[] {
     } else if (!row.email && p.email) {
       row.email = p.email
     }
+    if (p.inactive) row.inactive = true
     return row
   }
   const tag = (row: JobTeamRow, role: JobTeamRole, from: string) => {
@@ -188,11 +191,17 @@ export async function loadJobTeam(supabase: SupabaseClient, orgId: string, jobId
   // and they should still show. The ids come from this org's own records.
   const people = new Map<string, TeamPerson>()
   if (ids.size) {
-    const usersRes = await sb.from('users')
-      .select('id, full_name, first_name, last_name, email')
-      .in('id', Array.from(ids))
-    for (const u of (usersRes.data ?? []) as UserRow[]) {
-      people.set(u.id, { user_id: u.id, name: teamMemberName({ user_id: u.id, users: u }), email: u.email ?? null })
+    const idList = Array.from(ids)
+    const [usersRes, activeRes] = await Promise.all([
+      sb.from('users').select('id, full_name, first_name, last_name, email, deactivated_at').in('id', idList),
+      sb.from('org_members').select('user_id').eq('org_id', orgId).eq('is_active', true).in('user_id', idList),
+    ])
+    const active = new Set(((activeRes.data ?? []) as { user_id: string }[]).map((m) => m.user_id))
+    for (const u of (usersRes.data ?? []) as (UserRow & { deactivated_at?: string | null })[]) {
+      // Someone can be named on a job yet unable to act (left the org, or their login
+      // moved) — show them, but flagged, so nobody waits on a ghost.
+      const inactive = !active.has(u.id) || Boolean(u.deactivated_at)
+      people.set(u.id, { user_id: u.id, name: teamMemberName({ user_id: u.id, users: u }), email: u.email ?? null, ...(inactive ? { inactive: true } : {}) })
     }
   }
   const person = (id: string | null): TeamPerson | null => (id ? people.get(id) ?? null : null)
