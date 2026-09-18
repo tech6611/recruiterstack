@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { withCapability, handleSupabaseError } from '@/lib/api/helpers'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import type { Icp } from '@/lib/types/icp'
-import { sourceFromIcp, EmptyIcpQueryError } from '@/modules/pool/domain/crustdata-acquire'
+import { sourceFromIcp, EmptyIcpQueryError, loadAcquiredLevels } from '@/modules/pool/domain/crustdata-acquire'
 import { CrustdataConfigError } from '@/modules/pool/vendors/crustdata/client'
 import { sourcePoolForIcp, savePoolMatches, embedPoolProfiles } from '@/modules/pool/domain/pool-sourcing'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
@@ -74,7 +74,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
       }
       if (err instanceof EmptyIcpQueryError) {
         return NextResponse.json(
-          { error: 'This ICP has nothing Crustdata can search on yet — regenerate it so it carries a recruiter brief (feeder pools, title families), or add a title.' },
+          { error: 'The search plan has no level the market source can search on — add a school, employer or title to a level.' },
           { status: 400 },
         )
       }
@@ -92,7 +92,8 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
 
     // 3. Rank the refreshed pool against the ICP — every profile bought this run is
     //    scored whether or not semantic recall would have surfaced it — and cache.
-    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: sourced.profileIds })
+    const acquired = { ...(await loadAcquiredLevels(supabase, params.id)), ...sourced.acquired }
+    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired })
     if (result.status === 'ok') {
       await savePoolMatches(supabase, orgId, params.id, icp.version, result.matches).catch(() => {})
     }
@@ -108,6 +109,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
           unmappedRequirements: sourced.plan.unmapped,
           plan: sourced.plan,
           profileIds: sourced.profileIds,
+          acquired: sourced.acquired,
         },
         ...result,
         icp: icpColumns(icp),

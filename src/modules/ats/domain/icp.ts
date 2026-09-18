@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import type { Icp, IcpChangelogEntry, IcpCompetency, IcpDraftInput, IcpMustHave, RecruiterBrief, SourcingMap } from '@/lib/types/icp'
+import type { SearchSpec } from '@/lib/types/search-spec'
 import { embedText } from '@/lib/ai/llm'
 import { icpEmbeddingText } from '@/lib/ai/embeddings'
 import { logger } from '@/lib/logger'
@@ -238,6 +239,29 @@ export async function setIcpRecruiterCorrections(
     .eq('id', icpId)
     .select()
     .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error('ICP not found')
+  return data as Icp
+}
+
+/**
+ * Save a recruiter-edited SEARCH SPEC on an ICP (any status — like corrections, it is
+ * acquisition knowledge, not a change to gates/weights). Pass null to reset to the
+ * brief's proposal (the stored spec is removed; the next read re-derives it).
+ */
+export async function setIcpSearchSpec(
+  supabase: Supabase,
+  orgId: string,
+  icpId: string,
+  spec: SearchSpec | null,
+): Promise<Icp> {
+  const sb = supabase as unknown as LooseSb
+  const { data: row, error: readErr } = await sb.from('icps').select('sourcing_map').eq('org_id', orgId).eq('id', icpId).maybeSingle()
+  if (readErr) throw readErr
+  if (!row) throw new Error('ICP not found')
+  const sm = { reasoning: '', requirement_decomposition: [], unwritten_filters: [], ...((row.sourcing_map ?? {}) as Partial<SourcingMap>) } as SourcingMap & { search_spec?: SearchSpec | null }
+  sm.search_spec = spec ? { ...spec, source: 'edited', edited_at: new Date().toISOString() } : null
+  const { data, error } = await sb.from('icps').update({ sourcing_map: sm, updated_at: new Date().toISOString() }).eq('org_id', orgId).eq('id', icpId).select().maybeSingle()
   if (error) throw error
   if (!data) throw new Error('ICP not found')
   return data as Icp

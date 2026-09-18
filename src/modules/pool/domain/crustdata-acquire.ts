@@ -48,14 +48,11 @@ import {
 import { ingestVendorRecords, type BatchIngestTotals } from '@/modules/pool/domain/ingest'
 import { startIngestRun, finishIngestRun, recordVendorCall } from '@/modules/pool/domain/vendor-ledger'
 import type { CrustdataQueryContext } from '@/modules/pool/vendors/crustdata/query'
-import {
-  buildSearchPlan,
-  isPlanRunnable,
-  describePlan,
-  type SearchPlan,
-  type SearchPlanContext,
-} from '@/modules/pool/vendors/crustdata/search-plan'
+import { isPlanRunnable, describePlan, type SearchPlan, type SearchPlanContext } from '@/modules/pool/vendors/crustdata/search-plan'
+import { compileSpec } from '@/modules/pool/vendors/crustdata/compile-spec'
+import { resolveSearchSpec } from '@/modules/pool/search/spec-from-brief'
 import type { Icp } from '@/lib/types/icp'
+import type { SearchSpec } from '@/lib/types/search-spec'
 
 type Supabase = SupabaseClient<Database>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -204,94 +201,122 @@ export class EmptyIcpQueryError extends Error {
   }
 }
 
-/** What one lane of the plan did this run. */
+/** What one level (lane) of the ladder did this run. */
 export interface LaneRunResult {
   key: string
   kind: string
   label: string
   summary: string[]
   rationale: string | null
-  /** Vendor's total matches for the lane (may be null when not reported). */
+  /** Vendor's total matches for the level (may be null when not reported). */
   total: number | null
-  /** Profiles this lane contributed AFTER cross-lane de-duplication. */
+  /** Profiles this level contributed AFTER cross-level de-duplication. */
   fetched: number
-  /** Profiles the lane returned that another lane had already returned. */
+  /** Profiles the level returned that an earlier level had already returned. */
   duplicates: number
   creditsUsed: number
-  /** Where the next run should continue from (null = exhausted / start over). */
+  /** Where the next run continues from (null = nothing more on this page chain). */
   nextCursor: string | null
   /** True when this run resumed from a cursor saved by an earlier run. */
   resumed: boolean
+  /** True once the level has no more unseen people — later runs skip it and relax to the next. */
+  exhausted: boolean
+  /** Pool profile ids this level acquired this run (for match-level labels). */
+  profileIds: string[]
   error?: string | null
 }
 
+/** Which level acquired a profile — the "match level" shown on every person. */
+export interface AcquiredLevel { level: number; label: string; key: string }
+export type AcquiredMap = Record<string, AcquiredLevel>
+
 export interface SourceFromIcpResult extends SourceFromCrustdataResult {
-  /** The plan that ran, lane by lane, with what each contributed. */
-  plan: ReturnType<typeof describePlan> & { results: LaneRunResult[] }
+  /** The plan that ran, level by level, with what each contributed. */
+  plan: ReturnType<typeof describePlan> & { results: LaneRunResult[]; specSource: SearchSpec['source'] }
   /** Pool profile ids this run created or refreshed (for "new this run" badges). */
   profileIds: string[]
+  /** profile id → the level that acquired it, this run. */
+  acquired: AcquiredMap
 }
 
-type LaneCursorMap = Map<string, string>
+interface LaneState { cursor: string | null; exhausted: boolean }
 
 /**
- * Cursor continuity ("retrieval continuity" in the audit): find, per lane key, the
- * cursor the most recent run for this job left off at, so a re-run continues to page
- * 2 instead of re-buying page 1. Read from the last few pool_ingest_runs rows — no
- * new table needed. Best-effort: any failure means "start from page 1".
+ * Retrieval continuity: per level key, where the most recent runs for this job left
+ * off (cursor) and whether the level is already drained. Read from the last few
+ * pool_ingest_runs rows — no new table. Best-effort: any failure = start from page 1.
  */
-async function loadLaneCursors(supabase: Supabase, jobId: string | null | undefined): Promise<LaneCursorMap> {
-  const out: LaneCursorMap = new Map()
+async function loadLaneStates(supabase: Supabase, jobId: string | null | undefined): Promise<Map<string, LaneState>> {
+  const out = new Map<string, LaneState>()
   if (!jobId) return out
   try {
     const { data } = await (supabase as unknown as LooseSb)
-      .from('pool_ingest_runs')
-      .select('query')
-      .eq('source_key', SOURCE)
-      .eq('job_id', jobId)
-      .order('started_at', { ascending: false })
-      .limit(10)
-    for (const row of (data ?? []) as { query?: { results?: LaneRunResult[] } | null }[]) {
+      .from('pool_ingest_runs').select('query').eq('source_key', SOURCE).eq('job_id', jobId)
+      .order('started_at', { ascending: false }).limit(12)
+    for (const row of (data ?? []) as { query?: { results?: Partial<LaneRunResult>[] } | null }[]) {
       for (const r of row.query?.results ?? []) {
-        if (r?.key && r.nextCursor && !out.has(r.key)) out.set(r.key, r.nextCursor)
+        if (!r?.key || out.has(r.key)) continue
+        if (r.error) continue // a failed attempt says nothing about the level's supply
+        out.set(r.key, { cursor: r.nextCursor ?? null, exhausted: Boolean(r.exhausted) })
       }
     }
-  } catch {
-    /* start from page 1 */
-  }
+  } catch { /* start from page 1 */ }
   return out
 }
 
-/** The vendor's identity for a raw profile, for cross-lane de-duplication. */
+/**
+ * Which level acquired each profile for this job, across recent runs (lowest level
+ * wins if a person was reached twice). Used to label matches on every re-rank.
+ */
+export async function loadAcquiredLevels(supabase: Supabase, jobId: string): Promise<AcquiredMap> {
+  const out: AcquiredMap = {}
+  try {
+    const { data } = await (supabase as unknown as LooseSb)
+      .from('pool_ingest_runs').select('query').eq('source_key', SOURCE).eq('job_id', jobId)
+      .order('started_at', { ascending: false }).limit(30)
+    for (const row of (data ?? []) as { query?: { results?: Partial<LaneRunResult>[] } | null }[]) {
+      const results = row.query?.results ?? []
+      results.forEach((r, i) => {
+        const level = i + 1
+        for (const id of r?.profileIds ?? []) {
+          if (!out[id] || out[id].level > level) out[id] = { level, label: r.label ?? `Level ${level}`, key: r.key ?? '' }
+        }
+      })
+    }
+  } catch { /* no labels */ }
+  return out
+}
+
+/** The vendor's identity for a raw profile, for cross-level de-duplication. */
 function profileIdentity(raw: unknown): string | null {
-  const p = raw as { social_handles?: { professional_network_identifier?: { profile_url?: string | null } | null } | null; basic_profile?: { current_title?: string | null; location?: { raw?: string | null } | null } | null }
+  const p = raw as { social_handles?: { professional_network_identifier?: { profile_url?: string | null } | null } | null }
   const url = p?.social_handles?.professional_network_identifier?.profile_url?.trim().toLowerCase()
   return url || null
 }
 
 /**
- * Source candidates for a role from its ICP (Step 2: multi-lane search plan).
+ * Acquire candidates for a job from its SEARCH SPEC (the recruiter's ladder).
  *
- * Builds the plan (feeder lanes from the recruiter brief, a title-families lane,
- * shared market/years/structured-gate conditions), then runs the lanes IN PRIORITY
- * ORDER under one ingest run and one total budget (`maxRecords`): each lane gets an
- * equal share, and whatever a thin lane leaves unspent rolls into the next. Profiles
- * are de-duplicated across lanes by LinkedIn URL before ingest so one person is never
- * bought twice in a run; per-lane cursors are saved on the run so the NEXT run resumes
- * where each lane left off. A lane that errors is recorded and skipped, never fatal.
+ * The spec is the recruiter-edited one stored on the ICP, or derived from the brief.
+ * It compiles to one lane per level; lanes run IN ORDER and each is EXHAUSTED before
+ * the next opens: a run asks level 1 for the whole remaining budget, moves to level 2
+ * only when level 1 returns short with no further page, and remembers per level both
+ * the cursor and the exhausted flag so the next click continues where this one
+ * stopped. People are de-duplicated across levels before purchase; every acquired
+ * profile is labelled with the level that reached it. A level that errors is
+ * recorded and skipped, never fatal.
  */
 export async function sourceFromIcp(
   supabase: Supabase,
-  icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'job_id'>>,
+  icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'job_id' | 'competencies'>>,
   ctx: CrustdataQueryContext & Pick<SearchPlanContext, 'roleContext' | 'maxFeederLanes'> = {},
   opts: Omit<SourceFromCrustdataInput, 'filters'> = {},
 ): Promise<SourceFromIcpResult> {
-  const plan = buildSearchPlan(icp, { title: ctx.title, roleContext: ctx.roleContext, locationRadiusKm: ctx.locationRadiusKm, maxFeederLanes: ctx.maxFeederLanes })
+  const { spec } = resolveSearchSpec(icp, { title: ctx.title, roleContext: ctx.roleContext, locationRadiusKm: ctx.locationRadiusKm })
+  const plan = compileSpec(spec)
   if (!isPlanRunnable(plan)) throw new EmptyIcpQueryError(plan)
 
-  if (!crustdataConfigured()) {
-    throw new CrustdataConfigError('CRUSTDATA_API_KEY is not set — cannot source from Crustdata')
-  }
+  if (!crustdataConfigured()) throw new CrustdataConfigError('CRUSTDATA_API_KEY is not set — cannot source from Crustdata')
   if (!opts.allowDisabled && !(await isSourceEnabled(supabase))) {
     throw new Error(`${SOURCE} is disabled in pool_sources. Enable it, or pass allowDisabled:true for a development run.`)
   }
@@ -299,16 +324,15 @@ export async function sourceFromIcp(
   const jobId = opts.jobId ?? icp.job_id ?? null
   const maxRecords = Math.max(1, opts.maxRecords ?? opts.perPage ?? CRUSTDATA_DEFAULT_LIMIT)
   const described = describePlan(plan)
-  const cursors = await loadLaneCursors(supabase, jobId)
+  const states = await loadLaneStates(supabase, jobId)
 
   const runId = await startIngestRun(supabase, {
-    sourceKey: SOURCE,
-    orgId: opts.orgId,
-    jobId,
-    query: { ...described, maxRecords, results: [] },
+    sourceKey: SOURCE, orgId: opts.orgId, jobId,
+    query: { ...described, specSource: spec.source, maxRecords, results: [] },
   })
 
   const profiles: unknown[] = []
+  const laneOfPayload: number[] = [] // payload index → lane index
   const seen = new Set<string>()
   const results: LaneRunResult[] = []
   let creditsUsed = 0
@@ -316,75 +340,63 @@ export async function sourceFromIcp(
 
   try {
     let remaining = maxRecords
-    for (let i = 0; i < plan.lanes.length && remaining > 0; i++) {
+    for (let i = 0; i < plan.lanes.length; i++) {
       const lane = plan.lanes[i]
-      const lanesLeft = plan.lanes.length - i
-      const budget = Math.max(1, Math.ceil(remaining / lanesLeft))
-      const cursor = cursors.get(lane.key) ?? null
+      const prior = states.get(lane.key) ?? { cursor: null, exhausted: false }
       const result: LaneRunResult = {
         key: lane.key, kind: lane.kind, label: lane.label, summary: lane.summary, rationale: lane.rationale ?? null,
-        total: null, fetched: 0, duplicates: 0, creditsUsed: 0, nextCursor: null, resumed: Boolean(cursor),
+        total: null, fetched: 0, duplicates: 0, creditsUsed: 0, nextCursor: prior.cursor, resumed: Boolean(prior.cursor),
+        exhausted: prior.exhausted, profileIds: [],
       }
+      results.push(result)
+      if (remaining <= 0 || prior.exhausted) continue // already drained — relax to the next level
       try {
-        const page = await searchPeople(lane.filters, { limit: budget, cursor, sorts: opts.sorts })
+        const page = await searchPeople(lane.filters, { limit: remaining, cursor: prior.cursor, sorts: opts.sorts })
         creditsUsed += page.creditsUsed
         result.creditsUsed = page.creditsUsed
         result.total = page.totalCount
         result.nextCursor = page.nextCursor
         if (page.totalCount) matchedTotal += page.totalCount
-        await recordVendorCall(supabase, {
-          sourceKey: SOURCE, endpoint: 'search', orgId: opts.orgId, runId, ok: true,
-          credits: Math.ceil(page.creditsUsed), recordsReturned: page.profiles.length,
-        })
+        await recordVendorCall(supabase, { sourceKey: SOURCE, endpoint: 'search', orgId: opts.orgId, runId, ok: true, credits: Math.ceil(page.creditsUsed), recordsReturned: page.profiles.length })
         for (const raw of page.profiles) {
           const id = profileIdentity(raw)
           if (id && seen.has(id)) { result.duplicates++; continue }
           if (id) seen.add(id)
           profiles.push(raw)
+          laneOfPayload.push(i)
           result.fetched++
         }
         remaining -= result.fetched
+        // Short page with no next cursor = the level has nothing more to give.
+        if (!page.nextCursor && page.profiles.length < Math.min(remaining + result.fetched, maxRecords)) result.exhausted = true
       } catch (err) {
         result.error = err instanceof Error ? err.message : String(err)
-        await recordVendorCall(supabase, {
-          sourceKey: SOURCE, endpoint: 'search', orgId: opts.orgId, runId, ok: false, credits: 0, recordsReturned: 0,
-        }).catch(() => undefined)
-        logger.warn('Crustdata lane failed', { runId, lane: lane.label, error: result.error })
+        await recordVendorCall(supabase, { sourceKey: SOURCE, endpoint: 'search', orgId: opts.orgId, runId, ok: false, credits: 0, recordsReturned: 0 }).catch(() => undefined)
+        logger.warn('Crustdata level failed', { runId, level: lane.label, error: result.error })
       }
-      results.push(result)
     }
 
-    const ingest = await ingestVendorRecords(supabase, SOURCE, profiles, {
-      runId,
-      creditsPerRecord: profiles.length ? creditsUsed / profiles.length : 0,
+    const ingest = await ingestVendorRecords(supabase, SOURCE, profiles, { runId, creditsPerRecord: profiles.length ? creditsUsed / profiles.length : 0 })
+    const acquired: AcquiredMap = {}
+    ingest.outcomes.forEach((o, idx) => {
+      if (o.status !== 'ingested') return
+      const li = laneOfPayload[idx]
+      results[li].profileIds.push(o.profileId)
+      acquired[o.profileId] = { level: li + 1, label: results[li].label, key: results[li].key }
     })
-    await finishIngestRun(supabase, runId, {
-      ids_matched: matchedTotal || profiles.length,
-      ids_bought: profiles.length,
-      profiles_created: ingest.created,
-      profiles_merged: ingest.merged,
-      records_unusable: ingest.unusable,
-      credits_used: Math.ceil(creditsUsed),
-    })
-    // Persist per-lane outcomes + cursors on the run (jsonb) so the next run resumes.
-    await (supabase as unknown as LooseSb)
-      .from('pool_ingest_runs')
-      .update({ query: { ...described, maxRecords, results } })
-      .eq('id', runId)
-      .then(() => undefined, () => undefined)
 
-    logger.info('Crustdata plan run complete', {
-      runId, lanes: results.length, matched: matchedTotal, fetched: profiles.length, creditsUsed,
-      created: ingest.created, merged: ingest.merged, unusable: ingest.unusable,
+    await finishIngestRun(supabase, runId, {
+      ids_matched: matchedTotal || profiles.length, ids_bought: profiles.length,
+      profiles_created: ingest.created, profiles_merged: ingest.merged, records_unusable: ingest.unusable, credits_used: Math.ceil(creditsUsed),
     })
+    await (supabase as unknown as LooseSb).from('pool_ingest_runs').update({ query: { ...described, specSource: spec.source, maxRecords, results } }).eq('id', runId).then(() => undefined, () => undefined)
+
+    logger.info('Crustdata ladder run complete', { runId, levels: results.length, matched: matchedTotal, fetched: profiles.length, creditsUsed, created: ingest.created, merged: ingest.merged })
     return {
-      runId,
-      matched: matchedTotal || null,
-      fetched: profiles.length,
-      creditsUsed,
-      ingest,
-      plan: { ...described, results },
+      runId, matched: matchedTotal || null, fetched: profiles.length, creditsUsed, ingest,
+      plan: { ...described, results, specSource: spec.source },
       profileIds: ingest.needsReembed,
+      acquired,
     }
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)

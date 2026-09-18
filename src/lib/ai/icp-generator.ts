@@ -139,6 +139,7 @@ const recruiterBriefSchema = z.object({
     max_years: z.number().nullish(),
     rationale: z.string().nullish(),
   }).nullish(),
+  target_schools: z.object({ tier1: z.array(z.string()).max(40).default([]), tier2: z.array(z.string()).max(40).default([]) }).nullish(),
   feeder_pools: z.array(z.object({
     label: z.string(),
     companies: z.array(z.string()).default([]),
@@ -519,6 +520,7 @@ Work in this exact order, and let each step drive the next:
    - niche, persona: who you are and the 2–3 things you screen on first.
    - market: the hiring market as you understand it — city/country, on-site vs remote, whether relocation and visa-sponsored pools are realistic here.
    - experience_band: the realistic years-of-experience FLOOR and CEILING for this seat, from the level, the budget, the team size and the JD. The ceiling is as real as the floor: a Bain partner with 12 years is NOT a candidate for a 2–6 year Strategy & Ops seat — they won't take it, won't stay, and are out of budget. Over-seniority is a mismatch, never a bonus. Give min_years, max_years and a one-line rationale. Your feeder_pools must then name role types INSIDE that band (Analyst/Associate, not Partner).
+   - target_schools: when education pedigree matters in this market, the SCHOOL LISTS you would actually search — tier1 (the institutions a first-pass filter accepts) and tier2 (where you look once tier1 is exhausted). Write each as the short literal name a person would type on a profile ("Indian Institute of Technology", "IIM Ahmedabad", "BITS Pilani", "University of Oxford"); a generic institution name covers all its campuses. Leave both empty when pedigree is not a real filter for this role.
    - feeder_pools: where you would search FIRST, in priority order (priority 1 = first). Each pool names REAL employers AND the role types you'd pull from them, local to this market. Think like your niche: a strategy recruiter starts at top consulting, IB, VC/PE and in-house Strategy & Ops / BizOps / Chief of Staff teams; a GTM recruiter starts at quota carriers at comparable deal size and segment; an engineering recruiter at product companies solving comparable problems. Be concrete; name companies.
    - title_families: the titles that are the SAME search as this role.
    - market_gates: which of the JD's requirements are TRUE gates in this market and why (e.g. institute tier is a real filter in Indian strategy hiring; a degree barely matters in engineering).
@@ -549,6 +551,7 @@ Respond with ONLY valid JSON (no markdown), with the fields in this order:
   "recruiter_brief": {
     "niche": "", "persona": "", "market": "",
     "experience_band": { "min_years": 2, "max_years": 6, "rationale": "" },
+    "target_schools": { "tier1": [""], "tier2": [""] },
     "feeder_pools": [ { "label": "", "companies": [""], "role_types": [""], "priority": 1, "rationale": "" } ],
     "title_families": [""],
     "market_gates": [ { "requirement": "", "why": "" } ],

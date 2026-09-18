@@ -293,6 +293,8 @@ export interface BatchIngestTotals {
   unusable: number
   failed: number
   needsReembed: string[]
+  /** One outcome per payload, in payload order — lets a caller know WHICH profile each record became. */
+  outcomes: IngestOutcome[]
 }
 
 /** Ingest a batch of purchased payloads, sharing one trust config. */
@@ -304,7 +306,7 @@ export async function ingestVendorRecords(
 ): Promise<BatchIngestTotals> {
   const trust = await loadTrustConfig(supabase)
   const concurrency = opts.concurrency ?? 5
-  const totals: BatchIngestTotals = { ingested: 0, created: 0, merged: 0, unusable: 0, failed: 0, needsReembed: [] }
+  const totals: BatchIngestTotals = { ingested: 0, created: 0, merged: 0, unusable: 0, failed: 0, needsReembed: [], outcomes: [] }
 
   for (let i = 0; i < payloads.length; i += concurrency) {
     const results = await Promise.all(
@@ -320,6 +322,7 @@ export async function ingestVendorRecords(
       ),
     )
     for (const r of results) {
+      totals.outcomes.push(r)
       if (r.status === 'ingested') {
         totals.ingested++
         if (r.created) totals.created++

@@ -24,6 +24,8 @@ export interface MatrixMatch {
   gate_unknown?: { label?: string }[]
   /** Small chip next to the name, e.g. "Crustdata · new". */
   source_badge?: string | null
+  /** The ladder level that reached this person, e.g. "L1 · full match". */
+  level_badge?: string | null
   red_flags: string[]
   rationale: string | null
   data_incomplete?: boolean | null
@@ -196,6 +198,9 @@ export function SourcingMatrix({
                           <span className="truncate text-sm font-medium text-slate-800">{c?.name ?? 'Unknown'}</span>
                           {m.data_incomplete && (
                             <FileQuestion className="h-3 w-3 shrink-0 text-amber-500" aria-label="Background unverified" />
+                          )}
+                          {m.level_badge && (
+                            <span title="Which level of the search plan reached this person" className="inline-flex shrink-0 items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">{m.level_badge}</span>
                           )}
                           {m.source_badge && (
                             <span className="inline-flex shrink-0 items-center rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold text-sky-700">{m.source_badge}</span>

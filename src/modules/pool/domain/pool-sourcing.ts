@@ -38,6 +38,8 @@ export interface PoolMatch {
   gate_unknown?: string[]
   /** Where this profile came from (pool_identities.source_key), e.g. 'vendor:crustdata'. */
   sources?: string[]
+  /** The ladder level that acquired this person (1 = the 100% match), when known. */
+  acquired?: { level: number; label: string } | null
 }
 
 /** Build the Candidate shape the Fit Engine reads from a pool profile row. */
@@ -66,7 +68,7 @@ export async function sourcePoolForIcp(
   // Profile ids that must be scored regardless of semantic recall — e.g. everything a
   // Crustdata run just bought. A bought profile that never gets scored is money spent
   // on a person the recruiter never sees.
-  opts: { includeIds?: string[] } = {},
+  opts: { includeIds?: string[]; acquired?: Record<string, { level: number; label: string }> } = {},
 ): Promise<{ status: 'ok' | 'no_access' | 'empty'; matches: PoolMatch[] }> {
   const access = await getPoolAccess(supabase, orgId)
   if (!access.hasAccess) return { status: 'no_access', matches: [] }
@@ -176,6 +178,7 @@ export async function sourcePoolForIcp(
             competencies: fit.competencies.map((c) => ({ name: c.name, rating: c.rating, evidence: c.evidence })),
             red_flags: fit.red_flags,
             sources: sourcesByProfile.get(p.id) ?? [],
+            acquired: opts.acquired?.[p.id] ? { level: opts.acquired[p.id].level, label: opts.acquired[p.id].label } : null,
           } as PoolMatch
         } catch {
           return null
@@ -184,7 +187,10 @@ export async function sourcePoolForIcp(
     )
     for (const m of scored) if (m) matches.push(m)
   }
-  matches.sort((a, b) => b.score - a.score)
+  // Gates passed first; then the ladder level that reached them (a full match outranks a
+  // relaxed one); then the judge's score. Pool recall with no level sorts after all levels.
+  const lvl = (m: PoolMatch) => m.acquired?.level ?? 99
+  matches.sort((a, b) => (Number(b.gate_failures.length === 0) - Number(a.gate_failures.length === 0)) || (lvl(a) - lvl(b)) || (b.score - a.score))
   return { status: 'ok', matches }
 }
 

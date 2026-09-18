@@ -35,7 +35,7 @@ import {
 import { experienceBandFromGate, yearsFloorFromLabel } from '@/lib/icp-gates'
 export { yearsFloorFromLabel }
 
-export type LaneKind = 'feeder' | 'titles' | 'title'
+export type LaneKind = 'feeder' | 'titles' | 'title' | 'level'
 
 export interface SearchLane {
   /** Stable id (kind + slug + filter hash) — pagination cursors are keyed on it. */
