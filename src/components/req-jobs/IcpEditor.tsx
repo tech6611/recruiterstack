@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Brain, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Brain, ChevronDown, ChevronRight, Compass } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -51,6 +51,11 @@ export function IcpEditor({
   const [intakeNotes, setIntakeNotes] = useState('')
   const [showIntake, setShowIntake] = useState(false)
   const [showReasoning, setShowReasoning] = useState(true)
+  // Phase 1 (niche recruiter) — the brief the model reasoned in, and the recruiter's
+  // corrections to it (house knowledge fed into the next Regenerate).
+  const [showBrief, setShowBrief] = useState(true)
+  const [corrections, setCorrections] = useState('')
+  const [savingCorrections, setSavingCorrections] = useState(false)
 
   function loadTemplates() {
     fetch('/api/role-templates')
@@ -66,6 +71,28 @@ export function IcpEditor({
     setIcp(next)
     setComps(next.competencies ?? [])
     setGates(next.must_haves ?? [])
+    setCorrections(next.sourcing_map?.recruiter_brief?.corrections ?? '')
+  }
+
+  /** Save the recruiter's corrections to the brief. Allowed on any status — they are
+   *  house knowledge for the NEXT regenerate, not an edit to gates or weights. */
+  async function saveCorrections() {
+    if (!icp) return
+    setSavingCorrections(true)
+    const res = await fetch(`/api/jobs/${jobId}/icp/${icp.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recruiter_corrections: corrections }),
+    })
+    setSavingCorrections(false)
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast.error(j.error ?? 'Could not save corrections')
+      return
+    }
+    const { data } = await res.json()
+    setIcp(data as Icp)
+    toast.success('Corrections saved — they will shape the next Regenerate.')
   }
 
   useEffect(() => {
@@ -360,6 +387,137 @@ export function IcpEditor({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* ── Recruiter brief (Phase 1, niche recruiter) — WHO reasoned this ICP ── */}
+        {icp.sourcing_map && (icp.sourcing_map.recruiter_brief || icp.status === 'draft') && (() => {
+          const b = icp.sourcing_map.recruiter_brief
+          const pools = [...(b?.feeder_pools ?? [])].sort((x, y) => (x.priority ?? 99) - (y.priority ?? 99))
+          return (
+            <section className="rounded-xl border border-indigo-200 bg-indigo-50/40">
+              <button type="button" onClick={() => setShowBrief((v) => !v)}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-xs font-semibold text-slate-700">
+                {showBrief ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                <Compass className="h-3.5 w-3.5 text-indigo-600" />
+                {b?.niche ? <>Reasoning as: <span className="text-indigo-700">{b.niche}</span></> : 'Recruiter brief'}
+              </button>
+              {showBrief && (
+                <div className="space-y-3 px-3 pb-3">
+                  {!b && (
+                    <p className="text-xs text-slate-500">
+                      This ICP was generated before recruiter briefs existed. Regenerate to have the model decide which
+                      specialist recruiter it is for this search, or write corrections below to steer it.
+                    </p>
+                  )}
+                  {b?.persona && <p className="text-xs leading-relaxed text-slate-700">{b.persona}</p>}
+                  {b?.market && (
+                    <div className="text-xs"><span className="font-semibold uppercase tracking-wide text-[10px] text-slate-400">Market · </span><span className="text-slate-600">{b.market}</span></div>
+                  )}
+                  {b?.experience_band && (b.experience_band.min_years != null || b.experience_band.max_years != null) && (
+                    <div className="text-xs">
+                      <span className="font-semibold uppercase tracking-wide text-[10px] text-slate-400">Experience band · </span>
+                      <span className="font-medium text-slate-700">
+                        {b.experience_band.min_years ?? '?'}–{b.experience_band.max_years ?? '?'} years
+                      </span>
+                      {b.experience_band.rationale && <span className="text-slate-500"> — {b.experience_band.rationale}</span>}
+                      <span className="ml-1.5 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-700">ceiling enforced</span>
+                    </div>
+                  )}
+
+                  {pools.length > 0 && (
+                    <div>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Where to look first</div>
+                      <ol className="space-y-1.5">
+                        {pools.map((pool, i) => (
+                          <li key={i} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs">
+                            <div className="font-medium text-slate-800">{pool.priority ?? i + 1}. {pool.label}</div>
+                            {pool.companies.length > 0 && (
+                              <div className="mt-0.5 flex flex-wrap gap-1">
+                                {pool.companies.map((c) => <span key={c} className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] text-indigo-800">{c}</span>)}
+                              </div>
+                            )}
+                            {pool.role_types.length > 0 && <div className="mt-0.5 text-[11px] text-slate-500">Roles: {pool.role_types.join(' · ')}</div>}
+                            {pool.rationale && <div className="text-[11px] text-slate-400">{pool.rationale}</div>}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+
+                  {(b?.title_families?.length ?? 0) > 0 && (
+                    <div>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Same search, other titles</div>
+                      <div className="flex flex-wrap gap-1">
+                        {b!.title_families.map((t) => <span key={t} className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-700">{t}</span>)}
+                      </div>
+                    </div>
+                  )}
+
+                  {(b?.market_gates?.length ?? 0) > 0 && (
+                    <div>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">True gates in this market</div>
+                      <ul className="space-y-1">
+                        {b!.market_gates.map((g, i) => (
+                          <li key={i} className="text-xs"><span className="font-medium text-slate-700">{g.requirement}</span>{g.why && <span className="text-slate-500"> — {g.why}</span>}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(b?.jd_translations?.length ?? 0) > 0 && (
+                    <div>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">How the JD reads here</div>
+                      <ul className="space-y-1">
+                        {b!.jd_translations.map((t, i) => (
+                          <li key={i} className="text-xs"><span className="text-slate-500">“{t.phrase}”</span> <span className="text-slate-400">→</span> <span className="text-slate-700">{t.means_here}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(b?.market_norms?.length ?? 0) > 0 && (
+                    <div>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Market norms</div>
+                      <ul className="space-y-1">
+                        {b!.market_norms.map((n, i) => (
+                          <li key={i} className="text-xs"><span className="font-medium text-slate-700">{n.topic}: </span><span className="text-slate-600">{n.norm}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(b?.normal_red_flags?.length ?? 0) > 0 && (
+                    <div className="text-xs"><span className="font-semibold uppercase tracking-wide text-[10px] text-slate-400">Normal in this niche (don&apos;t penalise) · </span><span className="text-slate-600">{b!.normal_red_flags.join(' · ')}</span></div>
+                  )}
+                  {(b?.unsure_about?.length ?? 0) > 0 && (
+                    <div className="text-xs"><span className="font-semibold uppercase tracking-wide text-[10px] text-amber-600">Wants a human check · </span><span className="text-amber-800">{b!.unsure_about.join(' · ')}</span></div>
+                  )}
+
+                  <div className="rounded-lg border border-slate-200 bg-white p-2.5">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Correct this brief</div>
+                    <p className="mb-1.5 text-[11px] text-slate-500">
+                      Write what this recruiter got wrong or missed — feeder companies, what is really a gate here,
+                      market norms. Saved corrections override the model&apos;s defaults on the next Regenerate.
+                    </p>
+                    <textarea
+                      value={corrections}
+                      onChange={(e) => setCorrections(e.target.value)}
+                      rows={3}
+                      maxLength={4000}
+                      placeholder="e.g. In Bengaluru strategy hiring, also search IB analysts at Avendus/Kotak and PE associates; treat ISB/IIM-A/B/C as tier-1; 60–90 day notice is normal."
+                      className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none"
+                    />
+                    <div className="mt-1.5 flex justify-end">
+                      <Button size="sm" variant="outline" onClick={saveCorrections}
+                        disabled={savingCorrections || corrections === (b?.corrections ?? '')}>
+                        <Save className="mr-1.5 h-3.5 w-3.5" /> {savingCorrections ? 'Saving…' : 'Save corrections'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          )
+        })()}
+
         {/* ── Reasoning (Sourcing Brain, Slice 1) — how the JD was dissected ── */}
         {icp.sourcing_map && (
           <section className="rounded-xl border border-slate-200 bg-slate-50/60">
@@ -398,6 +556,7 @@ export function IcpEditor({
                         <div key={i} className="text-xs">
                           <span className="font-medium text-slate-700">{f.filter}</span>
                           {typeof f.confidence === 'number' && <span className="text-slate-400"> · {Math.round(f.confidence * 100)}% conf</span>}
+                          {f.recommend_apply === false && <span className="ml-1.5 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">model says: don&apos;t apply</span>}
                           {f.exclusion_cost && <div className="text-[11px] text-amber-700">Cost: {f.exclusion_cost}</div>}
                         </div>
                       ))}

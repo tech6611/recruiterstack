@@ -40,3 +40,9 @@ export const icpDraftInputSchema = z.object({
 })
 
 export type IcpDraftInputParsed = z.infer<typeof icpDraftInputSchema>
+
+/** PATCH payload: the recruiter's corrections to the ICP's recruiter brief. Free text —
+ *  it is house knowledge fed back into the prompt verbatim, not structured data. */
+export const icpRecruiterCorrectionsSchema = z.object({
+  recruiter_corrections: z.string().trim().max(4000),
+})

@@ -38,7 +38,9 @@ export const icpFitResponseSchema = z.object({
   // `pass` defaults to true so a parse hiccup never wrongly rejects someone.
   gate_results: z.array(z.object({
     id:     z.string(),
-    pass:   z.boolean().catch(true),
+    // true = met, false = evidence it is NOT met, null = the data can't establish it
+    // either way (UNKNOWN — never a rejection). A parse hiccup never wrongly rejects.
+    pass:   z.boolean().nullable().catch(true),
     reason: z.string().catch(''),
   })).catch([]),
   red_flags: z.array(z.string()).catch([]),

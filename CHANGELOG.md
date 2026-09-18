@@ -9,6 +9,108 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-17 (ICP experience band — the ceiling is as real as the floor)
+
+### Added
+- **`experience_band`** on the recruiter brief: the prompt now asks for the realistic
+  years FLOOR and CEILING for the seat (from level, budget, team size, JD) and to name
+  feeder role types inside it ("Analyst/Associate, not Partner"). The band becomes one
+  structured `experience_band` gate on the ICP (`src/lib/icp-gates.ts`), subsuming any
+  plain "N+ years" gate the model also wrote. From there it flows everywhere: the
+  Crustdata plan sends it as `=>`/`=<` on `years_of_experience_raw`; the Fit Engine
+  rejects deterministically when the years are known (and the judge is told
+  over-seniority — Partner/CXO/VP titles for an IC seat — is a mismatch, not a bonus).
+  Shown on the ICP page as "Experience band · 2–6 years · ceiling enforced".
+
+### Fixed
+- Fit Engine now unions deterministic gate checks with the judge's verdicts, so a
+  structured gate the judge waves through can still fail on hard evidence. The band
+  check itself only hard-fails a CLEAR breach (25% / 1-year tolerance); the judge,
+  told that over-seniority is a mismatch, rules on the margin.
+- **Total experience was calendar time since the earliest dated role** (gaps and a
+  2016 internship included), so vendor profiles Crustdata placed inside a 2–6 year
+  ceiling showed 7–11 years here and were rejected. `deriveMovability` now counts
+  EMPLOYED months — the union of role spans, internships excluded — via the new
+  `employedMonths()`. Rebuilt the 21 Crustdata pool profiles (20 changed).
+- `embedPoolProfiles` skips profiles with nothing to embed; one empty text made Gemini
+  reject the whole batch, leaving every newly sourced profile invisible to recall.
+- Reasoning-first ICP call gets a 20k output-token cap (the brief made 8k truncate
+  mid-JSON and silently fall back to the seed).
+
+## 2026-09-17 (Niche-recruiter sourcing — Step 2: the ICP drives the Crustdata search)
+
+### Added
+- **Search plan** (`vendors/crustdata/search-plan.ts`, pure + tested): the ICP's recruiter
+  brief becomes several small Crustdata LANES run in priority order — one **feeder lane**
+  per feeder pool (employer matched across ANY role, past or current, by all-words on
+  normalised company names, narrowed by the pool's role types) and a **titles lane**
+  (job title + title families on the current title). Every lane shares the **market
+  as a geo radius** (50 km of the job's structured location; skipped for remote), a
+  **years floor** parsed from plain-sentence gates, and any structured gate the old
+  translator can still map. Plain-sentence gates are reported honestly as
+  "checked after fetch, not searchable". Grammar verified live against Crustdata.
+- **Multi-lane orchestrator** (`sourceFromIcp` in `crustdata-acquire.ts`): one ingest
+  run, one budget spread across lanes (unspent share rolls forward), cross-lane
+  de-dup by LinkedIn URL, per-lane totals/credits/errors recorded, and **cursor
+  continuity** — each lane's `next_cursor` is saved on the run so the next click pages
+  forward instead of re-buying page 1 (was: every run re-bought the same 3 people).
+- **Unknown gate verdicts** in the Fit Engine: the judge may now answer `null` for a
+  specific-skill/credential gate the data can't establish (Crustdata search returns no
+  skills), surfaced as an amber "?" instead of a rejection. Previously every Crustdata
+  profile failed "mentions SQL" and was capped at 20.
+- **Richer evidence for market profiles**: role descriptions (`pool_experiences.summary`)
+  and education (`pool_profile_fields`) now reach the judge; matches carry `sources`
+  and the matrix shows a "Crustdata · new" badge so vendor hits are distinguishable
+  from pool recall.
+- **"What was sent to Crustdata" panel** in the sourcing section: each lane with its
+  filter chips, vendor total, fetched/duplicate counts, credits, resumed flag; plus the
+  requirements that were checked after fetch.
+
+### Changed
+- Crustdata run default is 10 profiles (was 3), spread across lanes; cap stays 25.
+- Employer filter field is the documented `…company_name` (was `…name`; both accepted).
+
+## 2026-09-17 (Niche-recruiter ICP — Phase 1: the recruiter brief)
+
+### Added
+- **Recruiter brief** in the reasoning-first ICP prompt (`icp-generator.ts`): before
+  reasoning about the role, the model must decide WHICH specialist recruiter it is for
+  this search (niche × market × company) and write the brief it would hand a junior —
+  feeder pools (named employers + role types, in priority order), title families, what
+  is a TRUE gate in this market, JD translations for the market ("2:1" → tier-1
+  institute in India), market norms (comp sanity, notice, visa/relocation,
+  findability), normal red flags, and where it wants a human check. Everything after
+  is reasoned in that persona. Stored as `icps.sourcing_map.recruiter_brief` (no
+  migration — existing JSONB).
+- **Market + company context** fed to the prompt (`job-role-context.ts`): structured
+  location (city/state/country/timezone/work model from `locations` + intake) and org
+  profile (name, industry, size, website, about). Both existed in the DB but never
+  reached a prompt — the model only ever saw the site nickname.
+- **Recruiter corrections** — a "Correct this brief" box on the ICP page; saved via
+  `PATCH /api/jobs/[id]/icp/[icpId]` into `recruiter_brief.corrections` (any status),
+  carried across regenerations and injected as `<recruiter_corrections>` that
+  override the model's defaults. The seed of a house recruiting knowledge base.
+- ICP page shows "Reasoning as: <niche>" with the brief, and now surfaces the model's
+  own "don't apply" verdict on unwritten filters (was stored but hidden).
+
+### Changed
+- Removed the engineering-flavoured defaults from the shared ICP prompt
+  ("software-engineering background", "product-vs-services", "Payments domain depth"
+  as the only example) so a non-tech role isn't reasoned through a tech recruiter's lens.
+
+## 2026-09-17 (AI prompts were blind to canonical job requirements)
+
+### Fixed
+- **`canonicalJobToHiringRequest()`** (`job-pipelines.ts`) hardcoded `key_requirements`,
+  `nice_to_haves`, `team_context`, `level`, `location`, `target_companies`, budget and
+  `generated_jd` to null, so EVERY AI feature on a canonical job — ICP generator,
+  Sifter scoring, screening, shortlist brief, enroll, copilot — saw "Key Requirements:
+  Not specified" / "Job description: Not provided" and invented requirements (e.g. the
+  Strategy & Ops ICP listed "5+ years" and "MBA preferred" while the real JD's 2:1
+  degree and SQL/Python/R never reached the model). Now reads the whole
+  `custom_fields.intake` bag + `jobs.description`, converted from Tiptap HTML to
+  prompt-ready plain text via the new exported `htmlToPromptText()` (bullets kept).
+  The three selects feeding the mapper now include `description`. Tests added.
 ## 2026-09-17 (Candidate profile — readable activity feed + current company)
 
 ### Changed
@@ -58,6 +160,14 @@ entries on top.
   thrown fetch, treats only a real 404 as "not found", and otherwise shows
   "Couldn’t load this candidate" with a **Try again** button.
   (`src/lib/hooks/useCandidate.ts`, `CandidateProfileContent.tsx`; hook tests added)
+
+## 2026-09-17 (AI sourcing competitor research)
+
+### Docs
+- Added a sourced deep-dive into leading AI sourcers' intake, company targeting,
+  search calibration, candidate evaluation, feedback, and data freshness, with
+  detailed vendor appendices and a proposed comparison trial. Earlier Crustdata
+  code findings are marked historical pending review of the updated implementation.
 
 ## 2026-09-17 (Crustdata sourcing — Slice 4: trigger route + matrix button)
 

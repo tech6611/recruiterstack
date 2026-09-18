@@ -133,3 +133,88 @@ describe('isDefaultRubric', () => {
     expect(isDefaultRubric([...DEFAULT_SCORING_CRITERIA, { id: 'leadership', name: 'Leadership', weight: 0, description: '' }])).toBe(false)
   })
 })
+
+// ── Phase 1: niche recruiter brief ───────────────────────────────────────────────
+import { buildReasoningFirstPrompt, sourcingMapFromReasoning, type ReasoningFirstGeneration } from './icp-generator'
+
+const stratJob = {
+  position_title: 'Strategy & Operations Manager', level: 'Senior', location: 'Bangalore Back Office', remote_ok: false,
+  key_requirements: '- At least a 2:1 degree\n- SQL, Python, or R', nice_to_haves: null, team_context: null,
+  target_companies: 'Google', generated_jd: 'Operations means problem-solving at scale.',
+} as unknown as HiringRequest
+
+describe('buildReasoningFirstPrompt (niche recruiter, Phase 1)', () => {
+  it('feeds the hiring company and market, and asks for the recruiter brief FIRST', () => {
+    const prompt = buildReasoningFirstPrompt(stratJob, null, {
+      roleContext: {
+        market: { site: 'Bangalore Back Office', city: 'Bengaluru', state: 'Karnataka', country: 'IN', timezone: 'IST', work_model: 'onsite' },
+        company: { name: 'RecruiterStack', industry: 'SaaS', size: '11-50', website: null, about: 'An ATS.' },
+      },
+    })
+    expect(prompt).toContain('<hiring_company>\nName: RecruiterStack\nIndustry: SaaS\nSize: 11-50 employees\nAbout: An ATS.\n</hiring_company>')
+    expect(prompt).toContain('<market>\nLocation: Bengaluru, Karnataka, IN (site: Bangalore Back Office)\nWork model: onsite\nTimezone: IST\n</market>')
+    expect(prompt.indexOf('0) recruiter_brief')).toBeLessThan(prompt.indexOf('1) reasoning'))
+    expect(prompt).toContain('"recruiter_brief"')
+    // The shared prompt no longer reasons like a tech recruiter by default.
+    expect(prompt).not.toContain('software-engineering background')
+    expect(prompt).not.toContain('product-vs-services')
+    expect(prompt).not.toContain('<recruiter_corrections>')
+  })
+
+  it('renders "Not provided" without context and injects recruiter corrections when present', () => {
+    const prompt = buildReasoningFirstPrompt(stratJob, null, { recruiterCorrections: 'Also search IB analysts at Avendus.' })
+    expect(prompt).toContain('<hiring_company>\nNot provided\n</hiring_company>')
+    expect(prompt).toContain('<market>\nNot provided\n</market>')
+    expect(prompt).toContain('<recruiter_corrections>\nAlso search IB analysts at Avendus.\n</recruiter_corrections>')
+    expect(prompt).toContain('THEY WIN')
+  })
+})
+
+describe('sourcingMapFromReasoning', () => {
+  const gen: ReasoningFirstGeneration = {
+    recruiter_brief: {
+      niche: 'Strategy & Ops recruiter, Bengaluru', persona: 'p', market: 'Bengaluru, on-site',
+      feeder_pools: [{ label: 'MBB', companies: ['McKinsey'], role_types: ['Consultant'], priority: 1, rationale: null }],
+      title_families: ['BizOps'], market_gates: [], jd_translations: [], market_norms: [], normal_red_flags: [], unsure_about: [],
+    },
+    reasoning: 'r', requirement_decomposition: [], unwritten_filters: [], archetypes: [],
+    competencies: [{ name: 'A', weight: 100, behaviours: [] }], must_haves: [],
+  }
+  it('stores the brief and carries the recruiter corrections on it', () => {
+    const sm = sourcingMapFromReasoning(gen, '  Prefer ISB grads. ')
+    expect(sm.recruiter_brief?.niche).toBe('Strategy & Ops recruiter, Bengaluru')
+    expect(sm.recruiter_brief?.feeder_pools[0].companies).toEqual(['McKinsey'])
+    expect(sm.recruiter_brief?.corrections).toBe('Prefer ISB grads.')
+  })
+  it('keeps corrections even when the model returned no brief; null brief otherwise', () => {
+    expect(sourcingMapFromReasoning({ ...gen, recruiter_brief: null }, 'x').recruiter_brief?.corrections).toBe('x')
+    expect(sourcingMapFromReasoning({ ...gen, recruiter_brief: null }, null).recruiter_brief).toBeNull()
+  })
+})
+
+// ── Experience band → one structured gate ─────────────────────────────────────
+import { draftFromReasoning } from './icp-generator'
+
+describe('draftFromReasoning (experience band)', () => {
+  const base: ReasoningFirstGeneration = {
+    recruiter_brief: {
+      niche: 'n', persona: 'p', market: 'm', experience_band: { min_years: 2, max_years: 6, rationale: 'IC seat' },
+      feeder_pools: [], title_families: [], market_gates: [], jd_translations: [], market_norms: [], normal_red_flags: [], unsure_about: [],
+    },
+    reasoning: '', requirement_decomposition: [], unwritten_filters: [], archetypes: [],
+    competencies: [{ name: 'A', weight: 100, behaviours: [] }],
+    must_haves: [{ label: 'Has at least 2 full years of experience?' }, { label: 'Mentions SQL?' }],
+  }
+  it("turns the brief's band into a structured gate and drops the plain years gate it subsumes", () => {
+    const d = draftFromReasoning(base)
+    expect(d.must_haves.map((g) => g.label)).toEqual([
+      'Mentions SQL?',
+      'Has between 2 and 6 years of professional experience — not over-senior for this role?',
+    ])
+    expect(d.must_haves[1]).toMatchObject({ attribute: 'experience_band', value: ['2', '6'] })
+  })
+  it('keeps plain gates untouched when the brief has no band', () => {
+    const d = draftFromReasoning({ ...base, recruiter_brief: { ...base.recruiter_brief!, experience_band: null } })
+    expect(d.must_haves.map((g) => g.label)).toEqual(['Has at least 2 full years of experience?', 'Mentions SQL?'])
+  })
+})

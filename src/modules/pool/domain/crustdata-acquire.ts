@@ -47,12 +47,14 @@ import {
 } from '@/modules/pool/vendors/crustdata/client'
 import { ingestVendorRecords, type BatchIngestTotals } from '@/modules/pool/domain/ingest'
 import { startIngestRun, finishIngestRun, recordVendorCall } from '@/modules/pool/domain/vendor-ledger'
+import type { CrustdataQueryContext } from '@/modules/pool/vendors/crustdata/query'
 import {
-  buildCrustdataQueryFromIcp,
-  isQueryable,
-  type CrustdataQueryContext,
-  type CrustdataQueryBuild,
-} from '@/modules/pool/vendors/crustdata/query'
+  buildSearchPlan,
+  isPlanRunnable,
+  describePlan,
+  type SearchPlan,
+  type SearchPlanContext,
+} from '@/modules/pool/vendors/crustdata/search-plan'
 import type { Icp } from '@/lib/types/icp'
 
 type Supabase = SupabaseClient<Database>
@@ -194,38 +196,199 @@ export async function sourceFromCrustdata(
   }
 }
 
-/** Thrown when an ICP produces no usable Crustdata filters, so a search would be wasteful. */
+/** Thrown when an ICP produces no usable Crustdata search lanes, so a search would be wasteful. */
 export class EmptyIcpQueryError extends Error {
-  constructor(readonly build: CrustdataQueryBuild) {
-    super('ICP produced no Crustdata-searchable filters; nothing to source on')
+  constructor(readonly plan: SearchPlan) {
+    super('ICP produced no Crustdata search lanes; nothing to source on')
     this.name = 'EmptyIcpQueryError'
   }
 }
 
+/** What one lane of the plan did this run. */
+export interface LaneRunResult {
+  key: string
+  kind: string
+  label: string
+  summary: string[]
+  rationale: string | null
+  /** Vendor's total matches for the lane (may be null when not reported). */
+  total: number | null
+  /** Profiles this lane contributed AFTER cross-lane de-duplication. */
+  fetched: number
+  /** Profiles the lane returned that another lane had already returned. */
+  duplicates: number
+  creditsUsed: number
+  /** Where the next run should continue from (null = exhausted / start over). */
+  nextCursor: string | null
+  /** True when this run resumed from a cursor saved by an earlier run. */
+  resumed: boolean
+  error?: string | null
+}
+
 export interface SourceFromIcpResult extends SourceFromCrustdataResult {
-  /** How the ICP translated — which requirements became filters and which were skipped. */
-  query: CrustdataQueryBuild
+  /** The plan that ran, lane by lane, with what each contributed. */
+  plan: ReturnType<typeof describePlan> & { results: LaneRunResult[] }
+  /** Pool profile ids this run created or refreshed (for "new this run" badges). */
+  profileIds: string[]
+}
+
+type LaneCursorMap = Map<string, string>
+
+/**
+ * Cursor continuity ("retrieval continuity" in the audit): find, per lane key, the
+ * cursor the most recent run for this job left off at, so a re-run continues to page
+ * 2 instead of re-buying page 1. Read from the last few pool_ingest_runs rows — no
+ * new table needed. Best-effort: any failure means "start from page 1".
+ */
+async function loadLaneCursors(supabase: Supabase, jobId: string | null | undefined): Promise<LaneCursorMap> {
+  const out: LaneCursorMap = new Map()
+  if (!jobId) return out
+  try {
+    const { data } = await (supabase as unknown as LooseSb)
+      .from('pool_ingest_runs')
+      .select('query')
+      .eq('source_key', SOURCE)
+      .eq('job_id', jobId)
+      .order('started_at', { ascending: false })
+      .limit(10)
+    for (const row of (data ?? []) as { query?: { results?: LaneRunResult[] } | null }[]) {
+      for (const r of row.query?.results ?? []) {
+        if (r?.key && r.nextCursor && !out.has(r.key)) out.set(r.key, r.nextCursor)
+      }
+    }
+  } catch {
+    /* start from page 1 */
+  }
+  return out
+}
+
+/** The vendor's identity for a raw profile, for cross-lane de-duplication. */
+function profileIdentity(raw: unknown): string | null {
+  const p = raw as { social_handles?: { professional_network_identifier?: { profile_url?: string | null } | null } | null; basic_profile?: { current_title?: string | null; location?: { raw?: string | null } | null } | null }
+  const url = p?.social_handles?.professional_network_identifier?.profile_url?.trim().toLowerCase()
+  return url || null
 }
 
 /**
- * Source candidates for a role directly from its ICP (Slice 3). Translates the ICP's
- * must-haves (+ job title) into a Crustdata query, then runs it through
- * sourceFromCrustdata. Throws EmptyIcpQueryError if the ICP yields no filters, so we
- * never spend a search on an empty query.
+ * Source candidates for a role from its ICP (Step 2: multi-lane search plan).
+ *
+ * Builds the plan (feeder lanes from the recruiter brief, a title-families lane,
+ * shared market/years/structured-gate conditions), then runs the lanes IN PRIORITY
+ * ORDER under one ingest run and one total budget (`maxRecords`): each lane gets an
+ * equal share, and whatever a thin lane leaves unspent rolls into the next. Profiles
+ * are de-duplicated across lanes by LinkedIn URL before ingest so one person is never
+ * bought twice in a run; per-lane cursors are saved on the run so the NEXT run resumes
+ * where each lane left off. A lane that errors is recorded and skipped, never fatal.
  */
 export async function sourceFromIcp(
   supabase: Supabase,
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'job_id'>>,
-  ctx: CrustdataQueryContext = {},
+  ctx: CrustdataQueryContext & Pick<SearchPlanContext, 'roleContext' | 'maxFeederLanes'> = {},
   opts: Omit<SourceFromCrustdataInput, 'filters'> = {},
 ): Promise<SourceFromIcpResult> {
-  const query = buildCrustdataQueryFromIcp(icp, ctx)
-  if (!isQueryable(query)) throw new EmptyIcpQueryError(query)
+  const plan = buildSearchPlan(icp, { title: ctx.title, roleContext: ctx.roleContext, locationRadiusKm: ctx.locationRadiusKm, maxFeederLanes: ctx.maxFeederLanes })
+  if (!isPlanRunnable(plan)) throw new EmptyIcpQueryError(plan)
 
-  const result = await sourceFromCrustdata(supabase, {
-    ...opts,
-    filters: query.filters,
-    jobId: opts.jobId ?? icp.job_id ?? null,
+  if (!crustdataConfigured()) {
+    throw new CrustdataConfigError('CRUSTDATA_API_KEY is not set — cannot source from Crustdata')
+  }
+  if (!opts.allowDisabled && !(await isSourceEnabled(supabase))) {
+    throw new Error(`${SOURCE} is disabled in pool_sources. Enable it, or pass allowDisabled:true for a development run.`)
+  }
+
+  const jobId = opts.jobId ?? icp.job_id ?? null
+  const maxRecords = Math.max(1, opts.maxRecords ?? opts.perPage ?? CRUSTDATA_DEFAULT_LIMIT)
+  const described = describePlan(plan)
+  const cursors = await loadLaneCursors(supabase, jobId)
+
+  const runId = await startIngestRun(supabase, {
+    sourceKey: SOURCE,
+    orgId: opts.orgId,
+    jobId,
+    query: { ...described, maxRecords, results: [] },
   })
-  return { ...result, query }
+
+  const profiles: unknown[] = []
+  const seen = new Set<string>()
+  const results: LaneRunResult[] = []
+  let creditsUsed = 0
+  let matchedTotal = 0
+
+  try {
+    let remaining = maxRecords
+    for (let i = 0; i < plan.lanes.length && remaining > 0; i++) {
+      const lane = plan.lanes[i]
+      const lanesLeft = plan.lanes.length - i
+      const budget = Math.max(1, Math.ceil(remaining / lanesLeft))
+      const cursor = cursors.get(lane.key) ?? null
+      const result: LaneRunResult = {
+        key: lane.key, kind: lane.kind, label: lane.label, summary: lane.summary, rationale: lane.rationale ?? null,
+        total: null, fetched: 0, duplicates: 0, creditsUsed: 0, nextCursor: null, resumed: Boolean(cursor),
+      }
+      try {
+        const page = await searchPeople(lane.filters, { limit: budget, cursor, sorts: opts.sorts })
+        creditsUsed += page.creditsUsed
+        result.creditsUsed = page.creditsUsed
+        result.total = page.totalCount
+        result.nextCursor = page.nextCursor
+        if (page.totalCount) matchedTotal += page.totalCount
+        await recordVendorCall(supabase, {
+          sourceKey: SOURCE, endpoint: 'search', orgId: opts.orgId, runId, ok: true,
+          credits: Math.ceil(page.creditsUsed), recordsReturned: page.profiles.length,
+        })
+        for (const raw of page.profiles) {
+          const id = profileIdentity(raw)
+          if (id && seen.has(id)) { result.duplicates++; continue }
+          if (id) seen.add(id)
+          profiles.push(raw)
+          result.fetched++
+        }
+        remaining -= result.fetched
+      } catch (err) {
+        result.error = err instanceof Error ? err.message : String(err)
+        await recordVendorCall(supabase, {
+          sourceKey: SOURCE, endpoint: 'search', orgId: opts.orgId, runId, ok: false, credits: 0, recordsReturned: 0,
+        }).catch(() => undefined)
+        logger.warn('Crustdata lane failed', { runId, lane: lane.label, error: result.error })
+      }
+      results.push(result)
+    }
+
+    const ingest = await ingestVendorRecords(supabase, SOURCE, profiles, {
+      runId,
+      creditsPerRecord: profiles.length ? creditsUsed / profiles.length : 0,
+    })
+    await finishIngestRun(supabase, runId, {
+      ids_matched: matchedTotal || profiles.length,
+      ids_bought: profiles.length,
+      profiles_created: ingest.created,
+      profiles_merged: ingest.merged,
+      records_unusable: ingest.unusable,
+      credits_used: Math.ceil(creditsUsed),
+    })
+    // Persist per-lane outcomes + cursors on the run (jsonb) so the next run resumes.
+    await (supabase as unknown as LooseSb)
+      .from('pool_ingest_runs')
+      .update({ query: { ...described, maxRecords, results } })
+      .eq('id', runId)
+      .then(() => undefined, () => undefined)
+
+    logger.info('Crustdata plan run complete', {
+      runId, lanes: results.length, matched: matchedTotal, fetched: profiles.length, creditsUsed,
+      created: ingest.created, merged: ingest.merged, unusable: ingest.unusable,
+    })
+    return {
+      runId,
+      matched: matchedTotal || null,
+      fetched: profiles.length,
+      creditsUsed,
+      ingest,
+      plan: { ...described, results },
+      profileIds: ingest.needsReembed,
+    }
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    await finishIngestRun(supabase, runId, { credits_used: Math.ceil(creditsUsed), error: reason }).catch(() => undefined)
+    throw err
+  }
 }

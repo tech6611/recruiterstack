@@ -160,49 +160,99 @@ interface CanonicalJobRow {
   status: string
   created_at: string | null
   apply_token?: string | null
+  /** The JD body (Tiptap HTML or legacy plain text). Feeds `generated_jd`. */
+  description?: string | null
   department: { name: string } | null
   // Board-only data not yet in dedicated columns lives in custom_fields:
-  // scoring_criteria + hiring_manager_* (written via the repointed board writers).
+  // scoring_criteria + hiring_manager_* (written via the repointed board writers),
+  // plus the whole HM intake bag under custom_fields.intake.
   custom_fields?: Record<string, unknown> | null
 }
 
+/**
+ * Tiptap/rich-text HTML → readable plain text for AI prompts. Keeps list items as
+ * "- " bullets and block boundaries as newlines, drops every other tag, decodes the
+ * common entities. Plain-text input passes through untouched (whitespace-trimmed).
+ * PURE + tested.
+ */
+export function htmlToPromptText(html: string | null | undefined): string | null {
+  if (typeof html !== 'string') return null
+  const text = html
+    .replace(/<li[^>]*>/gi, '\n- ')
+    .replace(/<\/(p|div|li|ul|ol|h[1-6]|tr|blockquote)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .split('\n')
+    .map((l) => l.replace(/[ \t]+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n')
+  return text || null
+}
+
 /** Map a canonical `jobs` row into the legacy HiringRequest-ish shape the board
- *  UI expects. Legacy-only fields are null / sensible defaults, EXCEPT
- *  scoring_criteria + hiring_manager_* which are surfaced from custom_fields so
- *  the board shows the values the repointed writers persist (Phase 3 / C6.1). */
-function canonicalJobToHiringRequest(row: CanonicalJobRow): HiringRequest {
+ *  UI + every AI prompt (ICP generator, Sifter, screening, brief, copilot) expect.
+ *  The HM intake — key requirements, nice-to-haves, team context, level, location,
+ *  target companies, budget — lives in custom_fields.intake and the JD body in
+ *  jobs.description; all of it is surfaced here (as prompt-ready plain text) so
+ *  the AI reasons from the real requirements. Before this, these fields were
+ *  hardcoded null and every prompt on a canonical job saw "Key Requirements:
+ *  Not specified" / "Job description: Not provided". Fields canonical jobs
+ *  genuinely lack (ticket_number, autopilot_*) stay null / sensible defaults.
+ *  scoring_criteria + hiring_manager_* come from custom_fields as before (C6.1). */
+export function canonicalJobToHiringRequest(row: CanonicalJobRow): HiringRequest {
   const cf = (row.custom_fields ?? {}) as Record<string, unknown>
+  const intake = readIntakeBag(row.custom_fields ?? null)
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+
+  // Target companies are stored as a string on some jobs and a string[] on others.
+  const targetCompanies = Array.isArray(intake.target_companies)
+    ? (intake.target_companies as unknown[]).filter((t): t is string => typeof t === 'string' && t.trim() !== '').join(', ') || null
+    : text(intake.target_companies)
+
+  // work_model is the newer tri-state; fall back to the legacy remote_ok boolean.
+  const remoteOk = intake.work_model === 'remote' || (intake.work_model == null && intake.remote_ok === true)
+
   return {
     id: row.id,
     org_id: row.org_id,
     ticket_number: null,
     position_title: row.title,
     department: row.department?.name ?? null,
-    hiring_manager_name: (cf.hiring_manager_name as string | undefined) ?? '',
-    hiring_manager_email: (cf.hiring_manager_email as string | undefined) ?? null,
-    hiring_manager_slack: (cf.hiring_manager_slack as string | undefined) ?? null,
+    hiring_manager_name:
+      (cf.hiring_manager_name as string | undefined) ?? text(intake.hiring_manager_name) ?? text(intake.hm_name) ?? '',
+    hiring_manager_email:
+      (cf.hiring_manager_email as string | undefined) ?? text(intake.hiring_manager_email) ?? text(intake.hm_email),
+    hiring_manager_slack: (cf.hiring_manager_slack as string | undefined) ?? text(intake.hm_slack),
     intake_token: '',
     // Only surface the public apply token once the job is open — pre-open jobs
     // must not expose a shareable (but non-functional) apply link. (migration 070)
     apply_link_token: row.status === 'open' ? (row.apply_token ?? null) : null,
     status: row.status as HiringRequestStatus,
     filled_by_recruiter: true,
-    team_context: null,
-    level: null,
-    headcount: 1,
-    location: null,
-    remote_ok: false,
-    key_requirements: null,
-    nice_to_haves: null,
-    target_companies: null,
-    budget_min: null,
-    budget_max: null,
-    target_start_date: null,
-    additional_notes: null,
-    generated_jd: null,
+    team_context: htmlToPromptText(text(intake.team_context)),
+    level: text(intake.level),
+    headcount: num(intake.headcount) ?? 1,
+    location: text(intake.location),
+    remote_ok: remoteOk,
+    key_requirements: htmlToPromptText(text(intake.key_requirements)),
+    // The intake form writes `nice_to_have`; older rows carry `nice_to_haves`.
+    nice_to_haves: htmlToPromptText(text(intake.nice_to_have) ?? text(intake.nice_to_haves)),
+    target_companies: targetCompanies,
+    budget_min: num(intake.budget_min),
+    budget_max: num(intake.budget_max),
+    target_start_date: text(intake.target_start_date),
+    additional_notes: htmlToPromptText(text(intake.additional_notes) ?? text(intake.notes)),
+    generated_jd: htmlToPromptText(row.description),
     intake_sent_at: null,
-    intake_submitted_at: null,
-    jd_sent_at: null,
+    intake_submitted_at: text(intake.intake_submitted_at),
+    jd_sent_at: text(intake.jd_sent_at),
     created_at: row.created_at ?? '',
     updated_at: row.created_at ?? '',
     auto_advance_score: null,
@@ -228,7 +278,7 @@ export async function listCanonicalJobBoardSummaries(
   const [jobsRes, stagesRes, appsRes, linksRes] = await Promise.all([
     (supabase as any)
       .from('jobs')
-      .select('id, org_id, title, status, created_at, custom_fields, department:departments(name)')
+      .select('id, org_id, title, status, created_at, description, custom_fields, department:departments(name)')
       .eq('org_id', orgId)
       // DELETE is a soft-archive (status='archived'); keep deleted jobs off the board.
       .neq('status', 'archived')
@@ -310,7 +360,7 @@ export async function getCanonicalJobBoardDetail(
   const [jobRes, stagesRes, appsRes] = await Promise.all([
     (supabase as any)
       .from('jobs')
-      .select('id, org_id, title, status, created_at, apply_token, custom_fields, department:departments(name)')
+      .select('id, org_id, title, status, created_at, description, apply_token, custom_fields, department:departments(name)')
       .eq('id', jobId)
       .eq('org_id', orgId)
       .maybeSingle(),
@@ -1722,7 +1772,7 @@ export async function getCanonicalJobScoringContext(
   const [jobRes, stagesRes, appsRes] = await Promise.all([
     (supabase as any)
       .from('jobs')
-      .select('id, org_id, title, status, created_at, custom_fields, department:departments(name)')
+      .select('id, org_id, title, status, created_at, description, custom_fields, department:departments(name)')
       .eq('id', jobId)
       .eq('org_id', orgId)
       .maybeSingle(),

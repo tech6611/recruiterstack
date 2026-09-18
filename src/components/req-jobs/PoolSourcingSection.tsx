@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Globe, Lock, Sparkles, ChevronRight, Radar } from 'lucide-react'
+import { Globe, Lock, Sparkles, ChevronRight, Radar, ListTree } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { SourcingMatrix, type MatrixIcp, type MatrixMatch } from '@/components/req-jobs/SourcingMatrix'
@@ -24,14 +24,29 @@ interface PoolMatch {
   gate_failures: string[]
   competencies?: { name: string; rating: number; evidence?: string }[]
   red_flags?: string[]
+  gate_unknown?: string[]
+  sources?: string[]
 }
 
+/** What the last Crustdata run did, lane by lane (from POST /source/crustdata). */
+interface SearchPlanReport {
+  lanes: { key: string; kind: string; label: string; summary: string[]; rationale: string | null }[]
+  common: string[]
+  unmapped: { requirement: string; reason: string }[]
+  results: { key: string; label: string; total: number | null; fetched: number; duplicates: number; creditsUsed: number; resumed: boolean; error?: string | null }[]
+}
+
+const SOURCE_BADGE: Record<string, string> = { 'vendor:crustdata': 'Crustdata', 'upload:cv': 'CV upload', github: 'GitHub' }
+
 /** Map a market (Pool B) profile onto the shared matrix row shape. */
-function toMatrixMatch(m: PoolMatch): MatrixMatch {
+function toMatrixMatch(m: PoolMatch, newIds?: Set<string>): MatrixMatch {
+  const badge = (m.sources ?? []).map((k) => SOURCE_BADGE[k]).find(Boolean) ?? null
   return {
     candidate_id: m.profile_id,
     score: m.score,
     gate_failures: (m.gate_failures ?? []).map((label) => ({ label })),
+    gate_unknown: (m.gate_unknown ?? []).map((label) => ({ label })),
+    source_badge: badge ? (newIds?.has(m.profile_id) ? `${badge} · new` : badge) : null,
     red_flags: m.red_flags ?? [],
     rationale: m.rationale ?? null,
     competencies: m.competencies ?? [],
@@ -60,6 +75,9 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   const [stale, setStale] = useState(false)
   const [open, setOpen] = useState(false)
   const [sourcing, setSourcing] = useState(false)
+  // The last Crustdata run's search plan + which profiles it brought in.
+  const [plan, setPlan] = useState<SearchPlanReport | null>(null)
+  const [newIds, setNewIds] = useState<Set<string>>(new Set())
 
   // Load the cached market shortlist so it survives a refresh (no re-scoring).
   useEffect(() => {
@@ -111,7 +129,10 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
     setMatches(data.matches ?? [])
     setState((data.matches ?? []).length ? 'ok' : 'empty')
     const s = data.sourced
-    toast.success(`Sourced ${s?.fetched ?? 0} new profile(s) from Crustdata (${s?.creditsUsed ?? 0} credits).`)
+    setPlan(s?.plan ?? null)
+    setNewIds(new Set<string>(s?.profileIds ?? []))
+    const lanes = s?.plan?.results?.length ?? 0
+    toast.success(`Ran ${lanes} search lane${lanes === 1 ? '' : 's'} on Crustdata — ${s?.fetched ?? 0} profile(s) fetched, ${s?.created ?? 0} new to the pool (${(s?.creditsUsed ?? 0).toFixed(2)} credits).`)
   }
 
   async function startTrial() {
@@ -191,10 +212,50 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
         <p className="mt-2 text-[11px] text-amber-600">The ICP has changed since this search — re-search for fresh matches.</p>
       )}
 
+      {plan && (
+        <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50/50 px-3 py-2.5">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+            <ListTree className="h-3.5 w-3.5 text-sky-600" /> What was sent to Crustdata
+          </div>
+          {plan.common.length > 0 && (
+            <div className="mt-1 text-[11px] text-slate-500">Every lane: {plan.common.join(' · ')}</div>
+          )}
+          <ol className="mt-2 space-y-1.5">
+            {plan.lanes.map((lane, i) => {
+              const r = plan.results.find((x) => x.key === lane.key)
+              return (
+                <li key={lane.key} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium text-slate-800">{i + 1}. {lane.label} <span className="font-normal text-slate-400">({lane.kind})</span></span>
+                    {r && (
+                      <span className="text-[11px] text-slate-500">
+                        {r.error ? <span className="text-rose-600">failed: {r.error}</span> : <>
+                          {r.total != null ? `${r.total.toLocaleString()} match${r.total === 1 ? '' : 'es'}` : 'matches n/a'} · fetched {r.fetched}
+                          {r.duplicates > 0 && ` (+${r.duplicates} already seen)`} · {r.creditsUsed.toFixed(2)} cr{r.resumed ? ' · resumed' : ''}
+                        </>}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    {lane.summary.map((sm) => <span key={sm} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{sm}</span>)}
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+          {plan.unmapped.length > 0 && (
+            <div className="mt-2 text-[11px] text-slate-500">
+              <span className="font-medium text-slate-600">Checked after fetch, not searchable:</span>{' '}
+              {plan.unmapped.map((u) => u.requirement).join(' · ')}
+            </div>
+          )}
+        </div>
+      )}
+
       {state === 'ok' && (
         <div className="mt-3 space-y-2">
           {icp ? (
-            <SourcingMatrix matches={matches.map(toMatrixMatch)} icp={icp} selected={selected} onToggle={toggle} />
+            <SourcingMatrix matches={matches.map((m) => toMatrixMatch(m, newIds))} icp={icp} selected={selected} onToggle={toggle} />
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-xs text-slate-400">
               Loading the ICP’s ranking parameters…

@@ -84,3 +84,27 @@ describe('toEnrichedProfile', () => {
     expect(p.education[0].year).toBe(2016)
   })
 })
+
+// ── employedMonths: union of role spans, internships excluded ────────────────────
+import { employedMonths } from './candidate-enrichment'
+
+describe('employedMonths', () => {
+  const now = new Date('2026-09-15')
+  const exp = (start: string, end: string | null, title = 'Analyst', is_current = false) =>
+    ({ title, employer: null, location: null, start_date: start, end_date: end, is_current, summary: null })
+  it('merges overlaps, skips gaps, and ignores internships', () => {
+    const exps = [
+      exp('2016-05-01', '2016-12-01', 'Summer Intern'),  // ignored
+      exp('2018-11-01', '2019-03-01'),                    // 4
+      exp('2020-08-01', '2022-06-01'),                    // 22  ┐ overlap → 2020-08..2024-08 = 48
+      exp('2022-06-01', '2024-08-01'),                    //     ┘
+      exp('2024-11-01', null, 'Manager', true),           // 22 (to Sep 2026)
+    ]
+    expect(employedMonths(exps, now)).toBe(4 + 48 + 22)
+    // Calendar time since 2016 would have been ~124 months; the old measure over-counted.
+    expect(deriveMovability(exps, now).total_experience_months).toBe(74)
+  })
+  it('returns null with no dated roles', () => {
+    expect(employedMonths([exp('', null)], now)).toBeNull()
+  })
+})
