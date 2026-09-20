@@ -47,6 +47,33 @@ const CITY_ALIASES: Record<string, string[]> = {
   Doha:            ['doha'],
 }
 
+/** Canonical country name per ISO-3166 alpha-2 code, for every code the parser can emit. */
+const COUNTRY_NAMES: Record<string, string> = {
+  IN: 'India', US: 'United States', GB: 'United Kingdom', CA: 'Canada', AU: 'Australia', DE: 'Germany', FR: 'France',
+  NL: 'Netherlands', SG: 'Singapore', AE: 'United Arab Emirates', SA: 'Saudi Arabia', QA: 'Qatar', JP: 'Japan',
+  HK: 'Hong Kong', IE: 'Ireland', ES: 'Spain', IT: 'Italy', CH: 'Switzerland', SE: 'Sweden', MX: 'Mexico', BR: 'Brazil',
+  CN: 'China', ZA: 'South Africa', NG: 'Nigeria', KE: 'Kenya', LK: 'Sri Lanka', BD: 'Bangladesh', PK: 'Pakistan',
+  NP: 'Nepal', ID: 'Indonesia', MY: 'Malaysia', PH: 'Philippines', VN: 'Vietnam', TH: 'Thailand', NZ: 'New Zealand',
+  IL: 'Israel', PL: 'Poland', PT: 'Portugal', BE: 'Belgium', AT: 'Austria', DK: 'Denmark', NO: 'Norway', FI: 'Finland',
+  KR: 'South Korea',
+}
+
+/**
+ * Region (state / province) for each hand-kept hub. The dictionary carries a state
+ * for every India/US place; hubs are the exception, so they get theirs here. Null
+ * where the city is its own top-level unit (Singapore, Hong Kong, Doha).
+ */
+const CITY_REGION: Record<string, string | null> = {
+  Bengaluru: 'Karnataka', Mumbai: 'Maharashtra', 'Delhi NCR': 'Delhi', Hyderabad: 'Telangana', Pune: 'Maharashtra',
+  Chennai: 'Tamil Nadu', Kolkata: 'West Bengal', Ahmedabad: 'Gujarat', Jaipur: 'Rajasthan', Kochi: 'Kerala',
+  Mangaluru: 'Karnataka', Coimbatore: 'Tamil Nadu', Indore: 'Madhya Pradesh', Chandigarh: 'Chandigarh',
+  Bhubaneswar: 'Odisha', Trivandrum: 'Kerala',
+  'New York': 'New York', 'San Francisco': 'California', 'Los Angeles': 'California', Seattle: 'Washington',
+  Boston: 'Massachusetts', Chicago: 'Illinois', Austin: 'Texas', London: 'England', Dubai: 'Dubai', 'Abu Dhabi': 'Abu Dhabi',
+  Singapore: null, Berlin: 'Berlin', Amsterdam: 'North Holland', Paris: 'Île-de-France', Toronto: 'Ontario',
+  Sydney: 'New South Wales', 'Hong Kong': null, Tokyo: 'Tokyo', Riyadh: 'Riyadh Province', Doha: null,
+}
+
 /** Country for each canonical city — display is "City, Country". */
 const CITY_COUNTRY: Record<string, string> = {
   Bengaluru: 'India', Mumbai: 'India', 'Delhi NCR': 'India', Hyderabad: 'India', Pune: 'India', Chennai: 'India', Kolkata: 'India',
@@ -63,7 +90,7 @@ const CITY_COUNTRY: Record<string, string> = {
 import citiesJson from './cities.generated.json'
 
 type CityRow = [name: string, cc: 'IN' | 'US', state: string, population: number]
-const COUNTRY_NAME: Record<string, string> = { IN: 'India', US: 'United States' }
+const COUNTRY_NAME = COUNTRY_NAMES
 
 /** Country names and codes as they appear in location strings → country code. */
 const COUNTRY_ALIASES: Record<string, string> = {
@@ -77,10 +104,7 @@ const COUNTRY_ALIASES: Record<string, string> = {
   indonesia: 'ID', malaysia: 'MY', philippines: 'PH', vietnam: 'VN', thailand: 'TH', 'new zealand': 'NZ', israel: 'IL',
   poland: 'PL', portugal: 'PT', belgium: 'BE', austria: 'AT', denmark: 'DK', norway: 'NO', finland: 'FI', 'south korea': 'KR',
 }
-const HUB_COUNTRY_CODE: Record<string, string> = {
-  India: 'IN', 'United States': 'US', 'United Kingdom': 'GB', 'United Arab Emirates': 'AE', Singapore: 'SG', Germany: 'DE',
-  Netherlands: 'NL', France: 'FR', Canada: 'CA', Australia: 'AU', 'Hong Kong': 'HK', Japan: 'JP', 'Saudi Arabia': 'SA', Qatar: 'QA',
-}
+const HUB_COUNTRY_CODE: Record<string, string> = Object.fromEntries(Object.entries(COUNTRY_NAMES).map(([cc, name]) => [name, cc]))
 
 const US_STATE_CODES: Record<string, string> = {
   al: 'Alabama', ak: 'Alaska', az: 'Arizona', ar: 'Arkansas', ca: 'California', co: 'Colorado', ct: 'Connecticut',
@@ -166,7 +190,13 @@ function parseLocation(raw: string): { places: string[]; hints: Hint[] } {
   return { places, hints }
 }
 
-type Resolved = { city: string; country: string | null; via: 'hub' | 'dictionary' | 'fuzzy' }
+/**
+ * A location split the way Ashby stores it: city / region / country as separate,
+ * independently optional fields, plus the ISO code the country resolved from.
+ */
+export type LocationParts = { city: string | null; region: string | null; country: string | null; country_code: string | null }
+
+type Resolved = { city: string; region: string | null; country: string | null; country_code: string | null; via: 'hub' | 'dictionary' | 'fuzzy' }
 
 /**
  * Look a place up in the India/US dictionary. Accepts a match when a hint confirms
@@ -184,13 +214,15 @@ function dictionaryMatch(place: string, hints: Hint[], alone: boolean): (Resolve
     const byState = rows.filter((r) => hints.some((h) => h.kind === 'state' && h.cc === r[1] && h.state === r[2]))
     const byCountry = rows.filter((r) => hints.some((h) => h.kind === 'country' && h.cc === r[1]))
     const pick = (list: CityRow[]) => list.reduce((a, b) => (b[3] > a[3] ? b : a))
-    if (byState.length) { const r = pick(byState); return { city: r[0], country: COUNTRY_NAME[r[1]], via: 'dictionary', confirmedBy: 'state' } }
+    const hit = (r: CityRow, confirmedBy: 'state' | 'country' | 'population') =>
+      ({ city: r[0], region: r[2] || null, country: COUNTRY_NAME[r[1]], country_code: r[1], via: 'dictionary' as const, confirmedBy })
+    if (byState.length) return hit(pick(byState), 'state')
     if (hints.some((h) => h.kind === 'state' && h.strong)) return null // a state was named and this place is not in it
-    if (byCountry.length) { const r = pick(byCountry); return { city: r[0], country: COUNTRY_NAME[r[1]], via: 'dictionary', confirmedBy: 'country' } }
+    if (byCountry.length) return hit(pick(byCountry), 'country')
     if (hints.some((h) => h.kind === 'country' && h.strong)) return null // another country was named
     if (!alone) return null                                            // "Springfield, Ontario": an unknown region — don't guess
     const r = pick(rows)
-    if (r[3] >= 100_000) return { city: r[0], country: COUNTRY_NAME[r[1]], via: 'dictionary', confirmedBy: 'population' }
+    if (r[3] >= 100_000) return hit(r, 'population')
     return null
   }
   return null
@@ -199,7 +231,7 @@ function dictionaryMatch(place: string, hints: Hint[], alone: boolean): (Resolve
 /** "New York, United States" / "Bengaluru, India"; falls back to the raw string (or null). PURE. */
 export function formatLocation(raw: string | null | undefined): string | null {
   const r = resolveLocation(raw)
-  if (r) return r.country ? `${r.city}, ${r.country}` : r.city
+  if (r) return formatLocationParts(r)
   const t = String(raw ?? '').trim()
   return t || null
 }
@@ -281,7 +313,7 @@ export function resolveLocation(raw: string | null | undefined): Resolved | null
   const place = moved ? places[places.length - 1] : places[0]
   const dict = place ? dictionaryMatch(place, hints, places.length === 1) : null
   if (hub && dict && dict.confirmedBy === 'state' && HUB_COUNTRY_CODE[dict.country ?? ''] !== hubCc) return dict
-  if (hub) return { city: hub, country: CITY_COUNTRY[hub] ?? null, via: 'hub' }
+  if (hub) return hubResolved(hub, 'hub')
   if (dict) return dict
 
   // (3) fuzzy hubs, token by token
@@ -299,7 +331,42 @@ export function resolveLocation(raw: string | null | undefined): Resolved | null
   let canon = distinct[0]
   if (distinct.length > 1) { fuzzy.sort((a, b) => a.at - b.at); canon = moved ? fuzzy[fuzzy.length - 1].canon : fuzzy[0].canon }
   if (hints.some((h) => h.kind === 'country' && h.strong && h.cc !== HUB_COUNTRY_CODE[CITY_COUNTRY[canon]])) return null
-  return { city: canon, country: CITY_COUNTRY[canon] ?? null, via: 'fuzzy' }
+  return hubResolved(canon, 'fuzzy')
+}
+
+/** A hub city with its region and country filled from the hand-kept maps. PURE. */
+function hubResolved(hub: string, via: 'hub' | 'fuzzy'): Resolved {
+  const country = CITY_COUNTRY[hub] ?? null
+  return { city: hub, region: CITY_REGION[hub] ?? null, country, country_code: country ? HUB_COUNTRY_CODE[country] ?? null : null, via }
+}
+
+/**
+ * Free-text location → separate city / region / country fields (the Ashby shape).
+ * Each level is optional: "Remote, India" has a country but no city; "Karnataka"
+ * has a region and the country it implies; "Springfield" alone resolves to nothing.
+ * A resolved city always carries whatever region/country the dictionary knows;
+ * without one, a strong state or country hint still fills the lower levels. PURE.
+ */
+export function resolveLocationParts(raw: string | null | undefined): LocationParts | null {
+  const r = resolveLocation(raw)
+  if (r) return { city: r.city, region: r.region, country: r.country, country_code: r.country_code }
+  const text = String(raw ?? '')
+  if (!slugifyPlace(text)) return null
+  const { hints } = parseLocation(text)
+  const state = hints.find((h) => h.kind === 'state' && h.strong)
+  if (state && state.kind === 'state') return { city: null, region: state.state, country: COUNTRY_NAMES[state.cc], country_code: state.cc }
+  const country = hints.find((h) => h.kind === 'country' && h.strong)
+  if (country && country.kind === 'country') return { city: null, region: null, country: COUNTRY_NAMES[country.cc] ?? null, country_code: country.cc }
+  return null
+}
+
+/** "City, Country" / "Region, Country" / "Country" from stored parts; null when all empty. PURE. */
+export function formatLocationParts(p: Partial<LocationParts> | null | undefined): string | null {
+  if (!p) return null
+  const head = p.city ?? p.region ?? null
+  const parts = [head, p.country].filter((x): x is string => Boolean(x))
+  if (parts.length === 2 && parts[0] === parts[1]) return parts[0] // Singapore, Singapore
+  return parts.length ? parts.join(', ') : null
 }
 
 /** Canonical city name only (see resolveLocation). PURE. */

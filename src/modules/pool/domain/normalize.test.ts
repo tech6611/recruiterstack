@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeCity, normalizeCompany, editDistance, slugifyPlace } from './normalize'
+import { normalizeCity, normalizeCompany, editDistance, slugifyPlace, resolveLocationParts, formatLocationParts } from './normalize'
 
 describe('normalizeCity', () => {
   it('collapses the spellings the GitHub pull actually produced', () => {
@@ -128,5 +128,39 @@ describe('formatLocation — India & US dictionary', () => {
   it('keeps the "IN" ambiguity (India vs Indiana) honest', () => {
     expect(formatLocation('Surat, IN')).toBe('Surat, India')
     expect(formatLocation('Carmel, IN')).toBe('Carmel, United States')
+  })
+})
+
+describe('resolveLocationParts — city / region / country as separate fields', () => {
+  it('fills all three from the dictionary', () => {
+    expect(resolveLocationParts('Surat, Gujarat')).toEqual({ city: 'Surat', region: 'Gujarat', country: 'India', country_code: 'IN' })
+    expect(resolveLocationParts('Springfield, IL')).toEqual({ city: 'Springfield', region: 'Illinois', country: 'United States', country_code: 'US' })
+  })
+  it('fills the region for hand-kept hubs too', () => {
+    expect(resolveLocationParts('Banglore, India')).toEqual({ city: 'Bengaluru', region: 'Karnataka', country: 'India', country_code: 'IN' })
+    expect(resolveLocationParts('Gurgaon')).toEqual({ city: 'Delhi NCR', region: 'Delhi', country: 'India', country_code: 'IN' })
+    expect(resolveLocationParts('SF Bay Area')).toEqual({ city: 'San Francisco', region: 'California', country: 'United States', country_code: 'US' })
+    expect(resolveLocationParts('Singapore')).toEqual({ city: 'Singapore', region: null, country: 'Singapore', country_code: 'SG' })
+  })
+  it('keeps the lower levels when no city is recognised', () => {
+    expect(resolveLocationParts('Remote, India')).toEqual({ city: null, region: null, country: 'India', country_code: 'IN' })
+    expect(resolveLocationParts('Karnataka')).toEqual({ city: null, region: 'Karnataka', country: 'India', country_code: 'IN' })
+    expect(resolveLocationParts('Remote - Germany')).toEqual({ city: null, region: null, country: 'Germany', country_code: 'DE' })
+  })
+  it('does not invent a country from a weak two-letter hint', () => {
+    expect(resolveLocationParts('Remote')).toBeNull()
+    expect(resolveLocationParts('Earth')).toBeNull()
+    expect(resolveLocationParts('')).toBeNull()
+  })
+})
+
+describe('formatLocationParts', () => {
+  it('reads like Ashby: "City, Country", falling back to the region or country', () => {
+    expect(formatLocationParts({ city: 'Pune', region: 'Maharashtra', country: 'India', country_code: 'IN' })).toBe('Pune, India')
+    expect(formatLocationParts({ city: null, region: 'Karnataka', country: 'India', country_code: 'IN' })).toBe('Karnataka, India')
+    expect(formatLocationParts({ city: null, region: null, country: 'India', country_code: 'IN' })).toBe('India')
+    expect(formatLocationParts({ city: null, region: null, country: null, country_code: null })).toBeNull()
+    expect(formatLocation('Singapore')).toBe('Singapore')
+    expect(formatLocation('Paris, TX')).toBe('Paris, United States')
   })
 })

@@ -4,7 +4,7 @@ import {
   getPoolAccess, startPoolTrial, searchPool, getPoolFacets,
 } from '@/modules/pool/domain/pool'
 
-// GET /api/pool?q=&city=&skill=&minExp=&minTenure=&reachable=1&source=&limit=&offset=
+// GET /api/pool?q=&city=&country=&skill=&minExp=&minTenure=&reachable=1&source=&limit=&offset=
 // Returns { hasAccess } plus, when granted, the rows + facets.
 export const GET = withCapability('recruiting:view', async (req, orgId, supabase) => {
   const { searchParams } = new URL(req.url)
@@ -16,6 +16,7 @@ export const GET = withCapability('recruiting:view', async (req, orgId, supabase
     searchPool(supabase, orgId, {
       q: searchParams.get('q') ?? undefined,
       city: searchParams.get('city') ?? undefined,
+      country: searchParams.get('country') ?? undefined,
       skill: searchParams.get('skill') ?? undefined,
       source: searchParams.get('source') ?? undefined,
       reachableOnly: searchParams.get('reachable') === '1',

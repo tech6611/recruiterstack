@@ -16,6 +16,8 @@ export interface PoolProfileDetailView {
   current_title: string | null
   current_company: string | null
   location_city: string | null
+  location_region?: string | null
+  location_country?: string | null
   experience_years: number | null
   skills: string[]
   sources: string[]
@@ -54,7 +56,11 @@ export function PoolProfilePanel({ profileId, tags, onClose, initialDetail }: { 
         {detail && (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-3 text-slate-500">
-              {detail.location_city && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{detail.location_city}</span>}
+              {(detail.location_city ?? detail.location_country) && (
+                <span className="inline-flex items-center gap-1" title={[detail.location_city, detail.location_region, detail.location_country].filter(Boolean).join(' · ')}>
+                  <MapPin className="h-3 w-3" />{[detail.location_city ?? detail.location_region, detail.location_country].filter(Boolean).join(', ')}
+                </span>
+              )}
               {detail.experience_years != null && <span className="inline-flex items-center gap-1"><Briefcase className="h-3 w-3" />{detail.experience_years} yrs</span>}
               {!detail.unlocked && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">contacts after unlock</span>}
             </div>

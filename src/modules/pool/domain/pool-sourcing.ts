@@ -8,7 +8,7 @@ import { getPoolAccess } from '@/modules/pool/domain/pool'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
 import { deriveProfileTags } from '@/modules/pool/domain/profile-tags'
-import { formatLocation, normalizeCity } from '@/modules/pool/domain/normalize'
+import { formatLocation, formatLocationParts, normalizeCity } from '@/modules/pool/domain/normalize'
 
 type Supabase = SupabaseClient<Database>
 // pool_* tables (migration 115) aren't in the generated types.
@@ -95,7 +95,7 @@ function poolProfileToFitCandidate(p: any): Candidate {
   return {
     name: p.display_name ?? 'Candidate',
     current_title: p.current_title ?? null,
-    location: p.location_city ?? p.location_raw ?? null,
+    location: formatLocationParts(p) ?? p.location_raw ?? null,
     skills: p.skills ?? [],
     experience_years: p.experience_years ?? null,
   } as unknown as Candidate
@@ -146,7 +146,7 @@ export async function sourcePoolForIcp(
 
   const { data: profiles } = await sb
     .from('pool_profiles')
-    .select('id, display_name, current_title, current_company, location_city, location_raw, skills, experience_years, total_experience_months, current_tenure_months, reachable')
+    .select('id, display_name, current_title, current_company, location_city, location_region, location_country, location_country_code, location_raw, skills, experience_years, total_experience_months, current_tenure_months, reachable')
     .in('id', ids)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const byId = new Map((profiles ?? []).map((p: any) => [p.id, p]))
@@ -211,7 +211,7 @@ export async function sourcePoolForIcp(
             name: p.display_name,
             current_title: p.current_title,
             current_company: p.current_company,
-            location: formatLocation(p.location_raw ?? p.location_city) ?? p.location_city ?? null,
+            location: formatLocationParts(p) ?? formatLocation(p.location_raw) ?? null,
             reachable: !!p.reachable,
             experience_years: p.experience_years ?? null,
             total_experience_months: p.total_experience_months ?? null,

@@ -21,6 +21,9 @@ type Summary = {
   current_title: string | null
   current_company: string | null
   location_city: string | null
+  location_region: string | null
+  location_country: string | null
+  location_country_code: string | null
   skills: string[]
   num_roles: number | null
   total_experience_months: number | null
@@ -63,7 +66,7 @@ type Detail = Summary & {
   contacts: { kind: string; value: string; source_key: string; confidence: string }[]
   provenance: { field: string; value: unknown; source_key: string; confidence: number }[]
 }
-type Facets = { cities: string[]; skills: string[]; sources: string[]; total: number }
+type Facets = { cities: string[]; countries: { code: string; name: string }[]; skills: string[]; sources: string[]; total: number }
 type Access = { hasAccess: boolean; tier?: string; unlockQuota?: number | null; unlocksUsed?: number }
 
 const months = (m: number | null | undefined) =>
@@ -71,6 +74,13 @@ const months = (m: number | null | undefined) =>
 
 const fmt = (d: string | null) =>
   !d ? '' : new Date(d).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+
+/** "Pune, India" from the stored city / region / country; falls back to the region or country alone. */
+const locationLabel = (r: Pick<Summary, 'location_city' | 'location_region' | 'location_country'>) => {
+  const head = r.location_city ?? r.location_region
+  if (head && r.location_country && head !== r.location_country) return `${head}, ${r.location_country}`
+  return head ?? r.location_country ?? null
+}
 
 function FreshnessPill({ r }: { r: Summary }) {
   const f = FRESHNESS[r.freshness ?? 'unknown']
@@ -95,6 +105,7 @@ export default function PoolPage() {
 
   const [q, setQ]                 = useState('')
   const [city, setCity]           = useState('')
+  const [country, setCountry]     = useState('')
   const [skill, setSkill]         = useState('')
   const [minExp, setMinExp]       = useState(0)
   const [minTenure, setMinTenure] = useState(0)
@@ -110,6 +121,7 @@ export default function PoolPage() {
     const p = new URLSearchParams()
     if (q) p.set('q', q)
     if (city) p.set('city', city)
+    if (country) p.set('country', country)
     if (skill) p.set('skill', skill)
     if (minExp) p.set('minExp', String(minExp * 12))
     if (minTenure) p.set('minTenure', String(minTenure * 12))
@@ -120,7 +132,7 @@ export default function PoolPage() {
     const j = await res.json()
     setAccess(j.access); setRows(j.rows ?? []); setTotal(j.total ?? 0); setFacets(j.facets)
     setLoading(false)
-  }, [q, city, skill, minExp, minTenure, reachable, maxAge, source])
+  }, [q, city, country, skill, minExp, minTenure, reachable, maxAge, source])
 
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [load])
 
@@ -190,8 +202,13 @@ export default function PoolPage() {
           </div>
           <select value={city} onChange={(e) => setCity(e.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
-            <option value="">Any location</option>
+            <option value="">Any city</option>
             {facets?.cities.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={country} onChange={(e) => setCountry(e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="">Any country</option>
+            {facets?.countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
           </select>
           <select value={skill} onChange={(e) => setSkill(e.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
@@ -305,8 +322,10 @@ export default function PoolPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {r.location_city && (
-                      <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{r.location_city}</span>
+                    {locationLabel(r) && (
+                      <span className="flex items-center gap-1" title={[r.location_city, r.location_region, r.location_country].filter(Boolean).join(' · ')}>
+                        <MapPin className="h-3.5 w-3.5" />{locationLabel(r)}
+                      </span>
                     )}
                     {r.has_email && <Mail className="h-3.5 w-3.5 text-emerald-600" />}
                     {r.has_linkedin && <Linkedin className="h-3.5 w-3.5 text-emerald-600" />}
@@ -346,7 +365,7 @@ export default function PoolPage() {
                     ['Experience', months(selected.total_experience_months)],
                     ['In role (last known)', months(selected.current_tenure_months)],
                     ['Roles', String(selected.num_roles ?? '—')],
-                    ['Location', selected.location_city ?? '—'],
+                    ['Location', locationLabel(selected) ?? '—'],
                   ].map(([l, v]) => (
                     <div key={l}>
                       <div className="text-sm font-semibold tabular-nums text-gray-900">{v}</div>
