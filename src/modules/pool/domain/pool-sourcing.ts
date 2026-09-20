@@ -7,6 +7,7 @@ import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
 import { getPoolAccess } from '@/modules/pool/domain/pool'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
+import { deriveProfileTags } from '@/modules/pool/domain/profile-tags'
 
 type Supabase = SupabaseClient<Database>
 // pool_* tables (migration 115) aren't in the generated types.
@@ -40,6 +41,30 @@ export interface PoolMatch {
   sources?: string[]
   /** The ladder level that acquired this person (1 = the 100% match), when known. */
   acquired?: { level: number; label: string } | null
+  /** Judge's one-line reason per gate label — shown when a cell is clicked. */
+  gate_reasons?: Record<string, string>
+  /** One-glance labels derived from role history ("Ex-McKinsey", "Fast career growth"). */
+  tags?: string[]
+  /** Highest degree + school, e.g. "MBA · IIM Ahmedabad". */
+  education_summary?: string | null
+  /** Recruiter flags — kept across re-ranks (savePoolMatches carries them forward). */
+  starred?: boolean
+  hidden?: boolean
+}
+
+/** Latest degree year on file, if any. */
+export function graduationYear(edu: { year?: string | number | null }[]): number | null {
+  const years = edu.map((e) => Number(e.year)).filter((y) => Number.isFinite(y) && y > 1950 && y < 2100)
+  return years.length ? Math.max(...years) : null
+}
+
+/** "MBA · IIM Ahmedabad" from the stored education claim (highest-looking degree first). */
+export function educationSummary(edu: { degree?: string | null; school?: string | null }[]): string | null {
+  if (!edu?.length) return null
+  const rank = (d: string) => (/phd|doctor/i.test(d) ? 4 : /mba|pgp|pgdm|master|m\.?tech|m\.?sc|ms\b/i.test(d) ? 3 : /b\.?tech|b\.?e\b|bachelor|b\.?sc|b\.?a\b|b\.?com/i.test(d) ? 2 : 1)
+  const best = [...edu].sort((a, b) => rank(b.degree ?? '') - rank(a.degree ?? ''))[0]
+  const parts = [best.degree?.trim(), best.school?.trim()].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
 }
 
 /** Build the Candidate shape the Fit Engine reads from a pool profile row. */
@@ -68,7 +93,7 @@ export async function sourcePoolForIcp(
   // Profile ids that must be scored regardless of semantic recall — e.g. everything a
   // Crustdata run just bought. A bought profile that never gets scored is money spent
   // on a person the recruiter never sees.
-  opts: { includeIds?: string[]; acquired?: Record<string, { level: number; label: string }> } = {},
+  opts: { includeIds?: string[]; acquired?: Record<string, { level: number; label: string }>; feederEmployers?: string[] } = {},
 ): Promise<{ status: 'ok' | 'no_access' | 'empty'; matches: PoolMatch[] }> {
   const access = await getPoolAccess(supabase, orgId)
   if (!access.hasAccess) return { status: 'no_access', matches: [] }
@@ -179,6 +204,9 @@ export async function sourcePoolForIcp(
             red_flags: fit.red_flags,
             sources: sourcesByProfile.get(p.id) ?? [],
             acquired: opts.acquired?.[p.id] ? { level: opts.acquired[p.id].level, label: opts.acquired[p.id].label } : null,
+            gate_reasons: Object.fromEntries(fit.gate_results.map((g) => [g.label, g.reason])),
+            tags: deriveProfileTags(expsByProfile.get(p.id) ?? [], { feederEmployers: opts.feederEmployers, graduationYear: graduationYear(eduByProfile.get(p.id) ?? []) }),
+            education_summary: educationSummary(eduByProfile.get(p.id) ?? []),
           } as PoolMatch
         } catch {
           return null
@@ -242,12 +270,36 @@ export async function savePoolMatches(
   icpVersion: number | null,
   matches: PoolMatch[],
 ): Promise<void> {
-  await (supabase as unknown as LooseSb)
+  const sb = supabase as unknown as LooseSb
+  // Recruiter flags (starred / hidden) live on the cached row; a re-rank must not lose them.
+  const { data: prev } = await sb.from('pool_sourcing_matches').select('matches').eq('org_id', orgId).eq('job_id', jobId).maybeSingle()
+  const flags = new Map<string, { starred?: boolean; hidden?: boolean }>()
+  for (const m of ((prev?.matches ?? []) as PoolMatch[])) if (m.starred || m.hidden) flags.set(m.profile_id, { starred: m.starred, hidden: m.hidden })
+  const merged = matches.map((m) => (flags.has(m.profile_id) ? { ...m, ...flags.get(m.profile_id) } : m))
+  await sb
     .from('pool_sourcing_matches')
     .upsert(
-      { org_id: orgId, job_id: jobId, icp_version: icpVersion, matches, updated_at: new Date().toISOString() },
+      { org_id: orgId, job_id: jobId, icp_version: icpVersion, matches: merged, updated_at: new Date().toISOString() },
       { onConflict: 'org_id,job_id' },
     )
+}
+
+/** Set a recruiter flag on one cached market match (star / hide). Returns false when the profile isn't in the cache. */
+export async function setPoolMatchFlags(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+  profileId: string,
+  flags: { starred?: boolean; hidden?: boolean },
+): Promise<boolean> {
+  const sb = supabase as unknown as LooseSb
+  const { data: row } = await sb.from('pool_sourcing_matches').select('matches').eq('org_id', orgId).eq('job_id', jobId).maybeSingle()
+  const matches = ((row?.matches ?? []) as PoolMatch[])
+  if (!matches.some((m) => m.profile_id === profileId)) return false
+  const next = matches.map((m) => (m.profile_id === profileId ? { ...m, ...flags } : m))
+  const { error } = await sb.from('pool_sourcing_matches').update({ matches: next, updated_at: new Date().toISOString() }).eq('org_id', orgId).eq('job_id', jobId)
+  if (error) throw error
+  return true
 }
 
 /** The cached market shortlist for a job (for on-mount load). Null if none / table

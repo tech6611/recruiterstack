@@ -206,3 +206,10 @@ export function resolveSearchSpec(
   if (stored && stored.levels?.length) return { spec: stored, stored: true }
   return { spec: specFromIcp(icp, ctx), stored: false }
 }
+
+/** Employer terms the plan searches on (current/former/any), for profile tags like "Ex-McKinsey". */
+export function feederEmployersFromSpec(spec: SearchSpec): string[] {
+  const out = new Set<string>()
+  for (const lvl of spec.levels) for (const c of lvl.criteria) if (c.kind.startsWith('employer_') && !c.exclude) for (const v of c.values) out.add(v)
+  return Array.from(out)
+}

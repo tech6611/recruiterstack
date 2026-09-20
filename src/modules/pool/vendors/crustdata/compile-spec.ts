@@ -13,6 +13,9 @@ import { mapSeniorityValues, mapFunctionValues } from '@/modules/pool/vendors/cr
 import type { SearchLane, SearchPlan } from '@/modules/pool/vendors/crustdata/search-plan'
 
 const F = {
+  headcountCurrent: 'experience.employment_details.current.company_headcount_range',
+  industriesCurrent: 'experience.employment_details.current.company_industries',
+  companyTypeCurrent: 'experience.employment_details.current.company_type',
   school: 'education.schools.school',
   gradYear: 'education.schools.end_year',
   empCurrent: 'experience.employment_details.current.company_name',
@@ -38,6 +41,16 @@ export interface CompiledCriterion {
 function orAllWords(field: string, values: string[]): CrustdataFilterGroup {
   return { op: 'or', conditions: values.slice(0, MAX_TERMS).map((value) => ({ field, type: '(.)', value })) }
 }
+/** Exclusion of text terms: every value must be absent — Crustdata's "(!)" fuzzy negation, ANDed. */
+function noneOf(field: string, values: string[]): CrustdataCondition[] {
+  return values.slice(0, MAX_TERMS).map((value) => ({ field, type: '(!)', value }))
+}
+/** Include → an OR group of all-words matches; exclude → ANDed negations. */
+function textMatch(field: string, c: SearchCriterion, vals: string[], noun: string, list: string): CompiledCriterion {
+  return c.exclude
+    ? { conditions: noneOf(field, vals), summary: `not ${noun}: ${list}` }
+    : { conditions: [orAllWords(field, vals)], summary: `${noun}: ${list}` }
+}
 
 /** Compile one criterion, or explain why this source can't. */
 export function compileCriterion(c: SearchCriterion): { ok: CompiledCriterion } | { unsupported: string } {
@@ -45,17 +58,17 @@ export function compileCriterion(c: SearchCriterion): { ok: CompiledCriterion } 
   const list = (n = 6) => vals.slice(0, n).join(' / ') + (vals.length > n ? ` +${vals.length - n}` : '')
   switch (c.kind) {
     case 'school':
-      return vals.length ? { ok: { conditions: [orAllWords(F.school, vals)], summary: `school: ${list()}` } } : { unsupported: 'no schools listed' }
+      return vals.length ? { ok: textMatch(F.school, c, vals, 'school', list()) } : { unsupported: 'no schools listed' }
     case 'employer_current':
-      return vals.length ? { ok: { conditions: [orAllWords(F.empCurrent, vals)], summary: `currently at: ${list()}` } } : { unsupported: 'no employers listed' }
+      return vals.length ? { ok: textMatch(F.empCurrent, c, vals, 'currently at', list()) } : { unsupported: 'no employers listed' }
     case 'employer_past':
-      return vals.length ? { ok: { conditions: [orAllWords(F.empPast, vals)], summary: `formerly at: ${list()}` } } : { unsupported: 'no employers listed' }
+      return vals.length ? { ok: textMatch(F.empPast, c, vals, 'formerly at', list()) } : { unsupported: 'no employers listed' }
     case 'employer_any':
-      return vals.length ? { ok: { conditions: [orAllWords(F.empAny, vals)], summary: `ever at: ${list()}` } } : { unsupported: 'no employers listed' }
+      return vals.length ? { ok: textMatch(F.empAny, c, vals, 'ever at', list()) } : { unsupported: 'no employers listed' }
     case 'title_current':
-      return vals.length ? { ok: { conditions: [orAllWords(F.titleCurrent, vals)], summary: `current title: ${list()}` } } : { unsupported: 'no titles listed' }
+      return vals.length ? { ok: textMatch(F.titleCurrent, c, vals, 'current title', list()) } : { unsupported: 'no titles listed' }
     case 'title_any':
-      return vals.length ? { ok: { conditions: [orAllWords(F.titleAny, vals)], summary: `any title: ${list()}` } } : { unsupported: 'no titles listed' }
+      return vals.length ? { ok: textMatch(F.titleAny, c, vals, 'any title', list()) } : { unsupported: 'no titles listed' }
     case 'seniority': {
       const { matched, unmatched } = mapSeniorityValues(vals)
       if (!matched.length) return { unsupported: `seniority ${JSON.stringify(unmatched)} not in this source's closed set` }
@@ -82,14 +95,20 @@ export function compileCriterion(c: SearchCriterion): { ok: CompiledCriterion } 
     }
     case 'location':
       return vals[0]
-        ? { ok: { conditions: [{ field: F.location, type: 'geo_distance', value: { location: vals[0], distance: c.radius_km ?? 50, unit: 'km' } }], summary: `within ${c.radius_km ?? 50} km of ${vals[0]}` } }
+        ? { ok: { conditions: [{ field: F.location, type: c.exclude ? 'geo_exclude' : 'geo_distance', value: { location: vals[0], distance: c.radius_km ?? 50, unit: 'km' } }], summary: `${c.exclude ? 'not ' : ''}within ${c.radius_km ?? 50} km of ${vals[0]}` } }
         : { unsupported: 'no location given' }
     case 'skill':
-      return vals.length ? { ok: { conditions: [{ field: F.skills, type: 'in', value: vals }], summary: `lists skill: ${list()}` } } : { unsupported: 'no skills listed' }
+      return vals.length ? { ok: { conditions: [{ field: F.skills, type: c.exclude ? 'not_in' : 'in', value: vals }], summary: `${c.exclude ? 'does not list' : 'lists'} skill: ${list()}` } } : { unsupported: 'no skills listed' }
     case 'industry':
-      return { unsupported: 'employer industry is not a reliable filter on this source yet' }
+      // Employer industry text (e.g. "Software Development", "Financial Services"), current role.
+      return vals.length ? { ok: textMatch(F.industriesCurrent, c, vals, 'industry', list()) } : { unsupported: 'no industries listed' }
     case 'company_size':
-      return { unsupported: 'employer size is not a reliable filter on this source yet' }
+      // Headcount bands as stored by the source: 1-10, 11-50, 51-200, 201-500, 501-1000, 1001-5000, 5001-10000, 10001+
+      return vals.length ? { ok: { conditions: [{ field: F.headcountCurrent, type: c.exclude ? 'not_in' : 'in', value: vals }], summary: `${c.exclude ? 'not ' : ''}company size: ${list()}` } } : { unsupported: 'no size bands listed' }
+    case 'company_type':
+      return vals.length ? { ok: { conditions: [{ field: F.companyTypeCurrent, type: c.exclude ? 'not_in' : 'in', value: vals }], summary: `${c.exclude ? 'not ' : ''}company type: ${list()}` } } : { unsupported: 'no company types listed' }
+    case 'funding_stage':
+      return { unsupported: 'this source cannot filter people by their employer\'s funding stage' }
   }
 }
 

@@ -28,7 +28,9 @@ export type CriterionKind =
   | 'location'          // geo radius around values[0]
   | 'skill'             // listed skills (exact, sparse on most sources)
   | 'industry'          // employer industry
-  | 'company_size'      // employer headcount band
+  | 'company_size'      // employer headcount band (e.g. 51-200)
+  | 'company_type'      // Privately Held / Public Company / Nonprofit …
+  | 'funding_stage'     // Seed / Series A … (not every source can filter on it)
 
 export interface SearchCriterion {
   id: string
@@ -88,4 +90,6 @@ export const CRITERION_KIND_LABEL: Record<CriterionKind, string> = {
   skill: 'Listed skill',
   industry: 'Industry',
   company_size: 'Company size',
+  company_type: 'Company type',
+  funding_stage: 'Funding stage',
 }

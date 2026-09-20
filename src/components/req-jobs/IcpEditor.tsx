@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Brain, ChevronDown, ChevronRight, Compass } from 'lucide-react'
+import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Brain, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import type { ScoringCriterion } from '@/lib/types/database'
 import type { Icp, IcpCompetency, IcpMustHave } from '@/lib/types/icp'
 import { icpToScoringCriteria } from '@/lib/scoring'
+import { RecruiterBriefCard } from '@/components/req-jobs/RecruiterBriefCard'
 
 
 const BUCKET_LABEL: Record<string, string> = { hard_filter: 'Hard filter', ranking_signal: 'Ranking', screen_later: 'Screen later' }
@@ -54,6 +55,7 @@ export function IcpEditor({
   // Phase 1 (niche recruiter) — the brief the model reasoned in, and the recruiter's
   // corrections to it (house knowledge fed into the next Regenerate).
   const [showBrief, setShowBrief] = useState(false)
+  const [openComps, setOpenComps] = useState<Set<string>>(new Set())
   const [corrections, setCorrections] = useState('')
   const [savingCorrections, setSavingCorrections] = useState(false)
 
@@ -380,75 +382,18 @@ export function IcpEditor({
             {isApproved ? 'Approved' : 'Draft'} · v{icp.version}
           </span>
         </CardTitle>
-        <CardDescription>
-          Must-haves are hard gates (captured now, enforced by the Fit Engine). Competencies are the
-          weighted rubric — approving syncs them to the Scoring rubric below.
-        </CardDescription>
+        <CardDescription>Gates reject. Weights rank. Approving syncs the rubric below.</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* ── Recruiter brief — WHO reasoned this ICP. Compact: one header line; details on demand. ── */}
-        {icp.sourcing_map && (icp.sourcing_map.recruiter_brief || icp.status === 'draft') && (() => {
-          const b = icp.sourcing_map.recruiter_brief
-          const pools = [...(b?.feeder_pools ?? [])].sort((x, y) => (x.priority ?? 99) - (y.priority ?? 99))
-          const band = b?.experience_band
-          const Chip = ({ children, tone = 'slate', title }: { children: React.ReactNode; tone?: 'slate' | 'indigo' | 'rose'; title?: string }) => (
-            <span title={title} className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] ${tone === 'indigo' ? 'bg-indigo-50 text-indigo-800' : tone === 'rose' ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>{children}</span>
-          )
-          return (
-            <section className="rounded-xl border border-slate-200 bg-white">
-              <button type="button" onClick={() => setShowBrief((v) => !v)} className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-left text-xs">
-                {showBrief ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
-                <Compass className="h-3.5 w-3.5 shrink-0 text-indigo-600" />
-                <span className="font-semibold text-slate-700">{b?.niche ? b.niche : 'Recruiter brief'}</span>
-                {band && (band.min_years != null || band.max_years != null) && <Chip tone="rose" title={band.rationale ?? 'Ceiling enforced'}>{band.min_years ?? '?'}–{band.max_years ?? '?'} yrs</Chip>}
-                {!showBrief && pools.slice(0, 3).map((pool) => <Chip key={pool.label} tone="indigo" title={pool.companies.join(', ')}>{pool.label}</Chip>)}
-                {!showBrief && (b?.title_families?.length ?? 0) > 0 && <Chip title={b!.title_families.join(', ')}>+{b!.title_families.length} titles</Chip>}
-              </button>
-              {showBrief && (
-                <div className="space-y-2.5 border-t border-slate-100 px-3 py-2.5">
-                  {!b && <p className="text-xs text-slate-500">Generated before recruiter briefs existed — regenerate, or steer it below.</p>}
-                  {b?.persona && <p className="line-clamp-2 text-xs text-slate-600" title={b.persona}>{b.persona}</p>}
-
-                  {pools.length > 0 && (
-                    <div className="space-y-1">
-                      {pools.map((pool, i) => (
-                        <div key={i} className="flex flex-wrap items-center gap-1 text-xs" title={pool.rationale ?? undefined}>
-                          <span className="w-4 shrink-0 text-[10px] font-bold text-indigo-700">{pool.priority ?? i + 1}</span>
-                          <span className="mr-1 font-medium text-slate-700">{pool.label}</span>
-                          {pool.companies.map((c) => <Chip key={c} tone="indigo">{c}</Chip>)}
-                          {pool.role_types.length > 0 && <span className="text-[10px] text-slate-400">as {pool.role_types.join(' · ')}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {(b?.title_families?.length ?? 0) > 0 && (
-                    <div className="flex flex-wrap items-center gap-1 text-xs"><span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Titles</span>{b!.title_families.map((t) => <Chip key={t}>{t}</Chip>)}</div>
-                  )}
-
-                  <div className="grid gap-x-6 gap-y-1 text-[11px] md:grid-cols-2">
-                    {b?.market && <div><span className="font-semibold text-slate-500">Market · </span><span className="text-slate-600">{b.market}</span></div>}
-                    {b?.market_gates?.map((g, i) => <div key={`g${i}`} title={g.why ?? undefined}><span className="font-semibold text-slate-500">Gate here · </span><span className="text-slate-700">{g.requirement}</span></div>)}
-                    {b?.jd_translations?.map((t, i) => <div key={`t${i}`}><span className="text-slate-400">“{t.phrase}”</span> <span className="text-slate-400">→</span> <span className="text-slate-700">{t.means_here}</span></div>)}
-                    {b?.market_norms?.map((n, i) => <div key={`n${i}`}><span className="font-semibold text-slate-500">{n.topic} · </span><span className="text-slate-600">{n.norm}</span></div>)}
-                    {(b?.normal_red_flags?.length ?? 0) > 0 && <div><span className="font-semibold text-slate-500">Normal here · </span><span className="text-slate-600">{b!.normal_red_flags.join(' · ')}</span></div>}
-                    {(b?.unsure_about?.length ?? 0) > 0 && <div><span className="font-semibold text-amber-600">Check with HM · </span><span className="text-amber-800">{b!.unsure_about.join(' · ')}</span></div>}
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <textarea value={corrections} onChange={(e) => setCorrections(e.target.value)} rows={2} maxLength={4000}
-                      placeholder="Correct this brief — companies to add or drop, what is really a gate here, market norms. Applied on the next Regenerate."
-                      className="flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none" />
-                    <Button size="sm" variant="outline" onClick={saveCorrections} disabled={savingCorrections || corrections === (b?.corrections ?? '')}>
-                      <Save className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </section>
-          )
-        })()}
+        {icp.sourcing_map && (icp.sourcing_map.recruiter_brief || icp.status === 'draft') && (
+          <RecruiterBriefCard
+            brief={icp.sourcing_map.recruiter_brief ?? null}
+            open={showBrief} onToggle={() => setShowBrief((v) => !v)}
+            corrections={corrections} onCorrectionsChange={setCorrections}
+            onSaveCorrections={saveCorrections} saving={savingCorrections}
+          />
+        )}
 
         {/* ── Reasoning (Sourcing Brain, Slice 1) — how the JD was dissected ── */}
         {icp.sourcing_map && (
@@ -529,7 +474,7 @@ export function IcpEditor({
             <ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> Must-haves (hard gates)
           </div>
           <p className="text-[11px] text-slate-400">
-            Each is a yes/no deal-breaker the AI checks against the candidate’s real history — failing any one rejects them.
+            Yes/no. Fail one and the candidate is out.
           </p>
           {gates.length === 0 ? (
             <p className="text-xs text-slate-400">No gates — every candidate is scored on competencies alone.</p>
@@ -605,8 +550,13 @@ export function IcpEditor({
                   </button>
                 </div>
 
-                {/* behaviours */}
-                <div className="mt-2 space-y-1.5 pl-1">
+                {/* behaviours — folded by default; the weight row is what most people need */}
+                <button type="button" onClick={() => setOpenComps((prev) => { const n = new Set(prev); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n })}
+                  className="mt-1 ml-1 text-[11px] text-slate-400 hover:text-slate-600">
+                  {openComps.has(c.id) ? '▾' : '▸'} {c.behaviours.filter((b) => b.trim()).length} behaviours
+                </button>
+                {openComps.has(c.id) && (
+                <div className="mt-1 space-y-1.5 pl-1">
                   {c.behaviours.map((b, bi) => (
                     <div key={bi} className="flex items-center gap-2">
                       <span className="text-slate-300">•</span>
@@ -633,6 +583,7 @@ export function IcpEditor({
                     + behaviour
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>

@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { SourcingMatrix, type MatrixIcp, type MatrixMatch } from '@/components/req-jobs/SourcingMatrix'
 import { SearchSpecEditor, type LevelRunStat } from '@/components/req-jobs/SearchSpecEditor'
+import { PoolProfilePanel } from '@/components/req-jobs/PoolProfilePanel'
 
 interface PoolMatch {
   profile_id: string
@@ -28,6 +29,11 @@ interface PoolMatch {
   gate_unknown?: string[]
   sources?: string[]
   acquired?: { level: number; label: string } | null
+  gate_reasons?: Record<string, string>
+  tags?: string[]
+  education_summary?: string | null
+  starred?: boolean
+  hidden?: boolean
 }
 
 /** What the last acquisition run did, lane by lane (from POST /source/crustdata). */
@@ -50,6 +56,13 @@ function toMatrixMatch(m: PoolMatch, newIds?: Set<string>): MatrixMatch {
     gate_unknown: (m.gate_unknown ?? []).map((label) => ({ label })),
     source_badge: badge ? (newIds?.has(m.profile_id) ? `${badge} · new` : badge) : null,
     level_badge: m.acquired ? `L${m.acquired.level}${m.acquired.level === 1 ? ' · full match' : ''}` : null,
+    tags: m.tags ?? [],
+    gate_reasons: m.gate_reasons ?? {},
+    education_summary: m.education_summary ?? null,
+    experience_years: m.experience_years ?? null,
+    current_tenure_months: m.current_tenure_months ?? null,
+    starred: !!m.starred,
+    hidden: !!m.hidden,
     red_flags: m.red_flags ?? [],
     rationale: m.rationale ?? null,
     competencies: m.competencies ?? [],
@@ -81,6 +94,15 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   // The last Crustdata run's search plan + which profiles it brought in.
   const [plan, setPlan] = useState<SearchPlanReport | null>(null)
   const [newIds, setNewIds] = useState<Set<string>>(new Set())
+  const [showHidden, setShowHidden] = useState(false)
+  const [openProfile, setOpenProfile] = useState<string | null>(null)
+
+  /** Star / hide: free, persisted on the cached list, survives re-ranks. */
+  async function setFlag(profileId: string, flags: { starred?: boolean; hidden?: boolean }) {
+    setMatches((prev) => prev.map((m) => (m.profile_id === profileId ? { ...m, ...flags } : m)))
+    const res = await fetch(`/api/jobs/${jobId}/source/pool/matches`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile_id: profileId, ...flags }) })
+    if (!res.ok) toast.error('Could not save that')
+  }
 
   // Load the cached market shortlist so it survives a refresh (no re-scoring).
   useEffect(() => {
@@ -218,7 +240,19 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
       {state === 'ok' && (
         <div className="mt-3 space-y-2">
           {icp ? (
-            <SourcingMatrix matches={matches.map((m) => toMatrixMatch(m, newIds))} icp={icp} selected={selected} onToggle={toggle} />
+            <>
+              {(() => { const hidden = matches.filter((m) => m.hidden).length; return hidden > 0 ? (
+                <button type="button" onClick={() => setShowHidden((v) => !v)} className="text-[11px] text-slate-400 hover:text-slate-600">{showHidden ? 'Hide' : 'Show'} {hidden} hidden</button>
+              ) : null })()}
+              <SourcingMatrix
+                matches={matches.filter((m) => showHidden || !m.hidden).map((m) => toMatrixMatch(m, newIds))}
+                icp={icp} selected={selected} onToggle={toggle}
+                onStar={(id, starred) => setFlag(id, { starred })}
+                onHide={(id) => setFlag(id, { hidden: true })}
+                onOpenProfile={(id) => setOpenProfile(id)}
+              />
+              {openProfile && <PoolProfilePanel profileId={openProfile} tags={matches.find((m) => m.profile_id === openProfile)?.tags} onClose={() => setOpenProfile(null)} />}
+            </>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-xs text-slate-400">
               Loading the ICP’s ranking parameters…
