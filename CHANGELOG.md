@@ -14,6 +14,38 @@ entries on top.
 ### Docs
 - Added an evidence-grounded review of the Gemini ICP prompt, with a proposed hiring-situation packet, prompt structure, propagation plan, and acceptance tests.
 
+## 2026-09-20 (Sourcing parity, items 1–5: sentences + edit page, exclusions, company filters, triage, evidence, columns)
+
+### Changed
+- **Search plan reads as sentences** (`SearchSpecEditor.tsx`): open the one-line summary
+  and each level is a sentence — "Tier-1 school · now at McKinsey, Bain +2 · function
+  Consulting · any title Business Analyst, Associate" — with count and last-run marks.
+  Editing moved to an **Edit page** (full-width modal): chips per filter, rename /
+  reorder / delete levels, add levels and filters, Count / Reset / Save.
+- **Exclude on every filter**: an IS/NOT toggle per filter. Compiler sends `(!)`
+  negations for text terms, `geo_exclude` for location, `not_in` for skills / seniority /
+  function / size / type.
+
+### Added
+- **Company filters** the source can actually answer: `company_size` (headcount bands,
+  clickable 1-10 … 10001+), `company_type` (Privately Held, Public Company…), `industry`
+  (employer industry text). `funding_stage` exists on the spec for other sources and is
+  reported "not searchable on this source" here — Crustdata person search has no
+  funding-stage field (verified live).
+- **Triage without spending an unlock**: ★ star and hide on every market row
+  (`PATCH /api/jobs/[id]/source/pool/matches`; flags live on the cached list and
+  survive re-ranks), "Show n hidden" toggle, and a **profile side panel**
+  (`PoolProfilePanel.tsx`, `GET /api/pool/[id]`) with role history + descriptions,
+  education, skills, sources — contacts stay behind the unlock.
+- **Profile tags** (`modules/pool/domain/profile-tags.ts`, pure + tested): "At Bain" /
+  "Ex-McKinsey" (from the plan's feeder employers), "Fast career growth", "Job hopper",
+  "Long tenures", "Recently moved", "Likely open to move". Campus/society roles,
+  internships and anything before the graduation year on file are not employment.
+- **Click-to-evidence**: every must-have and competency cell opens a popover with the
+  judge's one-line reason (Fit Engine now returns `gate_results` with reasons).
+- **Column picker** on the matrix: Years, Location, Tenure, Education (remembered per
+  browser). `education_summary` ("MBA · IIM Ahmedabad") added to matches.
+
 ## 2026-09-20 (Less to read: plan and brief collapse to one line; dev preview page)
 
 ### Changed

@@ -6,6 +6,7 @@ import { sourceFromIcp, EmptyIcpQueryError, loadAcquiredLevels } from '@/modules
 import { CrustdataConfigError } from '@/modules/pool/vendors/crustdata/client'
 import { sourcePoolForIcp, savePoolMatches, embedPoolProfiles } from '@/modules/pool/domain/pool-sourcing'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
+import { resolveSearchSpec, feederEmployersFromSpec } from '@/modules/pool/search/spec-from-brief'
 
 export const maxDuration = 300 // live vendor fetch + embed + Fit-Engine scoring
 
@@ -93,7 +94,8 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     // 3. Rank the refreshed pool against the ICP — every profile bought this run is
     //    scored whether or not semantic recall would have surfaced it — and cache.
     const acquired = { ...(await loadAcquiredLevels(supabase, params.id)), ...sourced.acquired }
-    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired })
+    const feederEmployers = feederEmployersFromSpec(resolveSearchSpec(icp, { title: job?.title ?? null, roleContext }).spec)
+    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired, feederEmployers })
     if (result.status === 'ok') {
       await savePoolMatches(supabase, orgId, params.id, icp.version, result.matches).catch(() => {})
     }

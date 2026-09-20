@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const kinds = ['school', 'employer_current', 'employer_past', 'employer_any', 'title_current', 'title_any', 'seniority', 'function', 'years_band', 'grad_year_band', 'location', 'skill', 'industry', 'company_size'] as const
+const kinds = ['school', 'employer_current', 'employer_past', 'employer_any', 'title_current', 'title_any', 'seniority', 'function', 'years_band', 'grad_year_band', 'location', 'skill', 'industry', 'company_size', 'company_type', 'funding_stage'] as const
 
 export const searchCriterionSchema = z.object({
   id: z.string().min(1).max(60),

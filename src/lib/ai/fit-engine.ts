@@ -48,6 +48,8 @@ export interface FitResult {
   // "mentions SQL" gate when the profile lists no skills and no role descriptions).
   // Surfaced as "unverified", never counted as a failure.
   gate_unknown: IcpMustHave[]
+  /** The judge's verdict and one-line reason per gate — the "click to see why" behind each cell. */
+  gate_results: { id: string; label: string; pass: boolean | null; reason: string }[]
   competencies: FitCompetency[]
   red_flags: string[]
   strengths: string[]
@@ -333,6 +335,7 @@ export async function scoreAgainstIcp(
     passed_gates,
     gate_failures,
     gate_unknown,
+    gate_results: gates.map((g) => ({ id: g.id, label: g.label, pass: hardFails.has(g.id) ? false : (verdictById.get(g.id)?.pass ?? true), reason: hardFails.has(g.id) ? 'Outside the experience band on file' : (verdictById.get(g.id)?.reason ?? '') })),
     competencies,
     red_flags: judged.red_flags,
     strengths: judged.strengths,

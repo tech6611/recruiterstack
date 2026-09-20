@@ -864,154 +864,10 @@
  },
  "matches": [
   {
-   "name": "Sushanth Shenoy",
-   "score": 80,
-   "skills": [],
-   "sources": [
-    "vendor:crustdata"
-   ],
-   "acquired": {
-    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
-    "level": 1
-   },
-   "location": "Bengaluru",
-   "rationale": "Sushanth is a strong candidate with a stellar academic background and significant experience at a top-tier consulting firm. Their entrepreneurial ventures further highlight leadership and initiative. The main gap is the lack of explicit technical skill mentions, particularly SQL, which would require further probing.",
-   "reachable": true,
-   "red_flags": [],
-   "fit_bucket": "great",
-   "profile_id": "1d5dbc3f-1c19-4b0b-93a4-de514627bedf",
-   "competencies": [
-    {
-     "name": "Structured Problem-Solving",
-     "rating": 4,
-     "evidence": "Extensive experience in top-tier management consulting at Bain & Company demonstrates strong problem-solving."
-    },
-    {
-     "name": "Hands-On Analytical Horsepower",
-     "rating": 2,
-     "evidence": "Previous roles as Product Analyst and Machine Learning Engineer suggest analytical capability, but specific tools are unlisted."
-    },
-    {
-     "name": "Ownership & Bias for Action",
-     "rating": 4,
-     "evidence": "Multiple founder and executive roles (E-Cell IITM Zanzibar, The Wiretap Podcast) demonstrate high ownership."
-    },
-    {
-     "name": "Strategic & Commercial Acumen",
-     "rating": 4,
-     "evidence": "Revenue & Growth role at Skydo and consulting at Bain indicate strong strategic and commercial understanding."
-    }
-   ],
-   "gate_unknown": [
-    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
-   ],
-   "current_title": "Senior Associate Consultant",
-   "gate_failures": [],
-   "current_company": "Bain & Company",
-   "experience_years": 5,
-   "current_tenure_months": 2,
-   "total_experience_months": 60
-  },
-  {
-   "name": "Shatakshi Sarangi",
-   "score": 73,
-   "skills": [],
-   "sources": [
-    "vendor:crustdata"
-   ],
-   "acquired": {
-    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
-    "level": 1
-   },
-   "location": "Bengaluru",
-   "rationale": "Shatakshi presents a very strong profile with an exceptional academic background and experience at a top-tier consulting firm. While the explicit technical skill mentions are missing, the overall trajectory suggests a highly capable candidate with significant strategic and problem-solving abilities. This candidate is likely a great fit for roles requiring strong analytical and strategic thinking, though their technical depth would need to be explored.",
-   "reachable": true,
-   "red_flags": [],
-   "fit_bucket": "good",
-   "profile_id": "a3b91399-4810-46a2-9730-2bc0589d8d3b",
-   "competencies": [
-    {
-     "name": "Structured Problem-Solving",
-     "rating": 4,
-     "evidence": "Extensive experience at Bain & Company demonstrates strong structured problem-solving abilities in complex business contexts."
-    },
-    {
-     "name": "Hands-On Analytical Horsepower",
-     "rating": 2,
-     "evidence": "Experience as an Associate Data Scientist at QuantumStreet AI suggests some analytical skills, but specific tool proficiency is not listed."
-    },
-    {
-     "name": "Ownership & Bias for Action",
-     "rating": 3,
-     "evidence": "Progressing to Senior Associate Consultant at Bain and various internships indicates a strong drive and ownership."
-    },
-    {
-     "name": "Strategic & Commercial Acumen",
-     "rating": 4,
-     "evidence": "Working at Bain & Company implies a deep understanding of strategic and commercial considerations."
-    }
-   ],
-   "gate_unknown": [
-    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
-   ],
-   "current_title": "Senior Associate Consultant",
-   "gate_failures": [],
-   "current_company": "Bain & Company",
-   "experience_years": 3.9,
-   "current_tenure_months": 8,
-   "total_experience_months": 47
-  },
-  {
-   "name": "Vamsi Antyakula",
-   "score": 73,
-   "skills": [],
-   "sources": [
-    "vendor:crustdata"
-   ],
-   "acquired": {
-    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
-    "level": 1
-   },
-   "location": "Bengaluru",
-   "rationale": "Vamsi is an excellent candidate for a role requiring strong strategic thinking and problem-solving, backed by a top-tier educational and professional background. The only potential gap is explicit proof of hands-on SQL skills, which would need to be verified.",
-   "reachable": true,
-   "red_flags": [],
-   "fit_bucket": "good",
-   "profile_id": "89680dec-3fff-4dd0-aff0-d0d7059d92e7",
-   "competencies": [
-    {
-     "name": "Structured Problem-Solving",
-     "rating": 4,
-     "evidence": "McKinsey Senior Consultant role strongly implies excellent structured problem-solving capabilities."
-    },
-    {
-     "name": "Hands-On Analytical Horsepower",
-     "rating": 2,
-     "evidence": "Experience in EV R&D and a top MBA suggests analytical skills, but hands-on data tools are not specified."
-    },
-    {
-     "name": "Ownership & Bias for Action",
-     "rating": 3,
-     "evidence": "Multiple roles at TVS Motor, various internships, and leadership positions show strong initiative."
-    },
-    {
-     "name": "Strategic & Commercial Acumen",
-     "rating": 4,
-     "evidence": "MBA from IIM-A and current role at McKinsey demonstrate high-level strategic and commercial thinking."
-    }
-   ],
-   "gate_unknown": [
-    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
-   ],
-   "current_title": "Senior Consultant",
-   "gate_failures": [],
-   "current_company": "McKinsey & Company",
-   "experience_years": 5.5,
-   "current_tenure_months": 5,
-   "total_experience_months": 66
-  },
-  {
    "name": "Sukheth Kallupalli",
+   "tags": [
+    "At Boston Consulting Group"
+   ],
    "score": 63,
    "skills": [],
    "sources": [
@@ -1022,7 +878,7 @@
     "level": 1
    },
    "location": "Bengaluru",
-   "rationale": "Sukheth presents as a highly accomplished and driven candidate from a top-tier institution with a strong consulting background. The entrepreneurial experience indicates significant ownership and strategic acumen, making them a good fit for problem-solving and driving initiatives. However, specific technical analytical skills need to be validated.",
+   "rationale": "Sukheth presents a highly impressive profile, particularly strong in structured problem-solving and ownership due to top-tier consulting and entrepreneurial experience. The main gap is the lack of explicit detail on hands-on analytical tools, which is crucial for the role's analytical horsepower requirement. Overall, a strong candidate but with one key skill area to probe further.",
    "reachable": true,
    "red_flags": [],
    "fit_bucket": "good",
@@ -1031,24 +887,30 @@
     {
      "name": "Structured Problem-Solving",
      "rating": 3,
-     "evidence": "Experience at BCG and McKinsey indicates strong structured problem-solving skills."
+     "evidence": "Experience at BCG and McKinsey indicates strong structured problem-solving abilities."
     },
     {
      "name": "Hands-On Analytical Horsepower",
      "rating": 2,
-     "evidence": "M.Tech in Quantitative Finance suggests analytical aptitude, but specific tool use is not detailed."
+     "evidence": "M.Tech in Quantitative Finance suggests analytical capability, but no explicit software skills are listed."
     },
     {
      "name": "Ownership & Bias for Action",
      "rating": 4,
-     "evidence": "Founder, Founder in Residence, and numerous leadership roles demonstrate high ownership and bias for action."
+     "evidence": "Founded a podcast, was Founder in Residence, and held multiple leadership roles."
     },
     {
      "name": "Strategic & Commercial Acumen",
      "rating": 3,
-     "evidence": "Consulting experience and entrepreneurial ventures showcase strong strategic and commercial understanding."
+     "evidence": "Worked at BCG, McKinsey, and led business development at GalaxEye."
     }
    ],
+   "gate_reasons": {
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?": "Candidate's profile does not explicitly mention hands-on experience with SQL.",
+    "Has between 2 and 6 years of professional experience — not over-senior for this role?": "Candidate has 5 years of experience, fitting within the 2-6 years band; current title is Associate.",
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?": "Candidate is pursuing a Dual Degree at Indian Institute of Technology, Madras.",
+    "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?": "Candidate worked as an Associate at Boston Consulting Group and an Intern at McKinsey & Company."
+   },
    "gate_unknown": [
     "Does the candidate's profile explicitly mention hands-on experience with SQL?"
    ],
@@ -1056,11 +918,78 @@
    "gate_failures": [],
    "current_company": "Boston Consulting Group (BCG)",
    "experience_years": 5,
+   "education_summary": "Dual Degree: B.Tech (Mechanical Engineering) + M.Tech (Quantitative Finance) · Indian Institute of Technology, Madras",
    "current_tenure_months": 8,
    "total_experience_months": 60
   },
   {
-   "name": "Anchit Handa",
+   "name": "Sushanth Shenoy",
+   "tags": [
+    "At Bain",
+    "Fast career growth",
+    "Job hopper",
+    "Recently moved"
+   ],
+   "score": 63,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Sushanth is a strong candidate due to his top-tier consulting background and IIT education, meeting key must-haves. While specific technical skills like SQL are not explicitly listed, his diverse early experience and leadership roles suggest high potential and a strong bias for action for this role.",
+   "reachable": true,
+   "red_flags": [],
+   "fit_bucket": "good",
+   "profile_id": "1d5dbc3f-1c19-4b0b-93a4-de514627bedf",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 3,
+     "evidence": "Experience in management consulting at Bain & Company indicates strong structured problem-solving."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "Diverse roles including Product Analyst and ML Engineer suggest analytical skills, but SQL/Python are not explicitly mentioned."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 4,
+     "evidence": "Founding multiple initiatives like E-Cell IITM Zanzibar and The Wiretap Podcast demonstrates high ownership."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 3,
+     "evidence": "Revenue & Growth role at Skydo and consulting experience indicate commercial acumen."
+    }
+   ],
+   "gate_reasons": {
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?": "The candidate's profile does not explicitly mention hands-on experience with SQL.",
+    "Has between 2 and 6 years of professional experience — not over-senior for this role?": "Sushanth has 5 years of experience, which is within the 2-6 years professional experience band.",
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?": "Sushanth graduated with a BTech from the Indian Institute of Technology, Madras.",
+    "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?": "Sushanth has worked as Senior Associate Consultant and Associate Consultant at Bain & Company, a top-tier management consulting firm."
+   },
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Senior Associate Consultant",
+   "gate_failures": [],
+   "current_company": "Bain & Company",
+   "experience_years": 5,
+   "education_summary": "Bachelor of Technology - BTech · Indian Institute of Technology, Madras",
+   "current_tenure_months": 2,
+   "total_experience_months": 60
+  },
+  {
+   "name": "Shatakshi Sarangi",
+   "tags": [
+    "At Bain",
+    "Fast career growth"
+   ],
    "score": 57,
    "skills": [],
    "sources": [
@@ -1071,7 +1000,68 @@
     "level": 1
    },
    "location": "Bengaluru",
-   "rationale": "Anchit is a strong candidate with an excellent background in top-tier consulting and relevant early-stage experience. The primary gap is the lack of explicit mention of hands-on analytical tools, which may need to be explored during interviews.",
+   "rationale": "Shatakshi is a strong candidate given her IIT background and experience at Bain & Company. While her analytical skills need to be confirmed, her consulting experience suggests strong problem-solving and strategic abilities. She appears to be a good fit for a role requiring structured thinking and drive.",
+   "reachable": true,
+   "red_flags": [],
+   "fit_bucket": "okay",
+   "profile_id": "a3b91399-4810-46a2-9730-2bc0589d8d3b",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 3,
+     "evidence": "Experience at Bain & Company demonstrates strong structured problem-solving skills."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "Roles like Associate Data Scientist and Advanced Analytics Intern suggest analytical capability."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 3,
+     "evidence": "Progress to Senior Associate Consultant at Bain and diverse internships show strong ownership."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 3,
+     "evidence": "Management consulting at Bain & Company provides a strong foundation in strategic acumen."
+    }
+   ],
+   "gate_reasons": {
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?": "The candidate's profile does not explicitly mention hands-on experience with SQL.",
+    "Has between 2 and 6 years of professional experience — not over-senior for this role?": "Candidate has 3.9 years of experience, which is within the 2 to 6 years range.",
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?": "Candidate is a Bachelor of Technology graduate from the Indian Institute of Technology, Madras.",
+    "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?": "Candidate has worked as an Associate and Senior Associate Consultant at Bain & Company, a top-tier management consulting firm."
+   },
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Senior Associate Consultant",
+   "gate_failures": [],
+   "current_company": "Bain & Company",
+   "experience_years": 3.9,
+   "education_summary": "Bachelor of Technology - BTech · Indian Institute of Technology, Madras",
+   "current_tenure_months": 8,
+   "total_experience_months": 47
+  },
+  {
+   "name": "Anchit Handa",
+   "tags": [
+    "At Bain",
+    "Fast career growth",
+    "Recently moved"
+   ],
+   "score": 57,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Anchit is a strong candidate with an excellent background in top-tier consulting and venture capital, indicating robust strategic and problem-solving abilities. The primary gap is the lack of explicit mention of hands-on analytical tools, which may need to be explored during interviews.",
    "reachable": true,
    "red_flags": [],
    "fit_bucket": "okay",
@@ -1080,24 +1070,30 @@
     {
      "name": "Structured Problem-Solving",
      "rating": 3,
-     "evidence": "Extensive experience at Bain & Company indicates strong structured problem-solving abilities."
+     "evidence": "Experience at Bain & Company and Lentra strongly suggests structured problem-solving."
     },
     {
      "name": "Hands-On Analytical Horsepower",
      "rating": 2,
-     "evidence": "Background in consulting typically involves data analysis, but no specific analytical tools are listed."
+     "evidence": "Consulting and VC roles imply analytical skills, but specific technical tools are not listed."
     },
     {
      "name": "Ownership & Bias for Action",
      "rating": 3,
-     "evidence": "Roles at Bain, General Catalyst, and Lentra suggest a proactive and results-oriented approach."
+     "evidence": "Roles at Bain, Lentra, and General Catalyst demonstrate a high degree of ownership."
     },
     {
      "name": "Strategic & Commercial Acumen",
      "rating": 3,
-     "evidence": "Consulting and VC experience demonstrates strong strategic thinking and commercial understanding."
+     "evidence": "Management consulting and VC experience indicates strong strategic and commercial acumen."
     }
    ],
+   "gate_reasons": {
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?": "Candidate's profile does not explicitly mention hands-on experience with SQL.",
+    "Has between 2 and 6 years of professional experience — not over-senior for this role?": "Has 2.7 years of professional experience, falling within the 2-6 years band.",
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?": "Graduated from Indian Institute of Technology, Madras, a Tier-1 university.",
+    "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?": "Candidate has worked at Bain & Company (top-tier Management Consulting) for 2.7 years and General Catalyst (VC)."
+   },
    "gate_unknown": [
     "Does the candidate's profile explicitly mention hands-on experience with SQL?"
    ],
@@ -1105,11 +1101,16 @@
    "gate_failures": [],
    "current_company": "Bain & Company",
    "experience_years": 2.7,
+   "education_summary": "Bachelor's degree · Indian Institute of Technology, Madras",
    "current_tenure_months": 5,
    "total_experience_months": 32
   },
   {
-   "name": "Vinay Mehta",
+   "name": "Vamsi Antyakula",
+   "tags": [
+    "At McKinsey",
+    "Recently moved"
+   ],
    "score": 57,
    "skills": [],
    "sources": [
@@ -1120,11 +1121,129 @@
     "level": 1
    },
    "location": "Bengaluru",
-   "rationale": "The candidate's background at IIM-C and McKinsey indicates a strong foundation in structured problem-solving and strategic thinking. While analytical horsepower is implied by their education and role, specific hands-on data skills are not evident, which could be a gap depending on the role's technical requirements.",
+   "rationale": "Vamsi is a strong candidate given their recent experience at McKinsey and top-tier education. While the specific analytical tools are not listed, their consulting background suggests strong foundational problem-solving and strategic skills, making them a good fit for the role.",
+   "reachable": true,
+   "red_flags": [],
+   "fit_bucket": "okay",
+   "profile_id": "89680dec-3fff-4dd0-aff0-d0d7059d92e7",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 3,
+     "evidence": "Experience at McKinsey & Company demonstrates strong structured problem-solving capabilities."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "While at TVS R&D, likely involved data, but specific analytical tools are not mentioned."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 3,
+     "evidence": "Progressed through roles at TVS and engaged in various projects and leadership roles at university."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 3,
+     "evidence": "Role as Senior Consultant at McKinsey suggests strong strategic and commercial understanding."
+    }
+   ],
+   "gate_reasons": {
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?": "The profile does not explicitly mention hands-on experience with SQL.",
+    "Has between 2 and 6 years of professional experience — not over-senior for this role?": "Vamsi has 5.5 years of experience, which falls within the 2-6 years range.",
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?": "Vamsi is pursuing an MBA from IIM Ahmedabad and holds a BTech from NIT Raipur, both Tier-1 institutions.",
+    "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?": "Vamsi is currently a Senior Consultant at McKinsey & Company, a top-tier management consulting firm."
+   },
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Senior Consultant",
+   "gate_failures": [],
+   "current_company": "McKinsey & Company",
+   "experience_years": 5.5,
+   "education_summary": "Master of Business Administration - MBA · Indian Institute of Management Ahmedabad",
+   "current_tenure_months": 5,
+   "total_experience_months": 66
+  },
+  {
+   "name": "Sumedh Karanth",
+   "tags": [
+    "At McKinsey"
+   ],
+   "score": 57,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Sumedh presents a strong profile with a top-tier educational background and experience at a prestigious consulting firm. While specific analytical tool experience is not explicitly stated, the overall trajectory suggests high potential for strategic and problem-solving roles, making him a good fit given the provided criteria.",
+   "reachable": true,
+   "red_flags": [],
+   "fit_bucket": "okay",
+   "profile_id": "55d718ce-5e1d-4711-835b-b55429047498",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 3,
+     "evidence": "Experience at McKinsey and as a Consultant at Daimler suggests structured problem-solving exposure."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "Software Engineer I and Consultant roles imply analytical work, but specific tools are not listed."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 3,
+     "evidence": "Chief Operating Officer role and multiple student leadership positions demonstrate ownership."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 3,
+     "evidence": "COO role at a software company indicates exposure to strategic and commercial aspects."
+    }
+   ],
+   "gate_reasons": {
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?": "Skills are not listed, and role descriptions do not explicitly mention SQL experience.",
+    "Has between 2 and 6 years of professional experience — not over-senior for this role?": "Candidate has 5.7 years of experience, which falls within the 2-6 years range.",
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?": "Graduated with a Master of Technology from Indian Institute of Technology, Madras.",
+    "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?": "Currently a Software Engineer I at McKinsey & Company, which is a top-tier management consulting firm."
+   },
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Software Engineer I",
+   "gate_failures": [],
+   "current_company": "McKinsey & Company",
+   "experience_years": 5.7,
+   "education_summary": "Master of Technology - MTech · Indian Institute of Technology, Madras",
+   "current_tenure_months": 8,
+   "total_experience_months": 68
+  },
+  {
+   "name": "Vinay Mehta",
+   "tags": [
+    "At McKinsey"
+   ],
+   "score": 57,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Vinay presents as a high-potential candidate with a strong academic and consulting background from top institutions. While the lack of explicit quantitative skills is a gap, his overall profile suggests he could quickly ramp up. He appears to be a good fit for a role requiring strong strategic thinking and execution.",
    "reachable": true,
    "red_flags": [
-    "No explicit mention of technical skills like SQL, Python/R which could be critical for hands-on analytical roles.",
-    "The BCom degree and Diploma in Nautical Science followed by MBA at IIM-C shows a non-linear and somewhat unconventional trajectory."
+    "No specific mention of quantitative skills like SQL, Python, or advanced Excel.",
+    "Multiple, short-duration roles outside of core consulting/finance track prior to MBA."
    ],
    "fit_bucket": "okay",
    "profile_id": "a0cf7d53-67ce-4b1a-a1bf-638302fa36fe",
@@ -1132,24 +1251,30 @@
     {
      "name": "Structured Problem-Solving",
      "rating": 3,
-     "evidence": "McKinsey Junior Associate role and IIM-C MBA suggest strong problem-solving skills."
+     "evidence": "McKinsey experience and MBA from IIM Calcutta suggest strong structured problem-solving abilities."
     },
     {
      "name": "Hands-On Analytical Horsepower",
      "rating": 2,
-     "evidence": "MBA from IIM-C implies analytical aptitude; however, no explicit hands-on data skills are listed."
+     "evidence": "No explicit mention of SQL, Python, R, or advanced Excel skills; CMO role might imply some data use."
     },
     {
      "name": "Ownership & Bias for Action",
      "rating": 3,
-     "evidence": "Held CMO role at Aceclub.pro and President of IIM-C Student Council, demonstrating leadership and drive."
+     "evidence": "Held CMO role at Aceclub.pro and President of Student Council, demonstrating strong ownership and drive."
     },
     {
      "name": "Strategic & Commercial Acumen",
      "rating": 3,
-     "evidence": "Experience as CMO and at McKinsey indicates developing strategic and commercial understanding."
+     "evidence": "CMO experience and McKinsey role indicate a strong understanding of business models and strategy."
     }
    ],
+   "gate_reasons": {
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?": "The candidate's profile does not explicitly mention hands-on experience with SQL.",
+    "Has between 2 and 6 years of professional experience — not over-senior for this role?": "Candidate has 4.2 years of experience, which is within the 2-6 years range, and a Junior Associate title.",
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?": "Candidate is pursuing an MBA from Indian Institute of Management, Calcutta (IIM-C), a Tier-1 university.",
+    "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?": "Currently a Junior Associate at McKinsey & Company, a top-tier management consulting firm."
+   },
    "gate_unknown": [
     "Does the candidate's profile explicitly mention hands-on experience with SQL?"
    ],
@@ -1157,11 +1282,16 @@
    "gate_failures": [],
    "current_company": "McKinsey & Company",
    "experience_years": 4.2,
+   "education_summary": "Master of Business Administration - MBA · Indian Institute of Management, Calcutta",
    "current_tenure_months": 15,
    "total_experience_months": 50
   },
   {
    "name": "Sahil Kumar",
+   "tags": [
+    "At Bain",
+    "Recently moved"
+   ],
    "score": 57,
    "skills": [],
    "sources": [
@@ -1172,11 +1302,10 @@
     "level": 1
    },
    "location": "Bengaluru",
-   "rationale": "Sahil presents a strong profile with top-tier education and consulting experience, aligning well with strategic thinking and problem-solving. The main gap is the lack of explicit detail on hands-on analytical tools, particularly SQL, which might need to be verified. The short stints in earlier roles also warrant exploration.",
+   "rationale": "Sahil has an excellent academic background and relevant consulting experience at top firms, fitting the core background and university requirements. The entrepreneurial experience is a strong positive, but the lack of explicit SQL mention is a gap that needs to be probed, although overall experience suggests strong potential for the role.",
    "reachable": true,
    "red_flags": [
-    "Lack of explicit mention of SQL experience given a role that might require it.",
-    "Multiple short stints in various roles, indicating potential job hopping."
+    "Lack of explicit mention of SQL in the profile."
    ],
    "fit_bucket": "okay",
    "profile_id": "cae6c5c5-36f6-4045-a212-26b02bd7699e",
@@ -1184,24 +1313,30 @@
     {
      "name": "Structured Problem-Solving",
      "rating": 3,
-     "evidence": "Experience at Bain & Company and IIMB MBA suggests strong structured problem-solving skills."
+     "evidence": "Experience at Bain & Company and TransformationX suggests strong structured problem-solving."
     },
     {
      "name": "Hands-On Analytical Horsepower",
      "rating": 2,
-     "evidence": "Background in ML Engineering and Business Analyst roles indicates analytical skills, but SQL is not explicitly mentioned."
+     "evidence": "Worked as ML Engineer, Business Analyst, and Senior Analyst, suggesting analytical proficiency."
     },
     {
      "name": "Ownership & Bias for Action",
      "rating": 3,
-     "evidence": "Founder's Office roles at NeoSapien and Prodo demonstrate strong ownership and initiative."
+     "evidence": "Experience in multiple Founder's Office roles demonstrates strong ownership and bias for action."
     },
     {
      "name": "Strategic & Commercial Acumen",
      "rating": 3,
-     "evidence": "Associate Consultant at Bain & Company and MBA education contribute to strong strategic acumen."
+     "evidence": "Roles in strategy, consulting, and founder's offices indicate strong strategic acumen."
     }
    ],
+   "gate_reasons": {
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?": "The candidate's profile does not explicitly mention hands-on experience with SQL.",
+    "Has between 2 and 6 years of professional experience — not over-senior for this role?": "The candidate has 3.6 years of professional experience, which is within the 2 to 6 years band.",
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?": "Candidate graduated from Indian Institute of Management Bangalore and Indian Institute of Technology, Madras.",
+    "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?": "Candidate has worked as Associate Consultant at Bain & Company and Summer Associate Consultant at TransformationX."
+   },
    "gate_unknown": [
     "Does the candidate's profile explicitly mention hands-on experience with SQL?"
    ],
@@ -1209,11 +1344,15 @@
    "gate_failures": [],
    "current_company": "Bain & Company",
    "experience_years": 3.6,
+   "education_summary": "Master of Business Administration - MBA · Indian Institute of Management Bangalore",
    "current_tenure_months": 4,
    "total_experience_months": 43
   },
   {
    "name": "Manya Deshpande",
+   "tags": [
+    "At Boston Consulting Group"
+   ],
    "score": 20,
    "skills": [],
    "sources": [
@@ -1224,36 +1363,39 @@
     "level": 1
    },
    "location": "Bengaluru",
-   "rationale": "Manya has a strong core background in management consulting with BCG and appropriate experience. However, the candidate fails the strict Tier-1 university gate and lacks explicit mention of SQL, which are critical deal-breakers for this role. While the consulting experience suggests strong competencies, the hard gates are not met.",
+   "rationale": "Manya presents as a high-potential candidate with solid consulting experience from BCG. However, the hard requirement for a Tier-1 university (as defined) is not met, and explicit hands-on SQL experience is not evidenced. While highly capable, these gaps are critical for this role's must-haves.",
    "reachable": true,
-   "red_flags": [
-    "Does not meet Tier-1 university requirement",
-    "Lack of explicit mention of SQL experience"
-   ],
+   "red_flags": [],
    "fit_bucket": "weak",
    "profile_id": "b0a44366-9b0f-4c76-b287-3c3625cab0f3",
    "competencies": [
     {
      "name": "Structured Problem-Solving",
      "rating": 3,
-     "evidence": "Experience at BCG, a firm known for structured problem-solving, suggests strong capabilities."
+     "evidence": "Experience as a Research Analyst/Associate at BCG demonstrates strong structured problem-solving skills."
     },
     {
      "name": "Hands-On Analytical Horsepower",
      "rating": 2,
-     "evidence": "Research roles at BCG and other organizations indicate analytical skills, but specific tool usage is not detailed."
+     "evidence": "Research roles imply data analysis, but specific tools like SQL, Python/R are not mentioned."
     },
     {
      "name": "Ownership & Bias for Action",
      "rating": 3,
-     "evidence": "Progressing from Research Associate to Research Analyst at BCG shows consistent delivery and initiative."
+     "evidence": "Progression and sustained tenure at BCG indicate ability to independently drive projects and outcomes."
     },
     {
      "name": "Strategic & Commercial Acumen",
      "rating": 3,
-     "evidence": "Working at BCG implies exposure to strategic projects and understanding of business impact."
+     "evidence": "Consulting experience at BCG points to a strong understanding of business models and strategic context."
     }
    ],
+   "gate_reasons": {
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?": "Candidate's profile does not explicitly mention hands-on experience with SQL.",
+    "Has between 2 and 6 years of professional experience — not over-senior for this role?": "Candidate has 3.6 years of experience, which falls within the 2-6 years professional experience range.",
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?": "Shri Ram College of Commerce (SRCC) is a top institution but not a Tier-1 university in the specified list (IIT, IIM A/B/C/L, ISB, BITS Pilani).",
+    "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?": "Candidate has 3.6 years of experience at Boston Consulting Group (BCG), a top-tier management consulting firm."
+   },
    "gate_unknown": [
     "Does the candidate's profile explicitly mention hands-on experience with SQL?"
    ],
@@ -1263,10 +1405,370 @@
    ],
    "current_company": "Boston Consulting Group (BCG)",
    "experience_years": 3.6,
+   "education_summary": "Bachelor of Arts - BA · Shri Ram College of Commerce (SRCC)",
    "current_tenure_months": 8,
    "total_experience_months": 43
+  },
+  {
+   "name": "Ankit K Sah",
+   "tags": [
+    "At Boston Consulting Group"
+   ],
+   "score": 20,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Ankit has a strong background in software engineering with reputable companies. While the university pedigree does not meet the strict Tier-1 criteria, his work experience at BCG is a significant plus. The absence of explicit skills information makes it challenging to fully assess analytical horsepower for this role.",
+   "reachable": true,
+   "red_flags": [],
+   "fit_bucket": "weak",
+   "profile_id": "b3b5e37f-3733-404f-ba56-bf614e790530",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 3,
+     "evidence": "Working at BCG as a Software Engineer suggests exposure to structured problem-solving."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "Software Engineer roles at Boeing and BCG imply data manipulation and analysis skills."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 3,
+     "evidence": "Progression from intern to Software Engineer at Boeing, then to BCG, shows initiative."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 2,
+     "evidence": "Role at BCG suggests exposure to broader business context, though specific impact isn't detailed."
+    }
+   ],
+   "gate_reasons": {
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?": "The candidate's profile does not explicitly mention hands-on experience with SQL.",
+    "Has between 2 and 6 years of professional experience — not over-senior for this role?": "Candidate has 5.5 years of experience, which falls within the 2-6 years professional experience band.",
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?": "National Institute of Technology, Tiruchirappalli and Jalpaiguri Government Engineering College are not Tier-1 universities (IIT, IIM A/B/C/L, ISB, BITS Pilani).",
+    "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?": "Currently a Software Engineer at Boston Consulting Group, a top-tier management consulting firm."
+   },
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Software Engineer",
+   "gate_failures": [
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?"
+   ],
+   "current_company": "Boston Consulting Group (BCG)",
+   "experience_years": 5.5,
+   "education_summary": "Master of Technology - M. Tech · National Institute of Technology, Tiruchirappalli",
+   "current_tenure_months": 39,
+   "total_experience_months": 66
   }
  ],
+ "profile": {
+  "id": "3e3c2a42-fb71-4706-9348-f68728e83538",
+  "display_name": "Sukheth Kallupalli",
+  "headline": "Associate at BCG | IIT Madras",
+  "current_title": "Associate",
+  "current_company": "Boston Consulting Group (BCG)",
+  "location_city": "Bengaluru",
+  "experience_years": 5,
+  "skills": [],
+  "num_roles": 18,
+  "total_experience_months": 60,
+  "current_tenure_months": 8,
+  "has_email": false,
+  "has_linkedin": true,
+  "reachable": true,
+  "sources": [
+   "vendor:crustdata"
+  ],
+  "evidence_as_of": "2026-09-17",
+  "evidence_source": "vendor:crustdata",
+  "tenure_verified_months": 8,
+  "employer_disputed": false,
+  "education": [
+   {
+    "year": 2025,
+    "field": null,
+    "degree": "Dual Degree: B.Tech (Mechanical Engineering) + M.Tech (Quantitative Finance)",
+    "school": "Indian Institute of Technology, Madras"
+   }
+  ],
+  "evidence_age_months": 0,
+  "freshness": "fresh",
+  "experiences": [
+   {
+    "id": "76909acc-33ce-4356-9522-4211f6c9be76",
+    "title": "Associate",
+    "employer": "Boston Consulting Group (BCG)",
+    "location": null,
+    "start_date": "2026-01-01",
+    "end_date": null,
+    "is_current": true,
+    "summary": null,
+    "sort_order": 0,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "4f33d54c-bd31-40c6-b20d-4009707a39c1",
+    "title": "Founder's Office",
+    "employer": "Optimist",
+    "location": "Bangalore / Gurugram",
+    "start_date": "2025-09-01",
+    "end_date": "2025-12-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 1,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "a6ef0e9c-57ce-4b7a-b921-2c8a3d2f7953",
+    "title": "Founder in Residence",
+    "employer": "Entrepreneurs First",
+    "location": "Bangalore Urban, Karnataka, India",
+    "start_date": "2025-06-01",
+    "end_date": "2025-09-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 2,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "847825d0-2bb2-460b-b2ad-6b8fd634ce42",
+    "title": "Delegate | 3rd India-Bhutan Youth Summit",
+    "employer": "Ministry of External Affairs, India",
+    "location": "Bhutan",
+    "start_date": "2024-09-01",
+    "end_date": "2024-09-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 3,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "9bb136da-53e7-4cfb-9f10-63ec571c1f29",
+    "title": "Business Analyst Intern",
+    "employer": "McKinsey & Company",
+    "location": null,
+    "start_date": "2024-05-01",
+    "end_date": "2024-07-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 4,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "660af4da-d401-4497-bcee-32a4e0042f12",
+    "title": "Institute Secretary (Co-Curricular Affairs)",
+    "employer": "Indian Institute of Technology, Madras",
+    "location": "Chennai",
+    "start_date": "2024-04-01",
+    "end_date": "2025-04-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 5,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "c2f63065-6734-410f-96e6-e766359cb33c",
+    "title": "Summer Analyst",
+    "employer": "Dalberg",
+    "location": "Mumbai, Maharashtra, India",
+    "start_date": "2023-06-01",
+    "end_date": "2023-07-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 6,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "416ef40a-c924-472a-83b5-1a11b754885d",
+    "title": "Core Team Member | Evolve",
+    "employer": "Shaastra, IIT Madras",
+    "location": null,
+    "start_date": "2023-04-01",
+    "end_date": "2024-04-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 7,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "72df95b5-4803-403c-95e8-0aae10d87197",
+    "title": "Business Development",
+    "employer": "GalaxEye",
+    "location": null,
+    "start_date": "2022-12-01",
+    "end_date": "2023-01-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 8,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "f14a44ba-0be5-42fe-b3cb-3e2f8b311028",
+    "title": "Correspondent",
+    "employer": "Chennai36, International & Alumni Relations, IIT Madras",
+    "location": null,
+    "start_date": "2022-11-01",
+    "end_date": "2023-05-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 9,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "e537631a-af1d-4491-98a6-987842c71e6e",
+    "title": "Founder/Producer",
+    "employer": "The Wiretap Podcast",
+    "location": null,
+    "start_date": "2022-07-01",
+    "end_date": "2024-03-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 10,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "a07aa546-46b6-4687-a94a-ae7442732e78",
+    "title": "Head of Mentorship",
+    "employer": "Avanti Fellows",
+    "location": "Puducherry, India",
+    "start_date": "2022-06-01",
+    "end_date": "2023-05-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 11,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "3799dc8c-8c41-4aa5-9b38-770cf5e0a76b",
+    "title": "QMS Manager | Evolve",
+    "employer": "Shaastra, IIT Madras",
+    "location": null,
+    "start_date": "2022-06-01",
+    "end_date": "2023-04-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 12,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "d688d93f-257b-49aa-968b-8838757fcfbc",
+    "title": "Summer Intern",
+    "employer": "ITC Limited",
+    "location": "Chennai, Tamil Nadu, India",
+    "start_date": "2022-05-01",
+    "end_date": "2022-07-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 13,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "0f4abcb4-c4e9-4fa0-98fc-933805bb085d",
+    "title": "Coordinator | Blockchain Club",
+    "employer": "Centre For Innovation (CFI)",
+    "location": null,
+    "start_date": "2021-06-01",
+    "end_date": "2022-04-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 14,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "3eddbfc3-cbbd-45e5-a6ea-deebdb946888",
+    "title": "Coordinator | Mind Trials | Evolve",
+    "employer": "Shaastra, IIT Madras",
+    "location": null,
+    "start_date": "2021-05-01",
+    "end_date": "2022-05-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 15,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "5f0d8bac-c61d-41b5-ab31-9187a95a621f",
+    "title": "Project Lead | Blockchain Club",
+    "employer": "Centre For Innovation (CFI)",
+    "location": null,
+    "start_date": "2021-05-01",
+    "end_date": "2022-04-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 16,
+    "source_key": "vendor:crustdata"
+   },
+   {
+    "id": "48d5972f-cd41-402d-8c4f-51eb079ddf3e",
+    "title": "Manager",
+    "employer": "E-Cell IIT Madras",
+    "location": null,
+    "start_date": "2021-05-01",
+    "end_date": "2022-03-01",
+    "is_current": false,
+    "summary": null,
+    "sort_order": 17,
+    "source_key": "vendor:crustdata"
+   }
+  ],
+  "contacts": [],
+  "unlocked": false,
+  "provenance": [
+   {
+    "field": "display_name",
+    "value": "Sukheth Kallupalli",
+    "source_key": "vendor:crustdata",
+    "confidence": 85
+   },
+   {
+    "field": "headline",
+    "value": "Associate at BCG | IIT Madras",
+    "source_key": "vendor:crustdata",
+    "confidence": 85
+   },
+   {
+    "field": "location",
+    "value": "Bengaluru, Karnataka, India",
+    "source_key": "vendor:crustdata",
+    "confidence": 85
+   },
+   {
+    "field": "education",
+    "value": [
+     {
+      "year": 2025,
+      "field": null,
+      "degree": "Dual Degree: B.Tech (Mechanical Engineering) + M.Tech (Quantitative Finance)",
+      "school": "Indian Institute of Technology, Madras"
+     }
+    ],
+    "source_key": "vendor:crustdata",
+    "confidence": 85
+   },
+   {
+    "field": "current_title",
+    "value": "Associate",
+    "source_key": "vendor:crustdata",
+    "confidence": 70
+   },
+   {
+    "field": "current_company",
+    "value": "Boston Consulting Group (BCG)",
+    "source_key": "vendor:crustdata",
+    "confidence": 70
+   }
+  ]
+ },
  "columns": {
   "must_haves": [
    {

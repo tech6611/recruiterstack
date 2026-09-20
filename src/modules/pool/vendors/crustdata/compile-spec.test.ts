@@ -14,7 +14,7 @@ describe('compileCriterion', () => {
     expect(compileCriterion({ id: 'g', kind: 'grad_year_band', values: [], min: 2019, max: 2023 })).toMatchObject({ ok: { conditions: [{ field: 'education.schools.end_year', type: '=>', value: 2019 }, { field: 'education.schools.end_year', type: '=<', value: 2023 }] } })
   })
   it('reports what this source cannot express instead of guessing', () => {
-    expect(compileCriterion({ id: 'h', kind: 'industry', values: ['fintech'] })).toHaveProperty('unsupported')
+    expect(compileCriterion({ id: 'h', kind: 'funding_stage', values: ['Series A'] })).toHaveProperty('unsupported')
     expect(compileCriterion({ id: 'i', kind: 'seniority', values: ['wizard'] })).toHaveProperty('unsupported')
     expect(compileCriterion({ id: 'j', kind: 'school', values: [] })).toHaveProperty('unsupported')
   })
@@ -26,11 +26,11 @@ describe('compileSpec', () => {
     base: [
       { id: 'loc', kind: 'location', values: ['Bengaluru, Karnataka, India'], radius_km: 50 },
       { id: 'yrs', kind: 'years_band', values: [], min: 2, max: 6 },
-      { id: 'ind', kind: 'industry', values: ['SaaS'] },
+      { id: 'ind', kind: 'funding_stage', values: ['Series A'] },
     ],
     levels: [
       { id: 'L1', label: 'Tier-1 · currently at MBB', criteria: [{ id: 's', kind: 'school', values: ['IIT'] }, { id: 'e', kind: 'employer_current', values: ['McKinsey'] }] },
-      { id: 'L2', label: 'Unsearchable level', criteria: [{ id: 'x', kind: 'company_size', values: ['1-50'] }] },
+      { id: 'L2', label: 'Unsearchable level', criteria: [{ id: 'x', kind: 'funding_stage', values: ['Series A'] }] },
       { id: 'L3', label: 'Titles', criteria: [{ id: 't', kind: 'title_current', values: ['Chief of Staff'] }], relaxes: 'title only' },
     ],
     post_fetch: [{ label: 'Mentions SQL', how: 'judge' }, { label: 'Consulting tenure', how: 'local' }],
@@ -54,5 +54,25 @@ describe('compileSpec', () => {
     expect(out.lanes.every((l) => l.kind === 'level')).toBe(true)
     expect(out.unmapped.map((u) => u.reason)).toEqual(expect.arrayContaining(['judged by the Fit Engine after fetch', 'computed from stored role history after fetch']))
     expect(compileSpec(spec).lanes.map((l) => l.key)).toEqual(out.lanes.map((l) => l.key))
+  })
+})
+
+describe('compileCriterion — exclusions and company filters', () => {
+  it('excludes text terms with ANDed "(!)" negations', () => {
+    const r = compileCriterion({ id: 'x', kind: 'title_current', values: ['Engineer', 'Intern'], exclude: true })
+    expect(r).toMatchObject({ ok: { conditions: [
+      { field: 'experience.employment_details.current.title', type: '(!)', value: 'Engineer' },
+      { field: 'experience.employment_details.current.title', type: '(!)', value: 'Intern' },
+    ], summary: 'not current title: Engineer / Intern' } })
+  })
+  it('excludes a location with geo_exclude and skills with not_in', () => {
+    expect(compileCriterion({ id: 'l', kind: 'location', values: ['Pune, India'], radius_km: 30, exclude: true })).toMatchObject({ ok: { conditions: [{ type: 'geo_exclude' }] } })
+    expect(compileCriterion({ id: 's', kind: 'skill', values: ['SQL'], exclude: true })).toMatchObject({ ok: { conditions: [{ type: 'not_in', value: ['SQL'] }] } })
+  })
+  it('maps company size, type and industry to the current employer fields; funding stage is unsupported', () => {
+    expect(compileCriterion({ id: 'a', kind: 'company_size', values: ['11-50', '51-200'] })).toMatchObject({ ok: { conditions: [{ field: 'experience.employment_details.current.company_headcount_range', type: 'in', value: ['11-50', '51-200'] }] } })
+    expect(compileCriterion({ id: 'b', kind: 'company_type', values: ['Privately Held'] })).toMatchObject({ ok: { conditions: [{ field: 'experience.employment_details.current.company_type', type: 'in' }] } })
+    expect(compileCriterion({ id: 'c', kind: 'industry', values: ['Software Development'] })).toMatchObject({ ok: { conditions: [{ conditions: [{ field: 'experience.employment_details.current.company_industries', type: '(.)' }] }] } })
+    expect(compileCriterion({ id: 'd', kind: 'funding_stage', values: ['Series A'] })).toHaveProperty('unsupported')
   })
 })
