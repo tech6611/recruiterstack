@@ -16,6 +16,10 @@ entries on top.
 
 ## 2026-09-20 (Locations standardised · unknown gates ranked · pool recall held to the plan)
 
+### Changed
+- **Market shortlist shows only people fit for the job by default.** Rows that fail a must-have are folded behind "Show N who miss a must-have" (next to the existing "elsewhere in your pool" and "hidden" folds). Unknown (?) gates stay visible — an unanswerable gate is not a failure. Nothing is dropped from the snapshot; every fold is one click.
+- **Plan marks and order are recomputed on read.** `rankPoolMatches` (the outside-plan mark + inside → ✓ → ? → ✗ → ladder → score sort) now runs when a cached shortlist is loaded, under the job's *current* Everyone line, so a snapshot scored before these rules shows them without re-scoring. Verified on the live job: 27 cached rows → 1 shown, 8 fold as missing a must-have, 17 as elsewhere, 1 hidden.
+
 ### Fixed
 - **Sourcing shortlist showed unstandardised locations** ("New York, New York, United States", "New York City Metropolitan Area") because the market matrix reads a cached snapshot of the last run. `getCachedPoolMatches` now overlays the live `pool_profiles` city / region / country onto every row (`withLiveLocations`), so a normaliser fix or backfill shows up without re-scoring the shortlist.
 

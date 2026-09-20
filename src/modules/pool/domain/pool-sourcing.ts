@@ -237,19 +237,7 @@ export async function sourcePoolForIcp(
     )
     for (const m of scored) if (m) matches.push(m)
   }
-  // Pool-recall profiles outside the plan's Everyone line (wrong city / outside the years
-  // band) are marked so the UI can fold them away; people the plan acquired never are.
-  for (const m of matches) m.outside_plan = outsidePlanReason(m, opts.plan)
-  // Order: inside the plan before outside · all gates met → some unknown → any failed ·
-  // then the ladder level that reached them (full match beats relaxed) · then score.
-  const gateState = (m: PoolMatch) => (m.gate_failures.length ? 2 : (m.gate_unknown?.length ? 1 : 0))
-  const lvl = (m: PoolMatch) => m.acquired?.level ?? 99
-  matches.sort((a, b) =>
-    (Number(Boolean(a.outside_plan)) - Number(Boolean(b.outside_plan))) ||
-    (gateState(a) - gateState(b)) ||
-    (lvl(a) - lvl(b)) ||
-    (b.score - a.score))
-  return { status: 'ok', matches }
+  return { status: 'ok', matches: rankPoolMatches(matches, opts.plan) }
 }
 
 /**
@@ -333,6 +321,28 @@ export async function setPoolMatchFlags(
 }
 
 /**
+ * Mark and order a scored shortlist. Applied when the shortlist is produced AND
+ * every time a cached one is read, so a snapshot scored under older rules shows
+ * the current ones without re-scoring.
+ *
+ * Marks: pool-recall profiles outside the plan's Everyone line (wrong city / outside
+ * the years band) get `outside_plan` so the UI can fold them away; people the plan
+ * acquired never are. Order: inside the plan before outside · all gates met → some
+ * unknown → any failed · then the ladder level that reached them (full match beats
+ * relaxed) · then score. PURE — returns a new array, the input is not mutated.
+ */
+export function rankPoolMatches(matches: PoolMatch[], plan: PlanEveryone | null | undefined): PoolMatch[] {
+  const marked = matches.map((m) => ({ ...m, outside_plan: outsidePlanReason(m, plan) }))
+  const gateState = (m: PoolMatch) => (m.gate_failures?.length ? 2 : (m.gate_unknown?.length ? 1 : 0))
+  const lvl = (m: PoolMatch) => m.acquired?.level ?? 99
+  return marked.sort((a, b) =>
+    (Number(Boolean(a.outside_plan)) - Number(Boolean(b.outside_plan))) ||
+    (gateState(a) - gateState(b)) ||
+    (lvl(a) - lvl(b)) ||
+    (b.score - a.score))
+}
+
+/**
  * Location is never trusted from the snapshot: it is re-read from pool_profiles
  * (the standardised city / region / country columns) so a fix to the normaliser or a
  * backfill shows up without re-running — and re-scoring — the shortlist. Everything
@@ -357,12 +367,16 @@ export async function withLiveLocations(supabase: Supabase, matches: PoolMatch[]
 }
 
 /** The cached market shortlist for a job (for on-mount load). Null if none / table
- *  not there yet. Flags stale when the ICP has moved past the cached version. */
+ *  not there yet. Flags stale when the ICP has moved past the cached version.
+ *  Locations, plan marks and order are recomputed on read (see withLiveLocations /
+ *  rankPoolMatches); scores and gate results stay as cached. */
 export async function getCachedPoolMatches(
   supabase: Supabase,
   orgId: string,
   jobId: string,
   currentIcpVersion: number | null,
+  /** The job's current Everyone line; when given, the snapshot is re-marked and re-sorted under it. */
+  plan?: PlanEveryone | null,
 ): Promise<{ matches: PoolMatch[]; stale: boolean; updated_at: string } | null> {
   try {
     const { data, error } = await (supabase as unknown as LooseSb)
@@ -373,7 +387,7 @@ export async function getCachedPoolMatches(
       .maybeSingle()
     if (error || !data) return null
     return {
-      matches: await withLiveLocations(supabase, (data.matches ?? []) as PoolMatch[]),
+      matches: rankPoolMatches(await withLiveLocations(supabase, (data.matches ?? []) as PoolMatch[]), plan),
       stale: currentIcpVersion != null && data.icp_version != null && data.icp_version !== currentIcpVersion,
       updated_at: data.updated_at,
     }
