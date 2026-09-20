@@ -17,7 +17,8 @@ import type { SearchCriterion, SearchLevel, SearchSpec, PostFetchCheck } from '@
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
 import { experienceBandFromGate, yearsFloorFromLabel } from '@/lib/icp-gates'
 import { schoolTiersFor } from '@/modules/pool/search/school-tiers'
-import { normalizeCity } from '@/modules/pool/domain/normalize'
+import { normalizeCity, resolveLocationParts } from '@/modules/pool/domain/normalize'
+import type { PlanEveryone } from '@/modules/pool/domain/pool-sourcing'
 
 export interface SpecContext {
   title?: string | null
@@ -216,8 +217,16 @@ export function feederEmployersFromSpec(spec: SearchSpec): string[] {
 }
 
 /** The plan's Everyone line in the shape the ranking uses to judge pool recall. PURE. */
-export function planEveryone(spec: SearchSpec): { city: string | null; locationText: string | null; minYears: number | null; maxYears: number | null } {
+export function planEveryone(spec: SearchSpec): PlanEveryone {
   const loc = spec.base.find((c) => c.kind === 'location' && !c.exclude)
   const yrs = spec.base.find((c) => c.kind === 'years_band')
-  return { city: normalizeCity(loc?.values[0] ?? null), locationText: loc?.values[0] ?? null, minYears: yrs?.min ?? null, maxYears: yrs?.max ?? null }
+  const parts = resolveLocationParts(loc?.values[0] ?? null)
+  return {
+    city: normalizeCity(loc?.values[0] ?? null),
+    region: parts?.region ?? null,
+    country_code: parts?.country_code ?? null,
+    locationText: loc?.values[0] ?? null,
+    minYears: yrs?.min ?? null,
+    maxYears: yrs?.max ?? null,
+  }
 }

@@ -8,7 +8,7 @@ import { getPoolAccess } from '@/modules/pool/domain/pool'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
 import { deriveProfileTags } from '@/modules/pool/domain/profile-tags'
-import { formatLocation, formatLocationParts, normalizeCity, type LocationParts } from '@/modules/pool/domain/normalize'
+import { formatLocation, formatLocationParts, resolveLocationParts, type LocationParts } from '@/modules/pool/domain/normalize'
 
 type Supabase = SupabaseClient<Database>
 // pool_* tables (migration 115) aren't in the generated types.
@@ -56,7 +56,15 @@ export interface PoolMatch {
 }
 
 /** The plan's must-have line, as the ranking applies it to pool recall. */
-export interface PlanEveryone { city: string | null; locationText: string | null; minYears: number | null; maxYears: number | null }
+export interface PlanEveryone {
+  city: string | null
+  /** The plan city's state/province and ISO country — what a city-less profile is held against. */
+  region?: string | null
+  country_code?: string | null
+  locationText: string | null
+  minYears: number | null
+  maxYears: number | null
+}
 
 /** Why a profile is outside the plan's Everyone line, or null when it fits (or can't be judged). PURE. */
 export function outsidePlanReason(
@@ -64,8 +72,12 @@ export function outsidePlanReason(
   plan: PlanEveryone | null | undefined,
 ): string | null {
   if (!plan || m.acquired) return null
-  const city = normalizeCity(m.location)
-  if (plan.city && city && city !== plan.city) return `${city}, not ${plan.city}`
+  // City when known → region when known → country when known. A level that is
+  // genuinely unknown passes; "Texas, United States" with no city does not pass New York.
+  const loc = resolveLocationParts(m.location)
+  if (plan.city && loc?.city && loc.city !== plan.city) return `${loc.city}, not ${plan.city}`
+  if (plan.city && !loc?.city && loc?.region && plan.region && loc.region !== plan.region) return `${loc.region}, not ${plan.city}`
+  if (plan.city && !loc?.city && !loc?.region && loc?.country && plan.country_code && loc.country_code !== plan.country_code) return `${loc.country}, not ${plan.city}`
   const yrs = m.experience_years
   if (yrs != null) {
     if (plan.minYears != null && yrs < plan.minYears - 1) return `${yrs} yrs, under ${plan.minYears}`
@@ -141,6 +153,8 @@ export async function sourcePoolForIcp(
         plan_city: held ? plan?.city ?? null : null,
         plan_min_years: held ? plan?.minYears ?? null : null,
         plan_max_years: held ? plan?.maxYears ?? null : null,
+        plan_region: held ? plan?.region ?? null : null,
+        plan_country_code: held ? plan?.country_code ?? null : null,
       })
       if (error) throw error
       return (data ?? []).map((r: { id: string }) => r.id) as string[]

@@ -10,6 +10,13 @@ describe('outsidePlanReason', () => {
     expect(outsidePlanReason({ location: 'New York, United States', experience_years: 14 }, plan)).toBe('14 yrs, over 12')
     expect(outsidePlanReason({ location: 'New York, United States', experience_years: 12.5 }, plan)).toBeNull()
   })
+  it('holds a city-less profile on its region, then country — only a truly unknown level passes', () => {
+    const ny = { ...plan, region: 'New York', country_code: 'US' }
+    expect(outsidePlanReason({ location: 'Texas, United States', experience_years: 8 }, ny)).toBe('Texas, not New York')
+    expect(outsidePlanReason({ location: 'Remote, India', experience_years: 8 }, ny)).toBe('India, not New York')
+    expect(outsidePlanReason({ location: 'New York, United States', experience_years: 8 }, ny)).toBeNull()
+    expect(outsidePlanReason({ location: 'Remote', experience_years: 8 }, ny)).toBeNull()
+  })
   it('never marks acquired people, unknown cities, or when there is no plan', () => {
     expect(outsidePlanReason({ location: 'Bengaluru', experience_years: 2, acquired: { level: 1 } }, plan)).toBeNull()
     expect(outsidePlanReason({ location: 'Somewhere', experience_years: 8 }, plan)).toBeNull()
