@@ -24,6 +24,46 @@ const CITY_ALIASES: Record<string, string[]> = {
   Chandigarh:  ['chandigarh', 'mohali', 'panchkula'],
   Bhubaneswar: ['bhubaneswar', 'bhubaneshwar'],
   Trivandrum:  ['trivandrum', 'thiruvananthapuram'],
+  // ── International hubs (the markets jobs are posted in) ──
+  'New York':      ['new york', 'new york city', 'nyc', 'manhattan', 'brooklyn', 'new york metropolitan area', 'greater new york'],
+  'San Francisco': ['san francisco', 'sf bay area', 'san francisco bay area', 'bay area', 'palo alto', 'mountain view', 'menlo park', 'south san francisco'],
+  'Los Angeles':   ['los angeles', 'santa monica', 'greater los angeles'],
+  Seattle:         ['seattle', 'bellevue', 'redmond'],
+  Boston:          ['boston', 'cambridge massachusetts', 'greater boston'],
+  Chicago:         ['chicago'],
+  Austin:          ['austin'],
+  London:          ['london', 'greater london', 'london area'],
+  Dubai:           ['dubai'],
+  'Abu Dhabi':     ['abu dhabi'],
+  Singapore:       ['singapore'],
+  Berlin:          ['berlin'],
+  Amsterdam:       ['amsterdam'],
+  Paris:           ['paris'],
+  Toronto:         ['toronto', 'greater toronto'],
+  Sydney:          ['sydney'],
+  'Hong Kong':     ['hong kong'],
+  Tokyo:           ['tokyo'],
+  Riyadh:          ['riyadh'],
+  Doha:            ['doha'],
+}
+
+/** Country for each canonical city — display is "City, Country". */
+const CITY_COUNTRY: Record<string, string> = {
+  Bengaluru: 'India', Mumbai: 'India', 'Delhi NCR': 'India', Hyderabad: 'India', Pune: 'India', Chennai: 'India', Kolkata: 'India',
+  Ahmedabad: 'India', Jaipur: 'India', Kochi: 'India', Mangaluru: 'India', Coimbatore: 'India', Indore: 'India', Chandigarh: 'India',
+  Bhubaneswar: 'India', Trivandrum: 'India',
+  'New York': 'United States', 'San Francisco': 'United States', 'Los Angeles': 'United States', Seattle: 'United States', Boston: 'United States',
+  Chicago: 'United States', Austin: 'United States', London: 'United Kingdom', Dubai: 'United Arab Emirates', 'Abu Dhabi': 'United Arab Emirates',
+  Singapore: 'Singapore', Berlin: 'Germany', Amsterdam: 'Netherlands', Paris: 'France', Toronto: 'Canada', Sydney: 'Australia',
+  'Hong Kong': 'Hong Kong', Tokyo: 'Japan', Riyadh: 'Saudi Arabia', Doha: 'Qatar',
+}
+
+/** "New York, United States" / "Bengaluru, India"; falls back to the raw string (or null). PURE. */
+export function formatLocation(raw: string | null | undefined): string | null {
+  const city = normalizeCity(raw)
+  if (city) return CITY_COUNTRY[city] ? `${city}, ${CITY_COUNTRY[city]}` : city
+  const t = String(raw ?? '').trim()
+  return t || null
 }
 
 /** Movement markers: "Kolkata → Bangalore" means they ended up in Bangalore. */
@@ -78,8 +118,9 @@ export function normalizeCity(raw: string | null | undefined): string | null {
   if (!s) return null
 
   const hits: { canon: string; at: number }[] = []
+  const padded = ` ${s} `
   for (const { canon, alias } of flat) {
-    const at = s.indexOf(alias)
+    const at = padded.indexOf(` ${alias} `)
     if (at >= 0) hits.push({ canon, at })
   }
   if (!hits.length) {

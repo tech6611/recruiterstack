@@ -34,6 +34,7 @@ interface PoolMatch {
   education_summary?: string | null
   starred?: boolean
   hidden?: boolean
+  outside_plan?: string | null
 }
 
 /** What the last acquisition run did, lane by lane (from POST /source/crustdata). */
@@ -63,6 +64,7 @@ function toMatrixMatch(m: PoolMatch, newIds?: Set<string>): MatrixMatch {
     current_tenure_months: m.current_tenure_months ?? null,
     starred: !!m.starred,
     hidden: !!m.hidden,
+    outside_plan: m.outside_plan ?? null,
     red_flags: m.red_flags ?? [],
     rationale: m.rationale ?? null,
     competencies: m.competencies ?? [],
@@ -95,6 +97,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   const [plan, setPlan] = useState<SearchPlanReport | null>(null)
   const [newIds, setNewIds] = useState<Set<string>>(new Set())
   const [showHidden, setShowHidden] = useState(false)
+  const [showOutside, setShowOutside] = useState(false)
   const [openProfile, setOpenProfile] = useState<string | null>(null)
 
   /** Star / hide: free, persisted on the cached list, survives re-ranks. */
@@ -241,11 +244,18 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
         <div className="mt-3 space-y-2">
           {icp ? (
             <>
-              {(() => { const hidden = matches.filter((m) => m.hidden).length; return hidden > 0 ? (
-                <button type="button" onClick={() => setShowHidden((v) => !v)} className="text-[11px] text-slate-400 hover:text-slate-600">{showHidden ? 'Hide' : 'Show'} {hidden} hidden</button>
-              ) : null })()}
+              {(() => {
+                const hidden = matches.filter((m) => m.hidden).length
+                const outside = matches.filter((m) => !m.hidden && m.outside_plan).length
+                return (hidden > 0 || outside > 0) ? (
+                  <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                    {outside > 0 && <button type="button" onClick={() => setShowOutside((v) => !v)} className="hover:text-slate-600" title="Already in your pool but outside the plan's location or years">{showOutside ? 'Hide' : 'Show'} {outside} elsewhere in your pool</button>}
+                    {hidden > 0 && <button type="button" onClick={() => setShowHidden((v) => !v)} className="hover:text-slate-600">{showHidden ? 'Hide' : 'Show'} {hidden} hidden</button>}
+                  </div>
+                ) : null
+              })()}
               <SourcingMatrix
-                matches={matches.filter((m) => showHidden || !m.hidden).map((m) => toMatrixMatch(m, newIds))}
+                matches={matches.filter((m) => (showHidden || !m.hidden) && (showOutside || !m.outside_plan)).map((m) => toMatrixMatch(m, newIds))}
                 icp={icp} selected={selected} onToggle={toggle}
                 onStar={(id, starred) => setFlag(id, { starred })}
                 onHide={(id) => setFlag(id, { hidden: true })}

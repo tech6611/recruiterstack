@@ -29,7 +29,7 @@ export function SourcingPreview() {
     source_badge: (m.sources ?? []).map((k: string) => SOURCE_BADGE[k]).find(Boolean) ?? null,
     level_badge: m.acquired ? `L${m.acquired.level}${m.acquired.level === 1 ? ' · full match' : ''}` : null,
     red_flags: m.red_flags ?? [], rationale: m.rationale ?? null, competencies: m.competencies ?? [],
-    unreachable: !m.reachable, skills: m.skills ?? [], decision: null,
+    unreachable: !m.reachable, skills: m.skills ?? [], decision: null, outside_plan: m.outside_plan ?? null,
     candidate: { id: m.profile_id, name: m.name, current_title: m.current_title, current_company: m.current_company, location: m.location },
     ...(flags[m.profile_id] ?? {}),
   }))

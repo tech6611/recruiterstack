@@ -35,6 +35,8 @@ export interface MatrixMatch {
   current_tenure_months?: number | null
   starred?: boolean
   hidden?: boolean
+  /** Pool-recall profile outside the plan's location / years, with the reason. */
+  outside_plan?: string | null
   red_flags: string[]
   rationale: string | null
   data_incomplete?: boolean | null
@@ -269,6 +271,9 @@ export function SourcingMatrix({
                           )}
                           {m.unreachable && (
                             <span className="inline-flex shrink-0 items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-600">no contact</span>
+                          )}
+                          {m.outside_plan && (
+                            <span title="Outside the plan's location or years band" className="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">outside plan: {m.outside_plan}</span>
                           )}
                         </div>
                         <div className="mt-0.5 flex items-center gap-2.5 pl-5 text-[11.5px] font-medium text-slate-500">
