@@ -14,6 +14,24 @@ entries on top.
 ### Docs
 - Added an evidence-grounded review of the Gemini ICP prompt, with a proposed hiring-situation packet, prompt structure, propagation plan, and acceptance tests.
 
+## 2026-09-20 (Less to read: plan and brief collapse to one line; dev preview page)
+
+### Changed
+- **Search plan** (`SearchSpecEditor.tsx`) is collapsed by default to one line — "9 levels
+  · first: Tier-1 school · currently in Top-Tier Management Consulting · 150 people in L1
+  · +10 last run · edited" — with Count / Find people in the header; the Everyone row and
+  the level rows open on click. Accepts `initialSpec` + `readOnly` for previews.
+- **Recruiter brief** extracted to `RecruiterBriefCard.tsx` (pure props); Scoring-tab
+  card description cut to "Gates reject. Weights rank."; must-have hint cut to one line;
+  each competency's behaviours fold behind an "n behaviours" toggle (weight row stays).
+- Source tab "From your candidates" description cut to one line.
+
+### Added
+- **`/dev/sourcing-preview`** — development-only page (404 elsewhere; public only under
+  `npm run dev` via middleware) that renders the brief card, the search plan and the
+  market matrix from `fixture.json` (captured from the Strategy & Ops job) with no
+  login, so layout can be reviewed at localhost before deploying.
+
 ## 2026-09-18 (One person, one record — approvals never wait on a ghost)
 
 ### Fixed

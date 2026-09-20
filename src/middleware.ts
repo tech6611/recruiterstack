@@ -2,6 +2,9 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 const isPublic = createRouteMatcher([
+  // Development-only component preview (src/app/dev/*). The page itself 404s outside
+  // development; this only stops the sign-in redirect while running `npm run dev`.
+  ...(process.env.NODE_ENV === 'development' ? ['/dev/(.*)'] : []),
   '/',
   // Marketing pages — publicly accessible
   '/craigslist',

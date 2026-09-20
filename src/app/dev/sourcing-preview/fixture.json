@@ -1,0 +1,1316 @@
+{
+ "icp": {
+  "id": "fixture",
+  "version": 5,
+  "status": "approved",
+  "must_haves": [
+   {
+    "id": "g-ai-0",
+    "label": "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?",
+    "value": "",
+    "operator": "",
+    "attribute": ""
+   },
+   {
+    "id": "g-ai-2",
+    "label": "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?",
+    "value": "",
+    "operator": "",
+    "attribute": ""
+   },
+   {
+    "id": "g-ai-3",
+    "label": "Does the candidate's profile explicitly mention hands-on experience with SQL?",
+    "value": "",
+    "operator": "",
+    "attribute": ""
+   },
+   {
+    "id": "g-band",
+    "label": "Has between 2 and 6 years of professional experience — not over-senior for this role?",
+    "value": [
+     "2",
+     "6"
+    ],
+    "operator": "between",
+    "attribute": "experience_band"
+   }
+  ],
+  "competencies": [
+   {
+    "id": "structured-problem-solving",
+    "name": "Structured Problem-Solving",
+    "weight": 40,
+    "anchors": {
+     "1": "Approaches problems in an unstructured, ad-hoc manner; jumps to solutions.",
+     "2": "Can structure a problem effectively with guidance.",
+     "3": "Independently and consistently breaks down complex business problems into a structured, actionable plan.",
+     "4": "Develops novel frameworks to solve unique problems and is seen as a go-to person for the company's toughest challenges."
+    },
+    "verbatim": "A magic skill to break complex problems into smaller ones",
+    "behaviours": [
+     "Deconstructs ambiguous, complex problems into logical, manageable components.",
+     "Develops clear, hypothesis-driven plans to solve problems.",
+     "Identifies 80/20 solutions to deliver impact quickly.",
+     "Articulates complex ideas with simplicity and clarity.",
+     "Consistently connects tactical day-to-day work to overarching strategic goals."
+    ]
+   },
+   {
+    "id": "hands-on-analytical-horsepower",
+    "name": "Hands-On Analytical Horsepower",
+    "weight": 30,
+    "anchors": {
+     "1": "Relies on others for data; basic spreadsheet skills only.",
+     "2": "Is proficient in SQL for most data extraction needs and is strong with spreadsheets.",
+     "3": "Independently uses SQL and Python/R to conduct complex analyses and build robust, reusable models.",
+     "4": "Automates analyses and reporting; introduces new analytical tools or methodologies to the company."
+    },
+    "verbatim": "Experience in coding with SQL, Python, or R",
+    "behaviours": [
+     "Pulls and manipulates data independently using SQL.",
+     "Uses Python or R for more complex analysis, scripting or modeling.",
+     "Builds clear, functional models in Excel/Google Sheets to support decision-making.",
+     "Translates raw data into actionable business insights and recommendations.",
+     "Demonstrates rigor and skepticism when interpreting data."
+    ]
+   },
+   {
+    "id": "ownership-bias-for-action",
+    "name": "Ownership & Bias for Action",
+    "weight": 20,
+    "anchors": {
+     "1": "Requires significant hand-holding and waits to be assigned tasks.",
+     "2": "Reliably executes well-defined tasks and projects.",
+     "3": "Independently owns and drives complex, ambiguous projects to successful completion.",
+     "4": "Acts like a founder for their domain, taking full psychological ownership of business problems and outcomes."
+    },
+    "verbatim": "A solid track record of taking ownership and leading complex projects end to end",
+    "behaviours": [
+     "Takes projects from a vague idea to a completed outcome with minimal supervision.",
+     "Proactively identifies opportunities and problems without being asked.",
+     "Is resourceful and finds creative ways to get things done despite constraints.",
+     "Maintains a high tempo and sense of urgency.",
+     "Focuses relentlessly on business impact and outcomes, not just activities."
+    ]
+   },
+   {
+    "id": "strategic-commercial-acumen",
+    "name": "Strategic & Commercial Acumen",
+    "weight": 10,
+    "anchors": {
+     "1": "Purely focused on executing assigned tasks without broader context.",
+     "2": "Understands the business goals of their specific projects.",
+     "3": "Contributes meaningfully to strategic discussions and prioritization decisions.",
+     "4": "Generates novel strategic insights that materially influence the company's direction."
+    },
+    "verbatim": "Developing strategic supply chain partnerships and negotiating commercial terms",
+    "behaviours": [
+     "Understands the company's business model, market, and competitive positioning.",
+     "Prioritizes initiatives based on a clear understanding of their potential business impact.",
+     "Effectively represents the company in commercial discussions with vendors or partners.",
+     "Thinks ahead to anticipate the second- and third-order consequences of decisions."
+    ]
+   }
+  ],
+  "sourcing_map": {
+   "reasoning": "This is effectively the 'first Ops hire' at a 10-person, highly technical startup. The job isn't about optimizing existing processes; it's about creating the company's entire operating system from scratch. The successful candidate will be a 'human Swiss Army knife' who can single-handedly tackle ambiguous, complex problems. Therefore, the profile must be heavily weighted on raw, structured problem-solving ability and the hands-on analytical horsepower to be self-sufficient with data (SQL/Python). These two skills, combined with a high degree of ownership and scrappiness, are the strongest predictors of success, far more than any specific domain experience.",
+   "archetypes": [
+    {
+     "name": "The Classic Post-Consulting Operator",
+     "thesis": "A purebred problem-solver from an MBB firm, trained in structured thinking, who is now eager to get hands-on operational experience and build something from the ground up.",
+     "why_no": "May be too theoretical and unaccustomed to the speed and scrappiness of execution required. Potentially high salary expectations.",
+     "hire_risk": "Analysis paralysis; struggles to shift from 'recommending' to 'doing' with 80% of the data and 10% of the time.",
+     "where_from": "2-3 years as a Business Analyst or Associate at McKinsey, Bain, or BCG in Bangalore/Gurgaon.",
+     "is_non_obvious": false,
+     "why_interested": "To escape the 'PowerPoint factory', see the direct impact of their work, and get meaningful equity in a high-potential AI startup."
+    },
+    {
+     "name": "The Scaled Startup BizOps Star",
+     "thesis": "Someone who has already made the leap from a structured background into a high-growth Indian startup and has seen the 10x-100x journey, knowing the operational scaling playbook.",
+     "why_no": "May be accustomed to the resources of a well-funded scale-up (e.g., dedicated data teams) and might be less hands-on with SQL/Python than required.",
+     "hire_risk": "Tries to implement a 'late-stage' scaling playbook (e.g., heavy processes, complex systems) at a 'seed-stage' company, killing agility.",
+     "where_from": "3-5 years total experience, with recent time in a Strategy/BizOps/Founder's Office role at Udaan, Swiggy, Razorpay, or CRED.",
+     "is_non_obvious": false,
+     "why_interested": "To join a company at an even earlier stage, have greater ownership and influence on the company's foundation, and bet on a new tech wave (Agentic AI)."
+    },
+    {
+     "name": "The IB/VC Analyst Seeking Alpha",
+     "thesis": "A highly quantitative, financially-minded individual trained to deconstruct business models, who wants to move from evaluating companies to actually building one.",
+     "why_no": "Likely has zero true operational experience and may not enjoy the messy, unpredictable reality of building processes and managing stakeholders.",
+     "hire_risk": "Lacks operational intuition; excels at building a perfect model in Excel but struggles to execute a messy, real-world project.",
+     "where_from": "2-4 years as an Analyst in Investment Banking (Goldman Sachs, Morgan Stanley) or as an Associate in Venture Capital (Sequoia, Accel).",
+     "is_non_obvious": true,
+     "why_interested": "Tired of the transactional lifestyle, wants to build long-term value, and is attracted to the high-risk/high-reward profile of an early-stage AI venture."
+    }
+   ],
+   "generated_at": "2026-09-17T17:14:24.626Z",
+   "recruiter_brief": {
+    "niche": "Strategy & Operations / BizOps recruiter for early-stage B2B SaaS, Bengaluru",
+    "market": "Bengaluru, Karnataka, IN. The role is on-site. The local talent pool is deep for this profile, but highly competitive. Relocation from other Indian metros is feasible; international relocation and visa sponsorship are not realistic for a company this size.",
+    "persona": "I specialize in placing the first G&A/Ops hires into founder-led, high-potential tech startups. I screen first on raw intellectual horsepower (pedigree as a proxy), hands-on analytical skills (SQL is a must), and evidence of thriving in a chaotic, unstructured environment.",
+    "corrections": null,
+    "feeder_pools": [
+     {
+      "label": "Top-Tier Management Consulting",
+      "priority": 1,
+      "companies": [
+       "McKinsey & Company",
+       "Bain & Company",
+       "Boston Consulting Group (BCG)"
+      ],
+      "rationale": "The primary source for structured problem-solving, analytical rigor, and pedigree. They are often looking for an operational role with impact.",
+      "role_types": [
+       "Business Analyst",
+       "Associate",
+       "Consultant"
+      ]
+     },
+     {
+      "label": "High-Growth Startup BizOps/Strategy",
+      "priority": 2,
+      "companies": [
+       "Udaan",
+       "Swiggy",
+       "Razorpay",
+       "CRED",
+       "Flipkart",
+       "Zomato",
+       "Google (Strategy/BizOps teams)"
+      ],
+      "rationale": "These candidates have already translated consulting/analytical skills into a chaotic tech environment and have seen scale.",
+      "role_types": [
+       "Strategy Manager",
+       "Business Operations Manager",
+       "Program Manager",
+       "Chief of Staff's Office"
+      ]
+     },
+     {
+      "label": "Investment Banking / Venture Capital",
+      "priority": 3,
+      "companies": [
+       "Goldman Sachs",
+       "Morgan Stanley",
+       "Sequoia Capital",
+       "Accel",
+       "Lightspeed Venture Partners"
+      ],
+      "rationale": "Brings elite quantitative and financial modeling skills, aligning with the 'interest in financial industry' note. They are often looking for a move to the operating side.",
+      "role_types": [
+       "Analyst",
+       "Associate"
+      ]
+     }
+    ],
+    "market_gates": [
+     {
+      "why": "In the Indian market for strategy and ops roles, educational pedigree from Tier-1 institutes is a very strong and commonly used first-pass filter for intellectual horsepower.",
+      "requirement": "Degree from a top university"
+     },
+     {
+      "why": "For a data-driven AI startup, the first ops hire must be self-sufficient analytically. SQL is the absolute minimum requirement to be functional.",
+      "requirement": "Experience in coding with SQL, Python, or R"
+     }
+    ],
+    "market_norms": [
+     {
+      "norm": "For a 1-10 person startup, cash will likely be at or slightly below market for larger firms, but this must be offset by a significant and clearly explained ESOP grant.",
+      "topic": "Compensation"
+     },
+     {
+      "norm": "Standard notice periods are 2-3 months. This is a critical factor for timeline planning, and buyouts are rare for startups.",
+      "topic": "Notice Periods"
+     },
+     {
+      "norm": "Local candidates only. The company is too small to handle visa sponsorship complexities.",
+      "topic": "Work Authorisation"
+     }
+    ],
+    "unsure_about": [
+     "The 'interest in the financial industry' requirement is unusual for a recruiting SaaS. I need to clarify with the hiring manager if this is a proxy for quantitative skills, knowledge of the VC/PE space, or if they have a FinTech client focus."
+    ],
+    "title_families": [
+     "Strategy & Operations Manager",
+     "Business Operations Manager",
+     "Strategy Manager",
+     "Growth & Operations Manager",
+     "Program Manager",
+     "Chief of Staff"
+    ],
+    "experience_band": {
+     "max_years": 6,
+     "min_years": 2,
+     "rationale": "This band targets high-potential ICs post their initial training (consulting/IB) who are hungry, hands-on, and affordable. Anything less is too junior; anything more brings mismatched expectations of management scope and structure."
+    },
+    "jd_translations": [
+     {
+      "phrase": "2:1 degree from a top university",
+      "means_here": "Graduate of a Tier-1 institute (IITs, IIMs A/B/C/L/K/I, ISB, BITS Pilani, top NITs, FMS, XLRI)."
+     },
+     {
+      "phrase": "fast-paced environment",
+      "means_here": "Experience at a top-tier consulting firm (MBB), investment bank, high-growth startup during its scaling phase, or a comparable elite corporate rotation program."
+     },
+     {
+      "phrase": "A magic skill to break complex problems into smaller ones",
+      "means_here": "Demonstrable structured thinking, likely honed in a consulting or similarly rigorous environment. Expect to test this with a case study."
+     }
+    ],
+    "normal_red_flags": [
+     "Job hopping every 12-18 months is common for high-potential talent in the Indian startup scene and shouldn't be an automatic disqualifier if the trajectory is logical and progressive."
+    ]
+   },
+   "unwritten_filters": [
+    {
+     "type": "Mindset / Culture Fit",
+     "filter": "Stage & Environment Fit",
+     "confidence": 0.9,
+     "inferred_from": "Previous experience in early-stage startups or small, autonomous teams. Language used in interviews that demonstrates comfort with ambiguity and lack of resources.",
+     "exclusion_cost": "Medium. May incorrectly filter out an adaptable consultant who has never worked at a startup but would thrive.",
+     "recommend_apply": true
+    },
+    {
+     "type": "Role Mismatch",
+     "filter": "Hands-on 'Doer' vs. Delegator",
+     "confidence": 0.95,
+     "inferred_from": "Total years of experience (6+ years is a flag), previous role titles, focus on individual contributions vs. team management in resume.",
+     "exclusion_cost": "Low. Correctly filters out candidates seeking a people management role that doesn't exist here.",
+     "recommend_apply": false
+    }
+   ],
+   "requirement_decomposition": [
+    {
+     "notes": "A standard gate for this type of role in the Indian market.",
+     "bucket": "hard_filter",
+     "requirement": "At least a 2:1 degree from a top university",
+     "findable_proxy": "Graduate of a Tier-1 Indian institute (IIT/IIM/ISB etc.) or global equivalent."
+    },
+    {
+     "notes": "The 6-year ceiling is crucial to ensure a hands-on, stage-appropriate mindset.",
+     "bucket": "hard_filter",
+     "requirement": "2+ years of work experience in a fast-paced environment",
+     "findable_proxy": "2-6 years of experience in management consulting, IB/VC, or BizOps/Strategy at a high-growth tech company."
+    },
+    {
+     "notes": "Non-negotiable for the first ops hire in a data-centric company.",
+     "bucket": "hard_filter",
+     "requirement": "Experience in coding with SQL, Python, or R",
+     "findable_proxy": "Explicit mention of SQL on resume. Python/R is a major plus."
+    },
+    {
+     "notes": "Look for verbs like 'owned', 'built', 'launched' vs. 'supported', 'analyzed'.",
+     "bucket": "ranking_signal",
+     "requirement": "A solid track record of taking ownership and leading complex projects end to end",
+     "findable_proxy": "Resume shows projects with clear individual contribution and impact metrics ('Led X, resulting in Y%')."
+    },
+    {
+     "notes": "A nice-to-have that signals quantitative strength, but not a core requirement.",
+     "bucket": "ranking_signal",
+     "requirement": "An interest in the financial industry",
+     "findable_proxy": "Previous experience in FinTech, IB, VC, or projects involving financial modeling."
+    },
+    {
+     "notes": "This is the primary focus of the case study interview.",
+     "bucket": "screen_later",
+     "requirement": "A magic skill to break complex problems into smaller ones",
+     "findable_proxy": null
+    },
+    {
+     "notes": "Assess through questioning on past projects and their enthusiasm for the technical screen.",
+     "bucket": "screen_later",
+     "requirement": "To enjoy working with data",
+     "findable_proxy": null
+    }
+   ]
+  }
+ },
+ "spec": {
+  "version": 1,
+  "base": [
+   {
+    "id": "c-loc-1",
+    "kind": "location",
+    "values": [
+     "Bengaluru, Karnatak, India"
+    ],
+    "radius_km": 50
+   },
+   {
+    "id": "c-years-2",
+    "kind": "years_band",
+    "values": [],
+    "min": 2,
+    "max": 6
+   },
+   {
+    "id": "c-sen-3",
+    "kind": "seniority",
+    "values": [
+     "Director",
+     "Vice President",
+     "CXO",
+     "Owner / Partner"
+    ],
+    "exclude": true,
+    "label": "Not an executive title"
+   }
+  ],
+  "levels": [
+   {
+    "id": "L1",
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "criteria": [
+     {
+      "id": "c-school-7",
+      "kind": "school",
+      "values": [
+       "Indian Institute of Technology",
+       "IIT",
+       "Indian Institute of Management",
+       "IIM",
+       "Indian School of Business",
+       "ISB",
+       "BITS Pilani",
+       "Birla Institute of Technology and Science",
+       "National Institute of Technology",
+       "NIT",
+       "Faculty of Management Studies",
+       "FMS Delhi",
+       "XLRI",
+       "Shri Ram College of Commerce",
+       "SRCC",
+       "St. Stephen's College"
+      ]
+     },
+     {
+      "id": "c-emp-6",
+      "kind": "employer_current",
+      "values": [
+       "McKinsey",
+       "Bain",
+       "Boston Consulting Group",
+       "BCG"
+      ]
+     },
+     {
+      "id": "c-fn-5",
+      "kind": "function",
+      "values": [
+       "Consulting"
+      ]
+     },
+     {
+      "id": "c-title-4",
+      "kind": "title_any",
+      "values": [
+       "Business Analyst",
+       "Associate",
+       "Consultant"
+      ]
+     }
+    ],
+    "relaxes": null,
+    "rationale": "The primary source for structured problem-solving, analytical rigor, and pedigree. They are often looking for an operational role with impact."
+   },
+   {
+    "id": "L2",
+    "label": "Tier-1 school · formerly in Top-Tier Management Consulting",
+    "criteria": [
+     {
+      "id": "c-school-9",
+      "kind": "school",
+      "values": [
+       "Indian Institute of Technology",
+       "IIT",
+       "Indian Institute of Management",
+       "IIM",
+       "Indian School of Business",
+       "ISB",
+       "BITS Pilani",
+       "Birla Institute of Technology and Science",
+       "National Institute of Technology",
+       "NIT",
+       "Faculty of Management Studies",
+       "FMS Delhi",
+       "XLRI",
+       "Shri Ram College of Commerce",
+       "SRCC",
+       "St. Stephen's College"
+      ]
+     },
+     {
+      "id": "c-emp-8",
+      "kind": "employer_past",
+      "values": [
+       "McKinsey",
+       "Bain",
+       "Boston Consulting Group",
+       "BCG"
+      ]
+     },
+     {
+      "id": "c-title-4",
+      "kind": "title_any",
+      "values": [
+       "Business Analyst",
+       "Associate",
+       "Consultant"
+      ]
+     }
+    ],
+    "relaxes": "still there → left (recency ranked after fetch)",
+    "rationale": "The primary source for structured problem-solving, analytical rigor, and pedigree. They are often looking for an operational role with impact."
+   },
+   {
+    "id": "L3",
+    "label": "Tier-1 school · currently in High-Growth Startup BizOps/Strategy",
+    "criteria": [
+     {
+      "id": "c-school-12",
+      "kind": "school",
+      "values": [
+       "Indian Institute of Technology",
+       "IIT",
+       "Indian Institute of Management",
+       "IIM",
+       "Indian School of Business",
+       "ISB",
+       "BITS Pilani",
+       "Birla Institute of Technology and Science",
+       "National Institute of Technology",
+       "NIT",
+       "Faculty of Management Studies",
+       "FMS Delhi",
+       "XLRI",
+       "Shri Ram College of Commerce",
+       "SRCC",
+       "St. Stephen's College"
+      ]
+     },
+     {
+      "id": "c-emp-11",
+      "kind": "employer_current",
+      "values": [
+       "Udaan",
+       "Swiggy",
+       "Razorpay",
+       "CRED",
+       "Flipkart",
+       "Zomato",
+       "Google"
+      ]
+     },
+     {
+      "id": "c-title-10",
+      "kind": "title_current",
+      "values": [
+       "Strategy Manager",
+       "Business Operations Manager",
+       "Program Manager",
+       "Chief of Staff's Office"
+      ]
+     }
+    ],
+    "relaxes": null,
+    "rationale": "These candidates have already translated consulting/analytical skills into a chaotic tech environment and have seen scale."
+   },
+   {
+    "id": "L4",
+    "label": "Tier-1 school · Investment Banking / Venture Capital",
+    "criteria": [
+     {
+      "id": "c-school-15",
+      "kind": "school",
+      "values": [
+       "Indian Institute of Technology",
+       "IIT",
+       "Indian Institute of Management",
+       "IIM",
+       "Indian School of Business",
+       "ISB",
+       "BITS Pilani",
+       "Birla Institute of Technology and Science",
+       "National Institute of Technology",
+       "NIT",
+       "Faculty of Management Studies",
+       "FMS Delhi",
+       "XLRI",
+       "Shri Ram College of Commerce",
+       "SRCC",
+       "St. Stephen's College"
+      ]
+     },
+     {
+      "id": "c-emp-14",
+      "kind": "employer_any",
+      "values": [
+       "Goldman Sachs",
+       "Morgan Stanley",
+       "Sequoia Capital",
+       "Accel",
+       "Lightspeed Venture Partners"
+      ]
+     },
+     {
+      "id": "c-title-13",
+      "kind": "title_any",
+      "values": [
+       "Analyst",
+       "Associate"
+      ]
+     }
+    ],
+    "relaxes": null,
+    "rationale": "Brings elite quantitative and financial modeling skills, aligning with the 'interest in financial industry' note. They are often looking for a move to the operating side."
+   },
+   {
+    "id": "L5",
+    "label": "Tier-2 school · currently in Top-Tier Management Consulting",
+    "criteria": [
+     {
+      "id": "c-school-19",
+      "kind": "school",
+      "values": [
+       "Delhi Technological University",
+       "DTU",
+       "Netaji Subhas",
+       "NSIT",
+       "NSUT",
+       "Vellore Institute of Technology",
+       "VIT",
+       "Jadavpur University",
+       "Anna University",
+       "College of Engineering, Pune",
+       "International Institute of Information Technology",
+       "IIIT",
+       "Indian Institute of Foreign Trade",
+       "IIFT",
+       "Management Development Institute",
+       "MDI Gurgaon",
+       "SP Jain",
+       "S.P. Jain",
+       "SPJIMR",
+       "NMIMS",
+       "Symbiosis",
+       "Jamnalal Bajaj",
+       "JBIMS",
+       "Lady Shri Ram",
+       "Hindu College",
+       "Hansraj College"
+      ]
+     },
+     {
+      "id": "c-emp-18",
+      "kind": "employer_current",
+      "values": [
+       "McKinsey",
+       "Bain",
+       "Boston Consulting Group",
+       "BCG"
+      ]
+     },
+     {
+      "id": "c-fn-17",
+      "kind": "function",
+      "values": [
+       "Consulting"
+      ]
+     },
+     {
+      "id": "c-title-16",
+      "kind": "title_any",
+      "values": [
+       "Business Analyst",
+       "Associate",
+       "Consultant"
+      ]
+     }
+    ],
+    "relaxes": "tier-1 schools → tier-2 schools",
+    "rationale": "The primary source for structured problem-solving, analytical rigor, and pedigree. They are often looking for an operational role with impact."
+   },
+   {
+    "id": "L6",
+    "label": "Tier-2 school · formerly in Top-Tier Management Consulting",
+    "criteria": [
+     {
+      "id": "c-school-21",
+      "kind": "school",
+      "values": [
+       "Delhi Technological University",
+       "DTU",
+       "Netaji Subhas",
+       "NSIT",
+       "NSUT",
+       "Vellore Institute of Technology",
+       "VIT",
+       "Jadavpur University",
+       "Anna University",
+       "College of Engineering, Pune",
+       "International Institute of Information Technology",
+       "IIIT",
+       "Indian Institute of Foreign Trade",
+       "IIFT",
+       "Management Development Institute",
+       "MDI Gurgaon",
+       "SP Jain",
+       "S.P. Jain",
+       "SPJIMR",
+       "NMIMS",
+       "Symbiosis",
+       "Jamnalal Bajaj",
+       "JBIMS",
+       "Lady Shri Ram",
+       "Hindu College",
+       "Hansraj College"
+      ]
+     },
+     {
+      "id": "c-emp-20",
+      "kind": "employer_past",
+      "values": [
+       "McKinsey",
+       "Bain",
+       "Boston Consulting Group",
+       "BCG"
+      ]
+     },
+     {
+      "id": "c-title-16",
+      "kind": "title_any",
+      "values": [
+       "Business Analyst",
+       "Associate",
+       "Consultant"
+      ]
+     }
+    ],
+    "relaxes": "still there → left (recency ranked after fetch)",
+    "rationale": "The primary source for structured problem-solving, analytical rigor, and pedigree. They are often looking for an operational role with impact."
+   },
+   {
+    "id": "L7",
+    "label": "Tier-2 school · currently in High-Growth Startup BizOps/Strategy",
+    "criteria": [
+     {
+      "id": "c-school-24",
+      "kind": "school",
+      "values": [
+       "Delhi Technological University",
+       "DTU",
+       "Netaji Subhas",
+       "NSIT",
+       "NSUT",
+       "Vellore Institute of Technology",
+       "VIT",
+       "Jadavpur University",
+       "Anna University",
+       "College of Engineering, Pune",
+       "International Institute of Information Technology",
+       "IIIT",
+       "Indian Institute of Foreign Trade",
+       "IIFT",
+       "Management Development Institute",
+       "MDI Gurgaon",
+       "SP Jain",
+       "S.P. Jain",
+       "SPJIMR",
+       "NMIMS",
+       "Symbiosis",
+       "Jamnalal Bajaj",
+       "JBIMS",
+       "Lady Shri Ram",
+       "Hindu College",
+       "Hansraj College"
+      ]
+     },
+     {
+      "id": "c-emp-23",
+      "kind": "employer_current",
+      "values": [
+       "Udaan",
+       "Swiggy",
+       "Razorpay",
+       "CRED",
+       "Flipkart",
+       "Zomato",
+       "Google"
+      ]
+     },
+     {
+      "id": "c-title-22",
+      "kind": "title_current",
+      "values": [
+       "Strategy Manager",
+       "Business Operations Manager",
+       "Program Manager",
+       "Chief of Staff's Office"
+      ]
+     }
+    ],
+    "relaxes": null,
+    "rationale": "These candidates have already translated consulting/analytical skills into a chaotic tech environment and have seen scale."
+   },
+   {
+    "id": "L8",
+    "label": "Tier-2 school · Investment Banking / Venture Capital",
+    "criteria": [
+     {
+      "id": "c-school-27",
+      "kind": "school",
+      "values": [
+       "Delhi Technological University",
+       "DTU",
+       "Netaji Subhas",
+       "NSIT",
+       "NSUT",
+       "Vellore Institute of Technology",
+       "VIT",
+       "Jadavpur University",
+       "Anna University",
+       "College of Engineering, Pune",
+       "International Institute of Information Technology",
+       "IIIT",
+       "Indian Institute of Foreign Trade",
+       "IIFT",
+       "Management Development Institute",
+       "MDI Gurgaon",
+       "SP Jain",
+       "S.P. Jain",
+       "SPJIMR",
+       "NMIMS",
+       "Symbiosis",
+       "Jamnalal Bajaj",
+       "JBIMS",
+       "Lady Shri Ram",
+       "Hindu College",
+       "Hansraj College"
+      ]
+     },
+     {
+      "id": "c-emp-26",
+      "kind": "employer_any",
+      "values": [
+       "Goldman Sachs",
+       "Morgan Stanley",
+       "Sequoia Capital",
+       "Accel",
+       "Lightspeed Venture Partners"
+      ]
+     },
+     {
+      "id": "c-title-25",
+      "kind": "title_any",
+      "values": [
+       "Analyst",
+       "Associate"
+      ]
+     }
+    ],
+    "relaxes": null,
+    "rationale": "Brings elite quantitative and financial modeling skills, aligning with the 'interest in financial industry' note. They are often looking for a move to the operating side."
+   },
+   {
+    "id": "L9",
+    "label": "Any school · title families",
+    "criteria": [
+     {
+      "id": "c-title-28",
+      "kind": "title_current",
+      "values": [
+       "Strategy & Operations Manager",
+       "Business Operations Manager",
+       "Strategy Manager",
+       "Growth & Operations Manager",
+       "Program Manager",
+       "Chief of Staff"
+      ]
+     }
+    ],
+    "relaxes": "no school or employer constraint — title only",
+    "rationale": null
+   }
+  ],
+  "post_fetch": [
+   {
+    "label": "Does the candidate's profile explicitly mention hands-on experience with SQL?",
+    "how": "judge",
+    "note": "Not searchable on most profiles. Engineering graduates from tier-1 schools are ordered first as the proxy; the AI Screen settles it."
+   },
+   {
+    "label": "Meaningful time in consulting (≥ 18 months), and how recently they left",
+    "how": "local",
+    "note": "Sources cannot filter on when a past role ended; computed from the stored role history and used to rank within a level."
+   },
+   {
+    "label": "Structured Problem-Solving",
+    "how": "judge"
+   },
+   {
+    "label": "Hands-On Analytical Horsepower",
+    "how": "judge"
+   },
+   {
+    "label": "Ownership & Bias for Action",
+    "how": "judge"
+   },
+   {
+    "label": "Strategic & Commercial Acumen",
+    "how": "judge"
+   }
+  ],
+  "source": "brief"
+ },
+ "matches": [
+  {
+   "name": "Sushanth Shenoy",
+   "score": 80,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Sushanth is a strong candidate with a stellar academic background and significant experience at a top-tier consulting firm. Their entrepreneurial ventures further highlight leadership and initiative. The main gap is the lack of explicit technical skill mentions, particularly SQL, which would require further probing.",
+   "reachable": true,
+   "red_flags": [],
+   "fit_bucket": "great",
+   "profile_id": "1d5dbc3f-1c19-4b0b-93a4-de514627bedf",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 4,
+     "evidence": "Extensive experience in top-tier management consulting at Bain & Company demonstrates strong problem-solving."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "Previous roles as Product Analyst and Machine Learning Engineer suggest analytical capability, but specific tools are unlisted."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 4,
+     "evidence": "Multiple founder and executive roles (E-Cell IITM Zanzibar, The Wiretap Podcast) demonstrate high ownership."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 4,
+     "evidence": "Revenue & Growth role at Skydo and consulting at Bain indicate strong strategic and commercial understanding."
+    }
+   ],
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Senior Associate Consultant",
+   "gate_failures": [],
+   "current_company": "Bain & Company",
+   "experience_years": 5,
+   "current_tenure_months": 2,
+   "total_experience_months": 60
+  },
+  {
+   "name": "Shatakshi Sarangi",
+   "score": 73,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Shatakshi presents a very strong profile with an exceptional academic background and experience at a top-tier consulting firm. While the explicit technical skill mentions are missing, the overall trajectory suggests a highly capable candidate with significant strategic and problem-solving abilities. This candidate is likely a great fit for roles requiring strong analytical and strategic thinking, though their technical depth would need to be explored.",
+   "reachable": true,
+   "red_flags": [],
+   "fit_bucket": "good",
+   "profile_id": "a3b91399-4810-46a2-9730-2bc0589d8d3b",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 4,
+     "evidence": "Extensive experience at Bain & Company demonstrates strong structured problem-solving abilities in complex business contexts."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "Experience as an Associate Data Scientist at QuantumStreet AI suggests some analytical skills, but specific tool proficiency is not listed."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 3,
+     "evidence": "Progressing to Senior Associate Consultant at Bain and various internships indicates a strong drive and ownership."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 4,
+     "evidence": "Working at Bain & Company implies a deep understanding of strategic and commercial considerations."
+    }
+   ],
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Senior Associate Consultant",
+   "gate_failures": [],
+   "current_company": "Bain & Company",
+   "experience_years": 3.9,
+   "current_tenure_months": 8,
+   "total_experience_months": 47
+  },
+  {
+   "name": "Vamsi Antyakula",
+   "score": 73,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Vamsi is an excellent candidate for a role requiring strong strategic thinking and problem-solving, backed by a top-tier educational and professional background. The only potential gap is explicit proof of hands-on SQL skills, which would need to be verified.",
+   "reachable": true,
+   "red_flags": [],
+   "fit_bucket": "good",
+   "profile_id": "89680dec-3fff-4dd0-aff0-d0d7059d92e7",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 4,
+     "evidence": "McKinsey Senior Consultant role strongly implies excellent structured problem-solving capabilities."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "Experience in EV R&D and a top MBA suggests analytical skills, but hands-on data tools are not specified."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 3,
+     "evidence": "Multiple roles at TVS Motor, various internships, and leadership positions show strong initiative."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 4,
+     "evidence": "MBA from IIM-A and current role at McKinsey demonstrate high-level strategic and commercial thinking."
+    }
+   ],
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Senior Consultant",
+   "gate_failures": [],
+   "current_company": "McKinsey & Company",
+   "experience_years": 5.5,
+   "current_tenure_months": 5,
+   "total_experience_months": 66
+  },
+  {
+   "name": "Sukheth Kallupalli",
+   "score": 63,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Sukheth presents as a highly accomplished and driven candidate from a top-tier institution with a strong consulting background. The entrepreneurial experience indicates significant ownership and strategic acumen, making them a good fit for problem-solving and driving initiatives. However, specific technical analytical skills need to be validated.",
+   "reachable": true,
+   "red_flags": [],
+   "fit_bucket": "good",
+   "profile_id": "3e3c2a42-fb71-4706-9348-f68728e83538",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 3,
+     "evidence": "Experience at BCG and McKinsey indicates strong structured problem-solving skills."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "M.Tech in Quantitative Finance suggests analytical aptitude, but specific tool use is not detailed."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 4,
+     "evidence": "Founder, Founder in Residence, and numerous leadership roles demonstrate high ownership and bias for action."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 3,
+     "evidence": "Consulting experience and entrepreneurial ventures showcase strong strategic and commercial understanding."
+    }
+   ],
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Associate",
+   "gate_failures": [],
+   "current_company": "Boston Consulting Group (BCG)",
+   "experience_years": 5,
+   "current_tenure_months": 8,
+   "total_experience_months": 60
+  },
+  {
+   "name": "Anchit Handa",
+   "score": 57,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Anchit is a strong candidate with an excellent background in top-tier consulting and relevant early-stage experience. The primary gap is the lack of explicit mention of hands-on analytical tools, which may need to be explored during interviews.",
+   "reachable": true,
+   "red_flags": [],
+   "fit_bucket": "okay",
+   "profile_id": "02a1130b-cb7b-4dbe-841e-0fafd231f308",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 3,
+     "evidence": "Extensive experience at Bain & Company indicates strong structured problem-solving abilities."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "Background in consulting typically involves data analysis, but no specific analytical tools are listed."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 3,
+     "evidence": "Roles at Bain, General Catalyst, and Lentra suggest a proactive and results-oriented approach."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 3,
+     "evidence": "Consulting and VC experience demonstrates strong strategic thinking and commercial understanding."
+    }
+   ],
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Senior Associate Consultant",
+   "gate_failures": [],
+   "current_company": "Bain & Company",
+   "experience_years": 2.7,
+   "current_tenure_months": 5,
+   "total_experience_months": 32
+  },
+  {
+   "name": "Vinay Mehta",
+   "score": 57,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "The candidate's background at IIM-C and McKinsey indicates a strong foundation in structured problem-solving and strategic thinking. While analytical horsepower is implied by their education and role, specific hands-on data skills are not evident, which could be a gap depending on the role's technical requirements.",
+   "reachable": true,
+   "red_flags": [
+    "No explicit mention of technical skills like SQL, Python/R which could be critical for hands-on analytical roles.",
+    "The BCom degree and Diploma in Nautical Science followed by MBA at IIM-C shows a non-linear and somewhat unconventional trajectory."
+   ],
+   "fit_bucket": "okay",
+   "profile_id": "a0cf7d53-67ce-4b1a-a1bf-638302fa36fe",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 3,
+     "evidence": "McKinsey Junior Associate role and IIM-C MBA suggest strong problem-solving skills."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "MBA from IIM-C implies analytical aptitude; however, no explicit hands-on data skills are listed."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 3,
+     "evidence": "Held CMO role at Aceclub.pro and President of IIM-C Student Council, demonstrating leadership and drive."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 3,
+     "evidence": "Experience as CMO and at McKinsey indicates developing strategic and commercial understanding."
+    }
+   ],
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Junior Associate",
+   "gate_failures": [],
+   "current_company": "McKinsey & Company",
+   "experience_years": 4.2,
+   "current_tenure_months": 15,
+   "total_experience_months": 50
+  },
+  {
+   "name": "Sahil Kumar",
+   "score": 57,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Sahil presents a strong profile with top-tier education and consulting experience, aligning well with strategic thinking and problem-solving. The main gap is the lack of explicit detail on hands-on analytical tools, particularly SQL, which might need to be verified. The short stints in earlier roles also warrant exploration.",
+   "reachable": true,
+   "red_flags": [
+    "Lack of explicit mention of SQL experience given a role that might require it.",
+    "Multiple short stints in various roles, indicating potential job hopping."
+   ],
+   "fit_bucket": "okay",
+   "profile_id": "cae6c5c5-36f6-4045-a212-26b02bd7699e",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 3,
+     "evidence": "Experience at Bain & Company and IIMB MBA suggests strong structured problem-solving skills."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "Background in ML Engineering and Business Analyst roles indicates analytical skills, but SQL is not explicitly mentioned."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 3,
+     "evidence": "Founder's Office roles at NeoSapien and Prodo demonstrate strong ownership and initiative."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 3,
+     "evidence": "Associate Consultant at Bain & Company and MBA education contribute to strong strategic acumen."
+    }
+   ],
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Associate Consultant",
+   "gate_failures": [],
+   "current_company": "Bain & Company",
+   "experience_years": 3.6,
+   "current_tenure_months": 4,
+   "total_experience_months": 43
+  },
+  {
+   "name": "Manya Deshpande",
+   "score": 20,
+   "skills": [],
+   "sources": [
+    "vendor:crustdata"
+   ],
+   "acquired": {
+    "label": "Tier-1 school · currently in Top-Tier Management Consulting",
+    "level": 1
+   },
+   "location": "Bengaluru",
+   "rationale": "Manya has a strong core background in management consulting with BCG and appropriate experience. However, the candidate fails the strict Tier-1 university gate and lacks explicit mention of SQL, which are critical deal-breakers for this role. While the consulting experience suggests strong competencies, the hard gates are not met.",
+   "reachable": true,
+   "red_flags": [
+    "Does not meet Tier-1 university requirement",
+    "Lack of explicit mention of SQL experience"
+   ],
+   "fit_bucket": "weak",
+   "profile_id": "b0a44366-9b0f-4c76-b287-3c3625cab0f3",
+   "competencies": [
+    {
+     "name": "Structured Problem-Solving",
+     "rating": 3,
+     "evidence": "Experience at BCG, a firm known for structured problem-solving, suggests strong capabilities."
+    },
+    {
+     "name": "Hands-On Analytical Horsepower",
+     "rating": 2,
+     "evidence": "Research roles at BCG and other organizations indicate analytical skills, but specific tool usage is not detailed."
+    },
+    {
+     "name": "Ownership & Bias for Action",
+     "rating": 3,
+     "evidence": "Progressing from Research Associate to Research Analyst at BCG shows consistent delivery and initiative."
+    },
+    {
+     "name": "Strategic & Commercial Acumen",
+     "rating": 3,
+     "evidence": "Working at BCG implies exposure to strategic projects and understanding of business impact."
+    }
+   ],
+   "gate_unknown": [
+    "Does the candidate's profile explicitly mention hands-on experience with SQL?"
+   ],
+   "current_title": "Research Analyst",
+   "gate_failures": [
+    "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?"
+   ],
+   "current_company": "Boston Consulting Group (BCG)",
+   "experience_years": 3.6,
+   "current_tenure_months": 8,
+   "total_experience_months": 43
+  }
+ ],
+ "columns": {
+  "must_haves": [
+   {
+    "id": "g-ai-0",
+    "label": "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?",
+    "attribute": ""
+   },
+   {
+    "id": "g-ai-2",
+    "label": "Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?",
+    "attribute": ""
+   },
+   {
+    "id": "g-ai-3",
+    "label": "Does the candidate's profile explicitly mention hands-on experience with SQL?",
+    "attribute": ""
+   },
+   {
+    "id": "g-band",
+    "label": "Has between 2 and 6 years of professional experience — not over-senior for this role?",
+    "attribute": "experience_band"
+   }
+  ],
+  "competencies": [
+   {
+    "id": "structured-problem-solving",
+    "name": "Structured Problem-Solving",
+    "weight": 40
+   },
+   {
+    "id": "hands-on-analytical-horsepower",
+    "name": "Hands-On Analytical Horsepower",
+    "weight": 30
+   },
+   {
+    "id": "ownership-bias-for-action",
+    "name": "Ownership & Bias for Action",
+    "weight": 20
+   },
+   {
+    "id": "strategic-commercial-acumen",
+    "name": "Strategic & Commercial Acumen",
+    "weight": 10
+   }
+  ]
+ }
+}

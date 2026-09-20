@@ -257,9 +257,7 @@ export function SourcingTab({ jobId }: { jobId: string }) {
                 {matches.length > 0 && <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">{matches.length}</span>}
               </CardTitle>
             </button>
-            <CardDescription className="pl-[1.375rem]">
-              Rank your existing candidate pool against this job&apos;s approved ICP, then add the best to the pipeline.
-            </CardDescription>
+            <CardDescription className="pl-[1.375rem]">People already in your pool, ranked against this ICP.</CardDescription>
           </div>
           {hasIcp && (
             <div className="flex flex-wrap items-center justify-end gap-2">

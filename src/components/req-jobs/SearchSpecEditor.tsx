@@ -94,8 +94,18 @@ function AddCriterion({ onAdd }: { onAdd: (kind: CriterionKind) => void }) {
   )
 }
 
-export function SearchSpecEditor({ jobId, onFind, finding, lastRun }: { jobId: string; onFind?: () => void; finding?: boolean; lastRun?: LevelRunStat[] | null }) {
-  const [spec, setSpec] = useState<SearchSpec | null>(null)
+export function SearchSpecEditor({ jobId, onFind, finding, lastRun, initialSpec, readOnly }: {
+  jobId: string
+  onFind?: () => void
+  finding?: boolean
+  lastRun?: LevelRunStat[] | null
+  /** Preview/testing: render this spec instead of fetching it. */
+  initialSpec?: SearchSpec | null
+  /** Preview/testing: no network actions. */
+  readOnly?: boolean
+}) {
+  const [spec, setSpec] = useState<SearchSpec | null>(initialSpec ?? null)
+  const [open, setOpen] = useState(false)
   const [stored, setStored] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -105,11 +115,12 @@ export function SearchSpecEditor({ jobId, onFind, finding, lastRun }: { jobId: s
   const [showPostFetch, setShowPostFetch] = useState(false)
 
   useEffect(() => {
+    if (initialSpec) return
     fetch(`/api/jobs/${jobId}/source/spec`)
       .then((r) => (r.ok ? r.json() : { data: null }))
       .then((j) => { if (j.data?.spec) { setSpec(j.data.spec); setStored(!!j.data.stored) } })
       .catch(() => {})
-  }, [jobId])
+  }, [jobId, initialSpec])
 
   function update(next: SearchSpec) { setSpec(next); setDirty(true); setCounts({}) }
   function setLevel(i: number, next: SearchLevel) { if (!spec) return; const levels = spec.levels.slice(); levels[i] = next; update({ ...spec, levels }) }
@@ -166,22 +177,32 @@ export function SearchSpecEditor({ jobId, onFind, finding, lastRun }: { jobId: s
 
   return (
     <section className="mt-3 rounded-xl border border-slate-200 bg-white">
-      {/* header: name + actions */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
-        <div className="flex items-center gap-2 text-xs">
+      {/* header: one-line summary + actions; the rows open on click */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+        <button type="button" onClick={() => setOpen((v) => !v)} className="flex min-w-0 items-center gap-2 text-left text-xs" title="Who gets acquired, in order. Click to edit.">
+          {open ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
           <span className="font-semibold text-slate-700">Search plan</span>
-          <span className="text-slate-400">{spec.levels.length} levels · searched top to bottom{stored ? ' · edited' : ''}{dirty ? ' · unsaved' : ''}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="ghost" onClick={count} loading={counting} title="How many people each level reaches, before anyone is acquired"><Calculator className="h-3.5 w-3.5" /> Count</Button>
-          {stored && <Button size="sm" variant="ghost" onClick={reset} title="Back to the plan the ICP proposed"><RotateCcw className="h-3.5 w-3.5" /></Button>}
-          {dirty && <Button size="sm" variant="outline" onClick={save} loading={saving}><Save className="h-3.5 w-3.5" /> Save</Button>}
-          {onFind && <Button size="sm" onClick={find} loading={finding} title="Acquire people, level 1 first"><Radar className="h-3.5 w-3.5" /> Find people</Button>}
-        </div>
+          <span className="truncate text-slate-500">
+            {spec.levels.length} levels
+            {spec.levels[0] && <> · first: <span className="text-slate-700">{spec.levels[0].label}</span></>}
+            {(() => { const c = byIndex(counts, 0); return c?.total != null ? <> · {c.total.toLocaleString()} people in L1</> : null })()}
+            {(() => { const r = runByIndex(0); return r?.fetched ? <> · +{r.fetched} last run</> : null })()}
+            {stored ? ' · edited' : ''}{dirty ? ' · unsaved' : ''}
+          </span>
+        </button>
+        {!readOnly && (
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" variant="ghost" onClick={count} loading={counting} title="How many people each level reaches, before anyone is acquired"><Calculator className="h-3.5 w-3.5" /> Count</Button>
+            {stored && <Button size="sm" variant="ghost" onClick={reset} title="Back to the plan the ICP proposed"><RotateCcw className="h-3.5 w-3.5" /></Button>}
+            {dirty && <Button size="sm" variant="outline" onClick={save} loading={saving}><Save className="h-3.5 w-3.5" /> Save</Button>}
+            {onFind && <Button size="sm" onClick={find} loading={finding} title="Acquire people, level 1 first"><Radar className="h-3.5 w-3.5" /> Find people</Button>}
+          </div>
+        )}
       </div>
 
+      {open && (<>
       {/* must-have line */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-3 py-2">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-rose-500" title="Applied to every level, never relaxed">Everyone</span>
         {spec.base.map((c, i) => (
           <Chips key={c.id} c={c} onChange={(n) => { const base = spec.base.slice(); base[i] = n; update({ ...spec, base }) }} onRemove={() => update({ ...spec, base: spec.base.filter((_, k) => k !== i) })} />
@@ -190,7 +211,7 @@ export function SearchSpecEditor({ jobId, onFind, finding, lastRun }: { jobId: s
       </div>
 
       {/* levels */}
-      <ol className="divide-y divide-slate-100">
+      <ol className="divide-y divide-slate-100 border-t border-slate-100">
         {spec.levels.map((lvl, i) => {
           const cnt = byIndex(counts, i)
           const run = runByIndex(i)
@@ -249,6 +270,7 @@ export function SearchSpecEditor({ jobId, onFind, finding, lastRun }: { jobId: s
           ))}
         </ul>
       )}
+      </>)}
     </section>
   )
 }
