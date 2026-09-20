@@ -17,6 +17,7 @@ entries on top.
 ## 2026-09-20 (Locations standardised · unknown gates ranked · pool recall held to the plan)
 
 ### Changed
+- **Recall is held to the plan before the nearest N are taken.** `match_pool_profiles` (migration 148) accepts `plan_city` / `plan_min_years` / `plan_max_years` with the same tolerance as the outside-plan rule (unknown city or years pass; ±1 year slack). `sourcePoolForIcp` asks for the 20 nearest *inside* the Everyone line first and only fills leftover slots with the nearest people outside it — so a Bengaluru profile no longer takes a slot a New York one should have had, while the "elsewhere in your pool" fold still gets populated on a small pool.
 - **Market shortlist shows only people fit for the job by default.** Rows that fail a must-have are folded behind "Show N who miss a must-have" (next to the existing "elsewhere in your pool" and "hidden" folds). Unknown (?) gates stay visible — an unanswerable gate is not a failure. Nothing is dropped from the snapshot; every fold is one click.
 - **Plan marks and order are recomputed on read.** `rankPoolMatches` (the outside-plan mark + inside → ✓ → ? → ✗ → ladder → score sort) now runs when a cached shortlist is loaded, under the job's *current* Everyone line, so a snapshot scored before these rules shows them without re-scoring. Verified on the live job: 27 cached rows → 1 shown, 8 fold as missing a must-have, 17 as elsewhere, 1 hidden.
 

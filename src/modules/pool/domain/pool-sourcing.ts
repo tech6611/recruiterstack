@@ -127,14 +127,29 @@ export async function sourcePoolForIcp(
   let ids: string[] = []
   try {
     const query = await embedText(icpEmbeddingText(icp))
-    const { data, error } = await sb.rpc('match_pool_profiles', {
-      query_embedding: query,
-      match_count: SHORTLIST,
-      exclude_ids: excludeIds,
-      only_reachable: false,
-    })
-    if (error) throw error
-    ids = (data ?? []).map((r: { id: string }) => r.id)
+    // Plan first: the N slots go to people inside the Everyone line (city / years band,
+    // same tolerance as outsidePlanReason — unknowns pass). Only when fewer than N exist
+    // are the remaining slots filled with the nearest people outside it, which the UI
+    // then folds as "elsewhere in your pool" rather than never showing at all.
+    const plan = opts.plan
+    const recall = async (count: number, held: boolean, exclude: string[]) => {
+      const { data, error } = await sb.rpc('match_pool_profiles', {
+        query_embedding: query,
+        match_count: count,
+        exclude_ids: exclude,
+        only_reachable: false,
+        plan_city: held ? plan?.city ?? null : null,
+        plan_min_years: held ? plan?.minYears ?? null : null,
+        plan_max_years: held ? plan?.maxYears ?? null : null,
+      })
+      if (error) throw error
+      return (data ?? []).map((r: { id: string }) => r.id) as string[]
+    }
+    const hasPlan = Boolean(plan && (plan.city || plan.minYears != null || plan.maxYears != null))
+    ids = await recall(SHORTLIST, hasPlan, excludeIds)
+    if (hasPlan && ids.length < SHORTLIST) {
+      ids.push(...(await recall(SHORTLIST - ids.length, false, [...excludeIds, ...ids])))
+    }
   } catch (err) {
     logger.warn('Pool semantic recall failed', { error: err instanceof Error ? err.message : String(err) })
     if (!opts.includeIds?.length) return { status: 'ok', matches: [] }
