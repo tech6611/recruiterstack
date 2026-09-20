@@ -21,7 +21,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import { deriveMovability, type EnrichedExperience } from '@/lib/ai/candidate-enrichment'
-import { normalizeCity, normalizeCompany } from '@/modules/pool/domain/normalize'
+import { normalizeCompany, resolveLocationParts } from '@/modules/pool/domain/normalize'
 import { fuseClaims, monthsBetween, type StoredClaim } from '@/modules/pool/domain/fusion'
 import { logger } from '@/lib/logger'
 
@@ -124,7 +124,7 @@ export async function rebuildProfile(
       sb.from('pool_contacts').select('kind').eq('profile_id', profileId),
       sb.from('pool_documents').select('vendor_updated_at,source_key').eq('profile_id', profileId),
       sb.from('pool_profiles')
-        .select('current_title,current_company,location_city,headline,skills,display_name,experience_years,evidence_as_of,evidence_source,tenure_verified_months')
+        .select('current_title,current_company,location_city,location_region,location_country,headline,skills,display_name,experience_years,evidence_as_of,evidence_source,tenure_verified_months')
         .eq('id', profileId).maybeSingle(),
     ])
 
@@ -222,11 +222,16 @@ export async function rebuildProfile(
   const sources = Array.from(new Set(claims.map((c) => c.source_key))).sort()
   const disputed = Boolean(fused.current_company?.disputed)
 
+  const locationParts = resolveLocationParts(locationRaw)
   const row: Record<string, unknown> = {
     display_name: displayName,
     headline,
     location_raw: locationRaw,
-    location_city: normalizeCity(locationRaw),
+    // City / region / country kept apart (the Ashby shape) so each can be filtered on its own.
+    location_city: locationParts?.city ?? null,
+    location_region: locationParts?.region ?? null,
+    location_country: locationParts?.country ?? null,
+    location_country_code: locationParts?.country_code ?? null,
     current_title: currentTitle,
     current_company: currentCompany,
     current_company_norm: normalizeCompany(currentCompany),
@@ -258,7 +263,7 @@ export async function rebuildProfile(
   const CLAIM_COLUMNS: Record<string, string[]> = {
     display_name: ['display_name'],
     headline: ['headline'],
-    location: ['location_raw', 'location_city'],
+    location: ['location_raw', 'location_city', 'location_region', 'location_country', 'location_country_code'],
     current_title: ['current_title'],
     current_company: ['current_company', 'current_company_norm'],
     experience_years: ['experience_years'],
@@ -279,8 +284,8 @@ export async function rebuildProfile(
   // evidence_as_of and tenure_verified_months belong in this list. Leaving them out
   // is how a rebuild rewrote the freshness of all 145 profiles while the S1 gate
   // still reported "changed: 0". A change you don't measure is a change you ship.
-  for (const key of ['display_name', 'headline', 'current_title', 'current_company', 'location_city',
-                     'experience_years', 'evidence_as_of', 'evidence_source', 'tenure_verified_months']) {
+  for (const key of ['display_name', 'headline', 'current_title', 'current_company', 'location_city', 'location_region',
+                     'location_country', 'experience_years', 'evidence_as_of', 'evidence_source', 'tenure_verified_months']) {
     // A column the guard removed is not being written at all, so it cannot change.
     if (!(key in row)) continue
     if ((prev[key] ?? null) !== (row[key] ?? null)) changed.push(key)

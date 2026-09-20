@@ -22,7 +22,13 @@ function icpColumns(icp: Icp | null) {
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   try {
     const icp = await getCurrentIcp(supabase, orgId, params.id).catch(() => null)
-    const cached = await getCachedPoolMatches(supabase, orgId, params.id, icp?.version ?? null)
+    // The current Everyone line, so an older snapshot is folded and ordered under today's plan.
+    let plan = null
+    if (icp) {
+      const roleContext = await getJobRoleContext(supabase, orgId, params.id).catch(() => undefined)
+      plan = planEveryone(resolveSearchSpec(icp, { roleContext }).spec)
+    }
+    const cached = await getCachedPoolMatches(supabase, orgId, params.id, icp?.version ?? null, plan)
     return NextResponse.json({ data: { matches: cached?.matches ?? [], stale: cached?.stale ?? false, cached: !!cached, icp: icpColumns(icp) } })
   } catch (e) {
     return handleSupabaseError(e as { code: string; message: string })

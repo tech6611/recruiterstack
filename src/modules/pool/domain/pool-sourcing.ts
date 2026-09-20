@@ -8,7 +8,7 @@ import { getPoolAccess } from '@/modules/pool/domain/pool'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
 import { deriveProfileTags } from '@/modules/pool/domain/profile-tags'
-import { formatLocation, normalizeCity } from '@/modules/pool/domain/normalize'
+import { formatLocation, formatLocationParts, resolveLocationParts, type LocationParts } from '@/modules/pool/domain/normalize'
 
 type Supabase = SupabaseClient<Database>
 // pool_* tables (migration 115) aren't in the generated types.
@@ -56,7 +56,15 @@ export interface PoolMatch {
 }
 
 /** The plan's must-have line, as the ranking applies it to pool recall. */
-export interface PlanEveryone { city: string | null; locationText: string | null; minYears: number | null; maxYears: number | null }
+export interface PlanEveryone {
+  city: string | null
+  /** The plan city's state/province and ISO country — what a city-less profile is held against. */
+  region?: string | null
+  country_code?: string | null
+  locationText: string | null
+  minYears: number | null
+  maxYears: number | null
+}
 
 /** Why a profile is outside the plan's Everyone line, or null when it fits (or can't be judged). PURE. */
 export function outsidePlanReason(
@@ -64,8 +72,12 @@ export function outsidePlanReason(
   plan: PlanEveryone | null | undefined,
 ): string | null {
   if (!plan || m.acquired) return null
-  const city = normalizeCity(m.location)
-  if (plan.city && city && city !== plan.city) return `${city}, not ${plan.city}`
+  // City when known → region when known → country when known. A level that is
+  // genuinely unknown passes; "Texas, United States" with no city does not pass New York.
+  const loc = resolveLocationParts(m.location)
+  if (plan.city && loc?.city && loc.city !== plan.city) return `${loc.city}, not ${plan.city}`
+  if (plan.city && !loc?.city && loc?.region && plan.region && loc.region !== plan.region) return `${loc.region}, not ${plan.city}`
+  if (plan.city && !loc?.city && !loc?.region && loc?.country && plan.country_code && loc.country_code !== plan.country_code) return `${loc.country}, not ${plan.city}`
   const yrs = m.experience_years
   if (yrs != null) {
     if (plan.minYears != null && yrs < plan.minYears - 1) return `${yrs} yrs, under ${plan.minYears}`
@@ -95,7 +107,7 @@ function poolProfileToFitCandidate(p: any): Candidate {
   return {
     name: p.display_name ?? 'Candidate',
     current_title: p.current_title ?? null,
-    location: p.location_city ?? p.location_raw ?? null,
+    location: formatLocationParts(p) ?? p.location_raw ?? null,
     skills: p.skills ?? [],
     experience_years: p.experience_years ?? null,
   } as unknown as Candidate
@@ -127,14 +139,31 @@ export async function sourcePoolForIcp(
   let ids: string[] = []
   try {
     const query = await embedText(icpEmbeddingText(icp))
-    const { data, error } = await sb.rpc('match_pool_profiles', {
-      query_embedding: query,
-      match_count: SHORTLIST,
-      exclude_ids: excludeIds,
-      only_reachable: false,
-    })
-    if (error) throw error
-    ids = (data ?? []).map((r: { id: string }) => r.id)
+    // Plan first: the N slots go to people inside the Everyone line (city / years band,
+    // same tolerance as outsidePlanReason — unknowns pass). Only when fewer than N exist
+    // are the remaining slots filled with the nearest people outside it, which the UI
+    // then folds as "elsewhere in your pool" rather than never showing at all.
+    const plan = opts.plan
+    const recall = async (count: number, held: boolean, exclude: string[]) => {
+      const { data, error } = await sb.rpc('match_pool_profiles', {
+        query_embedding: query,
+        match_count: count,
+        exclude_ids: exclude,
+        only_reachable: false,
+        plan_city: held ? plan?.city ?? null : null,
+        plan_min_years: held ? plan?.minYears ?? null : null,
+        plan_max_years: held ? plan?.maxYears ?? null : null,
+        plan_region: held ? plan?.region ?? null : null,
+        plan_country_code: held ? plan?.country_code ?? null : null,
+      })
+      if (error) throw error
+      return (data ?? []).map((r: { id: string }) => r.id) as string[]
+    }
+    const hasPlan = Boolean(plan && (plan.city || plan.minYears != null || plan.maxYears != null))
+    ids = await recall(SHORTLIST, hasPlan, excludeIds)
+    if (hasPlan && ids.length < SHORTLIST) {
+      ids.push(...(await recall(SHORTLIST - ids.length, false, [...excludeIds, ...ids])))
+    }
   } catch (err) {
     logger.warn('Pool semantic recall failed', { error: err instanceof Error ? err.message : String(err) })
     if (!opts.includeIds?.length) return { status: 'ok', matches: [] }
@@ -146,7 +175,7 @@ export async function sourcePoolForIcp(
 
   const { data: profiles } = await sb
     .from('pool_profiles')
-    .select('id, display_name, current_title, current_company, location_city, location_raw, skills, experience_years, total_experience_months, current_tenure_months, reachable')
+    .select('id, display_name, current_title, current_company, location_city, location_region, location_country, location_country_code, location_raw, skills, experience_years, total_experience_months, current_tenure_months, reachable')
     .in('id', ids)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const byId = new Map((profiles ?? []).map((p: any) => [p.id, p]))
@@ -211,7 +240,7 @@ export async function sourcePoolForIcp(
             name: p.display_name,
             current_title: p.current_title,
             current_company: p.current_company,
-            location: formatLocation(p.location_raw ?? p.location_city) ?? p.location_city ?? null,
+            location: formatLocationParts(p) ?? formatLocation(p.location_raw) ?? null,
             reachable: !!p.reachable,
             experience_years: p.experience_years ?? null,
             total_experience_months: p.total_experience_months ?? null,
@@ -237,19 +266,7 @@ export async function sourcePoolForIcp(
     )
     for (const m of scored) if (m) matches.push(m)
   }
-  // Pool-recall profiles outside the plan's Everyone line (wrong city / outside the years
-  // band) are marked so the UI can fold them away; people the plan acquired never are.
-  for (const m of matches) m.outside_plan = outsidePlanReason(m, opts.plan)
-  // Order: inside the plan before outside · all gates met → some unknown → any failed ·
-  // then the ladder level that reached them (full match beats relaxed) · then score.
-  const gateState = (m: PoolMatch) => (m.gate_failures.length ? 2 : (m.gate_unknown?.length ? 1 : 0))
-  const lvl = (m: PoolMatch) => m.acquired?.level ?? 99
-  matches.sort((a, b) =>
-    (Number(Boolean(a.outside_plan)) - Number(Boolean(b.outside_plan))) ||
-    (gateState(a) - gateState(b)) ||
-    (lvl(a) - lvl(b)) ||
-    (b.score - a.score))
-  return { status: 'ok', matches }
+  return { status: 'ok', matches: rankPoolMatches(matches, opts.plan) }
 }
 
 /**
@@ -332,13 +349,63 @@ export async function setPoolMatchFlags(
   return true
 }
 
+/**
+ * Mark and order a scored shortlist. Applied when the shortlist is produced AND
+ * every time a cached one is read, so a snapshot scored under older rules shows
+ * the current ones without re-scoring.
+ *
+ * Marks: pool-recall profiles outside the plan's Everyone line (wrong city / outside
+ * the years band) get `outside_plan` so the UI can fold them away; people the plan
+ * acquired never are. Order: inside the plan before outside · all gates met → some
+ * unknown → any failed · then the ladder level that reached them (full match beats
+ * relaxed) · then score. PURE — returns a new array, the input is not mutated.
+ */
+export function rankPoolMatches(matches: PoolMatch[], plan: PlanEveryone | null | undefined): PoolMatch[] {
+  const marked = matches.map((m) => ({ ...m, outside_plan: outsidePlanReason(m, plan) }))
+  const gateState = (m: PoolMatch) => (m.gate_failures?.length ? 2 : (m.gate_unknown?.length ? 1 : 0))
+  const lvl = (m: PoolMatch) => m.acquired?.level ?? 99
+  return marked.sort((a, b) =>
+    (Number(Boolean(a.outside_plan)) - Number(Boolean(b.outside_plan))) ||
+    (gateState(a) - gateState(b)) ||
+    (lvl(a) - lvl(b)) ||
+    (b.score - a.score))
+}
+
+/**
+ * Location is never trusted from the snapshot: it is re-read from pool_profiles
+ * (the standardised city / region / country columns) so a fix to the normaliser or a
+ * backfill shows up without re-running — and re-scoring — the shortlist. Everything
+ * else in the snapshot stays as scored. Falls back to the cached text per row.
+ */
+export async function withLiveLocations(supabase: Supabase, matches: PoolMatch[]): Promise<PoolMatch[]> {
+  const ids = matches.map((m) => m.profile_id).filter(Boolean)
+  if (!ids.length) return matches
+  const { data } = await (supabase as unknown as LooseSb)
+    .from('pool_profiles')
+    .select('id, location_city, location_region, location_country, location_country_code, location_raw')
+    .in('id', ids)
+  const byId = new Map<string, LocationParts & { location_raw: string | null }>()
+  for (const p of (data ?? []) as { id: string; location_city: string | null; location_region: string | null; location_country: string | null; location_country_code: string | null; location_raw: string | null }[]) {
+    byId.set(p.id, { city: p.location_city, region: p.location_region, country: p.location_country, country_code: p.location_country_code, location_raw: p.location_raw })
+  }
+  return matches.map((m) => {
+    const p = byId.get(m.profile_id)
+    if (!p) return m
+    return { ...m, location: formatLocationParts(p) ?? formatLocation(p.location_raw) ?? m.location }
+  })
+}
+
 /** The cached market shortlist for a job (for on-mount load). Null if none / table
- *  not there yet. Flags stale when the ICP has moved past the cached version. */
+ *  not there yet. Flags stale when the ICP has moved past the cached version.
+ *  Locations, plan marks and order are recomputed on read (see withLiveLocations /
+ *  rankPoolMatches); scores and gate results stay as cached. */
 export async function getCachedPoolMatches(
   supabase: Supabase,
   orgId: string,
   jobId: string,
   currentIcpVersion: number | null,
+  /** The job's current Everyone line; when given, the snapshot is re-marked and re-sorted under it. */
+  plan?: PlanEveryone | null,
 ): Promise<{ matches: PoolMatch[]; stale: boolean; updated_at: string } | null> {
   try {
     const { data, error } = await (supabase as unknown as LooseSb)
@@ -349,7 +416,7 @@ export async function getCachedPoolMatches(
       .maybeSingle()
     if (error || !data) return null
     return {
-      matches: (data.matches ?? []) as PoolMatch[],
+      matches: rankPoolMatches(await withLiveLocations(supabase, (data.matches ?? []) as PoolMatch[]), plan),
       stale: currentIcpVersion != null && data.icp_version != null && data.icp_version !== currentIcpVersion,
       updated_at: data.updated_at,
     }

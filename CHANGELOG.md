@@ -16,6 +16,22 @@ entries on top.
 
 ## 2026-09-20 (Locations standardised · unknown gates ranked · pool recall held to the plan)
 
+### Added
+- **`scripts/seed-crustdata-atlas.ts`** — seeds a Crustdata Atlas CSV export into the pool through the normal vendor spine (adapter → claims → resolve/fuse), so the people are indistinguishable from API-sourced ones: same `vendor:crustdata` source, ledger row, ingest run, raw payload. The export date in the file name is the evidence date. Dry-run by default, `--apply` to write, `--credits N` to record spend. First run: 100 VP Sales (Texas) → 100 created, 0 merged, all embedded; pool 186 → 286.
+
+### Changed
+- **A city-less profile is held on its region, then country** (migration 149; `plan_region` / `plan_country_code`). 148 let any unknown city pass, so the 59 Texas VPs with no city took 13 of the New York job's 20 recall slots. Now only a genuinely unknown level passes; the same fallback applies to the "elsewhere in your pool" mark (`outsidePlanReason`).
+- **Recall is held to the plan before the nearest N are taken.** `match_pool_profiles` (migration 148) accepts `plan_city` / `plan_min_years` / `plan_max_years` with the same tolerance as the outside-plan rule (unknown city or years pass; ±1 year slack). `sourcePoolForIcp` asks for the 20 nearest *inside* the Everyone line first and only fills leftover slots with the nearest people outside it — so a Bengaluru profile no longer takes a slot a New York one should have had, while the "elsewhere in your pool" fold still gets populated on a small pool.
+- **Market shortlist shows only people fit for the job by default.** Rows that fail a must-have are folded behind "Show N who miss a must-have" (next to the existing "elsewhere in your pool" and "hidden" folds). Unknown (?) gates stay visible — an unanswerable gate is not a failure. Nothing is dropped from the snapshot; every fold is one click.
+- **Plan marks and order are recomputed on read.** `rankPoolMatches` (the outside-plan mark + inside → ✓ → ? → ✗ → ladder → score sort) now runs when a cached shortlist is loaded, under the job's *current* Everyone line, so a snapshot scored before these rules shows them without re-scoring. Verified on the live job: 27 cached rows → 1 shown, 8 fold as missing a must-have, 17 as elsewhere, 1 hidden.
+
+### Fixed
+- **Sourcing shortlist showed unstandardised locations** ("New York, New York, United States", "New York City Metropolitan Area") because the market matrix reads a cached snapshot of the last run. `getCachedPoolMatches` now overlays the live `pool_profiles` city / region / country onto every row (`withLiveLocations`), so a normaliser fix or backfill shows up without re-scoring the shortlist.
+
+### Added
+- **Locations stored as city / region / country** (the Ashby shape) — `pool_profiles` gains `location_region`, `location_country`, `location_country_code` (migration 147; `location_city` / `location_raw` unchanged). `resolveLocationParts` fills each level independently, so "Remote, India" keeps its country and "Kundapur, India" keeps India even when the town is too small to guess; the region comes from the dictionary's state column or a hub→state map. Pool search gets a **country** filter and facet; the pool page, profile panel, sourcing rows and unlock projection display "City, Country" from the stored fields instead of re-parsing raw text. `scripts/backfill-pool-locations.ts` (dry-run by default, `--apply` to write) fills the new columns for existing rows — on the live pool, 172 of 174 resolve to a full city, 1 to country-only, 1 unresolved (Freiburg, DE).
+- **Location dictionary for India & US** — `formatLocation` / `normalizeCity` now recognise every populated place GeoNames lists for the two countries (19,887 rows in `src/modules/pool/domain/cities.generated.json`, regenerate with `npm run gen:cities`), not just the metros and 20 hubs. Matching is on the first place segment, confirmed by a state/country hint ("Springfield, IL", "Surat, Gujarat") or by size when the name stands alone; a state hint beats a same-name international hub ("Paris, TX"), a contradicting country drops it ("London, Ontario, Canada"), and small towns are never guessed from the name alone. Real pool data: 172 of 174 stored locations now resolve.
+
 ### Fixed
 - **Locations**: the city normaliser only knew Indian cities, so "New York, New York,
   United States" and "New York City Metropolitan Area" showed raw. `normalize.ts` now

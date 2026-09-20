@@ -17,7 +17,8 @@
     "audit:canonical": "node scripts/audit-canonical-model.mjs",
     "audit:canonical:check": "node scripts/audit-canonical-model.mjs --check",
     "check:boundaries": "node scripts/check-module-boundaries.mjs",
-    "gen:types": "npx supabase gen types --lang=typescript --project-id=$SUPABASE_PROJECT_ID > src/lib/types/supabase.ts"
+    "gen:types": "npx supabase gen types --lang=typescript --project-id=$SUPABASE_PROJECT_ID > src/lib/types/supabase.ts",
+    "gen:cities": "node scripts/gen-cities.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -65,6 +66,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^6.0.1",
+    "all-the-cities": "^3.1.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "jsdom": "^29.0.1",

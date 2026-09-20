@@ -98,6 +98,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   const [newIds, setNewIds] = useState<Set<string>>(new Set())
   const [showHidden, setShowHidden] = useState(false)
   const [showOutside, setShowOutside] = useState(false)
+  const [showFailed, setShowFailed] = useState(false)
   const [openProfile, setOpenProfile] = useState<string | null>(null)
 
   /** Star / hide: free, persisted on the cached list, survives re-ranks. */
@@ -247,15 +248,18 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
               {(() => {
                 const hidden = matches.filter((m) => m.hidden).length
                 const outside = matches.filter((m) => !m.hidden && m.outside_plan).length
-                return (hidden > 0 || outside > 0) ? (
+                // Failed a must-have: folded by default. Unknown (?) gates stay visible — unanswerable ≠ unfit.
+                const failed = matches.filter((m) => !m.hidden && !m.outside_plan && (m.gate_failures?.length ?? 0) > 0).length
+                return (hidden > 0 || outside > 0 || failed > 0) ? (
                   <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                    {failed > 0 && <button type="button" onClick={() => setShowFailed((v) => !v)} className="hover:text-slate-600" title="Scored, but fails at least one must-have">{showFailed ? 'Hide' : 'Show'} {failed} who miss a must-have</button>}
                     {outside > 0 && <button type="button" onClick={() => setShowOutside((v) => !v)} className="hover:text-slate-600" title="Already in your pool but outside the plan's location or years">{showOutside ? 'Hide' : 'Show'} {outside} elsewhere in your pool</button>}
                     {hidden > 0 && <button type="button" onClick={() => setShowHidden((v) => !v)} className="hover:text-slate-600">{showHidden ? 'Hide' : 'Show'} {hidden} hidden</button>}
                   </div>
                 ) : null
               })()}
               <SourcingMatrix
-                matches={matches.filter((m) => (showHidden || !m.hidden) && (showOutside || !m.outside_plan)).map((m) => toMatrixMatch(m, newIds))}
+                matches={matches.filter((m) => (showHidden || !m.hidden) && (showOutside || !m.outside_plan) && (showFailed || !(m.gate_failures?.length))).map((m) => toMatrixMatch(m, newIds))}
                 icp={icp} selected={selected} onToggle={toggle}
                 onStar={(id, starred) => setFlag(id, { starred })}
                 onHide={(id) => setFlag(id, { hidden: true })}

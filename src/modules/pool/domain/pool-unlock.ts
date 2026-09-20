@@ -3,6 +3,7 @@ import type { Database } from '@/lib/types/database'
 import { getPoolAccess } from '@/modules/pool/domain/pool'
 import { poolPlaceholderEmail } from '@/lib/pool-email'
 import { logger } from '@/lib/logger'
+import { formatLocationParts } from '@/modules/pool/domain/normalize'
 
 type Supabase = SupabaseClient<Database>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,7 +91,7 @@ export async function unlockPoolProfile(
       resume_url: null,
       current_title: profile.current_title ?? null,
       current_company: profile.current_company ?? null,
-      location: profile.location_city ?? profile.location_raw ?? null,
+      location: formatLocationParts(profile) ?? profile.location_raw ?? null,
       linkedin_url: linkedin,
       skills: profile.skills ?? [],
       experience_years: typeof profile.experience_years === 'number' ? Math.round(profile.experience_years) : 0,

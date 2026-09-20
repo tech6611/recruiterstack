@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeCity, normalizeCompany, editDistance, slugifyPlace } from './normalize'
+import { normalizeCity, normalizeCompany, editDistance, slugifyPlace, resolveLocationParts, formatLocationParts } from './normalize'
 
 describe('normalizeCity', () => {
   it('collapses the spellings the GitHub pull actually produced', () => {
@@ -85,5 +85,82 @@ describe('formatLocation — international hubs', () => {
   })
   it('does not match short aliases inside other words', () => {
     expect(formatLocation('Transferred to Hydrology dept')).toBe('Transferred to Hydrology dept')
+  })
+})
+
+describe('formatLocation — India & US dictionary', () => {
+  it('recognises any Indian city, not just the metros', () => {
+    expect(formatLocation('Surat, Gujarat, India')).toBe('Surat, India')
+    expect(formatLocation('Nagpur')).toBe('Nagpur, India')
+    expect(formatLocation('Vellore, Tamil Nadu')).toBe('Vellore, India')
+    expect(formatLocation('Guwahati, Assam')).toBe('Guwahati, India')
+  })
+  it('recognises any US city, disambiguating by state', () => {
+    expect(formatLocation('Springfield, IL')).toBe('Springfield, United States')
+    expect(formatLocation('Springfield, Missouri, United States')).toBe('Springfield, United States')
+    expect(formatLocation('Indianapolis, IN')).toBe('Indianapolis, United States')
+    expect(formatLocation('Portland, Oregon')).toBe('Portland, United States')
+    expect(formatLocation('Winston-Salem, NC')).toBe('Winston-Salem, United States')
+    expect(formatLocation('Austin Texas')).toBe('Austin, United States')
+  })
+  it('lets a state hint override an international hub of the same name', () => {
+    expect(formatLocation('Paris, TX')).toBe('Paris, United States')
+    expect(formatLocation('Paris, Texas')).toBe('Paris, United States')
+    expect(formatLocation('Paris, France')).toBe('Paris, France')
+    expect(formatLocation('Berlin, DE')).toBe('Berlin, Germany')
+  })
+  it('does not force a hub when the country says otherwise', () => {
+    expect(formatLocation('London, Ontario, Canada')).toBe('London, Ontario, Canada')
+    expect(formatLocation('Sydney, Nova Scotia, Canada')).toBe('Sydney, Nova Scotia, Canada')
+  })
+  it('handles metro shorthand and neighbourhood-first strings', () => {
+    expect(formatLocation('Raleigh-Durham-Chapel Hill Area')).toBe('Raleigh, United States')
+    expect(formatLocation('Dallas-Fort Worth Metroplex')).toBe('Dallas, United States')
+    expect(formatLocation('Greater Philadelphia')).toBe('Philadelphia, United States')
+    expect(formatLocation('Koramangala, Bengaluru')).toBe('Bengaluru, India')
+  })
+  it('will not guess a small town from its name alone', () => {
+    expect(formatLocation('Hope')).toBe('Hope')
+    expect(formatLocation('Earth')).toBe('Earth')
+    expect(formatLocation('Hope, AR')).toBe('Hope, United States')
+    expect(formatLocation('Springfield, Ontario')).toBe('Springfield, Ontario')
+  })
+  it('keeps the "IN" ambiguity (India vs Indiana) honest', () => {
+    expect(formatLocation('Surat, IN')).toBe('Surat, India')
+    expect(formatLocation('Carmel, IN')).toBe('Carmel, United States')
+  })
+})
+
+describe('resolveLocationParts — city / region / country as separate fields', () => {
+  it('fills all three from the dictionary', () => {
+    expect(resolveLocationParts('Surat, Gujarat')).toEqual({ city: 'Surat', region: 'Gujarat', country: 'India', country_code: 'IN' })
+    expect(resolveLocationParts('Springfield, IL')).toEqual({ city: 'Springfield', region: 'Illinois', country: 'United States', country_code: 'US' })
+  })
+  it('fills the region for hand-kept hubs too', () => {
+    expect(resolveLocationParts('Banglore, India')).toEqual({ city: 'Bengaluru', region: 'Karnataka', country: 'India', country_code: 'IN' })
+    expect(resolveLocationParts('Gurgaon')).toEqual({ city: 'Delhi NCR', region: 'Delhi', country: 'India', country_code: 'IN' })
+    expect(resolveLocationParts('SF Bay Area')).toEqual({ city: 'San Francisco', region: 'California', country: 'United States', country_code: 'US' })
+    expect(resolveLocationParts('Singapore')).toEqual({ city: 'Singapore', region: null, country: 'Singapore', country_code: 'SG' })
+  })
+  it('keeps the lower levels when no city is recognised', () => {
+    expect(resolveLocationParts('Remote, India')).toEqual({ city: null, region: null, country: 'India', country_code: 'IN' })
+    expect(resolveLocationParts('Karnataka')).toEqual({ city: null, region: 'Karnataka', country: 'India', country_code: 'IN' })
+    expect(resolveLocationParts('Remote - Germany')).toEqual({ city: null, region: null, country: 'Germany', country_code: 'DE' })
+  })
+  it('does not invent a country from a weak two-letter hint', () => {
+    expect(resolveLocationParts('Remote')).toBeNull()
+    expect(resolveLocationParts('Earth')).toBeNull()
+    expect(resolveLocationParts('')).toBeNull()
+  })
+})
+
+describe('formatLocationParts', () => {
+  it('reads like Ashby: "City, Country", falling back to the region or country', () => {
+    expect(formatLocationParts({ city: 'Pune', region: 'Maharashtra', country: 'India', country_code: 'IN' })).toBe('Pune, India')
+    expect(formatLocationParts({ city: null, region: 'Karnataka', country: 'India', country_code: 'IN' })).toBe('Karnataka, India')
+    expect(formatLocationParts({ city: null, region: null, country: 'India', country_code: 'IN' })).toBe('India')
+    expect(formatLocationParts({ city: null, region: null, country: null, country_code: null })).toBeNull()
+    expect(formatLocation('Singapore')).toBe('Singapore')
+    expect(formatLocation('Paris, TX')).toBe('Paris, United States')
   })
 })

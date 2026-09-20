@@ -45,7 +45,11 @@ export interface PoolProfileSummary {
   headline: string | null
   current_title: string | null
   current_company: string | null
+  /** Location kept as separate levels (the Ashby shape); each is independently nullable. */
   location_city: string | null
+  location_region: string | null
+  location_country: string | null
+  location_country_code: string | null
   experience_years: number | null
   skills: string[]
   num_roles: number | null
@@ -82,6 +86,8 @@ export interface PoolProfileDetail extends PoolProfileSummary {
 export interface PoolSearchFilters {
   q?: string
   city?: string
+  /** ISO 3166-1 alpha-2, e.g. "IN". */
+  country?: string
   skill?: string
   minExperienceMonths?: number
   /** Last-known tenure (role start → now). Use for recall. */
@@ -104,7 +110,7 @@ export interface PoolAccess {
 }
 
 const SUMMARY_COLS =
-  'id,display_name,headline,current_title,current_company,location_city,experience_years,' +
+  'id,display_name,headline,current_title,current_company,location_city,location_region,location_country,location_country_code,experience_years,' +
   'skills,num_roles,total_experience_months,current_tenure_months,has_email,has_linkedin,' +
   'reachable,sources,evidence_as_of,evidence_source,tenure_verified_months,employer_disputed'
 
@@ -174,6 +180,7 @@ export async function searchPool(
     .range(offset, offset + limit - 1)
 
   if (f.city) q = q.eq('location_city', f.city)
+  if (f.country) q = q.eq('location_country_code', f.country.toUpperCase())
   if (f.skill) q = q.contains('skills', [f.skill])
   if (f.source) q = q.contains('sources', [f.source])
   if (f.reachableOnly) q = q.eq('reachable', true)
@@ -267,22 +274,25 @@ export async function getPoolProfile(
 /** Distinct values for the search facets, computed from what's actually in the pool. */
 export async function getPoolFacets(
   supabase: Supabase,
-): Promise<{ cities: string[]; skills: string[]; sources: string[]; total: number }> {
+): Promise<{ cities: string[]; countries: { code: string; name: string }[]; skills: string[]; sources: string[]; total: number }> {
   const sb = supabase as unknown as LooseSb
   const { data, count } = await sb
     .from('pool_profiles')
-    .select('location_city,skills,sources', { count: 'exact' })
+    .select('location_city,location_country,location_country_code,skills,sources', { count: 'exact' })
     .limit(1000)
   const cities = new Set<string>()
+  const countries = new Map<string, string>()
   const skills = new Map<string, number>()
   const sources = new Set<string>()
-  for (const r of (data ?? []) as { location_city: string | null; skills: string[]; sources: string[] }[]) {
+  for (const r of (data ?? []) as { location_city: string | null; location_country: string | null; location_country_code: string | null; skills: string[]; sources: string[] }[]) {
     if (r.location_city) cities.add(r.location_city)
+    if (r.location_country_code && r.location_country) countries.set(r.location_country_code, r.location_country)
     for (const s of r.skills ?? []) skills.set(s, (skills.get(s) ?? 0) + 1)
     for (const s of r.sources ?? []) sources.add(s)
   }
   return {
     cities: Array.from(cities).sort(),
+    countries: Array.from(countries.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name)),
     skills: Array.from(skills.entries()).sort((a, b) => b[1] - a[1]).slice(0, 40).map(([s]) => s),
     sources: Array.from(sources).sort(),
     total: count ?? 0,
