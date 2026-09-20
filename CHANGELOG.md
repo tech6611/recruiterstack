@@ -14,6 +14,26 @@ entries on top.
 ### Docs
 - Added an evidence-grounded review of the Gemini ICP prompt, with a proposed hiring-situation packet, prompt structure, propagation plan, and acceptance tests.
 
+## 2026-09-20 (Locations standardised · unknown gates ranked · pool recall held to the plan)
+
+### Fixed
+- **Locations**: the city normaliser only knew Indian cities, so "New York, New York,
+  United States" and "New York City Metropolitan Area" showed raw. `normalize.ts` now
+  carries 20 international hubs with aliases (NYC/Manhattan/Brooklyn, Bay Area/Palo
+  Alto, Greater London, …) and a country per city; `formatLocation()` renders
+  "City, Country" and falls back to the raw string. Aliases now match on word
+  boundaries (no more "hyd" inside "hydrology").
+
+### Changed
+- **Ranking**: order is now inside-the-plan → all gates met → some unknown → any
+  failed → level → score. A candidate with two unknown gates no longer outranks one
+  with every gate met.
+- **Pool recall held to the plan's Everyone line**: pool-recall profiles whose known
+  city differs from the plan's, or whose years fall outside the band (±1 yr), are marked
+  `outside_plan` with the reason ("Bengaluru, not New York" / "3 yrs, under 6"), sorted
+  last, and folded under "Show n elsewhere in your pool". People the plan acquired are
+  never marked. Routes pass `planEveryone(spec)` into ranking.
+
 ## 2026-09-20 (Sourcing parity, items 1–5: sentences + edit page, exclusions, company filters, triage, evidence, columns)
 
 ### Changed

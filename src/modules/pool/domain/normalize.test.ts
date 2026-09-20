@@ -35,7 +35,7 @@ describe('normalizeCity', () => {
   })
   it('does not fuzzy-match a genuinely different city onto a known one', () => {
     expect(normalizeCity('Kigali')).toBeNull()
-    expect(normalizeCity('Toronto')).toBeNull()
+    expect(normalizeCity('Winnipeg')).toBeNull()
   })
 })
 
@@ -65,5 +65,25 @@ describe('helpers', () => {
   it('editDistance caps early', () => {
     expect(editDistance('bangalore', 'banglore')).toBe(1)
     expect(editDistance('abc', 'xyzxyzxyz', 3)).toBe(4)
+  })
+})
+
+import { formatLocation } from './normalize'
+
+describe('formatLocation — international hubs', () => {
+  it('standardises the New York spellings the vendor produces', () => {
+    expect(formatLocation('New York, New York, United States')).toBe('New York, United States')
+    expect(formatLocation('New York City Metropolitan Area')).toBe('New York, United States')
+    expect(formatLocation('Brooklyn, NY')).toBe('New York, United States')
+  })
+  it('handles other hubs and keeps India working; unknown strings pass through', () => {
+    expect(formatLocation('San Francisco Bay Area')).toBe('San Francisco, United States')
+    expect(formatLocation('Greater London')).toBe('London, United Kingdom')
+    expect(formatLocation('Bangalore')).toBe('Bengaluru, India')
+    expect(formatLocation('Winnipeg, Manitoba, Canada')).toBe('Winnipeg, Manitoba, Canada')
+    expect(formatLocation('')).toBeNull()
+  })
+  it('does not match short aliases inside other words', () => {
+    expect(formatLocation('Transferred to Hydrology dept')).toBe('Transferred to Hydrology dept')
   })
 })

@@ -4,7 +4,8 @@ import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import type { Icp } from '@/lib/types/icp'
 import { sourcePoolForIcp, savePoolMatches, getCachedPoolMatches } from '@/modules/pool/domain/pool-sourcing'
 import { loadAcquiredLevels } from '@/modules/pool/domain/crustdata-acquire'
-import { resolveSearchSpec, feederEmployersFromSpec } from '@/modules/pool/search/spec-from-brief'
+import { resolveSearchSpec, feederEmployersFromSpec, planEveryone } from '@/modules/pool/search/spec-from-brief'
+import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 
 export const maxDuration = 300 // Fit-Engine scores the pool shortlist
 
@@ -38,8 +39,9 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
     }
     // People already acquired for this job keep their ladder level and are always scored.
     const acquired = await loadAcquiredLevels(supabase, params.id)
-    const feederEmployers = feederEmployersFromSpec(resolveSearchSpec(icp, {}).spec)
-    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired, feederEmployers })
+    const roleContext = await getJobRoleContext(supabase, orgId, params.id)
+    const { spec } = resolveSearchSpec(icp, { roleContext })
+    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired, feederEmployers: feederEmployersFromSpec(spec), plan: planEveryone(spec) })
     if (result.status === 'ok') {
       await savePoolMatches(supabase, orgId, params.id, icp.version, result.matches).catch(() => {})
     }

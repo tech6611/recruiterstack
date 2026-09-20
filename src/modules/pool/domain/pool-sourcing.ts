@@ -8,6 +8,7 @@ import { getPoolAccess } from '@/modules/pool/domain/pool'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
 import { deriveProfileTags } from '@/modules/pool/domain/profile-tags'
+import { formatLocation, normalizeCity } from '@/modules/pool/domain/normalize'
 
 type Supabase = SupabaseClient<Database>
 // pool_* tables (migration 115) aren't in the generated types.
@@ -50,6 +51,27 @@ export interface PoolMatch {
   /** Recruiter flags — kept across re-ranks (savePoolMatches carries them forward). */
   starred?: boolean
   hidden?: boolean
+  /** Set when a pool-recall profile falls outside the plan's Everyone line (location / years); acquired people are never marked. */
+  outside_plan?: string | null
+}
+
+/** The plan's must-have line, as the ranking applies it to pool recall. */
+export interface PlanEveryone { city: string | null; locationText: string | null; minYears: number | null; maxYears: number | null }
+
+/** Why a profile is outside the plan's Everyone line, or null when it fits (or can't be judged). PURE. */
+export function outsidePlanReason(
+  m: { location: string | null; experience_years: number | null; acquired?: { level: number } | null },
+  plan: PlanEveryone | null | undefined,
+): string | null {
+  if (!plan || m.acquired) return null
+  const city = normalizeCity(m.location)
+  if (plan.city && city && city !== plan.city) return `${city}, not ${plan.city}`
+  const yrs = m.experience_years
+  if (yrs != null) {
+    if (plan.minYears != null && yrs < plan.minYears - 1) return `${yrs} yrs, under ${plan.minYears}`
+    if (plan.maxYears != null && yrs > plan.maxYears + 1) return `${yrs} yrs, over ${plan.maxYears}`
+  }
+  return null
 }
 
 /** Latest degree year on file, if any. */
@@ -93,7 +115,7 @@ export async function sourcePoolForIcp(
   // Profile ids that must be scored regardless of semantic recall — e.g. everything a
   // Crustdata run just bought. A bought profile that never gets scored is money spent
   // on a person the recruiter never sees.
-  opts: { includeIds?: string[]; acquired?: Record<string, { level: number; label: string }>; feederEmployers?: string[] } = {},
+  opts: { includeIds?: string[]; acquired?: Record<string, { level: number; label: string }>; feederEmployers?: string[]; plan?: PlanEveryone | null } = {},
 ): Promise<{ status: 'ok' | 'no_access' | 'empty'; matches: PoolMatch[] }> {
   const access = await getPoolAccess(supabase, orgId)
   if (!access.hasAccess) return { status: 'no_access', matches: [] }
@@ -189,7 +211,7 @@ export async function sourcePoolForIcp(
             name: p.display_name,
             current_title: p.current_title,
             current_company: p.current_company,
-            location: p.location_city ?? p.location_raw ?? null,
+            location: formatLocation(p.location_raw ?? p.location_city) ?? p.location_city ?? null,
             reachable: !!p.reachable,
             experience_years: p.experience_years ?? null,
             total_experience_months: p.total_experience_months ?? null,
@@ -215,10 +237,18 @@ export async function sourcePoolForIcp(
     )
     for (const m of scored) if (m) matches.push(m)
   }
-  // Gates passed first; then the ladder level that reached them (a full match outranks a
-  // relaxed one); then the judge's score. Pool recall with no level sorts after all levels.
+  // Pool-recall profiles outside the plan's Everyone line (wrong city / outside the years
+  // band) are marked so the UI can fold them away; people the plan acquired never are.
+  for (const m of matches) m.outside_plan = outsidePlanReason(m, opts.plan)
+  // Order: inside the plan before outside · all gates met → some unknown → any failed ·
+  // then the ladder level that reached them (full match beats relaxed) · then score.
+  const gateState = (m: PoolMatch) => (m.gate_failures.length ? 2 : (m.gate_unknown?.length ? 1 : 0))
   const lvl = (m: PoolMatch) => m.acquired?.level ?? 99
-  matches.sort((a, b) => (Number(b.gate_failures.length === 0) - Number(a.gate_failures.length === 0)) || (lvl(a) - lvl(b)) || (b.score - a.score))
+  matches.sort((a, b) =>
+    (Number(Boolean(a.outside_plan)) - Number(Boolean(b.outside_plan))) ||
+    (gateState(a) - gateState(b)) ||
+    (lvl(a) - lvl(b)) ||
+    (b.score - a.score))
   return { status: 'ok', matches }
 }
 

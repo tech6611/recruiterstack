@@ -17,6 +17,7 @@ import type { SearchCriterion, SearchLevel, SearchSpec, PostFetchCheck } from '@
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
 import { experienceBandFromGate, yearsFloorFromLabel } from '@/lib/icp-gates'
 import { schoolTiersFor } from '@/modules/pool/search/school-tiers'
+import { normalizeCity } from '@/modules/pool/domain/normalize'
 
 export interface SpecContext {
   title?: string | null
@@ -212,4 +213,11 @@ export function feederEmployersFromSpec(spec: SearchSpec): string[] {
   const out = new Set<string>()
   for (const lvl of spec.levels) for (const c of lvl.criteria) if (c.kind.startsWith('employer_') && !c.exclude) for (const v of c.values) out.add(v)
   return Array.from(out)
+}
+
+/** The plan's Everyone line in the shape the ranking uses to judge pool recall. PURE. */
+export function planEveryone(spec: SearchSpec): { city: string | null; locationText: string | null; minYears: number | null; maxYears: number | null } {
+  const loc = spec.base.find((c) => c.kind === 'location' && !c.exclude)
+  const yrs = spec.base.find((c) => c.kind === 'years_band')
+  return { city: normalizeCity(loc?.values[0] ?? null), locationText: loc?.values[0] ?? null, minYears: yrs?.min ?? null, maxYears: yrs?.max ?? null }
 }
