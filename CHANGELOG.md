@@ -16,6 +16,9 @@ entries on top.
 
 ## 2026-09-20 (Locations standardised · unknown gates ranked · pool recall held to the plan)
 
+### Added
+- **Location dictionary for India & US** — `formatLocation` / `normalizeCity` now recognise every populated place GeoNames lists for the two countries (19,887 rows in `src/modules/pool/domain/cities.generated.json`, regenerate with `npm run gen:cities`), not just the metros and 20 hubs. Matching is on the first place segment, confirmed by a state/country hint ("Springfield, IL", "Surat, Gujarat") or by size when the name stands alone; a state hint beats a same-name international hub ("Paris, TX"), a contradicting country drops it ("London, Ontario, Canada"), and small towns are never guessed from the name alone. Real pool data: 172 of 174 stored locations now resolve.
+
 ### Fixed
 - **Locations**: the city normaliser only knew Indian cities, so "New York, New York,
   United States" and "New York City Metropolitan Area" showed raw. `normalize.ts` now

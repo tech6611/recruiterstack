@@ -87,3 +87,46 @@ describe('formatLocation — international hubs', () => {
     expect(formatLocation('Transferred to Hydrology dept')).toBe('Transferred to Hydrology dept')
   })
 })
+
+describe('formatLocation — India & US dictionary', () => {
+  it('recognises any Indian city, not just the metros', () => {
+    expect(formatLocation('Surat, Gujarat, India')).toBe('Surat, India')
+    expect(formatLocation('Nagpur')).toBe('Nagpur, India')
+    expect(formatLocation('Vellore, Tamil Nadu')).toBe('Vellore, India')
+    expect(formatLocation('Guwahati, Assam')).toBe('Guwahati, India')
+  })
+  it('recognises any US city, disambiguating by state', () => {
+    expect(formatLocation('Springfield, IL')).toBe('Springfield, United States')
+    expect(formatLocation('Springfield, Missouri, United States')).toBe('Springfield, United States')
+    expect(formatLocation('Indianapolis, IN')).toBe('Indianapolis, United States')
+    expect(formatLocation('Portland, Oregon')).toBe('Portland, United States')
+    expect(formatLocation('Winston-Salem, NC')).toBe('Winston-Salem, United States')
+    expect(formatLocation('Austin Texas')).toBe('Austin, United States')
+  })
+  it('lets a state hint override an international hub of the same name', () => {
+    expect(formatLocation('Paris, TX')).toBe('Paris, United States')
+    expect(formatLocation('Paris, Texas')).toBe('Paris, United States')
+    expect(formatLocation('Paris, France')).toBe('Paris, France')
+    expect(formatLocation('Berlin, DE')).toBe('Berlin, Germany')
+  })
+  it('does not force a hub when the country says otherwise', () => {
+    expect(formatLocation('London, Ontario, Canada')).toBe('London, Ontario, Canada')
+    expect(formatLocation('Sydney, Nova Scotia, Canada')).toBe('Sydney, Nova Scotia, Canada')
+  })
+  it('handles metro shorthand and neighbourhood-first strings', () => {
+    expect(formatLocation('Raleigh-Durham-Chapel Hill Area')).toBe('Raleigh, United States')
+    expect(formatLocation('Dallas-Fort Worth Metroplex')).toBe('Dallas, United States')
+    expect(formatLocation('Greater Philadelphia')).toBe('Philadelphia, United States')
+    expect(formatLocation('Koramangala, Bengaluru')).toBe('Bengaluru, India')
+  })
+  it('will not guess a small town from its name alone', () => {
+    expect(formatLocation('Hope')).toBe('Hope')
+    expect(formatLocation('Earth')).toBe('Earth')
+    expect(formatLocation('Hope, AR')).toBe('Hope, United States')
+    expect(formatLocation('Springfield, Ontario')).toBe('Springfield, Ontario')
+  })
+  it('keeps the "IN" ambiguity (India vs Indiana) honest', () => {
+    expect(formatLocation('Surat, IN')).toBe('Surat, India')
+    expect(formatLocation('Carmel, IN')).toBe('Carmel, United States')
+  })
+})
