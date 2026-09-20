@@ -8,7 +8,7 @@ import { getPoolAccess } from '@/modules/pool/domain/pool'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
 import { deriveProfileTags } from '@/modules/pool/domain/profile-tags'
-import { formatLocation, formatLocationParts, normalizeCity } from '@/modules/pool/domain/normalize'
+import { formatLocation, formatLocationParts, normalizeCity, type LocationParts } from '@/modules/pool/domain/normalize'
 
 type Supabase = SupabaseClient<Database>
 // pool_* tables (migration 115) aren't in the generated types.
@@ -332,6 +332,30 @@ export async function setPoolMatchFlags(
   return true
 }
 
+/**
+ * Location is never trusted from the snapshot: it is re-read from pool_profiles
+ * (the standardised city / region / country columns) so a fix to the normaliser or a
+ * backfill shows up without re-running — and re-scoring — the shortlist. Everything
+ * else in the snapshot stays as scored. Falls back to the cached text per row.
+ */
+export async function withLiveLocations(supabase: Supabase, matches: PoolMatch[]): Promise<PoolMatch[]> {
+  const ids = matches.map((m) => m.profile_id).filter(Boolean)
+  if (!ids.length) return matches
+  const { data } = await (supabase as unknown as LooseSb)
+    .from('pool_profiles')
+    .select('id, location_city, location_region, location_country, location_country_code, location_raw')
+    .in('id', ids)
+  const byId = new Map<string, LocationParts & { location_raw: string | null }>()
+  for (const p of (data ?? []) as { id: string; location_city: string | null; location_region: string | null; location_country: string | null; location_country_code: string | null; location_raw: string | null }[]) {
+    byId.set(p.id, { city: p.location_city, region: p.location_region, country: p.location_country, country_code: p.location_country_code, location_raw: p.location_raw })
+  }
+  return matches.map((m) => {
+    const p = byId.get(m.profile_id)
+    if (!p) return m
+    return { ...m, location: formatLocationParts(p) ?? formatLocation(p.location_raw) ?? m.location }
+  })
+}
+
 /** The cached market shortlist for a job (for on-mount load). Null if none / table
  *  not there yet. Flags stale when the ICP has moved past the cached version. */
 export async function getCachedPoolMatches(
@@ -349,7 +373,7 @@ export async function getCachedPoolMatches(
       .maybeSingle()
     if (error || !data) return null
     return {
-      matches: (data.matches ?? []) as PoolMatch[],
+      matches: await withLiveLocations(supabase, (data.matches ?? []) as PoolMatch[]),
       stale: currentIcpVersion != null && data.icp_version != null && data.icp_version !== currentIcpVersion,
       updated_at: data.updated_at,
     }
