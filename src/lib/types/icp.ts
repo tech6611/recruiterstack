@@ -6,6 +6,8 @@
 // id/name/weight), so an ICP down-projects losslessly to the flat rubric the
 // existing Sifter reads — see icpToScoringCriteria() in src/lib/scoring.ts.
 
+import type { CriterionKind } from '@/lib/types/search-spec'
+
 export type IcpStatus = 'draft' | 'approved' | 'superseded'
 export type IcpSource = 'seed' | 'intake' | 'refinement' | 'manual' | 'template'
 
@@ -17,9 +19,33 @@ export type IcpSource = 'seed' | 'intake' | 'refinement' | 'manual' | 'template'
 export interface IcpMustHave {
   id: string
   label: string // human phrasing, e.g. "5+ years backend"
-  attribute: string // 'location' | 'min_experience' | 'skill' | 'seniority' | ...
-  operator: string // 'equals' | 'gte' | 'includes' | 'one_of'
+  attribute: string // 'location' | 'min_experience' | 'skill' | 'seniority' | ... | 'screening' (not verifiable from a profile)
+  operator: string // 'equals' | 'gte' | 'includes' | 'one_of' | 'criterion'
   value: string | number | string[]
+  // ── Structured form (docs/structured-must-haves-plan.md) ──────────────────────
+  // When `kind` is set this must-have IS a SearchCriterion: the same object the search
+  // plan sends to a vendor, checked deterministically by the gate evaluator. The legacy
+  // fields above stay populated (attribute = kind, operator = 'criterion') so every
+  // existing reader keeps working. `toCriterion()` / `isCriterion()` in
+  // src/lib/ai/gate-evaluator.ts are the accessors.
+  kind?: CriterionKind
+  values?: string[]
+  min?: number | null
+  max?: number | null
+  radius_km?: number | null
+  exclude?: boolean
+}
+
+/** The evaluator's answer for one structured must-have. */
+export interface GateVerdict {
+  id: string
+  kind: CriterionKind
+  label: string
+  /** null = unverified — the profile has no data for this kind. Never a failure. */
+  pass: boolean | null
+  /** 'vendor' = the criterion was in the query that bought this person, so it holds by construction. */
+  verified_by: 'data' | 'vendor' | null
+  reason: string
 }
 
 /**

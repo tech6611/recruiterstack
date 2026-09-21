@@ -5,6 +5,9 @@ import type { SearchSpec } from '@/lib/types/search-spec'
 import { embedText } from '@/lib/ai/llm'
 import { icpEmbeddingText } from '@/lib/ai/embeddings'
 import { logger } from '@/lib/logger'
+import { mustHavesFromBase } from '@/lib/icp-gates'
+import { convertLegacyGates } from '@/lib/ai/gate-evaluator'
+import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 
 type Supabase = SupabaseClient<Database>
 
@@ -64,7 +67,7 @@ export async function getCurrentIcp(
     .eq('status', 'approved')
     .maybeSingle()
   if (approved.error) throw approved.error
-  if (approved.data) return approved.data as Icp
+  if (approved.data) return withStructuredGates(supabase, orgId, jobId, approved.data as Icp)
 
   const draft = await sb
     .from('icps')
@@ -76,7 +79,25 @@ export async function getCurrentIcp(
     .limit(1)
     .maybeSingle()
   if (draft.error) throw draft.error
-  return (draft.data ?? null) as Icp | null
+  return draft.data ? withStructuredGates(supabase, orgId, jobId, draft.data as Icp) : null
+}
+
+/**
+ * Structured must-haves (docs/structured-must-haves-plan.md): legacy free-text gates
+ * are converted to criteria on read — years → band, "based in <market>" → location,
+ * "primary experience in X" → the brief's title families — and gates no profile can
+ * answer become `screening`. Pure and deterministic given the row, so nothing is
+ * written back; the stored gates are untouched until the editor (Phase 2) saves.
+ */
+async function withStructuredGates(supabase: Supabase, orgId: string, jobId: string, icp: Icp): Promise<Icp> {
+  const roleContext = await getJobRoleContext(supabase, orgId, jobId).catch(() => null)
+  return withConvertedGates(icp, roleContext?.market ?? null)
+}
+
+/** The read-time conversion, PURE — exported for the audit script and tests. */
+export function withConvertedGates(icp: Icp, market: { city?: string | null; state?: string | null; country?: string | null; work_model?: string | null } | null): Icp {
+  const must_haves = convertLegacyGates(icp.must_haves, { market, titleFamilies: icp.sourcing_map?.recruiter_brief?.title_families ?? null })
+  return { ...icp, must_haves }
 }
 
 /** All versions for a job, newest first (audit / history). */
@@ -256,12 +277,16 @@ export async function setIcpSearchSpec(
   spec: SearchSpec | null,
 ): Promise<Icp> {
   const sb = supabase as unknown as LooseSb
-  const { data: row, error: readErr } = await sb.from('icps').select('sourcing_map').eq('org_id', orgId).eq('id', icpId).maybeSingle()
+  const { data: row, error: readErr } = await sb.from('icps').select('sourcing_map, must_haves').eq('org_id', orgId).eq('id', icpId).maybeSingle()
   if (readErr) throw readErr
   if (!row) throw new Error('ICP not found')
   const sm = { reasoning: '', requirement_decomposition: [], unwritten_filters: [], ...((row.sourcing_map ?? {}) as Partial<SourcingMap>) } as SourcingMap & { search_spec?: SearchSpec | null }
   sm.search_spec = spec ? { ...spec, source: 'edited', edited_at: new Date().toISOString() } : null
-  const { data, error } = await sb.from('icps').update({ sourcing_map: sm, updated_at: new Date().toISOString() }).eq('org_id', orgId).eq('id', icpId).select().maybeSingle()
+  // The plan's base line IS the must-have list (docs/structured-must-haves-plan.md):
+  // an edited base is written back as the ICP's structured must-haves.
+  const patch: Record<string, unknown> = { sourcing_map: sm, updated_at: new Date().toISOString() }
+  if (spec) patch.must_haves = mustHavesFromBase((row as { must_haves?: IcpMustHave[] }).must_haves, spec.base ?? [])
+  const { data, error } = await sb.from('icps').update(patch).eq('org_id', orgId).eq('id', icpId).select().maybeSingle()
   if (error) throw error
   if (!data) throw new Error('ICP not found')
   return data as Icp

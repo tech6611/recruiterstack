@@ -127,7 +127,13 @@ export async function sourcePoolForIcp(
   // Profile ids that must be scored regardless of semantic recall — e.g. everything a
   // Crustdata run just bought. A bought profile that never gets scored is money spent
   // on a person the recruiter never sees.
-  opts: { includeIds?: string[]; acquired?: Record<string, { level: number; label: string }>; feederEmployers?: string[]; plan?: PlanEveryone | null } = {},
+  opts: {
+    includeIds?: string[]
+    /** Per bought profile: the ladder level that reached them and the must-have ids that query applied. */
+    acquired?: Record<string, { level: number; label: string; vendorGateIds?: string[] }>
+    feederEmployers?: string[]
+    plan?: PlanEveryone | null
+  } = {},
 ): Promise<{ status: 'ok' | 'no_access' | 'empty'; matches: PoolMatch[] }> {
   const access = await getPoolAccess(supabase, orgId)
   if (!access.hasAccess) return { status: 'no_access', matches: [] }
@@ -234,6 +240,7 @@ export async function sourcePoolForIcp(
             poolProfileToFitCandidate(p), icp, identity, profileText,
             { experiences: expsByProfile.get(p.id) ?? [], education: eduByProfile.get(p.id) ?? [] },
             'reject',
+            opts.acquired?.[p.id]?.vendorGateIds?.length ? { vendorFilteredGateIds: new Set(opts.acquired[p.id].vendorGateIds) } : {},
           )
           return {
             profile_id: p.id,

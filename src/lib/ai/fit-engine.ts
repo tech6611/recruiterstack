@@ -23,7 +23,8 @@ import { icpFitResponseSchema } from '@/lib/ai/schemas'
 import type { Candidate } from '@/lib/types/database'
 import type { Icp, IcpMustHave } from '@/lib/types/icp'
 import { fitBucketFor, type FitBucket } from '@/lib/ai/fit-bucket'
-import { experienceBandFromGate } from '@/lib/icp-gates'
+import { experienceBandFromGate, isCriterion } from '@/lib/icp-gates'
+import { evaluateMustHaves, SCREENING_ATTRIBUTE } from '@/lib/ai/gate-evaluator'
 
 const MODEL = 'gemini-2.5-flash' // bulk per-candidate scoring — speed/cost, like the Sifter
 
@@ -76,11 +77,16 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 // neutralises the location/seniority gates that OLD ICPs auto-seeded before this
 // change, so they can't suddenly start rejecting people. They remain visible on the
 // ICP and still inform the weighted judgement; they just can't reject.
-const NON_GATING_ATTRIBUTES = new Set(['location', 'seniority'])
+const NON_GATING_ATTRIBUTES = new Set(['location', 'seniority', SCREENING_ATTRIBUTE])
 
-/** The must-haves that are allowed to actually reject a candidate. PURE. */
+/**
+ * The must-haves that are allowed to actually reject a candidate. PURE.
+ * A structured criterion always gates — the recruiter chose it as a vendor filter, so
+ * it is checked the same way on every candidate. The exemptions above apply only to
+ * legacy free-text gates (and to screening gates, which no profile can answer).
+ */
 export function gatingMustHaves(mustHaves: IcpMustHave[] | undefined): IcpMustHave[] {
-  return (mustHaves ?? []).filter((g) => !NON_GATING_ATTRIBUTES.has(g.attribute?.toLowerCase() ?? ''))
+  return (mustHaves ?? []).filter((g) => isCriterion(g) || !NON_GATING_ATTRIBUTES.has(g.attribute?.toLowerCase() ?? ''))
 }
 
 function toTokens(value: IcpMustHave['value']): string[] {
@@ -120,9 +126,9 @@ function gateFails(candidate: Candidate, g: IcpMustHave): boolean {
   if (band) {
     const yrs = candidate.experience_years
     if (yrs == null) return false
-    const tol = (bound: number) => Math.max(1, bound * 0.25)
-    if (band.min != null && yrs < band.min - tol(band.min)) return true
-    if (band.max != null && yrs > band.max + tol(band.max)) return true
+    // ±1 year on both sides — the same slack as pool recall and the structured evaluator.
+    if (band.min != null && yrs < band.min - 1) return true
+    if (band.max != null && yrs > band.max + 1) return true
     return false
   }
 
@@ -285,13 +291,22 @@ export async function scoreAgainstIcp(
   // How to treat a candidate with no education/history — flag (internal) or reject
   // (market). See AbsentDataPolicy. Defaults to 'flag' (the safe, non-rejecting option).
   absentPolicy: AbsentDataPolicy = 'flag',
+  // Structured must-haves (docs/structured-must-haves-plan.md): ids of criteria that
+  // were in the vendor query that bought this candidate — they hold by construction.
+  opts: { vendorFilteredGateIds?: Set<string> | null } = {},
 ): Promise<FitResult> {
-  // Only genuine deal-breakers can reject — location/seniority never do (and this
+  // Only genuine deal-breakers can reject — legacy location/seniority never do (and this
   // neutralises old auto-seeded gates on existing ICPs).
   const gates = gatingMustHaves(icp.must_haves)
+  // Structured criteria are decided from data, never by the judge; only legacy
+  // free-text gates (shrinking to zero as ICPs convert) still go to the model.
+  const structured = gates.filter((g) => isCriterion(g))
+  const legacyGates = gates.filter((g) => !isCriterion(g))
+  const verdicts = evaluateMustHaves(structured, candidate, history, { vendorFilteredGateIds: opts.vendorFilteredGateIds })
+  const verdictByGate = new Map(verdicts.map((v) => [v.id, v]))
 
   const { text, usage, model } = await withRetry(
-    () => generateText(buildJudgePrompt(candidate, icp, gates, profileText, history), { model: MODEL, maxTokens: 4096, json: true }),
+    () => generateText(buildJudgePrompt(candidate, icp, legacyGates, profileText, history), { model: MODEL, maxTokens: 4096, json: true }),
     { label: 'Fit Engine' },
   )
   trackUsage('fit-engine', model, usage, identity)
@@ -302,9 +317,9 @@ export async function scoreAgainstIcp(
   const verdictById = new Map(judged.gate_results.map((r) => [r.id, r]))
   // Deterministic checks (the experience band, structured min-years) can fail a gate
   // even when the judge waved it through; the judge can fail anything it has evidence for.
-  const hardFails = new Set(evaluateGates(candidate, gates).map((g) => g.id))
-  const gate_failures = gates.filter((g) => hardFails.has(g.id) || verdictById.get(g.id)?.pass === false)
-  const gate_unknown = gates.filter((g) => !hardFails.has(g.id) && verdictById.get(g.id)?.pass === null)
+  const hardFails = new Set(evaluateGates(candidate, legacyGates).map((g) => g.id))
+  const gate_failures = gates.filter((g) => isCriterion(g) ? verdictByGate.get(g.id)?.pass === false : hardFails.has(g.id) || verdictById.get(g.id)?.pass === false)
+  const gate_unknown = gates.filter((g) => isCriterion(g) ? verdictByGate.get(g.id)?.pass === null : !hardFails.has(g.id) && verdictById.get(g.id)?.pass === null)
 
   // No education AND no work history → a background gate can't be verified. Internal
   // candidates get flagged; market candidates get rejected (a synthetic gate failure so
@@ -335,7 +350,11 @@ export async function scoreAgainstIcp(
     passed_gates,
     gate_failures,
     gate_unknown,
-    gate_results: gates.map((g) => ({ id: g.id, label: g.label, pass: hardFails.has(g.id) ? false : (verdictById.get(g.id)?.pass ?? true), reason: hardFails.has(g.id) ? 'Outside the experience band on file' : (verdictById.get(g.id)?.reason ?? '') })),
+    gate_results: gates.map((g) => {
+      const v = verdictByGate.get(g.id)
+      if (v) return { id: g.id, label: g.label, pass: v.pass, reason: v.verified_by === 'vendor' ? `✓ ${v.reason}` : v.reason }
+      return { id: g.id, label: g.label, pass: hardFails.has(g.id) ? false : (verdictById.get(g.id)?.pass ?? true), reason: hardFails.has(g.id) ? 'Outside the experience band on file' : (verdictById.get(g.id)?.reason ?? '') }
+    }),
     competencies,
     red_flags: judged.red_flags,
     strengths: judged.strengths,

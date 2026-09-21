@@ -227,7 +227,13 @@ export interface LaneRunResult {
 }
 
 /** Which level acquired a profile — the "match level" shown on every person. */
-export interface AcquiredLevel { level: number; label: string; key: string }
+export interface AcquiredLevel {
+  level: number
+  label: string
+  key: string
+  /** Must-have ids the vendor query applied when this person was bought (empty for runs that predate the record). */
+  vendorGateIds?: string[]
+}
 export type AcquiredMap = Record<string, AcquiredLevel>
 
 export interface SourceFromIcpResult extends SourceFromCrustdataResult {
@@ -274,12 +280,15 @@ export async function loadAcquiredLevels(supabase: Supabase, jobId: string): Pro
     const { data } = await (supabase as unknown as LooseSb)
       .from('pool_ingest_runs').select('query').eq('source_key', SOURCE).eq('job_id', jobId)
       .order('started_at', { ascending: false }).limit(30)
-    for (const row of (data ?? []) as { query?: { results?: Partial<LaneRunResult>[] } | null }[]) {
+    for (const row of (data ?? []) as { query?: { results?: Partial<LaneRunResult>[]; baseCriterionIds?: string[] } | null }[]) {
       const results = row.query?.results ?? []
+      // The must-have ids the vendor query applied on THIS run — they hold for the people
+      // it bought by construction. Older runs recorded none; those people are checked from data.
+      const vendorGateIds = row.query?.baseCriterionIds ?? []
       results.forEach((r, i) => {
         const level = i + 1
         for (const id of r?.profileIds ?? []) {
-          if (!out[id] || out[id].level > level) out[id] = { level, label: r.label ?? `Level ${level}`, key: r.key ?? '' }
+          if (!out[id] || out[id].level > level) out[id] = { level, label: r.label ?? `Level ${level}`, key: r.key ?? '', vendorGateIds }
         }
       })
     }
@@ -328,7 +337,7 @@ export async function sourceFromIcp(
 
   const runId = await startIngestRun(supabase, {
     sourceKey: SOURCE, orgId: opts.orgId, jobId,
-    query: { ...described, specSource: spec.source, maxRecords, results: [] },
+    query: { ...described, specSource: spec.source, maxRecords, results: [], baseCriterionIds: plan.baseCriterionIds },
   })
 
   const profiles: unknown[] = []
@@ -389,7 +398,7 @@ export async function sourceFromIcp(
       ids_matched: matchedTotal || profiles.length, ids_bought: profiles.length,
       profiles_created: ingest.created, profiles_merged: ingest.merged, records_unusable: ingest.unusable, credits_used: Math.ceil(creditsUsed),
     })
-    await (supabase as unknown as LooseSb).from('pool_ingest_runs').update({ query: { ...described, specSource: spec.source, maxRecords, results } }).eq('id', runId).then(() => undefined, () => undefined)
+    await (supabase as unknown as LooseSb).from('pool_ingest_runs').update({ query: { ...described, specSource: spec.source, maxRecords, results, baseCriterionIds: plan.baseCriterionIds } }).eq('id', runId).then(() => undefined, () => undefined)
 
     logger.info('Crustdata ladder run complete', { runId, levels: results.length, matched: matchedTotal, fetched: profiles.length, creditsUsed, created: ingest.created, merged: ingest.merged })
     return {

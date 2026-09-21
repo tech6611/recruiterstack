@@ -11,6 +11,7 @@ import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 import type { CrustdataCondition, CrustdataFilterGroup } from '@/modules/pool/vendors/crustdata/client'
 import { mapSeniorityValues, mapFunctionValues } from '@/modules/pool/vendors/crustdata/query'
 import type { SearchLane, SearchPlan } from '@/modules/pool/vendors/crustdata/search-plan'
+import { isGenericTitleTerm } from '@/lib/ai/gate-evaluator'
 
 const F = {
   headcountCurrent: 'experience.employment_details.current.company_headcount_range',
@@ -66,9 +67,17 @@ export function compileCriterion(c: SearchCriterion): { ok: CompiledCriterion } 
     case 'employer_any':
       return vals.length ? { ok: textMatch(F.empAny, c, vals, 'ever at', list()) } : { unsupported: 'no employers listed' }
     case 'title_current':
-      return vals.length ? { ok: textMatch(F.titleCurrent, c, vals, 'current title', list()) } : { unsupported: 'no titles listed' }
-    case 'title_any':
-      return vals.length ? { ok: textMatch(F.titleAny, c, vals, 'any title', list()) } : { unsupported: 'no titles listed' }
+    case 'title_any': {
+      // A level word alone ("Senior", "Manager") matches any title that contains it — that
+      // is how one stray term bought seven non-engineers. Whole phrases only on an include;
+      // an exclusion ("no Interns") is safe and intentionally broad.
+      const generic = c.exclude ? [] : vals.filter(isGenericTitleTerm)
+      const titles = c.exclude ? vals : vals.filter((v) => !isGenericTitleTerm(v))
+      if (!titles.length) return { unsupported: vals.length ? `title terms too generic to search on: ${generic.join(', ')}` : 'no titles listed' }
+      const field = c.kind === 'title_current' ? F.titleCurrent : F.titleAny
+      const noun = c.kind === 'title_current' ? 'current title' : 'any title'
+      return { ok: textMatch(field, c, titles, noun, titles.join(' / ')) }
+    }
     case 'seniority': {
       const { matched, unmatched } = mapSeniorityValues(vals)
       if (!matched.length) return { unsupported: `seniority ${JSON.stringify(unmatched)} not in this source's closed set` }
@@ -124,6 +133,8 @@ function hash(s: string): string {
 export interface CompiledSpec extends SearchPlan {
   /** Criteria this source can't express, per level ('base' for the must-have line). */
   unsupported: { requirement: string; reason: string; level?: string }[]
+  /** Base-line criteria that DID compile — every person this plan buys was filtered on them. */
+  baseCriterionIds: string[]
 }
 
 /** Compile the whole spec: every level becomes a lane carrying the base conditions. */
@@ -131,10 +142,15 @@ export function compileSpec(spec: SearchSpec): CompiledSpec {
   const unsupported: CompiledSpec['unsupported'] = []
   const common: SearchPlan['common'] = []
   const baseConds: (CrustdataCondition | CrustdataFilterGroup)[] = []
+  const baseCriterionIds: string[] = []
+  // One years band per query: the brief and a must-have can both carry it.
+  const seenKinds = new Set<string>()
   for (const c of spec.base) {
+    if (c.kind === 'years_band') { if (seenKinds.has(c.kind)) continue; seenKinds.add(c.kind) }
     const r = compileCriterion(c)
     if ('ok' in r) {
       baseConds.push(...r.ok.conditions)
+      baseCriterionIds.push(c.id)
       for (const cond of r.ok.conditions) common.push({ label: r.ok.summary, condition: cond as CrustdataCondition })
     } else unsupported.push({ requirement: c.label ?? CRITERION_KIND_LABEL[c.kind], reason: r.unsupported, level: 'base' })
   }
@@ -168,5 +184,6 @@ export function compileSpec(spec: SearchSpec): CompiledSpec {
       ...spec.post_fetch.map((p) => ({ requirement: p.label, reason: p.how === 'local' ? 'computed from stored role history after fetch' : p.how === 'screen' ? 'asked in the screen' : 'judged by the Fit Engine after fetch' })),
     ],
     unsupported,
+    baseCriterionIds,
   }
 }
