@@ -76,3 +76,22 @@ describe('compileCriterion — exclusions and company filters', () => {
     expect(compileCriterion({ id: 'd', kind: 'funding_stage', values: ['Series A'] })).toHaveProperty('unsupported')
   })
 })
+
+describe('title terms — whole phrases only', () => {
+  it('drops a bare level word and keeps the real titles (the "Senior" that bought seven non-engineers)', () => {
+    const r = compileCriterion({ id: 't', kind: 'title_current', values: ['Engineering Manager', 'Tech Lead Manager', 'Senior', 'Staff Software Engineer'] })
+    expect('ok' in r).toBe(true)
+    const group = (r as { ok: { conditions: { conditions: { value: string }[] }[]; summary: string } }).ok
+    expect(group.conditions[0].conditions.map((c) => c.value)).toEqual(['Engineering Manager', 'Tech Lead Manager', 'Staff Software Engineer'])
+    expect(group.summary).not.toMatch(/\bSenior\b/)
+  })
+  it('refuses a title criterion made only of level words', () => {
+    expect(compileCriterion({ id: 't', kind: 'title_any', values: ['Senior', 'Manager'] })).toMatchObject({ unsupported: expect.stringMatching(/too generic/) })
+  })
+  it('sends one years band even when the base line carries two', () => {
+    const spec = { version: 1 as const, source: 'brief' as const, post_fetch: [], levels: [{ id: 'l', label: 'L', criteria: [{ id: 'e', kind: 'employer_current' as const, values: ['Ramp'] }] }],
+      base: [{ id: 'a', kind: 'years_band' as const, values: [], min: 6, max: 12 }, { id: 'b', kind: 'years_band' as const, values: [], min: 6, max: 12 }] }
+    const out = compileSpec(spec)
+    expect(out.common.filter((c) => c.label === '6–12 years')).toHaveLength(2) // two conditions (>= and <=) from ONE band
+  })
+})

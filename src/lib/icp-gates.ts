@@ -4,6 +4,8 @@
  * Fit Engine (to enforce it deterministically). PURE + tested.
  */
 import type { IcpMustHave } from '@/lib/types/icp'
+import type { SearchCriterion, CriterionKind } from '@/lib/types/search-spec'
+import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 
 /** The attribute a structured experience-band gate carries: value = [min, max] years. */
 export const EXPERIENCE_BAND_ATTRIBUTE = 'experience_band'
@@ -49,4 +51,58 @@ export function experienceBandGate(min: number | null, max: number | null): IcpM
         ? `Has at least ${min} years of professional experience?`
         : `Has no more than ${max} years of professional experience — not over-senior for this role?`
   return { id: EXPERIENCE_BAND_GATE_ID, label, attribute: EXPERIENCE_BAND_ATTRIBUTE, operator: 'between', value: [String(min ?? ''), String(max ?? '')] }
+}
+
+// ── Structured must-haves: a must-have IS a search criterion ─────────────────────
+// (docs/structured-must-haves-plan.md). These accessors are shared by the spec builder,
+// the gate evaluator and the Fit Engine; they depend on nothing but the types.
+
+/** A must-have carrying a structured criterion (vs. a legacy free-text gate). */
+export function isCriterion(g: Pick<IcpMustHave, 'kind'> | null | undefined): g is IcpMustHave & { kind: CriterionKind } {
+  return Boolean(g && typeof g.kind === 'string' && g.kind in CRITERION_KIND_LABEL)
+}
+
+/** The criterion view of a structured must-have (null for a legacy gate). */
+export function toCriterion(g: IcpMustHave): SearchCriterion | null {
+  if (!isCriterion(g)) return null
+  return { id: g.id, kind: g.kind, values: g.values ?? [], min: g.min ?? null, max: g.max ?? null, radius_km: g.radius_km ?? null, exclude: g.exclude ?? false, label: g.label }
+}
+
+/** "6–12 years" · "Within 50 km of New York" · "Any title held: Engineering Manager / Tech Lead Manager". */
+export function criterionLabel(c: Pick<SearchCriterion, 'kind' | 'values' | 'min' | 'max' | 'radius_km' | 'exclude'>): string {
+  const list = (c.values ?? []).join(' / ')
+  const not = c.exclude ? 'Not ' : ''
+  switch (c.kind) {
+    case 'years_band':
+      return c.min != null && c.max != null ? `${c.min}–${c.max} years` : c.min != null ? `${c.min}+ years` : `Up to ${c.max} years`
+    case 'grad_year_band':
+      return c.min != null && c.max != null ? `Graduated ${c.min}–${c.max}` : c.min != null ? `Graduated ${c.min} or later` : `Graduated by ${c.max}`
+    case 'location':
+      return `${not}Within ${c.radius_km ?? 50} km of ${c.values?.[0] ?? '?'}`
+    default:
+      return `${not}${CRITERION_KIND_LABEL[c.kind]}: ${list}`
+  }
+}
+
+/** A must-have built from a criterion. The legacy fields mirror it so old readers see something sensible. */
+export function mustHaveFromCriterion(c: SearchCriterion, label?: string | null): IcpMustHave {
+  return {
+    id: c.id,
+    label: label ?? c.label ?? criterionLabel(c),
+    attribute: c.kind,
+    operator: 'criterion',
+    value: c.min != null || c.max != null ? [String(c.min ?? ''), String(c.max ?? '')] : c.values,
+    kind: c.kind,
+    values: c.values,
+    min: c.min ?? null,
+    max: c.max ?? null,
+    radius_km: c.radius_km ?? null,
+    exclude: c.exclude ?? false,
+  }
+}
+
+/** The must-haves an edited base line implies: its criteria, plus any non-criterion gates the ICP already had. PURE. */
+export function mustHavesFromBase(existing: IcpMustHave[] | null | undefined, base: SearchCriterion[]): IcpMustHave[] {
+  const keep = (existing ?? []).filter((g) => !isCriterion(g))
+  return [...base.map((c) => mustHaveFromCriterion(c)), ...keep]
 }

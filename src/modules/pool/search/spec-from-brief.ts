@@ -15,7 +15,7 @@
 import type { Icp, RecruiterBrief } from '@/lib/types/icp'
 import type { SearchCriterion, SearchLevel, SearchSpec, PostFetchCheck } from '@/lib/types/search-spec'
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
-import { experienceBandFromGate, yearsFloorFromLabel } from '@/lib/icp-gates'
+import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion } from '@/lib/icp-gates'
 import { schoolTiersFor } from '@/modules/pool/search/school-tiers'
 import { normalizeCity, resolveLocationParts } from '@/modules/pool/domain/normalize'
 import type { PlanEveryone } from '@/modules/pool/domain/pool-sourcing'
@@ -103,19 +103,28 @@ export function specFromIcp(
   const post_fetch: PostFetchCheck[] = []
 
   // ── Must-have line ────────────────────────────────────────────────────────────
-  const loc = marketLocation(ctx)
-  if (loc) base.push({ id: cid('loc'), kind: 'location', values: [loc], radius_km: ctx.locationRadiusKm ?? DEFAULT_RADIUS_KM })
+  // A must-have IS a search criterion (docs/structured-must-haves-plan.md): every
+  // structured must-have goes on the base line verbatim. The brief's band and the
+  // job's market only fill a kind the must-haves don't carry.
+  const structured = (icp.must_haves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null)
+  base.push(...structured)
+  const hasKind = (k: SearchCriterion['kind']) => structured.some((c) => c.kind === k)
 
-  let min: number | null = brief?.experience_band?.min_years ?? null
-  let max: number | null = brief?.experience_band?.max_years ?? null
+  const loc = marketLocation(ctx)
+  if (loc && !hasKind('location')) base.push({ id: cid('loc'), kind: 'location', values: [loc], radius_km: ctx.locationRadiusKm ?? DEFAULT_RADIUS_KM })
+
+  const bandGate = structured.find((c) => c.kind === 'years_band')
+  let min: number | null = bandGate?.min ?? brief?.experience_band?.min_years ?? null
+  let max: number | null = bandGate?.max ?? brief?.experience_band?.max_years ?? null
   for (const g of icp.must_haves ?? []) {
+    if (isCriterion(g)) continue
     const band = experienceBandFromGate(g)
     if (band) { min = min ?? band.min; max = max ?? band.max; continue }
     const floor = yearsFloorFromLabel(g.label ?? '')
     if (floor != null && min == null) min = floor
   }
-  if (min != null || max != null) base.push({ id: cid('years'), kind: 'years_band', values: [], min, max })
-  if (max != null && max <= IC_SENIORITY_CEILING_YEARS) {
+  if (!bandGate && (min != null || max != null)) base.push({ id: cid('years'), kind: 'years_band', values: [], min, max })
+  if (max != null && max <= IC_SENIORITY_CEILING_YEARS && !hasKind('seniority')) {
     base.push({ id: cid('sen'), kind: 'seniority', values: SENIOR_TITLES, exclude: true, label: 'Not an executive title' })
   }
 
@@ -181,6 +190,8 @@ export function specFromIcp(
 
   // ── What no source can search ─────────────────────────────────────────────────
   for (const g of icp.must_haves ?? []) {
+    if (isCriterion(g)) continue                       // sent as a filter, checked from data
+    if (g.attribute === 'screening') { post_fetch.push({ label: g.label ?? '', how: 'screen' }); continue }
     if (experienceBandFromGate(g)) continue
     const l = g.label ?? ''
     if (/tier|university|institute|college|degree/i.test(l) && useTiers) continue // sent as school lists
@@ -205,9 +216,16 @@ export function resolveSearchSpec(
   ctx: SpecContext = {},
 ): { spec: SearchSpec; stored: boolean } {
   const stored = icp.sourcing_map?.search_spec
-  if (stored && stored.levels?.length) return { spec: stored, stored: true }
+  if (stored && stored.levels?.length) {
+    // One source of truth: when the ICP carries structured must-haves, they ARE the base
+    // line — a stored spec keeps its levels but not a stale base. (setIcpSearchSpec
+    // writes an edited base back to the must-haves, so the two never diverge.)
+    const mustHaves = (icp.must_haves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null)
+    return { spec: mustHaves.length ? { ...stored, base: mustHaves } : stored, stored: true }
+  }
   return { spec: specFromIcp(icp, ctx), stored: false }
 }
+
 
 /** Employer terms the plan searches on (current/former/any), for profile tags like "Ex-McKinsey". */
 export function feederEmployersFromSpec(spec: SearchSpec): string[] {

@@ -14,6 +14,22 @@ entries on top.
 ### Docs
 - Added an evidence-grounded review of the Gemini ICP prompt, with a proposed hiring-situation packet, prompt structure, propagation plan, and acceptance tests.
 
+## 2026-09-21 (Structured must-haves — Phase 1)
+
+### Changed
+- **A must-have is a search criterion.** `IcpMustHave` carries the structured fields of a `SearchCriterion` (`kind`, `values`, `min`/`max`, `radius_km`, `exclude`); the plan's base line **is** the must-have list (`specFromIcp` / `resolveSearchSpec`), and an edited base line is written back to the ICP (`setIcpSearchSpec`). See `docs/structured-must-haves-plan.md`.
+- **Gates never ask the AI.** `src/lib/ai/gate-evaluator.ts` decides every structured must-have from stored data — pass / fail / unverified — with one case per criterion kind (years band ±1, whole-phrase titles, employers, schools, skills, graduation year, location with the city → region → country fallback). The Fit-Engine judge now sees only legacy free-text gates and competencies.
+- **A person bought through a filter cannot fail that filter.** Each Crustdata run records the base-line criterion ids it applied; the scorer marks those `verified_by: 'vendor'` for the people that run bought. Older runs recorded none, so their people are checked from data.
+- **Legacy gates convert on read** (`withConvertedGates`): years → `years_band`; "based in <market>" → `location` 50 km; explicit skill / school attributes and IIM / IIT-style labels → `skill` / `school`; "primary experience in X" → `title_any` from the brief's title families. Gates no profile can answer (work authorization, willingness to relocate) become `screening`: listed on the ICP, never a matrix column, never a reject. Across the 5 approved ICPs: 10 gates → 10 structured, 2 of them screening, 0 legacy.
+- **Band slack is ±1 year everywhere** (recall, legacy gate check, evaluator) — replaces the 25 % tolerance.
+
+### Fixed
+- **A bare level word can no longer be a title filter.** "Engineering Manager / Tech Lead Manager / Senior / Staff Software Engineer" used to send `Senior` on its own, which matched Senior Account Executives and Senior PMs — 7 of the New York job's 10 purchases. `titleTerms` repairs the phrase ("Senior Software Engineer", "Staff Software Engineer") and the Crustdata compiler refuses generic tokens on an include.
+- The base line sent one `years_band` twice when both the brief and a gate carried it.
+
+### Added
+- `scripts/audit-gates.ts` — every approved ICP's gates before/after conversion and the compiled base line; `--job <id>` evaluates that job's cached shortlist deterministically (no AI calls).
+
 ## 2026-09-20 (Locations standardised · unknown gates ranked · pool recall held to the plan)
 
 ### Added

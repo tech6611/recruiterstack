@@ -120,8 +120,11 @@ describe('evaluateGates (experience_band)', () => {
     expect(evaluateGates(cand(12), [band]).map((g) => g.id)).toEqual(['g-band'])
     expect(evaluateGates(cand(0.5), [band]).map((g) => g.id)).toEqual(['g-band'])
     expect(evaluateGates(cand(4), [band])).toEqual([])
-    // Within tolerance (max 6 → 7.5): derived years can over-count internships/overlaps; the judge decides.
-    expect(evaluateGates(cand(7.2), [band])).toEqual([])
+    // ±1 year slack on both sides (the same rule as pool recall and the structured evaluator):
+    // derived years can over-count internships/overlaps, so 6.9 against a 2–6 band passes; 7.2 does not.
+    expect(evaluateGates(cand(6.9), [band])).toEqual([])
+    expect(evaluateGates(cand(7.2), [band]).map((g) => g.id)).toEqual(['g-band'])
+    expect(evaluateGates(cand(1.1), [band])).toEqual([])
     expect(evaluateGates(cand(null), [band])).toEqual([])
   })
 })
