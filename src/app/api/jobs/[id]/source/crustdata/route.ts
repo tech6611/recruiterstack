@@ -23,7 +23,7 @@ function icpColumns(icp: Icp | null) {
   if (!icp || icp.status !== 'approved') return null
   return {
     // Screening gates (nothing a profile can answer) are not columns — a cell would read as ✓.
-    must_haves: icp.must_haves.filter((m) => m.attribute !== 'screening').map((m) => ({ id: m.id, label: m.label, attribute: m.attribute })),
+    must_haves: icp.must_haves.filter((m) => m.attribute !== 'screening').map((m) => ({ id: m.id, label: m.label, attribute: m.attribute, relax_at: m.relax_at ?? null })),
     competencies: icp.competencies.map((c) => ({ id: c.id, name: c.name, weight: c.weight })),
   }
 }
@@ -96,7 +96,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     //    scored whether or not semantic recall would have surfaced it — and cache.
     const acquired = { ...(await loadAcquiredLevels(supabase, params.id)), ...sourced.acquired }
     const { spec } = resolveSearchSpec(icp, { title: job?.title ?? null, roleContext })
-    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired, feederEmployers: feederEmployersFromSpec(spec), plan: planEveryone(spec) })
+    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired, feederEmployers: feederEmployersFromSpec(spec), plan: planEveryone(spec), relaxAtByLabel: Object.fromEntries(icp.must_haves.map((m) => [m.label, m.relax_at ?? null])) })
     if (result.status === 'ok') {
       await savePoolMatches(supabase, orgId, params.id, icp.version, result.matches).catch(() => {})
     }

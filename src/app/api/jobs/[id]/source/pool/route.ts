@@ -14,9 +14,15 @@ function icpColumns(icp: Icp | null) {
   if (!icp || icp.status !== 'approved') return null
   return {
     // Screening gates (nothing a profile can answer) are not columns — a cell would read as ✓.
-    must_haves: icp.must_haves.filter((m) => m.attribute !== 'screening').map((m) => ({ id: m.id, label: m.label, attribute: m.attribute })),
+    must_haves: icp.must_haves.filter((m) => m.attribute !== 'screening').map((m) => ({ id: m.id, label: m.label, attribute: m.attribute, relax_at: m.relax_at ?? null })),
     competencies: icp.competencies.map((c) => ({ id: c.id, name: c.name, weight: c.weight })),
   }
+}
+
+
+/** Ideal-profile ladder: gate label → the level it relaxes at (expected misses aren't failures). */
+function relaxAtByLabel(icp: Icp | null): Record<string, number | null | undefined> {
+  return Object.fromEntries((icp?.must_haves ?? []).map((m) => [m.label, m.relax_at ?? null]))
 }
 
 /** GET — the cached market shortlist for this job (so it survives a refresh). */
@@ -29,7 +35,7 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
       const roleContext = await getJobRoleContext(supabase, orgId, params.id).catch(() => undefined)
       plan = planEveryone(resolveSearchSpec(icp, { roleContext }).spec)
     }
-    const cached = await getCachedPoolMatches(supabase, orgId, params.id, icp?.version ?? null, plan)
+    const cached = await getCachedPoolMatches(supabase, orgId, params.id, icp?.version ?? null, plan, relaxAtByLabel(icp))
     return NextResponse.json({ data: { matches: cached?.matches ?? [], stale: cached?.stale ?? false, cached: !!cached, icp: icpColumns(icp) } })
   } catch (e) {
     return handleSupabaseError(e as { code: string; message: string })
@@ -48,7 +54,7 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
     const acquired = await loadAcquiredLevels(supabase, params.id)
     const roleContext = await getJobRoleContext(supabase, orgId, params.id)
     const { spec } = resolveSearchSpec(icp, { roleContext })
-    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired, feederEmployers: feederEmployersFromSpec(spec), plan: planEveryone(spec) })
+    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired, feederEmployers: feederEmployersFromSpec(spec), plan: planEveryone(spec), relaxAtByLabel: relaxAtByLabel(icp) })
     if (result.status === 'ok') {
       await savePoolMatches(supabase, orgId, params.id, icp.version, result.matches).catch(() => {})
     }

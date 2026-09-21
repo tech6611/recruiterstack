@@ -14,6 +14,17 @@ entries on top.
 ### Docs
 - Added an evidence-grounded review of the Gemini ICP prompt, with a proposed hiring-situation packet, prompt structure, propagation plan, and acceptance tests.
 
+## 2026-09-21 (The ideal profile — Phase 2)
+
+### Changed
+- **The must-haves are the ideal profile**: where · years · education · roles held · companies, built from the recruiter brief and the job's market (`idealProfileFromBrief`). The ICP generator no longer writes yes/no "gates" — the prompt's must-have step is gone and the brief gains `education` (degrees / fields) and `adjacent_titles`. See `docs/ideal-profile-plan.md`.
+- **The search plan is a ladder of relaxations of L1** (`ladderFromIdealProfile`): L1 = the ideal profile; L2 widens companies (the next feeder pools), L3 widens titles (adjacent titles), L4 widens the location (3× radius). Years and education never relax and sit on the base line. `relax_at` on a criterion records where it loosens.
+- **A person bought at a wider level is expected to miss what that level relaxed**: such misses show as ✗ but don't rank or fold as failures (`unexpectedGateFailures`); each run records per-level criterion ids so L2+ people are vendor-verified on what actually reached them.
+- ICP page: "Must-haves (hard gates)" → **"Ideal profile"** — the rows as phrases with where each relaxes, screening items under "Ask the candidate", older text gates flagged for Regenerate. The plan editor is the editor.
+
+### Added
+- Criterion kind **`degree_field`** — degree and/or field-of-study terms; Crustdata filters on `education.schools.degree` + `field_of_study`; the evaluator checks stored education.
+
 ## 2026-09-21 (Structured must-haves — Phase 1)
 
 ### Changed

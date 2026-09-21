@@ -223,6 +223,8 @@ export interface LaneRunResult {
   exhausted: boolean
   /** Pool profile ids this level acquired this run (for match-level labels). */
   profileIds: string[]
+  /** The level's own must-have ids the query applied (with the run's baseCriterionIds, what its people are vendor-verified on). */
+  criterionIds?: string[]
   error?: string | null
 }
 
@@ -284,9 +286,10 @@ export async function loadAcquiredLevels(supabase: Supabase, jobId: string): Pro
       const results = row.query?.results ?? []
       // The must-have ids the vendor query applied on THIS run — they hold for the people
       // it bought by construction. Older runs recorded none; those people are checked from data.
-      const vendorGateIds = row.query?.baseCriterionIds ?? []
+      const baseIds = row.query?.baseCriterionIds ?? []
       results.forEach((r, i) => {
         const level = i + 1
+        const vendorGateIds = [...baseIds, ...(r?.criterionIds ?? [])]
         for (const id of r?.profileIds ?? []) {
           if (!out[id] || out[id].level > level) out[id] = { level, label: r.label ?? `Level ${level}`, key: r.key ?? '', vendorGateIds }
         }
@@ -355,7 +358,7 @@ export async function sourceFromIcp(
       const result: LaneRunResult = {
         key: lane.key, kind: lane.kind, label: lane.label, summary: lane.summary, rationale: lane.rationale ?? null,
         total: null, fetched: 0, duplicates: 0, creditsUsed: 0, nextCursor: prior.cursor, resumed: Boolean(prior.cursor),
-        exhausted: prior.exhausted, profileIds: [],
+        exhausted: prior.exhausted, profileIds: [], criterionIds: lane.criterionIds ?? [],
       }
       results.push(result)
       if (remaining <= 0 || prior.exhausted) continue // already drained — relax to the next level

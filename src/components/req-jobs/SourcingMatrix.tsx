@@ -12,7 +12,7 @@ import { ChevronRight, MapPin, Building2, ThumbsUp, ThumbsDown, FileQuestion, St
 import { fitBucketFor } from '@/lib/ai/fit-bucket'
 
 export interface MatrixIcp {
-  must_haves: { id: string; label: string; attribute?: string }[]
+  must_haves: { id: string; label: string; attribute?: string; relax_at?: number | null }[]
   competencies: { id: string; name: string; weight: number }[]
 }
 

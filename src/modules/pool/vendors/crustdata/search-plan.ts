@@ -46,6 +46,8 @@ export interface SearchLane {
   /** Plain-English chips describing what this lane filters on (for the UI). */
   summary: string[]
   filters: CrustdataFilterGroup
+  /** The level's own criteria that compiled (base-line ids are on CompiledSpec.baseCriterionIds). */
+  criterionIds?: string[]
 }
 
 export interface SearchPlan {
