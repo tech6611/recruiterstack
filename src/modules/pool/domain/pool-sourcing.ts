@@ -9,6 +9,7 @@ import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
 import { deriveProfileTags } from '@/modules/pool/domain/profile-tags'
 import { formatLocation, formatLocationParts, resolveLocationParts, type LocationParts } from '@/modules/pool/domain/normalize'
+import { unexpectedGateFailures } from '@/lib/icp-gates'
 
 type Supabase = SupabaseClient<Database>
 // pool_* tables (migration 115) aren't in the generated types.
@@ -133,6 +134,8 @@ export async function sourcePoolForIcp(
     acquired?: Record<string, { level: number; label: string; vendorGateIds?: string[] }>
     feederEmployers?: string[]
     plan?: PlanEveryone | null
+    /** Ideal-profile ladder: gate label → level it relaxes at, so expected misses don't rank as failures. */
+    relaxAtByLabel?: Record<string, number | null | undefined> | null
   } = {},
 ): Promise<{ status: 'ok' | 'no_access' | 'empty'; matches: PoolMatch[] }> {
   const access = await getPoolAccess(supabase, orgId)
@@ -273,7 +276,7 @@ export async function sourcePoolForIcp(
     )
     for (const m of scored) if (m) matches.push(m)
   }
-  return { status: 'ok', matches: rankPoolMatches(matches, opts.plan) }
+  return { status: 'ok', matches: rankPoolMatches(matches, opts.plan, opts.relaxAtByLabel) }
 }
 
 /**
@@ -367,9 +370,10 @@ export async function setPoolMatchFlags(
  * unknown → any failed · then the ladder level that reached them (full match beats
  * relaxed) · then score. PURE — returns a new array, the input is not mutated.
  */
-export function rankPoolMatches(matches: PoolMatch[], plan: PlanEveryone | null | undefined): PoolMatch[] {
+export function rankPoolMatches(matches: PoolMatch[], plan: PlanEveryone | null | undefined, relaxAtByLabel?: Record<string, number | null | undefined> | null): PoolMatch[] {
   const marked = matches.map((m) => ({ ...m, outside_plan: outsidePlanReason(m, plan) }))
-  const gateState = (m: PoolMatch) => (m.gate_failures?.length ? 2 : (m.gate_unknown?.length ? 1 : 0))
+  // A miss on a dimension the person's level deliberately relaxed is expected, not a failure.
+  const gateState = (m: PoolMatch) => (unexpectedGateFailures(m.gate_failures ?? [], m.acquired?.level ?? null, relaxAtByLabel).length ? 2 : (m.gate_unknown?.length ? 1 : 0))
   const lvl = (m: PoolMatch) => m.acquired?.level ?? 99
   return marked.sort((a, b) =>
     (Number(Boolean(a.outside_plan)) - Number(Boolean(b.outside_plan))) ||
@@ -413,6 +417,7 @@ export async function getCachedPoolMatches(
   currentIcpVersion: number | null,
   /** The job's current Everyone line; when given, the snapshot is re-marked and re-sorted under it. */
   plan?: PlanEveryone | null,
+  relaxAtByLabel?: Record<string, number | null | undefined> | null,
 ): Promise<{ matches: PoolMatch[]; stale: boolean; updated_at: string } | null> {
   try {
     const { data, error } = await (supabase as unknown as LooseSb)
@@ -423,7 +428,7 @@ export async function getCachedPoolMatches(
       .maybeSingle()
     if (error || !data) return null
     return {
-      matches: rankPoolMatches(await withLiveLocations(supabase, (data.matches ?? []) as PoolMatch[]), plan),
+      matches: rankPoolMatches(await withLiveLocations(supabase, (data.matches ?? []) as PoolMatch[]), plan, relaxAtByLabel),
       stale: currentIcpVersion != null && data.icp_version != null && data.icp_version !== currentIcpVersion,
       updated_at: data.updated_at,
     }

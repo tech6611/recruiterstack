@@ -133,3 +133,70 @@ describe('evaluateMustHaves', () => {
     expect(criterionLabel({ kind: 'title_current', values: ['VP'], exclude: true })).toBe('Not Current title: VP')
   })
 })
+
+// ── The ideal profile (docs/ideal-profile-plan.md) ────────────────────────────────
+import { idealProfileFromBrief, IDEAL_PROFILE_IDS } from './gate-evaluator'
+
+describe('idealProfileFromBrief — the New York job', () => {
+  const brief = {
+    market: 'New York, onsite',
+    experience_band: { min_years: 6, max_years: 12, rationale: '' },
+    title_families: ['Engineering Manager', 'Tech Lead Manager / Senior / Staff Software Engineer'],
+    feeder_pools: [
+      { label: 'Growth-stage SaaS', companies: ['Datadog', 'Stripe'], role_types: [], priority: 2 },
+      { label: 'Scaling B2B SaaS (Series A–C)', companies: ['Rippling', 'Ramp', 'Vanta Inc.'], role_types: [], priority: 1 },
+    ],
+    education: { degrees: ['B.Tech'], fields: ['Engineering', 'Computer Science'] },
+  }
+  const market = { city: 'New York', state: 'New York', country: 'US', work_model: 'onsite' }
+  const out = idealProfileFromBrief(brief, market)
+  const by = (id: string) => out.find((g) => g.id === id)!
+
+  it('reads as where · years · education · roles held · companies', () => {
+    expect(out.map((g) => g.kind)).toEqual(['location', 'years_band', 'degree_field', 'title_any', 'employer_current'])
+  })
+  it('where: the job market, 50 km, relaxes at L4', () => {
+    expect(by(IDEAL_PROFILE_IDS.location)).toMatchObject({ values: ['New York, New York, US'], radius_km: 50, relax_at: 4 })
+  })
+  it('years and education never relax', () => {
+    expect(by(IDEAL_PROFILE_IDS.years)).toMatchObject({ min: 6, max: 12, relax_at: null })
+    expect(by(IDEAL_PROFILE_IDS.education)).toMatchObject({ values: ['B.Tech', 'Engineering', 'Computer Science'], relax_at: null })
+  })
+  it('roles held: whole titles, never a bare "Senior"; relaxes at L3', () => {
+    expect(by(IDEAL_PROFILE_IDS.titles)).toMatchObject({ values: ['Engineering Manager', 'Tech Lead Manager', 'Senior Software Engineer', 'Staff Software Engineer'], relax_at: 3 })
+  })
+  it('companies: the priority-1 pool only, legal suffixes stripped; relaxes at L2', () => {
+    expect(by(IDEAL_PROFILE_IDS.companies)).toMatchObject({ kind: 'employer_current', values: ['Rippling', 'Ramp', 'Vanta'], relax_at: 2 })
+  })
+  it('a remote market has no location row; an empty brief has no rows', () => {
+    expect(idealProfileFromBrief(brief, { ...market, work_model: 'remote' }).some((g) => g.kind === 'location')).toBe(false)
+    expect(idealProfileFromBrief(null, null)).toEqual([])
+  })
+  it('degree_field evaluates against stored education', () => {
+    const edu = by(IDEAL_PROFILE_IDS.education)
+    expect(evaluateMustHaves([edu], {}, { education: [{ school: 'NIT Calicut', degree: 'B.Tech', field: 'Computer Science' }] })[0].pass).toBe(true)
+    expect(evaluateMustHaves([edu], {}, { education: [{ school: 'Washington University', degree: 'BA', field: 'Entrepreneurship' }] })[0].pass).toBe(false)
+    expect(evaluateMustHaves([edu], {}, {})[0].pass).toBeNull()
+  })
+})
+
+import { unexpectedGateFailures, mustHavesFromSpec } from '@/lib/icp-gates'
+describe('the ladder and the fold', () => {
+  const relaxAt = { 'Roles held': 3, 'Companies': 2, 'Where': 4, 'Years': null }
+  it('a person bought at L3 is expected to miss companies and titles, not years', () => {
+    expect(unexpectedGateFailures(['Companies', 'Roles held', 'Years'], 3, relaxAt)).toEqual(['Years'])
+    expect(unexpectedGateFailures(['Where'], 3, relaxAt)).toEqual(['Where'])
+  })
+  it('a pool-recall person (no level) counts every miss', () => {
+    expect(unexpectedGateFailures(['Companies'], null, relaxAt)).toEqual(['Companies'])
+  })
+  it('an edited plan writes back its base line plus L1 relaxable rows, keeping screening gates', () => {
+    const existing = [{ id: 's', label: 'Work authorization?', attribute: 'screening', operator: '', value: '' }]
+    const spec = {
+      base: [{ id: 'ip-years', kind: 'years_band' as const, values: [], min: 6, max: 12 }],
+      levels: [{ criteria: [{ id: 'ip-titles', kind: 'title_any' as const, values: ['Engineering Manager'], relax_at: 3 }] }, { criteria: [{ id: 'ip-titles-l3', kind: 'title_any' as const, values: ['Staff Engineer'], relax_at: 3 }] }],
+    }
+    const out = mustHavesFromSpec(existing, spec)
+    expect(out.map((g) => g.id)).toEqual(['ip-years', 'ip-titles', 's'])
+  })
+})

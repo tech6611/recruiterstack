@@ -65,7 +65,7 @@ export function isCriterion(g: Pick<IcpMustHave, 'kind'> | null | undefined): g 
 /** The criterion view of a structured must-have (null for a legacy gate). */
 export function toCriterion(g: IcpMustHave): SearchCriterion | null {
   if (!isCriterion(g)) return null
-  return { id: g.id, kind: g.kind, values: g.values ?? [], min: g.min ?? null, max: g.max ?? null, radius_km: g.radius_km ?? null, exclude: g.exclude ?? false, label: g.label }
+  return { id: g.id, kind: g.kind, values: g.values ?? [], min: g.min ?? null, max: g.max ?? null, radius_km: g.radius_km ?? null, exclude: g.exclude ?? false, label: g.label, relax_at: g.relax_at ?? null }
 }
 
 /** "6–12 years" · "Within 50 km of New York" · "Any title held: Engineering Manager / Tech Lead Manager". */
@@ -98,11 +98,36 @@ export function mustHaveFromCriterion(c: SearchCriterion, label?: string | null)
     max: c.max ?? null,
     radius_km: c.radius_km ?? null,
     exclude: c.exclude ?? false,
+    relax_at: c.relax_at ?? null,
   }
 }
 
-/** The must-haves an edited base line implies: its criteria, plus any non-criterion gates the ICP already had. PURE. */
-export function mustHavesFromBase(existing: IcpMustHave[] | null | undefined, base: SearchCriterion[]): IcpMustHave[] {
+/**
+ * The must-haves an edited plan implies: the base line (never-relaxed rows) plus L1's
+ * relaxable rows (those carrying `relax_at`), plus any non-criterion gates the ICP
+ * already had (screening). PURE.
+ */
+export function mustHavesFromSpec(existing: IcpMustHave[] | null | undefined, spec: { base: SearchCriterion[]; levels?: { criteria: SearchCriterion[] }[] }): IcpMustHave[] {
   const keep = (existing ?? []).filter((g) => !isCriterion(g))
-  return [...base.map((c) => mustHaveFromCriterion(c)), ...keep]
+  const l1 = (spec.levels?.[0]?.criteria ?? []).filter((c) => c.relax_at != null)
+  return [...spec.base.map((c) => mustHaveFromCriterion(c)), ...l1.map((c) => mustHaveFromCriterion(c)), ...keep]
+}
+
+/**
+ * Ideal-profile ladder: which failed gates are NOT expected for this person. A person
+ * bought at level L was deliberately reached with the dimensions that relax at or before
+ * L loosened, so missing those is not a failure to fold away — only a miss on a row that
+ * never relaxes (years, education) or relaxes later still counts. Pool-recall people
+ * (no level) count every miss. PURE.
+ */
+export function unexpectedGateFailures(
+  failedLabels: string[],
+  acquiredLevel: number | null | undefined,
+  relaxAtByLabel: Record<string, number | null | undefined> | null | undefined,
+): string[] {
+  if (acquiredLevel == null || !relaxAtByLabel) return failedLabels
+  return failedLabels.filter((label) => {
+    const at = relaxAtByLabel[label]
+    return at == null || at > acquiredLevel
+  })
 }

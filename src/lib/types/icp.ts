@@ -34,6 +34,8 @@ export interface IcpMustHave {
   max?: number | null
   radius_km?: number | null
   exclude?: boolean
+  /** Ideal-profile ladder: level at which this dimension is loosened (see SearchCriterion.relax_at). */
+  relax_at?: number | null
 }
 
 /** The evaluator's answer for one structured must-have. */
@@ -110,6 +112,10 @@ export interface RecruiterBrief {
   }[]
   /** Titles that are the same search as this role. */
   title_families: string[]
+  /** The ideal profile's education row: degree terms and/or fields of study ("B.Tech", "Engineering"). */
+  education?: { degrees: string[]; fields: string[]; rationale?: string | null } | null
+  /** Titles one step wider than title_families — what L3 of the ladder searches. */
+  adjacent_titles?: string[]
   /** Which requirements are TRUE gates in this market, and why. */
   market_gates: { requirement: string; why?: string | null }[]
   /** How JD phrases translate for this market ("2:1" → "tier-1 institute" in India). */

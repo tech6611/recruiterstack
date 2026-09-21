@@ -25,6 +25,7 @@ export type CriterionKind =
   | 'function'          // vendor closed set
   | 'years_band'        // total experience min..max
   | 'grad_year_band'    // highest-degree end year min..max
+  | 'degree_field'      // degree and/or field-of-study terms ("B.Tech", "Engineering", "Computer Science")
   | 'location'          // geo radius around values[0]
   | 'skill'             // listed skills (exact, sparse on most sources)
   | 'industry'          // employer industry
@@ -44,6 +45,13 @@ export interface SearchCriterion {
   exclude?: boolean
   /** Optional human label shown instead of the kind name. */
   label?: string | null
+  /**
+   * Ideal-profile ladder (docs/ideal-profile-plan.md): the level index (1-based) at
+   * which this dimension is loosened — companies 2, titles 3, location 4. Null/absent =
+   * never relaxed (years, education). A person bought at level L is expected to miss
+   * dimensions with relax_at <= L; that is not a failure to fold away.
+   */
+  relax_at?: number | null
 }
 
 export interface SearchLevel {
@@ -86,6 +94,7 @@ export const CRITERION_KIND_LABEL: Record<CriterionKind, string> = {
   function: 'Function',
   years_band: 'Years of experience',
   grad_year_band: 'Graduation year',
+  degree_field: 'Degree / field',
   location: 'Location',
   skill: 'Listed skill',
   industry: 'Industry',

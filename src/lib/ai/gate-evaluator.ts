@@ -11,7 +11,7 @@
  * a criterion that was in the query that bought a person holds for that person by
  * construction (`verified_by: 'vendor'`). PURE — no I/O.
  */
-import type { IcpMustHave, GateVerdict } from '@/lib/types/icp'
+import type { IcpMustHave, GateVerdict, RecruiterBrief } from '@/lib/types/icp'
 import type { CriterionKind } from '@/lib/types/search-spec'
 import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion, criterionLabel, mustHaveFromCriterion } from '@/lib/icp-gates'
@@ -163,7 +163,7 @@ export interface EvaluableCandidate {
 }
 export interface EvaluableHistory {
   experiences?: { title?: string | null; employer?: string | null; is_current?: boolean | null }[]
-  education?: { school?: string | null; year?: string | number | null }[]
+  education?: { school?: string | null; year?: string | number | null; degree?: string | null; field?: string | null }[]
 }
 export interface EvaluationContext {
   /** Criterion ids that were in the vendor query that bought this person. */
@@ -236,6 +236,7 @@ export function evaluateMustHaves(
       case 'employer_past': anyOf(employers.past, c.values.flatMap(employerTerms), 'past employer'); break
       case 'employer_any': anyOf(employers.any, c.values.flatMap(employerTerms), 'employer'); break
       case 'school': anyOf(edu.map((e) => e.school ?? ''), c.values, 'school'); break
+      case 'degree_field': anyOf(edu.map((e) => [e.degree, e.field].filter(Boolean).join(' ')), c.values, 'degree / field'); break
       case 'skill': anyOf(candidate.skills ?? [], c.values, 'skill', (x, n) => x === norm(n) || phraseIn(x, n)); break
       case 'grad_year_band': {
         const years = edu.map((e) => Number(e.year)).filter((y) => Number.isFinite(y) && y > 1950)
@@ -272,4 +273,58 @@ export function evaluateMustHaves(
     }
   }
   return verdicts
+}
+
+// ── The ideal profile (docs/ideal-profile-plan.md) ───────────────────────────────
+
+/** Stable ids so a regenerated profile keeps matching stored snapshots and run records. */
+export const IDEAL_PROFILE_IDS = {
+  location: 'ip-location', years: 'ip-years', education: 'ip-education', titles: 'ip-titles', companies: 'ip-companies',
+} as const
+
+/** The ladder: the level at which each relaxable dimension is loosened. Years and education never are. */
+export const RELAX_AT = { companies: 2, titles: 3, location: 4 } as const
+
+export interface IdealProfileMarket { city?: string | null; state?: string | null; country?: string | null; work_model?: string | null }
+
+/**
+ * Who we are looking for, as filters: where · years · education · roles held ·
+ * companies. Built from the recruiter brief and the job's market; this list IS L1 and
+ * IS the must-have list. Rows the brief has nothing for are simply absent. PURE.
+ */
+export function idealProfileFromBrief(
+  brief: Pick<RecruiterBrief, 'experience_band' | 'title_families' | 'feeder_pools' | 'education' | 'market'> | null | undefined,
+  market: IdealProfileMarket | null | undefined,
+  opts: { radiusKm?: number } = {},
+): IcpMustHave[] {
+  const out: IcpMustHave[] = []
+  const radius = opts.radiusKm ?? 50
+
+  // Where: the job's structured market first; the brief's free-text market as a fallback.
+  const remote = market?.work_model === 'remote'
+  const place = market && !remote ? [market.city, market.state, market.country].filter(Boolean).join(', ') : ''
+  const fallback = !market && brief?.market ? resolveLocationParts(brief.market) : null
+  const where = place || (fallback ? [fallback.city, fallback.region, fallback.country].filter(Boolean).join(', ') : '')
+  if (where) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.location, kind: 'location', values: [where], radius_km: radius, relax_at: RELAX_AT.location }))
+
+  // Years: never relaxed.
+  const band = brief?.experience_band
+  if (band && (band.min_years != null || band.max_years != null)) {
+    out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.years, kind: 'years_band', values: [], min: band.min_years ?? null, max: band.max_years ?? null }))
+  }
+
+  // Education: never relaxed.
+  const edu = [...(brief?.education?.degrees ?? []), ...(brief?.education?.fields ?? [])].map((s) => s.trim()).filter(Boolean)
+  if (edu.length) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.education, kind: 'degree_field', values: Array.from(new Set(edu)) }))
+
+  // Roles held: whole-phrase titles, never a bare level word.
+  const titles = Array.from(new Set((brief?.title_families ?? []).flatMap(titleTerms)))
+  if (titles.length) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.titles, kind: 'title_any', values: titles, relax_at: RELAX_AT.titles }))
+
+  // Companies: the first feeder pool (lowest priority number) is the ideal.
+  const pools = [...(brief?.feeder_pools ?? [])].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
+  const companies = Array.from(new Set((pools[0]?.companies ?? []).flatMap(employerTerms)))
+  if (companies.length) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.companies, kind: 'employer_current', values: companies, relax_at: RELAX_AT.companies }))
+
+  return out
 }

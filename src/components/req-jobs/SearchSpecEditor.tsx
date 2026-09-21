@@ -22,13 +22,13 @@ import { CRITERION_KIND_LABEL, type CriterionKind, type SearchCriterion, type Se
 export interface LevelRunStat { key: string; fetched: number; total: number | null; exhausted?: boolean; error?: string | null }
 type Counts = Record<string, { total: number | null; error?: string | null }>
 
-const CHIP_KINDS: CriterionKind[] = ['school', 'employer_current', 'employer_past', 'employer_any', 'title_current', 'title_any', 'seniority', 'function', 'skill', 'industry', 'company_size', 'company_type', 'funding_stage']
-const ADDABLE_KINDS: CriterionKind[] = ['school', 'employer_current', 'employer_past', 'employer_any', 'title_current', 'title_any', 'seniority', 'function', 'skill', 'industry', 'company_size', 'company_type', 'funding_stage', 'location']
+const CHIP_KINDS: CriterionKind[] = ['school', 'degree_field', 'employer_current', 'employer_past', 'employer_any', 'title_current', 'title_any', 'seniority', 'function', 'skill', 'industry', 'company_size', 'company_type', 'funding_stage']
+const ADDABLE_KINDS: CriterionKind[] = ['school', 'degree_field', 'employer_current', 'employer_past', 'employer_any', 'title_current', 'title_any', 'seniority', 'function', 'skill', 'industry', 'company_size', 'company_type', 'funding_stage', 'location']
 /** Kinds that can be flipped to "not". */
-const EXCLUDABLE: CriterionKind[] = ['school', 'employer_current', 'employer_past', 'employer_any', 'title_current', 'title_any', 'seniority', 'function', 'skill', 'industry', 'company_size', 'company_type', 'location']
+const EXCLUDABLE: CriterionKind[] = ['school', 'degree_field', 'employer_current', 'employer_past', 'employer_any', 'title_current', 'title_any', 'seniority', 'function', 'skill', 'industry', 'company_size', 'company_type', 'location']
 const SHORT_KIND: Record<CriterionKind, string> = {
   school: 'school', employer_current: 'now at', employer_past: 'was at', employer_any: 'ever at', title_current: 'title', title_any: 'any title',
-  seniority: 'level', function: 'function', years_band: 'years', grad_year_band: 'graduated', location: 'near', skill: 'skill', industry: 'industry',
+  seniority: 'level', function: 'function', years_band: 'years', grad_year_band: 'graduated', degree_field: 'degree', location: 'near', skill: 'skill', industry: 'industry',
   company_size: 'company size', company_type: 'company type', funding_stage: 'funding stage',
 }
 const SIZE_BANDS = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+']

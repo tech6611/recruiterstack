@@ -95,3 +95,13 @@ describe('title terms — whole phrases only', () => {
     expect(out.common.filter((c) => c.label === '6–12 years')).toHaveLength(2) // two conditions (>= and <=) from ONE band
   })
 })
+
+describe('degree_field', () => {
+  it('matches the term in either the degree or the field of study', () => {
+    const r = compileCriterion({ id: 'e', kind: 'degree_field', values: ['B.Tech', 'Engineering'] })
+    const group = (r as { ok: { conditions: { op: string; conditions: { field: string; value: string }[] }[]; summary: string } }).ok
+    expect(group.conditions[0].op).toBe('or')
+    expect(group.conditions[0].conditions.map((c) => `${c.field.split('.').pop()}:${c.value}`)).toEqual(['degree:B.Tech', 'degree:Engineering', 'field_of_study:B.Tech', 'field_of_study:Engineering'])
+    expect(group.summary).toBe('degree / field: B.Tech / Engineering')
+  })
+})

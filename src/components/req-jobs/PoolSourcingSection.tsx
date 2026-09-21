@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { SourcingMatrix, type MatrixIcp, type MatrixMatch } from '@/components/req-jobs/SourcingMatrix'
 import { SearchSpecEditor, type LevelRunStat } from '@/components/req-jobs/SearchSpecEditor'
 import { PoolProfilePanel } from '@/components/req-jobs/PoolProfilePanel'
+import { unexpectedGateFailures } from '@/lib/icp-gates'
 
 interface PoolMatch {
   profile_id: string
@@ -99,6 +100,10 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   const [showHidden, setShowHidden] = useState(false)
   const [showOutside, setShowOutside] = useState(false)
   const [showFailed, setShowFailed] = useState(false)
+  // Ideal-profile ladder: a miss on a dimension the person's level deliberately relaxed
+  // (companies at L2, titles at L3, location at L4) is expected, not a failure to fold.
+  const relaxAt = Object.fromEntries((icp?.must_haves ?? []).map((g) => [g.label, g.relax_at ?? null]))
+  const misses = (m: PoolMatch) => unexpectedGateFailures(m.gate_failures ?? [], m.acquired?.level ?? null, relaxAt).length
   const [openProfile, setOpenProfile] = useState<string | null>(null)
 
   /** Star / hide: free, persisted on the cached list, survives re-ranks. */
@@ -249,7 +254,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
                 const hidden = matches.filter((m) => m.hidden).length
                 const outside = matches.filter((m) => !m.hidden && m.outside_plan).length
                 // Failed a must-have: folded by default. Unknown (?) gates stay visible — unanswerable ≠ unfit.
-                const failed = matches.filter((m) => !m.hidden && !m.outside_plan && (m.gate_failures?.length ?? 0) > 0).length
+                const failed = matches.filter((m) => !m.hidden && !m.outside_plan && misses(m) > 0).length
                 return (hidden > 0 || outside > 0 || failed > 0) ? (
                   <div className="flex items-center gap-3 text-[11px] text-slate-400">
                     {failed > 0 && <button type="button" onClick={() => setShowFailed((v) => !v)} className="hover:text-slate-600" title="Scored, but fails at least one must-have">{showFailed ? 'Hide' : 'Show'} {failed} who miss a must-have</button>}
@@ -259,7 +264,7 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
                 ) : null
               })()}
               <SourcingMatrix
-                matches={matches.filter((m) => (showHidden || !m.hidden) && (showOutside || !m.outside_plan) && (showFailed || !(m.gate_failures?.length))).map((m) => toMatrixMatch(m, newIds))}
+                matches={matches.filter((m) => (showHidden || !m.hidden) && (showOutside || !m.outside_plan) && (showFailed || misses(m) === 0)).map((m) => toMatrixMatch(m, newIds))}
                 icp={icp} selected={selected} onToggle={toggle}
                 onStar={(id, starred) => setFlag(id, { starred })}
                 onHide={(id) => setFlag(id, { hidden: true })}

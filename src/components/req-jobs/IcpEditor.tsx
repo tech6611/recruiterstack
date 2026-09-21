@@ -10,6 +10,8 @@ import type { ScoringCriterion } from '@/lib/types/database'
 import type { Icp, IcpCompetency, IcpMustHave } from '@/lib/types/icp'
 import { icpToScoringCriteria } from '@/lib/scoring'
 import { RecruiterBriefCard } from '@/components/req-jobs/RecruiterBriefCard'
+import { isCriterion, toCriterion, criterionLabel } from '@/lib/icp-gates'
+import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 
 
 const BUCKET_LABEL: Record<string, string> = { hard_filter: 'Hard filter', ranking_signal: 'Ranking', screen_later: 'Screen later' }
@@ -279,18 +281,6 @@ export function IcpEditor({
     setComp(ci, { behaviours: comps[ci].behaviours.filter((_, j) => j !== bi) })
 
   // ── gate editing ────────────────────────────────────────────────────────────
-  const setGate = (i: number, patch: Partial<IcpMustHave>) =>
-    setGates((prev) => prev.map((g, j) => (j === i ? { ...g, ...patch } : g)))
-  const removeGate = (i: number) => setGates((prev) => prev.filter((_, j) => j !== i))
-  const addGate = () =>
-    setGates((prev) => [
-      ...prev,
-      // A must-have is now just a plain-English yes/no question the Fit Engine judge
-      // answers from the candidate's history. attribute/operator/value are legacy
-      // fields the judge no longer reads — kept empty so nothing mis-tags as a gate.
-      { id: `g-${prev.length}-${Date.now()}`, label: '', attribute: '', operator: '', value: '' },
-    ])
-
   if (loading) {
     return (
       <Card>
@@ -468,36 +458,75 @@ export function IcpEditor({
           </section>
         )}
 
-        {/* ── Must-haves ── */}
+        {/* ── Ideal profile (docs/ideal-profile-plan.md) ── */}
         <section className="space-y-2">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-            <ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> Must-haves (hard gates)
+            <ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> Ideal profile
           </div>
           <p className="text-[11px] text-slate-400">
-            Yes/no. Fail one and the candidate is out.
+            Who we are looking for, as filters: where · years · education · roles held · companies. This list is L1 of the
+            search plan and what every candidate is checked against; the ladder below it loosens one row at a time.
+            Edit it in the <strong>Search plan</strong> on the Sourcing tab.
           </p>
-          {gates.length === 0 ? (
-            <p className="text-xs text-slate-400">No gates — every candidate is scored on competencies alone.</p>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100">
-              {gates.map((g, i) => (
-                <div key={g.id} className="flex items-center gap-2 px-3 py-2.5">
-                  <Input
-                    value={g.label}
-                    onChange={(e) => setGate(i, { label: e.target.value })}
-                    placeholder="A yes/no deal-breaker, e.g. Has a genuine software-engineering background?"
-                    className="h-8 min-w-[10rem] flex-1 text-sm"
-                  />
-                  <button type="button" onClick={() => removeGate(i)} className="text-slate-300 hover:text-red-500">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <Button size="sm" variant="outline" onClick={addGate}>
-            <Plus className="h-3.5 w-3.5" /> Add must-have
-          </Button>
+          {(() => {
+            const profile = gates.filter((g) => isCriterion(g))
+            const screening = gates.filter((g) => g.attribute === 'screening')
+            const legacy = gates.filter((g) => !isCriterion(g) && g.attribute !== 'screening')
+            const relaxNote = (at: number | null | undefined) => (at == null ? 'never relaxed' : `relaxes at L${at}`)
+            return (
+              <>
+                {profile.length === 0 && legacy.length === 0 && (
+                  <p className="text-xs text-slate-400">No ideal profile yet — Regenerate to build it from the JD and the recruiter brief.</p>
+                )}
+                {profile.length > 0 && (
+                  <div className="overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100">
+                    {profile.map((g) => {
+                      const c = toCriterion(g)!
+                      return (
+                        <div key={g.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                          <span className="w-24 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{CRITERION_KIND_LABEL[c.kind]}</span>
+                          <span className="flex-1 text-slate-700">{criterionLabel(c)}</span>
+                          <span className="text-[10px] text-slate-400">{relaxNote(g.relax_at)}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {screening.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ask the candidate</div>
+                    <p className="text-[11px] text-slate-400">Not verifiable from a profile, so never a filter and never a reject.</p>
+                    <div className="overflow-hidden rounded-xl border border-dashed border-slate-200 divide-y divide-slate-100">
+                      {screening.map((g) => (
+                        <div key={g.id} className="flex items-center gap-2 px-3 py-2 text-xs text-slate-600">
+                          <span className="flex-1">{g.label}</span>
+                          <button type="button" onClick={() => setGates((prev) => prev.filter((x) => x.id !== g.id))} className="text-slate-300 hover:text-red-500" title="Remove">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {legacy.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Older text gates</div>
+                    <p className="text-[11px] text-slate-400">Written before the ideal profile existed. Converted to filters where the text allows; Regenerate to replace them.</p>
+                    <div className="overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100">
+                      {legacy.map((g) => (
+                        <div key={g.id} className="flex items-center gap-2 px-3 py-2.5">
+                          <Input value={g.label} onChange={(e) => setGates((prev) => prev.map((x) => (x.id === g.id ? { ...x, label: e.target.value } : x)))} className="h-8 min-w-[10rem] flex-1 text-sm" />
+                          <button type="button" onClick={() => setGates((prev) => prev.filter((x) => x.id !== g.id))} className="text-slate-300 hover:text-red-500">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </section>
 
         {/* ── Competencies ── */}

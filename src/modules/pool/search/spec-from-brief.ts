@@ -16,6 +16,7 @@ import type { Icp, RecruiterBrief } from '@/lib/types/icp'
 import type { SearchCriterion, SearchLevel, SearchSpec, PostFetchCheck } from '@/lib/types/search-spec'
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
 import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion } from '@/lib/icp-gates'
+import { titleTerms } from '@/lib/ai/gate-evaluator'
 import { schoolTiersFor } from '@/modules/pool/search/school-tiers'
 import { normalizeCity, resolveLocationParts } from '@/modules/pool/domain/normalize'
 import type { PlanEveryone } from '@/modules/pool/domain/pool-sourcing'
@@ -101,6 +102,10 @@ export function specFromIcp(
   const brief: RecruiterBrief | null | undefined = icp.sourcing_map?.recruiter_brief
   const base: SearchCriterion[] = []
   const post_fetch: PostFetchCheck[] = []
+
+  // ── The ideal profile → a ladder of relaxations (docs/ideal-profile-plan.md) ──
+  const ladder = ladderFromIdealProfile(icp, ctx)
+  if (ladder) return ladder
 
   // ── Must-have line ────────────────────────────────────────────────────────────
   // A must-have IS a search criterion (docs/structured-must-haves-plan.md): every
@@ -210,6 +215,70 @@ export function specFromIcp(
   return { version: 1, base, levels, post_fetch, source: 'brief' }
 }
 
+/**
+ * When the ICP's must-haves are an ideal profile — where · years · education · roles held
+ * · companies, with `relax_at` on the relaxable rows — the plan is that list as L1 and
+ * controlled relaxations below it: L2 widens companies, L3 widens titles, L4 widens the
+ * location. Years and education never relax, so they sit on the base line the compiler
+ * ANDs into every level. Returns null for an ICP without an ideal profile. PURE.
+ */
+export function ladderFromIdealProfile(
+  icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'competencies'>>,
+  ctx: SpecContext = {},
+): SearchSpec | null {
+  const all = (icp.must_haves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null)
+  const relaxable = all.filter((c) => c.relax_at != null)
+  if (!relaxable.length) return null
+  const brief = icp.sourcing_map?.recruiter_brief
+  const base = all.filter((c) => c.relax_at == null)
+  const post_fetch: PostFetchCheck[] = []
+
+  const companies = relaxable.find((c) => c.kind.startsWith('employer_'))
+  const titles = relaxable.find((c) => c.kind.startsWith('title_'))
+  const location = relaxable.find((c) => c.kind === 'location')
+  const others = relaxable.filter((c) => c !== companies && c !== titles && c !== location)
+
+  const levels: SearchLevel[] = []
+  const level = (label: string, criteria: SearchCriterion[], relaxes: string | null) => {
+    if (criteria.length) levels.push({ id: `L${levels.length + 1}`, label, criteria, relaxes, rationale: null })
+  }
+  const keep = (...cs: (SearchCriterion | undefined)[]) => [...others, ...cs.filter((c): c is SearchCriterion => Boolean(c))]
+
+  // L1: the ideal profile, verbatim.
+  level('Ideal profile', keep(location, titles, companies), null)
+
+  // L2: the next feeder pools instead of the first; no pools left → any company.
+  if (companies) {
+    const pools = [...(brief?.feeder_pools ?? [])].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99)).slice(1)
+    const wider = Array.from(new Set(pools.flatMap((p) => (p.companies ?? []).flatMap(employerTerms)))).filter((t) => !companies.values.includes(t))
+    const widerCompanies: SearchCriterion | undefined = wider.length ? { ...companies, id: `${companies.id}-l2`, values: wider, label: null } : undefined
+    level(wider.length ? 'Wider companies' : 'Any company', keep(location, titles, widerCompanies), wider.length ? `companies: ${pools.map((p) => p.label).join(' / ')}` : 'no company constraint')
+  }
+
+  // L3: adjacent titles, no company constraint.
+  const adjacent = Array.from(new Set((brief?.adjacent_titles ?? []).flatMap(titleTerms))).filter((t) => !(titles?.values ?? []).includes(t))
+  if (titles && adjacent.length) {
+    level('Wider titles', keep(location, { ...titles, id: `${titles.id}-l3`, values: adjacent, label: null }), `titles: ${adjacent.slice(0, 4).join(' / ')}${adjacent.length > 4 ? ' …' : ''}`)
+  }
+
+  // L4: the wider region (3× radius), every title so far, no company constraint.
+  if (location) {
+    const allTitles = titles ? { ...titles, id: `${titles.id}-l4`, values: Array.from(new Set([...titles.values, ...adjacent])), label: null } : undefined
+    const radius = (location.radius_km ?? DEFAULT_RADIUS_KM) * 3
+    level('Wider location', keep({ ...location, id: `${location.id}-l4`, radius_km: radius, label: null }, allTitles), `within ${radius} km`)
+  }
+
+  // Seniority ceiling as before: an IC band means no executive titles.
+  const band = base.find((c) => c.kind === 'years_band')
+  if (band?.max != null && band.max <= IC_SENIORITY_CEILING_YEARS && !all.some((c) => c.kind === 'seniority')) {
+    base.push({ id: cid('sen'), kind: 'seniority', values: SENIOR_TITLES, exclude: true, label: 'Not an executive title' })
+  }
+  for (const g of icp.must_haves ?? []) if (g.attribute === 'screening') post_fetch.push({ label: g.label ?? '', how: 'screen' })
+  for (const c of icp.competencies ?? []) post_fetch.push({ label: c.name, how: 'judge' })
+  void ctx
+  return { version: 1, base, levels, post_fetch, source: 'brief' }
+}
+
 /** The spec to acquire with: the recruiter-edited one stored on the ICP, else derived from the brief. */
 export function resolveSearchSpec(
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'competencies'>>,
@@ -217,10 +286,11 @@ export function resolveSearchSpec(
 ): { spec: SearchSpec; stored: boolean } {
   const stored = icp.sourcing_map?.search_spec
   if (stored && stored.levels?.length) {
-    // One source of truth: when the ICP carries structured must-haves, they ARE the base
-    // line — a stored spec keeps its levels but not a stale base. (setIcpSearchSpec
-    // writes an edited base back to the must-haves, so the two never diverge.)
-    const mustHaves = (icp.must_haves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null)
+    // One source of truth: the never-relaxed must-haves ARE the base line — a stored
+    // spec keeps its levels but not a stale base. Relaxable rows (relax_at set) live on
+    // L1, which the stored spec already holds. (setIcpSearchSpec writes an edited plan
+    // back to the must-haves, so the two never diverge.)
+    const mustHaves = (icp.must_haves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null && c.relax_at == null)
     return { spec: mustHaves.length ? { ...stored, base: mustHaves } : stored, stored: true }
   }
   return { spec: specFromIcp(icp, ctx), stored: false }

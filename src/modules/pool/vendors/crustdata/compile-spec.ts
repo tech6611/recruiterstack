@@ -19,6 +19,8 @@ const F = {
   companyTypeCurrent: 'experience.employment_details.current.company_type',
   school: 'education.schools.school',
   gradYear: 'education.schools.end_year',
+  degree: 'education.schools.degree',
+  fieldOfStudy: 'education.schools.field_of_study',
   empCurrent: 'experience.employment_details.current.company_name',
   empPast: 'experience.employment_details.past.company_name',
   empAny: 'experience.employment_details.company_name',
@@ -66,6 +68,14 @@ export function compileCriterion(c: SearchCriterion): { ok: CompiledCriterion } 
       return vals.length ? { ok: textMatch(F.empPast, c, vals, 'formerly at', list()) } : { unsupported: 'no employers listed' }
     case 'employer_any':
       return vals.length ? { ok: textMatch(F.empAny, c, vals, 'ever at', list()) } : { unsupported: 'no employers listed' }
+    case 'degree_field': {
+      // "Engineering" should match a B.Tech in Engineering whether the vendor put the word
+      // in the degree or the field — one OR group across both education fields.
+      if (!vals.length) return { unsupported: 'no degree / field terms listed' }
+      if (c.exclude) return { ok: { conditions: [...noneOf(F.degree, vals), ...noneOf(F.fieldOfStudy, vals)], summary: `not degree / field: ${list()}` } }
+      const both = [...vals.map((value) => ({ field: F.degree, type: '(.)' as const, value })), ...vals.map((value) => ({ field: F.fieldOfStudy, type: '(.)' as const, value }))]
+      return { ok: { conditions: [{ op: 'or', conditions: both.slice(0, MAX_TERMS) }], summary: `degree / field: ${list()}` } }
+    }
     case 'title_current':
     case 'title_any': {
       // A level word alone ("Senior", "Manager") matches any title that contains it — that
@@ -159,9 +169,10 @@ export function compileSpec(spec: SearchSpec): CompiledSpec {
   spec.levels.forEach((lvl: SearchLevel, i) => {
     const own: (CrustdataCondition | CrustdataFilterGroup)[] = []
     const summary: string[] = []
+    const criterionIds: string[] = []
     for (const c of lvl.criteria) {
       const r = compileCriterion(c)
-      if ('ok' in r) { own.push(...r.ok.conditions); summary.push(r.ok.summary) }
+      if ('ok' in r) { own.push(...r.ok.conditions); summary.push(r.ok.summary); criterionIds.push(c.id) }
       else unsupported.push({ requirement: c.label ?? `${CRITERION_KIND_LABEL[c.kind]}: ${c.values.join(', ')}`, reason: r.unsupported, level: lvl.label })
     }
     if (!own.length) return // a level with nothing this source can search is skipped (reported above)
@@ -173,6 +184,7 @@ export function compileSpec(spec: SearchSpec): CompiledSpec {
       rationale: lvl.relaxes ? `Relaxes: ${lvl.relaxes}` : lvl.rationale ?? null,
       summary,
       filters,
+      criterionIds,
     })
   })
 

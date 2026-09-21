@@ -21,7 +21,7 @@ import { DEFAULT_SCORING_CRITERIA } from '@/lib/scoring'
 import type { HiringRequest, ScoringCriterion } from '@/lib/types/database'
 import type { IcpCompetency, IcpDraftInput, IcpMustHave, RecruiterBrief, SourcingMap } from '@/lib/types/icp'
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
-import { experienceBandGate, yearsFloorFromLabel } from '@/lib/icp-gates'
+import { idealProfileFromBrief, type IdealProfileMarket } from '@/lib/ai/gate-evaluator'
 
 const DEFAULT_RUBRIC_IDS = DEFAULT_SCORING_CRITERIA.map((c) => c.id).sort().join(',')
 
@@ -148,6 +148,8 @@ const recruiterBriefSchema = z.object({
     rationale: z.string().nullish(),
   })).max(10).default([]),
   title_families: z.array(z.string()).max(20).default([]),
+  education: z.object({ degrees: z.array(z.string()).max(10).default([]), fields: z.array(z.string()).max(10).default([]), rationale: z.string().nullish() }).nullish(),
+  adjacent_titles: z.array(z.string()).max(20).optional(),
   market_gates: z.array(z.object({ requirement: z.string(), why: z.string().nullish() })).max(12).default([]),
   jd_translations: z.array(z.object({ phrase: z.string(), means_here: z.string() })).max(12).default([]),
   market_norms: z.array(z.object({ topic: z.string(), norm: z.string() })).max(12).default([]),
@@ -523,6 +525,8 @@ Work in this exact order, and let each step drive the next:
    - target_schools: when education pedigree matters in this market, the SCHOOL LISTS you would actually search — tier1 (the institutions a first-pass filter accepts) and tier2 (where you look once tier1 is exhausted). Write each as the short literal name a person would type on a profile ("Indian Institute of Technology", "IIM Ahmedabad", "BITS Pilani", "University of Oxford"); a generic institution name covers all its campuses. Leave both empty when pedigree is not a real filter for this role.
    - feeder_pools: where you would search FIRST, in priority order (priority 1 = first). Each pool names REAL employers AND the role types you'd pull from them, local to this market. Think like your niche: a strategy recruiter starts at top consulting, IB, VC/PE and in-house Strategy & Ops / BizOps / Chief of Staff teams; a GTM recruiter starts at quota carriers at comparable deal size and segment; an engineering recruiter at product companies solving comparable problems. Be concrete; name companies.
    - title_families: the titles that are the SAME search as this role.
+   - adjacent_titles: titles ONE step wider — the people you would search once the title families run dry (a Tech Lead Manager search widens to Staff Engineer who leads; a Chief of Staff search widens to Strategy Manager). Never generic level words alone ("Senior", "Manager").
+   - education: the ideal profile's education row for THIS market — degrees ("B.Tech", "MBA") and/or fields of study ("Engineering", "Computer Science") a recruiter would actually filter on; empty lists when education genuinely doesn't matter here.
    - market_gates: which of the JD's requirements are TRUE gates in this market and why (e.g. institute tier is a real filter in Indian strategy hiring; a degree barely matters in engineering).
    - jd_translations: how you'd translate the JD's phrases for this market (e.g. "2:1 from a top university" → "tier-1 institute (IIT/IIM/ISB)" in India).
    - market_norms: compensation sanity vs the budget given for this level in this city, notice periods, work authorisation/visa, relocation realism, title inflation, and where these candidates are actually findable.
@@ -544,7 +548,7 @@ Work in this exact order, and let each step drive the next:
 
 5) competencies — NOW translate the reasoning above into WEIGHTED competencies: choose AS MANY as THIS role genuinely needs — usually 4 to 7. Use more when the role has several distinct, independent success factors; use fewer when one or two clearly dominate. Do not pad to a round number. THIS IS THE CRUX: the weights must be a direct consequence of your reasoning — put the most weight on whatever step 1 said matters most, and make the highest-weighted competency the strongest predictor you identified. Do NOT default to a tidy 35/30/20/15 descending split — that is a template, not a judgement. The spread must reflect THIS role's real priorities: it is fine for one competency to clearly dominate (e.g. 45–55), for two to be near-tied, or for a genuinely minor factor to sit at 5–10. Two different roles should almost never produce the same weight column. Weights are integers that MUST sum to exactly 100. For each: a specific, role-relevant name (e.g. "Enterprise deal ownership", "Payments domain depth", "Structured problem-solving" — not "Domain Experience"); 3–6 concrete, observable behaviours; a 1–4 anchor scale (1 poor → 4 excellent); optionally the hiring manager's verbatim phrasing. Give recruiter-first signals REAL weight when the role calls for them — feeder background (your feeder_pools or close comparables), scale & complexity, and span of management for leadership roles — rather than burying them in a generic competency.
 
-6) must_haves — the genuine DEAL-BREAKERS, written as plain yes/no questions a recruiter could answer from a CV. A candidate who fails any is REJECTED, so include only true non-negotiables, consistent with your market_gates. The most important is usually RELEVANT BACKGROUND — is this genuinely the kind of professional your niche hires for this role (a real practitioner of the function, not someone adjacent to it)? Also valid: a specifically required skill/licence, or a hard minimum of years. Do NOT gate on location, relocation, or company pedigree — those are weighted signals, never rejections.
+6) must_haves — leave this EMPTY. The ideal profile (where · years · education · roles held · companies) is built directly from your recruiter_brief; there are no separate yes/no gates.
 
 Respond with ONLY valid JSON (no markdown), with the fields in this order:
 {
@@ -554,6 +558,8 @@ Respond with ONLY valid JSON (no markdown), with the fields in this order:
     "target_schools": { "tier1": [""], "tier2": [""] },
     "feeder_pools": [ { "label": "", "companies": [""], "role_types": [""], "priority": 1, "rationale": "" } ],
     "title_families": [""],
+    "adjacent_titles": [""],
+    "education": { "degrees": [""], "fields": [""], "rationale": "" },
     "market_gates": [ { "requirement": "", "why": "" } ],
     "jd_translations": [ { "phrase": "", "means_here": "" } ],
     "market_norms": [ { "topic": "", "norm": "" } ],
@@ -565,7 +571,7 @@ Respond with ONLY valid JSON (no markdown), with the fields in this order:
   "unwritten_filters": [ { "filter": "", "type": "", "inferred_from": "", "confidence": 0.7, "exclusion_cost": "", "recommend_apply": true } ],
   "archetypes": [ { "name": "", "thesis": "", "where_from": "", "why_interested": "", "why_no": "", "is_non_obvious": false, "hire_risk": "" } ],
   "competencies": [ { "name": "", "weight": 30, "behaviours": ["..."], "anchors": { "1": "", "2": "", "3": "", "4": "" }, "verbatim": "" } ],
-  "must_haves": [ { "label": "Is this genuinely a practitioner of the function this role is for?" } ]
+  "must_haves": []
 }`
 }
 
@@ -587,18 +593,14 @@ export function sourcingMapFromReasoning(g: ReasoningFirstGeneration, recruiterC
   }
 }
 
-/** Build the draft. The brief's experience band becomes ONE structured gate (floor +
- *  ceiling) that the search plan can send and the Fit Engine can enforce
- *  deterministically; any plain "N+ years" gate the model also wrote is subsumed by
- *  it so the same floor isn't judged twice. PURE + tested. */
-export function draftFromReasoning(g: ReasoningFirstGeneration): IcpDraftInput {
-  const band = g.recruiter_brief?.experience_band
-  const bandGate = band ? experienceBandGate(band.min_years ?? null, band.max_years ?? null) : null
-  const modelGates: IcpMustHave[] = g.must_haves
-    .map((m, i) => ({ id: `g-ai-${i}`, label: m.label.trim(), attribute: '', operator: '', value: '' }))
-    .filter((m) => m.label)
-    .filter((m) => !(bandGate && yearsFloorFromLabel(m.label) != null))
-  const must_haves = (bandGate ? [...modelGates, bandGate] : modelGates).slice(0, MAX_GATES)
+/**
+ * Build the draft. The must-haves ARE the ideal profile — where · years · education ·
+ * roles held · companies — built from the recruiter brief and the job's market
+ * (docs/ideal-profile-plan.md). Any yes/no "gates" the model still writes are ignored:
+ * there is no separate gate concept. PURE + tested.
+ */
+export function draftFromReasoning(g: ReasoningFirstGeneration, market?: IdealProfileMarket | null): IcpDraftInput {
+  const must_haves = idealProfileFromBrief(g.recruiter_brief ?? null, market ?? null).slice(0, MAX_GATES)
   return { must_haves, competencies: competenciesFromGeneration(g.competencies), source: 'intake' }
 }
 
@@ -626,7 +628,7 @@ export async function generateIcpWithReasoning(
     trackUsage('icp-generator', model, usage, identity)
     const generation = parseAiJson(text, reasoningFirstSchema, 'ICP Generator (reasoning-first)')
     if (!generation.competencies.length) throw new Error('no competencies generated')
-    return { draft: draftFromReasoning(generation), sourcingMap: sourcingMapFromReasoning(generation, opts.recruiterCorrections) }
+    return { draft: draftFromReasoning(generation, opts.roleContext?.market ?? null), sourcingMap: sourcingMapFromReasoning(generation, opts.recruiterCorrections) }
   } catch (err) {
     logger.warn('ICP Generator: reasoning-first generation failed, using deterministic seed', {
       error: err instanceof Error ? err.message : String(err),

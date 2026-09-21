@@ -5,7 +5,7 @@ import type { SearchSpec } from '@/lib/types/search-spec'
 import { embedText } from '@/lib/ai/llm'
 import { icpEmbeddingText } from '@/lib/ai/embeddings'
 import { logger } from '@/lib/logger'
-import { mustHavesFromBase } from '@/lib/icp-gates'
+import { mustHavesFromSpec } from '@/lib/icp-gates'
 import { convertLegacyGates } from '@/lib/ai/gate-evaluator'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 
@@ -285,7 +285,7 @@ export async function setIcpSearchSpec(
   // The plan's base line IS the must-have list (docs/structured-must-haves-plan.md):
   // an edited base is written back as the ICP's structured must-haves.
   const patch: Record<string, unknown> = { sourcing_map: sm, updated_at: new Date().toISOString() }
-  if (spec) patch.must_haves = mustHavesFromBase((row as { must_haves?: IcpMustHave[] }).must_haves, spec.base ?? [])
+  if (spec) patch.must_haves = mustHavesFromSpec((row as { must_haves?: IcpMustHave[] }).must_haves, { base: spec.base ?? [], levels: spec.levels })
   const { data, error } = await sb.from('icps').update(patch).eq('org_id', orgId).eq('id', icpId).select().maybeSingle()
   if (error) throw error
   if (!data) throw new Error('ICP not found')
