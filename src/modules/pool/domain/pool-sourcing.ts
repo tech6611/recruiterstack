@@ -130,6 +130,8 @@ export async function sourcePoolForIcp(
   // on a person the recruiter never sees.
   opts: {
     includeIds?: string[]
+    /** Experiments compare retrieved people, including candidates the organisation already unlocked. */
+    includeUnlocked?: boolean
     /** Per bought profile: the ladder level that reached them and the must-have ids that query applied. */
     acquired?: Record<string, { level: number; label: string; vendorGateIds?: string[] }>
     feederEmployers?: string[]
@@ -143,7 +145,7 @@ export async function sourcePoolForIcp(
   const sb = supabase as unknown as LooseSb
 
   const { data: unlocked } = await sb.from('pool_unlocks').select('profile_id').eq('org_id', orgId)
-  const excludeIds = (unlocked ?? []).map((r: { profile_id: string }) => r.profile_id)
+  const excludeIds = opts.includeUnlocked ? [] : (unlocked ?? []).map((r: { profile_id: string }) => r.profile_id)
 
   let ids: string[] = []
   try {

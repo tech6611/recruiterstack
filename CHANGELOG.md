@@ -9,6 +9,14 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-23
+
+### Added
+- Added **Sourcing Lab**: per-job, equal-budget Current-versus-Challenger Crustdata experiments with isolated cursors, externally sourced candidate cards, recruiter verdicts, and a cross-job results dashboard.
+
+### Docs
+- Added a clean-slate product and technical plan for an evidence-driven sourcing agent, covering the strategy object, recruiter workflow, architecture, delivery sequence, and evaluation model.
+
 ## 2026-09-18
 
 ### Docs

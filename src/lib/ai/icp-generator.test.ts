@@ -135,7 +135,7 @@ describe('isDefaultRubric', () => {
 })
 
 // ── Phase 1: niche recruiter brief ───────────────────────────────────────────────
-import { buildReasoningFirstPrompt, sourcingMapFromReasoning, type ReasoningFirstGeneration } from './icp-generator'
+import { buildChallengerReasoningPrompt, buildReasoningFirstPrompt, sourcingMapFromReasoning, type ReasoningFirstGeneration } from './icp-generator'
 
 const stratJob = {
   position_title: 'Strategy & Operations Manager', level: 'Senior', location: 'Bangalore Back Office', remote_ok: false,
@@ -167,6 +167,15 @@ describe('buildReasoningFirstPrompt (niche recruiter, Phase 1)', () => {
     expect(prompt).toContain('<market>\nNot provided\n</market>')
     expect(prompt).toContain('<recruiter_corrections>\nAlso search IB analysts at Avendus.\n</recruiter_corrections>')
     expect(prompt).toContain('THEY WIN')
+  })
+
+  it('keeps the shared response contract while adding the challenger evidence rules', () => {
+    const prompt = buildChallengerReasoningPrompt(stratJob)
+    expect(prompt).toContain('"recruiter_brief"')
+    expect(prompt).toContain('"must_haves": []')
+    expect(prompt).toContain('Build the acquisition strategy from the work this hire must personally do')
+    expect(prompt).toContain('Company size is not company stage')
+    expect(prompt).toContain('A company name is evidence of possible exposure')
   })
 })
 

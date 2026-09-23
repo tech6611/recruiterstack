@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { pickCalibrationSet } from '@/lib/ai/calibration'
 import { PoolSourcingSection } from '@/components/req-jobs/PoolSourcingSection'
+import { SourcingExperimentLab } from '@/components/req-jobs/SourcingExperimentLab'
 import { ShortlistBrief } from '@/components/req-jobs/ShortlistBrief'
 import { LearningPanel } from '@/components/req-jobs/LearningPanel'
 import { SourcingMatrix, type MatrixIcp } from '@/components/req-jobs/SourcingMatrix'
@@ -404,6 +405,7 @@ export function SourcingTab({ jobId }: { jobId: string }) {
       </>)}
 
       {/* ── Sourcing Brain — the market (Pool B) ─────────────────────────────── */}
+      <SourcingExperimentLab jobId={jobId} />
       <PoolSourcingSection jobId={jobId} />
 
       {/* ── Sourcing Brain — the shortlist brief (Slice 1b) ──────────────────── */}
