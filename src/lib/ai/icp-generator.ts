@@ -575,6 +575,46 @@ Respond with ONLY valid JSON (no markdown), with the fields in this order:
 }`
 }
 
+/**
+ * The challenger used only by the Sourcing Lab. It deliberately preserves the live
+ * output contract so both variants compile through the same ideal-profile and vendor
+ * path. The difference is decision logic: work/outcomes and evidence lead; pedigree
+ * and market lore are hypotheses to test rather than defaults to enforce.
+ */
+export function buildChallengerReasoningPrompt(job: HiringRequest, intakeNotes?: string | null, opts: ReasoningFirstOptions = {}): string {
+  return `${buildReasoningFirstPrompt(job, intakeNotes, opts)}
+
+<sourcing_lab_challenger>
+For this Sourcing Lab variant, override any earlier generic default with the rules below.
+Keep the exact JSON schema already requested.
+
+Build the acquisition strategy from the work this hire must personally do, not from a
+prestige template. First identify: (a) the stated outcomes and operating constraints,
+(b) the observable prior work that would support those outcomes, and (c) several
+credible background paths that could contain that work.
+
+Only treat supplied hiring-manager input, corrections, job description, company block,
+and market block as facts. Company size is not company stage. Do not invent a stage,
+team shape, package, candidate motivation, retention likelihood, relocation policy, or
+visa policy. Put missing facts that would change the search into unsure_about.
+
+For every feeder pool, explain in its rationale the comparable work, customer/problem,
+or operating environment. A company name is evidence of possible exposure, never proof
+that a person did the work. Include one adjacent pool where equivalent work can be
+verified after retrieval. Do not use school pedigree, employer prestige, title alone, or
+years alone as proof of ability.
+
+An experience ceiling, target-school list, or education filter may be populated only
+when the supplied role evidence makes it necessary. Otherwise leave it empty or null.
+The brief becomes a search ladder, so reserve it for signals worth spending market-search
+credits on. Keep must_haves as an empty array as requested by the shared contract.
+
+In reasoning, explicitly state the work/outcome that makes each high-weight competency
+matter. In unwritten_filters, add only testable hypotheses and describe the exclusion
+cost. In archetypes, distinguish transferable evidence from the risk that needs a screen.
+</sourcing_lab_challenger>`
+}
+
 /** Build the stored sourcing map; the recruiter's corrections ride along on the brief
  *  so they survive every regeneration. PURE. */
 export function sourcingMapFromReasoning(g: ReasoningFirstGeneration, recruiterCorrections?: string | null): SourcingMap {
@@ -631,6 +671,30 @@ export async function generateIcpWithReasoning(
     return { draft: draftFromReasoning(generation, opts.roleContext?.market ?? null), sourcingMap: sourcingMapFromReasoning(generation, opts.recruiterCorrections) }
   } catch (err) {
     logger.warn('ICP Generator: reasoning-first generation failed, using deterministic seed', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return { draft: deriveIcpSeed(job), sourcingMap: null }
+  }
+}
+
+/** Generate an in-memory challenger ICP for a Sourcing Lab comparison. Never writes an ICP. */
+export async function generateChallengerIcpWithReasoning(
+  job: HiringRequest,
+  identity: UsageIdentity = {},
+  intakeNotes?: string | null,
+  opts: ReasoningFirstOptions = {},
+): Promise<{ draft: IcpDraftInput; sourcingMap: SourcingMap | null }> {
+  try {
+    const { text, usage, model } = await withRetry(
+      () => generateText(buildChallengerReasoningPrompt(job, intakeNotes, opts), { model: MODEL, maxTokens: 20000, json: true }),
+      { label: 'Sourcing Lab challenger' },
+    )
+    trackUsage('sourcing-lab-challenger', model, usage, identity)
+    const generation = parseAiJson(text, reasoningFirstSchema, 'Sourcing Lab challenger')
+    if (!generation.competencies.length) throw new Error('no competencies generated')
+    return { draft: draftFromReasoning(generation, opts.roleContext?.market ?? null), sourcingMap: sourcingMapFromReasoning(generation, opts.recruiterCorrections) }
+  } catch (err) {
+    logger.warn('Sourcing Lab challenger failed, using deterministic seed', {
       error: err instanceof Error ? err.message : String(err),
     })
     return { draft: deriveIcpSeed(job), sourcingMap: null }

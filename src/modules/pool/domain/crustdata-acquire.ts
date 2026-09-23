@@ -254,14 +254,17 @@ interface LaneState { cursor: string | null; exhausted: boolean }
  * off (cursor) and whether the level is already drained. Read from the last few
  * pool_ingest_runs rows — no new table. Best-effort: any failure = start from page 1.
  */
-async function loadLaneStates(supabase: Supabase, jobId: string | null | undefined): Promise<Map<string, LaneState>> {
+async function loadLaneStates(supabase: Supabase, jobId: string | null | undefined, cursorScope: string | null = null): Promise<Map<string, LaneState>> {
   const out = new Map<string, LaneState>()
   if (!jobId) return out
   try {
     const { data } = await (supabase as unknown as LooseSb)
       .from('pool_ingest_runs').select('query').eq('source_key', SOURCE).eq('job_id', jobId)
       .order('started_at', { ascending: false }).limit(12)
-    for (const row of (data ?? []) as { query?: { results?: Partial<LaneRunResult>[] } | null }[]) {
+    for (const row of (data ?? []) as { query?: { cursorScope?: string | null; results?: Partial<LaneRunResult>[] } | null }[]) {
+      // An A/B experiment must never advance the live job cursor, or the other arm's
+      // cursor. Legacy/live runs have no scope and continue to share the null scope.
+      if ((row.query?.cursorScope ?? null) !== cursorScope) continue
       for (const r of row.query?.results ?? []) {
         if (!r?.key || out.has(r.key)) continue
         if (r.error) continue // a failed attempt says nothing about the level's supply
@@ -282,7 +285,10 @@ export async function loadAcquiredLevels(supabase: Supabase, jobId: string): Pro
     const { data } = await (supabase as unknown as LooseSb)
       .from('pool_ingest_runs').select('query').eq('source_key', SOURCE).eq('job_id', jobId)
       .order('started_at', { ascending: false }).limit(30)
-    for (const row of (data ?? []) as { query?: { results?: Partial<LaneRunResult>[]; baseCriterionIds?: string[] } | null }[]) {
+    for (const row of (data ?? []) as { query?: { cursorScope?: string | null; results?: Partial<LaneRunResult>[]; baseCriterionIds?: string[] } | null }[]) {
+      // Sourcing Lab acquisitions remain visible in the shared pool, but their
+      // experimental level must not be presented as the live ICP's level.
+      if (row.query?.cursorScope) continue
       const results = row.query?.results ?? []
       // The must-have ids the vendor query applied on THIS run — they hold for the people
       // it bought by construction. Older runs recorded none; those people are checked from data.
@@ -322,7 +328,7 @@ export async function sourceFromIcp(
   supabase: Supabase,
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'job_id' | 'competencies'>>,
   ctx: CrustdataQueryContext & Pick<SearchPlanContext, 'roleContext' | 'maxFeederLanes'> = {},
-  opts: Omit<SourceFromCrustdataInput, 'filters'> = {},
+  opts: Omit<SourceFromCrustdataInput, 'filters'> & { cursorScope?: string | null } = {},
 ): Promise<SourceFromIcpResult> {
   const { spec } = resolveSearchSpec(icp, { title: ctx.title, roleContext: ctx.roleContext, locationRadiusKm: ctx.locationRadiusKm })
   const plan = compileSpec(spec)
@@ -336,11 +342,12 @@ export async function sourceFromIcp(
   const jobId = opts.jobId ?? icp.job_id ?? null
   const maxRecords = Math.max(1, opts.maxRecords ?? opts.perPage ?? CRUSTDATA_DEFAULT_LIMIT)
   const described = describePlan(plan)
-  const states = await loadLaneStates(supabase, jobId)
+  const cursorScope = opts.cursorScope ?? null
+  const states = await loadLaneStates(supabase, jobId, cursorScope)
 
   const runId = await startIngestRun(supabase, {
     sourceKey: SOURCE, orgId: opts.orgId, jobId,
-    query: { ...described, specSource: spec.source, maxRecords, results: [], baseCriterionIds: plan.baseCriterionIds },
+    query: { ...described, specSource: spec.source, maxRecords, cursorScope, results: [], baseCriterionIds: plan.baseCriterionIds },
   })
 
   const profiles: unknown[] = []
@@ -394,14 +401,19 @@ export async function sourceFromIcp(
       if (o.status !== 'ingested') return
       const li = laneOfPayload[idx]
       results[li].profileIds.push(o.profileId)
-      acquired[o.profileId] = { level: li + 1, label: results[li].label, key: results[li].key }
+      acquired[o.profileId] = {
+        level: li + 1,
+        label: results[li].label,
+        key: results[li].key,
+        vendorGateIds: [...plan.baseCriterionIds, ...(results[li].criterionIds ?? [])],
+      }
     })
 
     await finishIngestRun(supabase, runId, {
       ids_matched: matchedTotal || profiles.length, ids_bought: profiles.length,
       profiles_created: ingest.created, profiles_merged: ingest.merged, records_unusable: ingest.unusable, credits_used: Math.ceil(creditsUsed),
     })
-    await (supabase as unknown as LooseSb).from('pool_ingest_runs').update({ query: { ...described, specSource: spec.source, maxRecords, results, baseCriterionIds: plan.baseCriterionIds } }).eq('id', runId).then(() => undefined, () => undefined)
+    await (supabase as unknown as LooseSb).from('pool_ingest_runs').update({ query: { ...described, specSource: spec.source, maxRecords, cursorScope, results, baseCriterionIds: plan.baseCriterionIds } }).eq('id', runId).then(() => undefined, () => undefined)
 
     logger.info('Crustdata ladder run complete', { runId, levels: results.length, matched: matchedTotal, fetched: profiles.length, creditsUsed, created: ingest.created, merged: ingest.merged })
     return {

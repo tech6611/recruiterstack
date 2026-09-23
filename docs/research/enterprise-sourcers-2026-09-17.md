@@ -1,0 +1,67 @@
+# SeekOut and hireEZ: competitor sourcing mechanisms
+
+Research date: **17 September 2026**. Scope: competitor research only. This report makes no assessment of the current Recruiterstack ICP implementation. Sources are vendor-owned help articles, operating guides, release notes and product pages; no live product accounts or sales demos were used. A documented capability is not an independently measured quality result.
+
+## SeekOut: explicit search criteria plus a separate evaluation rubric
+
+**Intake and role representation.** The June 2026 Workspaces guide describes three entry paths: JD/ideal-candidate description, guided setup, or a blank workspace. Guided setup selects titles, two to four crucial skills/experiences, preferred **previous** employers, and optional education, experience and location. AI generates five editable Yes/No evaluation criteria. Recruiters review the generated search and scorecard before use. Workspaces is documented as included with paid Recruit licenses. This is the clearest operational example of translating a role into both retrieval criteria and an evaluation instrument. [Workspaces setup, June 10, 2026](https://support.seekout.com/en/articles/12805473-how-to-use-seekout-workspaces)
+
+**What target companies mean.** Company filtering has explicit current-company, past-company, company-alumni, industry, and current-company-size concepts. The alumni filter includes a date range. This allows a recruiter to express “worked in that environment” separately from “works there now.” The public filter guide does not establish that SeekOut models historical company stage at the exact time of employment, team-level scope, or why a particular company is an ideal training ground. Those deeper interpretations remain unverified. [Filter reference](https://support.seekout.com/en/articles/11878164-an-overview-of-seekout-s-filters)
+
+**Search logic and tradeoffs.** Smart Match suggests related titles. Required skills have AND semantics with editable OR groups; preferred skills affect ordering. Candidates meeting only some required skills can appear as partial matches. Recruiters can move skills between required and preferred and explicitly include/exclude terms. Highlighted profile words may be related variants, not exact matches. This is a concrete distinction between qualification, preference, and weaker similarity. [Smart Match help](https://support.seekout.com/en/articles/11877811-smart-match)
+
+**Conversational refinement is inspectable.** SeekOut Assist translates natural-language requests into visible filters and keywords, suggests expansions, and lets the recruiter refine either conversationally or manually. Results change as criteria change. Its examples include interpreting a company category such as streaming services into named employers. Plan availability varies. The help article documents translation behavior, not the internal model or whether a newly described company category is complete. [Conversational search help](https://support.seekout.com/en/articles/11877771-conversational-search-with-seekout-assist)
+
+**Market validation and search iteration.** Workspaces shows matching counts across sources, preserves filters when moving between public profiles, ATS talent and alumni, and provides aggregate geography, seniority and company insights. Recruiters can broaden into partial matches, change filters, and evaluate selected or all profiles against the scorecard. Search state persists. This supports iterative feasibility checks before outreach. The detailed April guide still calls the scoring area an Evaluate tab, so its navigation labels should be checked against newer releases. [Search workflow, April 9, 2026](https://support.seekout.com/en/articles/14049227-workspaces-search-tab)
+
+**Current UI and evidence.** May 2026 release notes replaced the Evaluation tab with AI Recommendations. July added scorecard criteria and criterion-based filtering in shortlists; August added evaluation snapshots to recommendations. April introduced a Not a Fit action and filters hiding previously actioned profiles. These establish visibility and exclusion behavior. They do **not** establish that every negative action retrains a ranking model. August also reports a GitHub index refresh, underlining that live querying and source freshness are separate concepts. [2026 release notes](https://www.seekout.com/release-notes/)
+
+**Calibration interpretation.** SeekOut's well-supported mechanism is rubric calibration: recruiter-editable criteria, visible results, and repeated search adjustments. The reviewed sources do not document an obligatory positive/negative sample-selection training round before every search. Nor do they establish statistical calibration of fit scores, a validated personality assessment, or deterministic source citations for every inferred criterion. Those should be verified in a demo, not assumed from “AI evaluation.”
+
+## hireEZ: an editable persona, sample calibration and semantic expansion
+
+**Intake is broader than a JD.** The August 2025 EZ Agent operating guide explicitly supports deriving an Ideal Candidate Persona from a JD, intake documents, hireEZ Forms/intake notes, search filters or sample candidates. It instructs users to review the persona and remove unnecessary generic JD requirements before screening. It also documents prompts to find people similar to a named candidate, analyze poor search results, run Deep Search, and assess market size. The guide says feedback helps the agent remember preferences, but does not specify whether this updates prompts, project state, retrieval weights or a trained model. [EZ Agent operating guide, August 1, 2025](https://hireez.com/blog/mastering-ez-agent-your-guide-to-effective-prompts-in-hireez/)
+
+**Company mapping and labeled examples are established historical mechanisms.** A January 2022 official sourcing guide documents chosen companies plus similar-company suggestions, company size/type/industry filters, reusable include/exclude company lists, and current/past/either title scope. Before starting sourcing, users marked example candidates Good Fit or Not a Fit; the guide says these labels affected similarity-based retrieval. Preferred skills reordered candidates without reducing pool size. This is direct documentation of company expansion and positive/negative calibration, but its age means the exact current interface and retained semantics need demo confirmation. [Detailed sourcing guide, January 25, 2022](https://hireez.com/blog/your-ultimate-guide-to-sourcing-candidates-with-hireez/)
+
+**The current agent narrative preserves calibration.** The current official one-pager describes a brief → analyzed candidate options → recruiter direction loop, including target companies and explanatory tags. It claims criteria can change during a search, recommendations have written rationale, and actions are logged. Crucially, it places uploading past successful hires for custom calibration under **future scope**. That planned feature should not be confused with the earlier operating guide's sample-candidate persona input. The page is a product narrative, not a release note proving universal availability. [Agent-native operating model](https://hireez.com/one-pager/)
+
+**Semantic broadening is an explicit product.** Deep Search is described as semantic search that addresses candidate pools made too small by restrictive keywords, finding people whose qualifications fit despite wording differences. The page does not disclose the exact relaxation algorithm, what constraints cannot be relaxed, or whether recruiters see each constraint change. Consequently, it verifies the product's intended behavior but not precision preservation. [Deep Search](https://hireez.com/deep-search/)
+
+**Retrieval and review are separate.** AI Review evaluates sourced candidates against the JD and persona, assigning Best, Good, Partial or Limited Match categories. These are product categories; the page supplies no calibrated probability or independent validity benchmark. [AI Review](https://explore.hireez.com/ai-review)
+
+**Evidence and source coverage.** The current sourcing page describes searching public-web and ATS profiles, explaining candidate-to-role fit, and connecting accepted candidates to outreach. The platform page additionally describes highlighting relevant profile passages. This is stronger than an unexplained rank, but neither page establishes sentence-level source provenance or whether unsupported requirements are marked unknown instead of missing. [AI Sourcing](https://www.hireez.com/ai-sourcing/), [Platform](https://www.hireez.com/platform/)
+
+**Market-informed intake.** The current homepage positions Research & Intake before sourcing: interpreting the role, assessing talent supply and salary benchmarks, and producing a sourcing strategy. This aligns with reverse-engineering a realistic funnel from the available market. These are vendor claims without a public detailed intake schema or a benchmark demonstrating that the proposed strategy reliably improves outcomes. [hireEZ current workflow](https://www.hireez.com/home/)
+
+**Availability caveat.** EZ Agent, AI Review and Deep Search have active product pages and sales/demo entry points. Public materials reviewed do not provide a precise plan-by-plan rollout matrix. The current one-pager also mixes present claims with an explicitly labeled roadmap. Historical help-center updates may show recent maintenance timestamps even when their title concerns a 2021 release; those should not be read as fresh feature launches.
+
+## Mechanisms these competitors actually establish
+
+The following is a synthesis of the cited evidence, not a ranking of vendor accuracy:
+
+| Funnel decision | SeekOut | hireEZ |
+|---|---|---|
+| What does the role require? | Guided criteria and editable binary scorecard | Editable Ideal Candidate Persona informed by JD, intake or examples |
+| Where should those candidates have worked? | Explicit prior-employer selection and scoped company filters | Target-company briefing; historical similar-company and firmographic expansion |
+| Are there enough candidates? | Cross-pool counts and aggregate People Insights | Market analysis prompts and Research & Intake positioning |
+| How do criteria change? | Visible filters, required/preferred skills, conversational edits, partial matches | Persona edits, examples, conversational feedback and Deep Search |
+| How is fit shown? | Scorecard criteria, recommendation snapshots, profile highlights | Match categories, rationale and profile highlights |
+| What does rejection do? | Documented hide/exclude behavior; model learning unverified | Historical negative examples influence retrieval; current learning internals undisclosed |
+| Can it infer personality reliably? | Not established by reviewed sources | Soft-skill alignment is mentioned, but validated personality inference is not established |
+
+## Product lessons and specific demo tests
+
+These are independent recommendations drawn from the comparison; they do not imply corresponding deficiencies in Recruiterstack.
+
+1. **Separate the search plan from the evidence rubric.** Retrieval benefits from multiple plausible paths. Evaluation needs explicit requirements and uncertainty. Ask a vendor to show both artifacts for the same job, then demonstrate how an edit propagates.
+2. **Require a reason for a company target.** Test whether the system understands a company as a source of relevant environment/experience or simply an employer string. Compare current employees, alumni, similar companies and a strong candidate from an unfamiliar employer.
+3. **Calibrate with contrasting examples.** Supply one good match, one adjacent match, and one deceptive keyword match. Ask what changed after each judgment, whether the change persists, and whether it affects this job or every future search.
+4. **Audit relaxation.** Use a deliberately narrow job. Ask the system to broaden it, then inspect exactly which constraints changed and whether immutable requirements stayed intact. A larger pool alone does not prove better sourcing.
+5. **Inspect evidence rather than prose confidence.** Include a sparse profile and a stale employer. Require explicit support, contradiction and unknown states, with source and date. Check that a plausible explanation is not substituting for evidence.
+6. **Test behavioral fit through job evidence.** “Led a small team through ambiguous zero-to-one product work” is verifiable through projects and interview evidence. A confident personality label inferred from company prestige or profile tone is not established by these products' public material.
+7. **Measure recruiter acceptance and useful coverage.** Give every vendor the same role, calibration examples and review budget. Blind-review results and record accepted candidates, unique relevant candidates, factual errors, and time to a usable shortlist. Marketing database size and vendor-reported speed gains do not provide a comparative accuracy test.
+
+## Research limitations
+
+Public sources provide much stronger operational detail for SeekOut's 2026 Workspaces than for hireEZ's newest agent interface. Neither vendor discloses enough to reconstruct its entire retrieval/ranking architecture or validate its fit scores. No claim is made that either vendor is categorically the best. Dates above refer to source publication/release where available, not crawl recency. All source summaries are kept under 150 words per source.
