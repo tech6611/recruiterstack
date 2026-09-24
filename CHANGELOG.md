@@ -11,6 +11,9 @@ entries on top.
 
 ## 2026-09-24
 
+### Removed
+- **The hand-edited "Scoring rubric" card** at the bottom of a job's Scoring tab (`ScoringTab.tsx`). The ICP's competencies and weights already are the rubric — approving an ICP writes `custom_fields.scoring_criteria` via `icpToScoringCriteria` — so the second editor only let the two drift apart. The read-only rubric summary on the Overview sidebar is unchanged, and nothing about how candidates are scored changes.
+
 ### Added
 - **Ideal-candidate persona tabs on the Source tab** (Juicebox-style): six clickable tabs — Current employers · Job titles · Skills · Seniority · Years of experience · Locations. Each shows the values the job's ideal profile targets (company logos via Clearbit's public endpoint, fetched on the fly with a coloured-initial fallback) and, when the org has pool access, the distribution present in the pool ("the market map"). New pure builder `buildPersonaTabs` (`src/lib/persona-tabs.ts`, tested), logo helper `src/lib/company-logo.ts` (tested), read-only endpoint `GET /api/jobs/[id]/source/persona` (spends no vendor credits), and `PersonaTabs.tsx` mounted atop `SourcingTab`.
 

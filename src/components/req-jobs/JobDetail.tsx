@@ -18,7 +18,6 @@ import { CloseJobDialog } from '@/components/req-jobs/CloseJobDialog'
 import { SaveAsTemplateDialog } from '@/components/req-jobs/SaveAsTemplateDialog'
 import { PostingsTab } from '@/components/req-jobs/PostingsTab'
 import { ScreeningTab } from '@/components/req-jobs/ScreeningTab'
-import { ScoringTab } from '@/components/req-jobs/ScoringTab'
 import { IcpEditor } from '@/components/req-jobs/IcpEditor'
 import { SourcingTab } from '@/components/req-jobs/SourcingTab'
 import { JobPostReview } from '@/components/req-jobs/JobPostReview'
@@ -1033,19 +1032,14 @@ export function JobDetail({ job: initialJob, department, departments, locations 
         />
       )}
 
+      {/* The ICP's competencies ARE the rubric: approving one writes scoring_criteria
+          (icpToScoringCriteria). A second, hand-edited rubric card here only let the two
+          drift apart, so it was removed. */}
       {tab === 'scoring' && (
-        <div className="space-y-4">
-          <IcpEditor
-            jobId={job.id}
-            onApproved={c => setJob(j => ({ ...j, custom_fields: { ...j.custom_fields, scoring_criteria: c } }))}
-          />
-          <ScoringTab
-            key={JSON.stringify(readScoringCriteria(job.custom_fields))}
-            jobId={job.id}
-            initialCriteria={readScoringCriteria(job.custom_fields)}
-            onSaved={c => setJob(j => ({ ...j, custom_fields: { ...j.custom_fields, scoring_criteria: c } }))}
-          />
-        </div>
+        <IcpEditor
+          jobId={job.id}
+          onApproved={c => setJob(j => ({ ...j, custom_fields: { ...j.custom_fields, scoring_criteria: c } }))}
+        />
       )}
 
       {tab === 'source' && <SourcingTab jobId={job.id} />}
