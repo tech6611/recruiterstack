@@ -12,6 +12,7 @@ import { SourcingExperimentLab } from '@/components/req-jobs/SourcingExperimentL
 import { ShortlistBrief } from '@/components/req-jobs/ShortlistBrief'
 import { LearningPanel } from '@/components/req-jobs/LearningPanel'
 import { SourcingMatrix, type MatrixIcp } from '@/components/req-jobs/SourcingMatrix'
+import { CalibrationPopup } from '@/components/req-jobs/CalibrationPopup'
 
 const CALIBRATION_SIZE = 15
 const MIN_DECISIONS = 5
@@ -241,6 +242,15 @@ export function SourcingTab({ jobId }: { jobId: string }) {
   const decidedCount = matches.filter((m) => m.decision === 'yes' || m.decision === 'no' || m.decision === 'maybe').length
   const shown = calibrate ? pickCalibrationSet(matches, CALIBRATION_SIZE) : matches
 
+  // The Juicebox-style "Review 3 profiles" trio — a diverse spread across the score range.
+  const calibProfiles = pickCalibrationSet(matches, 3).map((m) => ({
+    candidate_id: m.candidate_id,
+    name: m.candidate?.name ?? 'Unknown',
+    title: m.candidate?.current_title ?? null,
+    company: m.candidate?.current_company ?? null,
+    decision: m.decision,
+  }))
+
   const stale = matches.some((m) => currentVersion != null && m.icp_version !== currentVersion)
 
   if (loading) {
@@ -422,6 +432,14 @@ export function SourcingTab({ jobId }: { jobId: string }) {
       {/* ── Sourcing Brain — the learning loop (Slice 3) ─────────────────────── */}
       <LearningPanel jobId={jobId} />
     </Card>
+
+    {hasIcp && matches.length > 0 && (
+      <CalibrationPopup
+        profiles={calibProfiles}
+        onDecide={(id, d) => decide(id, d)}
+        onReviewAll={() => setCalibrate(true)}
+      />
+    )}
     </div>
   )
 }
