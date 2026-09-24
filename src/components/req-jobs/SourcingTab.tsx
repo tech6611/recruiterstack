@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { pickCalibrationSet } from '@/lib/ai/calibration'
+import { PersonaTabs } from '@/components/req-jobs/PersonaTabs'
 import { PoolSourcingSection } from '@/components/req-jobs/PoolSourcingSection'
 import { SourcingExperimentLab } from '@/components/req-jobs/SourcingExperimentLab'
 import { ShortlistBrief } from '@/components/req-jobs/ShortlistBrief'
@@ -243,10 +244,17 @@ export function SourcingTab({ jobId }: { jobId: string }) {
   const stale = matches.some((m) => currentVersion != null && m.icp_version !== currentVersion)
 
   if (loading) {
-    return <Card><CardContent className="py-8 text-center text-sm text-slate-400">Loading…</CardContent></Card>
+    return (
+      <div className="space-y-4">
+        <PersonaTabs jobId={jobId} />
+        <Card><CardContent className="py-8 text-center text-sm text-slate-400">Loading…</CardContent></Card>
+      </div>
+    )
   }
 
   return (
+    <div className="space-y-4">
+    <PersonaTabs jobId={jobId} />
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
@@ -414,5 +422,6 @@ export function SourcingTab({ jobId }: { jobId: string }) {
       {/* ── Sourcing Brain — the learning loop (Slice 3) ─────────────────────── */}
       <LearningPanel jobId={jobId} />
     </Card>
+    </div>
   )
 }

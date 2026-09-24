@@ -9,6 +9,14 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-24
+
+### Added
+- **Ideal-candidate persona tabs on the Source tab** (Juicebox-style): six clickable tabs — Current employers · Job titles · Skills · Seniority · Years of experience · Locations. Each shows the values the job's ideal profile targets (company logos via Clearbit's public endpoint, fetched on the fly with a coloured-initial fallback) and, when the org has pool access, the distribution present in the pool ("the market map"). New pure builder `buildPersonaTabs` (`src/lib/persona-tabs.ts`, tested), logo helper `src/lib/company-logo.ts` (tested), read-only endpoint `GET /api/jobs/[id]/source/persona` (spends no vendor credits), and `PersonaTabs.tsx` mounted atop `SourcingTab`.
+
+### Changed
+- **Pool facets now tally employers and job titles** (`getPoolFacets`): alongside the existing city/country/skill/source facets, the pool now returns the top companies and titles with per-value counts — the data behind the forthcoming Juicebox-style persona tabs. Backed by a pure, tested `summarizeLabelCounts` (case-insensitive grouping, first-seen spelling, frequency order). Additive only; existing facet fields unchanged.
+
 ## 2026-09-23
 
 ### Added

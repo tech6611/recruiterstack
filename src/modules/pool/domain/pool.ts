@@ -271,20 +271,62 @@ export async function getPoolProfile(
   }
 }
 
+/**
+ * Count free-text labels (employers, job titles) case-insensitively, keeping the
+ * first-seen spelling for display, and return the top N by frequency. Pure — the
+ * tested core of the company/title facets that drive the persona tabs. Ties break
+ * alphabetically so the ordering is stable.
+ */
+export function summarizeLabelCounts(
+  values: (string | null | undefined)[],
+  topN: number,
+): { name: string; count: number }[] {
+  const map = new Map<string, { name: string; count: number }>()
+  for (const raw of values) {
+    if (!raw) continue
+    const name = raw.trim()
+    if (!name) continue
+    const key = name.toLowerCase()
+    const cur = map.get(key)
+    if (cur) cur.count += 1
+    else map.set(key, { name, count: 1 })
+  }
+  return Array.from(map.values())
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, topN)
+}
+
 /** Distinct values for the search facets, computed from what's actually in the pool. */
 export async function getPoolFacets(
   supabase: Supabase,
-): Promise<{ cities: string[]; countries: { code: string; name: string }[]; skills: string[]; sources: string[]; total: number }> {
+): Promise<{
+  cities: string[]
+  countries: { code: string; name: string }[]
+  skills: string[]
+  companies: { name: string; count: number }[]
+  titles: { name: string; count: number }[]
+  sources: string[]
+  total: number
+}> {
   const sb = supabase as unknown as LooseSb
   const { data, count } = await sb
     .from('pool_profiles')
-    .select('location_city,location_country,location_country_code,skills,sources', { count: 'exact' })
+    .select('current_title,current_company,location_city,location_country,location_country_code,skills,sources', { count: 'exact' })
     .limit(1000)
+  const rows = (data ?? []) as {
+    current_title: string | null
+    current_company: string | null
+    location_city: string | null
+    location_country: string | null
+    location_country_code: string | null
+    skills: string[]
+    sources: string[]
+  }[]
   const cities = new Set<string>()
   const countries = new Map<string, string>()
   const skills = new Map<string, number>()
   const sources = new Set<string>()
-  for (const r of (data ?? []) as { location_city: string | null; location_country: string | null; location_country_code: string | null; skills: string[]; sources: string[] }[]) {
+  for (const r of rows) {
     if (r.location_city) cities.add(r.location_city)
     if (r.location_country_code && r.location_country) countries.set(r.location_country_code, r.location_country)
     for (const s of r.skills ?? []) skills.set(s, (skills.get(s) ?? 0) + 1)
@@ -294,6 +336,8 @@ export async function getPoolFacets(
     cities: Array.from(cities).sort(),
     countries: Array.from(countries.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.name.localeCompare(b.name)),
     skills: Array.from(skills.entries()).sort((a, b) => b[1] - a[1]).slice(0, 40).map(([s]) => s),
+    companies: summarizeLabelCounts(rows.map((r) => r.current_company), 50),
+    titles: summarizeLabelCounts(rows.map((r) => r.current_title), 50),
     sources: Array.from(sources).sort(),
     total: count ?? 0,
   }
