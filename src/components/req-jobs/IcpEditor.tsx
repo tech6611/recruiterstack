@@ -10,8 +10,8 @@ import type { ScoringCriterion } from '@/lib/types/database'
 import type { Icp, IcpCompetency, IcpMustHave } from '@/lib/types/icp'
 import { icpToScoringCriteria } from '@/lib/scoring'
 import { RecruiterBriefCard } from '@/components/req-jobs/RecruiterBriefCard'
-import { isCriterion, toCriterion, criterionLabel } from '@/lib/icp-gates'
-import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
+import { isCriterion, toCriterion, mustHaveFromCriterion } from '@/lib/icp-gates'
+import { IdealProfileTiles } from '@/components/req-jobs/IdealProfileTiles'
 
 
 const BUCKET_LABEL: Record<string, string> = { hard_filter: 'Hard filter', ranking_signal: 'Ranking', screen_later: 'Screen later' }
@@ -472,25 +472,18 @@ export function IcpEditor({
             const profile = gates.filter((g) => isCriterion(g))
             const screening = gates.filter((g) => g.attribute === 'screening')
             const legacy = gates.filter((g) => !isCriterion(g) && g.attribute !== 'screening')
-            const relaxNote = (at: number | null | undefined) => (at == null ? 'never relaxed' : `relaxes at L${at}`)
             return (
               <>
                 {profile.length === 0 && legacy.length === 0 && (
                   <p className="text-xs text-slate-400">No ideal profile yet — Regenerate to build it from the JD and the recruiter brief.</p>
                 )}
                 {profile.length > 0 && (
-                  <div className="overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100">
-                    {profile.map((g) => {
-                      const c = toCriterion(g)!
-                      return (
-                        <div key={g.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                          <span className="w-24 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{CRITERION_KIND_LABEL[c.kind]}</span>
-                          <span className="flex-1 text-slate-700">{criterionLabel(c)}</span>
-                          <span className="text-[10px] text-slate-400">{relaxNote(g.relax_at)}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <IdealProfileTiles
+                    criteria={profile.map((g) => toCriterion(g)!)}
+                    onChange={(next) =>
+                      setGates((prev) => prev.map((g) => (g.id === next.id ? { ...mustHaveFromCriterion(next), relax_at: next.relax_at ?? null } : g)))
+                    }
+                  />
                 )}
                 {screening.length > 0 && (
                   <div className="space-y-1">
