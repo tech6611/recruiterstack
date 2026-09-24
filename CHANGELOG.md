@@ -13,6 +13,10 @@ entries on top.
 
 ### Added
 - Added **Sourcing Lab**: per-job, equal-budget Current-versus-Challenger Crustdata experiments with isolated cursors, externally sourced candidate cards, recruiter verdicts, and a cross-job results dashboard.
+- **Diverse Sourcing Lab first slate:** each strict target company is now an acquisition lane; the Lab takes one profile per lane before repeating an employer.
+
+### Changed
+- **Strict persona sourcing:** recruiter briefs now declare current versus historical title basis, required current function, and excluded ambiguous title families. The strict ideal profile defaults to current title and sends those conditions to the vendor before any relaxation.
 
 ### Docs
 - Added a clean-slate product and technical plan for an evidence-driven sourcing agent, covering the strategy object, recruiter workflow, architecture, delivery sequence, and evaluation model.

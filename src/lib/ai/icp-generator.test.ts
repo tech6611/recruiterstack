@@ -184,7 +184,7 @@ describe('sourcingMapFromReasoning', () => {
     recruiter_brief: {
       niche: 'Strategy & Ops recruiter, Bengaluru', persona: 'p', market: 'Bengaluru, on-site',
       feeder_pools: [{ label: 'MBB', companies: ['McKinsey'], role_types: ['Consultant'], priority: 1, rationale: null }],
-      title_families: ['BizOps'], market_gates: [], jd_translations: [], market_norms: [], normal_red_flags: [], unsure_about: [],
+      title_families: ['BizOps'], current_functions: [], current_title_exclusions: [], market_gates: [], jd_translations: [], market_norms: [], normal_red_flags: [], unsure_about: [],
     },
     reasoning: 'r', requirement_decomposition: [], unwritten_filters: [], archetypes: [],
     competencies: [{ name: 'A', weight: 100, behaviours: [] }], must_haves: [],
@@ -209,7 +209,7 @@ describe('draftFromReasoning — the must-haves ARE the ideal profile', () => {
     recruiter_brief: {
       niche: 'n', persona: 'p', market: 'm', experience_band: { min_years: 2, max_years: 6, rationale: 'IC seat' },
       feeder_pools: [{ label: 'Consulting', companies: ['McKinsey & Company', 'Bain'], role_types: [], priority: 1 }],
-      title_families: ['Chief of Staff', 'Strategy Manager'], adjacent_titles: ['Business Operations Manager'],
+      title_families: ['Chief of Staff', 'Strategy Manager'], current_functions: [], current_title_exclusions: [], adjacent_titles: ['Business Operations Manager'],
       education: { degrees: ['MBA'], fields: [] },
       market_gates: [], jd_translations: [], market_norms: [], normal_red_flags: [], unsure_about: [],
     },
@@ -219,7 +219,7 @@ describe('draftFromReasoning — the must-haves ARE the ideal profile', () => {
   }
   it('builds where · years · education · roles held · companies from the brief and ignores yes/no gates', () => {
     const d = draftFromReasoning(base, { city: 'Bengaluru', state: 'Karnataka', country: 'IN', work_model: 'onsite' })
-    expect(d.must_haves.map((g) => g.kind)).toEqual(['location', 'years_band', 'degree_field', 'title_any', 'employer_current'])
+    expect(d.must_haves.map((g) => g.kind)).toEqual(['location', 'years_band', 'degree_field', 'title_current', 'employer_current'])
     expect(d.must_haves.find((g) => g.kind === 'years_band')).toMatchObject({ min: 2, max: 6 })
     expect(d.must_haves.find((g) => g.kind === 'employer_current')?.values).toEqual(['McKinsey', 'Bain'])
     expect(d.must_haves.some((g) => /SQL/.test(g.label))).toBe(false)

@@ -148,6 +148,9 @@ const recruiterBriefSchema = z.object({
     rationale: z.string().nullish(),
   })).max(10).default([]),
   title_families: z.array(z.string()).max(20).default([]),
+  title_basis: z.enum(['current', 'past']).nullish(),
+  current_functions: z.array(z.string()).max(8).default([]),
+  current_title_exclusions: z.array(z.string()).max(20).default([]),
   education: z.object({ degrees: z.array(z.string()).max(10).default([]), fields: z.array(z.string()).max(10).default([]), rationale: z.string().nullish() }).nullish(),
   adjacent_titles: z.array(z.string()).max(20).optional(),
   market_gates: z.array(z.object({ requirement: z.string(), why: z.string().nullish() })).max(12).default([]),
@@ -525,6 +528,9 @@ Work in this exact order, and let each step drive the next:
    - target_schools: when education pedigree matters in this market, the SCHOOL LISTS you would actually search — tier1 (the institutions a first-pass filter accepts) and tier2 (where you look once tier1 is exhausted). Write each as the short literal name a person would type on a profile ("Indian Institute of Technology", "IIM Ahmedabad", "BITS Pilani", "University of Oxford"); a generic institution name covers all its campuses. Leave both empty when pedigree is not a real filter for this role.
    - feeder_pools: where you would search FIRST, in priority order (priority 1 = first). Each pool names REAL employers AND the role types you'd pull from them, local to this market. Think like your niche: a strategy recruiter starts at top consulting, IB, VC/PE and in-house Strategy & Ops / BizOps / Chief of Staff teams; a GTM recruiter starts at quota carriers at comparable deal size and segment; an engineering recruiter at product companies solving comparable problems. Be concrete; name companies.
    - title_families: the titles that are the SAME search as this role.
+   - title_basis: "current" when the person must hold that role today (the default for an operating hire); "past" only when a prior role is deliberately the relevant evidence. Never use career history as a shortcut for a current-role search.
+   - current_functions: the professional functions the person must work in TODAY for the strict first pass, using literal source categories where possible (for example "Engineering", "Sales", "Consulting"). Leave empty only if function is genuinely irrelevant.
+   - current_title_exclusions: current-title phrases that look similar but are the wrong job for this seat (for example GTM Engineering, Sales Engineering, Solutions Engineering, RevOps for a core product-engineering leader). Leave empty when none apply.
    - adjacent_titles: titles ONE step wider — the people you would search once the title families run dry (a Tech Lead Manager search widens to Staff Engineer who leads; a Chief of Staff search widens to Strategy Manager). Never generic level words alone ("Senior", "Manager").
    - education: the ideal profile's education row for THIS market — degrees ("B.Tech", "MBA") and/or fields of study ("Engineering", "Computer Science") a recruiter would actually filter on; empty lists when education genuinely doesn't matter here.
    - market_gates: which of the JD's requirements are TRUE gates in this market and why (e.g. institute tier is a real filter in Indian strategy hiring; a degree barely matters in engineering).
@@ -557,7 +563,7 @@ Respond with ONLY valid JSON (no markdown), with the fields in this order:
     "experience_band": { "min_years": 2, "max_years": 6, "rationale": "" },
     "target_schools": { "tier1": [""], "tier2": [""] },
     "feeder_pools": [ { "label": "", "companies": [""], "role_types": [""], "priority": 1, "rationale": "" } ],
-    "title_families": [""],
+    "title_families": [""], "title_basis": "current", "current_functions": [""], "current_title_exclusions": [""],
     "adjacent_titles": [""],
     "education": { "degrees": [""], "fields": [""], "rationale": "" },
     "market_gates": [ { "requirement": "", "why": "" } ],

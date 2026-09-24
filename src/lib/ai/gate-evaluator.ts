@@ -293,7 +293,7 @@ export interface IdealProfileMarket { city?: string | null; state?: string | nul
  * IS the must-have list. Rows the brief has nothing for are simply absent. PURE.
  */
 export function idealProfileFromBrief(
-  brief: Pick<RecruiterBrief, 'experience_band' | 'title_families' | 'feeder_pools' | 'education' | 'market'> | null | undefined,
+  brief: Pick<RecruiterBrief, 'experience_band' | 'title_families' | 'title_basis' | 'current_functions' | 'current_title_exclusions' | 'feeder_pools' | 'education' | 'market'> | null | undefined,
   market: IdealProfileMarket | null | undefined,
   opts: { radiusKm?: number } = {},
 ): IcpMustHave[] {
@@ -317,9 +317,15 @@ export function idealProfileFromBrief(
   const edu = [...(brief?.education?.degrees ?? []), ...(brief?.education?.fields ?? [])].map((s) => s.trim()).filter(Boolean)
   if (edu.length) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.education, kind: 'degree_field', values: Array.from(new Set(edu)) }))
 
-  // Roles held: whole-phrase titles, never a bare level word.
+  // Strict pass: a role held TODAY unless the recruiter deliberately says prior experience is the signal.
   const titles = Array.from(new Set((brief?.title_families ?? []).flatMap(titleTerms)))
-  if (titles.length) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.titles, kind: 'title_any', values: titles, relax_at: RELAX_AT.titles }))
+  if (titles.length) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.titles, kind: brief?.title_basis === 'past' ? 'title_any' : 'title_current', values: titles, relax_at: RELAX_AT.titles }))
+
+  const functions = Array.from(new Set((brief?.current_functions ?? []).map((v) => v.trim()).filter(Boolean)))
+  if (functions.length) out.push(mustHaveFromCriterion({ id: 'ip-function', kind: 'function', values: functions }))
+
+  const exclusions = Array.from(new Set((brief?.current_title_exclusions ?? []).flatMap(titleTerms)))
+  if (exclusions.length) out.push(mustHaveFromCriterion({ id: 'ip-title-exclusions', kind: 'title_current', values: exclusions, exclude: true }))
 
   // Companies: the first feeder pool (lowest priority number) is the ideal.
   const pools = [...(brief?.feeder_pools ?? [])].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))

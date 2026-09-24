@@ -244,8 +244,13 @@ export function ladderFromIdealProfile(
   }
   const keep = (...cs: (SearchCriterion | undefined)[]) => [...others, ...cs.filter((c): c is SearchCriterion => Boolean(c))]
 
-  // L1: the ideal profile, verbatim.
-  level('Ideal profile', keep(location, titles, companies), null)
+  // L1: the exact persona. Split target companies into peer lanes so a five-person
+  // slate can present distinct recruiter bets instead of five people from one employer.
+  if (companies?.values.length) {
+    for (const company of companies.values) level(`Ideal profile · ${company}`, keep(location, titles, { ...companies, values: [company], label: null }), null)
+  } else {
+    level('Ideal profile', keep(location, titles, companies), null)
+  }
 
   // L2: the next feeder pools instead of the first; no pools left → any company.
   if (companies) {

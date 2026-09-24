@@ -101,7 +101,7 @@ import { resolveSearchSpec as resolveSpec } from './spec-from-brief'
 describe('ladderFromIdealProfile', () => {
   const brief = {
     niche: '', persona: '', market: 'New York', experience_band: { min_years: 6, max_years: 12 },
-    title_families: ['Engineering Manager', 'Tech Lead Manager'], adjacent_titles: ['Staff Software Engineer', 'Engineering Lead'],
+    title_families: ['Engineering Manager', 'Tech Lead Manager'], current_functions: [], current_title_exclusions: [], adjacent_titles: ['Staff Software Engineer', 'Engineering Lead'],
     feeder_pools: [
       { label: 'Scaling B2B SaaS', companies: ['Rippling', 'Ramp'], role_types: [], priority: 1 },
       { label: 'Growth-stage SaaS', companies: ['Datadog', 'Stripe'], role_types: [], priority: 2 },
@@ -116,22 +116,22 @@ describe('ladderFromIdealProfile', () => {
 
   it('never-relaxed rows sit on the base line (years, education); relaxable rows on L1', () => {
     expect(spec.base.map((c) => c.kind)).toEqual(['years_band', 'degree_field'])
-    expect(spec.levels[0]).toMatchObject({ label: 'Ideal profile' })
-    expect(spec.levels[0].criteria.map((c) => c.kind)).toEqual(['location', 'title_any', 'employer_current'])
+    expect(spec.levels[0]).toMatchObject({ label: 'Ideal profile · Rippling' })
+    expect(spec.levels[0].criteria.map((c) => c.kind)).toEqual(['location', 'title_current', 'employer_current'])
   })
   it('relaxes companies → titles → location, one per level', () => {
-    expect(spec.levels.map((l) => l.label)).toEqual(['Ideal profile', 'Wider companies', 'Wider titles', 'Wider location'])
-    const l2 = spec.levels[1].criteria; const l3 = spec.levels[2].criteria; const l4 = spec.levels[3].criteria
+    expect(spec.levels.map((l) => l.label)).toEqual(['Ideal profile · Rippling', 'Ideal profile · Ramp', 'Wider companies', 'Wider titles', 'Wider location'])
+    const l2 = spec.levels[2].criteria; const l3 = spec.levels[3].criteria; const l4 = spec.levels[4].criteria
     expect(l2.find((c) => c.kind === 'employer_current')?.values).toEqual(['Datadog', 'Stripe'])
-    expect(l2.find((c) => c.kind === 'title_any')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager'])
+    expect(l2.find((c) => c.kind === 'title_current')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager'])
     expect(l3.some((c) => c.kind === 'employer_current')).toBe(false)
-    expect(l3.find((c) => c.kind === 'title_any')?.values).toEqual(['Staff Software Engineer', 'Engineering Lead'])
+    expect(l3.find((c) => c.kind === 'title_current')?.values).toEqual(['Staff Software Engineer', 'Engineering Lead'])
     expect(l4.find((c) => c.kind === 'location')?.radius_km).toBe(150)
-    expect(l4.find((c) => c.kind === 'title_any')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager', 'Staff Software Engineer', 'Engineering Lead'])
+    expect(l4.find((c) => c.kind === 'title_current')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager', 'Staff Software Engineer', 'Engineering Lead'])
   })
   it('L1 keeps the ideal-profile ids so bought people are vendor-verified on them; wider levels get their own', () => {
     expect(spec.levels[0].criteria.map((c) => c.id)).toEqual(['ip-location', 'ip-titles', 'ip-companies'])
-    expect(spec.levels[1].criteria.find((c) => c.kind === 'employer_current')?.id).toBe('ip-companies-l2')
+    expect(spec.levels[2].criteria.find((c) => c.kind === 'employer_current')?.id).toBe('ip-companies-l2')
   })
   it('is null for an ICP without an ideal profile (legacy gates keep the pool-based plan)', () => {
     expect(ladderFromIdealProfile({ must_haves: [{ id: 'x', label: 'Has SQL?', attribute: '', operator: '', value: '' }] })).toBeNull()

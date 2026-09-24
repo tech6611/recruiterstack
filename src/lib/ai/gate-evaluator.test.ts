@@ -153,7 +153,7 @@ describe('idealProfileFromBrief — the New York job', () => {
   const by = (id: string) => out.find((g) => g.id === id)!
 
   it('reads as where · years · education · roles held · companies', () => {
-    expect(out.map((g) => g.kind)).toEqual(['location', 'years_band', 'degree_field', 'title_any', 'employer_current'])
+    expect(out.map((g) => g.kind)).toEqual(['location', 'years_band', 'degree_field', 'title_current', 'employer_current'])
   })
   it('where: the job market, 50 km, relaxes at L4', () => {
     expect(by(IDEAL_PROFILE_IDS.location)).toMatchObject({ values: ['New York, New York, US'], radius_km: 50, relax_at: 4 })
