@@ -112,6 +112,12 @@ export interface RecruiterBrief {
   }[]
   /** Titles that are the same search as this role. */
   title_families: string[]
+  /** Whether the strict first-pass search needs the title today or in prior career history. */
+  title_basis?: 'current' | 'past' | null
+  /** Current professional functions required in the strict first-pass search (for example, Engineering). */
+  current_functions?: string[]
+  /** Ambiguous current-title families which are out of scope for this role (for example, GTM Engineering). */
+  current_title_exclusions?: string[]
   /** The ideal profile's education row: degree terms and/or fields of study ("B.Tech", "Engineering"). */
   education?: { degrees: string[]; fields: string[]; rationale?: string | null } | null
   /** Titles one step wider than title_families — what L3 of the ladder searches. */

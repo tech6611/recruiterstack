@@ -328,7 +328,7 @@ export async function sourceFromIcp(
   supabase: Supabase,
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'job_id' | 'competencies'>>,
   ctx: CrustdataQueryContext & Pick<SearchPlanContext, 'roleContext' | 'maxFeederLanes'> = {},
-  opts: Omit<SourceFromCrustdataInput, 'filters'> & { cursorScope?: string | null } = {},
+  opts: Omit<SourceFromCrustdataInput, 'filters'> & { cursorScope?: string | null; maxPerLane?: number | null } = {},
 ): Promise<SourceFromIcpResult> {
   const { spec } = resolveSearchSpec(icp, { title: ctx.title, roleContext: ctx.roleContext, locationRadiusKm: ctx.locationRadiusKm })
   const plan = compileSpec(spec)
@@ -370,7 +370,8 @@ export async function sourceFromIcp(
       results.push(result)
       if (remaining <= 0 || prior.exhausted) continue // already drained — relax to the next level
       try {
-        const page = await searchPeople(lane.filters, { limit: remaining, cursor: prior.cursor, sorts: opts.sorts })
+        const laneLimit = Math.min(remaining, Math.max(1, opts.maxPerLane ?? remaining))
+        const page = await searchPeople(lane.filters, { limit: laneLimit, cursor: prior.cursor, sorts: opts.sorts })
         creditsUsed += page.creditsUsed
         result.creditsUsed = page.creditsUsed
         result.total = page.totalCount

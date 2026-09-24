@@ -66,6 +66,8 @@ async function runVariant(
       jobId: experiment.job_id,
       maxRecords: experiment.count_per_variant,
       perPage: experiment.count_per_variant,
+      // A first slate is a set of recruiter bets: one strict candidate per company/archetype lane before repeats.
+      maxPerLane: 1,
       // Each arm starts at page one and never advances the live job's cursor.
       cursorScope: `sourcing-experiment:${experiment.id}:${key}`,
     },

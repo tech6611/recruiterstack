@@ -84,8 +84,17 @@ export function SourcingExperimentLab({ jobId }: { jobId: string }) {
 
   useEffect(() => { if (open) void load() }, [open, load])
 
+  // A comparison performs two sequential Gemini + Crustdata searches and can take a few minutes.
+  // Poll independently of the initiating request so results arrive even if that request is slow.
+  useEffect(() => {
+    if (!open || (!running && !experiments.some((experiment) => experiment.status === 'running'))) return
+    const refresh = window.setInterval(() => { void load() }, 5_000)
+    return () => window.clearInterval(refresh)
+  }, [open, running, experiments, load])
+
   async function run() {
     setRunning(true)
+    window.setTimeout(() => { void load() }, 1_000)
     const response = await fetch(`/api/jobs/${jobId}/source/experiments`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count_per_variant: count }),
     })
@@ -116,7 +125,7 @@ export function SourcingExperimentLab({ jobId }: { jobId: string }) {
       </div>
       {open && <>
         <p className="mt-2 text-xs leading-relaxed text-slate-500">Runs the current production strategy and the challenger from the same job details, with the same Crustdata budget per arm. It does not change the approved ICP or normal sourcing results.</p>
-        {loading ? <p className="mt-3 text-xs text-slate-400">Loading comparisons…</p> : experiments.length === 0 ? <p className="mt-3 rounded-lg border border-dashed border-slate-200 p-3 text-xs text-slate-400">No comparisons yet. Start with five external profiles per strategy.</p> : <div className="mt-4 space-y-5">{experiments.map((experiment) => <div key={experiment.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="mb-3 flex items-center justify-between text-[11px] text-slate-400"><span>{new Date(experiment.created_at).toLocaleString()}</span><span>{experiment.status === 'completed' ? 'Completed' : experiment.status}</span></div>{experiment.status === 'failed' ? <p className="text-xs text-rose-600">{experiment.error ?? 'Comparison failed'}</p> : <div className="grid gap-3 lg:grid-cols-2"><VariantColumn variant={experiment.baseline} onDecision={(profileId, decision) => decide(experiment.id, 'baseline', profileId, decision)} /><VariantColumn variant={experiment.challenger} onDecision={(profileId, decision) => decide(experiment.id, 'challenger', profileId, decision)} /></div>}</div>)}</div>}
+        {loading && experiments.length === 0 ? <p className="mt-3 text-xs text-slate-400">Loading comparisons…</p> : experiments.length === 0 ? <p className="mt-3 rounded-lg border border-dashed border-slate-200 p-3 text-xs text-slate-400">No comparisons yet. Start with five external profiles per strategy.</p> : <div className="mt-4 space-y-5">{experiments.map((experiment) => <div key={experiment.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="mb-3 flex items-center justify-between text-[11px] text-slate-400"><span>{new Date(experiment.created_at).toLocaleString()}</span><span>{experiment.status === 'completed' ? 'Completed' : experiment.status === 'running' ? 'Searching the external market… results refresh automatically' : experiment.status}</span></div>{experiment.status === 'failed' ? <p className="text-xs text-rose-600">{experiment.error ?? 'Comparison failed'}</p> : <div className="grid gap-3 lg:grid-cols-2"><VariantColumn variant={experiment.baseline} onDecision={(profileId, decision) => decide(experiment.id, 'baseline', profileId, decision)} /><VariantColumn variant={experiment.challenger} onDecision={(profileId, decision) => decide(experiment.id, 'challenger', profileId, decision)} /></div>}</div>)}</div>}
         {!loading && experiments.length > 0 && <button type="button" onClick={load} className="mt-3 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"><RotateCcw className="h-3 w-3" /> Refresh experiments</button>}
       </>}
     </section>
