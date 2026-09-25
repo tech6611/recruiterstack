@@ -98,6 +98,14 @@ is JSONB). Reuses `SearchSpec`/`SearchLevel`.
 
 ## #3 — The adaptive planner (the recruiter brain)
 
+> **Status: engine SHIPPED (propose-only).** `runAdaptivePlan` / `applyMove` / `planReach`
+> (`src/modules/pool/search/adaptive-plan.ts`, tested) + `proposeNextMove`
+> (`src/lib/ai/next-move.ts`, Flash) + `POST /api/jobs/[id]/source/plan/adaptive`. The loop
+> below is live behind that route; it spends only probe credits and never acquires.
+> **Remaining:** surface the proposed plan + reasoning in the UI, and land it as a
+> Sourcing-Lab challenger for A/B before it becomes a default. Safety cap = 8 expansions,
+> returned as `capped`.
+
 **Principle:** plan against the *market*, not a fixed script. After each tier, look at the
 yield and decide the next move — expand, deepen, or stop — the way Juicebox narrates
 "56 is too tight, expanding to peers".
