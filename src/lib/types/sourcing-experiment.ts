@@ -4,6 +4,14 @@ import type { SearchSpec } from '@/lib/types/search-spec'
 export type ExperimentVariantKey = 'baseline' | 'challenger'
 export type ExperimentDecision = 'yes' | 'maybe' | 'no' | null
 
+/** Timings from one strategy arm. Persisted with the experiment for speed diagnosis. */
+export interface ExperimentVariantTiming {
+  total_ms: number
+  icp_generation_ms: number
+  crustdata_retrieval_ms: number
+  fit_scoring_ms: number
+}
+
 export interface ExperimentCandidate {
   profile_id: string
   name: string | null
@@ -31,6 +39,7 @@ export interface ExperimentVariant {
   fetched?: number
   matched?: number | null
   credits_used?: number
+  timing?: ExperimentVariantTiming
   candidates: ExperimentCandidate[]
   error?: string | null
 }

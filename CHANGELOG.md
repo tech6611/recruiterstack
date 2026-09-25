@@ -4,6 +4,10 @@
 
 ### Fixed
 - Made a job's structured location the source of truth for canonical scoring and AI prompts; source-plan location edits now synchronise the job location, while legacy intake text is retained only as a mirror.
+- Target-company criteria now guide sourcing only: they no longer reject candidates, cap Fit Engine scores, or appear as must-have scorecard columns. Existing relaxed employer rows receive the same protection.
+
+### Added
+- The ICP prompt now classifies feeder pools as direct competitors, same-problem peers, or adjacent talent markets using the hiring company context. Sourcing Lab persists and displays per-arm generation, Crustdata retrieval, and scoring timings, with duration per Crustdata lane retained in the run record.
 
 A running log of notable changes to RecruiterStack — new features, fixes, schema
 changes, UI/visual changes, and anything else worth knowing at a glance. Newest

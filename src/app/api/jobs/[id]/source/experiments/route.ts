@@ -53,10 +53,14 @@ async function runVariant(
   userId: string,
   supabase: Supabase,
 ): Promise<{ variant: ExperimentVariant; needsEmbedding: string[] }> {
+  const startedAt = Date.now()
   const generator = key === 'baseline' ? generateIcpWithReasoning : generateChallengerIcpWithReasoning
+  const generationStartedAt = Date.now()
   const { draft, sourcingMap } = await generator(job, { orgId, userId }, null, { roleContext, recruiterCorrections })
+  const icpGenerationMs = Date.now() - generationStartedAt
   const icp = transientIcp(experiment.job_id, `${experiment.id}-${key}`, draft, sourcingMap)
   const { spec } = resolveSearchSpec(icp, { title: job.position_title, roleContext })
+  const retrievalStartedAt = Date.now()
   const sourced = await sourceFromIcp(
     supabase,
     icp,
@@ -72,7 +76,9 @@ async function runVariant(
       cursorScope: `sourcing-experiment:${experiment.id}:${key}`,
     },
   )
+  const crustdataRetrievalMs = Date.now() - retrievalStartedAt
   const acquiredIds = Object.keys(sourced.acquired)
+  const scoringStartedAt = Date.now()
   const scored = await sourcePoolForIcp(
     supabase,
     orgId,
@@ -87,6 +93,7 @@ async function runVariant(
       relaxAtByLabel: Object.fromEntries(icp.must_haves.map((gate) => [gate.label, gate.relax_at ?? null])),
     },
   )
+  const fitScoringMs = Date.now() - scoringStartedAt
   const acquired = new Set(acquiredIds)
   return {
     variant: {
@@ -99,6 +106,12 @@ async function runVariant(
       fetched: sourced.fetched,
       matched: sourced.matched,
       credits_used: sourced.creditsUsed,
+      timing: {
+        total_ms: Date.now() - startedAt,
+        icp_generation_ms: icpGenerationMs,
+        crustdata_retrieval_ms: crustdataRetrievalMs,
+        fit_scoring_ms: fitScoringMs,
+      },
       candidates: scored.status === 'ok' ? scored.matches.filter((match) => acquired.has(match.profile_id)).map(candidateCard) : [],
     },
     needsEmbedding: sourced.ingest.needsReembed,

@@ -31,6 +31,7 @@ export const icpMustHaveSchema = z.object({
   radius_km: z.number().nullable().optional(),
   exclude: z.boolean().optional(),
   relax_at: z.number().int().nullable().optional(),
+  enforcement: z.enum(['hard', 'sourcing_only']).optional(),
 })
 
 export const icpCompetencySchema = z.object({

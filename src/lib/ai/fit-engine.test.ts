@@ -48,6 +48,15 @@ describe('gatingMustHaves', () => {
     expect(gatingMustHaves(gates).map((g) => g.id)).toEqual(['c', 'd'])
     expect(gatingMustHaves(undefined)).toEqual([])
   })
+
+  it('keeps target employers out of scoring gates, including ICPs created before enforcement existed', () => {
+    const gates = [
+      gate({ id: 'target', kind: 'employer_current', values: ['Rippling'], relax_at: 2, enforcement: 'sourcing_only' }),
+      gate({ id: 'legacy-target', kind: 'employer_current', values: ['Ramp'], relax_at: 2 }),
+      gate({ id: 'hard-employer', kind: 'employer_current', values: ['Acme'], relax_at: null, enforcement: 'hard' }),
+    ]
+    expect(gatingMustHaves(gates).map((g) => g.id)).toEqual(['hard-employer'])
+  })
 })
 
 describe('combineFit', () => {

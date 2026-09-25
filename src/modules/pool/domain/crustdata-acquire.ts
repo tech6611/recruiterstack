@@ -223,6 +223,8 @@ export interface LaneRunResult {
   exhausted: boolean
   /** Pool profile ids this level acquired this run (for match-level labels). */
   profileIds: string[]
+  /** Wall-clock time spent in this provider request, including its response. */
+  durationMs?: number
   /** The level's own must-have ids the query applied (with the run's baseCriterionIds, what its people are vendor-verified on). */
   criterionIds?: string[]
   error?: string | null
@@ -371,7 +373,9 @@ export async function sourceFromIcp(
       if (remaining <= 0 || prior.exhausted) continue // already drained — relax to the next level
       try {
         const laneLimit = Math.min(remaining, Math.max(1, opts.maxPerLane ?? remaining))
+        const startedAt = Date.now()
         const page = await searchPeople(lane.filters, { limit: laneLimit, cursor: prior.cursor, sorts: opts.sorts })
+        result.durationMs = Date.now() - startedAt
         creditsUsed += page.creditsUsed
         result.creditsUsed = page.creditsUsed
         result.total = page.totalCount

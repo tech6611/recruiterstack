@@ -21,6 +21,11 @@ function planLabels(variant: ExperimentVariant): string[] {
   return (plan?.lanes ?? []).map((lane) => lane.label ?? '').filter(Boolean).slice(0, 4)
 }
 
+function duration(ms?: number): string {
+  if (ms == null || !Number.isFinite(ms)) return '—'
+  return ms < 1_000 ? `${ms} ms` : `${(ms / 1_000).toFixed(ms < 10_000 ? 1 : 0)}s`
+}
+
 function CandidateCard({ candidate, onDecision }: { candidate: ExperimentCandidate; onDecision: (decision: ExperimentDecision) => void }) {
   const scoreClass = candidate.fit_bucket === 'great' ? 'text-emerald-700 bg-emerald-50' : candidate.fit_bucket === 'good' ? 'text-sky-700 bg-sky-50' : candidate.fit_bucket === 'okay' ? 'text-amber-700 bg-amber-50' : 'text-rose-700 bg-rose-50'
   return (
@@ -57,6 +62,10 @@ function VariantColumn({ variant, onDecision }: { variant: ExperimentVariant; on
         <div className="text-right text-[11px] text-slate-500">
           <p>{variant.fetched ?? 0} sourced · {(variant.credits_used ?? 0).toFixed(2)} credits</p>
           <p><span className="text-emerald-700">{counts.yes} promising</span> · {counts.no} no</p>
+          {variant.timing && <>
+            <p>Completed in {duration(variant.timing.total_ms)}</p>
+            <p className="text-[10px] text-slate-400">ICP {duration(variant.timing.icp_generation_ms)} · market {duration(variant.timing.crustdata_retrieval_ms)} · scoring {duration(variant.timing.fit_scoring_ms)}</p>
+          </>}
         </div>
       </div>
       {variant.sourcing_map?.reasoning && <p className="mb-3 rounded-md bg-white p-2 text-xs leading-relaxed text-slate-600">{variant.sourcing_map.reasoning}</p>}
@@ -125,7 +134,7 @@ export function SourcingExperimentLab({ jobId }: { jobId: string }) {
       </div>
       {open && <>
         <p className="mt-2 text-xs leading-relaxed text-slate-500">Runs the current production strategy and the challenger from the same job details, with the same Crustdata budget per arm. It does not change the approved ICP or normal sourcing results.</p>
-        {loading && experiments.length === 0 ? <p className="mt-3 text-xs text-slate-400">Loading comparisons…</p> : experiments.length === 0 ? <p className="mt-3 rounded-lg border border-dashed border-slate-200 p-3 text-xs text-slate-400">No comparisons yet. Start with five external profiles per strategy.</p> : <div className="mt-4 space-y-5">{experiments.map((experiment) => <div key={experiment.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="mb-3 flex items-center justify-between text-[11px] text-slate-400"><span>{new Date(experiment.created_at).toLocaleString()}</span><span>{experiment.status === 'completed' ? 'Completed' : experiment.status === 'running' ? 'Searching the external market… results refresh automatically' : experiment.status}</span></div>{experiment.status === 'failed' ? <p className="text-xs text-rose-600">{experiment.error ?? 'Comparison failed'}</p> : <div className="grid gap-3 lg:grid-cols-2"><VariantColumn variant={experiment.baseline} onDecision={(profileId, decision) => decide(experiment.id, 'baseline', profileId, decision)} /><VariantColumn variant={experiment.challenger} onDecision={(profileId, decision) => decide(experiment.id, 'challenger', profileId, decision)} /></div>}</div>)}</div>}
+        {loading && experiments.length === 0 ? <p className="mt-3 text-xs text-slate-400">Loading comparisons…</p> : experiments.length === 0 ? <p className="mt-3 rounded-lg border border-dashed border-slate-200 p-3 text-xs text-slate-400">No comparisons yet. Start with five external profiles per strategy.</p> : <div className="mt-4 space-y-5">{experiments.map((experiment) => <div key={experiment.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="mb-3 flex items-center justify-between text-[11px] text-slate-400"><span>{new Date(experiment.created_at).toLocaleString()}</span><span>{experiment.status === 'completed' ? `Completed in ${duration(new Date(experiment.completed_at!).getTime() - new Date(experiment.created_at).getTime())}` : experiment.status === 'running' ? 'Searching the external market… results refresh automatically' : experiment.status}</span></div>{experiment.status === 'failed' ? <p className="text-xs text-rose-600">{experiment.error ?? 'Comparison failed'}</p> : <div className="grid gap-3 lg:grid-cols-2"><VariantColumn variant={experiment.baseline} onDecision={(profileId, decision) => decide(experiment.id, 'baseline', profileId, decision)} /><VariantColumn variant={experiment.challenger} onDecision={(profileId, decision) => decide(experiment.id, 'challenger', profileId, decision)} /></div>}</div>)}</div>}
         {!loading && experiments.length > 0 && <button type="button" onClick={load} className="mt-3 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"><RotateCcw className="h-3 w-3" /> Refresh experiments</button>}
       </>}
     </section>
