@@ -1,7 +1,12 @@
 import { z } from 'zod'
+import { CRITERION_KIND_LABEL, type CriterionKind } from '@/lib/types/search-spec'
 
 // Validation for the editable ICP draft payload (migration 104_icp.sql).
 // Kept structurally aligned with IcpDraftInput in src/lib/types/icp.ts.
+
+// The criterion kinds, derived from the single source of truth so this list can't
+// drift from the type. Used to validate a structured must-have's `kind`.
+const CRITERION_KINDS = Object.keys(CRITERION_KIND_LABEL) as [CriterionKind, ...CriterionKind[]]
 
 export const icpMustHaveSchema = z.object({
   id: z.string().min(1).max(60),
@@ -14,6 +19,18 @@ export const icpMustHaveSchema = z.object({
   attribute: z.string().trim().max(60).default(''),
   operator: z.string().trim().max(30).default(''),
   value: z.union([z.string().max(500), z.number(), z.array(z.string().max(200))]).default(''),
+  // Structured must-have (docs/structured-must-haves-plan.md): when `kind` is set, this
+  // must-have IS a SearchCriterion — the same object the search plan sends to a vendor and
+  // the ideal-profile tiles render. These MUST be preserved through save/approve; omitting
+  // them here made Zod silently strip them, downgrading structured must-haves to plain text
+  // (and hiding the tiles after approval). All optional — legacy gates carry none.
+  kind: z.enum(CRITERION_KINDS).optional(),
+  values: z.array(z.string().max(200)).max(50).optional(),
+  min: z.number().nullable().optional(),
+  max: z.number().nullable().optional(),
+  radius_km: z.number().nullable().optional(),
+  exclude: z.boolean().optional(),
+  relax_at: z.number().int().nullable().optional(),
 })
 
 export const icpCompetencySchema = z.object({

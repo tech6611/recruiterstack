@@ -14,6 +14,11 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-25
+
+### Fixed
+- **Structured must-haves were silently stripped on ICP save/approve.** `icpMustHaveSchema` (the save-payload validator) listed only the legacy fields, so Zod dropped the structured ones — `kind`, `values`, `min`, `max`, `radius_km`, `exclude`, `relax_at` — on every save. That downgraded a structured must-have to plain text, which hid the ideal-profile tiles once an ICP was approved and let the location drift from the job's canonical location. The schema now preserves all seven (`kind` validated against the criterion-kind list, derived from `CRITERION_KIND_LABEL` so it can't drift). Regression tests added.
+
 ## 2026-09-24
 
 ### Removed
