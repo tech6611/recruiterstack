@@ -98,13 +98,13 @@ is JSONB). Reuses `SearchSpec`/`SearchLevel`.
 
 ## #3 — The adaptive planner (the recruiter brain)
 
-> **Status: engine SHIPPED (propose-only).** `runAdaptivePlan` / `applyMove` / `planReach`
-> (`src/modules/pool/search/adaptive-plan.ts`, tested) + `proposeNextMove`
-> (`src/lib/ai/next-move.ts`, Flash) + `POST /api/jobs/[id]/source/plan/adaptive`. The loop
-> below is live behind that route; it spends only probe credits and never acquires.
-> **Remaining:** surface the proposed plan + reasoning in the UI, and land it as a
-> Sourcing-Lab challenger for A/B before it becomes a default. Safety cap = 8 expansions,
-> returned as `capped`.
+> **Status: engine + UI SHIPPED (propose-only).** `runAdaptivePlan` / `applyMove` /
+> `planReach` (`src/modules/pool/search/adaptive-plan.ts`, tested) + `proposeNextMove`
+> (`src/lib/ai/next-move.ts`, Flash) + `POST /api/jobs/[id]/source/plan/adaptive` +
+> `AdaptivePlanPanel.tsx` ("Plan the market" on the Source tab: narrated moves, per-level
+> counts, "Apply this plan"). Spends only probe credits, never acquires. Safety cap = 8
+> expansions, returned as `capped`. **Remaining:** land it as a Sourcing-Lab challenger for
+> A/B before it becomes a default; verify live once the market source (Crustdata) is on.
 
 **Principle:** plan against the *market*, not a fixed script. After each tier, look at the
 yield and decide the next move — expand, deepen, or stop — the way Juicebox narrates

@@ -21,6 +21,7 @@ entries on top.
 ## 2026-09-25
 
 ### Added
+- **"Plan the market" UI for the adaptive planner (#3).** A panel on the Source tab (market section) runs the planner and shows, Juicebox-style, **how it widened** (each move — more companies / feeder titles / wider location — with its rationale and resulting reach), the **proposed levels with per-level counts**, and a target-met / capped summary. "Apply this plan" saves the proposed plan as the job's search plan (and remounts the Search-plan editor). `AdaptivePlanPanel.tsx` in `PoolSourcingSection`.
 - **Adaptive sourcing planner engine (#3), propose-only.** New `POST /api/jobs/[id]/source/plan/adaptive`: probes each ladder level's reach (cheap vendor `limit:1` counts) against the per-role target and, while short, asks the brain (`proposeNextMove`, Flash) for the next expansion — more same-space companies at the same title → feeder titles → wider location (never for remote) — appends it and re-probes, until the target is met or there's no next move (the Juicebox "map the market" loop). Returns the proposed plan + step reasoning + per-level counts; spends only probe credits and **never acquires** (recruiter reviews/edits before "Find people"). Pure loop (`runAdaptivePlan` / `applyMove` / `planReach`) with the probe and the brain injected — fully tested. Safety-capped at 8 expansions, surfaced via `capped` (never silent). UI surfacing + a Sourcing-Lab A/B are the remaining follow-ups.
 
 ### Changed
