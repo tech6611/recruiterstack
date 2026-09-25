@@ -21,6 +21,7 @@ entries on top.
 ## 2026-09-25
 
 ### Changed
+- **Sourcing ladder now reasons like a recruiter (#2).** `ladderFromIdealProfile` no longer follows the fixed "companies (L2) → titles (L3) → location (L4)" steps. It now **exhausts company breadth at the same title across the brief's reasoned feeder-pool tiers** (competitors → same-space → adjacent/big-tech, one level each, in priority order) **before** widening titles; then applies **feeder titles across that same broadened company set** (not "any company" first); then a wider location last (absent for remote roles). L1 keeps the ideal-profile ids for vendor-verification; wider tiers get their own. See `docs/recruiter-brain-sourcing.md`. Tests updated. (#3 adaptive count-aware planner still to come.)
 - **Job titles are now a sourcing signal, not a hard gate.** A `title_current`/`title_any` must-have carrying a relax level is treated as `sourcing_only` (like target companies) — it guides the search and ranking but no longer floors a candidate to a rejecting "weak" score, so people found by widening titles (logical career progression) rank on merit instead of being auto-rejected. Exclusion titles (no relax level, e.g. "not a TPM") stay hard gates. Retroactive to existing ICPs via the `isSourcingOnlyCriterion` fallback; `mustHaveFromCriterion` tags new ones. Tests added.
 
 ### Docs

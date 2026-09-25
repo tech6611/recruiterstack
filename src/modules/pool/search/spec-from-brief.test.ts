@@ -119,19 +119,29 @@ describe('ladderFromIdealProfile', () => {
     expect(spec.levels[0]).toMatchObject({ label: 'Ideal profile · Rippling' })
     expect(spec.levels[0].criteria.map((c) => c.kind)).toEqual(['location', 'title_current', 'employer_current'])
   })
-  it('relaxes companies → titles → location, one per level', () => {
-    expect(spec.levels.map((l) => l.label)).toEqual(['Ideal profile · Rippling', 'Ideal profile · Ramp', 'Wider companies', 'Wider titles', 'Wider location'])
-    const l2 = spec.levels[2].criteria; const l3 = spec.levels[3].criteria; const l4 = spec.levels[4].criteria
-    expect(l2.find((c) => c.kind === 'employer_current')?.values).toEqual(['Datadog', 'Stripe'])
-    expect(l2.find((c) => c.kind === 'title_current')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager'])
-    expect(l3.some((c) => c.kind === 'employer_current')).toBe(false)
-    expect(l3.find((c) => c.kind === 'title_current')?.values).toEqual(['Staff Software Engineer', 'Engineering Lead'])
-    expect(l4.find((c) => c.kind === 'location')?.radius_km).toBe(150)
-    expect(l4.find((c) => c.kind === 'title_current')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager', 'Staff Software Engineer', 'Engineering Lead'])
+  it('exhausts reasoned company tiers at the SAME title, then feeder titles across those companies, then location', () => {
+    expect(spec.levels.map((l) => l.label)).toEqual([
+      'Ideal profile · Rippling', 'Ideal profile · Ramp', 'Growth-stage SaaS',
+      'Feeder titles · target companies', 'Feeder titles · any company', 'Wider location',
+    ])
+    // A company tier widens the companies but keeps the EXACT title.
+    const tier = spec.levels[2].criteria
+    expect(tier.find((c) => c.kind === 'employer_current')?.values).toEqual(['Datadog', 'Stripe'])
+    expect(tier.find((c) => c.kind === 'title_current')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager'])
+    // Feeder titles apply across the SAME broadened company set (not "any company" first).
+    const feederAtCompanies = spec.levels[3].criteria
+    expect(feederAtCompanies.find((c) => c.kind === 'employer_current')?.values).toEqual(['Rippling', 'Ramp', 'Datadog', 'Stripe'])
+    expect(feederAtCompanies.find((c) => c.kind === 'title_current')?.values).toEqual(['Staff Software Engineer', 'Engineering Lead'])
+    // Then feeder titles with no company constraint.
+    expect(spec.levels[4].criteria.some((c) => c.kind === 'employer_current')).toBe(false)
+    // Location widens LAST (3× radius, every title so far).
+    const loc = spec.levels[5].criteria
+    expect(loc.find((c) => c.kind === 'location')?.radius_km).toBe(150)
+    expect(loc.find((c) => c.kind === 'title_current')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager', 'Staff Software Engineer', 'Engineering Lead'])
   })
   it('L1 keeps the ideal-profile ids so bought people are vendor-verified on them; wider levels get their own', () => {
     expect(spec.levels[0].criteria.map((c) => c.id)).toEqual(['ip-location', 'ip-titles', 'ip-companies'])
-    expect(spec.levels[2].criteria.find((c) => c.kind === 'employer_current')?.id).toBe('ip-companies-l2')
+    expect(spec.levels[2].criteria.find((c) => c.kind === 'employer_current')?.id).toBe('ip-companies-t1')
   })
   it('is null for an ICP without an ideal profile (legacy gates keep the pool-based plan)', () => {
     expect(ladderFromIdealProfile({ must_haves: [{ id: 'x', label: 'Has SQL?', attribute: '', operator: '', value: '' }] })).toBeNull()

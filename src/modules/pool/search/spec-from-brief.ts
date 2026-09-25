@@ -217,10 +217,12 @@ export function specFromIcp(
 
 /**
  * When the ICP's must-haves are an ideal profile — where · years · education · roles held
- * · companies, with `relax_at` on the relaxable rows — the plan is that list as L1 and
- * controlled relaxations below it: L2 widens companies, L3 widens titles, L4 widens the
- * location. Years and education never relax, so they sit on the base line the compiler
- * ANDs into every level. Returns null for an ICP without an ideal profile. PURE.
+ * · companies, with `relax_at` on the relaxable rows — the plan is that list as L1 and a
+ * RECRUITER-ORDERED ladder below it (docs/recruiter-brain-sourcing.md): exhaust company
+ * breadth at the SAME title across the brief's reasoned feeder-pool tiers (competitors →
+ * same-space → adjacent), THEN feeder titles across that same broadened company set, THEN
+ * (for non-remote roles) a wider location. Years/education/function never relax and sit on
+ * the base line ANDed into every level. Returns null for an ICP without an ideal profile. PURE.
  */
 export function ladderFromIdealProfile(
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'competencies'>>,
@@ -244,33 +246,55 @@ export function ladderFromIdealProfile(
   }
   const keep = (...cs: (SearchCriterion | undefined)[]) => [...others, ...cs.filter((c): c is SearchCriterion => Boolean(c))]
 
-  // L1: the exact persona. Split target companies into peer lanes so a five-person
-  // slate can present distinct recruiter bets instead of five people from one employer.
-  if (companies?.values.length) {
-    for (const company of companies.values) level(`Ideal profile · ${company}`, keep(location, titles, { ...companies, values: [company], label: null }), null)
+  // ── #2 reasoned ladder (docs/recruiter-brain-sourcing.md): exhaust company breadth at
+  // the SAME title across the brief's reasoned tiers (competitors → same-space → adjacent)
+  // BEFORE widening titles, then apply feeder titles across that SAME broadened company
+  // set. Companies/titles are sourcing lanes (enforcement: sourcing_only), so this orders
+  // the search and ranking only, never eligibility. ──
+  const poolSorted = [...(brief?.feeder_pools ?? [])].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
+  const REL_LABEL: Record<string, string> = { direct_competitor: 'Competitors', similar_problem: 'Same-space peers', adjacent_talent_market: 'Adjacent / big-tech' }
+  let laneSeq = 0
+  const companyLane = (vals: string[]): SearchCriterion => ({ ...(companies as SearchCriterion), id: `${companies!.id}-t${++laneSeq}`, values: vals, label: null })
+
+  // L1: the exact persona — each ideal company its own lane (distinct recruiter bets).
+  // Keep the ideal-profile ids so a person bought at L1 is vendor-verified on the must-haves.
+  const idealTerms = companies?.values ?? []
+  if (idealTerms.length) {
+    for (const c of idealTerms) level(`Ideal profile · ${c}`, keep(location, titles, { ...(companies as SearchCriterion), values: [c], label: null }), null)
   } else {
     level('Ideal profile', keep(location, titles, companies), null)
   }
 
-  // L2: the next feeder pools instead of the first; no pools left → any company.
+  // Company tiers: one level PER subsequent feeder pool, in priority order, SAME title.
+  const seen = new Set(idealTerms.map((t) => t.toLowerCase()))
   if (companies) {
-    const pools = [...(brief?.feeder_pools ?? [])].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99)).slice(1)
-    const wider = Array.from(new Set(pools.flatMap((p) => (p.companies ?? []).flatMap(employerTerms)))).filter((t) => !companies.values.includes(t))
-    const widerCompanies: SearchCriterion | undefined = wider.length ? { ...companies, id: `${companies.id}-l2`, values: wider, label: null } : undefined
-    level(wider.length ? 'Wider companies' : 'Any company', keep(location, titles, widerCompanies), wider.length ? `companies: ${pools.map((p) => p.label).join(' / ')}` : 'no company constraint')
+    for (const p of poolSorted.slice(1)) {
+      const terms = Array.from(new Set((p.companies ?? []).flatMap(employerTerms))).filter((t) => !seen.has(t.toLowerCase()))
+      if (!terms.length) continue
+      terms.forEach((t) => seen.add(t.toLowerCase()))
+      const rel = p.relationship ? REL_LABEL[p.relationship] : null
+      level(rel ? `${rel}: ${p.label}` : p.label, keep(location, titles, companyLane(terms)), p.rationale ?? (p.relationship?.replace(/_/g, ' ') ?? null))
+    }
+    // The brief named no peers — still widen companies (same title) before touching titles.
+    if (poolSorted.length <= 1) level('Any company · same title', keep(location, titles), 'no company constraint — same title')
   }
 
-  // L3: adjacent titles, no company constraint.
+  // Title progression: feeder titles across the SAME broadened companies, then any company.
   const adjacent = Array.from(new Set((brief?.adjacent_titles ?? []).flatMap(titleTerms))).filter((t) => !(titles?.values ?? []).includes(t))
   if (titles && adjacent.length) {
-    level('Wider titles', keep(location, { ...titles, id: `${titles.id}-l3`, values: adjacent, label: null }), `titles: ${adjacent.slice(0, 4).join(' / ')}${adjacent.length > 4 ? ' …' : ''}`)
+    const adjTitles: SearchCriterion = { ...titles, id: `${titles.id}-adj`, values: adjacent, label: null }
+    const allCompanies = Array.from(new Set(poolSorted.flatMap((p) => (p.companies ?? []).flatMap(employerTerms))))
+    if (companies && allCompanies.length) {
+      level('Feeder titles · target companies', keep(location, companyLane(allCompanies), adjTitles), `career-progression titles at the same companies: ${adjacent.slice(0, 4).join(' / ')}${adjacent.length > 4 ? ' …' : ''}`)
+    }
+    level('Feeder titles · any company', keep(location, { ...adjTitles, id: `${titles.id}-adj-any` }), 'feeder titles, no company constraint')
   }
 
-  // L4: the wider region (3× radius), every title so far, no company constraint.
+  // Location widens LAST (absent entirely for remote roles).
   if (location) {
-    const allTitles = titles ? { ...titles, id: `${titles.id}-l4`, values: Array.from(new Set([...titles.values, ...adjacent])), label: null } : undefined
+    const everyTitle = titles ? { ...titles, id: `${titles.id}-loc`, values: Array.from(new Set([...titles.values, ...adjacent])), label: null } : undefined
     const radius = (location.radius_km ?? DEFAULT_RADIUS_KM) * 3
-    level('Wider location', keep({ ...location, id: `${location.id}-l4`, radius_km: radius, label: null }, allTitles), `within ${radius} km`)
+    level('Wider location', keep({ ...location, id: `${location.id}-loc`, radius_km: radius, label: null }, everyTitle), `within ${radius} km`)
   }
 
   // Seniority ceiling as before: an IC band means no executive titles.
