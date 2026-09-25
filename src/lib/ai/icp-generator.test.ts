@@ -179,6 +179,15 @@ describe('buildReasoningFirstPrompt (niche recruiter, Phase 1)', () => {
     expect(prompt).toContain('Company size is not company stage')
     expect(prompt).toContain('A company name is evidence of possible exposure')
   })
+
+  it('asks for reasoned feeder-pool depth, ordered title progression, and a per-role target', () => {
+    const prompt = buildReasoningFirstPrompt(stratJob, null)
+    expect(prompt).toContain('3–5 pools')
+    expect(prompt).toContain('set a relationship on EVERY pool')
+    expect(prompt).toContain('career-progression titles, IN ORDER')
+    expect(prompt).toContain('- target: the per-role SOURCING GOAL')
+    expect(prompt).toContain('"target": { "qualified_leads"')
+  })
 })
 
 describe('sourcingMapFromReasoning', () => {
@@ -200,6 +209,10 @@ describe('sourcingMapFromReasoning', () => {
   it('keeps corrections even when the model returned no brief; null brief otherwise', () => {
     expect(sourcingMapFromReasoning({ ...gen, recruiter_brief: null }, 'x').recruiter_brief?.corrections).toBe('x')
     expect(sourcingMapFromReasoning({ ...gen, recruiter_brief: null }, null).recruiter_brief).toBeNull()
+  })
+  it('carries a per-role sourcing target onto the brief', () => {
+    const withTarget = { ...gen, recruiter_brief: { ...gen.recruiter_brief!, target: { qualified_leads: 40, rationale: 'thin niche' } } }
+    expect(sourcingMapFromReasoning(withTarget, null).recruiter_brief?.target?.qualified_leads).toBe(40)
   })
 })
 

@@ -124,8 +124,12 @@ export interface RecruiterBrief {
   current_title_exclusions?: string[]
   /** The ideal profile's education row: degree terms and/or fields of study ("B.Tech", "Engineering"). */
   education?: { degrees: string[]; fields: string[]; rationale?: string | null } | null
-  /** Titles one step wider than title_families — what L3 of the ladder searches. */
+  /** The logical career-progression titles, closest-first, the ladder steps to once the
+   *  exact titles run dry (Tech Lead Manager → Staff Engineer who leads → …). */
   adjacent_titles?: string[]
+  /** Per-role sourcing goal: how many qualified leads a healthy search for this seat
+   *  should yield, and why. The yardstick for the adaptive planner's "too thin?" check (#3). */
+  target?: { qualified_leads?: number | null; rationale?: string | null } | null
   /** Which requirements are TRUE gates in this market, and why. */
   market_gates: { requirement: string; why?: string | null }[]
   /** How JD phrases translate for this market ("2:1" → "tier-1 institute" in India). */
