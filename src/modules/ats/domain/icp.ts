@@ -5,7 +5,7 @@ import type { SearchSpec } from '@/lib/types/search-spec'
 import { embedText } from '@/lib/ai/llm'
 import { icpEmbeddingText } from '@/lib/ai/embeddings'
 import { logger } from '@/lib/logger'
-import { mustHavesFromSpec } from '@/lib/icp-gates'
+import { mustHaveFromCriterion, mustHavesFromSpec } from '@/lib/icp-gates'
 import { convertLegacyGates } from '@/lib/ai/gate-evaluator'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 
@@ -15,6 +15,91 @@ type Supabase = SupabaseClient<Database>
 // use a loose handle for it — same approach as candidate_ai_summaries.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseSb = any
+
+function canonicalLocationText(location: { name?: string | null; city?: string | null; state?: string | null; country?: string | null } | null | undefined): string | null {
+  if (!location) return null
+  const geographic = [location.city, location.state, location.country].filter((v): v is string => typeof v === 'string' && v.trim() !== '').join(', ')
+  return geographic || (typeof location.name === 'string' && location.name.trim() ? location.name.trim() : null)
+}
+
+function syncSpecLocation(spec: SearchSpec, market: string): SearchSpec {
+  const criterion = <T extends { kind: string; values: string[]; exclude?: boolean }>(c: T): T =>
+    c.kind === 'location' && !c.exclude ? { ...c, values: [market] } : c
+  return {
+    ...spec,
+    base: spec.base.map(criterion),
+    levels: spec.levels.map((level) => ({ ...level, criteria: level.criteria.map(criterion) })),
+  }
+}
+
+/**
+ * A job location change invalidates every active ICP's geographic copy. Keep the
+ * job authoritative and bring active drafts/approved ICPs (including saved source
+ * plans and the recruiter-brief label) into line. Historical experiments stay as
+ * immutable evidence of the market they actually searched.
+ */
+export async function syncActiveIcpLocationsFromJob(
+  supabase: Supabase,
+  orgId: string,
+  jobId: string,
+): Promise<void> {
+  const sb = supabase as unknown as LooseSb
+  const { data: job, error: jobError } = await sb
+    .from('jobs')
+    .select('location:locations(name, city, state, country)')
+    .eq('id', jobId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (jobError) throw jobError
+  const market = canonicalLocationText(job?.location)
+  if (!market) return
+
+  const { data: rows, error } = await sb
+    .from('icps')
+    .select('id, must_haves, sourcing_map')
+    .eq('org_id', orgId)
+    .eq('job_id', jobId)
+    .in('status', ['draft', 'approved'])
+  if (error) throw error
+
+  await Promise.all((rows ?? []).map(async (row: { id: string; must_haves?: IcpMustHave[] | null; sourcing_map?: SourcingMap | null }) => {
+    let hasLocation = false
+    const mustHaves = (row.must_haves ?? []).map((gate) => {
+      if (gate.kind !== 'location' || gate.exclude) return gate
+      hasLocation = true
+      return mustHaveFromCriterion({
+        id: gate.id,
+        kind: 'location',
+        values: [market],
+        radius_km: gate.radius_km ?? 50,
+        exclude: false,
+        relax_at: gate.relax_at ?? null,
+      })
+    })
+    // Older ICPs predate the ideal-profile location row. Add it so both scoring
+    // and sourcing read the same canonical market after a job location change.
+    if (!hasLocation) {
+      mustHaves.push(mustHaveFromCriterion({
+        id: 'ip-location',
+        kind: 'location',
+        values: [market],
+        radius_km: 50,
+        relax_at: 4,
+      }))
+    }
+    const currentMap = (row.sourcing_map ?? {}) as SourcingMap & { search_spec?: SearchSpec | null }
+    const brief = currentMap.recruiter_brief
+      ? { ...currentMap.recruiter_brief, market }
+      : currentMap.recruiter_brief
+    const search_spec = currentMap.search_spec ? syncSpecLocation(currentMap.search_spec, market) : currentMap.search_spec
+    const { error: updateError } = await sb.from('icps').update({
+      must_haves: mustHaves,
+      sourcing_map: { ...currentMap, recruiter_brief: brief, search_spec },
+      updated_at: new Date().toISOString(),
+    }).eq('id', row.id).eq('org_id', orgId)
+    if (updateError) throw updateError
+  }))
+}
 
 /** Coarse "why does this version exist" from the draft source. PURE. */
 function causeFromSource(source?: string | null): string {

@@ -7,7 +7,9 @@ import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { jobUpdateSchema } from '@/lib/validations/jobs'
 import { updateCanonicalJob } from '@/modules/ats/domain/job-pipelines'
+import { syncActiveIcpLocationsFromJob } from '@/modules/ats/domain/icp'
 import { maybeTriggerReapproval } from '@/lib/jobs/reapproval'
+import { findOrCreateLocation, syncJobLocationIntakeMirror } from '@/lib/jobs/inherit'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireOrgAndUser()
@@ -84,8 +86,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // the requisition and may be overridden at any status, so they're split out
   // of the structural set and written alongside the JD.
   const { status, custom_fields, description, location_id, comp_min, comp_max, comp_currency, ...structural } = body
+  const intakeLocation = typeof (custom_fields as { intake?: { location?: unknown } } | undefined)?.intake?.location === 'string'
+    ? (custom_fields as { intake: { location: string } }).intake.location
+    : null
+  const resolvedLocationId = location_id !== undefined
+    ? location_id
+    : intakeLocation != null
+      ? await findOrCreateLocation(supabase, orgId, intakeLocation)
+      : undefined
   const attributes: Partial<Record<JobAttributeKey, unknown>> = {}
-  if (location_id   !== undefined) attributes.location_id   = location_id
+  if (resolvedLocationId !== undefined) attributes.location_id = resolvedLocationId
   if (comp_min      !== undefined) attributes.comp_min      = comp_min
   if (comp_max      !== undefined) attributes.comp_max      = comp_max
   if (comp_currency !== undefined) attributes.comp_currency = comp_currency
@@ -119,6 +129,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const error = await updateJobTolerant(supabase, orgId, params.id, directWrite)
       if (error) return handleSupabaseError(error)
     }
+  }
+
+  // A legacy intake write is allowed for compatibility, but it cannot become a
+  // competing market. Mirror the canonical location back after either entry path.
+  if (resolvedLocationId !== undefined) {
+    await syncJobLocationIntakeMirror(supabase, orgId, params.id)
+    await syncActiveIcpLocationsFromJob(supabase, orgId, params.id)
   }
 
   // ── Re-approval gate ─────────────────────────────────────────────────────

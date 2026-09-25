@@ -118,6 +118,14 @@ describe('canonicalJobToHiringRequest', () => {
     expect(hr.scoring_criteria).toEqual([{ id: 'a', name: 'A', weight: 100 }])
   })
 
+  it('uses the structured job location ahead of the compatibility intake text', () => {
+    const hr = canonicalJobToHiringRequest({
+      ...row,
+      location: { name: 'San Francisco HQ' },
+    })
+    expect(hr.location).toBe('San Francisco HQ')
+  })
+
   it('joins array-shaped target companies and honours work_model=remote', () => {
     const hr = canonicalJobToHiringRequest({
       ...row,

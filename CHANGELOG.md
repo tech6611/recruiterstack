@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-25
+
+### Fixed
+- Made a job's structured location the source of truth for canonical scoring and AI prompts; source-plan location edits now synchronise the job location, while legacy intake text is retained only as a mirror.
+
 A running log of notable changes to RecruiterStack — new features, fixes, schema
 changes, UI/visual changes, and anything else worth knowing at a glance. Newest
 entries on top.

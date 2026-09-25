@@ -163,6 +163,8 @@ interface CanonicalJobRow {
   /** The JD body (Tiptap HTML or legacy plain text). Feeds `generated_jd`. */
   description?: string | null
   department: { name: string } | null
+  /** The canonical job market. Intake text is only a compatibility fallback. */
+  location?: { name?: string | null } | null
   // Board-only data not yet in dedicated columns lives in custom_fields:
   // scoring_criteria + hiring_manager_* (written via the repointed board writers),
   // plus the whole HM intake bag under custom_fields.intake.
@@ -239,7 +241,9 @@ export function canonicalJobToHiringRequest(row: CanonicalJobRow): HiringRequest
     team_context: htmlToPromptText(text(intake.team_context)),
     level: text(intake.level),
     headcount: num(intake.headcount) ?? 1,
-    location: text(intake.location),
+    // `jobs.location_id` is the canonical market for sourcing and scoring. The
+    // intake value remains only for records created before structured locations.
+    location: text(row.location?.name) ?? text(intake.location),
     remote_ok: remoteOk,
     key_requirements: htmlToPromptText(text(intake.key_requirements)),
     // The intake form writes `nice_to_have`; older rows carry `nice_to_haves`.
@@ -278,7 +282,7 @@ export async function listCanonicalJobBoardSummaries(
   const [jobsRes, stagesRes, appsRes, linksRes] = await Promise.all([
     (supabase as any)
       .from('jobs')
-      .select('id, org_id, title, status, created_at, description, custom_fields, department:departments(name)')
+      .select('id, org_id, title, status, created_at, description, custom_fields, department:departments(name), location:locations(name)')
       .eq('org_id', orgId)
       // DELETE is a soft-archive (status='archived'); keep deleted jobs off the board.
       .neq('status', 'archived')
@@ -1772,7 +1776,7 @@ export async function getCanonicalJobScoringContext(
   const [jobRes, stagesRes, appsRes] = await Promise.all([
     (supabase as any)
       .from('jobs')
-      .select('id, org_id, title, status, created_at, description, custom_fields, department:departments(name)')
+      .select('id, org_id, title, status, created_at, description, custom_fields, department:departments(name), location:locations(name)')
       .eq('id', jobId)
       .eq('org_id', orgId)
       .maybeSingle(),

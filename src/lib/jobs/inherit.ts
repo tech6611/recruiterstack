@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { logger } from '@/lib/logger'
+import { resolveLocationParts } from '@/modules/pool/domain/normalize'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Loose = any
@@ -41,7 +42,51 @@ export async function findOrCreateLocation(supabase: SupabaseClient, orgId: stri
   const sb = supabase as unknown as Loose
   const { data: found } = await sb.from('locations').select('id').eq('org_id', orgId).ilike('name', n).limit(1).maybeSingle()
   if (found?.id) return found.id as string
-  const { data: created, error } = await sb.from('locations').insert({ org_id: orgId, name: n }).select('id').single()
+  // A location created from a free-text intake or source-plan edit must still be
+  // usable by market sourcing. Populate the structured geography when our city
+  // dictionary recognises it; a name-only row cannot produce a CrustData geo filter.
+  const parts = resolveLocationParts(n)
+  const { data: created, error } = await sb.from('locations').insert({
+    org_id: orgId,
+    name: n,
+    city: parts?.city ?? null,
+    state: parts?.region ?? null,
+    country: parts?.country ?? null,
+  }).select('id').single()
   if (error) { logger.warn('[jobs] create location failed', { name: n, error: error.message }); return null }
   return (created?.id as string) ?? null
+}
+
+/**
+ * Keep the pre-canonical intake text as a compatibility mirror of jobs.location_id.
+ * It must never be an independent market after a structured location exists.
+ */
+export async function syncJobLocationIntakeMirror(
+  supabase: SupabaseClient,
+  orgId: string,
+  jobId: string,
+): Promise<void> {
+  const sb = supabase as unknown as Loose
+  const { data: job, error } = await sb
+    .from('jobs')
+    .select('custom_fields, location:locations(name)')
+    .eq('id', jobId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (error || !job) {
+    if (error) logger.warn('[jobs] could not synchronise intake location', { jobId, error: error.message })
+    return
+  }
+
+  const current = (job.custom_fields ?? {}) as Record<string, unknown>
+  const intake = (current.intake ?? {}) as Record<string, unknown>
+  const name = typeof job.location?.name === 'string' && job.location.name.trim() ? job.location.name.trim() : null
+  if (intake.location === name) return
+
+  const { error: updateError } = await sb
+    .from('jobs')
+    .update({ custom_fields: { ...current, intake: { ...intake, location: name } } })
+    .eq('id', jobId)
+    .eq('org_id', orgId)
+  if (updateError) logger.warn('[jobs] could not mirror canonical location into intake', { jobId, error: updateError.message })
 }

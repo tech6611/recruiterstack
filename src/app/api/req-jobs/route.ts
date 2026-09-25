@@ -5,7 +5,7 @@ import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
 import { parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { jobIntakeCreateSchema } from '@/lib/validations/jobs'
-import { findOrCreateLocation } from '@/lib/jobs/inherit'
+import { findOrCreateLocation, syncJobLocationIntakeMirror } from '@/lib/jobs/inherit'
 import { getJobTemplate, applyJobTemplateToJob } from '@/modules/ats/domain/job-templates'
 import { logger } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -206,6 +206,7 @@ export async function POST(req: NextRequest) {
 
   if (error) return handleSupabaseError(error)
   const jobRow = job as { id: string }
+  await syncJobLocationIntakeMirror(supabase, orgId, jobRow.id)
 
   // Link the approved requisition to the new job. Ignore a duplicate link
   // (composite PK) gracefully.
