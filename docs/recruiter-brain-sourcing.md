@@ -104,19 +104,20 @@ yield and decide the next move — expand, deepen, or stop — the way Juicebox 
 
 ### The loop
 ```
-target = qualified-lead goal (e.g. 100–150)
+target = brain.proposeTarget(role, brief)   # PER ROLE, recruiter-editable
 plan   = tier 1 (core companies × exact title)
 found  = 0
-while found < target and tiers remain:
-    count = probe(current tier)            # /spec/counts, cheap limit:1
+while found < target:                        # no iteration/credit ceiling for now
+    count = probe(current tier)              # /spec/counts, cheap limit:1
     if count is thin for the whole plan:
         move = brain.nextMove(brief, plan, found, whatIsThin)
-        #   → "add these same-space companies with the same title"
+        #   → "add these same-space companies with the same title"   (may NAME NEW companies)
         #   → or "step to these feeder titles across the current companies"
-        #   → or "widen location"
-        plan.append(move)                  # LLM may NAME NEW companies/titles here
+        #   → or "widen location"   (skipped for remote roles)
+        plan.append(move)
     found += count
-record plan + reasoning + per-tier counts   # show it, Juicebox-style
+PROPOSE plan + reasoning + per-tier counts   # recruiter reviews/edits before "Find people".
+                                             # Planning spends only probes + LLM — no acquisition credits.
 ```
 
 ### What "think like a recruiter" means concretely
@@ -155,12 +156,23 @@ its own phase after #2.
    Land it first in **Sourcing Lab** as a "challenger" strategy so we can A/B it against
    today's ladder before it becomes default.
 
-## Open decisions (need Sagar)
-- **Qualified-lead target** that drives "thin?" — fixed (e.g. 120) or per-role?
-- **Max expansion iterations / credit ceiling** for #3.
-- **Location:** always relax last, or role-dependent (remote roles skip it)?
-- **Who can edit the plan** — recruiter-only, or does the brain's proposal auto-apply then
-  get edited?
+## Decisions (locked 2026-09-25, Sagar)
+- **Qualified-lead target: per role.** No global constant. The recruiter-brain proposes a
+  target from the role itself (seniority, niche, market depth); the recruiter can override
+  it. A senior niche seat might target ~20–40 qualified leads; a broad role 100+. This
+  per-role target is what defines "too thin" at each tier.
+- **Expansion ceiling: none for now.** The loop keeps proposing expansions until it meets
+  the per-role target. Low-risk because the *planning* loop only spends cheap `limit:1`
+  count probes + LLM calls — **real acquisition credits are never spent during planning**
+  (propose-only, below). ⚠️ Still add a credit/iteration ceiling before #3 becomes a
+  default (non-Lab) path.
+- **Location: role-dependent.** Remote roles omit location from the ladder entirely
+  (already true: `marketLocation` returns null when `work_model === 'remote'`).
+  On-site/hybrid roles relax location last.
+- **Plan editing: propose-only.** The brain never auto-applies. It produces a *proposed*
+  plan (tiers + reasoning + per-tier counts) surfaced in the existing search-plan editor;
+  the recruiter edits/approves before "Find people" spends any vendor credits. Mirrors the
+  existing "recruiter edits win over regeneration" rule.
 
 ## Coordination
 This is deep in the sourcing/ladder/gate code the other session owns (`RELAX_AT`,
