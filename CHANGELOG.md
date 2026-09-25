@@ -21,6 +21,7 @@ entries on top.
 ## 2026-09-25
 
 ### Fixed
+- **Target companies wrongly shown as a must-have column in the sourcing matrices.** The three sourcing routes (`source`, `source/pool`, `source/crustdata`) built the matrix's `icp.must_haves` with a `.map()` that copied only `id/label/attribute(/relax_at)` — silently dropping `kind` and `enforcement`. `isSourcingOnlyCriterion` needs those to tell that an `employer_*` criterion is sourcing-only, so with them gone the "hide sourcing-only" filter (`SourcingMatrix`) never fired and "Currently at: …" rendered as a MUST-HAVE column (all ✓ — it never actually gated). Completes `b81e60d` by passing `kind` + `enforcement` (and `relax_at` on the `source` route) through all three mappings, so target companies guide the search but no longer appear as a candidate gate.
 - **Structured must-haves were silently stripped on ICP save/approve.** `icpMustHaveSchema` (the save-payload validator) listed only the legacy fields, so Zod dropped the structured ones — `kind`, `values`, `min`, `max`, `radius_km`, `exclude`, `relax_at` — on every save. That downgraded a structured must-have to plain text, which hid the ideal-profile tiles once an ICP was approved and let the location drift from the job's canonical location. The schema now preserves all seven (`kind` validated against the criterion-kind list, derived from `CRITERION_KIND_LABEL` so it can't drift). Regression tests added.
 
 ## 2026-09-24

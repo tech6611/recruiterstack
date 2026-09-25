@@ -22,7 +22,7 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
         // The ICP's ranking parameters — used to build the matrix columns.
         icp: approved
           ? {
-              must_haves: approved.must_haves.map((m) => ({ id: m.id, label: m.label, attribute: m.attribute })),
+              must_haves: approved.must_haves.map((m) => ({ id: m.id, label: m.label, attribute: m.attribute, relax_at: m.relax_at ?? null, kind: m.kind, enforcement: m.enforcement })),
               competencies: approved.competencies.map((c) => ({ id: c.id, name: c.name, weight: c.weight })),
             }
           : null,

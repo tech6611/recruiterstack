@@ -14,7 +14,7 @@ function icpColumns(icp: Icp | null) {
   if (!icp || icp.status !== 'approved') return null
   return {
     // Screening gates (nothing a profile can answer) are not columns — a cell would read as ✓.
-    must_haves: icp.must_haves.filter((m) => m.attribute !== 'screening').map((m) => ({ id: m.id, label: m.label, attribute: m.attribute, relax_at: m.relax_at ?? null })),
+    must_haves: icp.must_haves.filter((m) => m.attribute !== 'screening').map((m) => ({ id: m.id, label: m.label, attribute: m.attribute, relax_at: m.relax_at ?? null, kind: m.kind, enforcement: m.enforcement })),
     competencies: icp.competencies.map((c) => ({ id: c.id, name: c.name, weight: c.weight })),
   }
 }
