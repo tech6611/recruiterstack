@@ -99,16 +99,21 @@ export function mustHaveFromCriterion(c: SearchCriterion, label?: string | null)
     radius_km: c.radius_km ?? null,
     exclude: c.exclude ?? false,
     relax_at: c.relax_at ?? null,
-    // Employer lists in a relaxation ladder are target-company search lanes. They
-    // are not candidate eligibility gates unless explicitly made non-relaxable.
-    enforcement: c.kind.startsWith('employer_') && c.relax_at != null ? 'sourcing_only' : 'hard',
+    // Employer AND positive-title lists in a relaxation ladder are target-market search
+    // lanes — "find these titles at these companies, then widen to logical peers". They
+    // guide sourcing and ranking, not candidate eligibility. An exclusion ("not a TPM")
+    // carries no relax_at, so it correctly stays a hard gate.
+    enforcement: (c.kind.startsWith('employer_') || c.kind.startsWith('title_')) && c.relax_at != null ? 'sourcing_only' : 'hard',
   }
 }
 
 /** True when a row is a target-market instruction rather than a candidate gate. */
 export function isSourcingOnlyCriterion(g: Pick<IcpMustHave, 'kind' | 'relax_at' | 'enforcement'>): boolean {
   // Fallback keeps existing ICPs created before `enforcement` on the correct side.
-  return g.enforcement === 'sourcing_only' || (g.enforcement == null && Boolean(g.kind?.startsWith('employer_')) && g.relax_at != null)
+  // A relaxable employer OR positive-title row is a search lane, not a gate; an
+  // exclusion (no relax_at) is not a lane and stays hard.
+  const isLane = Boolean(g.kind?.startsWith('employer_') || g.kind?.startsWith('title_'))
+  return g.enforcement === 'sourcing_only' || (g.enforcement == null && isLane && g.relax_at != null)
 }
 
 /**

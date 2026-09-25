@@ -20,6 +20,12 @@ entries on top.
 
 ## 2026-09-25
 
+### Changed
+- **Job titles are now a sourcing signal, not a hard gate.** A `title_current`/`title_any` must-have carrying a relax level is treated as `sourcing_only` (like target companies) — it guides the search and ranking but no longer floors a candidate to a rejecting "weak" score, so people found by widening titles (logical career progression) rank on merit instead of being auto-rejected. Exclusion titles (no relax level, e.g. "not a TPM") stay hard gates. Retroactive to existing ICPs via the `isSourcingOnlyCriterion` fallback; `mustHaveFromCriterion` tags new ones. Tests added.
+
+### Docs
+- Added `docs/recruiter-brain-sourcing.md` — design for the reasoned expansion ladder (#2: exhaust reasoned company tiers at the same title before widening titles) and the adaptive, count-aware recruiter-brain planner (#3: probe yield, re-reason the next move, Juicebox-style) that replaces the fixed `RELAX_AT` ladder.
+
 ### Fixed
 - **Target companies wrongly shown as a must-have column in the sourcing matrices.** The three sourcing routes (`source`, `source/pool`, `source/crustdata`) built the matrix's `icp.must_haves` with a `.map()` that copied only `id/label/attribute(/relax_at)` — silently dropping `kind` and `enforcement`. `isSourcingOnlyCriterion` needs those to tell that an `employer_*` criterion is sourcing-only, so with them gone the "hide sourcing-only" filter (`SourcingMatrix`) never fired and "Currently at: …" rendered as a MUST-HAVE column (all ✓ — it never actually gated). Completes `b81e60d` by passing `kind` + `enforcement` (and `relax_at` on the `source` route) through all three mappings, so target companies guide the search but no longer appear as a candidate gate.
 - **Structured must-haves were silently stripped on ICP save/approve.** `icpMustHaveSchema` (the save-payload validator) listed only the legacy fields, so Zod dropped the structured ones — `kind`, `values`, `min`, `max`, `radius_km`, `exclude`, `relax_at` — on every save. That downgraded a structured must-have to plain text, which hid the ideal-profile tiles once an ICP was approved and let the location drift from the job's canonical location. The schema now preserves all seven (`kind` validated against the criterion-kind list, derived from `CRITERION_KIND_LABEL` so it can't drift). Regression tests added.
