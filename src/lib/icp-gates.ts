@@ -99,7 +99,16 @@ export function mustHaveFromCriterion(c: SearchCriterion, label?: string | null)
     radius_km: c.radius_km ?? null,
     exclude: c.exclude ?? false,
     relax_at: c.relax_at ?? null,
+    // Employer lists in a relaxation ladder are target-company search lanes. They
+    // are not candidate eligibility gates unless explicitly made non-relaxable.
+    enforcement: c.kind.startsWith('employer_') && c.relax_at != null ? 'sourcing_only' : 'hard',
   }
+}
+
+/** True when a row is a target-market instruction rather than a candidate gate. */
+export function isSourcingOnlyCriterion(g: Pick<IcpMustHave, 'kind' | 'relax_at' | 'enforcement'>): boolean {
+  // Fallback keeps existing ICPs created before `enforcement` on the correct side.
+  return g.enforcement === 'sourcing_only' || (g.enforcement == null && Boolean(g.kind?.startsWith('employer_')) && g.relax_at != null)
 }
 
 /**

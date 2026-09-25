@@ -146,6 +146,7 @@ const recruiterBriefSchema = z.object({
     role_types: z.array(z.string()).default([]),
     priority: z.number().nullish(),
     rationale: z.string().nullish(),
+    relationship: z.enum(['direct_competitor', 'similar_problem', 'adjacent_talent_market']).nullish(),
   })).max(10).default([]),
   title_families: z.array(z.string()).max(20).default([]),
   title_basis: z.enum(['current', 'past']).nullish(),
@@ -526,7 +527,7 @@ Work in this exact order, and let each step drive the next:
    - market: the hiring market as you understand it — city/country, on-site vs remote, whether relocation and visa-sponsored pools are realistic here.
    - experience_band: the realistic years-of-experience FLOOR and CEILING for this seat, from the level, the budget, the team size and the JD. The ceiling is as real as the floor: a Bain partner with 12 years is NOT a candidate for a 2–6 year Strategy & Ops seat — they won't take it, won't stay, and are out of budget. Over-seniority is a mismatch, never a bonus. Give min_years, max_years and a one-line rationale. Your feeder_pools must then name role types INSIDE that band (Analyst/Associate, not Partner).
    - target_schools: when education pedigree matters in this market, the SCHOOL LISTS you would actually search — tier1 (the institutions a first-pass filter accepts) and tier2 (where you look once tier1 is exhausted). Write each as the short literal name a person would type on a profile ("Indian Institute of Technology", "IIM Ahmedabad", "BITS Pilani", "University of Oxford"); a generic institution name covers all its campuses. Leave both empty when pedigree is not a real filter for this role.
-   - feeder_pools: where you would search FIRST, in priority order (priority 1 = first). Each pool names REAL employers AND the role types you'd pull from them, local to this market. Think like your niche: a strategy recruiter starts at top consulting, IB, VC/PE and in-house Strategy & Ops / BizOps / Chief of Staff teams; a GTM recruiter starts at quota carriers at comparable deal size and segment; an engineering recruiter at product companies solving comparable problems. Be concrete; name companies.
+   - feeder_pools: first analyse the hiring company in <hiring_company>: its product, customer, business model, technical environment and stage — using only the supplied facts. Then name where you would search FIRST, in priority order (priority 1 = first), with a relationship for every pool. For a company with a clear product category, make the first pool its direct competitors or closest same-problem peers when you can identify them confidently; for example, an engineering role at Recruiter Stack should begin with recruiting-tech / talent-intelligence competitors and close peers, before generic SaaS employers. Next use similar_problem companies, then adjacent_talent_market companies. Each pool names REAL employers AND the role types you'd pull from them, local to this market, and its rationale must explain the shared customer, product problem, technical environment, or operating model. Do not invent competitors: when the company facts are too thin or your knowledge is uncertain, use a truthful category-level rationale and put the uncertainty in unsure_about. Target companies are SEARCH HYPOTHESES, never candidate must-haves or reasons to reject an otherwise strong person. Think like your niche: a strategy recruiter starts at top consulting, IB, VC/PE and in-house Strategy & Ops / BizOps / Chief of Staff teams; a GTM recruiter starts at quota carriers at comparable deal size and segment; an engineering recruiter at product companies solving comparable problems. Be concrete; name companies when justified.
    - title_families: the titles that are the SAME search as this role.
    - title_basis: "current" when the person must hold that role today (the default for an operating hire); "past" only when a prior role is deliberately the relevant evidence. Never use career history as a shortcut for a current-role search.
    - current_functions: the professional functions the person must work in TODAY for the strict first pass, using literal source categories where possible (for example "Engineering", "Sales", "Consulting"). Leave empty only if function is genuinely irrelevant.
@@ -562,7 +563,7 @@ Respond with ONLY valid JSON (no markdown), with the fields in this order:
     "niche": "", "persona": "", "market": "",
     "experience_band": { "min_years": 2, "max_years": 6, "rationale": "" },
     "target_schools": { "tier1": [""], "tier2": [""] },
-    "feeder_pools": [ { "label": "", "companies": [""], "role_types": [""], "priority": 1, "rationale": "" } ],
+    "feeder_pools": [ { "label": "", "companies": [""], "role_types": [""], "priority": 1, "relationship": "direct_competitor", "rationale": "" } ],
     "title_families": [""], "title_basis": "current", "current_functions": [""], "current_title_exclusions": [""],
     "adjacent_titles": [""],
     "education": { "degrees": [""], "fields": [""], "rationale": "" },
@@ -605,8 +606,9 @@ team shape, package, candidate motivation, retention likelihood, relocation poli
 visa policy. Put missing facts that would change the search into unsure_about.
 
 For every feeder pool, explain in its rationale the comparable work, customer/problem,
-or operating environment. A company name is evidence of possible exposure, never proof
-that a person did the work. Include one adjacent pool where equivalent work can be
+or operating environment and set relationship to direct_competitor, similar_problem,
+or adjacent_talent_market. Start with direct competitors or closest same-problem peers
+of the hiring company when the supplied company facts support that conclusion. A company name is evidence of possible exposure, never proof that a person did the work and never a candidate rejection criterion. Include one adjacent pool where equivalent work can be
 verified after retrieval. Do not use school pedigree, employer prestige, title alone, or
 years alone as proof of ability.
 

@@ -23,7 +23,7 @@ import { icpFitResponseSchema } from '@/lib/ai/schemas'
 import type { Candidate } from '@/lib/types/database'
 import type { Icp, IcpMustHave } from '@/lib/types/icp'
 import { fitBucketFor, type FitBucket } from '@/lib/ai/fit-bucket'
-import { experienceBandFromGate, isCriterion } from '@/lib/icp-gates'
+import { experienceBandFromGate, isCriterion, isSourcingOnlyCriterion } from '@/lib/icp-gates'
 import { evaluateMustHaves, SCREENING_ATTRIBUTE } from '@/lib/ai/gate-evaluator'
 
 const MODEL = 'gemini-2.5-flash' // bulk per-candidate scoring — speed/cost, like the Sifter
@@ -86,7 +86,9 @@ const NON_GATING_ATTRIBUTES = new Set(['location', 'seniority', SCREENING_ATTRIB
  * legacy free-text gates (and to screening gates, which no profile can answer).
  */
 export function gatingMustHaves(mustHaves: IcpMustHave[] | undefined): IcpMustHave[] {
-  return (mustHaves ?? []).filter((g) => isCriterion(g) || !NON_GATING_ATTRIBUTES.has(g.attribute?.toLowerCase() ?? ''))
+  return (mustHaves ?? []).filter((g) =>
+    !isSourcingOnlyCriterion(g) && (isCriterion(g) || !NON_GATING_ATTRIBUTES.has(g.attribute?.toLowerCase() ?? '')),
+  )
 }
 
 function toTokens(value: IcpMustHave['value']): string[] {

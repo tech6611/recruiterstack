@@ -36,6 +36,8 @@ export interface IcpMustHave {
   exclude?: boolean
   /** Ideal-profile ladder: level at which this dimension is loosened (see SearchCriterion.relax_at). */
   relax_at?: number | null
+  /** A sourcing-only row guides retrieval but never rejects a candidate during scoring. */
+  enforcement?: 'hard' | 'sourcing_only'
 }
 
 /** The evaluator's answer for one structured must-have. */
@@ -109,6 +111,8 @@ export interface RecruiterBrief {
     role_types: string[]
     priority?: number | null
     rationale?: string | null
+    /** How this pool relates to the hiring company, when the recruiter can tell. */
+    relationship?: 'direct_competitor' | 'similar_problem' | 'adjacent_talent_market' | null
   }[]
   /** Titles that are the same search as this role. */
   title_families: string[]

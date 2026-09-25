@@ -155,6 +155,8 @@ describe('buildReasoningFirstPrompt (niche recruiter, Phase 1)', () => {
     expect(prompt).toContain('<market>\nLocation: Bengaluru, Karnataka, IN (site: Bangalore Back Office)\nWork model: onsite\nTimezone: IST\n</market>')
     expect(prompt.indexOf('0) recruiter_brief')).toBeLessThan(prompt.indexOf('1) reasoning'))
     expect(prompt).toContain('"recruiter_brief"')
+    expect(prompt).toContain('direct competitors or closest same-problem peers')
+    expect(prompt).toContain('Target companies are SEARCH HYPOTHESES')
     // The shared prompt no longer reasons like a tech recruiter by default.
     expect(prompt).not.toContain('software-engineering background')
     expect(prompt).not.toContain('product-vs-services')
@@ -222,6 +224,7 @@ describe('draftFromReasoning — the must-haves ARE the ideal profile', () => {
     expect(d.must_haves.map((g) => g.kind)).toEqual(['location', 'years_band', 'degree_field', 'title_current', 'employer_current'])
     expect(d.must_haves.find((g) => g.kind === 'years_band')).toMatchObject({ min: 2, max: 6 })
     expect(d.must_haves.find((g) => g.kind === 'employer_current')?.values).toEqual(['McKinsey', 'Bain'])
+    expect(d.must_haves.find((g) => g.kind === 'employer_current')?.enforcement).toBe('sourcing_only')
     expect(d.must_haves.some((g) => /SQL/.test(g.label))).toBe(false)
   })
   it('with no market and no brief there is simply no profile — never a question gate', () => {

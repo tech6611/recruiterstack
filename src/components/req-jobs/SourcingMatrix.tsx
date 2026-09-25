@@ -10,9 +10,11 @@
 import { Fragment, useState } from 'react'
 import { ChevronRight, MapPin, Building2, ThumbsUp, ThumbsDown, FileQuestion, Star, EyeOff, Columns3, PanelRightOpen } from 'lucide-react'
 import { fitBucketFor } from '@/lib/ai/fit-bucket'
+import { isSourcingOnlyCriterion } from '@/lib/icp-gates'
+import type { IcpMustHave } from '@/lib/types/icp'
 
 export interface MatrixIcp {
-  must_haves: { id: string; label: string; attribute?: string; relax_at?: number | null }[]
+  must_haves: Pick<IcpMustHave, 'id' | 'label' | 'attribute' | 'relax_at' | 'kind' | 'enforcement'>[]
   competencies: { id: string; name: string; weight: number }[]
 }
 
@@ -186,7 +188,10 @@ export function SourcingMatrix({
       return n
     })
 
-  const cols = 1 + icp.must_haves.length + icp.competencies.length + 1 + (onDecide ? 1 : 0) // name + musts + comps + fit (+ actions)
+  // Target-company lanes guide acquisition; presenting them as scorecard columns
+  // falsely tells recruiters that everyone outside the target list is ineligible.
+  const gates = icp.must_haves.filter((gate) => !isSourcingOnlyCriterion(gate))
+  const cols = 1 + gates.length + icp.competencies.length + 1 + (onDecide ? 1 : 0) // name + musts + comps + fit (+ actions)
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -196,8 +201,8 @@ export function SourcingMatrix({
           <tr className="bg-slate-50 text-[8px] font-bold uppercase tracking-wide text-slate-400">
             <th className="sticky left-0 z-10 bg-slate-50" aria-hidden />
             {extra.length > 0 && <th colSpan={extra.length} aria-hidden />}
-            {icp.must_haves.length > 0 && (
-              <th colSpan={icp.must_haves.length} className="border-l-2 border-slate-200 px-2 pt-2 text-center">Must-have</th>
+            {gates.length > 0 && (
+              <th colSpan={gates.length} className="border-l-2 border-slate-200 px-2 pt-2 text-center">Must-have</th>
             )}
             {icp.competencies.length > 0 && (
               <th colSpan={icp.competencies.length} className="border-l-2 border-slate-200 px-2 pt-2 text-center">Competency</th>
@@ -221,7 +226,7 @@ export function SourcingMatrix({
               </div>
             </th>
             {extra.map((col) => <th key={col} className="px-2 pb-2 text-left text-[10px] font-medium text-slate-500">{EXTRA_COLS.find((c) => c.key === col)?.label}</th>)}
-            {icp.must_haves.map((m, i) => (
+            {gates.map((m, i) => (
               <th key={m.id} className={`px-2 pb-2 text-center text-[10px] font-medium leading-tight ${i === 0 ? 'border-l-2 border-slate-200' : ''}`}>
                 <div className="mx-auto line-clamp-2 max-w-[128px]" title={m.label}>{shortLabel(m.label)}</div>
               </th>
@@ -297,7 +302,7 @@ export function SourcingMatrix({
                   </td>
                   {extra.map((col) => <td key={col} className="px-2 py-2.5 text-left text-[11px] text-slate-600"><span className="line-clamp-2 max-w-[160px]" title={extraValue(m, col)}>{extraValue(m, col)}</span></td>)}
                   {/* must-have gates */}
-                  {icp.must_haves.map((mh, i) => {
+                  {gates.map((mh, i) => {
                     const st = gateState(m, mh.label)
                     return (
                       <td key={mh.id} className={`relative px-2 py-2.5 text-center ${i === 0 ? 'border-l-2 border-slate-100' : ''}`}>
@@ -373,7 +378,7 @@ export function SourcingMatrix({
                           </div>
                         )}
                         <div className="grid gap-x-10 gap-y-1 md:grid-cols-2">
-                          {icp.must_haves.map((mh) => {
+                          {gates.map((mh) => {
                             const st = gateState(m, mh.label)
                             return (
                               <div key={mh.id} className="flex items-start gap-2.5 border-t border-slate-200/70 py-2 first:border-0 md:[&:nth-child(2)]:border-0">
