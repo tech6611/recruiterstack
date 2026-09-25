@@ -50,7 +50,7 @@ export function PersonaTabs({ jobId }: { jobId: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-sm">
-          <Sparkles className="h-4 w-4 text-indigo-500" /> Ideal candidate persona
+          <Sparkles className="h-4 w-4 text-emerald-500" /> Ideal candidate persona
         </CardTitle>
         <CardDescription>
           Who to target for this role, dimension by dimension.
@@ -71,11 +71,11 @@ export function PersonaTabs({ jobId }: { jobId: string }) {
                 type="button"
                 onClick={() => setActive(t.key)}
                 className={`shrink-0 border-b-2 px-3 py-2.5 text-xs transition-colors ${
-                  on ? 'border-indigo-500 font-semibold text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                  on ? 'border-emerald-500 font-semibold text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'
                 }`}
               >
                 {t.label}
-                {t.summary !== '—' && <span className={`ml-1.5 ${on ? 'text-indigo-400' : 'text-slate-400'}`}>· {t.summary}</span>}
+                {t.summary !== '—' && <span className={`ml-1.5 ${on ? 'text-emerald-400' : 'text-slate-400'}`}>· {t.summary}</span>}
               </button>
             )
           })}
@@ -138,7 +138,7 @@ function PoolDistribution({ tab }: { tab: PersonaTab }) {
               {showLogos && <CompanyLogo name={p.label} />}
               <span className="w-40 shrink-0 truncate text-slate-700" title={p.label}>{p.label}</span>
               <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                <span className="block h-full rounded-full bg-indigo-400" style={{ width: `${Math.round(((p.count ?? 0) / max) * 100)}%` }} />
+                <span className="block h-full rounded-full bg-emerald-400" style={{ width: `${Math.round(((p.count ?? 0) / max) * 100)}%` }} />
               </span>
               <span className="w-8 shrink-0 text-right tabular-nums text-slate-500">{p.count ?? 0}</span>
             </li>
@@ -160,7 +160,7 @@ function Chip({ chip, logo }: { chip: PersonaChip; logo: boolean }) {
     ? 'bg-rose-50 text-rose-700 ring-rose-100'
     : chip.relaxed
       ? 'bg-white text-slate-400 ring-slate-200'
-      : 'bg-indigo-50 text-indigo-800 ring-indigo-100'
+      : 'bg-emerald-50 text-emerald-800 ring-emerald-100'
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium ring-1 ${base}`}>
       {chip.exclude && <span className="text-[9px] font-bold uppercase text-rose-500">not</span>}
