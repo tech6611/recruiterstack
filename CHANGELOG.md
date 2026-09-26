@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-26
+
+### Changed
+- Faster market sourcing: "Find candidates" now shows the new Crustdata people as soon as they are ingested (marked "Scoring…"), then scores them in a second call instead of blocking the list for ~45s. That call re-judges only the new or re-ingested people and reuses cached Fit Engine scores for everyone else under the same ICP version; the "Re-rank" button still re-judges everyone. Fit Engine now scores 20 profiles at a time (was 5). On a real 40-person job, scoring dropped from ~28s to ~12s for a full re-rank and ~9s with reuse.
+
 ## 2026-09-25
 
 ### Fixed

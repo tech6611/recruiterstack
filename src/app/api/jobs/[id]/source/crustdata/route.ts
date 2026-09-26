@@ -4,7 +4,7 @@ import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import type { Icp } from '@/lib/types/icp'
 import { sourceFromIcp, EmptyIcpQueryError, loadAcquiredLevels } from '@/modules/pool/domain/crustdata-acquire'
 import { CrustdataConfigError } from '@/modules/pool/vendors/crustdata/client'
-import { sourcePoolForIcp, savePoolMatches, embedPoolProfiles } from '@/modules/pool/domain/pool-sourcing'
+import { sourcePoolForIcp, savePoolMatches, embedPoolProfiles, pendingPoolMatches } from '@/modules/pool/domain/pool-sourcing'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 import { resolveSearchSpec, feederEmployersFromSpec, planEveryone } from '@/modules/pool/search/spec-from-brief'
 
@@ -33,6 +33,10 @@ function icpColumns(icp: Icp | null) {
  * refreshed pool. Flow: translate ICP → fetch a few real profiles into the pool →
  * embed them → semantic recall + Fit-Engine score → cache + return the matrix.
  *
+ * With `{ score: false }` the route returns as soon as the people are ingested — the
+ * new rows come back unscored (`pending`) and the caller asks POST /source/pool to
+ * embed + score them, so the recruiter sees names in seconds instead of ~45s.
+ *
  * Staged: while vendor:crustdata is disabled in pool_sources this returns 409 rather
  * than erroring, so the button degrades cleanly until the source is switched on.
  */
@@ -45,11 +49,13 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
 
     // How many to fetch (default 3, hard-capped). Body is optional.
     let count = DEFAULT_COUNT
+    let score = true
     try {
-      const body = (await req.json()) as { count?: number }
+      const body = (await req.json()) as { count?: number; score?: boolean }
       if (typeof body?.count === 'number' && Number.isFinite(body.count)) {
         count = Math.min(MAX_COUNT, Math.max(1, Math.floor(body.count)))
       }
+      if (body?.score === false) score = false
     } catch {
       /* no body — use the default */
     }
@@ -89,6 +95,24 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
       throw err
     }
 
+    const sourcedSummary = {
+      fetched: sourced.fetched,
+      matched: sourced.matched,
+      creditsUsed: sourced.creditsUsed,
+      created: sourced.ingest.created,
+      merged: sourced.ingest.merged,
+      unmappedRequirements: sourced.plan.unmapped,
+      plan: sourced.plan,
+      profileIds: sourced.profileIds,
+      acquired: sourced.acquired,
+    }
+
+    // Fast path: show the people now; the caller scores them via POST /source/pool.
+    if (!score) {
+      const pending = await pendingPoolMatches(supabase, Object.keys(sourced.acquired), sourced.acquired)
+      return NextResponse.json({ data: { sourced: sourcedSummary, status: 'pending', matches: pending, icp: icpColumns(icp) } })
+    }
+
     // 2. Embed the newly ingested profiles so semantic recall can find them.
     await embedPoolProfiles(supabase, sourced.ingest.needsReembed).catch(() => {})
 
@@ -103,17 +127,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
 
     return NextResponse.json({
       data: {
-        sourced: {
-          fetched: sourced.fetched,
-          matched: sourced.matched,
-          creditsUsed: sourced.creditsUsed,
-          created: sourced.ingest.created,
-          merged: sourced.ingest.merged,
-          unmappedRequirements: sourced.plan.unmapped,
-          plan: sourced.plan,
-          profileIds: sourced.profileIds,
-          acquired: sourced.acquired,
-        },
+        sourced: sourcedSummary,
         ...result,
         icp: icpColumns(icp),
       },

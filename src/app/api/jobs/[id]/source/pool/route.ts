@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { withCapability, handleSupabaseError } from '@/lib/api/helpers'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import type { Icp } from '@/lib/types/icp'
-import { sourcePoolForIcp, savePoolMatches, getCachedPoolMatches } from '@/modules/pool/domain/pool-sourcing'
+import { sourcePoolForIcp, savePoolMatches, getCachedPoolMatches, embedPoolProfiles } from '@/modules/pool/domain/pool-sourcing'
 import { loadAcquiredLevels } from '@/modules/pool/domain/crustdata-acquire'
 import { resolveSearchSpec, feederEmployersFromSpec, planEveryone } from '@/modules/pool/search/spec-from-brief'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
@@ -43,18 +43,30 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
 })
 
 /** POST — source the cross-org Candidate Pool (Pool B) against this job's approved
- *  ICP. Returns ICP-ranked market profiles to unlock + add, and caches them. */
-export const POST = withCapability('recruiting:edit', async (_req, orgId, supabase, { params }, _scope, userId) => {
+ *  ICP. Returns ICP-ranked market profiles to unlock + add, and caches them.
+ *
+ *  Body (optional) `{ newProfileIds }`: the follow-up to a fast Crustdata run — embed
+ *  those people, re-judge only them, and keep cached scores for everyone else. With
+ *  no body (the "Re-rank" button) every shortlisted profile is re-judged. */
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase, { params }, _scope, userId) => {
   try {
     const icp = await getCurrentIcp(supabase, orgId, params.id).catch(() => null)
     if (!icp || icp.status !== 'approved') {
       return NextResponse.json({ error: 'Approve an ICP for this job before sourcing the market.' }, { status: 400 })
     }
+    let newProfileIds: string[] | null = null
+    try {
+      const body = (await req.json()) as { newProfileIds?: unknown }
+      if (Array.isArray(body?.newProfileIds)) newProfileIds = body.newProfileIds.filter((x): x is string => typeof x === 'string').slice(0, 100)
+    } catch { /* no body — full re-rank */ }
+    if (newProfileIds?.length) await embedPoolProfiles(supabase, newProfileIds).catch(() => {})
+
     // People already acquired for this job keep their ladder level and are always scored.
     const acquired = await loadAcquiredLevels(supabase, params.id)
     const roleContext = await getJobRoleContext(supabase, orgId, params.id)
     const { spec } = resolveSearchSpec(icp, { roleContext })
-    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired, feederEmployers: feederEmployersFromSpec(spec), plan: planEveryone(spec), relaxAtByLabel: relaxAtByLabel(icp) })
+    const result = await sourcePoolForIcp(supabase, orgId, icp, { orgId, userId }, { includeIds: Object.keys(acquired), acquired, feederEmployers: feederEmployersFromSpec(spec), plan: planEveryone(spec), relaxAtByLabel: relaxAtByLabel(icp),
+      reuseFrom: newProfileIds ? { jobId: params.id, icpVersion: icp.version ?? null, rescoreIds: newProfileIds } : null })
     if (result.status === 'ok') {
       await savePoolMatches(supabase, orgId, params.id, icp.version, result.matches).catch(() => {})
     }

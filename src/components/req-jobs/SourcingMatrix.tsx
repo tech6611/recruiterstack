@@ -8,7 +8,7 @@
  */
 
 import { Fragment, useState } from 'react'
-import { ChevronRight, MapPin, Building2, ThumbsUp, ThumbsDown, FileQuestion, Star, EyeOff, Columns3, PanelRightOpen } from 'lucide-react'
+import { ChevronRight, MapPin, Building2, ThumbsUp, ThumbsDown, FileQuestion, Star, EyeOff, Columns3, PanelRightOpen, Loader2 } from 'lucide-react'
 import { fitBucketFor } from '@/lib/ai/fit-bucket'
 import { isSourcingOnlyCriterion } from '@/lib/icp-gates'
 import type { IcpMustHave } from '@/lib/types/icp'
@@ -39,6 +39,8 @@ export interface MatrixMatch {
   hidden?: boolean
   /** Pool-recall profile outside the plan's location / years, with the reason. */
   outside_plan?: string | null
+  /** Not scored yet — gate, competency and fit cells show a placeholder. */
+  pending?: boolean
   red_flags: string[]
   rationale: string | null
   data_incomplete?: boolean | null
@@ -302,7 +304,12 @@ export function SourcingMatrix({
                   </td>
                   {extra.map((col) => <td key={col} className="px-2 py-2.5 text-left text-[11px] text-slate-600"><span className="line-clamp-2 max-w-[160px]" title={extraValue(m, col)}>{extraValue(m, col)}</span></td>)}
                   {/* must-have gates */}
-                  {gates.map((mh, i) => {
+                  {m.pending && [...gates, ...icp.competencies].map((col, i) => (
+                    <td key={col.id} className={`px-2 py-2.5 text-center ${i === 0 || i === gates.length ? 'border-l-2 border-slate-100' : ''}`}>
+                      <span className="inline-block h-2 w-6 animate-pulse rounded bg-slate-200" aria-label="Scoring…" />
+                    </td>
+                  ))}
+                  {!m.pending && gates.map((mh, i) => {
                     const st = gateState(m, mh.label)
                     return (
                       <td key={mh.id} className={`relative px-2 py-2.5 text-center ${i === 0 ? 'border-l-2 border-slate-100' : ''}`}>
@@ -317,7 +324,7 @@ export function SourcingMatrix({
                     )
                   })}
                   {/* competency ratings */}
-                  {icp.competencies.map((cp, i) => (
+                  {!m.pending && icp.competencies.map((cp, i) => (
                     <td key={cp.id} className={`relative px-2 py-2.5 text-center ${i === 0 ? 'border-l-2 border-slate-100' : ''}`}>
                       <button type="button" title="Why? Click for the evidence" onClick={(e) => { e.stopPropagation(); setPop(pop?.id === m.candidate_id && pop.key === cp.id ? null : { id: m.candidate_id, key: cp.id }) }} className="inline-block rounded px-1 hover:bg-slate-100">
                         <RatingBar rating={compFor(m, cp.name, i)?.rating ?? 0} />
@@ -329,7 +336,9 @@ export function SourcingMatrix({
                   ))}
                   {/* fit */}
                   <td className="border-l-2 border-slate-100 px-3 py-2.5 text-center">
-                    <span className={`text-base font-bold tabular-nums ${fitCls}`}>{m.score}</span>
+                    {m.pending
+                      ? <Loader2 className="mx-auto h-4 w-4 animate-spin text-slate-300" aria-label="Scoring…" />
+                      : <span className={`text-base font-bold tabular-nums ${fitCls}`}>{m.score}</span>}
                   </td>
                   {/* decide (internal pocket only) */}
                   {onDecide && (

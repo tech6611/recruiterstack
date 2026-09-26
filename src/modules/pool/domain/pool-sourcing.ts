@@ -17,7 +17,9 @@ type Supabase = SupabaseClient<Database>
 type LooseSb = any
 
 const SHORTLIST = 20
-const CONCURRENCY = 5
+// Judge calls in flight at once. Flash handles this comfortably (withRetry absorbs a
+// 429); at 5, a 40-person shortlist took ~8 sequential rounds (~28s on 2026-09-25).
+const CONCURRENCY = 20
 
 export interface PoolMatch {
   profile_id: string
@@ -54,6 +56,8 @@ export interface PoolMatch {
   hidden?: boolean
   /** Set when a pool-recall profile falls outside the plan's Everyone line (location / years); acquired people are never marked. */
   outside_plan?: string | null
+  /** Shown before the Fit Engine has scored it — score / gates / competencies are placeholders. */
+  pending?: boolean
 }
 
 /** The plan's must-have line, as the ranking applies it to pool recall. */
@@ -138,6 +142,11 @@ export async function sourcePoolForIcp(
     plan?: PlanEveryone | null
     /** Ideal-profile ladder: gate label → level it relaxes at, so expected misses don't rank as failures. */
     relaxAtByLabel?: Record<string, number | null | undefined> | null
+    /**
+     * Reuse this job's cached scores instead of re-judging people already scored under
+     * the same ICP version. rescoreIds (e.g. profiles just re-ingested) are always re-judged.
+     */
+    reuseFrom?: { jobId: string; icpVersion: number | null; rescoreIds?: string[] } | null
   } = {},
 ): Promise<{ status: 'ok' | 'no_access' | 'empty'; matches: PoolMatch[] }> {
   const access = await getPoolAccess(supabase, orgId)
@@ -232,12 +241,33 @@ export async function sourcePoolForIcp(
     sourcesByProfile.set(r.profile_id, arr)
   }
 
+  // Scores already cached for this job under the same ICP version — only people new
+  // to the shortlist (or just re-ingested) go to the judge.
+  const reusable = new Map<string, PoolMatch>()
+  if (opts.reuseFrom) {
+    const { data: cached } = await sb.from('pool_sourcing_matches').select('matches, icp_version').eq('org_id', orgId).eq('job_id', opts.reuseFrom.jobId).maybeSingle()
+    if (cached && cached.icp_version === opts.reuseFrom.icpVersion) {
+      const rescore = new Set(opts.reuseFrom.rescoreIds ?? [])
+      for (const m of (cached.matches ?? []) as PoolMatch[]) if (!m.pending && !rescore.has(m.profile_id)) reusable.set(m.profile_id, m)
+    }
+  }
+
   const matches: PoolMatch[] = []
   for (let i = 0; i < ordered.length; i += CONCURRENCY) {
     const chunk = ordered.slice(i, i + CONCURRENCY)
     const scored = await Promise.all(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       chunk.map(async (p: any) => {
+        const prev = reusable.get(p.id)
+        if (prev) {
+          // Judge's verdict carried over; where-they-came-from is refreshed.
+          return {
+            ...prev,
+            location: formatLocationParts(p) ?? formatLocation(p.location_raw) ?? prev.location,
+            sources: sourcesByProfile.get(p.id) ?? prev.sources ?? [],
+            acquired: opts.acquired?.[p.id] ? { level: opts.acquired[p.id].level, label: opts.acquired[p.id].label } : null,
+          } as PoolMatch
+        }
         try {
           // Market candidates: assume complete vendor data → REJECT when it's missing.
           const profileText = (textByProfile.get(p.id) ?? []).join('\n').slice(0, 4000) || undefined
@@ -319,6 +349,53 @@ export async function embedPoolProfiles(supabase: Supabase, profileIds: string[]
     }
   }
   return embedded
+}
+
+/**
+ * The just-acquired people as unscored rows, so the list can show them the moment the
+ * vendor answers — the Fit Engine's verdict replaces these once scoring finishes.
+ */
+export async function pendingPoolMatches(
+  supabase: Supabase,
+  profileIds: string[],
+  acquired: Record<string, { level: number; label: string }> = {},
+): Promise<PoolMatch[]> {
+  const ids = Array.from(new Set(profileIds.filter(Boolean)))
+  if (!ids.length) return []
+  const sb = supabase as unknown as LooseSb
+  const [{ data: profiles }, { data: pids }] = await Promise.all([
+    sb.from('pool_profiles')
+      .select('id, display_name, current_title, current_company, location_city, location_region, location_country, location_country_code, location_raw, skills, experience_years, total_experience_months, current_tenure_months, reachable')
+      .in('id', ids),
+    sb.from('pool_identities').select('profile_id, source_key').in('profile_id', ids),
+  ])
+  const sources = new Map<string, string[]>()
+  for (const r of (pids ?? []) as { profile_id: string; source_key: string }[]) {
+    const arr = sources.get(r.profile_id) ?? []
+    if (!arr.includes(r.source_key)) arr.push(r.source_key)
+    sources.set(r.profile_id, arr)
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((profiles ?? []) as any[]).map((p) => ({
+    profile_id: p.id,
+    name: p.display_name,
+    current_title: p.current_title,
+    current_company: p.current_company,
+    location: formatLocationParts(p) ?? formatLocation(p.location_raw) ?? null,
+    reachable: !!p.reachable,
+    experience_years: p.experience_years ?? null,
+    total_experience_months: p.total_experience_months ?? null,
+    current_tenure_months: p.current_tenure_months ?? null,
+    skills: p.skills ?? [],
+    score: 0,
+    fit_bucket: 'weak',
+    rationale: '',
+    gate_failures: [],
+    sources: sources.get(p.id) ?? [],
+    acquired: acquired[p.id] ? { level: acquired[p.id].level, label: acquired[p.id].label } : null,
+    pending: true,
+  }))
+    .sort((a, b) => (a.acquired?.level ?? 99) - (b.acquired?.level ?? 99))
 }
 
 /** Persist the market shortlist so it survives a refresh (and avoids re-scoring). */
