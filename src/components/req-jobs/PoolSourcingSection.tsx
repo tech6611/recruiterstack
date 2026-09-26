@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Globe, Lock, Sparkles, ChevronRight } from 'lucide-react'
+import { Globe, Lock, Sparkles, ChevronRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { SourcingMatrix, type MatrixIcp, type MatrixMatch } from '@/components/req-jobs/SourcingMatrix'
@@ -37,6 +37,7 @@ interface PoolMatch {
   starred?: boolean
   hidden?: boolean
   outside_plan?: string | null
+  pending?: boolean
 }
 
 /** What the last acquisition run did, lane by lane (from POST /source/crustdata). */
@@ -67,6 +68,7 @@ function toMatrixMatch(m: PoolMatch, newIds?: Set<string>): MatrixMatch {
     starred: !!m.starred,
     hidden: !!m.hidden,
     outside_plan: m.outside_plan ?? null,
+    pending: !!m.pending,
     red_flags: m.red_flags ?? [],
     rationale: m.rationale ?? null,
     competencies: m.competencies ?? [],
@@ -97,6 +99,8 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   // Bumped after the adaptive planner applies a new plan, to remount the SearchSpecEditor.
   const [specKey, setSpecKey] = useState(0)
   const [sourcing, setSourcing] = useState(false)
+  // How many just-found people the Fit Engine is still scoring (0 = none).
+  const [scoring, setScoring] = useState(0)
   // The last Crustdata run's search plan + which profiles it brought in.
   const [plan, setPlan] = useState<SearchPlanReport | null>(null)
   const [newIds, setNewIds] = useState<Set<string>>(new Set())
@@ -145,10 +149,11 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
     setState((data.matches ?? []).length ? 'ok' : 'empty')
   }
 
-  // Pull NEW people from Crustdata for this ICP, then re-rank the refreshed pool.
+  // Pull NEW people from Crustdata for this ICP and show them at once (unscored), then
+  // score just those in a second call while the recruiter is already reading the list.
   async function sourceFromCrustdata() {
     setSourcing(true)
-    const res = await fetch(`/api/jobs/${jobId}/source/crustdata`, { method: 'POST' })
+    const res = await fetch(`/api/jobs/${jobId}/source/crustdata`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ score: false }) })
     setSourcing(false)
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
@@ -160,16 +165,32 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
       return
     }
     const { data } = await res.json()
-    if (data.status === 'no_access') { setState('no_access'); return }
-    setStale(false)
-    setIcp(data.icp ?? null)
-    setMatches(data.matches ?? [])
-    setState((data.matches ?? []).length ? 'ok' : 'empty')
     const s = data.sourced
     setPlan(s?.plan ?? null)
     setNewIds(new Set<string>(s?.profileIds ?? []))
+    setIcp(data.icp ?? null)
     const lanes = s?.plan?.results?.length ?? 0
     toast.success(`${s?.fetched ?? 0} people found across ${lanes} level${lanes === 1 ? '' : 's'} · ${(s?.creditsUsed ?? 0).toFixed(2)} credits`)
+
+    // The new people go on top, marked as still being scored; everyone else stays as scored.
+    const fresh: PoolMatch[] = data.matches ?? []
+    if (!fresh.length) return
+    const freshIds = new Set(fresh.map((m) => m.profile_id))
+    setMatches((prev) => [...fresh, ...prev.filter((m) => !freshIds.has(m.profile_id))])
+    setState('ok')
+    setScoring(fresh.length)
+
+    const scored = await fetch(`/api/jobs/${jobId}/source/pool`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newProfileIds: s?.profileIds ?? [] }) })
+    setScoring(0)
+    if (!scored.ok) {
+      toast.error('Found the people, but scoring them failed — click Re-rank to try again.')
+      return
+    }
+    const { data: ranked } = await scored.json()
+    if (ranked.status === 'no_access') { setState('no_access'); return }
+    setStale(false)
+    setMatches(ranked.matches ?? [])
+    setState((ranked.matches ?? []).length ? 'ok' : 'empty')
   }
 
   async function startTrial() {
@@ -245,6 +266,12 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
       )}
 
       {state === 'empty' && <p className="mt-3 text-xs text-slate-400">No market matches yet — the pool may still be filling, or none fit this ICP.</p>}
+
+      {scoring > 0 && (
+        <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500">
+          <Loader2 className="h-3 w-3 animate-spin" /> Scoring {scoring} new {scoring === 1 ? 'person' : 'people'} against the ICP…
+        </p>
+      )}
 
       {state === 'ok' && stale && (
         <p className="mt-2 text-[11px] text-amber-600">The ICP has changed since this search — re-search for fresh matches.</p>
