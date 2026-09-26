@@ -144,6 +144,7 @@ Optional (features degrade gracefully):
 - `SLACK_WEBHOOK_URL` (notifications)
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (rate limiting)
 - `NEXT_PUBLIC_SENTRY_DSN` (error tracking)
+- `LOGODEV_TOKEN` (company/school logos via `/api/brand-icon`; falls back to a favicon service, then a monogram)
 - `TOKEN_ENCRYPTION_KEY` (OAuth token encryption, 32-byte hex)
 - `OAUTH_STATE_SECRET` (CSRF protection)
 - `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_DEFAULT_COUNTRY` (WhatsApp via Meta Cloud API; per-org credentials live in `whatsapp_accounts`)

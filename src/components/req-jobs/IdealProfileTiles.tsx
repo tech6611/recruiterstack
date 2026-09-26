@@ -8,7 +8,7 @@ import {
 import type { SearchCriterion, CriterionKind } from '@/lib/types/search-spec'
 import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 import { criterionLabel } from '@/lib/icp-gates'
-import { CompanyLogo } from '@/components/req-jobs/CompanyLogo'
+import { BrandIcon } from '@/components/ui/BrandIcon'
 
 /**
  * The "Ideal profile" as an editable tile grid (Option B). Each dimension is a card
@@ -137,7 +137,7 @@ function Display({ c }: { c: SearchCriterion }) {
       <div className="flex flex-wrap gap-1.5">
         {c.values.map((v) => (
           <span key={v} className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-1.5 py-1 text-[12px] text-slate-700">
-            <CompanyLogo name={v} />
+            <BrandIcon name={v} />
             {v}
           </span>
         ))}
@@ -229,7 +229,7 @@ function ChipField({ draft, setDraft, withLogos }: { draft: SearchCriterion; set
     <div className="flex flex-wrap items-center gap-1.5">
       {draft.values.map((v) => (
         <span key={v} className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-1.5 py-1 text-[12px] text-slate-700">
-          {withLogos && <CompanyLogo name={v} />}
+          {withLogos && <BrandIcon name={v} />}
           {v}
           <button type="button" aria-label={`Remove ${v}`} onClick={() => setDraft({ ...draft, values: draft.values.filter((x) => x !== v) })} className="text-slate-400 hover:text-red-500">
             <X className="h-3 w-3" />

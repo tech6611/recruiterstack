@@ -21,6 +21,20 @@ entries on top.
 ## 2026-09-26
 
 ### Fixed
+- **Company logos have been dead app-wide, silently.** `lib/company-logo.ts` fetched from `logo.clearbit.com`, which no longer resolves at all — so `<CompanyLogo>`'s `onError` fired on every render and the persona tabs and ideal-profile tiles have been showing grey initials, not logos. Replaced with the layered resolver below. (Juicebox parity, Step 0.)
+
+### Added
+- **`<BrandIcon>` — one mark for every company and school in the product** (`components/ui/BrandIcon.tsx` + `lib/brand-icon.ts`). Replaces `<CompanyLogo>` and the duplicate copy inside `PersonaTabs`, so iconography can no longer drift between surfaces. Name → domain resolution is two-speed: an alias table for the dirty head (`GOLDMAN SACHS`, `Boston Consulting Group (BCG)`, `Tata Consultancy Services` → tcs.com), IIT/IIM/NIT campus patterns for schools, and a conservative guess for the rest — capped at three words, because slugging a LinkedIn-style "Brand | tagline" line produced confident nonsense (`googlesummerofcodefedora.com`). Companies and schools normalise differently: company rules cut at the comma and strip "Technology", which turned "Indian Institute of Technology, Madras" into a name that could never resolve. Measured over all 1,370 role rows and 498 education rows we hold — 93% of role rows and 33% of education rows now resolve to a domain, and the education misses are overwhelmingly K-12 schools that have no logo to find. Pure and tested.
+- **`GET /api/brand-icon` — the single server-side logo fetcher.** Proxied rather than hotlinked so the browser never tells a third party who a candidate works for, and because the provider lies about misses: Google's favicon service answers **200 with a generic globe** rather than 404 — byte-identical for `iitm.ac.in` and for a domain that does not exist. The route screens that image by digest and returns 404, so `<BrandIcon>` draws its monogram instead. Provider order: logo.dev when `LOGODEV_TOKEN` is set → favicon service → monogram. 30-day cache on a hit, 1-day on a miss, and no request at all when the resolver already knows the answer is a monogram. Verified end-to-end against the live provider.
+- **`/dev/brand-icons`** — development-only review page rendering the 72 most common employers and 48 most common schools in the database at 32/20/16px, for judging whether a screen that is part logo and part monogram reads as one design.
+
+### Schema
+- **Migration 151 — `brand_domains`.** Optional hand-correction table for the resolver (`name_norm`, `kind`, `domain`, where a NULL domain means "stop asking, draw the monogram"). No `org_id`: a company's domain is the same fact for every tenant. `/api/brand-icon` degrades to the code tables when the table is absent, so nothing breaks before it is applied.
+
+### Docs
+- Added `docs/juicebox-profile-parity-plan.md` — the four-step plan for Juicebox visual parity on the ATS candidate profile. Records the two findings that shaped it: the logo provider is dead, and `candidate_experiences` is populated (77 dated roles across 12 of 15 candidates) but no screen has ever rendered it.
+
+### Fixed
 - **Adaptive planner no longer declares “target met” while the ideal is empty (#3).** The “too thin?” reach now **excludes catch-all fallback levels** (feeder-titles-at-any-company, wider-location) — those are always huge and were hiding a thin ideal, so the planner never widened. New `qualifiedReach`; `SearchLevel.fallback` marks the catch-alls (set in `ladderFromIdealProfile`); the panel shows the *qualified* reach and greys the catch-alls (“not counted”). Tests added. (On the Founding EM job the reported reach drops from a misleading 7,445 to the qualified tiers.)
 - **`function` no longer silently zeroes market searches.** The market source’s function-category field is sparse, so ANDing `function: Engineering` into a search dropped a valid “EM at Rippling, SF, 6–12 yrs” from **13 → 0**. `function` is now **verified after fetch** (the Fit Engine judge reads the roles held) instead of being sent as a hard vendor filter. Verified live — the ideal now returns 13 real EMs instead of 0.
 

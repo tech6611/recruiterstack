@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Users, Sparkles } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { companyInitials, companyLogoUrl } from '@/lib/company-logo'
+import { BrandIcon } from '@/components/ui/BrandIcon'
 import type { Persona, PersonaChip, PersonaTab, PersonaTabKey } from '@/lib/persona-tabs'
 
 /**
@@ -135,7 +135,7 @@ function PoolDistribution({ tab }: { tab: PersonaTab }) {
         <ul className="space-y-1">
           {tab.pool.map((p, i) => (
             <li key={i} className="flex items-center gap-2 text-xs">
-              {showLogos && <CompanyLogo name={p.label} />}
+              {showLogos && <BrandIcon name={p.label} />}
               <span className="w-40 shrink-0 truncate text-slate-700" title={p.label}>{p.label}</span>
               <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                 <span className="block h-full rounded-full bg-emerald-400" style={{ width: `${Math.round(((p.count ?? 0) / max) * 100)}%` }} />
@@ -164,7 +164,7 @@ function Chip({ chip, logo }: { chip: PersonaChip; logo: boolean }) {
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium ring-1 ${base}`}>
       {chip.exclude && <span className="text-[9px] font-bold uppercase text-rose-500">not</span>}
-      {logo && !chip.exclude && <CompanyLogo name={chip.label} />}
+      {logo && !chip.exclude && <BrandIcon name={chip.label} />}
       {chip.label}
       {chip.count != null && chip.count > 0 && (
         <span className="rounded-full bg-white/70 px-1 text-[10px] tabular-nums text-slate-500">{chip.count}</span>
@@ -173,16 +173,3 @@ function Chip({ chip, logo }: { chip: PersonaChip; logo: boolean }) {
   )
 }
 
-function CompanyLogo({ name }: { name: string }) {
-  const [failed, setFailed] = useState(false)
-  const url = failed ? null : companyLogoUrl(name)
-  if (!url) {
-    return (
-      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-slate-200 text-[8px] font-bold text-slate-500">
-        {companyInitials(name)}
-      </span>
-    )
-  }
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt="" onError={() => setFailed(true)} className="h-4 w-4 shrink-0 rounded-sm object-contain" />
-}
