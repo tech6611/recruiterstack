@@ -293,12 +293,28 @@ export function brandDomain(name: string, kind: BrandKind = 'company'): string |
   return `${bare}.com`
 }
 
-/** 1–2 letter fallback mark: "Stripe" → "S", "Palo Alto Networks" → "PA". */
+/** Words that carry no identity, so they must never supply a monogram letter. */
+const STOPWORDS = /^(?:of|the|and|at|for|in|on|a|an|de|du|la|le)$/i
+
+/**
+ * 1–2 letter fallback mark: "Stripe" → "S", "Palo Alto Networks" → "PA".
+ *
+ * Stopwords are dropped first. Taking the first two words blindly gave every
+ * university the same "UO" — University of Manitoba, University of California and
+ * University of Illinois were one indistinguishable mark, which is worse than no mark
+ * at all. Parentheticals go too: "Techevince (The Annual Exhibition…)" is "T".
+ */
 export function brandInitials(name: string): string {
-  const words = (name ?? '').trim().replace(/[^A-Za-z0-9À-ɏ\s]/g, ' ').split(/\s+/).filter(Boolean)
-  if (!words.length) return '?'
-  if (words.length === 1) return words[0].slice(0, 1).toUpperCase()
-  return (words[0][0] + words[1][0]).toUpperCase()
+  const cleaned = (name ?? '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^A-Za-z0-9À-ɏ\s]/g, ' ')
+    .trim()
+  const words = cleaned.split(/\s+/).filter(Boolean)
+  const meaningful = words.filter((w) => !STOPWORDS.test(w))
+  const use = meaningful.length ? meaningful : words
+  if (!use.length) return '?'
+  if (use.length === 1) return use[0].slice(0, 1).toUpperCase()
+  return (use[0][0] + use[1][0]).toUpperCase()
 }
 
 /** The proxy URL the <BrandIcon> img points at, or null when only a monogram applies. */

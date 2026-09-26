@@ -20,7 +20,16 @@ entries on top.
 
 ## 2026-09-26
 
+### Changed
+- **Career history on the candidate profile now reads like Juicebox.** Roles are grouped under one employer with a single logo and a single span, so three promotions at one company stop looking like three jobs; each step up the seniority ladder gets a **Promotion** badge; every role and stint carries a duration (`Jul 2024 – Present · 2 yrs 2 mos`); and the section header states `Experience · 10 years total · 4 years average tenure`. Education gained school marks and the same two-line shape. The three "movability" chips were removed rather than shown twice — total and average moved into the header, and current tenure is simply the duration on the current role. The roles' `summary` text was already being fetched and thrown away; it is now displayed, which is most of what a recruiter actually reads. (Juicebox parity, Step 1.)
+
+### Added
+- **`lib/ui/work-history.ts`** — pure, tested helpers behind the above: duration and range formatting, employer grouping, promotion detection by seniority rank (a lateral move is not a promotion), and a career summary. Total experience is the union of dated role intervals, so two concurrent roles count once and a two-year gap counts not at all. Average tenure is measured **per employer**, not per role — `deriveMovability` divides by role count, which is right for the scoring brain and wrong for "how long does this person stay". Both numbers now exist, each for its own question.
+- **`/dev/candidate-history`** — development-only review page rendering four real histories from the database (person names removed) through the new components.
+
 ### Fixed
+- **Monograms no longer collapse to "UO" for every university.** `brandInitials` took the first two words, so University of Manitoba, University of California and University of Illinois were one indistinguishable mark. Stopwords and parentheticals are now skipped: `UM`, `UC`, `UI`, and `Techevince (The Annual Exhibition…)` → `T`.
+- **A 9-month average tenure no longer prints as "1 year".** `formatYears` divided then rounded, so any span from 6 months up became "1 year" — overstating the one number a recruiter reads for stability. Under a year it now reports months.
 - **Company logos have been dead app-wide, silently.** `lib/company-logo.ts` fetched from `logo.clearbit.com`, which no longer resolves at all — so `<CompanyLogo>`'s `onError` fired on every render and the persona tabs and ideal-profile tiles have been showing grey initials, not logos. Replaced with the layered resolver below. (Juicebox parity, Step 0.)
 
 ### Added

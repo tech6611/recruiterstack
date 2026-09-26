@@ -97,6 +97,17 @@ describe('brandInitials', () => {
   it('single word → one letter', () => expect(brandInitials('Stripe')).toBe('S'))
   it('multi word → two letters', () => expect(brandInitials('Palo Alto Networks')).toBe('PA'))
   it('ignores leading punctuation', () => expect(brandInitials('.NET Foundation')).toBe('NF'))
+  it('skips stopwords, so universities do not all become "UO"', () => {
+    expect(brandInitials('University of Manitoba')).toBe('UM')
+    expect(brandInitials('University of California, Berkeley')).toBe('UC')
+    expect(brandInitials('University of Illinois Urbana-Champaign')).toBe('UI')
+  })
+  it('drops a parenthetical rather than initialling it', () => {
+    expect(brandInitials('Techevince (The Annual Technical Exhibition)')).toBe('T')
+  })
+  it('falls back to stopwords when that is all there is', () => {
+    expect(brandInitials('The The')).toBe('TT')
+  })
   it('empty → ?', () => expect(brandInitials('')).toBe('?'))
 })
 

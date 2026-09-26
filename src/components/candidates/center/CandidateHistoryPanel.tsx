@@ -1,30 +1,34 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Briefcase, GraduationCap, RefreshCw, Loader2, Clock } from 'lucide-react'
+import { Briefcase, RefreshCw, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCandidateProfile } from '../CandidateProfileContext'
+import { ExperienceTimeline } from '../ExperienceTimeline'
+import { EducationList, type EducationEntry } from '../EducationList'
+import type { WorkRole } from '@/lib/ui/work-history'
 
-interface Exp { title: string | null; employer: string | null; location: string | null; start_date: string | null; end_date: string | null; is_current: boolean }
-interface Edu { degree: string | null; field: string | null; school: string | null; year: number | null }
-interface Movability { num_roles: number; current_tenure_months: number | null; total_experience_months: number | null; avg_tenure_months: number | null }
-interface History { experiences: Exp[]; education: Edu[]; movability: Movability; enriched_at: string | null }
-
-function dur(months: number | null): string {
-  if (months == null) return '—'
-  const y = Math.floor(months / 12), m = months % 12
-  return [y ? `${y}y` : '', m ? `${m}mo` : ''].filter(Boolean).join(' ') || '0mo'
-}
-function ym(d: string | null): string {
-  if (!d) return ''
-  const dt = new Date(d)
-  return dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+interface History {
+  experiences: WorkRole[]
+  education: EducationEntry[]
+  enriched_at: string | null
 }
 
-/** Sourcing Brain, Slice 0 — the structured, dated career history extracted from the
- *  résumé, plus the derived movability signals the reasoning brain uses. */
+/**
+ * Sourcing Brain, Slice 0 — the structured, dated career history extracted from the
+ * résumé. Presentation now matches the market (Juicebox): roles grouped under one
+ * employer logo, promotions marked, a duration on every span, and a header that says
+ * how long and how settled.
+ *
+ * WHAT CHANGED AND WHY. This panel used to print a flat bullet list plus three
+ * "movability" chips. The chips said things the timeline now says better — total
+ * experience and average tenure moved into the section header, and current tenure is
+ * simply the duration on the current role — so they were removed rather than shown
+ * twice. The roles' own `summary` text was being fetched and thrown away; it is now
+ * displayed, which is most of what a recruiter actually reads.
+ */
 export function CandidateHistoryPanel({ candidateId }: { candidateId: string }) {
-  const [h, setH] = useState<History | null>(null)
+  const [history, setHistory] = useState<History | null>(null)
   const [loading, setLoading] = useState(true)
   const [enriching, setEnriching] = useState(false)
   // Enrichment also fills current_title / current_company on the candidate row —
@@ -34,7 +38,7 @@ export function CandidateHistoryPanel({ candidateId }: { candidateId: string }) 
   const load = useCallback(() => {
     fetch(`/api/candidates/${candidateId}/enrich`)
       .then((r) => (r.ok ? r.json() : { data: null }))
-      .then((j) => setH(j.data ?? null))
+      .then((j) => setHistory(j.data ?? null))
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [candidateId])
@@ -49,13 +53,20 @@ export function CandidateHistoryPanel({ candidateId }: { candidateId: string }) 
       toast.error('Enrichment failed — is the résumé a text-readable PDF?')
       return
     }
-    if (j.data?.status === 'enriched') { toast.success(`Extracted ${j.data.roles} roles from the résumé.`); load(); void reloadProfile() }
-    else toast(`Skipped: ${j.data?.reason?.replace(/_/g, ' ') ?? 'no résumé to read'}.`)
+    if (j.data?.status === 'enriched') {
+      toast.success(`Extracted ${j.data.roles} roles from the résumé.`)
+      load()
+      void reloadProfile()
+    } else {
+      toast(`Skipped: ${j.data?.reason?.replace(/_/g, ' ') ?? 'no résumé to read'}.`)
+    }
   }
 
   if (loading) return null
-  const hasData = h && (h.experiences.length > 0 || h.education.length > 0)
-  const mv = h?.movability
+
+  const experiences = history?.experiences ?? []
+  const education = history?.education ?? []
+  const hasData = experiences.length > 0 || education.length > 0
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white">
@@ -63,54 +74,26 @@ export function CandidateHistoryPanel({ candidateId }: { candidateId: string }) 
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
           <Briefcase className="h-4 w-4 text-slate-400" /> Career history
         </div>
-        <button onClick={enrich} disabled={enriching}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+        <button
+          onClick={enrich}
+          disabled={enriching}
+          className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+        >
           {enriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           {hasData ? 'Re-extract' : 'Extract from résumé'}
         </button>
       </div>
 
       <div className="px-5 py-4">
-        {!hasData && (
+        {!hasData ? (
           <p className="text-xs text-slate-500">
-            No structured history yet. Click <strong>Extract from résumé</strong> to pull the dated work history and education from this candidate’s CV.
+            No structured history yet. Click <strong>Extract from résumé</strong> to pull the dated
+            work history and education from this candidate&rsquo;s CV.
           </p>
-        )}
-
-        {hasData && (
-          <div className="space-y-4">
-            {mv && mv.num_roles > 0 && (
-              <div className="flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2.5 py-1 text-xs text-slate-600"><Clock className="h-3 w-3 text-slate-400" /> {dur(mv.current_tenure_months)} in current role</span>
-                <span className="rounded-lg bg-slate-50 px-2.5 py-1 text-xs text-slate-600">{dur(mv.total_experience_months)} total</span>
-                <span className="rounded-lg bg-slate-50 px-2.5 py-1 text-xs text-slate-600">{mv.num_roles} roles · avg {dur(mv.avg_tenure_months)}</span>
-              </div>
-            )}
-
-            {h!.experiences.length > 0 && (
-              <ol className="relative space-y-3 border-l border-slate-200 pl-4">
-                {h!.experiences.map((e, i) => (
-                  <li key={i} className="relative">
-                    <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-slate-300" />
-                    <div className="text-sm font-medium text-slate-800">{e.title ?? 'Role'}{e.employer && <span className="font-normal text-slate-500"> · {e.employer}</span>}</div>
-                    <div className="text-[11px] text-slate-400">
-                      {ym(e.start_date) || '—'} – {e.is_current ? 'Present' : (ym(e.end_date) || '—')}{e.location ? ` · ${e.location}` : ''}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-
-            {h!.education.length > 0 && (
-              <div className="border-t border-slate-100 pt-3">
-                <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-500"><GraduationCap className="h-3.5 w-3.5" /> Education</div>
-                {h!.education.map((ed, i) => (
-                  <div key={i} className="text-xs text-slate-600">
-                    {[ed.degree, ed.field].filter(Boolean).join(', ')}{ed.school ? ` — ${ed.school}` : ''}{ed.year ? ` (${ed.year})` : ''}
-                  </div>
-                ))}
-              </div>
-            )}
+        ) : (
+          <div className="space-y-6">
+            <ExperienceTimeline roles={experiences} />
+            <EducationList education={education} />
           </div>
         )}
       </div>

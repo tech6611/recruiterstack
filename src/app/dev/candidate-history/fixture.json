@@ -1,0 +1,498 @@
+[
+  {
+    "name": "Candidate A",
+    "education": [
+      {
+        "year": 2024,
+        "field": null,
+        "degree": "BTech Minor",
+        "school": "Indian Institute of Technology, Guwahati"
+      },
+      {
+        "year": 2020,
+        "field": null,
+        "degree": null,
+        "school": "Maharishi International Residential School"
+      },
+      {
+        "year": 2024,
+        "field": null,
+        "degree": "Bachelor of Technology - BTech",
+        "school": "Indian Institute of Technology, Guwahati"
+      },
+      {
+        "year": 2016,
+        "field": null,
+        "degree": null,
+        "school": "Sri Vinayaga Vidhyalaya School"
+      }
+    ],
+    "experiences": [
+      {
+        "title": "Manager- Central Strategy",
+        "employer": "Flipkart",
+        "location": "Bengaluru, Karnataka, India",
+        "start_date": "2026-04-01",
+        "end_date": null,
+        "is_current": true,
+        "summary": null
+      },
+      {
+        "title": "Senior Business Analyst- SPnA Strategy",
+        "employer": "Shadowfax",
+        "location": "Bengaluru, Karnataka, India",
+        "start_date": "2025-10-01",
+        "end_date": "2026-03-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Business Analyst- SPnA Special projects",
+        "employer": "Shadowfax",
+        "location": "Bengaluru, Karnataka, India",
+        "start_date": "2024-06-01",
+        "end_date": "2025-10-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "MITACS GRI'23 Intern",
+        "employer": "University of Manitoba",
+        "location": "Winnipeg, Manitoba, Canada",
+        "start_date": "2023-05-01",
+        "end_date": "2023-08-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Head of Operations",
+        "employer": "Techevince (The Annual Technical Exhibition of IIT Guwahati)",
+        "location": "North Guwahati, Assam, India",
+        "start_date": "2023-02-01",
+        "end_date": "2023-05-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "B.Tech Representative, DUPC Chemistry",
+        "employer": "Indian Institute of Technology, Guwahati",
+        "location": "Guwahati, Assam, India",
+        "start_date": "2022-08-01",
+        "end_date": "2024-05-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Head of Corporate Relations",
+        "employer": "Udgam, IIT Guwahati",
+        "location": "Guwahati, Assam, India",
+        "start_date": "2022-08-01",
+        "end_date": "2023-04-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Head of Hospitality",
+        "employer": "Spirit, IIT Guwahati",
+        "location": "North Guwahati, Assam, India",
+        "start_date": "2022-07-01",
+        "end_date": "2022-10-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Head of Growth",
+        "employer": "E-Cell, IIT Guwahati",
+        "location": null,
+        "start_date": "2022-02-01",
+        "end_date": "2023-04-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "PR and Branding Associate",
+        "employer": "Research and Industrial Conclave, IIT Guwahati",
+        "location": "North Guwahati, Assam, India",
+        "start_date": "2021-11-01",
+        "end_date": "2022-01-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Manager",
+        "employer": "Udgam, IIT Guwahati",
+        "location": "North Guwahati, Assam, India",
+        "start_date": "2021-09-01",
+        "end_date": "2022-01-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Branch Representative, Chemical science and technology",
+        "employer": "Indian Institute of Technology, Guwahati",
+        "location": "North Guwahati, Assam, India",
+        "start_date": "2021-07-01",
+        "end_date": "2024-05-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Designer",
+        "employer": "TEDxIITGuwahati",
+        "location": "North Guwahati, Assam, India",
+        "start_date": "2021-07-01",
+        "end_date": "2022-04-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Mentorship Recruitment Associate",
+        "employer": "UnchaAi",
+        "location": "India",
+        "start_date": "2021-07-01",
+        "end_date": "2022-01-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Mentor",
+        "employer": "UnchaAi",
+        "location": "India",
+        "start_date": "2021-06-01",
+        "end_date": "2022-01-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "City representative",
+        "employer": "Technothlon",
+        "location": "North Guwahati, Assam, India",
+        "start_date": "2021-06-01",
+        "end_date": "2022-01-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Senior Executive",
+        "employer": "E-Cell, IIT Guwahati",
+        "location": null,
+        "start_date": "2020-12-01",
+        "end_date": "2022-02-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Associate Manager",
+        "employer": "Udgam, IIT Guwahati",
+        "location": null,
+        "start_date": "2020-12-01",
+        "end_date": "2021-09-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Campus Ambassador",
+        "employer": "Udgam, IIT Guwahati",
+        "location": "Guwahati, Assam, India",
+        "start_date": "2020-11-01",
+        "end_date": "2021-09-01",
+        "is_current": false,
+        "summary": null
+      }
+    ]
+  },
+  {
+    "name": "Candidate B",
+    "education": [
+      {
+        "year": 2022,
+        "field": null,
+        "degree": "MBA(IB)",
+        "school": "Indian Institute of Foreign Trade (Delhi)"
+      },
+      {
+        "year": 2015,
+        "field": null,
+        "degree": "Higher Secondary",
+        "school": "Julien Day School, Kolkata"
+      },
+      {
+        "year": 2019,
+        "field": null,
+        "degree": "Bachelor of Technology - BTech",
+        "school": "Heritage Institute of Technology"
+      },
+      {
+        "year": 2013,
+        "field": null,
+        "degree": "Secondary",
+        "school": "Julien Day School, Kolkata"
+      }
+    ],
+    "experiences": [
+      {
+        "title": "Senior Manager - Strategy and Program Management",
+        "employer": "Razorpay",
+        "location": null,
+        "start_date": "2026-04-01",
+        "end_date": null,
+        "is_current": true,
+        "summary": null
+      },
+      {
+        "title": "Manager - Strategy & Program Management",
+        "employer": "Razorpay",
+        "location": "Bengaluru",
+        "start_date": "2024-11-01",
+        "end_date": "2026-04-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Program Manager - D2C",
+        "employer": "Cambridge University Press & Assessment",
+        "location": "New Delhi, Delhi, India",
+        "start_date": "2023-11-01",
+        "end_date": "2024-11-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Program Manager",
+        "employer": "Unacademy",
+        "location": "Bengaluru, Karnataka, India",
+        "start_date": "2022-04-01",
+        "end_date": "2023-11-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Sales Leadership Program Intern- Kraftshala",
+        "employer": "Flipkart",
+        "location": null,
+        "start_date": "2021-09-01",
+        "end_date": "2021-10-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Sales Leadership Program Intern- Kraftshala",
+        "employer": "The Hershey Company",
+        "location": "India",
+        "start_date": "2021-07-01",
+        "end_date": "2021-09-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Summer Intern",
+        "employer": "Unacademy",
+        "location": null,
+        "start_date": "2021-04-01",
+        "end_date": "2021-06-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Fund Raising Intern",
+        "employer": "Youth Empowerment Foundation (YEF India)",
+        "location": null,
+        "start_date": "2020-12-01",
+        "end_date": "2021-01-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "ASE",
+        "employer": "Tata Consultancy Services",
+        "location": "Kolkata metropolitan area, West Bengal, India",
+        "start_date": "2019-07-01",
+        "end_date": "2020-06-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Summer Trainee",
+        "employer": "The Kolkata Municipal Corporation",
+        "location": "Kolkata, West Bengal, India",
+        "start_date": "2018-06-01",
+        "end_date": "2018-09-01",
+        "is_current": false,
+        "summary": null
+      }
+    ]
+  },
+  {
+    "name": "Candidate C",
+    "education": [
+      {
+        "year": 2018,
+        "field": null,
+        "degree": "Bachelor’s Degree",
+        "school": "Indian Institute of Technology, Bombay"
+      },
+      {
+        "year": 2020,
+        "field": null,
+        "degree": "PGP",
+        "school": "Indian Institute of Management Ahmedabad"
+      }
+    ],
+    "experiences": [
+      {
+        "title": "Investment Professional",
+        "employer": "General Catalyst",
+        "location": "Bengaluru, Karnataka, India",
+        "start_date": "2024-08-01",
+        "end_date": null,
+        "is_current": true,
+        "summary": null
+      },
+      {
+        "title": "Investment Professional",
+        "employer": "Venture Highway",
+        "location": "Bengaluru, Karnataka, India",
+        "start_date": "2024-02-01",
+        "end_date": "2024-08-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Growth & Strategy",
+        "employer": "GOAT Brand Labs",
+        "location": null,
+        "start_date": "2021-07-01",
+        "end_date": "2024-01-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Junior Associate",
+        "employer": "McKinsey & Company",
+        "location": null,
+        "start_date": "2020-09-01",
+        "end_date": "2021-07-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Summer Intern, Management Consulting",
+        "employer": "Accenture in India",
+        "location": null,
+        "start_date": "2019-04-01",
+        "end_date": "2019-05-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Summer Analyst",
+        "employer": "BDA Partners",
+        "location": null,
+        "start_date": "2017-05-01",
+        "end_date": "2017-06-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Summer Intern",
+        "employer": "GIST ADVISORY UK PVT. LTD",
+        "location": null,
+        "start_date": "2016-05-01",
+        "end_date": "2016-06-01",
+        "is_current": false,
+        "summary": null
+      },
+      {
+        "title": "Early Team Intern",
+        "employer": "Taskbob",
+        "location": null,
+        "start_date": "2015-04-01",
+        "end_date": "2015-05-01",
+        "is_current": false,
+        "summary": null
+      }
+    ]
+  },
+  {
+    "name": "Candidate D",
+    "education": [
+      {
+        "year": 2015,
+        "field": null,
+        "degree": "Master of Computer Application",
+        "school": "Bangalore University"
+      },
+      {
+        "year": 2012,
+        "field": null,
+        "degree": "Bachelor of Computer Application",
+        "school": "Veer Narmad South Gujarat University"
+      }
+    ],
+    "experiences": [
+      {
+        "title": "Mobile Architect",
+        "employer": "InstaView",
+        "location": "Bengaluru",
+        "start_date": "2023-08-01",
+        "end_date": null,
+        "is_current": true,
+        "summary": "Led and managed a team of 3 developers, fostering a collaborative and high-performing work environment. Maintained clean and modular code architecture. Collaborated with designers to translate design specifications into actionable development tasks. Collaborated closely with cross-functional teams to coordinate and streamline the release process. Built the app from scratch and developed a plug-and-play SDK."
+      },
+      {
+        "title": "Tech Lead - Mobile",
+        "employer": "SuperShare",
+        "location": "Bengaluru",
+        "start_date": "2022-03-01",
+        "end_date": "2023-07-01",
+        "is_current": false,
+        "summary": "Led a team of developers in writing optimized code in Kotlin and Swift, resulting in significant performance improvements across multiple projects (50% less startup time). Mentored team in advanced data structures and optimization techniques (25% app improvement). Implemented rigorous testing methodologies and achieved 95% crash-free rate. Collaborated closely with cross-functional teams."
+      },
+      {
+        "title": "Tech Lead - Android",
+        "employer": "Kami Vision",
+        "location": "San Jose (Remote)",
+        "start_date": "2020-12-01",
+        "end_date": "2022-02-01",
+        "is_current": false,
+        "summary": "Led and managed a team of 5 developers, fostering a collaborative and high-performing work environment. Implemented efficient caching and optimized network requests to reduce latency and enhance user experience by 15%. Conducted thorough code reviews and utilized profiling tools to identify and eliminate performance bottlenecks, improving performance by 25%. Maintained clean and modular code architecture. Collaborated with designers and cross-functional teams."
+      },
+      {
+        "title": "Lead Mobile Developer",
+        "employer": "Enhance IT",
+        "location": "Atlanta (Remote)",
+        "start_date": "2018-06-01",
+        "end_date": "2020-12-01",
+        "is_current": false,
+        "summary": "Led a team of 10 developers, defined team goals and established clear expectations, ensuring alignment with project objectives. Assigned tasks and responsibilities to team members. Actively researched and implemented best practices, new language features, and frameworks. Introduced and enforced coding standards and performance guidelines (98% crash-free rate). Collaborated closely with the development team to address identified issues."
+      },
+      {
+        "title": "Senior Android Developer",
+        "employer": "KeepWorks Technologies Pvt. Ltd.",
+        "location": "Bengaluru",
+        "start_date": "2015-01-01",
+        "end_date": "2018-06-01",
+        "is_current": false,
+        "summary": "Actively stayed updated with the latest language features and frameworks, incorporating them into code to ensure high performance and compatibility. Enhanced the responsiveness of user interface interactions. Decreased network latency by optimizing network requests, reducing data transfer size, and implementing efficient caching mechanisms (reducing API calls by 10%). Implemented proactive monitoring and error-tracking mechanisms. Monitored release performance and actively sought feedback from users and stakeholders. Participated in sprint planning and backlog grooming sessions."
+      },
+      {
+        "title": "Freelance Developer",
+        "employer": "Freelance",
+        "location": "Bengaluru",
+        "start_date": "2012-01-01",
+        "end_date": null,
+        "is_current": true,
+        "summary": "Independently managed and executed Android development projects, ensuring high-quality deliverables and client satisfaction. Gathered and analyzed project requirements. Developed and maintained robust and scalable Android applications. Implemented clean and maintainable code architecture, utilizing design patterns and modular code structure. Conducted comprehensive testing and debugging. Demonstrated flexibility and adaptability by working on multiple projects simultaneously. Managed the full development lifecycle from requirements gathering to post-release support."
+      },
+      {
+        "title": "Software Developer",
+        "employer": "Xcellence-IT",
+        "location": "Surat India",
+        "start_date": "2011-11-01",
+        "end_date": "2012-04-01",
+        "is_current": false,
+        "summary": "Built a Desktop app that generated reports using Jasper soft."
+      }
+    ]
+  }
+]

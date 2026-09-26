@@ -38,12 +38,18 @@ work history**, and **durations computed everywhere**.
 | School logo | none |
 | Social icon row | LinkedIn only, as an editable text row in the left rail |
 | Tabs | `Summary` / `Activities & Progress` |
-| **Experience timeline** | **never rendered** — `candidate_experiences` is populated but no screen reads it, and the detail API doesn't even select it |
-| **Education** | **never rendered** — `candidates.education` is on the row and unused |
+| **Experience timeline** | rendered, but as a flat bullet list — `CandidateHistoryPanel`, fed by `GET /api/candidates/[id]/enrich`. No logos, no durations, no employer grouping, and the roles' `summary` text was fetched and discarded |
+| **Education** | rendered as one plain line per entry, no school marks |
 | Durations, total, average tenure | none; only a flat `experience_years` number |
 | Employer grouping / Promotion badge | none on the ATS side (the logic exists in `modules/pool/domain/profile-tags.ts`) |
 | Skills | chips in the left rail, folded at 6 |
 | Avatar | coloured initials (`lib/ui/avatar`) |
+
+> **Correction (2026-09-26).** An earlier draft of this plan said the work history was
+> never rendered anywhere. That was wrong — `CandidateHistoryPanel` has been showing it
+> on the Summary tab, fed by its own endpoint rather than the candidate detail API,
+> which is why a grep of that route missed it. Step 1 was re-scoped accordingly: no API
+> work was needed, only the presentation.
 
 **The data is already there.** Measured on the live database:
 
@@ -51,8 +57,7 @@ work history**, and **durations computed everywhere**.
 - 12 of 15 have education JSON, LinkedIn URLs and skills
 - the pool holds 423 profiles / 1,313 role rows for the later phase
 
-So Phases 1–3 are a front-end build plus one added `select`. Nothing needs re-fetching
-or re-buying.
+So Phases 1–3 are a front-end build. Nothing needs re-fetching or re-buying.
 
 ## 3. The icon problem, measured
 
@@ -100,15 +105,20 @@ The "all the icons show similarly" requirement. One component, one resolver, eve
 
 *Fixing this alone repairs logos on the persona tabs and ideal-profile tiles, which are broken today.*
 
-### Phase 1 — Surface the history we already store
+### Phase 1 — Surface the history we already store — **DONE**
 
-- Add `candidate_experiences` (ordered by `sort_order`) to `GET /api/candidates/[id]`.
+- No API change was needed: `GET /api/candidates/[id]/enrich` already returns the dated
+  roles, the education and the derived movability.
 - **`src/lib/ui/work-history.ts`** — pure and tested: `"2 yrs 2 mos"` formatting, total
   experience, average tenure, grouping roles by employer, promotion detection. Lift the
   rules already proven in `pool/domain/profile-tags.ts` rather than writing new ones, so
   the pool and the ATS can't drift apart.
 
-### Phase 2 — The profile drawer
+### Phase 2 — The profile drawer — **partly done in Phase 1**
+
+`<ExperienceTimeline>` and `<EducationList>` were built and are live inside the existing
+Career-history panel. What remains here is the tab restructure and the Overview tab.
+
 
 - Tabs become **Overview / Experience / Education / Skills / Activity**.
 - **`<ExperienceTimeline>`** — roles grouped under one employer logo, connector rail,
