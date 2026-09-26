@@ -7,7 +7,7 @@ import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
 import { getPoolAccess } from '@/modules/pool/domain/pool'
 import type { UsageIdentity } from '@/lib/ai/track-usage'
 import { logger } from '@/lib/logger'
-import { deriveProfileTags } from '@/modules/pool/domain/profile-tags'
+import { deriveProfileTags } from '@/lib/profile-tags'
 import { formatLocation, formatLocationParts, resolveLocationParts, type LocationParts } from '@/modules/pool/domain/normalize'
 import { unexpectedGateFailures } from '@/lib/icp-gates'
 

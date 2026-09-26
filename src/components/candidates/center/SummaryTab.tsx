@@ -376,7 +376,7 @@ export default function SummaryTab({ candidate, applications }: SummaryTabProps)
       {primaryApp && <AiScreenPanel applicationId={primaryApp.id} />}
 
       {/* ── Career history (Sourcing Brain, Slice 0) — structured dated history ── */}
-      <CandidateHistoryPanel candidateId={candidate.id} />
+      <CandidateHistoryPanel candidateId={candidate.id} skills={candidate.skills ?? []} />
 
       {/* ── Application Answers — the candidate's form responses (item 1) ────── */}
       {answers.length > 0 && (

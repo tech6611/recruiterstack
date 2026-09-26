@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Briefcase, RefreshCw, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCandidateProfile } from '../CandidateProfileContext'
-import { ExperienceTimeline } from '../ExperienceTimeline'
-import { EducationList, type EducationEntry } from '../EducationList'
+import { ProfileDocument } from '../ProfileDocument'
+import type { EducationEntry } from '../EducationList'
 import type { WorkRole } from '@/lib/ui/work-history'
 
 interface History {
@@ -20,6 +20,8 @@ interface History {
  * employer logo, promotions marked, a duration on every span, and a header that says
  * how long and how settled.
  *
+ * The four tabs are anchors into one document, not four screens — see ProfileDocument.
+ *
  * WHAT CHANGED AND WHY. This panel used to print a flat bullet list plus three
  * "movability" chips. The chips said things the timeline now says better — total
  * experience and average tenure moved into the section header, and current tenure is
@@ -27,7 +29,7 @@ interface History {
  * twice. The roles' own `summary` text was being fetched and thrown away; it is now
  * displayed, which is most of what a recruiter actually reads.
  */
-export function CandidateHistoryPanel({ candidateId }: { candidateId: string }) {
+export function CandidateHistoryPanel({ candidateId, skills = [] }: { candidateId: string; skills?: string[] }) {
   const [history, setHistory] = useState<History | null>(null)
   const [loading, setLoading] = useState(true)
   const [enriching, setEnriching] = useState(false)
@@ -66,7 +68,12 @@ export function CandidateHistoryPanel({ candidateId }: { candidateId: string }) 
 
   const experiences = history?.experiences ?? []
   const education = history?.education ?? []
-  const hasData = experiences.length > 0 || education.length > 0
+  // Newest recorded qualification — the cutoff that tells campus roles from employment.
+  const graduationYear = education.reduce<number | null>(
+    (latest, e) => (typeof e.year === 'number' && (latest == null || e.year > latest) ? e.year : latest),
+    null,
+  )
+  const hasData = experiences.length > 0 || education.length > 0 || skills.length > 0
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white">
@@ -91,10 +98,12 @@ export function CandidateHistoryPanel({ candidateId }: { candidateId: string }) 
             work history and education from this candidate&rsquo;s CV.
           </p>
         ) : (
-          <div className="space-y-6">
-            <ExperienceTimeline roles={experiences} />
-            <EducationList education={education} />
-          </div>
+          <ProfileDocument
+            experiences={experiences}
+            education={education}
+            skills={skills}
+            graduationYear={graduationYear}
+          />
         )}
       </div>
     </div>

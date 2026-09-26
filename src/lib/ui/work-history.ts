@@ -53,6 +53,8 @@ export interface HistorySummary {
   totalMonths: number | null
   /** Mean completed stint length, per EMPLOYER. Null until one stint has ended. */
   averageTenureMonths: number | null
+  /** How long they have been at the CURRENT employer — promotions included. */
+  currentTenureMonths: number | null
   employerCount: number
   roleCount: number
 }
@@ -125,15 +127,18 @@ export function formatDuration(months: number | null | undefined): string {
 }
 
 /**
- * "10 years", for the section header. Rounds to the nearest whole year — but only once
- * there is a whole year to round. Rounding first turned a 9-month average tenure into
- * "1 year average tenure", which overstates how long someone actually stays; under a
- * year the honest answer is the months.
+ * "10 years", for the section header. Counts WHOLE years only — it never rounds up.
+ *
+ * Two reasons. It must not overstate: rounding first turned a 9-month average tenure
+ * into "1 year average tenure", and tenure is the number a recruiter reads for
+ * stability. And it sits on the same screen as the precise tiles, where rounding 68
+ * months to "6 years" beside a tile reading "5 yrs 8 mos" looks like a bug rather than
+ * two roundings of one fact.
  */
 export function formatYears(months: number | null | undefined): string {
   if (months == null) return ''
   if (months < 12) return formatDuration(months)
-  const years = Math.round(months / 12)
+  const years = Math.floor(months / 12)
   return `${years} ${years === 1 ? 'year' : 'years'}`
 }
 
@@ -239,6 +244,9 @@ export function summarizeHistory(roles: WorkRole[], now: Date): HistorySummary {
   return {
     totalMonths,
     averageTenureMonths,
+    // The current STINT, not the current role: someone promoted last year has been at
+    // the company far longer than they have held the title.
+    currentTenureMonths: stints.find((s) => s.isCurrent)?.months ?? null,
     employerCount: stints.length,
     roleCount: roles.length,
   }

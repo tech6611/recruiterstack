@@ -3,6 +3,10 @@
  * ("Fast career growth", "Ex-McKinsey", "Job hopper", "Recently moved"). Derived
  * deterministically from the stored role history and the job's search plan; no AI.
  * PURE + tested.
+ *
+ * Lives in lib/, not modules/pool, because the ATS candidate profile shows the same
+ * chips. One set of rules, so the pool and the profile can never say different things
+ * about the same person — and modules may not import each other sideways anyway.
  */
 export interface TagExperience { title?: string | null; employer?: string | null; start_date?: string | null; end_date?: string | null; is_current?: boolean | null }
 

@@ -20,6 +20,20 @@ entries on top.
 
 ## 2026-09-26
 
+### Added
+- **The candidate profile is now one document with Overview / Experience / Education / Skills tabs** (`ProfileDocument`). The tabs are **anchors, not four screens**: Education shows Education *and then* Skills, Skills shows Skills alone, Overview shows the lot — same blocks, same order, a tab only picks where to start reading. Rebuilding it as independent panels would look right in a screenshot and feel wrong in use. The rule is a pure `tabPlan()` with its own tests, and a tab with nothing at or below its anchor is never offered. (Juicebox parity, Step 2.)
+- **Skill Map on the profile** — the flat `skills[]` array read as named groups, ordered by how much of *this* person sits in each, so the first heading says what they are.
+- **Trait chips and tenure tiles above the timeline.** Chips come from `lib/profile-tags` — the same rules the sourcing pool uses, moved to `lib/` so the pool and the profile can never label the same person differently. Tiles show avg tenure, current tenure and total experience, each omitted when unknown rather than shown as a dash.
+- **Current tenure** added to the career summary — measured on the current *stint*, not the current title, since someone promoted last year has been at the company far longer than they have held the job.
+
+### Changed
+- **Experience dates moved to a right-aligned column** (range above duration), and **education now leads with the school**, qualification grey beneath — both matching Juicebox.
+- `deriveProfileTags` moved from `modules/pool/domain/` to `src/lib/profile-tags.ts`. Modules may not import each other sideways, and both the pool and the ATS profile need it.
+
+### Fixed
+- **Icons no longer leave a blank hole while loading or failing.** `<BrandIcon>` drew the monogram only after the image errored, so a slow or 404ing logo occupied its box as a gap — and a timeline of gaps looks broken in exactly the way the component exists to prevent. The monogram is now painted first with the logo layered over it, invisible until it has actually decoded.
+- **The header no longer disagrees with the tile beside it.** `formatYears` rounded, so 68 months read "6 years total" next to a tile reading "5 yrs 8 mos". It now counts whole years and never rounds up — which also keeps it from overstating tenure.
+
 ### Changed
 - **Career history on the candidate profile now reads like Juicebox.** Roles are grouped under one employer with a single logo and a single span, so three promotions at one company stop looking like three jobs; each step up the seniority ladder gets a **Promotion** badge; every role and stint carries a duration (`Jul 2024 – Present · 2 yrs 2 mos`); and the section header states `Experience · 10 years total · 4 years average tenure`. Education gained school marks and the same two-line shape. The three "movability" chips were removed rather than shown twice — total and average moved into the header, and current tenure is simply the duration on the current role. The roles' `summary` text was already being fetched and thrown away; it is now displayed, which is most of what a recruiter actually reads. (Juicebox parity, Step 1.)
 

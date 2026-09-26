@@ -1,7 +1,7 @@
 'use client'
 
-import { ExperienceTimeline } from '@/components/candidates/ExperienceTimeline'
-import { EducationList, type EducationEntry } from '@/components/candidates/EducationList'
+import { ProfileDocument } from '@/components/candidates/ProfileDocument'
+import type { EducationEntry } from '@/components/candidates/EducationList'
 import type { WorkRole } from '@/lib/ui/work-history'
 import fixture from './fixture.json'
 
@@ -19,6 +19,7 @@ interface FixtureCandidate {
   name: string
   education: EducationEntry[]
   experiences: WorkRole[]
+  skills: string[]
 }
 
 export function CandidateHistoryPreview() {
@@ -27,8 +28,9 @@ export function CandidateHistoryPreview() {
     <main className="mx-auto max-w-3xl px-6 py-10">
       <h1 className="text-xl font-bold text-slate-900">Career history</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Four real histories from the database, names removed. Logos only load when you are
-        signed in — <code>/api/brand-icon</code> requires a session, so these will be monograms.
+        Four real histories from the database, names removed, each with a real skills array.
+        The tabs are anchors into one document — Education shows Education then Skills.
+        Logos only load when you are signed in — <code>/api/brand-icon</code> requires a session.
       </p>
       <div className="mt-8 space-y-6">
         {candidates.map((candidate) => (
@@ -36,9 +38,14 @@ export function CandidateHistoryPreview() {
             <div className="border-b border-slate-100 px-5 py-3 text-sm font-semibold text-slate-700">
               {candidate.name} · {candidate.experiences.length} roles
             </div>
-            <div className="space-y-6 px-5 py-4">
-              <ExperienceTimeline roles={candidate.experiences} now={NOW} />
-              <EducationList education={candidate.education} />
+            <div className="px-5 py-4">
+              <ProfileDocument
+                experiences={candidate.experiences}
+                education={candidate.education}
+                skills={candidate.skills}
+                graduationYear={candidate.education.reduce<number | null>((a, e) => (typeof e.year === 'number' && (a == null || e.year > a) ? e.year : a), null)}
+                now={NOW}
+              />
             </div>
           </div>
         ))}

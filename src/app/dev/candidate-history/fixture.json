@@ -199,6 +199,30 @@
         "is_current": false,
         "summary": null
       }
+    ],
+    "skills": [
+      "CSS3",
+      "JavaScript",
+      "ReactJS",
+      "Ant Design",
+      "TypeScript",
+      "GraphQL",
+      "Python",
+      "REST APIs",
+      "Kafka",
+      "PostgreSQL",
+      "AWS",
+      "CI/CD Pipelines",
+      "Webpack",
+      "Git",
+      "Datadog",
+      "Sumo Logic",
+      "Grafana",
+      "Jira",
+      "Agile",
+      "Scrum",
+      "Microfrontend Architecture",
+      "Mentorship"
     ]
   },
   {
@@ -320,6 +344,23 @@
         "is_current": false,
         "summary": null
       }
+    ],
+    "skills": [
+      "Java",
+      "Spring Boot",
+      "Microservices",
+      "AWS",
+      "Redis",
+      "Kafka",
+      "RDBMS",
+      "PostgreSQL",
+      "MySQL",
+      "Git",
+      "Apache",
+      "Python",
+      "Product A/B Testing",
+      "Product Planning and Strategy",
+      "Problem effort breakdown and estimation"
     ]
   },
   {
@@ -411,6 +452,19 @@
         "is_current": false,
         "summary": null
       }
+    ],
+    "skills": [
+      "GTM Strategy",
+      "P&L Management",
+      "SQL",
+      "Process Design",
+      "Funnel Analytics",
+      "Vendor Management",
+      "Cross-Functional Leadership",
+      "Commercial Negotiation",
+      "0 → 1 Team Building",
+      "Scalable Process Design",
+      "International Expansion"
     ]
   },
   {
@@ -493,6 +547,22 @@
         "is_current": false,
         "summary": "Built a Desktop app that generated reports using Jasper soft."
       }
+    ],
+    "skills": [
+      "SQL",
+      "Python",
+      "Data Pipeline Design",
+      "AI/LLM-Powered Automation",
+      "Funnel & Marketplace Analytics",
+      "Go-to-Market Strategy",
+      "P&L Management",
+      "Channel Optimisation",
+      "Cross-Functional Program Leadership",
+      "Scalable Process Design",
+      "0 → 1 Team Building",
+      "International Expansion",
+      "Vendor & Supply-Chain Partnerships",
+      "Commercial Negotiation"
     ]
   }
 ]

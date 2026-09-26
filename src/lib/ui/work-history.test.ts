@@ -40,9 +40,14 @@ describe('formatDuration', () => {
 })
 
 describe('formatYears', () => {
-  it('rounds to whole years for the header', () => {
+  it('counts whole years for the header', () => {
     expect(formatYears(120)).toBe('10 years')
     expect(formatYears(13)).toBe('1 year')
+  })
+  it('never rounds up, so the header agrees with the precise tile beside it', () => {
+    // 68 months is "5 yrs 8 mos" on the tile; the header must not say "6 years".
+    expect(formatYears(68)).toBe('5 years')
+    expect(formatYears(23)).toBe('1 year')
   })
   it('falls back to months under a year', () => {
     expect(formatYears(5)).toBe('5 mos')
@@ -188,6 +193,20 @@ describe('summarizeHistory', () => {
   it('leaves the average out while every stint is still running', () => {
     const onlyCurrent = [role({ employer: 'Figma', start_date: '2026-01-01', is_current: true })]
     expect(summarizeHistory(onlyCurrent, NOW).averageTenureMonths).toBeNull()
+  })
+
+  it('reports current tenure as the whole stint, not the latest title', () => {
+    const promotedRecently = [
+      role({ employer: 'Figma', title: 'Engineer', start_date: '2020-01-01', end_date: '2025-01-01' }),
+      role({ employer: 'Figma', title: 'Senior Engineer', start_date: '2025-01-01', is_current: true }),
+    ]
+    // At Figma 6 yrs 8 mos; in the senior title only 20 months.
+    expect(summarizeHistory(promotedRecently, NOW).currentTenureMonths).toBe(80)
+  })
+
+  it('has no current tenure when nobody is currently employed', () => {
+    const past = [role({ employer: 'A', start_date: '2019-01-01', end_date: '2021-01-01' })]
+    expect(summarizeHistory(past, NOW).currentTenureMonths).toBeNull()
   })
 
   it('survives a history with no dates at all', () => {

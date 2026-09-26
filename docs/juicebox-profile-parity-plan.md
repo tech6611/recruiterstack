@@ -114,10 +114,23 @@ The "all the icons show similarly" requirement. One component, one resolver, eve
   rules already proven in `pool/domain/profile-tags.ts` rather than writing new ones, so
   the pool and the ATS can't drift apart.
 
-### Phase 2 — The profile drawer — **partly done in Phase 1**
+### Phase 2 — The profile document — **DONE**
 
-`<ExperienceTimeline>` and `<EducationList>` were built and are live inside the existing
-Career-history panel. What remains here is the tab restructure and the Overview tab.
+The key realisation, from the tab screenshots: **the tabs are anchors into one
+continuous document, not four screens.** Education shows Education *then* Skills;
+Skills shows Skills alone; Overview shows everything. Same blocks, same order —
+`tabPlan()` in `ProfileDocument.tsx`, with tests.
+
+Built: `<ProfileDocument>` (tabs), `<SkillMap>`, `<TraitChips>`, `<TenureTiles>`,
+right-aligned date column, school-first education, and `lib/skills` — a 1,114-skill,
+55-category catalog covering engineering, design, product, marketing, sales, finance,
+HR, operations, legal, healthcare and research. Median 85% of a person's chips land in
+a named category; `npm run audit:skills` reports the rest.
+
+**Deliberate divergence:** Juicebox's Overview opens with Status / Email / Phone /
+Tags. Ours does not — the left rail already owns those, and repeating them would be the
+same facts twice on one screen. If the left rail slims down in Phase 3, that block
+belongs here.
 
 
 - Tabs become **Overview / Experience / Education / Skills / Activity**.
