@@ -74,7 +74,7 @@ export function AdaptivePlanPanel({ jobId, onApplied }: { jobId: string; onAppli
               <Target className="h-3 w-3" /> target {result.target}
             </span>
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${result.met ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-              ~{result.reach.toLocaleString()} reachable {result.met ? '· target met' : '· still short'}
+              ~{result.reach.toLocaleString()} at your target tiers {result.met ? '· target met' : '· still short'}
             </span>
             {result.capped && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">stopped at the expansion cap</span>}
           </div>
@@ -104,9 +104,12 @@ export function AdaptivePlanPanel({ jobId, onApplied }: { jobId: string; onAppli
             <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Proposed plan · {result.perLevel.length} levels</div>
             <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
               {result.perLevel.map((l, i) => (
-                <li key={i} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px]">
+                <li key={i} className={`flex items-center gap-2 px-2.5 py-1.5 text-[12px] ${l.fallback ? 'opacity-55' : ''}`}>
                   <ChevronRight className="h-3 w-3 shrink-0 text-slate-300" />
-                  <span className="min-w-0 flex-1 truncate text-slate-600" title={l.label}>{l.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-slate-600" title={l.label}>
+                    {l.label}
+                    {l.fallback && <span className="ml-1 text-[10px] text-slate-400">· catch-all, not counted</span>}
+                  </span>
                   <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-medium tabular-nums text-slate-600">{l.total == null ? '—' : l.total.toLocaleString()}</span>
                 </li>
               ))}

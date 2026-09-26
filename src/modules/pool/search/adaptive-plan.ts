@@ -44,15 +44,26 @@ export interface AdaptivePlanResult {
   reach: number
   met: boolean
   steps: AdaptivePlanStep[]
-  perLevel: { label: string; total: number | null }[]
+  /** Every probed level's count; `fallback` = a catch-all that does NOT count toward the target. */
+  perLevel: { label: string; total: number | null; fallback?: boolean }[]
   /** True when the loop hit its safety expansion cap before meeting the target (surfaced, never silent). */
   capped: boolean
 }
 
-/** Reachable count across levels. Levels overlap, so this is an UPPER estimate — good enough
- *  to decide "keep widening?" without deduping every candidate. PURE. */
+/** Reachable count across ALL levels (overlap-agnostic upper estimate). PURE. */
 export function planReach(counts: LevelCount[]): number {
   return counts.reduce((s, c) => s + (c.total ?? 0), 0)
+}
+
+/**
+ * The reach that decides "too thin?": the sum EXCLUDING catch-all fallback levels
+ * (feeder-titles-at-any-company, wider-location). Those are always huge and would hide a
+ * thin ideal, so they must never count toward the target — otherwise the planner declares
+ * success while the real ideal found nobody. Matches counts to levels by label. PURE.
+ */
+export function qualifiedReach(counts: LevelCount[], spec: SearchSpec): number {
+  const fb = new Set(spec.levels.filter((l) => l.fallback).map((l) => l.label))
+  return counts.filter((c) => !fb.has(c.label ?? '')).reduce((s, c) => s + (c.total ?? 0), 0)
 }
 
 const dedupe = (xs: string[]): string[] => Array.from(new Set(xs.map((s) => s.trim()).filter(Boolean)))
@@ -117,7 +128,7 @@ export async function runAdaptivePlan(opts: {
   const max = opts.maxExpansions ?? DEFAULT_MAX_EXPANSIONS
   let spec = opts.spec
   let counts = await opts.probe(spec)
-  let reach = planReach(counts)
+  let reach = qualifiedReach(counts, spec)
   const steps: AdaptivePlanStep[] = [{ move: null, reachAfter: reach, levelsAfter: spec.levels.length }]
   let capped = false
   let expansions = 0
@@ -135,18 +146,19 @@ export async function runAdaptivePlan(opts: {
     if (next === spec) break // move added nothing usable.
     spec = next
     counts = await opts.probe(spec)
-    reach = planReach(counts)
+    reach = qualifiedReach(counts, spec)
     steps.push({ move, reachAfter: reach, levelsAfter: spec.levels.length })
     expansions++
   }
 
+  const fbLabels = new Set(spec.levels.filter((l) => l.fallback).map((l) => l.label))
   return {
     spec,
     target: opts.target,
     reach,
     met: reach >= opts.target,
     steps,
-    perLevel: counts.map((c) => ({ label: c.label ?? c.key, total: c.total })),
+    perLevel: counts.map((c) => ({ label: c.label ?? c.key, total: c.total, fallback: fbLabels.has(c.label ?? '') })),
     capped,
   }
 }

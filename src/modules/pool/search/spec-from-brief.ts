@@ -241,8 +241,8 @@ export function ladderFromIdealProfile(
   const others = relaxable.filter((c) => c !== companies && c !== titles && c !== location)
 
   const levels: SearchLevel[] = []
-  const level = (label: string, criteria: SearchCriterion[], relaxes: string | null) => {
-    if (criteria.length) levels.push({ id: `L${levels.length + 1}`, label, criteria, relaxes, rationale: null })
+  const level = (label: string, criteria: SearchCriterion[], relaxes: string | null, fallback = false) => {
+    if (criteria.length) levels.push({ id: `L${levels.length + 1}`, label, criteria, relaxes, rationale: null, fallback: fallback || undefined })
   }
   const keep = (...cs: (SearchCriterion | undefined)[]) => [...others, ...cs.filter((c): c is SearchCriterion => Boolean(c))]
 
@@ -287,14 +287,14 @@ export function ladderFromIdealProfile(
     if (companies && allCompanies.length) {
       level('Feeder titles · target companies', keep(location, companyLane(allCompanies), adjTitles), `career-progression titles at the same companies: ${adjacent.slice(0, 4).join(' / ')}${adjacent.length > 4 ? ' …' : ''}`)
     }
-    level('Feeder titles · any company', keep(location, { ...adjTitles, id: `${titles.id}-adj-any` }), 'feeder titles, no company constraint')
+    level('Feeder titles · any company', keep(location, { ...adjTitles, id: `${titles.id}-adj-any` }), 'feeder titles, no company constraint', true)
   }
 
   // Location widens LAST (absent entirely for remote roles).
   if (location) {
     const everyTitle = titles ? { ...titles, id: `${titles.id}-loc`, values: Array.from(new Set([...titles.values, ...adjacent])), label: null } : undefined
     const radius = (location.radius_km ?? DEFAULT_RADIUS_KM) * 3
-    level('Wider location', keep({ ...location, id: `${location.id}-loc`, radius_km: radius, label: null }, everyTitle), `within ${radius} km`)
+    level('Wider location', keep({ ...location, id: `${location.id}-loc`, radius_km: radius, label: null }, everyTitle), `within ${radius} km`, true)
   }
 
   // Seniority ceiling as before: an IC band means no executive titles.

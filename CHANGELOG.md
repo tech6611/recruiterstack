@@ -18,6 +18,12 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-26
+
+### Fixed
+- **Adaptive planner no longer declares “target met” while the ideal is empty (#3).** The “too thin?” reach now **excludes catch-all fallback levels** (feeder-titles-at-any-company, wider-location) — those are always huge and were hiding a thin ideal, so the planner never widened. New `qualifiedReach`; `SearchLevel.fallback` marks the catch-alls (set in `ladderFromIdealProfile`); the panel shows the *qualified* reach and greys the catch-alls (“not counted”). Tests added. (On the Founding EM job the reported reach drops from a misleading 7,445 to the qualified tiers.)
+- **`function` no longer silently zeroes market searches.** The market source’s function-category field is sparse, so ANDing `function: Engineering` into a search dropped a valid “EM at Rippling, SF, 6–12 yrs” from **13 → 0**. `function` is now **verified after fetch** (the Fit Engine judge reads the roles held) instead of being sent as a hard vendor filter. Verified live — the ideal now returns 13 real EMs instead of 0.
+
 ## 2026-09-25
 
 ### Added

@@ -61,6 +61,13 @@ export interface SearchLevel {
   /** What this level gives up versus the previous one. */
   relaxes?: string | null
   rationale?: string | null
+  /**
+   * A catch-all fallback level (feeder titles at ANY company, or a widened location).
+   * It is searched, but it does NOT count toward the "is the search too thin?" reach the
+   * adaptive planner measures — otherwise the always-huge catch-alls hide a thin ideal and
+   * the planner never widens. See docs/recruiter-brain-sourcing.md.
+   */
+  fallback?: boolean
 }
 
 export interface PostFetchCheck {

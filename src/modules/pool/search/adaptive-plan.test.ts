@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planReach, applyMove, runAdaptivePlan, type AdaptiveMove } from './adaptive-plan'
+import { planReach, qualifiedReach, applyMove, runAdaptivePlan, type AdaptiveMove } from './adaptive-plan'
 import type { SearchSpec } from '@/lib/types/search-spec'
 
 const spec: SearchSpec = {
@@ -27,6 +27,25 @@ const probe3 = async (s: SearchSpec) => s.levels.map((l) => ({ key: l.id, label:
 describe('planReach', () => {
   it('sums level totals, treating null as 0', () => {
     expect(planReach([{ key: 'a', total: 3 }, { key: 'b', total: null }, { key: 'c', total: 5 }])).toBe(8)
+  })
+})
+
+const specWithFallback: SearchSpec = {
+  version: 1,
+  base: [],
+  levels: [
+    { id: 'L1', label: 'Ideal', criteria: [{ id: 'c', kind: 'employer_current', values: ['Rippling'] }], relaxes: null },
+    { id: 'L2', label: 'Wider location', criteria: [{ id: 'c2', kind: 'location', values: ['SF'], radius_km: 150 }], relaxes: null, fallback: true },
+  ],
+  post_fetch: [],
+  source: 'brief',
+}
+
+describe('qualifiedReach', () => {
+  it('excludes catch-all fallback levels from the total', () => {
+    const counts = [{ key: 'a', label: 'Ideal', total: 2 }, { key: 'b', label: 'Wider location', total: 9999 }]
+    expect(planReach(counts)).toBe(10001)          // raw sum sees the catch-all
+    expect(qualifiedReach(counts, specWithFallback)).toBe(2) // the decision does NOT
   })
 })
 
@@ -76,5 +95,16 @@ describe('runAdaptivePlan', () => {
     const r = await runAdaptivePlan({ spec, target: 1000, probe: probe3, nextMove: async () => moreCompanies, maxExpansions: 3 })
     expect(r.capped).toBe(true)
     expect(r.spec.levels).toHaveLength(4) // 1 initial + 3 added
+  })
+  it('a huge catch-all level does NOT satisfy the target — the planner still widens', async () => {
+    // Ideal reaches 2, the catch-all "Wider location" reaches 9999. Old behaviour: 10001 ≥ 5 → done.
+    // New behaviour: only the ideal (2) counts, so it widens until qualified reach ≥ 5.
+    const probeFallback = async (s: SearchSpec) =>
+      s.levels.map((l) => ({ key: l.id, label: l.label, total: l.fallback ? 9999 : l.id === 'L1' ? 2 : 3 }))
+    const r = await runAdaptivePlan({ spec: specWithFallback, target: 5, probe: probeFallback, nextMove: async () => moreCompanies })
+    expect(r.reach).toBe(5)            // 2 (ideal) + 3 (one widening) — NOT 10001
+    expect(r.met).toBe(true)
+    expect(r.spec.levels.length).toBeGreaterThan(specWithFallback.levels.length) // it widened
+    expect(r.perLevel.find((l) => l.label === 'Wider location')?.fallback).toBe(true)
   })
 })

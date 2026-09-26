@@ -9,7 +9,7 @@
 import type { SearchCriterion, SearchLevel, SearchSpec } from '@/lib/types/search-spec'
 import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 import type { CrustdataCondition, CrustdataFilterGroup } from '@/modules/pool/vendors/crustdata/client'
-import { mapSeniorityValues, mapFunctionValues } from '@/modules/pool/vendors/crustdata/query'
+import { mapSeniorityValues } from '@/modules/pool/vendors/crustdata/query'
 import type { SearchLane, SearchPlan } from '@/modules/pool/vendors/crustdata/search-plan'
 import { isGenericTitleTerm } from '@/lib/ai/gate-evaluator'
 
@@ -93,11 +93,14 @@ export function compileCriterion(c: SearchCriterion): { ok: CompiledCriterion } 
       if (!matched.length) return { unsupported: `seniority ${JSON.stringify(unmatched)} not in this source's closed set` }
       return { ok: { conditions: [{ field: F.seniority, type: c.exclude ? 'not_in' : 'in', value: matched }], summary: `${c.exclude ? 'not ' : ''}seniority: ${matched.join(' / ')}` } }
     }
-    case 'function': {
-      const { matched, unmatched } = mapFunctionValues(vals)
-      if (!matched.length) return { unsupported: `function ${JSON.stringify(unmatched)} not in this source's closed set` }
-      return { ok: { conditions: [{ field: F.fn, type: c.exclude ? 'not_in' : 'in', value: matched }], summary: `${c.exclude ? 'not ' : ''}function: ${matched.join(' / ')}` } }
-    }
+    case 'function':
+      // The source's function-category field is SPARSE: an `in` filter on it silently drops
+      // everyone whose profile doesn't carry the field, zeroing otherwise-good searches (a
+      // clear "Engineering Manager at Rippling in SF, 6–12 yrs" search dropped 13 → 0 the
+      // moment function was ANDed in). Titles + title exclusions already fix the role at the
+      // vendor; the function itself is verified AFTER fetch, where the Fit Engine's judge
+      // reads the actual roles held. So it is never sent as a hard vendor filter.
+      return { unsupported: 'function is verified after fetch, not searched (sparse field on this source)' }
     case 'years_band': {
       const conds: CrustdataCondition[] = []
       if (c.min != null) conds.push({ field: F.years, type: '=>', value: c.min })
