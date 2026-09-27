@@ -65,7 +65,8 @@ export function WiderPlanProposal({ result, currentLevelIds, onAccept, onDiscard
       <ul className="mb-3 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
         {result.spec.levels.map((l, i) => {
           const isNew = !currentLevelIds.has(l.id)
-          const total = result.perLevel[i]?.total
+          // Match by lane key: a level the source can't search has no lane, so indexes shift.
+          const total = result.perLevel.find((p) => p.key.startsWith(`L${i + 1}:`))?.total
           return (
             <li key={l.id} className={`flex items-center gap-2 px-2.5 py-1.5 text-[12px] ${l.fallback ? 'opacity-60' : ''}`}>
               <span className="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800">L{i + 1}</span>

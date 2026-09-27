@@ -108,3 +108,17 @@ describe('runAdaptivePlan', () => {
     expect(r.perLevel.find((l) => l.label === 'Wider location')?.fallback).toBe(true)
   })
 })
+
+describe('applyMove ids', () => {
+  it('takes the next free LA id when the plan already holds one from an accepted proposal', () => {
+    const spec = {
+      version: 1 as const, base: [], post_fetch: [], source: 'edited' as const,
+      levels: [
+        { id: 'L1', label: 'Ideal', criteria: [{ id: 'c', kind: 'employer_current' as const, values: ['Rippling'] }], relaxes: null },
+        { id: 'LA1', label: 'Accepted earlier', criteria: [{ id: 'c1', kind: 'employer_current' as const, values: ['Deel'] }], relaxes: null },
+      ],
+    }
+    const next = applyMove(spec, { kind: 'more_companies', label: 'More peers', rationale: null, companies: ['Brex'] } as never, 0)
+    expect(next.levels.map((l) => l.id)).toEqual(['L1', 'LA1', 'LA2'])
+  })
+})

@@ -425,7 +425,7 @@ export function SourcingTab({ jobId, onOpenScoring }: { jobId: string; onOpenSco
                 onToggle={toggle}
                 onDecide={(key, d) => decide(unkey(key), d)}
                 onStar={(key, starred) => market.setFlag(unkey(key), { starred })}
-                onHide={(key) => market.setFlag(unkey(key), { hidden: true })}
+                onHide={(key) => { market.setFlag(unkey(key), { hidden: true }); setSelected((prev) => { const n = new Set(prev); n.delete(key); return n }) }}
                 onOpenProfile={(key) => setOpenProfile(unkey(key))}
               />
             ) : (

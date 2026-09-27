@@ -50,14 +50,22 @@ export const POST = withCapability(
       const { draft, sourcingMap } = await generateIcpWithReasoning(
         context.job, { orgId, userId }, intakeNotes, { roleContext, recruiterCorrections },
       )
-      const icp = await createIcpDraft(supabase, orgId, params.id, draft, { createdBy: userId })
+      // Regenerate starts fresh — never inherit the previous version's reasoning.
+      const icp = await createIcpDraft(supabase, orgId, params.id, draft, { createdBy: userId, inheritSourcingMap: false })
 
-      if (sourcingMap) {
+      // If the AI returned no reasoning, still keep the recruiter's corrections (house
+      // knowledge that must survive regeneration) so the next Regenerate can use them.
+      const map = sourcingMap ?? (recruiterCorrections
+        ? { reasoning: '', requirement_decomposition: [], unwritten_filters: [], recruiter_brief: {
+            niche: '', persona: '', feeder_pools: [], title_families: [], market_gates: [], jd_translations: [],
+            market_norms: [], normal_red_flags: [], unsure_about: [], corrections: recruiterCorrections } }
+        : null)
+      if (map) {
         await (supabase as unknown as LooseSb)
-          .from('icps').update({ sourcing_map: sourcingMap }).eq('id', icp.id).eq('org_id', orgId)
+          .from('icps').update({ sourcing_map: map }).eq('id', icp.id).eq('org_id', orgId)
       }
 
-      return NextResponse.json({ data: { ...icp, sourcing_map: sourcingMap } }, { status: 201 })
+      return NextResponse.json({ data: { ...icp, sourcing_map: map } }, { status: 201 })
     } catch (e) {
       return handleSupabaseError(e as { code: string; message: string })
     }

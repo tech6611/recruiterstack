@@ -18,6 +18,8 @@
 - The search-plan save validation stripped `relax_at` from criteria and `fallback` from levels, so a saved plan could drop the relaxable title/company/location must-haves and undo the planner's catch-all fix. Both kept now (plus the new `ideal` flag), with a test; the level cap rises from 16 to 40.
 - A new ICP version (Save on an approved ICP, Refine from feedback, from-template) now keeps the reasoning, recruiter brief, corrections and saved search plan; they used to vanish. Approving also carries over a newer search plan edited on the live version.
 
+- Review fixes on the cleanup: a new must-have tile gets a real label once filled in (gate results are keyed by label); only one location must-have can be added; a second "Suggest a wider plan" no longer reuses level ids; proposal counts match their level; Regenerate never shows the previous version's reasoning if the AI returns none (corrections kept); hiding a selected market person drops them from the unlock selection; a job-location sync failure after Approve no longer reports the approval as failed.
+
 ### Added
 - `?tab=<name>` opens a job page on that tab (e.g. `/req-jobs/<id>?tab=scoring`).
 

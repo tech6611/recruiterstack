@@ -224,7 +224,7 @@ export async function createIcpDraft(
   orgId: string,
   jobId: string,
   input: IcpDraftInput,
-  opts?: { createdBy?: string | null; derivedFrom?: Record<string, unknown> },
+  opts?: { createdBy?: string | null; derivedFrom?: Record<string, unknown>; inheritSourcingMap?: boolean },
 ): Promise<Icp> {
   const sb = supabase as unknown as LooseSb
 
@@ -262,8 +262,9 @@ export async function createIcpDraft(
       competencies: input.competencies,
       // Carry the reasoning, recruiter brief (+ corrections) and saved search plan into
       // the new version — a Save or Refine used to drop them. Generate overwrites this
-      // with its fresh reasoning straight after.
-      sourcing_map: last.data?.sourcing_map ?? null,
+      // with its fresh reasoning (and opts out, so a failed generation never shows the
+      // previous version's reasoning as its own).
+      sourcing_map: opts?.inheritSourcingMap === false ? null : (last.data?.sourcing_map ?? null),
       changelog,
       // Complete lineage on EVERY version (not just refinements), so the evolution
       // timeline is a clean chain, and record why this version exists.

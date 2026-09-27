@@ -100,7 +100,8 @@ export function IdealProfileTiles({
         <select id="icp-add-must-have" value="" onChange={(e) => { if (e.target.value) add(e.target.value as CriterionKind) }}
           className="h-8 rounded-md border border-dashed border-slate-300 bg-white px-2 text-xs text-slate-500">
           <option value="">+ Add a must-have…</option>
-          {ADDABLE.map((k) => <option key={k} value={k}>{CRITERION_KIND_LABEL[k]}</option>)}
+          {/* One location per role: a second would be ANDed (nobody passes) and the job-location sync keeps only one. */}
+          {ADDABLE.filter((k) => k !== 'location' || !criteria.some((c) => c.kind === 'location')).map((k) => <option key={k} value={k}>{CRITERION_KIND_LABEL[k]}</option>)}
         </select>
       )}
     </div>

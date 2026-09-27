@@ -5,6 +5,7 @@ import { updateCanonicalJob } from '@/modules/ats/domain/job-pipelines'
 import { icpToScoringCriteria } from '@/lib/scoring'
 import { findOrCreateLocation, syncJobLocationIntakeMirror } from '@/lib/jobs/inherit'
 import type { Icp } from '@/lib/types/icp'
+import { logger } from '@/lib/logger'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseSb = any
@@ -39,7 +40,9 @@ export const POST = withCapability(
       await updateCanonicalJob(supabase, orgId, params.id, {
         custom_fields: { scoring_criteria: icpToScoringCriteria(icp) },
       })
-      await syncJobLocationFromIcp(supabase, orgId, params.id, icp)
+      // The approval has already committed — a location-sync failure must not report it as failed.
+      await syncJobLocationFromIcp(supabase, orgId, params.id, icp).catch((err) =>
+        logger.warn('Job location sync after ICP approve failed', { jobId: params.id, error: err instanceof Error ? err.message : String(err) }))
       return NextResponse.json({ data: icp })
     } catch (e) {
       return handleSupabaseError(e as { code: string; message: string })

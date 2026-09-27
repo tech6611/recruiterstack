@@ -10,7 +10,7 @@ import type { ScoringCriterion } from '@/lib/types/database'
 import type { Icp, IcpCompetency, IcpMustHave } from '@/lib/types/icp'
 import { icpToScoringCriteria } from '@/lib/scoring'
 import { RecruiterBriefBody, RecruiterBriefChips } from '@/components/req-jobs/RecruiterBriefCard'
-import { isCriterion, toCriterion, mustHaveFromCriterion } from '@/lib/icp-gates'
+import { isCriterion, toCriterion, mustHaveFromCriterion, criterionLabel } from '@/lib/icp-gates'
 import { IdealProfileTiles } from '@/components/req-jobs/IdealProfileTiles'
 
 
@@ -490,9 +490,16 @@ export function IcpEditor({
                 <IdealProfileTiles
                     criteria={profile.map((g) => toCriterion(g)!)}
                     onChange={(next) =>
-                      setGates((prev) => prev.map((g) => (g.id === next.id ? { ...mustHaveFromCriterion(next), relax_at: next.relax_at ?? null } : g)))
+                      setGates((prev) => prev.map((g) => {
+                        if (g.id !== next.id) return g
+                        // Gate results are keyed by label, so keep a hand-written / AI label —
+                        // but rebuild one that was auto-made (e.g. a new tile's "Current employer: ").
+                        const was = toCriterion(g)
+                        const auto = !g.label || (was != null && g.label === criterionLabel(was)) || was?.exclude !== next.exclude
+                        return { ...mustHaveFromCriterion(auto ? { ...next, label: null } : next), relax_at: next.relax_at ?? null }
+                      }))
                     }
-                    onAdd={(c) => setGates((prev) => [...prev, mustHaveFromCriterion(c)])}
+                    onAdd={(c) => setGates((prev) => [...prev, mustHaveFromCriterion({ ...c, label: null })])}
                     onRemove={(id) => setGates((prev) => prev.filter((g) => g.id !== id))}
                   />
                 {screening.length > 0 && (
