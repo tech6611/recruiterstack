@@ -141,12 +141,19 @@ belongs here.
 - **Overview** = labelled rows (Status / Email / Phone / Tags) + the three most recent
   roles + education, which is Juicebox's Overview exactly.
 
-### Phase 3 — Header and list
+### Phase 3 — Header and list — **DONE**
 
-- Profile header: name, social icon row (LinkedIn / GitHub / site / résumé) with `+N`
-  overflow, location, and the logo chip row (current company · top school).
-- `/candidates` rows rebuilt as Juicebox result cards: logo + *Title at Company* + dates,
-  indented prior roles, education line.
+- **Profile header**: name, title, location, then the current employer and most recent
+  school as marks with their names — no chip, no frame (a box around a logo competes
+  with whatever box the logo already is). Links are drawn only where we hold them:
+  email, phone, LinkedIn, résumé. Institutions are abbreviated the way people refer to
+  them (IIT Guwahati, U of Virginia), because the rail truncated the campus otherwise.
+- **`/candidates` card view**, toggled against the table and remembered per browser.
+  Current role with the employer's mark and dates, two prior roles on an indented rail,
+  education, AI assessment. The table stays for density and sorting.
+- **Photos**: a candidate unlocked from the pool keeps their GitHub avatar. LinkedIn is
+  out — behind their auth, and their terms forbid it. Résumé extraction deferred: a
+  picture in a CV needs a face check or a company logo becomes someone's portrait.
 
 ### Phase 4 — Optional, outside the chosen scope
 
