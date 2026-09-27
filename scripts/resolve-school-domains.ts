@@ -209,29 +209,23 @@ async function resolveSchool(name: string): Promise<Hit> {
 }
 
 /**
- * Words that mark an UMBRELLA body rather than a branch. "Kendriya Vidyalaya Sangathan"
- * is the organisation behind every KV, so its crest is the right one to inherit.
- */
-const UMBRELLA = /^(?:sangathan|sangh|society|societies|group|trust|foundation|schools|organisation|organization|council|board|system)$/i
-
-/**
- * Is the entity Wikidata matched for a PARENT name actually the chain — or just another
- * branch of it?
+ * Is the entity Wikidata matched for a PARENT name really part of that chain?
  *
- * Searching "Delhi Public School" returns "Delhi Public School, Rourkela", an
- * independent school in a different state. Its crest looks close enough to pass a
- * glance, which is exactly why it should not be stored: it is a different institution's
- * domain on someone's record. DPS branches are separate societies with separate sites,
- * unlike KV, which has one central body — so the label has to earn the inheritance.
+ * Indian school chains are franchised bodies that fly ONE crest across the country —
+ * Delhi Public School, Kendriya Vidyalaya, Sainik School, DAV, Amity. A branch
+ * inheriting from a sibling branch is therefore correct, not a mistake: DPS Dhanbad and
+ * DPS Rourkela display the same emblem. (An earlier version rejected sibling matches on
+ * the theory that separate societies meant separate identities. They don't.)
+ *
+ * What this still rejects is a match that isn't the chain at all — a name search that
+ * wandered off to an unrelated institution. The label has to begin with the parent name.
  */
 export function parentLabelAcceptable(parent: string, label: string): boolean {
   const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
   const p = norm(parent)
   const l = norm(label)
   if (!p || !l) return false
-  if (p === l) return true
-  if (!l.startsWith(`${p} `)) return false
-  return l.slice(p.length).trim().split(' ').every((w) => UMBRELLA.test(w))
+  return l === p || l.startsWith(`${p} `)
 }
 
 /**
