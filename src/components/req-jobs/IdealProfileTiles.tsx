@@ -9,6 +9,9 @@ import type { SearchCriterion, CriterionKind } from '@/lib/types/search-spec'
 import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 import { criterionLabel } from '@/lib/icp-gates'
 import { BrandIcon } from '@/components/ui/BrandIcon'
+import { SuggestInput } from '@/components/ui/SuggestInput'
+import { useIcpOptions } from '@/lib/hooks/useIcpOptions'
+import { RADIUS_KM, YEARS_BANDS, bandLabel, optionsFor, type FetchedOptions } from '@/lib/icp-options'
 
 /**
  * The "Ideal profile" as one strip of coloured pills (option P1). Each must-have is a
@@ -64,12 +67,15 @@ export function IdealProfileTiles({
   onChange,
   onAdd,
   onRemove,
+  options,
 }: {
   criteria: SearchCriterion[]
   onChange: (next: SearchCriterion) => void
   /** Add a new (never-relaxed) must-have; omitted = no add control. */
   onAdd?: (c: SearchCriterion) => void
   onRemove?: (id: string) => void
+  /** Suggestion lists, for the dev fixture. Omitted = fetched from /api/icp/options. */
+  options?: FetchedOptions
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   function add(kind: CriterionKind) {
@@ -107,6 +113,7 @@ export function IdealProfileTiles({
           <CriterionEditor
             key={editing.id}
             c={editing}
+            options={options}
             onCancel={close}
             onSave={(next) => {
               if (isEmpty(next)) onRemove?.(next.id)
@@ -169,16 +176,20 @@ function Pill({ c, active, onClick }: { c: SearchCriterion; active: boolean; onC
 
 // ── Inline editors ─────────────────────────────────────────────────────────────
 
-function CriterionEditor({ c, onCancel, onSave }: { c: SearchCriterion; onCancel: () => void; onSave: (n: SearchCriterion) => void }) {
+function CriterionEditor({ c, onCancel, onSave, options }: { c: SearchCriterion; onCancel: () => void; onSave: (n: SearchCriterion) => void; options?: FetchedOptions }) {
   const [draft, setDraft] = useState<SearchCriterion>({ ...c, values: [...c.values] })
+  // One fetch per page, shared by every pill's editor. `options` overrides it so the
+  // dev fixture can show real pickers without an authenticated request.
+  const live = useIcpOptions()
+  const suggestions = optionsFor(draft.kind, options ?? live)
   return (
     <div className="space-y-2">
       {isBand(draft.kind) ? (
         <BandFields draft={draft} setDraft={setDraft} />
       ) : draft.kind === 'location' ? (
-        <LocationFields draft={draft} setDraft={setDraft} />
+        <LocationFields draft={draft} setDraft={setDraft} cities={suggestions} />
       ) : (
-        <ChipField draft={draft} setDraft={setDraft} withLogos={isEmployer(draft.kind)} />
+        <ChipField draft={draft} setDraft={setDraft} withLogos={isEmployer(draft.kind)} options={suggestions} />
       )}
       {EXCLUDABLE(draft.kind) && (
         <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
@@ -206,51 +217,101 @@ const numOrNull = (s: string): number | null => {
 }
 
 function BandFields({ draft, setDraft }: { draft: SearchCriterion; setDraft: (n: SearchCriterion) => void }) {
+  const chosen = bandLabel(draft.min, draft.max)
+  const years = draft.kind === 'years_band'
   return (
-    <div className="flex items-center gap-2 text-[13px]">
-      <input
-        type="number" min={0} value={draft.min ?? ''} placeholder="min"
-        onChange={(e) => setDraft({ ...draft, min: numOrNull(e.target.value) })}
-        className="w-20 rounded-md border border-slate-200 px-2 py-1 focus:border-emerald-400 focus:outline-none"
-      />
-      <span className="text-slate-400">to</span>
-      <input
-        type="number" min={0} value={draft.max ?? ''} placeholder="max"
-        onChange={(e) => setDraft({ ...draft, max: numOrNull(e.target.value) })}
-        className="w-20 rounded-md border border-slate-200 px-2 py-1 focus:border-emerald-400 focus:outline-none"
-      />
-      <span className="text-slate-400">{draft.kind === 'years_band' ? 'years' : ''}</span>
+    <div className="space-y-2">
+      {years && (
+        <div className="flex flex-wrap gap-1">
+          {YEARS_BANDS.map((b) => (
+            <button
+              key={b.label}
+              type="button"
+              onClick={() => setDraft({ ...draft, min: b.min, max: b.max })}
+              className={`rounded-md border px-2 py-1 text-[12px] transition-colors ${
+                chosen === b.label
+                  ? 'border-emerald-500 bg-emerald-50 font-medium text-emerald-800'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {/* The bands cover what recruiters ask for; the numbers stay editable for the
+          brief that asks for something else. */}
+      <div className="flex items-center gap-2 text-[13px]">
+        <input
+          type="number" min={0} value={draft.min ?? ''} placeholder="min" aria-label="Minimum"
+          onChange={(e) => setDraft({ ...draft, min: numOrNull(e.target.value) })}
+          className="w-20 rounded-md border border-slate-200 px-2 py-1 focus:border-emerald-400 focus:outline-none"
+        />
+        <span className="text-slate-400">to</span>
+        <input
+          type="number" min={0} value={draft.max ?? ''} placeholder="any" aria-label="Maximum"
+          onChange={(e) => setDraft({ ...draft, max: numOrNull(e.target.value) })}
+          className="w-20 rounded-md border border-slate-200 px-2 py-1 focus:border-emerald-400 focus:outline-none"
+        />
+        <span className="text-slate-400">{years ? 'years' : ''}</span>
+      </div>
     </div>
   )
 }
 
-function LocationFields({ draft, setDraft }: { draft: SearchCriterion; setDraft: (n: SearchCriterion) => void }) {
+function LocationFields({ draft, setDraft, cities }: { draft: SearchCriterion; setDraft: (n: SearchCriterion) => void; cities: string[] }) {
+  const radius = draft.radius_km ?? 50
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[13px]">
-      <input
-        value={draft.values[0] ?? ''} placeholder="City, Country"
-        onChange={(e) => setDraft({ ...draft, values: [e.target.value] })}
-        className="min-w-[10rem] flex-1 rounded-md border border-slate-200 px-2 py-1 focus:border-emerald-400 focus:outline-none"
+    <div className="space-y-2">
+      <SuggestInput
+        value={draft.values[0] ?? ''}
+        onChange={(v) => setDraft({ ...draft, values: [v] })}
+        options={cities}
+        placeholder="City, region, country"
+        ariaLabel="City"
+        autoFocus
+        className="max-w-md"
       />
-      <input
-        type="number" min={1} max={2000} value={draft.radius_km ?? 50}
-        onChange={(e) => setDraft({ ...draft, radius_km: numOrNull(e.target.value) ?? 50 })}
-        className="w-20 rounded-md border border-slate-200 px-2 py-1 focus:border-emerald-400 focus:outline-none"
-      />
-      <span className="text-slate-400">km</span>
+      <div className="flex flex-wrap items-center gap-1.5 text-[13px]">
+        <span className="text-slate-400">within</span>
+        {RADIUS_KM.map((km) => (
+          <button
+            key={km}
+            type="button"
+            onClick={() => setDraft({ ...draft, radius_km: km })}
+            className={`rounded-md border px-2 py-1 text-[12px] transition-colors ${
+              radius === km
+                ? 'border-emerald-500 bg-emerald-50 font-medium text-emerald-800'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {km} km
+          </button>
+        ))}
+        {/* Keyable, because a search radius is a number someone may want exactly. */}
+        <input
+          type="number" min={1} max={2000} value={radius} aria-label="Radius in kilometres"
+          onChange={(e) => setDraft({ ...draft, radius_km: numOrNull(e.target.value) ?? 50 })}
+          className="w-20 rounded-md border border-slate-200 px-2 py-1 focus:border-emerald-400 focus:outline-none"
+        />
+        <span className="text-slate-400">km</span>
+      </div>
     </div>
   )
 }
 
-function ChipField({ draft, setDraft, withLogos }: { draft: SearchCriterion; setDraft: (n: SearchCriterion) => void; withLogos: boolean }) {
+function ChipField({ draft, setDraft, withLogos, options }: { draft: SearchCriterion; setDraft: (n: SearchCriterion) => void; withLogos: boolean; options: string[] }) {
   const [entry, setEntry] = useState('')
-  const add = () => {
-    const v = entry.trim()
+  const add = (raw?: string) => {
+    const v = (raw ?? entry).trim()
     if (v && !draft.values.some((x) => x.toLowerCase() === v.toLowerCase())) {
       setDraft({ ...draft, values: [...draft.values, v] })
     }
     setEntry('')
   }
+  // Already-chosen values drop out of the list: offering someone a value they have
+  // just added reads as a control that did nothing.
+  const left = options.filter((o) => !draft.values.some((v) => v.toLowerCase() === o.toLowerCase()))
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {draft.values.map((v) => (
@@ -263,15 +324,17 @@ function ChipField({ draft, setDraft, withLogos }: { draft: SearchCriterion; set
         </span>
       ))}
       <span className="inline-flex items-center gap-1">
-        <input
+        <SuggestInput
           value={entry}
-          onChange={(e) => setEntry(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
-          onBlur={add}
-          placeholder="Add…"
-          className="w-24 rounded-md border border-dashed border-slate-300 px-2 py-1 text-[12px] focus:w-40 focus:border-emerald-400 focus:outline-none"
+          onChange={setEntry}
+          onCommit={(v) => add(v)}
+          options={left}
+          withLogos={withLogos}
+          placeholder={left.length ? 'Search or type…' : 'Add…'}
+          ariaLabel="Add a value"
+          className="w-52"
         />
-        <button type="button" onClick={add} aria-label="Add" className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-slate-100"><Plus className="h-3.5 w-3.5" /></button>
+        <button type="button" onClick={() => add()} aria-label="Add" className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-slate-100"><Plus className="h-3.5 w-3.5" /></button>
       </span>
     </div>
   )
