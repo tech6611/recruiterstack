@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Brain, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Brain, ChevronDown, ChevronRight, Compass } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import type { ScoringCriterion } from '@/lib/types/database'
 import type { Icp, IcpCompetency, IcpMustHave } from '@/lib/types/icp'
 import { icpToScoringCriteria } from '@/lib/scoring'
-import { RecruiterBriefCard } from '@/components/req-jobs/RecruiterBriefCard'
+import { RecruiterBriefBody, RecruiterBriefChips } from '@/components/req-jobs/RecruiterBriefCard'
 import { isCriterion, toCriterion, mustHaveFromCriterion } from '@/lib/icp-gates'
 import { IdealProfileTiles } from '@/components/req-jobs/IdealProfileTiles'
 
@@ -25,8 +25,8 @@ const BUCKET_CLS: Record<string, string> = {
  * The Ideal Candidate Profile editor (Slice 1b). Generates a draft ICP by seeding
  * from the job's existing rubric + fields, lets the recruiter edit hard gates and
  * weighted competencies (with observable behaviours), and approves it. Approving
- * syncs the flat rubric back to the job, so the Scoring rubric card below stays in
- * step. Gates are captured now; they start being enforced in the Fit Engine.
+ * syncs the flat rubric back to the job, so the Overview's Scoring rubric card stays
+ * in step. Gates are captured now; they start being enforced in the Fit Engine.
  */
 export function IcpEditor({
   jobId,
@@ -54,9 +54,8 @@ export function IcpEditor({
   const [intakeNotes, setIntakeNotes] = useState('')
   const [showIntake, setShowIntake] = useState(false)
   const [showReasoning, setShowReasoning] = useState(false)
-  // Phase 1 (niche recruiter) — the brief the model reasoned in, and the recruiter's
-  // corrections to it (house knowledge fed into the next Regenerate).
-  const [showBrief, setShowBrief] = useState(false)
+  // Phase 1 (niche recruiter) — the recruiter's corrections to the brief the model
+  // reasoned in (house knowledge fed into the next Regenerate).
   const [openComps, setOpenComps] = useState<Set<string>>(new Set())
   const [corrections, setCorrections] = useState('')
   const [savingCorrections, setSavingCorrections] = useState(false)
@@ -280,7 +279,23 @@ export function IcpEditor({
   const removeBehaviour = (ci: number, bi: number) =>
     setComp(ci, { behaviours: comps[ci].behaviours.filter((_, j) => j !== bi) })
 
-  // ── gate editing ────────────────────────────────────────────────────────────
+  // One intake-notes box, shared by the empty state (Generate) and the editor (Regenerate).
+  const intakeBox = (
+    <div className="text-left">
+      <label htmlFor="icp-intake-notes" className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+        Intake call notes (optional, used when you {icp ? 'Regenerate' : 'Generate'})
+      </label>
+      <textarea
+        id="icp-intake-notes"
+        value={intakeNotes}
+        onChange={(e) => setIntakeNotes(e.target.value)}
+        rows={4}
+        placeholder="Paste the hiring-manager intake call notes/transcript — the AI pulls their exact phrasing and must-haves."
+        className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
+      />
+    </div>
+  )
+
   if (loading) {
     return (
       <Card>
@@ -332,20 +347,7 @@ export function IcpEditor({
               Seeds from your scoring rubric, location, and level — or reuse a saved role. Nothing is applied until you approve.
             </p>
             <div className="mt-3">
-              {showIntake ? (
-                <div className="text-left">
-                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                    Intake call notes (optional)
-                  </label>
-                  <textarea
-                    value={intakeNotes}
-                    onChange={(e) => setIntakeNotes(e.target.value)}
-                    rows={4}
-                    placeholder="Paste the hiring-manager intake call notes/transcript — the AI will pull their exact phrasing and must-haves."
-                    className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-              ) : (
+              {showIntake ? intakeBox : (
                 <button type="button" onClick={() => setShowIntake(true)} className="text-xs font-medium text-slate-400 hover:text-slate-600">
                   + Paste intake call notes for sharper, verbatim competencies
                 </button>
@@ -372,29 +374,36 @@ export function IcpEditor({
             {isApproved ? 'Approved' : 'Draft'} · v{icp.version}
           </span>
         </CardTitle>
-        <CardDescription>Gates reject. Weights rank. Approving syncs the rubric below.</CardDescription>
+        <CardDescription>Gates reject. Weights rank. Approving updates the scoring rubric on the Overview tab.</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {icp.sourcing_map && (icp.sourcing_map.recruiter_brief || icp.status === 'draft') && (
-          <RecruiterBriefCard
-            brief={icp.sourcing_map.recruiter_brief ?? null}
-            open={showBrief} onToggle={() => setShowBrief((v) => !v)}
-            corrections={corrections} onCorrectionsChange={setCorrections}
-            onSaveCorrections={saveCorrections} saving={savingCorrections}
-          />
-        )}
-
-        {/* ── Reasoning (Sourcing Brain, Slice 1) — how the JD was dissected ── */}
+        {/* ── How this profile was reasoned — the recruiter brief + the JD breakdown,
+            in one place (they used to be two panels, and the Source tab repeated them). ── */}
         {icp.sourcing_map && (
           <section className="rounded-xl border border-slate-200 bg-slate-50/60">
             <button type="button" onClick={() => setShowReasoning((s) => !s)}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-xs font-semibold text-slate-600">
-              {showReasoning ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              <Brain className="h-3.5 w-3.5 text-indigo-500" /> Reasoning, requirement breakdown &amp; archetypes
+              className="flex w-full flex-wrap items-center gap-2 px-3 py-2.5 text-left text-xs">
+              {showReasoning ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
+              <Brain className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+              <span className="font-semibold text-slate-700">How this profile was reasoned</span>
+              {icp.sourcing_map.recruiter_brief?.niche && <span className="text-slate-500">· {icp.sourcing_map.recruiter_brief.niche}</span>}
+              <RecruiterBriefChips brief={icp.sourcing_map.recruiter_brief ?? null} compact={!showReasoning} />
             </button>
             {showReasoning && (
               <div className="space-y-3 px-3 pb-3">
+                {(icp.sourcing_map.recruiter_brief || icp.status === 'draft') && (
+                  <div className="rounded-lg border border-slate-200 bg-white">
+                    <div className="flex items-center gap-1.5 px-3 pt-2.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      <Compass className="h-3 w-3 text-indigo-600" /> Recruiter brief
+                    </div>
+                    <RecruiterBriefBody
+                      brief={icp.sourcing_map.recruiter_brief ?? null}
+                      corrections={corrections} onCorrectionsChange={setCorrections}
+                      onSaveCorrections={saveCorrections} saving={savingCorrections}
+                    />
+                  </div>
+                )}
                 {icp.sourcing_map.reasoning && (
                   <p className="text-xs leading-relaxed text-slate-600">{icp.sourcing_map.reasoning}</p>
                 )}
@@ -616,18 +625,7 @@ export function IcpEditor({
       </CardContent>
 
       {/* Component 04 — optional intake notes to fold into a Regenerate. */}
-      {showIntake && (
-        <div className="border-t border-slate-100 px-6 py-3">
-          <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Intake call notes (used on Regenerate)</label>
-          <textarea
-            value={intakeNotes}
-            onChange={(e) => setIntakeNotes(e.target.value)}
-            rows={3}
-            placeholder="Paste the hiring-manager intake call notes/transcript — the AI pulls their exact phrasing and must-haves when you Regenerate."
-            className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-800 focus:border-emerald-500 focus:outline-none"
-          />
-        </div>
-      )}
+      {showIntake && <div className="border-t border-slate-100 px-6 py-3">{intakeBox}</div>}
 
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-6 py-3">
         <div className="flex flex-wrap items-center gap-2">

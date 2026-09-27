@@ -45,7 +45,7 @@ interface PendingReview {
  * approved ICP with the Fit Engine, shows the matches, and adds the good ones to
  * the pipeline. Runs on demand ("Source candidates") and caches the result.
  */
-export function SourcingTab({ jobId }: { jobId: string }) {
+export function SourcingTab({ jobId, onOpenScoring }: { jobId: string; onOpenScoring?: () => void }) {
   const [matches, setMatches] = useState<Match[]>([])
   const [icp, setIcp] = useState<MatrixIcp | null>(null)
   const [openInternal, setOpenInternal] = useState(true) // the primary section — open by default
@@ -54,7 +54,6 @@ export function SourcingTab({ jobId }: { jobId: string }) {
   const [loading, setLoading] = useState(true)
   const [sourcing, setSourcing] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [refining, setRefining] = useState(false)
   const [embedding, setEmbedding] = useState(false)
   const [calibrate, setCalibrate] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -214,23 +213,6 @@ export function SourcingTab({ jobId }: { jobId: string }) {
     }
   }
 
-  async function refineFromFeedback() {
-    setRefining(true)
-    const res = await fetch(`/api/jobs/${jobId}/icp/refine-from-feedback`, { method: 'POST' })
-    setRefining(false)
-    const body = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      toast.error(body.error ?? 'Could not refine the ICP')
-      return
-    }
-    const data = body.data
-    if (data?.status === 'insufficient') {
-      toast(`${data.decided}/${data.needed} decisions so far — mark a few more, then refine.`)
-      return
-    }
-    toast.success(`ICP refined from your decisions — review draft v${data?.icp?.version ?? ''} on the Scoring tab.`)
-  }
-
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev)
@@ -318,9 +300,15 @@ export function SourcingTab({ jobId }: { jobId: string }) {
                   {decidedCount} decision{decidedCount === 1 ? '' : 's'}
                   {calibrate ? ` · reviewing ${shown.length} diverse candidates` : ''}
                 </span>
-                <Button size="sm" variant="outline" onClick={refineFromFeedback} loading={refining} disabled={decidedCount < MIN_DECISIONS}>
-                  <Sparkles className="h-3 w-3" /> Refine ICP{decidedCount < MIN_DECISIONS ? ` (${decidedCount}/${MIN_DECISIONS})` : ''}
-                </Button>
+                {/* Refining lives on the Scoring tab (it produces a draft you approve there). */}
+                {decidedCount < MIN_DECISIONS ? (
+                  <span className="text-slate-400">{decidedCount} of {MIN_DECISIONS} decisions needed to refine the ICP</span>
+                ) : (
+                  <button type="button" onClick={onOpenScoring} disabled={!onOpenScoring}
+                    className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-900">
+                    <Sparkles className="h-3 w-3" /> Enough decisions — refine the ICP on Scoring →
+                  </button>
+                )}
               </div>
             )}
             {stale && (
@@ -427,10 +415,10 @@ export function SourcingTab({ jobId }: { jobId: string }) {
       <PoolSourcingSection jobId={jobId} />
 
       {/* ── Sourcing Brain — the shortlist brief (Slice 1b) ──────────────────── */}
-      <ShortlistBrief jobId={jobId} />
+      <ShortlistBrief jobId={jobId} onOpenScoring={onOpenScoring} />
 
       {/* ── Sourcing Brain — the learning loop (Slice 3) ─────────────────────── */}
-      <LearningPanel jobId={jobId} />
+      <LearningPanel jobId={jobId} onOpenScoring={onOpenScoring} />
     </Card>
 
     {hasIcp && matches.length > 0 && (

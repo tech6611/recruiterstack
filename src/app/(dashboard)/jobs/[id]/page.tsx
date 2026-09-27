@@ -1147,6 +1147,18 @@ function ScoringCriteriaModal({
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState('')
+  // Once the job has an approved ICP, the rubric is its competencies — edited on
+  // the Scoring tab. Editing here too let the two drift apart, so it is read-only.
+  const [icpOwned, setIcpOwned] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    fetch(`/api/jobs/${jobId}/icp`)
+      .then(r => (r.ok ? r.json() : { data: null }))
+      .then(j => { if (active) setIcpOwned(j.data?.status === 'approved') })
+      .catch(() => {})
+    return () => { active = false }
+  }, [jobId])
 
   const total = items.reduce((s, c) => s + c.weight, 0)
 
@@ -1180,7 +1192,11 @@ function ScoringCriteriaModal({
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
           <div>
             <h2 className="text-base font-bold text-slate-800">Scoring Criteria</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Drag to reorder · weights must sum to 100%</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {icpOwned
+                ? 'From this job’s approved Ideal Candidate Profile'
+                : 'Drag to reorder · weights must sum to 100%'}
+            </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
             <X className="h-4 w-4" />
@@ -1190,12 +1206,13 @@ function ScoringCriteriaModal({
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 px-5 pb-2 space-y-3">
 
-          {/* Criteria rows */}
+          {/* Criteria rows — a disabled fieldset makes every input/button read-only */}
+          <fieldset disabled={icpOwned} className="space-y-3">
           <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
             {items.map((c, i) => (
               <div
                 key={c.id}
-                draggable
+                draggable={!icpOwned}
                 onDragStart={() => setDragIdx(i)}
                 onDragOver={e => e.preventDefault()}
                 onDrop={() => {
@@ -1255,11 +1272,13 @@ function ScoringCriteriaModal({
           {/* Add criterion */}
           <button
             type="button"
+            hidden={icpOwned}
             onClick={() => setItems(prev => [...prev, { id: `c_${Date.now()}`, name: 'New Criterion', weight: 0, description: null }])}
             className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" /> Add criterion
           </button>
+          </fieldset>
 
           {/* ── Unified scoring breakdown table — same 4-column layout for all states ── */}
           {(() => {
@@ -1420,12 +1439,19 @@ function ScoringCriteriaModal({
             <button
               onClick={onClose}
               className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-            >Cancel</button>
+            >{icpOwned ? 'Close' : 'Cancel'}</button>
+            {icpOwned ? (
+              <a
+                href={`/req-jobs/${jobId}?tab=scoring`}
+                className="flex-1 rounded-xl bg-slate-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-slate-500 transition-colors"
+              >Edit on the Scoring tab</a>
+            ) : (
             <button
               onClick={handleSave}
               disabled={saving || total !== 100}
               className="flex-1 rounded-xl bg-slate-600 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >{saving ? 'Saving…' : 'Save'}</button>
+            )}
           </div>
         </div>
 

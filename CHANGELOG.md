@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-27
+
+### Changed
+- Scoring/Source cleanup, stage 1 of 3 ("One of Each"): one "Refine ICP" button, on the Scoring tab. The Source tab's calibration strip shows "n of 5 decisions" and then links to Scoring, and the Learning panel's button now opens Scoring instead of refining itself.
+- The recruiter brief and the "Reasoning, requirement breakdown & archetypes" panel merged into one "How this profile was reasoned" section on Scoring. The Shortlist brief no longer repeats the reasoning or archetypes; it links to Scoring (the copy-for-hiring-manager text still includes them).
+- The Scoring tab's intake-call-notes box is one shared box for Generate and Regenerate.
+- The Overview "Scoring rubric" card flags when a newer ICP draft is not approved yet, so draft edits no longer look like they are in use.
+- The pipeline page's "Scoring Criteria" pop-up is read-only once the job has an approved ICP, with an "Edit on the Scoring tab" link. Jobs without an ICP can still edit it there.
+
+### Added
+- `?tab=<name>` opens a job page on that tab (e.g. `/req-jobs/<id>?tab=scoring`).
+
 ## 2026-09-26
 
 ### Changed

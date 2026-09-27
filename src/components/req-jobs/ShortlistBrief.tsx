@@ -40,7 +40,7 @@ const BUCKET: Record<string, { label: string; cls: string }> = {
 
 /** Sourcing Brain, Slice 1b — one ranked shortlist across your candidates + the
  *  market, with the reasoning, and a copy-for-hiring-manager export. */
-export function ShortlistBrief({ jobId }: { jobId: string }) {
+export function ShortlistBrief({ jobId, onOpenScoring }: { jobId: string; onOpenScoring?: () => void }) {
   const [brief, setBrief] = useState<Brief | null>(null)
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
@@ -128,23 +128,12 @@ export function ShortlistBrief({ jobId }: { jobId: string }) {
             <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-700">{brief.counts.great} great · {brief.counts.good} good</span>
           </div>
 
-          {brief.reasoning && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-xs leading-relaxed text-slate-600">
-              {brief.reasoning}
-            </div>
-          )}
-
-          {brief.archetypes?.length > 0 && (
-            <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Who could fit (the bets)</div>
-              <div className="flex flex-wrap gap-1.5">
-                {brief.archetypes.map((a, i) => (
-                  <span key={i} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600" title={a.thesis}>
-                    {a.name}{a.is_non_obvious && <span className="text-indigo-500"> ✦</span>}
-                  </span>
-                ))}
-              </div>
-            </div>
+          {/* The reasoning + archetypes live once, on the Scoring tab. They still go
+              into the copy-for-hiring-manager text. */}
+          {onOpenScoring && (brief.reasoning || brief.archetypes?.length > 0) && (
+            <button type="button" onClick={onOpenScoring} className="text-[11px] font-medium text-emerald-700 hover:text-emerald-900">
+              How this profile was reasoned → Scoring tab
+            </button>
           )}
 
           <ol className="space-y-2">
