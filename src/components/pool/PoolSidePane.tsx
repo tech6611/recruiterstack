@@ -186,6 +186,19 @@ export function PoolSidePane({
     <aside className="flex w-80 shrink-0 flex-col gap-3 border-l border-slate-200 bg-slate-50/60 p-4">
       {unlocked && candidateId ? (
         <UnlockedPanes candidateId={candidateId} />
+      ) : unlocked ? (
+        /* Unlocked, but the unlock row never recorded which candidate it created. Rare,
+           and it must not offer a second unlock — you would be charged again for someone
+           you already hold. */
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Notes &amp; outreach
+          </h3>
+          <p className="text-xs leading-relaxed text-slate-600">
+            You&rsquo;ve already unlocked this profile, but we didn&rsquo;t record which candidate
+            it was copied into. Search your candidates by name to find them.
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">

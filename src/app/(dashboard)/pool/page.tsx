@@ -15,6 +15,7 @@ import { PoolResultCard } from '@/components/pool/PoolResultCard'
 import { PoolSidePane } from '@/components/pool/PoolSidePane'
 import { Search, Sparkles, Loader2, Database, Filter, CalendarClock, AlertTriangle } from 'lucide-react'
 import { ProfileIdentity } from '@/components/candidates/ProfileIdentity'
+import { formatLocation } from '@/lib/ui/location'
 
 type Summary = {
   id: string
@@ -41,6 +42,8 @@ type Summary = {
   reachable: boolean
   sources: string[]
   unlocked?: boolean
+  /** The candidate this profile was projected into, when this org has unlocked it. */
+  candidate_id?: string | null
   /** Returned by the search so a card can show a person, not just a job title. */
   education: { degree?: string | null; field?: string | null; school?: string | null; year?: number | null }[]
   recent_roles: { title: string | null; employer: string | null; start_date: string | null; end_date: string | null; is_current: boolean }[]
@@ -84,11 +87,13 @@ const fmt = (d: string | null) =>
   !d ? '' : new Date(d).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 
 /** "Pune, India" from the stored city / region / country; falls back to the region or country alone. */
-const locationLabel = (r: Pick<Summary, 'location_city' | 'location_region' | 'location_country'>) => {
-  const head = r.location_city ?? r.location_region
-  if (head && r.location_country && head !== r.location_country) return `${head}, ${r.location_country}`
-  return head ?? r.location_country ?? null
-}
+/**
+ * City, state, country — see lib/ui/location. This used to be `city ?? region`, which
+ * treated the state as a SUBSTITUTE for the city and so never printed both: everyone in
+ * Bengaluru read as "Bengaluru, India" when we hold "Karnataka" for 409 of 423 profiles.
+ */
+const locationLabel = (r: Pick<Summary, 'location_city' | 'location_region' | 'location_country'>) =>
+  formatLocation(r)
 
 function FreshnessPill({ r }: { r: Summary }) {
   const f = FRESHNESS[r.freshness ?? 'unknown']
@@ -404,9 +409,12 @@ export default function PoolPage() {
                 column. What it can offer depends on whether this person is in your
                 workspace yet; the pane says so rather than showing dead controls. */}
             {selected && (
+              /* Just-unlocked wins, then the id the profile already carries. Reading only
+                 the session value made an ALREADY unlocked profile look locked — you were
+                 offered an unlock for someone sitting in your ATS. */
               <PoolSidePane
                 unlocked={Boolean(selected.unlocked)}
-                candidateId={unlockedCandidateId}
+                candidateId={unlockedCandidateId ?? selected.candidate_id ?? null}
                 unlocksLeft={access?.unlockQuota == null ? null : Math.max(0, access.unlockQuota - (access.unlocksUsed ?? 0))}
                 unlocking={unlocking}
                 onUnlock={unlockSelected}

@@ -1,9 +1,10 @@
 'use client'
 
-import { Github, Globe, Linkedin, Mail, Phone, Twitter, FileText, X as XIcon } from 'lucide-react'
+import { X as XIcon } from 'lucide-react'
 import { BrandIcon } from '@/components/ui/BrandIcon'
+import { SocialIcon } from '@/components/ui/SocialIcon'
 import { shortSchoolName, topSchool } from '@/components/candidates/CandidateHeader'
-import { profileLinks, type LinkNetwork } from '@/lib/ui/profile-links'
+import { profileLinks } from '@/lib/ui/profile-links'
 
 /**
  * The identity block above a profile on a WIDE surface — the pool drawer, and anywhere
@@ -27,16 +28,6 @@ import { profileLinks, type LinkNetwork } from '@/lib/ui/profile-links'
  * when both are missing — that row is where the eye goes, and a silently absent row
  * shifts everything below it.
  */
-
-const LINK_ICONS: Record<LinkNetwork, typeof Globe> = {
-  linkedin: Linkedin,
-  github: Github,
-  x: Twitter,
-  website: Globe,
-  resume: FileText,
-  email: Mail,
-  phone: Phone,
-}
 
 export interface ProfileIdentityProps {
   name: string
@@ -69,22 +60,19 @@ export function ProfileIdentity({
         <h2 className="min-w-0 text-xl font-semibold leading-tight text-slate-900">{name}</h2>
 
         <div className="flex shrink-0 items-center gap-0.5">
-          {links.map((l) => {
-            const Icon = LINK_ICONS[l.network]
-            return (
-              <a
-                key={l.network}
-                href={l.href}
-                title={l.label}
-                aria-label={l.label}
-                target={l.network === 'email' || l.network === 'phone' ? undefined : '_blank'}
-                rel="noopener noreferrer"
-                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-              >
-                <Icon className="h-4 w-4" />
-              </a>
-            )
-          })}
+          {links.map((l) => (
+            <a
+              key={l.network}
+              href={l.href}
+              title={l.label}
+              aria-label={l.label}
+              target={l.network === 'email' || l.network === 'phone' ? undefined : '_blank'}
+              rel="noopener noreferrer"
+              className="rounded-lg p-1.5 transition-colors hover:bg-slate-100"
+            >
+              <SocialIcon network={l.network} />
+            </a>
+          ))}
           {!links.length && lockedNote && (
             <span className="text-[11px] text-slate-400">{lockedNote}</span>
           )}

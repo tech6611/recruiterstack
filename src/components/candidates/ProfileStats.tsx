@@ -5,7 +5,7 @@ import {
   Brain, Building2, Code2, Crown, Gem, GraduationCap, Hourglass, Landmark,
   Move, Rocket, TrendingUp, Users,
 } from 'lucide-react'
-import { deriveProfileChips, type ChipIcon } from '@/lib/profile-chips'
+import { deriveProfileChips, type ChipIcon, type ProfileChip } from '@/lib/profile-chips'
 
 /**
  * Icon names from the pure chip rules, mapped to marks here. The derivation stays free
@@ -24,6 +24,24 @@ const CHIP_ICONS: Record<ChipIcon, typeof Rocket> = {
   building: Building2,
   gem: Gem,
   landmark: Landmark,
+}
+
+/**
+ * Each KIND of chip gets its own colour, so the row reads as several different claims
+ * rather than one repeated shape. Grouping by kind and not by label is what keeps it
+ * legible: every domain chip is the same blue whether it says "AI / ML" or "Finance",
+ * so the colour tells you what KIND of thing you are looking at before you read it.
+ *
+ * Tailwind needs these spelled out in full — it scans source text for class names, so a
+ * template string like `bg-${hue}-50` compiles to nothing at all.
+ */
+const CHIP_TONES: Record<ProfileChip['kind'], { wrap: string; icon: string }> = {
+  domain:     { wrap: 'border-indigo-200 bg-indigo-50 text-indigo-900',     icon: 'text-indigo-500' },
+  seniority:  { wrap: 'border-amber-200 bg-amber-50 text-amber-900',        icon: 'text-amber-500' },
+  trajectory: { wrap: 'border-emerald-200 bg-emerald-50 text-emerald-900',  icon: 'text-emerald-500' },
+  tenure:     { wrap: 'border-sky-200 bg-sky-50 text-sky-900',              icon: 'text-sky-500' },
+  education:  { wrap: 'border-violet-200 bg-violet-50 text-violet-900',     icon: 'text-violet-500' },
+  breadth:    { wrap: 'border-rose-200 bg-rose-50 text-rose-900',           icon: 'text-rose-500' },
 }
 
 /**
@@ -56,13 +74,14 @@ export function TraitChips({
     <div className="flex flex-wrap gap-1.5">
       {chips.map((chip) => {
         const Icon = CHIP_ICONS[chip.icon]
+        const tone = CHIP_TONES[chip.kind]
         return (
           <span
             key={chip.label}
             title={chip.hint}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${tone.wrap}`}
           >
-            <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <Icon className={`h-3.5 w-3.5 shrink-0 ${tone.icon}`} />
             {chip.label}
           </span>
         )

@@ -2,6 +2,7 @@
 
 import { CheckCircle2, FileText, AlertTriangle } from 'lucide-react'
 import { ResultCard } from '@/components/ui/ResultCard'
+import { formatLocation } from '@/lib/ui/location'
 
 /** The subset of a pool row a card draws. Mirrors `PoolProfileSummary`. */
 export interface PoolCardRow {
@@ -44,7 +45,7 @@ const FRESHNESS: Record<string, { label: string; cls: string }> = {
  */
 export function PoolResultCard({ row, onOpen }: { row: PoolCardRow; onOpen: () => void }) {
   const fresh = FRESHNESS[row.freshness ?? 'unknown']
-  const place = [row.location_city ?? row.location_region, row.location_country].filter(Boolean).join(', ')
+  const place = formatLocation(row) ?? ''
 
   return (
     <ResultCard

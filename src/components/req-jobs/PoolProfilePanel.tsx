@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Briefcase } from 'lucide-react'
 import { ProfileDocument } from '@/components/candidates/ProfileDocument'
 import { ProfileIdentity } from '@/components/candidates/ProfileIdentity'
+import { formatLocation } from '@/lib/ui/location'
 
 /**
  * Right-hand profile panel for a market match — the pool's version of the candidate
@@ -62,9 +63,7 @@ export function PoolProfilePanel({
       .catch((e) => setError(e.message))
   }, [profileId, initialDetail])
 
-  const place = detail
-    ? [detail.location_city ?? detail.location_region, detail.location_country].filter(Boolean).join(', ')
-    : ''
+  const place = (detail && formatLocation(detail)) ?? ''
 
   return (
     <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl">

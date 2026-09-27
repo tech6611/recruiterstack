@@ -73,6 +73,8 @@ export interface PoolProfileSummary {
   recent_roles: { title: string | null; employer: string | null; start_date: string | null; end_date: string | null; is_current: boolean }[]
   /** True when THIS org has already unlocked the profile. */
   unlocked?: boolean
+  /** The candidate row this profile was copied into on unlock, when there is one. */
+  candidate_id?: string | null
   /** Derived at read time — storing it would itself go stale. */
   evidence_age_months?: number | null
   freshness?: 'fresh' | 'aging' | 'stale' | 'unknown'
@@ -272,7 +274,7 @@ export async function getPoolProfile(
     sb.from('pool_profile_fields')
       .select('field,value,source_key,confidence')
       .eq('profile_id', id).order('confidence', { ascending: false }),
-    sb.from('pool_unlocks').select('id').eq('org_id', orgId).eq('profile_id', id).maybeSingle(),
+    sb.from('pool_unlocks').select('id,candidate_id').eq('org_id', orgId).eq('profile_id', id).maybeSingle(),
   ])
 
   let contacts: PoolContact[] = []
@@ -290,6 +292,10 @@ export async function getPoolProfile(
     experiences: (exps ?? []) as PoolExperience[],
     contacts,
     unlocked: Boolean(unlock),
+    // The candidate this profile was projected into. Without it the drawer can tell
+    // that someone is in your ATS but not WHERE, so it fell back to offering an unlock
+    // for a person you had already unlocked.
+    candidate_id: (unlock as { candidate_id?: string | null } | null)?.candidate_id ?? null,
     provenance: (prov ?? []) as PoolProfileDetail['provenance'],
   }
 }
