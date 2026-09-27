@@ -1,6 +1,9 @@
 'use client'
 
 import { PoolProfilePanel, type PoolProfileDetailView } from '@/components/req-jobs/PoolProfilePanel'
+import { ProfileIdentity } from '@/components/candidates/ProfileIdentity'
+import { ProfileDocument } from '@/components/candidates/ProfileDocument'
+import { PoolSidePane } from '@/components/pool/PoolSidePane'
 import fixture from '../candidate-history/fixture.json'
 
 /**
@@ -31,6 +34,73 @@ export function PoolPanelPreview() {
         One real history, name removed. The drawer now renders the same timeline, education
         list and Skill Map as the ATS profile, so an unlocked candidate doesn&rsquo;t change shape.
       </p>
+      {/* The WIDE drawer, as /pool renders it: fixed identity block, profile, side pane. */}
+      <section className="mt-8 max-w-5xl">
+        <h2 className="mb-2 text-sm font-semibold text-slate-900">/pool drawer — locked</h2>
+        <div className="flex rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="min-w-0 flex-1 p-6">
+            <ProfileIdentity
+              name={detail.display_name ?? ''}
+              location="Bengaluru, India"
+              currentCompany={detail.current_company}
+              education={detail.education}
+              contacts={[]}
+              lockedNote="Contacts after unlock"
+              onClose={() => {}}
+            />
+            <ProfileDocument
+              experiences={detail.experiences.map((e) => ({
+                title: e.title ?? null,
+                employer: e.employer ?? null,
+                location: e.location ?? null,
+                start_date: e.start_date ?? null,
+                end_date: e.end_date ?? null,
+                is_current: Boolean(e.is_current),
+                summary: e.summary ?? null,
+              }))}
+              education={detail.education}
+              skills={detail.skills}
+            />
+          </div>
+          <PoolSidePane unlocked={false} candidateId={null} unlocksLeft={12} unlocking={false} onUnlock={() => {}} />
+        </div>
+      </section>
+
+      <section className="mt-8 max-w-5xl">
+        <h2 className="mb-2 text-sm font-semibold text-slate-900">Identity block — with links</h2>
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <ProfileIdentity
+            name="Jeevan Shankar"
+            location="Edison, California, United States"
+            currentCompany="Rippling"
+            education={[{ school: 'University of Massachusetts Amherst', year: 2014 }]}
+            contacts={[
+              { kind: 'linkedin', value: 'https://www.linkedin.com/in/jeevanshankar' },
+              { kind: 'website', value: 'https://github.com/jeevanshankar' },
+              { kind: 'website', value: 'https://x.com/jeevanshankar' },
+              { kind: 'website', value: 'jeevanshankar.com' },
+              { kind: 'email', value: 'jeevan@example.com' },
+            ]}
+          />
+        </div>
+      </section>
+
+      <section className="mt-8 max-w-sm">
+        <h2 className="mb-2 text-sm font-semibold text-slate-900">Side pane — unlocked</h2>
+        <p className="mb-2 text-xs text-slate-500">
+          Tabs only; the panes fetch live candidate data, which this fixture has none of.
+        </p>
+        <div className="flex h-96 rounded-xl border border-slate-200 bg-white shadow-sm">
+          <PoolSidePane
+            unlocked
+            candidateId="00000000-0000-0000-0000-000000000000"
+            unlocksLeft={null}
+            unlocking={false}
+            onUnlock={() => {}}
+          />
+        </div>
+      </section>
+
       <PoolProfilePanel profileId="fixture" tags={['Fast career growth']} onClose={() => {}} initialDetail={detail} />
     </main>
   )

@@ -13,7 +13,8 @@ import { toast } from 'sonner'
 import { ProfileDocument } from '@/components/candidates/ProfileDocument'
 import { PoolResultCard } from '@/components/pool/PoolResultCard'
 import { PoolSidePane } from '@/components/pool/PoolSidePane'
-import { Search, Sparkles, Loader2, X, Database, Filter, CalendarClock, AlertTriangle } from 'lucide-react'
+import { Search, Sparkles, Loader2, Database, Filter, CalendarClock, AlertTriangle } from 'lucide-react'
+import { ProfileIdentity } from '@/components/candidates/ProfileIdentity'
 
 type Summary = {
   id: string
@@ -319,24 +320,26 @@ export default function PoolPage() {
               <div className="flex justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>
             ) : (
               <>
-                <div className="mb-4 flex items-start justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-900">{selected.display_name}</h2>
-                    <p className="text-sm text-gray-600">
-                      {selected.current_title}{selected.current_company ? ` · ${selected.current_company}` : ''}
-                    </p>
-                  </div>
-                  <button onClick={() => setSelected(null)} className="rounded p-1 text-gray-400 hover:bg-gray-100">
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
+                {/* The same identity block the ATS profile opens with: name, where they
+                    are, the employer and school marks, the source links. Fixed order,
+                    every candidate — see components/candidates/ProfileIdentity. */}
+                <ProfileIdentity
+                  name={selected.display_name ?? 'Unnamed'}
+                  location={locationLabel(selected)}
+                  currentCompany={selected.current_company}
+                  education={selected.education}
+                  contacts={selected.contacts}
+                  lockedNote={
+                    selected.has_email || selected.has_linkedin ? 'Contacts after unlock' : null
+                  }
+                  onClose={() => setSelected(null)}
+                />
 
-                <div className="mb-3 grid grid-cols-4 gap-3 rounded-lg bg-gray-50 p-3 text-center">
+                <div className="mb-3 grid grid-cols-3 gap-3 rounded-lg bg-gray-50 p-3 text-center">
                   {[
                     ['Experience', months(selected.total_experience_months)],
                     ['In role (last known)', months(selected.current_tenure_months)],
                     ['Roles', String(selected.num_roles ?? '—')],
-                    ['Location', locationLabel(selected) ?? '—'],
                   ].map(([l, v]) => (
                     <div key={l}>
                       <div className="text-sm font-semibold tabular-nums text-gray-900">{v}</div>
@@ -370,29 +373,9 @@ export default function PoolPage() {
                   )}
                 </div>
 
-                {/* Contacts — gated on unlock */}
-                <section className="mb-5">
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Contact</h3>
-                  {selected.contacts.length ? (
-                    <ul className="space-y-1 text-sm">
-                      {selected.contacts.map((c, i) => (
-                        <li key={i} className="flex items-center gap-2">
-                          <span className="w-16 shrink-0 text-xs text-gray-400">{c.kind}</span>
-                          {c.kind === 'linkedin' || c.kind === 'website' ? (
-                            <a href={c.value} target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline">{c.value}</a>
-                          ) : <span className="text-gray-800">{c.value}</span>}
-                          <span className="ml-auto text-xs text-gray-400">{c.source_key}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-gray-300 p-3 text-sm text-gray-500">
-                      {selected.has_email || selected.has_linkedin
-                        ? 'Contact details are hidden until you unlock this profile.'
-                        : 'No contact details on file for this person.'}
-                    </div>
-                  )}
-                </section>
+                {/* Contacts are the icon row in the header now, as Juicebox has them.
+                    The unlock gate still lives on the server: a locked profile simply
+                    returns no contact rows, so there is nothing here to hide. */}
 
                 {/* Career arc */}
                 {/* Career, education and skills — the SAME components the candidate

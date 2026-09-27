@@ -55,8 +55,16 @@ export function shortSchoolName(name: string): string {
   )
 }
 
-/** Most recent qualification: the school worth putting beside the employer. */
-function topSchool(education: Candidate['education']): string | null {
+/**
+ * Most recent qualification: the school worth putting beside the employer.
+ *
+ * Structural over `Candidate['education']` on purpose — the pool drawer holds the same
+ * four fields under a different type, and both headers have to pick the same school or
+ * the two surfaces describe one person differently.
+ */
+export function topSchool(
+  education: { school?: string | null; year?: number | null }[] | null | undefined,
+): string | null {
   const entries = (education ?? []).filter((e) => e?.school)
   if (!entries.length) return null
   const dated = entries.filter((e) => typeof e.year === 'number')

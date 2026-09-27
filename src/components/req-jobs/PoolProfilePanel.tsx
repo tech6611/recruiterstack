@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, MapPin, Briefcase } from 'lucide-react'
-import { BrandIcon } from '@/components/ui/BrandIcon'
+import { Briefcase } from 'lucide-react'
 import { ProfileDocument } from '@/components/candidates/ProfileDocument'
+import { ProfileIdentity } from '@/components/candidates/ProfileIdentity'
 
 /**
  * Right-hand profile panel for a market match — the pool's version of the candidate
@@ -68,37 +68,27 @@ export function PoolProfilePanel({
 
   return (
     <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl">
-      <div className="flex items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-slate-900">{detail?.display_name ?? '…'}</div>
-          {(detail?.current_title || detail?.current_company) && (
-            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
-              {detail?.current_company && <BrandIcon name={detail.current_company} size={14} />}
-              <span className="truncate">
-                {detail?.current_title}
-                {detail?.current_company ? ` · ${detail.current_company}` : ''}
-              </span>
-            </div>
-          )}
-          <div className="mt-1 flex flex-wrap gap-1">
-            {(tags ?? []).map((t) => (
-              <span key={t} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{t}</span>
-            ))}
-            {(detail?.sources ?? []).map((s) => (
-              <span key={s} className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700">
-                {s.replace('vendor:', '').replace('upload:', '')}
-              </span>
-            ))}
-          </div>
+      <div className="border-b border-slate-100 px-4 pb-3 pt-4">
+        {/* One identity block, shared with the /pool drawer and the ATS rail: name,
+            location, the employer and school marks, the source links — same things in
+            the same order whichever surface you opened the person from. */}
+        <ProfileIdentity
+          name={detail?.display_name ?? '…'}
+          location={place || null}
+          currentCompany={detail?.current_company}
+          education={detail?.education}
+          onClose={onClose}
+        />
+        <div className="-mt-3 flex flex-wrap gap-1">
+          {(tags ?? []).map((t) => (
+            <span key={t} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{t}</span>
+          ))}
+          {(detail?.sources ?? []).map((s) => (
+            <span key={s} className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700">
+              {s.replace('vendor:', '').replace('upload:', '')}
+            </span>
+          ))}
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          <X className="h-4 w-4" />
-        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -107,14 +97,6 @@ export function PoolProfilePanel({
         {detail && (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-              {place && (
-                <span
-                  className="inline-flex items-center gap-1"
-                  title={[detail.location_city, detail.location_region, detail.location_country].filter(Boolean).join(' · ')}
-                >
-                  <MapPin className="h-3 w-3" />{place}
-                </span>
-              )}
               {detail.experience_years != null && (
                 <span className="inline-flex items-center gap-1"><Briefcase className="h-3 w-3" />{detail.experience_years} yrs</span>
               )}
