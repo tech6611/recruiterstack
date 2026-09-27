@@ -14,6 +14,27 @@ const LOOKS = [
 ]
 const GOLD = { Icon: Sparkles, circle: 'bg-gold-500', card: 'from-gold-50 ring-gold-200' }
 
+/** A pool entry's company without its parenthetical: "Google (Area 120, X)" → "Google". */
+function baseName(raw: string | null | undefined): string {
+  return (raw ?? '').replace(/\s*\([^)]*\)/g, '').trim()
+}
+
+/** Whole-word test, so "Meta" does not match "metadata". */
+function mentions(text: string, name: string): boolean {
+  if (!name) return false
+  return new RegExp(`\\b${name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(text)
+}
+
+/** Everything an archetype's prose says about where its people come from. */
+const proseOf = (a: Archetype) => `${a.where_from ?? ''} ${a.thesis ?? ''}`.toLowerCase()
+
+/** The brief's feeder pools, highest priority first — the order the search works through. */
+function sortedPools(brief: RecruiterBrief | null | undefined) {
+  return [...(brief?.feeder_pools ?? [])]
+    .filter((p) => p.companies?.length)
+    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
+}
+
 /**
  * Feeder-pool companies an archetype's text names — archetypes carry no company list of
  * their own, so the two have to be matched up.
@@ -24,20 +45,47 @@ const GOLD = { Icon: Sparkles, circle: 'bg-gold-500', card: 'from-gold-50 ring-g
  * logos at all while the others showed four. The parenthetical is a note about WHICH
  * part of the company, so it is dropped for both the match and the logo lookup —
  * "Google (Area 120, X)" resolves to no logo either.
- *
- * Whole words only: a bare `includes` would let "Meta" match "metadata".
  */
 export function companiesFor(a: Archetype, brief: RecruiterBrief | null | undefined): string[] {
-  const text = `${a.where_from ?? ''} ${a.thesis ?? ''}`.toLowerCase()
+  const text = proseOf(a)
   const out: string[] = []
   for (const raw of (brief?.feeder_pools ?? []).flatMap((p) => p.companies)) {
-    const base = (raw ?? '').replace(/\s*\([^)]*\)/g, '').trim()
+    const base = baseName(raw)
     if (!base || out.includes(base)) continue
-    const word = new RegExp(`\\b${base.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
-    if (word.test(text)) out.push(base)
+    if (mentions(text, base)) out.push(base)
     if (out.length === 4) break
   }
   return out
+}
+
+/**
+ * Which pass of the search first reaches this bet.
+ *
+ * WHY THIS HAS TO BE SHOWN. The search does not sample all three bets evenly — it works
+ * through the feeder pools in priority order, exhausting one before starting the next.
+ * So a bet whose companies all sit in pool 3 is not looked for until the first two are
+ * spent. Without saying so, three cards side by side promise an even split and the
+ * recruiter wonders where their big-tech people are.
+ *
+ * Two bets CAN share a pass: the Aspiring Leader draws on Notion, which is in pool 1,
+ * so it is reached alongside the Startup Scaler rather than after it. The number is
+ * read off the pools, not assumed from the order the cards happen to be written in.
+ *
+ * Null means no pool names any of its companies — a bet with no lane of its own, which
+ * is worth knowing.
+ */
+export function searchPassFor(
+  a: Archetype,
+  brief: RecruiterBrief | null | undefined,
+): { pass: number; pool: string } | null {
+  const pools = sortedPools(brief)
+  const text = proseOf(a)
+  for (let i = 0; i < pools.length; i++) {
+    if ((pools[i].companies ?? []).some((raw) => mentions(text, baseName(raw)))) {
+      return { pass: i + 1, pool: pools[i].label ?? `Pool ${i + 1}` }
+    }
+  }
+  return null
 }
 
 /**
@@ -54,9 +102,24 @@ export function companiesFor(a: Archetype, brief: RecruiterBrief | null | undefi
  */
 export function BetCards({ archetypes, brief }: { archetypes: Archetype[]; brief?: RecruiterBrief | null }) {
   let plain = 0
+
+  // Ordered by when the search actually reaches them, not by the order the model wrote
+  // them in — the cards are read left to right, so left to right had better be true.
+  const ordered = archetypes
+    .map((a) => ({ a, order: searchPassFor(a, brief) }))
+    .sort((x, y) => (x.order?.pass ?? 99) - (y.order?.pass ?? 99))
+  const anyOrder = ordered.some((o) => o.order)
+
   return (
-    <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
-      {archetypes.map((a, i) => {
+    <div>
+      {anyOrder && (
+        <p className="mb-1.5 text-[11px] text-slate-400">
+          Searched in this order — each pool is exhausted before the next one starts, so
+          these are not sampled evenly.
+        </p>
+      )}
+      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
+      {ordered.map(({ a, order }, i) => {
         const look = a.is_non_obvious ? GOLD : LOOKS[plain++ % LOOKS.length]
         const logos = companiesFor(a, brief)
         return (
@@ -65,9 +128,24 @@ export function BetCards({ archetypes, brief }: { archetypes: Archetype[]; brief
               <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-white ${look.circle}`}>
                 <look.Icon className="h-4 w-4" />
               </span>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-slate-900" title={a.name}>{a.name}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="min-w-0 truncate text-sm font-semibold text-slate-900" title={a.name}>{a.name}</span>
+                  {order && (
+                    <span
+                      title={`Reached from the "${order.pool}" pool, pass ${order.pass} of the search`}
+                      className="shrink-0 rounded bg-white/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500 ring-1 ring-slate-200"
+                    >
+                      {order.pass}{order.pass === 1 ? 'st' : order.pass === 2 ? 'nd' : order.pass === 3 ? 'rd' : 'th'}
+                    </span>
+                  )}
+                </div>
                 {a.is_non_obvious && <div className="text-[11px] font-semibold text-gold-700">✦ non-obvious</div>}
+                {!order && (
+                  <div className="text-[10px] text-slate-400" title="No feeder pool names this bet's companies, so the search has no lane aimed at it.">
+                    no lane of its own
+                  </div>
+                )}
               </div>
             </div>
             {a.thesis && (
@@ -106,6 +184,7 @@ export function BetCards({ archetypes, brief }: { archetypes: Archetype[]; brief
           </div>
         )
       })}
+      </div>
     </div>
   )
 }

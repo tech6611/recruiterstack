@@ -2,6 +2,9 @@
 
 ## 2026-09-27
 
+### Added
+- **The bets say when the search reaches them.** Three cards side by side promise an even split; the search actually works through the feeder pools in priority order, exhausting one before the next starts. Each card now carries its pass number, the cards are ordered by it, and a line above says so. The number is read off the pools rather than assumed — the Aspiring Leader draws on Notion, which sits in pool 1, so it shares the first pass with the Startup Scaler instead of coming third. A bet no pool aims at is marked "no lane of its own", which is worth knowing. 9 tests.
+
 ### Changed
 - **The ideal profile's unset fields fold away.** Twelve empty rows under five filled ones buried the profile in fields nobody set. They now sit behind one greyed line — "12 more fields, not set" — which still answers "have I missed anything" without spending a screen on it.
 

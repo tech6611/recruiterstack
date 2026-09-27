@@ -1,13 +1,29 @@
 import { describe, it, expect } from 'vitest'
-import { companiesFor } from './BetCards'
+import { companiesFor, searchPassFor } from './BetCards'
 
 /** The real approved ICP for "Founding Engineering Manager" (v5). */
 const BRIEF = {
   feeder_pools: [
-    { label: 'High-Growth, Product-First Startups (Series A-C)', companies: ['Rippling', 'Deel', 'Ramp', 'Vanta', 'Notion', 'Retool', 'Brex'] },
-    { label: "Established 'Unicorns' with Strong Eng Culture", companies: ['Stripe', 'Plaid', 'Airtable', 'Datadog', 'Figma'] },
-    { label: "Big Tech '0-to-1' Internal Teams", companies: ['Google (Area 120, X)', 'Meta (NPE)', 'Microsoft (Incubation)'] },
+    { label: 'High-Growth, Product-First Startups (Series A-C)', priority: 1, companies: ['Rippling', 'Deel', 'Ramp', 'Vanta', 'Notion', 'Retool', 'Brex'] },
+    { label: "Established 'Unicorns' with Strong Eng Culture", priority: 2, companies: ['Stripe', 'Plaid', 'Airtable', 'Datadog', 'Figma'] },
+    { label: "Big Tech '0-to-1' Internal Teams", priority: 3, companies: ['Google (Area 120, X)', 'Meta (NPE)', 'Microsoft (Incubation)'] },
   ],
+} as never
+
+const SCALER = {
+  name: 'The Startup Scaler',
+  where_from: 'Rippling, Deel, Vanta, Brex.',
+  thesis: 'Joined a now well-known startup (e.g., Rippling, Ramp) as an IC when it was <100 people.',
+} as never
+const BIGTECH = {
+  name: 'The Big-Tech Intrapreneur',
+  where_from: 'Google Area 120, Meta NPE, internal incubators at large tech companies.',
+  thesis: "An EM from a '0-to-1' team inside Google, Meta, or similar.",
+} as never
+const ASPIRING = {
+  name: 'The Aspiring Leader',
+  where_from: 'Notion, Airtable, Plaid, Dropbox.',
+  thesis: 'A high-performing Staff Engineer at a mid-stage company (e.g., Notion, Plaid).',
 } as never
 
 describe('companiesFor', () => {
@@ -41,5 +57,39 @@ describe('companiesFor', () => {
     const a = { name: 'x', where_from: 'A consultancy background.', thesis: '' } as never
     expect(companiesFor(a, BRIEF)).toEqual([])
     expect(companiesFor(a, null)).toEqual([])
+  })
+})
+
+describe('searchPassFor', () => {
+  it('reads the pass off the pools, not off the order the model wrote the bets in', () => {
+    expect(searchPassFor(SCALER, BRIEF)).toEqual({ pass: 1, pool: 'High-Growth, Product-First Startups (Series A-C)' })
+    expect(searchPassFor(BIGTECH, BRIEF)?.pass).toBe(3)
+  })
+
+  it('lets two bets share a pass', () => {
+    // The Aspiring Leader draws on Notion, which is in pool 1 — so it is reached
+    // alongside the Startup Scaler, not after it. Assuming one bet per pool would have
+    // put this third.
+    expect(searchPassFor(ASPIRING, BRIEF)?.pass).toBe(1)
+  })
+
+  it('takes the EARLIEST pool a bet appears in', () => {
+    // Its companies span pools 1 and 2; the search reaches it in the first.
+    const spanning = { name: 'x', where_from: 'Notion and Plaid.', thesis: '' } as never
+    expect(searchPassFor(spanning, BRIEF)?.pass).toBe(1)
+  })
+
+  it('is null for a bet no pool aims at', () => {
+    const orphan = { name: 'x', where_from: 'Consultancies and agencies.', thesis: '' } as never
+    expect(searchPassFor(orphan, BRIEF)).toBeNull()
+    expect(searchPassFor(SCALER, null)).toBeNull()
+  })
+
+  it('honours priority over array order', () => {
+    const reversed = { feeder_pools: [
+      { label: 'Late', priority: 9, companies: ['Stripe'] },
+      { label: 'First', priority: 1, companies: ['Rippling'] },
+    ] } as never
+    expect(searchPassFor(SCALER, reversed)).toEqual({ pass: 1, pool: 'First' })
   })
 })
