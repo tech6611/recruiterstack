@@ -82,6 +82,64 @@ const wiki = async (url: string) => {
   try { return JSON.parse(text) } catch { throw new Error('Wikidata rate limited') }
 }
 
+/**
+ * Wikidata's structured claims are thinner than the article beside them. Checked
+ * against our own pool: Flipkart (22,000), Rippling (5,000) and Swiggy (6,000) all
+ * carry a headcount in the Wikipedia infobox and none in Wikidata. So when a claim is
+ * missing, read the article — reached through the entity's own sitelink, never a second
+ * name search, so the identity guard still holds.
+ */
+function cleanInfobox(raw: string): string {
+  return raw
+    .replace(/<ref[^>]*\/>/gi, ' ')
+    .replace(/<ref[\s\S]*?<\/ref>/gi, ' ')
+    .replace(/\{\{[^}]*\}?\}?/g, ' ')
+    .replace(/\[\[([^\]|]*\|)?/g, '')
+    .replace(/\]\]/g, '')
+    .replace(/'{2,}/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function infoboxField(wikitext: string, key: string): string | null {
+  const m = wikitext.match(new RegExp(`\\|\\s*${key}\\s*=\\s*([^\n]{1,200})`, 'i'))
+  const v = m ? cleanInfobox(m[1]) : ''
+  return v || null
+}
+
+/** "22,000 (excluding Myntra)" → 22000. The first plain number wins. */
+function firstNumber(v: string | null): number | null {
+  if (!v) return null
+  const m = v.match(/\d[\d,]{2,}/)
+  if (!m) return null
+  const n = Number(m[0].replace(/,/g, ''))
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+async function fromWikipedia(title: string): Promise<{ employees: number | null; founded: number | null; industries: string[] }> {
+  const blank = { employees: null, founded: null, industries: [] as string[] }
+  try {
+    const r = await wiki(
+      `https://en.wikipedia.org/w/api.php?action=query&prop=revisions&rvprop=content&rvslots=main` +
+      `&format=json&formatversion=2&titles=${encodeURIComponent(title)}`,
+    )
+    const text: string = r.query?.pages?.[0]?.revisions?.[0]?.slots?.main?.content ?? ''
+    if (!text) return blank
+    const industry = infoboxField(text, 'industry')
+    return {
+      employees: firstNumber(infoboxField(text, 'num_employees')),
+      founded: firstNumber(infoboxField(text, 'founded'))
+        ?? (Number(infoboxField(text, 'founded')?.match(/\b(1[89]|20)\d{2}\b/)?.[0]) || null),
+      // Split a piped list ("E-commerce | Retail") and drop anything implausible.
+      industries: industry
+        ? industry.split(/[,;|]|\band\b/).map((x) => x.trim()).filter((x) => x.length > 2 && x.length < 40).slice(0, 4)
+        : [],
+    }
+  } catch {
+    return blank
+  }
+}
+
 interface Facts {
   name_norm: string
   display_name: string | null
@@ -120,7 +178,7 @@ async function lookup(employer: string): Promise<Facts> {
   await sleep(THROTTLE_MS)
   const entities = await wiki(
     `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${candidates.map((c) => c.id).join('|')}` +
-    `&props=claims|labels&format=json&languages=en`,
+    `&props=claims|labels|sitelinks&format=json&languages=en&sitefilter=enwiki`,
   )
 
   for (const candidate of candidates) {
@@ -164,16 +222,30 @@ async function lookup(employer: string): Promise<Facts> {
       country = c.entities?.[countryId]?.claims?.P297?.[0]?.mainsnak?.datavalue?.value ?? null
     }
 
+    let foundedYear = founded ? Number(String(founded).slice(1, 5)) || null : null
+    let employees = employeesRaw ? Math.round(Number(String(employeesRaw).replace('+', ''))) || null : null
+
+    // Fill the gaps from the article itself, reached by the entity's own sitelink.
+    const article: string | undefined = ent.sitelinks?.enwiki?.title
+    let via = `wikidata ${candidate.id}`
+    if (article && (employees == null || foundedYear == null || !industries.length)) {
+      await sleep(THROTTLE_MS)
+      const wp = await fromWikipedia(article)
+      if (employees == null && wp.employees != null) { employees = wp.employees; via += ' + enwiki headcount' }
+      if (foundedYear == null && wp.founded != null) { foundedYear = wp.founded; via += ' + enwiki founded' }
+      if (!industries.length && wp.industries.length) { industries = wp.industries; via += ' + enwiki industry' }
+    }
+
     return {
       ...base,
       display_name: label,
       wikidata_id: candidate.id,
-      founded_year: founded ? Number(String(founded).slice(1, 5)) || null : null,
-      employees: employeesRaw ? Math.round(Number(String(employeesRaw).replace('+', ''))) || null : null,
+      founded_year: foundedYear,
+      employees,
       industries,
       country_code: country,
       is_public: instanceOf.some((q) => PUBLIC_QIDS.has(q)) ? true : null,
-      note: `wikidata ${candidate.id}`,
+      note: via,
     }
   }
   return { ...base, note: 'matches exist but none is an organisation by that name' }
