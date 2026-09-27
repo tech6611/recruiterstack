@@ -67,6 +67,10 @@ export interface PoolProfileSummary {
   has_linkedin: boolean
   reachable: boolean
   sources: string[]
+  /** Highest qualification(s) — the card draws the most recent one. */
+  education: { degree?: string | null; field?: string | null; school?: string | null; year?: number | null }[]
+  /** The three most recent roles, for the card. The table view ignores them. */
+  recent_roles: { title: string | null; employer: string | null; start_date: string | null; end_date: string | null; is_current: boolean }[]
   /** True when THIS org has already unlocked the profile. */
   unlocked?: boolean
   /** Derived at read time — storing it would itself go stale. */
@@ -112,7 +116,7 @@ export interface PoolAccess {
 const SUMMARY_COLS =
   'id,display_name,headline,current_title,current_company,location_city,location_region,location_country,location_country_code,experience_years,' +
   'skills,num_roles,total_experience_months,current_tenure_months,has_email,has_linkedin,' +
-  'reachable,sources,evidence_as_of,evidence_source,tenure_verified_months,employer_disputed'
+  'reachable,sources,evidence_as_of,evidence_source,tenure_verified_months,employer_disputed,education'
 
 /** Months between an ISO date and now. */
 function monthsSince(iso: string | null): number | null {
@@ -213,15 +217,34 @@ export async function searchPool(
   if (error) throw error
   const rows = ((data ?? []) as PoolProfileSummary[]).map(withFreshness)
 
-  // Mark the ones this org has already unlocked, so the UI can show "in your ATS".
+  for (const r of rows) {
+    r.education = Array.isArray(r.education) ? r.education : []
+    r.recent_roles = []
+  }
+
   if (rows.length) {
-    const { data: un } = await sb
-      .from('pool_unlocks')
-      .select('profile_id')
-      .eq('org_id', orgId)
-      .in('profile_id', rows.map((r) => r.id))
+    const ids = rows.map((r) => r.id)
+    // Mark what this org has unlocked, and fetch the few roles a card draws — one
+    // batched query for the page, not one per row, and only the columns it needs.
+    const [{ data: un }, { data: exps }] = await Promise.all([
+      sb.from('pool_unlocks').select('profile_id').eq('org_id', orgId).in('profile_id', ids),
+      sb
+        .from('pool_experiences')
+        .select('profile_id,title,employer,start_date,end_date,is_current,sort_order')
+        .in('profile_id', ids)
+        .order('sort_order', { ascending: true }),
+    ])
     const unlocked = new Set((un ?? []).map((u: { profile_id: string }) => u.profile_id))
-    for (const r of rows) r.unlocked = unlocked.has(r.id)
+    const byProfile = new Map<string, PoolProfileSummary['recent_roles']>()
+    for (const e of (exps ?? []) as (PoolProfileSummary['recent_roles'][number] & { profile_id: string })[]) {
+      const list = byProfile.get(e.profile_id) ?? []
+      if (list.length < 3) list.push(e)
+      byProfile.set(e.profile_id, list)
+    }
+    for (const r of rows) {
+      r.unlocked = unlocked.has(r.id)
+      r.recent_roles = byProfile.get(r.id) ?? []
+    }
   }
   return { rows, total: count ?? rows.length }
 }

@@ -50,6 +50,13 @@ entries on top.
 
 ## 2026-09-27
 
+### Added
+- **The pool browser reads like Juicebox.** Rows became cards — photo, name, freshness and unlock state, **current role with the employer's mark and dates, the two before it, education** — so a market can be judged by scrolling. The detail drawer widened into two columns: the profile on the left, a **notes-and-outreach pane** on the right, which is Juicebox's third column.
+  - **One card, two surfaces.** `<ResultCard>` is shared with the candidates list; each side passes its own badges and links (a candidate has applications and a résumé, a pool row has an evidence date and an unlock price). Writing the markup twice is how the two ended up describing the same person differently in the first place.
+  - **The side pane says what it can honestly offer.** A pool profile isn't in your workspace — those tables are shared across orgs and carry no `org_id` — so there is nowhere for a note to live until it's unlocked. And notes attach to an *application*, so even an unlocked person needs a job first. The pane names the next real step at each stage instead of showing a disabled text box.
+  - `GET /api/pool` now returns each profile's three most recent roles and its education, batched for the page.
+- **`POST /api/pool/[id]/unlock`.** Unlocking already existed but only from a job's Source tab, where it also adds the person to that pipeline. Browsing the pool and wanting someone in your candidates without picking a job first had no path; now it does.
+
 ### Changed
 - **The pool now describes a person the same way the pipeline does** (Juicebox parity, Phase 4). `PoolProfilePanel` renders the shared `ProfileDocument` — the grouped timeline with employer marks and promotion badges, the education list, the Skill Map, behind the same anchor tabs. It used to hand-roll a flatter version of each, so a candidate's history visibly **changed shape the moment they were unlocked**; one set of components removes that.
 - **Employer marks on the pool browse rows and the sourcing matrix.** The matrix's generic building glyph became the real logo. Its results table was rebuilt by other work two commits ago, so this adds the mark rather than imposing a competing card layout on it.

@@ -9,11 +9,11 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { BrandIcon } from '@/components/ui/BrandIcon'
-import {
-  Search, MapPin, Briefcase, Clock, Mail, Linkedin, Sparkles,
-  Loader2, X, Database, Filter, CheckCircle2, CalendarClock, AlertTriangle, FileText,
-} from 'lucide-react'
+import { toast } from 'sonner'
+import { ProfileDocument } from '@/components/candidates/ProfileDocument'
+import { PoolResultCard } from '@/components/pool/PoolResultCard'
+import { PoolSidePane } from '@/components/pool/PoolSidePane'
+import { Search, Sparkles, Loader2, X, Database, Filter, CalendarClock, AlertTriangle } from 'lucide-react'
 
 type Summary = {
   id: string
@@ -40,6 +40,9 @@ type Summary = {
   reachable: boolean
   sources: string[]
   unlocked?: boolean
+  /** Returned by the search so a card can show a person, not just a job title. */
+  education: { degree?: string | null; field?: string | null; school?: string | null; year?: number | null }[]
+  recent_roles: { title: string | null; employer: string | null; start_date: string | null; end_date: string | null; is_current: boolean }[]
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -116,6 +119,8 @@ export default function PoolPage() {
 
   const [selected, setSelected] = useState<Detail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [unlocking, setUnlocking] = useState(false)
+  const [unlockedCandidateId, setUnlockedCandidateId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -145,9 +150,31 @@ export default function PoolPage() {
 
   async function openProfile(id: string) {
     setDetailLoading(true)
+    setUnlockedCandidateId(null)
     const res = await fetch(`/api/pool/${id}`)
     if (res.ok) setSelected((await res.json()).profile)
     setDetailLoading(false)
+  }
+
+  /** Spend an unlock, then re-read the profile so contacts appear in place. */
+  async function unlockSelected() {
+    if (!selected) return
+    setUnlocking(true)
+    const res = await fetch(`/api/pool/${selected.id}/unlock`, { method: 'POST' })
+    const j = await res.json().catch(() => ({}))
+    setUnlocking(false)
+    if (!res.ok) {
+      toast.error(
+        j?.result?.status === 'quota_exceeded' ? 'No unlocks left on your plan.'
+        : j?.result?.status === 'no_contact' ? 'No way to contact this person — nothing to unlock.'
+        : 'Could not unlock this profile.',
+      )
+      return
+    }
+    setUnlockedCandidateId(j?.result?.candidate_id ?? null)
+    toast.success(j?.result?.status === 'already' ? 'Already in your candidates.' : 'Unlocked — added to your candidates.')
+    await openProfile(selected.id)
+    load()
   }
 
   // ── No subscription ────────────────────────────────────────────────────────
@@ -272,71 +299,7 @@ export default function PoolPage() {
       ) : (
         <div className="space-y-2">
           {rows.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => openProfile(r.id)}
-              className="block w-full rounded-xl border border-gray-200 bg-white p-4 text-left transition hover:border-emerald-400 hover:shadow-sm"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-900">{r.display_name || 'Unnamed'}</span>
-                    {r.unlocked && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                        <CheckCircle2 className="h-3 w-3" /> In your ATS
-                      </span>
-                    )}
-                    <FreshnessPill r={r} />
-                    {(r.sources ?? []).includes('upload:cv') && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-inset ring-violet-200">
-                        <FileText className="h-3 w-3" /> CV
-                      </span>
-                    )}
-                    {r.employer_disputed && (
-                      <span title="Sources disagree on the current employer — one is out of date"
-                        className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
-                        <AlertTriangle className="h-3 w-3" /> Employer disputed
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-gray-600">
-                    {r.current_company && <BrandIcon name={r.current_company} size={16} />}
-                    <span className="truncate">
-                      {r.current_title || '—'}{r.current_company ? ` · ${r.current_company}` : ''}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {r.skills.slice(0, 8).map((s) => (
-                      <span key={s} className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">{s}</span>
-                    ))}
-                    {r.skills.length > 8 && (
-                      <span className="px-1 text-xs text-gray-400">+{r.skills.length - 8}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs text-gray-500">
-                  <div className="flex items-center gap-3 tabular-nums">
-                    <span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" />{months(r.total_experience_months)}</span>
-                    <span
-                      className="flex items-center gap-1"
-                      title={`Last known: ${months(r.current_tenure_months)} since the role started. Only ${months(r.tenure_verified_months)} of that is confirmed by a source — nothing observes the present.`}
-                    >
-                      <Clock className="h-3.5 w-3.5" />{months(r.current_tenure_months)} in role
-                      {r.freshness !== 'fresh' && <span className="text-amber-600">*</span>}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {locationLabel(r) && (
-                      <span className="flex items-center gap-1" title={[r.location_city, r.location_region, r.location_country].filter(Boolean).join(' · ')}>
-                        <MapPin className="h-3.5 w-3.5" />{locationLabel(r)}
-                      </span>
-                    )}
-                    {r.has_email && <Mail className="h-3.5 w-3.5 text-emerald-600" />}
-                    {r.has_linkedin && <Linkedin className="h-3.5 w-3.5 text-emerald-600" />}
-                  </div>
-                </div>
-              </div>
-            </button>
+            <PoolResultCard key={r.id} row={r} onOpen={() => openProfile(r.id)} />
           ))}
         </div>
       )}
@@ -345,9 +308,10 @@ export default function PoolPage() {
       {(selected || detailLoading) && (
         <div className="fixed inset-0 z-40 flex justify-end bg-black/20" onClick={() => setSelected(null)}>
           <div
-            className="h-full w-full max-w-2xl overflow-y-auto bg-white p-6 shadow-xl"
+            className="flex h-full w-full max-w-5xl bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="min-w-0 flex-1 overflow-y-auto p-6">
             {detailLoading || !selected ? (
               <div className="flex justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>
             ) : (
@@ -429,44 +393,26 @@ export default function PoolPage() {
                 </section>
 
                 {/* Career arc */}
+                {/* Career, education and skills — the SAME components the candidate
+                    profile uses, so an unlocked profile does not change shape. */}
                 <section className="mb-5">
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Career history</h3>
-                  {selected.experiences.length ? (
-                    <ol className="space-y-3 border-l border-gray-200 pl-4">
-                      {selected.experiences.map((e) => (
-                        <li key={e.id} className="relative">
-                          <span className={`absolute -left-[21px] top-1.5 h-2 w-2 rounded-full ${e.is_current ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                          <div className="text-sm font-medium text-gray-900">{e.title || 'Role'}</div>
-                          <div className="text-sm text-gray-600">{e.employer || '—'}</div>
-                          <div className="text-xs tabular-nums text-gray-400">
-                            {fmt(e.start_date) || '?'} → {e.is_current ? 'present' : (fmt(e.end_date) || '?')}
-                            {e.location ? ` · ${e.location}` : ''}
-                          </div>
-                          {e.summary && <p className="mt-0.5 text-xs text-gray-500">{e.summary}</p>}
-                        </li>
-                      ))}
-                    </ol>
-                  ) : <p className="text-sm text-gray-500">No dated history captured.</p>}
-                </section>
-
-                {selected.education?.length > 0 && (
-                  <section className="mb-5">
-                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Education</h3>
-                    <ul className="space-y-1 text-sm text-gray-700">
-                      {selected.education.map((ed, i) => (
-                        <li key={i}>{[ed.degree, ed.field, ed.school, ed.year].filter(Boolean).join(' · ')}</li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
-
-                <section className="mb-5">
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Skills</h3>
-                  <div className="flex flex-wrap gap-1">
-                    {selected.skills.map((s) => (
-                      <span key={s} className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{s}</span>
-                    ))}
-                  </div>
+                  <ProfileDocument
+                    experiences={(selected.experiences ?? []).map((e) => ({
+                      title: e.title ?? null,
+                      employer: e.employer ?? null,
+                      location: e.location ?? null,
+                      start_date: e.start_date ?? null,
+                      end_date: e.end_date ?? null,
+                      is_current: Boolean(e.is_current),
+                      summary: e.summary ?? null,
+                    }))}
+                    education={selected.education ?? []}
+                    skills={selected.skills ?? []}
+                    graduationYear={(selected.education ?? []).reduce<number | null>(
+                      (latest, e) => (typeof e?.year === 'number' && (latest == null || e.year > latest) ? e.year : latest),
+                      null,
+                    )}
+                  />
                 </section>
 
                 {/* Provenance — the thing no other ATS shows you */}
@@ -504,6 +450,20 @@ export default function PoolPage() {
                   </p>
                 </section>
               </>
+            )}
+            </div>
+
+            {/* Notes and outreach, beside the profile — what Juicebox puts in its third
+                column. What it can offer depends on whether this person is in your
+                workspace yet; the pane says so rather than showing dead controls. */}
+            {selected && (
+              <PoolSidePane
+                unlocked={Boolean(selected.unlocked)}
+                candidateId={unlockedCandidateId}
+                unlocksLeft={access?.unlockQuota == null ? null : Math.max(0, access.unlockQuota - (access.unlocksUsed ?? 0))}
+                unlocking={unlocking}
+                onUnlock={unlockSelected}
+              />
             )}
           </div>
         </div>
