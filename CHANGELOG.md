@@ -3,6 +3,9 @@
 ## 2026-09-27
 
 ### Changed
+- **The ideal profile's unset fields fold away.** Twelve empty rows under five filled ones buried the profile in fields nobody set. They now sit behind one greyed line — "12 more fields, not set" — which still answers "have I missed anything" without spending a screen on it.
+
+### Changed
 - **The ideal profile is a record, not a pill strip.** Label left, value right, every field in a fixed order whether it is set or not, and clicking a row opens its editor in place. The pills only showed what you had already filled in, so "no school requirement" and "forgot to set one" looked identical — and the fixed order means you always know where to look. Colour survives on the field icon rather than a filled shape.
 
 ### Removed

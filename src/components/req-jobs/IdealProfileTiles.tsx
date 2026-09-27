@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   MapPin, Clock, Briefcase, Layers, Building2, Tag, BarChart3, GraduationCap,
-  BookOpen, Ban, Check, X, Plus, DollarSign, Lock, MoveHorizontal,
+  BookOpen, Ban, Check, X, Plus, DollarSign, Lock, MoveHorizontal, ChevronRight,
 } from 'lucide-react'
 import type { SearchCriterion, CriterionKind } from '@/lib/types/search-spec'
 import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
@@ -78,6 +78,9 @@ export function IdealProfileTiles({
   options?: FetchedOptions
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
+  // Folded by default. Eleven empty rows under five filled ones buries the profile in
+  // fields nobody set; the count alone answers "is there anything I have missed".
+  const [showUnset, setShowUnset] = useState(false)
   function add(kind: CriterionKind) {
     const c: SearchCriterion = { id: `mh-${Date.now().toString(36)}-${++addSeq}`, kind, values: [], relax_at: null }
     onAdd?.(c)
@@ -122,21 +125,35 @@ export function IdealProfileTiles({
         </Row>
       ))}
 
-      {onAdd && unset.map((k) => (
-        <button
-          key={k}
-          type="button"
-          onClick={() => add(k)}
-          className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2 text-left hover:bg-slate-50"
-        >
-          <span className="w-[9.5rem] shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-            {CRITERION_KIND_LABEL[k]}
-          </span>
-          {/* Just "Not set". The kind labels are phrases ("Currently at", "Ever at"),
-              and "Add a currently at" is not English for any of them. */}
-          <span className="text-[13px] italic text-slate-400">Not set</span>
-        </button>
-      ))}
+      {onAdd && unset.length > 0 && (
+        <div className="border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setShowUnset((v) => !v)}
+            aria-expanded={showUnset}
+            className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-[11px] text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+          >
+            <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showUnset ? 'rotate-90' : ''}`} />
+            {unset.length} more field{unset.length === 1 ? '' : 's'}, not set
+          </button>
+
+          {showUnset && unset.map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => add(k)}
+              className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2 text-left hover:bg-slate-50"
+            >
+              <span className="w-[9.5rem] shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+                {CRITERION_KIND_LABEL[k]}
+              </span>
+              {/* Just "Not set". The kind labels are phrases ("Currently at", "Ever at"),
+                  and "Add a currently at" is not English for any of them. */}
+              <span className="text-[13px] italic text-slate-400">Not set</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
