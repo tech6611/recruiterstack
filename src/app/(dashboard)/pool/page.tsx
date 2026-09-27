@@ -68,7 +68,10 @@ type Detail = Summary & {
   education: { degree?: string | null; field?: string | null; school?: string | null; year?: number | null }[]
   experiences: Experience[]
   contacts: { kind: string; value: string; source_key: string; confidence: string }[]
-  provenance: { field: string; value: unknown; source_key: string; confidence: number }[]
+  // The API also returns `provenance` (per-field claims with trust scores). It is not
+  // typed or rendered here on purpose: a recruiter reading a profile wants the person,
+  // not our sourcing and confidence workings. The claims still drive which value wins
+  // and the disputed-employer warning above, and remain queryable in pool_profile_fields.
 }
 type Facets = { cities: string[]; countries: { code: string; name: string }[]; skills: string[]; sources: string[]; total: number }
 type Access = { hasAccess: boolean; tier?: string; unlockQuota?: number | null; unlocksUsed?: number }
@@ -362,8 +365,7 @@ export default function PoolPage() {
                   {selected.employer_disputed && (
                     <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      Two sources name different employers — see the provenance table below.
-                      One of them is out of date.
+                      Two sources name different employers — one of them is out of date.
                     </p>
                   )}
                 </div>
@@ -411,40 +413,6 @@ export default function PoolPage() {
                   />
                 </section>
 
-                {/* Provenance — the thing no other ATS shows you */}
-                <section>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Where this came from
-                  </h3>
-                  <div className="overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-50 text-gray-500">
-                        <tr>
-                          <th className="px-3 py-1.5 text-left font-medium">Field</th>
-                          <th className="px-3 py-1.5 text-left font-medium">Value</th>
-                          <th className="px-3 py-1.5 text-left font-medium">Source</th>
-                          <th className="px-3 py-1.5 text-right font-medium">Trust</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selected.provenance.map((p, i) => (
-                          <tr key={i} className="border-t border-gray-100">
-                            <td className="px-3 py-1.5 text-gray-500">{p.field}</td>
-                            <td className="max-w-[220px] truncate px-3 py-1.5 text-gray-800">
-                              {typeof p.value === 'string' ? p.value : JSON.stringify(p.value)}
-                            </td>
-                            <td className="px-3 py-1.5 text-gray-600">{p.source_key}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums text-gray-500">{p.confidence}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="mt-2 text-xs text-gray-400">
-                    Conflicting values are kept, not silently resolved — the higher trust
-                    score wins in the resolved view, but both remain auditable.
-                  </p>
-                </section>
               </>
             )}
             </div>
