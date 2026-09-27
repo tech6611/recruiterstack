@@ -50,6 +50,10 @@ entries on top.
 
 ## 2026-09-27
 
+### Changed
+- **A real logo is no longer put in a box.** `<BrandIcon>` framed every mark in a coloured rounded tile, so wordmarks read as something stuffed into a square. That tile belongs to the **monogram**, which needs a surface to be legible on; a logo brings its own — Rippling's is a dark square, IBM's is blue, a wordmark is transparent and wants nothing behind it. Once the image loads the tile drops its background entirely and the logo simply sits there. (An intermediate version inset the logo inside a white tile; the box was the problem, not the padding.)
+- **The candidates list shows the current company with its logo**, in its own column beside the name — the mark is recognised before the words are. `current_company` was already in that API's response.
+
 ### Added
 - **The candidate profile header now leads with the two marks that place someone** (Juicebox parity, Step 3). Under the name and title sit the current employer and the most recent school, each with its logo — a recruiter recognises "Flipkart" and "IIT Guwahati" as marks before reading either word, which is why Juicebox puts them directly below the name. Location moved up beside them, and the ways to reach someone became a compact icon row (email, phone, LinkedIn, résumé).
   - **Only links we actually hold are drawn.** Juicebox's header carries LinkedIn, GitHub, X, a personal site and about.me because its profiles are assembled from those sources; an ATS candidate arrives with a CV, so a greyed-out icon for something we don't have would be noise pretending to be a feature.

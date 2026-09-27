@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { CandidateStatus, CandidateListItem } from '@/lib/types/database'
 import { inputCls, labelCls } from '@/lib/ui/styles'
+import { BrandIcon } from '@/components/ui/BrandIcon'
 import {
   PaneSearchInput, TimeRangeControl, PaneDownloadButton, PaneFilterControl,
   ALL_RANGE_VALUE, withinRange, rowMatchesFilters, todayStamp,
@@ -520,6 +521,9 @@ function CandidatesBlock({
                   <th className={thCls} onClick={() => onSort('name')}>
                     <span className="flex items-center">Name <SortIcon col="name" /></span>
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-default">
+                    Company
+                  </th>
                   <th className={thCls} onClick={() => onSort('current_title')}>
                     <span className="flex items-center">Current Title <SortIcon col="current_title" /></span>
                   </th>
@@ -551,6 +555,17 @@ function CandidatesBlock({
                       <td className="px-4 py-3.5">
                         <p className="font-semibold text-sm text-slate-900">{c.name}</p>
                         <p className="text-xs text-slate-400 mt-0.5">{c.email}</p>
+                      </td>
+                      {/* Current company — the mark is read before the words are. */}
+                      <td className="px-4 py-3.5">
+                        {c.current_company ? (
+                          <span className="flex min-w-0 items-center gap-2 text-sm text-slate-700">
+                            <BrandIcon name={c.current_company} size={20} />
+                            <span className="truncate">{c.current_company}</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
                       </td>
                       {/* Current title */}
                       <td className="px-4 py-3.5 text-sm text-slate-600">

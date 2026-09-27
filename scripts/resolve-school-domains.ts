@@ -138,7 +138,10 @@ export function parentNames(name: string): string[] {
   const push = (n: string) => {
     const t = n.replace(/[\s,(-]+$/, '').replace(/\s+/g, ' ').trim()
     if (!t || t.toLowerCase() === original) return
-    if (t.split(/\s+/).length < 2 || out.includes(t)) return
+    const parts = t.split(/\s+/)
+    if (parts.length < 2 || out.includes(t)) return
+    // A name ending in a preposition is a fragment, not a shorter name.
+    if (/^(?:of|and|the|for|in|at|de|du)$/i.test(parts[parts.length - 1])) return
     out.push(t)
   }
   const parts = name.split(',').map((p) => p.trim()).filter(Boolean)
@@ -149,6 +152,15 @@ export function parentNames(name: string): string[] {
     push(shorter.replace(BRANCH_TAIL, ''))
   }
   push(name.replace(BRANCH_TAIL, ''))
+
+  // Last resort: drop trailing words one at a time. A branch is often just the chain
+  // plus a place with no comma and no "No." to cut at — "Kendriya Vidyalaya
+  // Mughalsarai", "Sainik School Kazhakootam" — and without this those never reach
+  // their chain. Two words is the floor: a single word is a name anyone could share,
+  // and `parentLabelAcceptable` still requires the match to begin with what we asked.
+  const words = name.replace(/,/g, ' ').replace(/\s+/g, ' ').trim().split(' ')
+  for (let keep = words.length - 1; keep >= 2; keep--) push(words.slice(0, keep).join(' '))
+
   return out
 }
 

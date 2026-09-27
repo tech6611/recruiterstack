@@ -24,6 +24,12 @@ import { avatarColor } from '@/lib/ui/avatar'
  * simply covers it when it arrives. The image carries its own white background so a
  * transparent favicon doesn't show the letters through it.
  *
+ * A REAL LOGO IS NOT PUT IN A BOX. Once the image loads, the tile drops its background
+ * entirely and the logo simply sits there. The coloured rounded square belongs to the
+ * MONOGRAM, which needs a surface to be legible on; a logo brings its own — Rippling's
+ * is a dark square, IBM's is blue, and a wordmark is transparent and wants nothing
+ * behind it. Framing all of them alike made every one look stuffed into a box.
+ *
  * Companies and schools are square-rounded; people are round. Same component, so the
  * iconography can't drift between surfaces.
  */
@@ -69,11 +75,13 @@ export function BrandIcon({
   return (
     <span
       style={{ ...box, fontSize: `${Math.max(8, Math.round(size * 0.42))}px` }}
-      className={`relative grid shrink-0 place-items-center overflow-hidden font-bold ${shape} ${avatarColor(label)} ${className}`}
+      className={`relative grid shrink-0 place-items-center overflow-hidden font-bold ${shape} ${
+        loaded ? '' : avatarColor(label)
+      } ${className}`}
       title={label}
       aria-hidden
     >
-      {brandInitials(label)}
+      <span className={loaded ? 'opacity-0' : undefined}>{brandInitials(label)}</span>
       {src && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -84,7 +92,7 @@ export function BrandIcon({
           onError={() => setFailed(true)}
           onLoad={(e) => setLoaded(e.currentTarget.naturalWidth > 0)}
           className={`absolute inset-0 h-full w-full object-contain transition-opacity ${
-            loaded ? 'bg-white opacity-100' : 'opacity-0'
+            loaded ? 'opacity-100' : 'opacity-0'
           }`}
         />
       )}
