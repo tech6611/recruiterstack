@@ -6,6 +6,9 @@
 - **The ideal profile is a record, not a pill strip.** Label left, value right, every field in a fixed order whether it is set or not, and clicking a row opens its editor in place. The pills only showed what you had already filled in, so "no school requirement" and "forgot to set one" looked identical — and the fixed order means you always know where to look. Colour survives on the field icon rather than a filled shape.
 
 ### Removed
+- **The hard-filter and ranking rows are off the Scoring page.** The generator sorts every JD requirement into `hard_filter` / `ranking_signal` / `screen_later`, and the panel showed all three — the hard filters in red, beside a list of must-haves that actually filter. No route, query or scorer read either of those two buckets. A red "HARD FILTER" badge on a line that filters nobody is a claim the product doesn't honour. The `screen_later` rows stay, because `/api/internal/screen-context` genuinely turns them into what the AI probes, and the heading now says "Asked in screening" instead of calling the whole thing a breakdown. Nothing changes in the data: all three buckets are still generated and still on the ICP row.
+
+### Removed
 - **The inferred "unwritten filters" are off the Scoring page.** They carried a confidence percentage and an exclusion cost, which reads like a system making a decision — and nothing in the chain gated, ranked or screened on them. The generator still writes them and they are still on the ICP row, so wiring them up later costs nothing; they are just no longer displayed as if they were doing something.
 
 ### Changed

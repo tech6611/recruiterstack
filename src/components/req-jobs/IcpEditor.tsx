@@ -15,12 +15,6 @@ import { IdealProfileTiles } from '@/components/req-jobs/IdealProfileTiles'
 import { BetCards } from '@/components/req-jobs/BetCards'
 
 
-const BUCKET_LABEL: Record<string, string> = { hard_filter: 'Hard filter', ranking_signal: 'Ranking', screen_later: 'Screen later' }
-const BUCKET_CLS: Record<string, string> = {
-  hard_filter: 'bg-red-100 text-red-700',
-  ranking_signal: 'bg-emerald-100 text-emerald-700',
-  screen_later: 'bg-amber-100 text-amber-700',
-}
 
 /**
  * The Ideal Candidate Profile editor (Slice 1b). Generates a draft ICP by seeding
@@ -417,21 +411,42 @@ export function IcpEditor({
                   <p className="text-xs leading-relaxed text-slate-600">{icp.sourcing_map.reasoning}</p>
                 )}
 
-                {icp.sourcing_map.requirement_decomposition?.length > 0 && (
-                  <div>
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Requirement breakdown</div>
-                    <div className="space-y-1">
-                      {icp.sourcing_map.requirement_decomposition.map((r, i) => (
-                        <div key={i} className="flex items-start gap-2 text-xs">
-                          <span className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${BUCKET_CLS[r.bucket] ?? 'bg-slate-100 text-slate-600'}`}>
-                            {BUCKET_LABEL[r.bucket] ?? r.bucket}
-                          </span>
-                          <span className="text-slate-600">{r.requirement}{r.findable_proxy ? <span className="text-slate-400"> — look for: {r.findable_proxy}</span> : null}</span>
-                        </div>
-                      ))}
+                {/*
+                  ONLY THE screen_later ROWS. The generator sorts every requirement into
+                  hard_filter / ranking_signal / screen_later, and this panel used to show
+                  all three — the hard filters in red, next to a list of must-haves that
+                  actually filter. Nothing read either of those two buckets: no route, no
+                  query, no scorer. A red "HARD FILTER" badge on a line that filters nobody
+                  is a claim the product does not honour, so they are gone.
+
+                  screen_later stays because it is real: /api/internal/screen-context turns
+                  these into what the AI probes, which is why the heading now says so
+                  instead of calling them a breakdown.
+                */}
+                {(() => {
+                  const probes = (icp.sourcing_map.requirement_decomposition ?? [])
+                    .filter((r) => r.bucket === 'screen_later' && r.requirement)
+                  if (!probes.length) return null
+                  return (
+                    <div>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                        Asked in screening
+                      </div>
+                      <p className="mb-1.5 text-[11px] text-slate-400">
+                        Requirements no profile can prove. They become probes in the AI screen
+                        rather than filters.
+                      </p>
+                      <ul className="space-y-1">
+                        {probes.map((r, i) => (
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
+                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300" />
+                            <span>{r.requirement}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
 
                 {/* The inferred "unwritten filters" used to sit here, with a confidence
                     percentage and an exclusion cost. They read as machinery and were
