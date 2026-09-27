@@ -317,8 +317,18 @@ export function brandInitials(name: string): string {
   return (use[0][0] + use[1][0]).toUpperCase()
 }
 
-/** The proxy URL the <BrandIcon> img points at, or null when only a monogram applies. */
+/**
+ * The proxy URL the <BrandIcon> img points at, or null when the name is not an
+ * organisation at all and no request is worth making.
+ *
+ * DELIBERATELY NOT `brandDomain(...) === null`. The browser does not know what the
+ * server knows: `brand_domains` holds hand-resolved domains for names these code tables
+ * have never heard of — Patna University among them. Short-circuiting on the client
+ * meant the server was never asked, so every row resolved into that table stayed a
+ * monogram and the whole override mechanism was unreachable. Only `isUnbrandable`
+ * decides here, because "Freelance" is not an organisation anywhere, at any layer.
+ */
 export function brandIconSrc(name: string, kind: BrandKind = 'company'): string | null {
-  if (!brandDomain(name, kind)) return null
+  if (isUnbrandable(name)) return null
   return `/api/brand-icon?name=${encodeURIComponent(name.trim())}&kind=${kind}`
 }

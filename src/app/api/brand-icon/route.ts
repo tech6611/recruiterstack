@@ -146,8 +146,13 @@ export async function GET(req: NextRequest) {
   if (kind === 'company') keys.push(`school:${normalizeName(name, 'school')}`)
   const override = keys.map((k) => overrides.get(k)).find(Boolean)
   const domain = override ?? brandDomain(name, kind)
-  // No domain worth asking about — the caller draws its monogram.
-  if (!domain) return new NextResponse(null, { status: 404 })
+  // No domain worth asking about — the caller draws its monogram. Cached like any
+  // other miss: the client now asks about every name (it cannot know what
+  // `brand_domains` holds), so without this a monogram-heavy page re-asks on every
+  // render about names we answer instantly and negatively.
+  if (!domain) {
+    return new NextResponse(null, { status: 404, headers: { 'Cache-Control': 'public, max-age=600' } })
+  }
 
   const cached = memo.get(domain)
   const fresh = cached && Date.now() - cached.at < (cached.icon ? HIT_TTL_MS : MISS_TTL_MS)
