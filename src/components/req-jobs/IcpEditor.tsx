@@ -433,21 +433,12 @@ export function IcpEditor({
                   </div>
                 )}
 
-                {icp.sourcing_map.unwritten_filters?.length > 0 && (
-                  <div>
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Unwritten filters (inferred)</div>
-                    <div className="space-y-1.5">
-                      {icp.sourcing_map.unwritten_filters.map((f, i) => (
-                        <div key={i} className="text-xs">
-                          <span className="font-medium text-slate-700">{f.filter}</span>
-                          {typeof f.confidence === 'number' && <span className="text-slate-400"> · {Math.round(f.confidence * 100)}% conf</span>}
-                          {f.recommend_apply === false && <span className="ml-1.5 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">model says: don&apos;t apply</span>}
-                          {f.exclusion_cost && <div className="text-[11px] text-amber-700">Cost: {f.exclusion_cost}</div>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* The inferred "unwritten filters" used to sit here, with a confidence
+                    percentage and an exclusion cost. They read as machinery and were
+                    not: nothing gated, ranked or screened on them anywhere in the
+                    chain. The generator still produces them and they are still on the
+                    ICP row, so wiring them up later costs nothing — they are simply no
+                    longer shown as if they were doing something. */}
 
               </div>
             )}

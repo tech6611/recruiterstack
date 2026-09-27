@@ -3,6 +3,12 @@
 ## 2026-09-27
 
 ### Changed
+- **The ideal profile is a record, not a pill strip.** Label left, value right, every field in a fixed order whether it is set or not, and clicking a row opens its editor in place. The pills only showed what you had already filled in, so "no school requirement" and "forgot to set one" looked identical — and the fixed order means you always know where to look. Colour survives on the field icon rather than a filled shape.
+
+### Removed
+- **The inferred "unwritten filters" are off the Scoring page.** They carried a confidence percentage and an exclusion cost, which reads like a system making a decision — and nothing in the chain gated, ranked or screened on them. The generator still writes them and they are still on the ICP row, so wiring them up later costs nothing; they are just no longer displayed as if they were doing something.
+
+### Changed
 - **Job page look.** The left menu gives every section a white icon on its own colour circle (Overview blue, Postings orange, Application form violet, Scoring red, Source teal, Interview plan indigo, Audit log grey).
 - Scoring's reasoning box now leads with the ICP's bets as compact people cards ("Who we're betting on": name, one line, feeder-pool logos named in the bet, one 👍 / 👎). The brief, requirement breakdown, unwritten filters and full bet notes are under **Details**.
 - Scoring's Ideal profile is one strip of coloured pills instead of a tile grid — a lock for "never relaxed", ↔ for "widens later"; clicking a pill opens its editor below the strip. The explainer paragraph moved to a hover tooltip on the heading.

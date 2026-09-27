@@ -86,43 +86,119 @@ export function IdealProfileTiles({
   const editing = criteria.find((c) => c.id === editingId) ?? null
   // A just-added pill left empty is dropped rather than saved as a blank filter.
   const close = () => { if (editing && isEmpty(editing)) onRemove?.(editing.id); setEditingId(null) }
+  // Fixed field order, so you always know where to look. Criteria we hold come first in
+  // that order; every remaining field is still listed, unset — which is the whole point
+  // of a record. Without them you cannot tell "no school requirement" from "forgot one".
+  const byKind = (k: CriterionKind) => criteria.filter((c) => c.kind === k)
+  const ordered = [
+    ...ADDABLE.flatMap(byKind),
+    ...criteria.filter((c) => !ADDABLE.includes(c.kind)),
+  ]
+  const unset = ADDABLE.filter((k) => !criteria.some((c) => c.kind === k))
+
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        {criteria.map((c) => (
-          <Pill key={c.id} c={c} active={c.id === editingId} onClick={() => (c.id === editingId ? close() : setEditingId(c.id))} />
-        ))}
-        {onAdd && (
-          <select id="icp-add-must-have" value="" onChange={(e) => { if (e.target.value) add(e.target.value as CriterionKind) }}
-            className="h-8 rounded-full border border-dashed border-slate-300 bg-white px-3 text-xs text-slate-500 hover:border-emerald-300">
-            <option value="">+ Add</option>
-            {/* One location per role: a second would be ANDed (nobody passes) and the job-location sync keeps only one. */}
-            {ADDABLE.filter((k) => k !== 'location' || !criteria.some((c) => c.kind === 'location')).map((k) => <option key={k} value={k}>{CRITERION_KIND_LABEL[k]}</option>)}
-          </select>
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      {ordered.map((c) => (
+        <Row
+          key={c.id}
+          c={c}
+          editing={c.id === editingId}
+          onOpen={() => (c.id === editingId ? close() : setEditingId(c.id))}
+        >
+          {c.id === editingId && (
+            <CriterionEditor
+              key={c.id}
+              c={c}
+              options={options}
+              onCancel={close}
+              onRemove={onRemove && (() => { onRemove(c.id); setEditingId(null) })}
+              onSave={(next) => {
+                if (isEmpty(next)) onRemove?.(next.id)
+                else onChange(next)
+                setEditingId(null)
+              }}
+            />
+          )}
+        </Row>
+      ))}
+
+      {onAdd && unset.map((k) => (
+        <button
+          key={k}
+          type="button"
+          onClick={() => add(k)}
+          className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2 text-left hover:bg-slate-50"
+        >
+          <span className="w-[9.5rem] shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+            {CRITERION_KIND_LABEL[k]}
+          </span>
+          {/* Just "Not set". The kind labels are phrases ("Currently at", "Ever at"),
+              and "Add a currently at" is not English for any of them. */}
+          <span className="text-[13px] italic text-slate-400">Not set</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * One field of the record: label on the left, value on the right, and what happens to it
+ * when the search widens. Clicking anywhere on the row opens its editor underneath.
+ */
+function Row({
+  c, editing, onOpen, children,
+}: {
+  c: SearchCriterion
+  editing: boolean
+  onOpen: () => void
+  children?: React.ReactNode
+}) {
+  const Icon = c.exclude ? Ban : ICON[c.kind] ?? Tag
+  const never = c.relax_at == null
+  const t = c.exclude ? { pill: '', icon: 'text-slate-400' } : tone(c.kind)
+  const logos = isEmployer(c.kind) && !c.exclude ? c.values.filter((v) => v.trim()) : []
+
+  return (
+    <div className={`border-t border-slate-100 first:border-t-0 ${editing ? 'bg-slate-50/70' : ''}`}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-expanded={editing}
+        className="flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-slate-50"
+      >
+        <span className="flex w-[9.5rem] shrink-0 items-center gap-1.5 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          <Icon className={`h-3.5 w-3.5 shrink-0 ${t.icon}`} />
+          <span className="truncate">{tileHeading(c)}</span>
+        </span>
+
+        <span className="min-w-0 flex-1 text-[13px] text-slate-800">
+          {logos.length > 0 ? (
+            <span className="flex flex-wrap items-center gap-1.5">
+              {logos.slice(0, 6).map((v) => (
+                <span key={v} className="inline-flex items-center gap-1">
+                  <BrandIcon name={v} size={16} />
+                  <span>{v}</span>
+                </span>
+              ))}
+              {logos.length > 6 && <span className="text-slate-400">+{logos.length - 6}</span>}
+            </span>
+          ) : (
+            <span className={c.exclude ? 'text-slate-500 line-through decoration-slate-300' : ''}>
+              {shortValue(c) || <span className="italic text-slate-400">Empty</span>}
+            </span>
+          )}
+        </span>
+
+        {!c.exclude && (
+          <span className="flex shrink-0 items-center gap-1 pt-0.5 text-[10px] text-slate-400">
+            {never
+              ? <><Lock className="h-3 w-3" /> never relaxed</>
+              : <><MoveHorizontal className="h-3 w-3" /> widens at {c.relax_at}</>}
+          </span>
         )}
-      </div>
-      {editing && (
-        <div className="rounded-xl border border-slate-200 bg-white p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{tileHeading(editing)}</span>
-            {onRemove && (
-              <button type="button" onClick={() => { onRemove(editing.id); setEditingId(null) }}
-                className="text-[11px] text-slate-400 hover:text-red-500">Remove this must-have</button>
-            )}
-          </div>
-          <CriterionEditor
-            key={editing.id}
-            c={editing}
-            options={options}
-            onCancel={close}
-            onSave={(next) => {
-              if (isEmpty(next)) onRemove?.(next.id)
-              else onChange(next)
-              setEditingId(null)
-            }}
-          />
-        </div>
-      )}
+      </button>
+
+      {children && <div className="border-t border-slate-100 px-4 pb-3 pt-3">{children}</div>}
     </div>
   )
 }
@@ -147,36 +223,10 @@ function shortValue(c: SearchCriterion): string {
   return vals.slice(0, 3).join(' · ') + (vals.length > 3 ? ` +${vals.length - 3}` : '')
 }
 
-function Pill({ c, active, onClick }: { c: SearchCriterion; active: boolean; onClick: () => void }) {
-  const Icon = c.exclude ? Ban : ICON[c.kind] ?? Tag
-  const never = c.relax_at == null
-  const t = c.exclude ? { pill: 'bg-slate-100 text-slate-500 ring-slate-200', icon: 'text-slate-400' } : tone(c.kind)
-  const logos = isEmployer(c.kind) && !c.exclude ? c.values.filter((v) => v.trim()) : []
-  const title = `${tileHeading(c)}: ${c.values.join(', ') || criterionLabel(c)} — ${never ? 'never relaxed' : `widens at search level ${c.relax_at}`}. Click to edit.`
-  return (
-    <button type="button" onClick={onClick} title={title}
-      className={`inline-flex max-w-full items-center gap-1.5 rounded-full py-1.5 pl-2 pr-3 text-[13px] ring-1 transition ${t.pill} ${active ? 'ring-2 ring-emerald-500' : 'hover:brightness-95'}`}>
-      <Icon className={`h-4 w-4 shrink-0 ${t.icon}`} />
-      {logos.length > 0 ? (
-        <span className="flex items-center gap-1">
-          <span className="flex -space-x-1">
-            {logos.slice(0, 4).map((v) => <span key={v} className="rounded ring-2 ring-white"><BrandIcon name={v} /></span>)}
-          </span>
-          {logos.length > 4 && <span className="text-xs">+{logos.length - 4}</span>}
-        </span>
-      ) : (
-        <span className={`truncate ${c.exclude ? 'line-through decoration-slate-400' : ''}`}>{shortValue(c) || 'Empty'}</span>
-      )}
-      {!c.exclude && (never
-        ? <Lock className={`h-3 w-3 shrink-0 ${t.icon}`} />
-        : <MoveHorizontal className={`h-3 w-3 shrink-0 ${t.icon}`} />)}
-    </button>
-  )
-}
 
 // ── Inline editors ─────────────────────────────────────────────────────────────
 
-function CriterionEditor({ c, onCancel, onSave, options }: { c: SearchCriterion; onCancel: () => void; onSave: (n: SearchCriterion) => void; options?: FetchedOptions }) {
+function CriterionEditor({ c, onCancel, onSave, onRemove, options }: { c: SearchCriterion; onCancel: () => void; onSave: (n: SearchCriterion) => void; onRemove?: () => void; options?: FetchedOptions }) {
   const [draft, setDraft] = useState<SearchCriterion>({ ...c, values: [...c.values] })
   // One fetch per page, shared by every pill's editor. `options` overrides it so the
   // dev fixture can show real pickers without an authenticated request.
@@ -198,6 +248,11 @@ function CriterionEditor({ c, onCancel, onSave, options }: { c: SearchCriterion;
         </label>
       )}
       <div className="flex items-center justify-end gap-1.5 pt-1">
+        {onRemove && (
+          <button type="button" onClick={onRemove} className="mr-auto text-[11px] text-slate-400 hover:text-red-500">
+            Remove this must-have
+          </button>
+        )}
         <button type="button" onClick={onCancel} className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 text-slate-400 hover:bg-slate-50" aria-label="Cancel" title="Cancel">
           <X className="h-3.5 w-3.5" />
         </button>

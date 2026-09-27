@@ -38,11 +38,11 @@ export function TilesPreview() {
   const [criteria, setCriteria] = useState<SearchCriterion[]>(START)
   return (
     <main className="px-6 py-10">
-      <h1 className="text-xl font-bold text-slate-900">Ideal profile — pickers</h1>
+      <h1 className="text-xl font-bold text-slate-900">Ideal profile — the record</h1>
       <p className="mt-1 max-w-2xl text-sm text-slate-500">
-        Click a pill to open its editor. Location and the chip fields are typeaheads over
-        real values that still accept anything typed; experience and radius offer the
-        bands recruiters actually ask for and stay keyable.
+        Every field, set or not, in a fixed order. Click a row to edit it in place. Location
+        and the chip fields are typeaheads over real values that still accept anything typed;
+        experience and radius offer the bands recruiters actually ask for and stay keyable.
       </p>
       <div className="mt-6 max-w-4xl rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <IdealProfileTiles
