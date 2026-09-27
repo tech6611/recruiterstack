@@ -50,11 +50,14 @@ export function TenureTiles({
   if (!tiles.length) return null
 
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+    /* Three across at every width. A viewport breakpoint was wrong here: the pool
+       drawer is 448px wide inside a full-size window, so `sm:` never fired and three
+       short values became three tall tiles that pushed the timeline below the fold. */
+    <div className="grid grid-cols-3 gap-2">
       {tiles.map((tile) => (
-        <div key={tile.label} className="rounded-xl bg-slate-50 px-3.5 py-2.5" title={tile.hint}>
-          <p className="text-xs text-slate-500">{tile.label}</p>
-          <p className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">
+        <div key={tile.label} className="min-w-0 rounded-xl bg-slate-50 px-3 py-2" title={tile.hint}>
+          <p className="truncate text-[11px] text-slate-500">{tile.label}</p>
+          <p className="mt-0.5 truncate text-sm font-semibold tabular-nums text-slate-900">
             {formatDuration(tile.months)}
           </p>
         </div>

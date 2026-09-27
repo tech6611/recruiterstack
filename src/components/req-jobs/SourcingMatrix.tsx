@@ -9,7 +9,8 @@
  */
 
 import { Fragment, useState } from 'react'
-import { ChevronRight, MapPin, Building2, ThumbsUp, ThumbsDown, FileQuestion, Star, EyeOff, Columns3, PanelRightOpen, Loader2 } from 'lucide-react'
+import { BrandIcon } from '@/components/ui/BrandIcon'
+import { ChevronRight, MapPin, ThumbsUp, ThumbsDown, FileQuestion, Star, EyeOff, Columns3, PanelRightOpen, Loader2 } from 'lucide-react'
 import { fitBucketFor } from '@/lib/ai/fit-bucket'
 import { isSourcingOnlyCriterion } from '@/lib/icp-gates'
 import type { IcpMustHave } from '@/lib/types/icp'
@@ -287,7 +288,7 @@ export function SourcingMatrix({
                           )}
                         </div>
                         <div className="mt-0.5 flex items-center gap-2.5 pl-5 text-[11.5px] font-medium text-slate-500">
-                          {c?.current_company && <span className="inline-flex items-center gap-1"><Building2 className="h-3 w-3 text-slate-400" />{c.current_company}</span>}
+                          {c?.current_company && <span className="inline-flex min-w-0 items-center gap-1.5"><BrandIcon name={c.current_company} size={14} />{c.current_company}</span>}
                           {c?.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 text-slate-400" />{c.location}</span>}
                         </div>
                         {(m.tags?.length ?? 0) > 0 && (

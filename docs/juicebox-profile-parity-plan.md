@@ -155,10 +155,15 @@ belongs here.
   out — behind their auth, and their terms forbid it. Résumé extraction deferred: a
   picture in a CV needs a face check or a company logo becomes someone's portrait.
 
-### Phase 4 — Optional, outside the chosen scope
+### Phase 4 — Pool and Source tab — **DONE**
 
-Drop the same primitives into `/pool` and the job Source tab. Cheap once Phases 0–2 exist;
-the Source tab is the larger job because it's a scorecard spreadsheet today, not a card list.
+`PoolProfilePanel` renders the shared `ProfileDocument`, so the pool and the pipeline
+describe a person identically — previously a history changed shape on unlock. Employer
+marks added to the pool browse rows and the sourcing matrix.
+
+**Not done deliberately:** the Source tab's results table was rebuilt by separate work
+("One of Each") while this was in progress. Imposing a competing card layout on it would
+have been destructive, so it got the marks and kept its shape.
 
 ## 5. Deliberately not built
 

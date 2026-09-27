@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { BrandIcon } from '@/components/ui/BrandIcon'
 import {
   Search, MapPin, Briefcase, Clock, Mail, Linkedin, Sparkles,
   Loader2, X, Database, Filter, CheckCircle2, CalendarClock, AlertTriangle, FileText,
@@ -298,8 +299,11 @@ export default function PoolPage() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-0.5 text-sm text-gray-600">
-                    {r.current_title || '—'}{r.current_company ? ` · ${r.current_company}` : ''}
+                  <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-sm text-gray-600">
+                    {r.current_company && <BrandIcon name={r.current_company} size={16} />}
+                    <span className="truncate">
+                      {r.current_title || '—'}{r.current_company ? ` · ${r.current_company}` : ''}
+                    </span>
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {r.skills.slice(0, 8).map((s) => (

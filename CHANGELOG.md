@@ -50,6 +50,13 @@ entries on top.
 
 ## 2026-09-27
 
+### Changed
+- **The pool now describes a person the same way the pipeline does** (Juicebox parity, Phase 4). `PoolProfilePanel` renders the shared `ProfileDocument` — the grouped timeline with employer marks and promotion badges, the education list, the Skill Map, behind the same anchor tabs. It used to hand-roll a flatter version of each, so a candidate's history visibly **changed shape the moment they were unlocked**; one set of components removes that.
+- **Employer marks on the pool browse rows and the sourcing matrix.** The matrix's generic building glyph became the real logo. Its results table was rebuilt by other work two commits ago, so this adds the mark rather than imposing a competing card layout on it.
+
+### Fixed
+- **The tenure tiles no longer stack in the pool drawer.** They used a viewport breakpoint, but the drawer is 448px wide inside a full-size window — so `sm:` never fired, three short values became three tall tiles, and the timeline was pushed below the fold. Three across at every width.
+
 ### Added
 - **The candidates list has a card view, alongside the table** (Juicebox parity, Step 3 — final piece). Each person becomes a card read top to bottom: photo or initials, name with their links, location, **current role with the employer's mark and dates**, the two roles before it on a quieter indented rail, education, and the AI assessment. A shortlist can be judged by scrolling instead of by opening twelve profiles.
   - **A toggle, not a replacement.** The table fits fifteen people on a screen and sorts by column; the cards fit about four and don't. They answer different questions, so both stay. The choice is remembered per browser.
