@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-09-27
+
+### Changed
+- Scoring/Source cleanup, stage 1 of 3 ("One of Each"): one "Refine ICP" button, on the Scoring tab. The Source tab's calibration strip shows "n of 5 decisions" and then links to Scoring, and the Learning panel's button now opens Scoring instead of refining itself.
+- The recruiter brief and the "Reasoning, requirement breakdown & archetypes" panel merged into one "How this profile was reasoned" section on Scoring. The Shortlist brief no longer repeats the reasoning or archetypes; it links to Scoring (the copy-for-hiring-manager text still includes them).
+- The Scoring tab's intake-call-notes box is one shared box for Generate and Regenerate.
+- The Overview "Scoring rubric" card flags when a newer ICP draft is not approved yet, so draft edits no longer look like they are in use.
+- The pipeline page's "Scoring Criteria" pop-up is read-only once the job has an approved ICP, with an "Edit on the Scoring tab" link. Jobs without an ICP can still edit it there.
+
+- Scoring/Source cleanup, stage 2 of 3: the Scoring tab is the one editor for the ideal profile / must-haves (versioned, reaches sourcing on Approve). The tiles can now add a must-have, remove one, and flip it to "exclude". The Search plan shows the "Everyone" line and the ideal-profile lines read-only ("from Scoring") and owns only the widening levels. "Plan the market" is no longer a separate panel: "Suggest a wider plan" inside the Search plan shows the proposal with new levels marked, and Accept / Discard. The persona tabs link to Scoring for edits.
+- Scoring/Source cleanup, stage 3 of 3: the Source tab has ONE results table for your own candidates and the market, with an All / Your candidates / Market filter, one "out of date" banner, and per-row actions (👍/👎 + add to pipeline for yours; star / open / hide + unlock & add for the market). Three verbs: **Rank candidates** (scores your pool and the market pool together; free; embedding now runs automatically, so the "Embed pool" button is gone), **Find new people** (market acquisition, credit estimate on the button), and the Search plan. The Calibrate toggle is gone; the "Review 3" pop-up only offers people not yet rated and "See all" jumps to the table. The Shortlist brief section became a "Copy shortlist" button on the table. Sourcing Lab is behind a "Show experiments" switch (remembered per browser).
+- Approving an ICP whose location changed now moves the job's location with it (the Search plan save used to do this).
+
+### Fixed
+- Saving the Search plan (or applying a planned one) no longer rewrites the ICP's must-haves. It used to overwrite the APPROVED ICP in place with no new version, fight the Scoring editor's saves, and keep only the first ideal company.
+- The search-plan save validation stripped `relax_at` from criteria and `fallback` from levels, so a saved plan could drop the relaxable title/company/location must-haves and undo the planner's catch-all fix. Both kept now (plus the new `ideal` flag), with a test; the level cap rises from 16 to 40.
+- A new ICP version (Save on an approved ICP, Refine from feedback, from-template) now keeps the reasoning, recruiter brief, corrections and saved search plan; they used to vanish. Approving also carries over a newer search plan edited on the live version.
+
+- Review fixes on the cleanup: a new must-have tile gets a real label once filled in (gate results are keyed by label); only one location must-have can be added; a second "Suggest a wider plan" no longer reuses level ids; proposal counts match their level; Regenerate never shows the previous version's reasoning if the AI returns none (corrections kept); hiding a selected market person drops them from the unlock selection; a job-location sync failure after Approve no longer reports the approval as failed.
+
+### Added
+- `?tab=<name>` opens a job page on that tab (e.g. `/req-jobs/<id>?tab=scoring`).
+
 ## 2026-09-26
 
 ### Changed

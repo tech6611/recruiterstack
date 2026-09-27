@@ -1,19 +1,37 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { SlidersHorizontal } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import type { ScoringCriterion } from '@/lib/types/database'
 
 /** A read-only glance at the job's scoring rubric for the Overview sidebar —
- *  each criterion with its weight and a proportional bar. */
+ *  each criterion with its weight and a proportional bar.
+ *
+ *  `criteria` is the rubric scoring runs on today (written when an ICP is approved).
+ *  The card also checks the newest ICP: if a draft is waiting, it says so, so draft
+ *  edits on the Scoring tab never look like they are already in use. */
 export function ScoringRubricSummary({
+  jobId,
   criteria,
   onEdit,
 }: {
+  jobId?: string
   criteria: ScoringCriterion[]
   onEdit?: () => void
 }) {
   const sorted = [...criteria].sort((a, b) => b.weight - a.weight)
+  const [draftVersion, setDraftVersion] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!jobId) return
+    let active = true
+    fetch(`/api/jobs/${jobId}/icp?latest=1`)
+      .then((r) => (r.ok ? r.json() : { data: null }))
+      .then((j) => { if (active) setDraftVersion(j.data?.status === 'draft' ? j.data.version : null) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [jobId])
 
   return (
     <Card>
@@ -49,6 +67,12 @@ export function ScoringRubricSummary({
               </div>
             ))}
           </div>
+        )}
+        {draftVersion != null && (
+          <p className="mt-3 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-700">
+            Draft v{draftVersion} is not approved yet, so scoring still uses {criteria.length > 0 ? 'the rubric above' : 'no rubric'}.{' '}
+            {onEdit && <button onClick={onEdit} className="font-semibold underline underline-offset-2">Review on Scoring</button>}
+          </p>
         )}
       </CardContent>
     </Card>

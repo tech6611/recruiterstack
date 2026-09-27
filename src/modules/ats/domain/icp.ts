@@ -5,7 +5,7 @@ import type { SearchSpec } from '@/lib/types/search-spec'
 import { embedText } from '@/lib/ai/llm'
 import { icpEmbeddingText } from '@/lib/ai/embeddings'
 import { logger } from '@/lib/logger'
-import { mustHaveFromCriterion, mustHavesFromSpec } from '@/lib/icp-gates'
+import { mustHaveFromCriterion } from '@/lib/icp-gates'
 import { convertLegacyGates } from '@/lib/ai/gate-evaluator'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 
@@ -16,7 +16,7 @@ type Supabase = SupabaseClient<Database>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseSb = any
 
-function canonicalLocationText(location: { name?: string | null; city?: string | null; state?: string | null; country?: string | null } | null | undefined): string | null {
+export function canonicalLocationText(location: { name?: string | null; city?: string | null; state?: string | null; country?: string | null } | null | undefined): string | null {
   if (!location) return null
   const geographic = [location.city, location.state, location.country].filter((v): v is string => typeof v === 'string' && v.trim() !== '').join(', ')
   return geographic || (typeof location.name === 'string' && location.name.trim() ? location.name.trim() : null)
@@ -224,13 +224,13 @@ export async function createIcpDraft(
   orgId: string,
   jobId: string,
   input: IcpDraftInput,
-  opts?: { createdBy?: string | null; derivedFrom?: Record<string, unknown> },
+  opts?: { createdBy?: string | null; derivedFrom?: Record<string, unknown>; inheritSourcingMap?: boolean },
 ): Promise<Icp> {
   const sb = supabase as unknown as LooseSb
 
   const last = await sb
     .from('icps')
-    .select('id, version')
+    .select('id, version, sourcing_map')
     .eq('org_id', orgId)
     .eq('job_id', jobId)
     .order('version', { ascending: false })
@@ -260,6 +260,11 @@ export async function createIcpDraft(
       source: input.source ?? 'manual',
       must_haves: input.must_haves,
       competencies: input.competencies,
+      // Carry the reasoning, recruiter brief (+ corrections) and saved search plan into
+      // the new version — a Save or Refine used to drop them. Generate overwrites this
+      // with its fresh reasoning (and opts out, so a failed generation never shows the
+      // previous version's reasoning as its own).
+      sourcing_map: opts?.inheritSourcingMap === false ? null : (last.data?.sourcing_map ?? null),
       changelog,
       // Complete lineage on EVERY version (not just refinements), so the evolution
       // timeline is a clean chain, and record why this version exists.
@@ -362,15 +367,16 @@ export async function setIcpSearchSpec(
   spec: SearchSpec | null,
 ): Promise<Icp> {
   const sb = supabase as unknown as LooseSb
-  const { data: row, error: readErr } = await sb.from('icps').select('sourcing_map, must_haves').eq('org_id', orgId).eq('id', icpId).maybeSingle()
+  const { data: row, error: readErr } = await sb.from('icps').select('sourcing_map').eq('org_id', orgId).eq('id', icpId).maybeSingle()
   if (readErr) throw readErr
   if (!row) throw new Error('ICP not found')
   const sm = { reasoning: '', requirement_decomposition: [], unwritten_filters: [], ...((row.sourcing_map ?? {}) as Partial<SourcingMap>) } as SourcingMap & { search_spec?: SearchSpec | null }
   sm.search_spec = spec ? { ...spec, source: 'edited', edited_at: new Date().toISOString() } : null
-  // The plan's base line IS the must-have list (docs/structured-must-haves-plan.md):
-  // an edited base is written back as the ICP's structured must-haves.
+  // The plan does NOT write the must-haves. The Scoring tab owns them (versioned, via
+  // Draft → Approve); the plan's base + ideal lines are rebuilt from them on read
+  // (resolveSearchSpec). Writing them back here used to overwrite the APPROVED ICP in
+  // place and fight the Scoring editor.
   const patch: Record<string, unknown> = { sourcing_map: sm, updated_at: new Date().toISOString() }
-  if (spec) patch.must_haves = mustHavesFromSpec((row as { must_haves?: IcpMustHave[] }).must_haves, { base: spec.base ?? [], levels: spec.levels })
   const { data, error } = await sb.from('icps').update(patch).eq('org_id', orgId).eq('id', icpId).select().maybeSingle()
   if (error) throw error
   if (!data) throw new Error('ICP not found')
@@ -399,6 +405,22 @@ export async function approveIcp(
   if (!found.data) throw new Error('ICP not found')
   const row = found.data as Icp
 
+  // The search plan is edited on the LIVE ICP, so it may have changed after this draft
+  // branched off. Carry the newer plan across so approving never loses plan edits.
+  const prev = await sb
+    .from('icps')
+    .select('sourcing_map')
+    .eq('org_id', orgId)
+    .eq('job_id', row.job_id)
+    .eq('status', 'approved')
+    .neq('id', icpId)
+    .maybeSingle()
+  if (prev.error) throw prev.error
+  const prevPlan = (prev.data?.sourcing_map as { search_spec?: SearchSpec | null } | null)?.search_spec ?? null
+  const ownPlan = (row.sourcing_map as { search_spec?: SearchSpec | null } | null)?.search_spec ?? null
+  const newer = (a: SearchSpec | null, b: SearchSpec | null) => (a?.edited_at ?? '') > (b?.edited_at ?? '')
+  const carryPlan = prevPlan && newer(prevPlan, ownPlan) ? prevPlan : null
+
   // Demote the current approved version for this job (if any, and not this one).
   const demote = await sb
     .from('icps')
@@ -413,6 +435,7 @@ export async function approveIcp(
     .from('icps')
     .update({
       status: 'approved',
+      ...(carryPlan ? { sourcing_map: { ...(row.sourcing_map ?? {}), search_spec: carryPlan } } : {}),
       approved_by: approvedBy ?? null,
       approved_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

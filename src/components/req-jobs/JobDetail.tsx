@@ -252,6 +252,12 @@ export function JobDetail({ job: initialJob, department, departments, locations 
     } catch { /* keep last-known status on a transient failure */ }
   }, [initialJob.id])
 
+  // Deep link: `?tab=scoring` opens that tab (e.g. from the pipeline's rubric pop-up).
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t && t in TAB_LABELS) setTab(t as Tab)
+  }, [])
+
   useEffect(() => {
     const onFocus = () => { refreshJob() }
     window.addEventListener('focus', onFocus)
@@ -995,6 +1001,7 @@ export function JobDetail({ job: initialJob, department, departments, locations 
 
             {/* Scoring rubric summary (item 2). */}
             <ScoringRubricSummary
+              jobId={job.id}
               criteria={readScoringCriteria(job.custom_fields)}
               onEdit={() => setTab('scoring')}
             />
@@ -1042,7 +1049,7 @@ export function JobDetail({ job: initialJob, department, departments, locations 
         />
       )}
 
-      {tab === 'source' && <SourcingTab jobId={job.id} />}
+      {tab === 'source' && <SourcingTab jobId={job.id} onOpenScoring={() => setTab('scoring')} />}
 
       {tab === 'plan' && <InterviewPlanTab jobId={job.id} />}
 

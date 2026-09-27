@@ -154,4 +154,40 @@ describe('ladderFromIdealProfile', () => {
     expect(r.spec.base.map((c) => c.kind)).toEqual(['years_band', 'degree_field'])
     expect(r.spec.base.some((c) => c.kind === 'employer_current')).toBe(false)
   })
+  it('marks the ideal-profile lines, and only those', () => {
+    expect(spec.levels.filter((l) => l.ideal).map((l) => l.label)).toEqual(['Ideal profile · Rippling', 'Ideal profile · Ramp'])
+  })
+  it('a stored plan takes its ideal lines from the CURRENT must-haves and keeps its own widening levels', () => {
+    // The plan was saved when the ideal companies were Rippling + Ramp, with a hand-added level.
+    const handAdded = { id: 'LX', label: 'Hand-added · fintech', criteria: [{ id: 'hx', kind: 'employer_current' as const, values: ['Brex'] }], relaxes: null }
+    const stored = { ...spec, source: 'edited' as const, levels: [...spec.levels, handAdded] }
+    // Then the Scoring tab changed the ideal companies to Deel only.
+    const mustHaves = icp.must_haves.map((g) => (g.kind === 'employer_current' ? { ...g, values: ['Deel'] } : g))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = resolveSpec({ ...icp, must_haves: mustHaves, sourcing_map: { ...icp.sourcing_map, search_spec: stored } } as any)
+    const labels = r.spec.levels.map((l) => l.label)
+    expect(labels.filter((l) => l.startsWith('Ideal profile'))).toEqual(['Ideal profile · Deel'])
+    expect(labels).toContain('Growth-stage SaaS')
+    expect(labels[labels.length - 1]).toBe('Hand-added · fintech')
+  })
+  it('recognises ideal lines in plans saved before the flag existed', () => {
+    expect(isIdealLevel({ label: 'Ideal profile · Rippling' })).toBe(true)
+    expect(isIdealLevel({ label: 'Growth-stage SaaS' })).toBe(false)
+    expect(isIdealLevel({ label: 'Anything', ideal: true })).toBe(true)
+  })
+})
+
+// ── Saving a plan must not drop fields (the save used to strip these) ────────────
+import { searchSpecSchema } from '@/lib/validations/search-spec'
+import { isIdealLevel } from './spec-from-brief'
+
+describe('searchSpecSchema', () => {
+  it('keeps relax_at on criteria and fallback / ideal on levels', () => {
+    const parsed = searchSpecSchema.parse({
+      version: 1, base: [], source: 'edited',
+      levels: [{ id: 'L1', label: 'Ideal', ideal: true, fallback: true, criteria: [{ id: 'c', kind: 'title_current', values: ['EM'], relax_at: 3 }] }],
+    })
+    expect(parsed.levels[0]).toMatchObject({ ideal: true, fallback: true })
+    expect(parsed.levels[0].criteria[0].relax_at).toBe(3)
+  })
 })

@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, RotateCcw, Save, Trash2, X, Calculator, Radar, Pencil } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, RotateCcw, Save, Trash2, X, Calculator, Radar, Pencil, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { CRITERION_KIND_LABEL, type CriterionKind, type SearchCriterion, type SearchLevel, type SearchSpec } from '@/lib/types/search-spec'
+import type { AdaptivePlanResult } from '@/modules/pool/search/adaptive-plan'
+import { WiderPlanProposal } from '@/components/req-jobs/WiderPlanProposal'
 
 /**
  * The search plan, read like a recruiter would say it and edited on its own page.
@@ -17,7 +19,15 @@ import { CRITERION_KIND_LABEL, type CriterionKind, type SearchCriterion, type Se
  *    filter, rename / reorder / delete levels, add levels and filters, Save / Reset.
  *
  * Vendor-neutral; a source that can't express a filter reports it after Count.
+ *
+ * Ownership (One of Each, stage 2): the "Everyone" line and the ideal-profile lines come
+ * from the ICP and are edited on the Scoring tab — read-only here. This panel owns only
+ * the widening levels below them. "Suggest a wider plan" (the adaptive planner) proposes
+ * extra levels in place; nothing changes until Accept.
  */
+
+/** An ideal-profile line — plans saved before the `ideal` flag are known by their label. */
+const isIdeal = (l: SearchLevel) => l.ideal === true || /^Ideal profile\b/.test(l.label)
 
 export interface LevelRunStat { key: string; fetched: number; total: number | null; exhausted?: boolean; error?: string | null }
 type Counts = Record<string, { total: number | null; error?: string | null }>
@@ -114,9 +124,11 @@ function AddFilter({ onAdd }: { onAdd: (kind: CriterionKind) => void }) {
   )
 }
 
-export function SearchSpecEditor({ jobId, onFind, finding, lastRun, initialSpec, readOnly }: {
+export function SearchSpecEditor({ jobId, onFind, finding, lastRun, initialSpec, readOnly, onOpenScoring }: {
   jobId: string
   onFind?: () => void
+  /** Jump to the Scoring tab, where the must-haves / ideal profile are edited. */
+  onOpenScoring?: () => void
   finding?: boolean
   lastRun?: LevelRunStat[] | null
   /** Preview/testing: render this spec instead of fetching it. */
@@ -134,6 +146,9 @@ export function SearchSpecEditor({ jobId, onFind, finding, lastRun, initialSpec,
   const [counts, setCounts] = useState<Counts>({})
   const [unsupported, setUnsupported] = useState<{ requirement: string; reason: string; level?: string }[]>([])
   const [showPostFetch, setShowPostFetch] = useState(false)
+  const [planning, setPlanning] = useState(false)
+  const [proposal, setProposal] = useState<AdaptivePlanResult | null>(null)
+  const [accepting, setAccepting] = useState(false)
 
   useEffect(() => {
     if (initialSpec) return
@@ -163,6 +178,33 @@ export function SearchSpecEditor({ jobId, onFind, finding, lastRun, initialSpec,
     const { data } = await res.json()
     setSpec(data.spec); setStored(true); setCounts({})
     return true
+  }
+  /** The adaptive planner: probe reach vs the role's target and propose extra levels.
+   *  Spends only tiny count probes; never acquires. */
+  async function suggest() {
+    if (readOnly) return
+    setPlanning(true)
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/source/plan/adaptive`, { method: 'POST' })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        if (res.status === 503) toast('The market source isn’t switched on for your workspace yet.')
+        else toast.error(j.error ?? 'Could not suggest a wider plan')
+        return
+      }
+      const { data } = await res.json()
+      setProposal(data as AdaptivePlanResult)
+      setOpen(true)
+    } finally {
+      setPlanning(false)
+    }
+  }
+  async function acceptProposal() {
+    if (!proposal) return
+    setAccepting(true)
+    const ok = await save(proposal.spec)
+    setAccepting(false)
+    if (ok) { setProposal(null); toast.success('Wider plan accepted — it’s now this job’s search plan.') }
   }
   async function reset() {
     if (readOnly) return
@@ -194,6 +236,7 @@ export function SearchSpecEditor({ jobId, onFind, finding, lastRun, initialSpec,
         </button>
         <div className="flex items-center gap-1.5">
           {!readOnly && <Button size="sm" variant="ghost" onClick={() => count(spec)} loading={counting} title="How many people each level reaches, before anyone is acquired"><Calculator className="h-3.5 w-3.5" /> Count</Button>}
+          {!readOnly && <Button size="sm" variant="ghost" onClick={suggest} loading={planning} title="Size the market against this role's target and propose extra levels if it's thin. Uses tiny count probes only; nothing is acquired."><Sparkles className="h-3.5 w-3.5" /> Suggest a wider plan</Button>}
           <Button size="sm" variant="outline" onClick={() => { setDraft(JSON.parse(JSON.stringify(spec))); setEditing(true) }}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
           {onFind && !readOnly && <Button size="sm" onClick={onFind} loading={finding} title="Acquire people, level 1 first"><Radar className="h-3.5 w-3.5" /> Find people</Button>}
         </div>
@@ -212,6 +255,7 @@ export function SearchSpecEditor({ jobId, onFind, finding, lastRun, initialSpec,
                   <span className="min-w-0 flex-1 truncate text-slate-600" title={`${lvl.label}${lvl.relaxes ? ` — relaxes: ${lvl.relaxes}` : ''}\n${levelSentence(lvl)}`}>
                     <span className="font-medium text-slate-800">{lvl.label}</span> — {levelSentence(lvl)}
                   </span>
+                  {isIdeal(lvl) && <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700" title="From the ideal profile — edit it on the Scoring tab">from Scoring</span>}
                   <span className="shrink-0 text-[11px] text-slate-500">
                     {run && (run.fetched > 0 || run.exhausted) && <span className={`mr-1.5 rounded px-1.5 py-0.5 ${run.exhausted ? 'bg-slate-100 text-slate-500' : 'bg-emerald-50 text-emerald-700'}`}>{run.fetched > 0 ? `+${run.fetched}` : ''}{run.exhausted ? ' done' : ''}</span>}
                     {cnt && <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-700">{cnt.error ? '—' : cnt.total != null ? cnt.total.toLocaleString() : '—'}</span>}
@@ -230,10 +274,15 @@ export function SearchSpecEditor({ jobId, onFind, finding, lastRun, initialSpec,
         </div>
       )}
 
+      {proposal && (
+        <WiderPlanProposal result={proposal} currentLevelIds={new Set(spec.levels.map((l) => l.id))}
+          onAccept={acceptProposal} onDiscard={() => setProposal(null)} accepting={accepting} />
+      )}
+
       {/* edit page (modal) */}
       {editing && draft && (
         <SpecEditModal
-          draft={draft} setDraft={setDraft} counts={counts} counting={counting} saving={saving} stored={stored} readOnly={!!readOnly}
+          draft={draft} setDraft={setDraft} counts={counts} counting={counting} saving={saving} stored={stored} readOnly={!!readOnly} onOpenScoring={onOpenScoring}
           onCount={() => count(draft)} onReset={reset} onCancel={() => setEditing(false)}
           onSave={async () => { if (await save(draft)) setEditing(false) }}
         />
@@ -242,13 +291,17 @@ export function SearchSpecEditor({ jobId, onFind, finding, lastRun, initialSpec,
   )
 }
 
-function SpecEditModal({ draft, setDraft, counts, counting, saving, stored, readOnly, onCount, onReset, onCancel, onSave }: {
+function SpecEditModal({ draft, setDraft, counts, counting, saving, stored, readOnly, onCount, onReset, onCancel, onSave, onOpenScoring }: {
   draft: SearchSpec; setDraft: (s: SearchSpec) => void; counts: Counts; counting: boolean; saving: boolean; stored: boolean; readOnly: boolean
-  onCount: () => void; onReset: () => void; onCancel: () => void; onSave: () => void
+  onCount: () => void; onReset: () => void; onCancel: () => void; onSave: () => void; onOpenScoring?: () => void
 }) {
   const update = (next: SearchSpec) => setDraft(next)
   const setLevel = (i: number, next: SearchLevel) => { const levels = draft.levels.slice(); levels[i] = next; update({ ...draft, levels }) }
-  const moveLevel = (i: number, dir: -1 | 1) => { const j = i + dir; if (j < 0 || j >= draft.levels.length) return; const levels = draft.levels.slice(); const [l] = levels.splice(i, 1); levels.splice(j, 0, l); update({ ...draft, levels }) }
+  // Widening levels reorder among themselves; the ideal lines stay on top.
+  const moveLevel = (i: number, dir: -1 | 1) => { const j = i + dir; if (j < 0 || j >= draft.levels.length || isIdeal(draft.levels[j])) return; const levels = draft.levels.slice(); const [l] = levels.splice(i, 1); levels.splice(j, 0, l); update({ ...draft, levels }) }
+  const editOnScoring = onOpenScoring
+    ? <button type="button" onClick={() => { onCancel(); onOpenScoring() }} className="font-medium text-emerald-600 hover:text-emerald-800">Edit on Scoring</button>
+    : <span>Edit it on the Scoring tab</span>
   const addLevel = () => { const last = draft.levels[draft.levels.length - 1]; update({ ...draft, levels: [...draft.levels, { id: newId('L'), label: last ? `${last.label} (copy)` : 'New level', criteria: (last?.criteria ?? []).map((c) => ({ ...c, id: newId('c') })), relaxes: null }] }) }
   const byIndex = (i: number) => Object.entries(counts).find(([k]) => k.startsWith(`L${i + 1}:`))?.[1]
   return (
@@ -265,16 +318,29 @@ function SpecEditModal({ draft, setDraft, counts, counting, saving, stored, read
         </div>
 
         <div className="border-b border-slate-100 px-4 py-3">
-          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-rose-500" title="Applied to every level, never relaxed">Everyone</div>
-          <div className="space-y-1.5">
-            {draft.base.map((c, i) => <Chips key={c.id} c={c} onChange={(n) => { const base = draft.base.slice(); base[i] = n; update({ ...draft, base }) }} onRemove={() => update({ ...draft, base: draft.base.filter((_, k) => k !== i) })} />)}
-            <AddFilter onAdd={(kind) => update({ ...draft, base: [...draft.base, { id: newId('c'), kind, values: [] }] })} />
+          <div className="mb-1.5 flex items-center gap-2 text-[10px]">
+            <span className="font-semibold uppercase tracking-wide text-rose-500" title="Applied to every level, never relaxed">Everyone</span>
+            <span className="text-slate-400">· the profile&apos;s must-haves ·</span> {editOnScoring}
           </div>
+          <p className="text-xs text-slate-600">{draft.base.map((c) => criterionPhrase(c, 6)).join(' · ') || '—'}</p>
         </div>
 
         <ol className="divide-y divide-slate-100">
           {draft.levels.map((lvl, i) => {
             const cnt = byIndex(i)
+            if (isIdeal(lvl)) {
+              return (
+                <li key={lvl.id} className="bg-slate-50/60 px-4 py-2.5">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-800">L{i + 1}</span>
+                    <span className="font-medium text-slate-800">{lvl.label}</span>
+                    {cnt && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700">{cnt.error ? '—' : cnt.total != null ? `${cnt.total.toLocaleString()} people` : '—'}</span>}
+                    <span className="ml-auto text-[10px] text-slate-400">from the ideal profile · {editOnScoring}</span>
+                  </div>
+                  <p className="mt-1 pl-7 text-[11px] text-slate-500">{levelSentence(lvl)}</p>
+                </li>
+              )
+            }
             return (
               <li key={lvl.id} className="px-4 py-3">
                 <div className="mb-1.5 flex items-center gap-2">

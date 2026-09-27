@@ -45,7 +45,7 @@ export interface AdaptivePlanResult {
   met: boolean
   steps: AdaptivePlanStep[]
   /** Every probed level's count; `fallback` = a catch-all that does NOT count toward the target. */
-  perLevel: { label: string; total: number | null; fallback?: boolean }[]
+  perLevel: { key: string; label: string; total: number | null; fallback?: boolean }[]
   /** True when the loop hit its safety expansion cap before meeting the target (surfaced, never silent). */
   capped: boolean
 }
@@ -107,7 +107,11 @@ export function applyMove(spec: SearchSpec, move: AdaptiveMove, seq: number): Se
     if (t.title) criteria.push(t.title)
   }
 
-  const level: SearchLevel = { id: `LA${seq + 1}`, label: move.label, criteria, relaxes: move.rationale, rationale: move.rationale }
+  // A plan can already hold LA levels from an earlier accepted proposal — take the next free id.
+  const used = new Set(spec.levels.map((l) => l.id))
+  let n = seq + 1
+  while (used.has(`LA${n}`)) n++
+  const level: SearchLevel = { id: `LA${n}`, label: move.label, criteria, relaxes: move.rationale, rationale: move.rationale }
   return { ...spec, levels: [...spec.levels, level] }
 }
 
@@ -158,7 +162,7 @@ export async function runAdaptivePlan(opts: {
     reach,
     met: reach >= opts.target,
     steps,
-    perLevel: counts.map((c) => ({ label: c.label ?? c.key, total: c.total, fallback: fbLabels.has(c.label ?? '') })),
+    perLevel: counts.map((c) => ({ key: c.key, label: c.label ?? c.key, total: c.total, fallback: fbLabels.has(c.label ?? '') })),
     capped,
   }
 }

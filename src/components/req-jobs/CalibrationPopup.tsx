@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button'
  * The Juicebox-style "Review N profiles to calibrate" card, as a FOLDABLE floating
  * pop-up. Presentational only — it reuses the job's existing calibration engine:
  * the trio is picked by pickCalibrationSet (diverse across the score range) and each
- * 👍/👎 flows through the same setSourcingDecision path as the matrix. "Review all"
- * opens the full diverse set in the matrix below.
+ * 👍/👎 flows through the same setSourcingDecision path as the matrix. It only offers
+ * people not yet rated, so it never duplicates a decision already made in the table.
+ * "See all" jumps to the results table filtered to your candidates.
  */
 
 export interface CalibrationProfile {
@@ -56,8 +57,8 @@ export function CalibrationPopup({
         <h4 className="flex-1 text-[13px] font-semibold text-slate-800">
           Review {profiles.length} profile{profiles.length === 1 ? '' : 's'} to calibrate your search
         </h4>
-        <Button size="sm" onClick={onReviewAll} title="Open the full diverse set below">
-          <SlidersHorizontal className="h-3.5 w-3.5" /> Review all
+        <Button size="sm" onClick={onReviewAll} title="Show your candidates in the results table, where the same thumbs live">
+          <SlidersHorizontal className="h-3.5 w-3.5" /> See all
         </Button>
         <button
           type="button"

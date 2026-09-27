@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { GraduationCap, Target, Send, DollarSign, RefreshCw, ChevronRight } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
 interface Diagnosis {
@@ -21,10 +20,9 @@ const MODES: { key: 'fit_miss' | 'no_reply' | 'declined_offer'; label: string; i
 
 /** Sourcing Brain, Slice 3 — separate fit / reachability / movability so the loop
  *  fixes the right thing (only fit misses should refine the ICP). */
-export function LearningPanel({ jobId }: { jobId: string }) {
+export function LearningPanel({ jobId, onOpenScoring }: { jobId: string; onOpenScoring?: () => void }) {
   const [d, setD] = useState<Diagnosis | null>(null)
   const [loading, setLoading] = useState(true)
-  const [refining, setRefining] = useState(false)
   const [open, setOpen] = useState(false)
 
   const load = useCallback(() => {
@@ -35,17 +33,6 @@ export function LearningPanel({ jobId }: { jobId: string }) {
       .finally(() => setLoading(false))
   }, [jobId])
   useEffect(() => { load() }, [load])
-
-  async function refine() {
-    setRefining(true)
-    const res = await fetch(`/api/jobs/${jobId}/icp/refine-from-feedback`, { method: 'POST' })
-    setRefining(false)
-    const body = await res.json().catch(() => ({}))
-    if (!res.ok) { toast.error(body.error ?? 'Could not refine the ICP'); return }
-    const data = body.data
-    if (data?.status === 'insufficient') { toast(`${data.decided}/${data.needed} decisions so far — mark a few more Yes/No.`); return }
-    if (data?.icp) toast.success(`Refined ICP draft v${data.icp.version}${data.change_summary ? `: ${data.change_summary}` : ''} — review it in Scoring.`)
-  }
 
   if (loading || !d || d.decided === 0) return null
 
@@ -74,9 +61,10 @@ export function LearningPanel({ jobId }: { jobId: string }) {
 
       <p className="mt-3 text-xs leading-relaxed text-slate-600">{d.guidance}</p>
 
-      {d.dominant === 'fit_miss' && (
-        <Button size="sm" variant="outline" className="mt-2" onClick={refine} loading={refining}>
-          <RefreshCw className="h-3.5 w-3.5" /> Refine ICP from fit feedback
+      {/* The one Refine button lives on the Scoring tab; this points there. */}
+      {d.dominant === 'fit_miss' && onOpenScoring && (
+        <Button size="sm" variant="outline" className="mt-2" onClick={onOpenScoring}>
+          <RefreshCw className="h-3.5 w-3.5" /> Refine the ICP on Scoring →
         </Button>
       )}
       </>)}

@@ -68,6 +68,13 @@ export interface SearchLevel {
    * the planner never widens. See docs/recruiter-brain-sourcing.md.
    */
   fallback?: boolean
+  /**
+   * An ideal-profile line: the ICP's own must-haves (exact title × ideal company ×
+   * location). The Scoring tab owns these — they are rebuilt from the ICP on every read,
+   * never taken from a stored plan, so the plan can't drift from the profile. Only the
+   * widening levels below them are the plan's own.
+   */
+  ideal?: boolean
 }
 
 export interface PostFetchCheck {

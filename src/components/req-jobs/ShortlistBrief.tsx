@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ClipboardList, Copy, Sparkles, Users, Globe, ChevronRight } from 'lucide-react'
+import { Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { fitBucketFor } from '@/lib/ai/fit-bucket'
@@ -23,157 +23,68 @@ interface Archetype { name: string; thesis: string; where_from?: string | null; 
 interface Brief {
   role_title: string | null
   reasoning: string | null
-  unwritten_filters: { filter: string; exclusion_cost?: string | null }[]
   archetypes: Archetype[]
   shortlist: Item[]
   counts: { total: number; yours: number; market: number; great: number; good: number; okay: number }
-  has_market: boolean
-  market_stale?: boolean
 }
 
-const BUCKET: Record<string, { label: string; cls: string }> = {
-  great: { label: 'Great', cls: 'bg-emerald-100 text-emerald-700' },
-  good: { label: 'Good', cls: 'bg-sky-100 text-sky-700' },
-  okay: { label: 'Okay', cls: 'bg-amber-100 text-amber-700' },
-  weak: { label: 'Weak', cls: 'bg-rose-100 text-rose-700' },
+const BUCKET_LABEL: Record<string, string> = { great: 'Great', good: 'Good', okay: 'Okay', weak: 'Weak' }
+
+/** The shortlist as plain text for the hiring manager: what we're looking for, the bets,
+ *  and the top candidates across both pools. PURE. */
+export function shortlistText(brief: Brief): string {
+  const lines: string[] = []
+  lines.push(`Shortlist — ${brief.role_title ?? 'this role'}`)
+  lines.push('')
+  if (brief.reasoning) { lines.push('What we’re looking for:'); lines.push(brief.reasoning); lines.push('') }
+  if (brief.archetypes?.length) {
+    lines.push('Who could fit (the bets we’re making):')
+    brief.archetypes.forEach((a) => lines.push(`- ${a.name}${a.is_non_obvious ? ' (non-obvious)' : ''}: ${a.thesis}`))
+    lines.push('')
+  }
+  lines.push(`Top candidates (${brief.counts.total} — ${brief.counts.yours} from our pool, ${brief.counts.market} from the market):`)
+  brief.shortlist.forEach((i, n) => {
+    const where = [i.title, i.company].filter(Boolean).join(' @ ')
+    const bk = fitBucketFor(i.score, i.gate_failures.length === 0)
+    lines.push(`${n + 1}. ${i.name}${where ? ` — ${where}` : ''} [${BUCKET_LABEL[bk] ?? 'Fit'}, ${i.score}/100${i.source === 'market' ? ', market' : ''}]`)
+    if (i.rationale) lines.push(`   ${i.rationale}`)
+  })
+  return lines.join('\n')
 }
 
-/** Sourcing Brain, Slice 1b — one ranked shortlist across your candidates + the
- *  market, with the reasoning, and a copy-for-hiring-manager export. */
-export function ShortlistBrief({ jobId }: { jobId: string }) {
+/**
+ * "Copy shortlist" — the hiring-manager hand-off from the one results table. It used to
+ * be a separate Shortlist brief section: a third ranked list that re-showed the ICP's
+ * reasoning (which now lives once, on the Scoring tab). The brief is fetched ahead of
+ * the click (`refreshKey` changes after every rank / find), because browsers only allow
+ * a clipboard write straight from the click.
+ */
+export function CopyShortlistButton({ jobId, refreshKey }: { jobId: string; refreshKey: number }) {
   const [brief, setBrief] = useState<Brief | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [open, setOpen] = useState(false)
 
-  const build = useCallback(async (announce = false) => {
-    setLoading(true)
+  const load = useCallback(async (): Promise<Brief | null> => {
     const res = await fetch(`/api/jobs/${jobId}/brief`)
-    setLoading(false)
-    if (!res.ok) {
-      if (announce) {
-        const j = await res.json().catch(() => ({}))
-        toast.error(j.error ?? 'Could not build the shortlist')
-      }
-      return
-    }
+    if (!res.ok) return null
     const { data } = await res.json()
-    // Only surface the brief once there's something in it (avoids an empty card on mount).
-    if (announce || (data?.shortlist?.length ?? 0) > 0) setBrief(data as Brief)
+    setBrief(data as Brief)
+    return data as Brief
   }, [jobId])
 
-  // Load on mount so the brief survives a hard refresh.
-  useEffect(() => { build(false) }, [build])
+  useEffect(() => { load() }, [load, refreshKey])
 
-  function copyForHm() {
-    if (!brief) return
-    const lines: string[] = []
-    lines.push(`Shortlist — ${brief.role_title ?? 'this role'}`)
-    lines.push('')
-    if (brief.reasoning) { lines.push('What we’re looking for:'); lines.push(brief.reasoning); lines.push('') }
-    if (brief.archetypes?.length) {
-      lines.push('Who could fit (the bets we’re making):')
-      brief.archetypes.forEach((a) => lines.push(`- ${a.name}${a.is_non_obvious ? ' (non-obvious)' : ''}: ${a.thesis}`))
-      lines.push('')
-    }
-    lines.push(`Top candidates (${brief.counts.total} — ${brief.counts.yours} from our pool, ${brief.counts.market} from the market):`)
-    brief.shortlist.forEach((i, n) => {
-      const where = [i.title, i.company].filter(Boolean).join(' @ ')
-      const bk = fitBucketFor(i.score, i.gate_failures.length === 0)
-      lines.push(`${n + 1}. ${i.name}${where ? ` — ${where}` : ''} [${BUCKET[bk]?.label ?? 'Fit'}, ${i.score}/100${i.source === 'market' ? ', market' : ''}]`)
-      if (i.rationale) lines.push(`   ${i.rationale}`)
-    })
-    navigator.clipboard.writeText(lines.join('\n')).then(
-      () => toast.success('Brief copied — paste it to your hiring manager.'),
-      () => toast.error('Could not copy'),
+  async function copy() {
+    const b = brief ?? (await load())
+    if (!b || b.shortlist.length === 0) { toast('Nothing to copy yet — rank candidates first.'); return }
+    navigator.clipboard.writeText(shortlistText(b)).then(
+      () => toast.success(`Shortlist of ${b.counts.total} copied — paste it to your hiring manager.`),
+      () => toast.error('Could not copy — your browser blocked the clipboard.'),
     )
   }
 
   return (
-    <div className="border-t border-slate-100 px-6 py-4">
-      <div className="flex items-center justify-between gap-2">
-        <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-          <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`} />
-          <ClipboardList className="h-4 w-4 text-indigo-500" /> Shortlist brief
-          {brief && <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">{brief.counts.total}</span>}
-        </button>
-        <div className="flex items-center gap-2">
-          {brief && (
-            <Button size="sm" variant="outline" onClick={copyForHm}>
-              <Copy className="h-3.5 w-3.5" /> Copy for hiring manager
-            </Button>
-          )}
-          <Button size="sm" onClick={() => build(true)} loading={loading}>
-            <Sparkles className="h-3.5 w-3.5" /> {brief ? 'Rebuild' : 'Build shortlist'}
-          </Button>
-        </div>
-      </div>
-      {open && (<>
-
-      {!brief && (
-        <p className="mt-2 text-xs text-slate-500">
-          One ranked shortlist across your sourced candidates and your last market search, with the reasoning — ready to share with the hiring manager. Source your pool and the market above, then build.
-        </p>
-      )}
-
-      {brief?.market_stale && (
-        <p className="mt-2 text-[11px] text-amber-600">The ICP has changed since your last market search — re-search the market above for fresh market picks.</p>
-      )}
-
-      {brief && (
-        <div className="mt-3 space-y-3">
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600">{brief.counts.total} candidates</span>
-            <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600"><Users className="h-3 w-3" /> {brief.counts.yours} your pool</span>
-            <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600"><Globe className="h-3 w-3" /> {brief.counts.market} market</span>
-            <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-700">{brief.counts.great} great · {brief.counts.good} good</span>
-          </div>
-
-          {brief.reasoning && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-xs leading-relaxed text-slate-600">
-              {brief.reasoning}
-            </div>
-          )}
-
-          {brief.archetypes?.length > 0 && (
-            <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Who could fit (the bets)</div>
-              <div className="flex flex-wrap gap-1.5">
-                {brief.archetypes.map((a, i) => (
-                  <span key={i} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600" title={a.thesis}>
-                    {a.name}{a.is_non_obvious && <span className="text-indigo-500"> ✦</span>}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <ol className="space-y-2">
-            {brief.shortlist.map((i, n) => (
-              <li key={`${i.source}-${i.ref_id}`} className="rounded-lg border border-slate-200 p-3">
-                <div className="flex items-start gap-2">
-                  <span className="mt-0.5 text-xs font-bold text-slate-400">{n + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-slate-800">{i.name}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${BUCKET[fitBucketFor(i.score, i.gate_failures.length === 0)]?.cls ?? 'bg-slate-100 text-slate-600'}`}>{BUCKET[fitBucketFor(i.score, i.gate_failures.length === 0)]?.label ?? 'Fit'}</span>
-                      <span className="text-xs font-bold text-slate-500">{i.score}</span>
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${i.source === 'market' ? 'bg-sky-50 text-sky-600' : 'bg-slate-100 text-slate-500'}`}>
-                        {i.source === 'market' ? 'Market' : 'Your pool'}
-                      </span>
-                      {i.source === 'market' && !i.reachable && <span className="text-[10px] text-amber-600">no contact</span>}
-                    </div>
-                    <div className="truncate text-[11px] text-slate-400">{[i.title, i.company].filter(Boolean).join(' @ ')}{i.location ? ` — ${i.location}` : ''}</div>
-                    {i.rationale && <div className="mt-1 line-clamp-2 text-[11px] text-slate-500">{i.rationale}</div>}
-                    {i.gate_failures.length > 0 && <div className="text-[11px] text-red-600">Missing: {i.gate_failures.join(', ')}</div>}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
-          {brief.shortlist.length === 0 && <p className="text-xs text-slate-400">No matches yet — source your pool or the market first.</p>}
-        </div>
-      )}
-      </>)}
-    </div>
+    <Button size="sm" variant="outline" onClick={copy} disabled={!!brief && brief.shortlist.length === 0}
+      title="Copy the ranked shortlist across your candidates and the market, with the reasoning, as text for the hiring manager">
+      <Copy className="h-3.5 w-3.5" /> Copy shortlist
+    </Button>
   )
 }

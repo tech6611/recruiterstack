@@ -49,41 +49,74 @@ function tileHeading(c: SearchCriterion): string {
   return CRITERION_KIND_LABEL[c.kind]
 }
 
+/** Kinds a recruiter can add as a new must-have (the Search plan's "Everyone" line used
+ *  to be the only place to add one; the tiles are now the one editor). */
+const ADDABLE: CriterionKind[] = ['location', 'years_band', 'title_current', 'title_any', 'employer_current', 'employer_past', 'employer_any', 'school', 'degree_field', 'grad_year_band', 'seniority', 'function', 'skill', 'industry', 'company_size', 'company_type', 'funding_stage']
+/** Kinds whose tile can flip to "exclude these". */
+const EXCLUDABLE = (k: CriterionKind) => !isBand(k) && k !== 'location'
+const isEmpty = (c: SearchCriterion) => c.values.every((v) => !v.trim()) && c.min == null && c.max == null
+
+let addSeq = 0
+
 export function IdealProfileTiles({
   criteria,
   onChange,
+  onAdd,
+  onRemove,
 }: {
   criteria: SearchCriterion[]
   onChange: (next: SearchCriterion) => void
+  /** Add a new (never-relaxed) must-have; omitted = no add control. */
+  onAdd?: (c: SearchCriterion) => void
+  onRemove?: (id: string) => void
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
+  function add(kind: CriterionKind) {
+    const c: SearchCriterion = { id: `mh-${Date.now().toString(36)}-${++addSeq}`, kind, values: [], relax_at: null }
+    onAdd?.(c)
+    setEditingId(c.id)
+  }
   return (
-    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-      {criteria.map((c) => (
-        <Tile
-          key={c.id}
-          c={c}
-          editing={editingId === c.id}
-          onEdit={() => setEditingId(c.id)}
-          onClose={() => setEditingId(null)}
-          onChange={(next) => {
-            onChange(next)
-            setEditingId(null)
-          }}
-        />
-      ))}
+    <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {criteria.map((c) => (
+          <Tile
+            key={c.id}
+            c={c}
+            editing={editingId === c.id}
+            onEdit={() => setEditingId(c.id)}
+            // A just-added tile left empty is dropped rather than saved as a blank filter.
+            onClose={() => { if (isEmpty(c)) onRemove?.(c.id); setEditingId(null) }}
+            onChange={(next) => {
+              if (isEmpty(next)) onRemove?.(next.id)
+              else onChange(next)
+              setEditingId(null)
+            }}
+            onRemove={onRemove ? () => onRemove(c.id) : undefined}
+          />
+        ))}
+      </div>
+      {onAdd && (
+        <select id="icp-add-must-have" value="" onChange={(e) => { if (e.target.value) add(e.target.value as CriterionKind) }}
+          className="h-8 rounded-md border border-dashed border-slate-300 bg-white px-2 text-xs text-slate-500">
+          <option value="">+ Add a must-have…</option>
+          {/* One location per role: a second would be ANDed (nobody passes) and the job-location sync keeps only one. */}
+          {ADDABLE.filter((k) => k !== 'location' || !criteria.some((c) => c.kind === 'location')).map((k) => <option key={k} value={k}>{CRITERION_KIND_LABEL[k]}</option>)}
+        </select>
+      )}
     </div>
   )
 }
 
 function Tile({
-  c, editing, onEdit, onClose, onChange,
+  c, editing, onEdit, onClose, onChange, onRemove,
 }: {
   c: SearchCriterion
   editing: boolean
   onEdit: () => void
   onClose: () => void
   onChange: (next: SearchCriterion) => void
+  onRemove?: () => void
 }) {
   const Icon = c.exclude ? Ban : ICON[c.kind] ?? Tag
   const never = c.relax_at == null
@@ -117,6 +150,17 @@ function Tile({
               className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             >
               <Pencil className="h-3 w-3" />
+            </button>
+          )}
+          {!editing && onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              title="Remove this must-have"
+              aria-label="Remove"
+              className="grid h-6 w-6 place-items-center rounded-md text-slate-300 hover:bg-slate-100 hover:text-red-500"
+            >
+              <X className="h-3 w-3" />
             </button>
           )}
         </span>
@@ -159,6 +203,12 @@ function CriterionEditor({ c, onCancel, onSave }: { c: SearchCriterion; onCancel
         <LocationFields draft={draft} setDraft={setDraft} />
       ) : (
         <ChipField draft={draft} setDraft={setDraft} withLogos={isEmployer(draft.kind)} />
+      )}
+      {EXCLUDABLE(draft.kind) && (
+        <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <input type="checkbox" checked={!!draft.exclude} onChange={(e) => setDraft({ ...draft, exclude: e.target.checked })} className="h-3.5 w-3.5" />
+          Exclude these instead (candidates must NOT match)
+        </label>
       )}
       <div className="flex items-center justify-end gap-1.5 pt-1">
         <button type="button" onClick={onCancel} className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 text-slate-400 hover:bg-slate-50" aria-label="Cancel" title="Cancel">
