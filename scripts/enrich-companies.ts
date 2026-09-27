@@ -28,6 +28,18 @@ import path from 'node:path'
 import { isUnbrandable, normalizeName } from '../src/lib/brand-icon'
 
 const APPLY = process.argv.includes('--apply')
+/**
+ * A HARD SPEND CAP, not a guideline.
+ *
+ * Exa's answer endpoint is $5 per 1,000 requests, so ~860 employers costs about $4.30
+ * — comfortably inside the $10 of free credit. But a bug that retried in a loop would
+ * spend real money silently, so the run counts its own requests and stops dead at the
+ * cap rather than trusting the loop to terminate.
+ */
+const EXA_COST_PER_REQUEST = 0.005
+const BUDGET_USD = Number(process.argv.find((a) => a.startsWith('--budget='))?.split('=')[1] ?? '8')
+const MAX_EXA_REQUESTS = Math.floor(BUDGET_USD / EXA_COST_PER_REQUEST)
+let exaRequests = 0
 const LIMIT = Number(process.argv.find((a) => a.startsWith('--limit='))?.split('=')[1] ?? '0')
 const UA = 'RecruiterStack/1.0 (company enrichment; contact tech@recruiterstack.in)'
 /** Wikidata refuses at speed; this keeps a full run inside its limits. */
@@ -70,6 +82,7 @@ const env = Object.fromEntries(
 )
 const U = env.NEXT_PUBLIC_SUPABASE_URL
 const K = env.SUPABASE_SERVICE_ROLE_KEY
+const EXA_KEY = env.EXA_API_KEY
 if (!U || !K) { console.error('Missing Supabase credentials in .env.local'); process.exit(1) }
 const h = { apikey: K, Authorization: `Bearer ${K}`, 'Content-Type': 'application/json' }
 const rest = async (p: string, init?: RequestInit) => fetch(`${U}/rest/v1/${p}`, { ...init, headers: { ...h, ...(init?.headers ?? {}) } })
@@ -149,7 +162,100 @@ interface Facts {
   industries: string[]
   country_code: string | null
   is_public: boolean | null
+  latest_stage: string | null
+  latest_round_date: string | null
+  total_raised_usd: number | null
+  valuation_usd: number | null
+  is_unicorn: boolean | null
+  citations: string[]
+  enriched_by: string | null
   note: string
+}
+
+/**
+ * Funding, valuation and headcount from Exa's answer endpoint.
+ *
+ * ONE SOURCE PER FIGURE, NOT AN AVERAGE. Providers disagree — Razorpay's headcount
+ * comes back as 3,465 / 4,035 / 4,486 / 4,665 depending on who you ask — and averaging
+ * four guesses produces a fifth number nobody published. Every figure here feeds a
+ * bucket ("unicorn", "Series B", "large"), where the spread makes no difference, so
+ * one sourced answer beats a synthesised one. The citations are stored so it can be
+ * checked rather than argued about.
+ */
+/**
+ * Reduce "latest deal type" to a company STAGE a recruiter would recognise.
+ *
+ * The raw answer is whatever transaction happened most recently, which for an
+ * established company is noise: Bain came back "Grant (prize money)", Meta "PIPE - II",
+ * Goldman "Post IPO Debt". None of those describe the environment someone worked in,
+ * which is the only reason the field exists. A debt raise or a secondary sale is not a
+ * stage at all and becomes null rather than a misleading chip.
+ */
+export function normalizeStage(raw: string | null, isPublic: boolean | null): string | null {
+  const v = (raw ?? '').toLowerCase()
+  if (isPublic || /\b(ipo|publicly|post.?ipo|pipe|stock exchange)\b/.test(v)) return 'Public'
+  const series = v.match(/series\s+([a-k])\b/)
+  if (series) return `Series ${series[1].toUpperCase()}`
+  if (/pre.?seed/.test(v)) return 'Pre-seed'
+  if (/\bseed\b/.test(v)) return 'Seed'
+  if (/\bangel\b/.test(v)) return 'Angel'
+  if (/acqui(red|sition)|merger/.test(v)) return 'Acquired'
+  if (/bootstrap/.test(v)) return 'Bootstrapped'
+  if (/growth|late stage|private equity/.test(v)) return 'Growth'
+  // Debt, grants, secondaries and prizes are transactions, not stages.
+  return null
+}
+
+async function fromExa(employer: string, domain: string | null): Promise<Partial<Facts> | null> {
+  if (!EXA_KEY) return null
+  if (exaRequests >= MAX_EXA_REQUESTS) return null
+  exaRequests++
+  try {
+    const res = await fetch('https://api.exa.ai/answer', {
+      method: 'POST',
+      headers: { 'x-api-key': EXA_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query:
+          `${employer}${domain ? ` (${domain})` : ''} the company: latest funding round stage, ` +
+          'date of that round, total funding raised in USD, current valuation in USD, ' +
+          'whether it is a unicorn (valuation over $1B), year founded, current employee ' +
+          'headcount, and its industries. Answer only for this company; if you cannot ' +
+          'identify it, leave the fields empty.',
+        outputSchema: {
+          type: 'object',
+          properties: {
+            latest_stage: { type: 'string' },
+            latest_round_date: { type: 'string' },
+            total_raised_usd: { type: 'number' },
+            valuation_usd: { type: 'number' },
+            is_unicorn: { type: 'boolean' },
+            founded_year: { type: 'number' },
+            employees: { type: 'number' },
+            industries: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      }),
+    })
+    if (!res.ok) return null
+    const j = await res.json()
+    const a = j?.answer
+    if (!a || typeof a !== 'object') return null
+    const year = Number(a.founded_year)
+    return {
+      latest_stage: typeof a.latest_stage === 'string' && a.latest_stage.trim() ? a.latest_stage.trim() : null,
+      latest_round_date: /^\d{4}-\d{2}-\d{2}$/.test(String(a.latest_round_date)) ? String(a.latest_round_date) : null,
+      total_raised_usd: Number.isFinite(a.total_raised_usd) ? Math.round(a.total_raised_usd) : null,
+      valuation_usd: Number.isFinite(a.valuation_usd) ? Math.round(a.valuation_usd) : null,
+      // Trust an explicit valuation over the model's own yes/no where we have one.
+      is_unicorn: Number.isFinite(a.valuation_usd) ? a.valuation_usd >= 1_000_000_000 : (typeof a.is_unicorn === 'boolean' ? a.is_unicorn : null),
+      founded_year: Number.isFinite(year) && year > 1800 && year <= new Date().getFullYear() ? year : null,
+      employees: Number.isFinite(a.employees) && a.employees > 0 ? Math.round(a.employees) : null,
+      industries: Array.isArray(a.industries) ? a.industries.filter((x: unknown) => typeof x === 'string').slice(0, 6) : [],
+      citations: Array.isArray(j.citations) ? j.citations.map((c: { url?: string }) => c.url).filter(Boolean).slice(0, 5) : [],
+    }
+  } catch {
+    return null
+  }
 }
 
 /** Does the matched entity plausibly name the employer we asked about? */
@@ -161,11 +267,56 @@ function labelMatches(employer: string, label: string): boolean {
   return a.includes(b) || b.includes(a)
 }
 
-async function lookup(employer: string): Promise<Facts> {
+/**
+ * Free sources first, then Exa.
+ *
+ * Exa runs for EVERY employer rather than only the gaps, because funding history is
+ * the one thing Wikidata and Wikipedia never carry — there is no cheaper source to try
+ * first. It also fills whatever founding year, headcount or industry the free tiers
+ * left blank, so a company with no Wikipedia article (Razorpay, Shadowfax) still comes
+ * back with something.
+ */
+async function lookup(employer: string, domain: string | null): Promise<Facts> {
+  const free = await lookupFree(employer)
+  const exa = await fromExa(employer, domain)
+  if (!exa) return free
+
+  const merged: Facts = {
+    ...free,
+    // The free tiers win where they answered: Wikidata's claims are structured and
+    // dated, Exa's are a model reading pages. Exa fills the blanks.
+    founded_year: free.founded_year ?? exa.founded_year ?? null,
+    employees: free.employees ?? exa.employees ?? null,
+    industries: free.industries.length ? free.industries : (exa.industries ?? []),
+    // "Unicorn" means a PRIVATE company valued over $1B. Google is worth two trillion
+    // and is not a unicorn; calling it one makes the chip meaningless.
+    latest_stage: normalizeStage(exa.latest_stage ?? null, free.is_public),
+    latest_round_date: exa.latest_round_date ?? null,
+    total_raised_usd: exa.total_raised_usd ?? null,
+    valuation_usd: exa.valuation_usd ?? null,
+    is_unicorn: null, // set below, once the stage is known
+    citations: exa.citations ?? [],
+  }
+  // Suppress "unicorn" off the STAGE, not just Wikidata's public flag — that flag was
+  // null for the "Facebook" entity while set for "Meta", which let a two-trillion-dollar
+  // company through as a unicorn. A unicorn is a PRIVATE company valued over $1B.
+  merged.is_unicorn = merged.latest_stage === 'Public' || free.is_public
+    ? false
+    : (exa.is_unicorn ?? null)
+
+  const tiers = [free.wikidata_id ? 'wikidata' : null, free.note.includes('enwiki') ? 'enwiki' : null, 'exa'].filter(Boolean)
+  merged.enriched_by = tiers.join('+')
+  merged.note = free.note === 'no wikidata entity' && exa.latest_stage ? 'exa only' : free.note
+  return merged
+}
+
+async function lookupFree(employer: string): Promise<Facts> {
   const base: Facts = {
     name_norm: normalizeName(employer, 'company'),
     display_name: null, wikidata_id: null, founded_year: null, employees: null,
-    industries: [], country_code: null, is_public: null, note: '',
+    industries: [], country_code: null, is_public: null,
+    latest_stage: null, latest_round_date: null, total_raised_usd: null,
+    valuation_usd: null, is_unicorn: null, citations: [], enriched_by: null, note: '',
   }
 
   const search = await wiki(
@@ -269,6 +420,16 @@ async function main() {
 
   // Tolerant of the table not existing yet: a dry run should work before migration 153
   // is applied, so you can see what it would find before deciding to apply it.
+  // brand_domains already knows many employers' websites — handing Exa the domain
+  // stops it answering about a different company with the same name.
+  const domainRows = await get('brand_domains?select=name_norm,domain&kind=eq.company&limit=5000')
+  const domainOf = new Map<string, string>(
+    Array.isArray(domainRows)
+      ? (domainRows as { name_norm: string; domain: string | null }[])
+          .filter((r) => r.domain).map((r) => [r.name_norm, r.domain as string])
+      : [],
+  )
+
   const existing = await get('company_facts?select=name_norm&limit=5000')
   const known = new Set(
     Array.isArray(existing) ? (existing as { name_norm: string }[]).map((r) => r.name_norm) : [],
@@ -286,13 +447,17 @@ async function main() {
   let found = 0
   for (const [employer, count] of work) {
     let facts: Facts
-    try { facts = await lookup(employer) } catch (err) { console.log(`  !! ${employer} — ${(err as Error).message}`); break }
-    if (facts.wikidata_id) {
+    try {
+      facts = await lookup(employer, domainOf.get(normalizeName(employer, 'company')) ?? null)
+    } catch (err) { console.log(`  !! ${employer} — ${(err as Error).message}`); break }
+    if (facts.wikidata_id || facts.latest_stage || facts.employees) {
       found++
       const bits = [
         facts.industries.length ? facts.industries.slice(0, 2).join('/') : null,
         facts.founded_year ? `est ${facts.founded_year}` : null,
         facts.employees ? `${facts.employees.toLocaleString()} staff` : null,
+        facts.latest_stage,
+        facts.is_unicorn ? 'unicorn' : null,
         facts.is_public ? 'public' : null,
       ].filter(Boolean).join(' · ')
       console.log(`  ${String(count).padStart(3)}  ${employer.slice(0, 40).padEnd(42)} ${bits || '(no attributes)'}`)
@@ -302,7 +467,12 @@ async function main() {
     await sleep(THROTTLE_MS)
   }
 
-  console.log(`\n${found} of ${rows.length} employers matched an organisation on Wikidata.`)
+  console.log(`\n${found} of ${rows.length} employers resolved to a company.`)
+  console.log(`   Exa requests: ${exaRequests} — about $${(exaRequests * EXA_COST_PER_REQUEST).toFixed(2)} of the $${BUDGET_USD} cap`)
+  if (exaRequests >= MAX_EXA_REQUESTS) console.log('   !! budget cap reached — re-run to continue where it stopped')
+  const withStage = rows.filter((r) => r.latest_stage).length
+  const unicorns = rows.filter((r) => r.is_unicorn).length
+  console.log(`   with a funding stage: ${withStage}   unicorns: ${unicorns}`)
   const withIndustry = rows.filter((r) => r.industries.length).length
   const withStaff = rows.filter((r) => r.employees != null).length
   console.log(`   with an industry: ${withIndustry}   with a headcount: ${withStaff}   (headcount is sparse by nature)`)
