@@ -29,8 +29,11 @@ import { logger } from '@/lib/logger'
  */
 
 export const runtime = 'nodejs'
-// The upstream answer for a domain changes about never; let Vercel hold the route.
-export const revalidate = 86400
+// NOT `revalidate`. Next patches global fetch and inherits a route's revalidate for the
+// calls inside it, so a 24-hour revalidate meant the provider's answer was frozen for a
+// day — including a "nothing here" from before LOGODEV_TOKEN was configured. Adding the
+// token then changed nothing for 24 hours, which is exactly the bug it caused.
+export const dynamic = 'force-dynamic'
 
 /** Google's "I have nothing" PNG — one stable 726-byte image at every requested size. */
 const GENERIC_GLOBE_MD5 = 'b8a0bf372c762e966cc99ede8682bc71'
@@ -39,9 +42,18 @@ const SIZE = 128
 const TIMEOUT_MS = 4000
 const MAX_BYTES = 256 * 1024
 
-/** Per-process memo. Serverless gives us one per warm instance, which is plenty. */
-const memo = new Map<string, { body: Buffer; type: string } | null>()
+/**
+ * Per-process memo. Serverless gives us one per warm instance, which is plenty.
+ *
+ * A HIT is held for a day — a company's logo does not change. A MISS is held for
+ * minutes only, because a miss is often a statement about our configuration rather than
+ * about the world: before LOGODEV_TOKEN existed, every .ac.in school was a miss. A
+ * long-lived negative cache turns "we fixed it" into "wait until tomorrow".
+ */
+const memo = new Map<string, { icon: { body: Buffer; type: string } | null; at: number }>()
 const MEMO_MAX = 500
+const HIT_TTL_MS = 24 * 60 * 60 * 1000
+const MISS_TTL_MS = 10 * 60 * 1000
 
 /** Hand-corrections from the brand_domains table, loaded once per warm instance. */
 let overrides: Map<string, string> | null = null
@@ -77,7 +89,9 @@ async function fetchImage(url: string): Promise<{ body: Buffer; type: string } |
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS)
   try {
-    const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow' })
+    // no-store for the same reason: these responses are cached deliberately below, by
+    // us, with a TTL that reflects whether we found anything — not by Next, forever.
+    const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow', cache: 'no-store' })
     if (!res.ok) return null
     const type = res.headers.get('content-type') ?? ''
     if (!type.startsWith('image/')) return null
@@ -122,25 +136,36 @@ export async function GET(req: NextRequest) {
   const kind: BrandKind = searchParams.get('kind') === 'school' ? 'school' : 'company'
   if (!name) return new NextResponse(null, { status: 400 })
 
-  const key = `${kind}:${normalizeName(name, kind)}`
-  const domain = (await loadOverrides()).get(key) ?? brandDomain(name, kind)
+  // Universities turn up in the EMPLOYER field too — research assistants, campus staff,
+  // interns. brandDomain already routes those at the school tables, so the override
+  // lookup has to as well, or a hand-resolved school stays invisible behind a company
+  // -kind request. (Found by University of Manitoba resolving as a school and still
+  // rendering a monogram on a role row.)
+  const overrides = await loadOverrides()
+  const keys = [`${kind}:${normalizeName(name, kind)}`]
+  if (kind === 'company') keys.push(`school:${normalizeName(name, 'school')}`)
+  const override = keys.map((k) => overrides.get(k)).find(Boolean)
+  const domain = override ?? brandDomain(name, kind)
   // No domain worth asking about — the caller draws its monogram.
   if (!domain) return new NextResponse(null, { status: 404 })
 
-  if (!memo.has(domain)) {
-    const icon = await resolveIcon(domain)
+  const cached = memo.get(domain)
+  const fresh = cached && Date.now() - cached.at < (cached.icon ? HIT_TTL_MS : MISS_TTL_MS)
+  if (!fresh) {
+    const resolved = await resolveIcon(domain)
     if (memo.size >= MEMO_MAX) memo.clear()
-    memo.set(domain, icon)
-    if (!icon) logger.info('brand-icon: no logo', { domain, kind })
+    memo.set(domain, { icon: resolved, at: Date.now() })
+    if (!resolved) logger.info('brand-icon: no logo', { domain, kind, logoDev: Boolean(process.env.LOGODEV_TOKEN) })
   }
-  const icon = memo.get(domain) ?? null
+  const icon = memo.get(domain)?.icon ?? null
 
   if (!icon) {
     return new NextResponse(null, {
       status: 404,
-      // Cache the miss too: without this every render re-asks a provider that has
-      // already said no, and a monogram-heavy page would make dozens of round-trips.
-      headers: { 'Cache-Control': 'public, max-age=86400' },
+      // Cache the miss, but briefly. Without any caching a monogram-heavy page makes
+      // dozens of round-trips; with a day of it, a browser that once saw "no logo"
+      // keeps showing a monogram long after the server started returning the real one.
+      headers: { 'Cache-Control': 'public, max-age=600' },
     })
   }
 

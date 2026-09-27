@@ -25,6 +25,13 @@ entries on top.
 
 ## 2026-09-27
 
+### Fixed
+- **School logos stayed monograms for a day after `LOGODEV_TOKEN` was configured.** Three caches were each holding the pre-token answer, and all three had to go:
+  - `export const revalidate = 86400` on `/api/brand-icon`. Next patches global fetch and inherits a route's revalidate for the calls inside it, so the provider's "nothing here" was frozen for 24 hours. Replaced with `dynamic = 'force-dynamic'` and `cache: 'no-store'` on the outbound calls — these responses are cached deliberately, by us, with a TTL that reflects what we found.
+  - the per-process memo never expired. Hits are now held a day (a logo doesn't change); **misses only ten minutes**, because a miss is often a statement about our own configuration rather than about the world.
+  - the 404 told browsers `max-age=86400`, so a browser that once saw "no logo" kept drawing a monogram long after the server started returning the real crest. Now ten minutes.
+- **School overrides are now found for academic employers too.** Universities appear in the employer field — research assistants, campus staff, teaching interns — and those rows asked for a `company`-kind override, so a hand-resolved school stayed invisible. Found via University of Manitoba resolving correctly and still rendering a monogram on a role row. `resolve:schools` now scans academic employers as well as education records: 415 names considered, **106 resolved**.
+
 ### Added
 - **`npm run resolve:schools`** — resolves school names to their websites via Wikidata and stores them in `brand_domains`, so colleges get logos too. Company domains can be guessed from the name; school domains cannot ("Indian Institute of Technology, Madras" is iitm.ac.in), and the free favicon tier has no record of `.ac.in` at all. Run against the live data it resolved **98 of the 286 schools the code tables couldn't name** — the unresolved remainder is almost entirely small K-12 schools with no logo anywhere. Dry run by default; `--apply` writes. Needs migration 151.
   - **Guarded against a real false positive:** a plain name search for "IIM Kozhikode" returns the *journal* "IIM Kozhikode Society & Management Review", whose site is `ksm.sagepub.com`. Every hit must be an educational institution by Wikidata's own `instance of` claim, not merely a text match. The accepted list was widened against the real data after that guard blocked genuine schools (public high school, community college, state university of India).

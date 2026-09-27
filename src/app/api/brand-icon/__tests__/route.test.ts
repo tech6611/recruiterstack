@@ -85,11 +85,14 @@ describe('/api/brand-icon', () => {
     expect(res.status).toBe(404)
   })
 
-  it('treats an upstream failure as a miss, and caches the miss', async () => {
+  it('treats an upstream failure as a miss, and caches the miss only briefly', async () => {
     fetchMock.mockRejectedValueOnce(new Error('network down'))
     const res = await GET(req('Globant'))
     expect(res.status).toBe(404)
-    expect(res.headers.get('cache-control')).toContain('max-age=86400')
+    // Minutes, not a day. A miss is often a statement about our configuration rather
+    // than the world — every .ac.in school missed until LOGODEV_TOKEN was set — and a
+    // long negative cache turns "we fixed it" into "wait until tomorrow".
+    expect(res.headers.get('cache-control')).toBe('public, max-age=600')
   })
 
   it('rejects a request with no name', async () => {

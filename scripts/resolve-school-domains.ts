@@ -171,12 +171,30 @@ async function main() {
     if (rows.length < 1000) break
   }
 
+  // Universities appear in the EMPLOYER field too — research assistants, campus staff,
+  // teaching interns. Those rows want the school's crest just as much as a degree does,
+  // and nothing else will ever resolve them.
+  const ACADEMIC_EMPLOYER = /\b(?:university|universidad|institute|college|school|polytechnic|iit|iim|nit|iisc|iiit)\b/i
+  const addEmployers = (rows: { employer?: string | null }[]) => {
+    for (const row of rows) {
+      const employer = (row.employer ?? '').trim()
+      if (employer && ACADEMIC_EMPLOYER.test(employer)) counts.set(employer, (counts.get(employer) ?? 0) + 1)
+    }
+  }
+  addEmployers(await (await sb('candidate_experiences?select=employer&limit=1000')).json())
+  for (let offset = 0; ; offset += 1000) {
+    const rows = await (await sb(`pool_experiences?select=employer&limit=1000&offset=${offset}`)).json()
+    if (!rows.length) break
+    addEmployers(rows)
+    if (rows.length < 1000) break
+  }
+
   // Only the ones the code tables can't already name.
   const todo = Array.from(counts.entries())
     .filter(([name]) => !brandDomain(name, 'school'))
     .sort((a, b) => b[1] - a[1])
 
-  console.log(`${counts.size} distinct schools; ${todo.length} have no domain yet.`)
+  console.log(`${counts.size} distinct schools (education records + academic employers); ${todo.length} have no domain yet.`)
   console.log(APPLY ? 'Writing to brand_domains.\n' : 'DRY RUN — pass --apply to write.\n')
 
   let found = 0
