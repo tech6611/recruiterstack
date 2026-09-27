@@ -1,13 +1,10 @@
 'use client'
 
 import React, { useState } from 'react'
-import {
-  Mail, Phone, MapPin, Briefcase, ExternalLink, FileText,
-  Linkedin, Pencil, Check, X, ChevronDown, Building2,
-} from 'lucide-react'
+import { Mail, Phone, MapPin, Briefcase, ExternalLink, FileText, Linkedin, Pencil, Check, X, ChevronDown } from 'lucide-react'
 import type { Candidate, CandidateTag, Application, HiringRequest } from '@/lib/types/database'
 import TagInput from './TagInput'
-import { avatarColor, initials } from '@/lib/ui/avatar'
+import { CandidateHeader } from './CandidateHeader'
 import { isPoolPlaceholderEmail } from '@/lib/pool-email'
 import { useCandidateProfile } from './CandidateProfileContext'
 
@@ -65,25 +62,7 @@ export default React.memo(function LeftPanel({
   return (
     <div className="w-64 shrink-0 overflow-y-auto border-r border-slate-200 bg-white flex flex-col">
       <div className="p-5 space-y-5">
-        {/* Avatar + name */}
-        <div className="flex flex-col items-center text-center">
-          <div className={`h-16 w-16 rounded-full flex items-center justify-center text-xl font-bold mb-3 ${avatarColor(candidate.name)}`}>
-            {initials(candidate.name)}
-          </div>
-          <h1 className="text-lg font-bold text-slate-900">{candidate.name}</h1>
-          {candidate.current_title && (
-            <p className="text-sm text-slate-500 mt-0.5">{candidate.current_title}</p>
-          )}
-          {candidate.current_company && (
-            <p
-              className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
-              title="Current company (from the candidate's CV)"
-            >
-              <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              <span className="truncate">{candidate.current_company}</span>
-            </p>
-          )}
-        </div>
+        <CandidateHeader candidate={candidate} />
 
         {/* Tags */}
         <div>

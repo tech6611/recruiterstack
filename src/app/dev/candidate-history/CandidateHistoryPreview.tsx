@@ -1,6 +1,8 @@
 'use client'
 
+import { CandidateHeader } from '@/components/candidates/CandidateHeader'
 import { ProfileDocument } from '@/components/candidates/ProfileDocument'
+import type { Candidate } from '@/lib/types/database'
 import type { EducationEntry } from '@/components/candidates/EducationList'
 import type { WorkRole } from '@/lib/ui/work-history'
 import fixture from './fixture.json'
@@ -35,8 +37,25 @@ export function CandidateHistoryPreview() {
       <div className="mt-8 space-y-6">
         {candidates.map((candidate) => (
           <div key={candidate.name} className="rounded-xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-100 px-5 py-3 text-sm font-semibold text-slate-700">
-              {candidate.name} · {candidate.experiences.length} roles
+            <div className="flex gap-5 border-b border-slate-100 p-5">
+              {/* The left rail, at its real width, so the header is judged in situ. */}
+              <div className="w-64 shrink-0">
+                <CandidateHeader
+                  candidate={{
+                    id: 'fixture',
+                    name: candidate.name,
+                    current_title: candidate.experiences[0]?.title ?? null,
+                    current_company: candidate.experiences.find((e) => e.employer)?.employer ?? null,
+                    location: candidate.experiences.find((e) => e.location)?.location ?? null,
+                    education: candidate.education,
+                    email: 'fixture@example.com',
+                    phone: '+91 00000 00000',
+                    linkedin_url: 'https://linkedin.com/in/example',
+                    resume_url: 'resume.pdf',
+                  } as Candidate}
+                />
+              </div>
+              <p className="self-center text-sm text-slate-400">{candidate.experiences.length} roles</p>
             </div>
             <div className="px-5 py-4">
               <ProfileDocument

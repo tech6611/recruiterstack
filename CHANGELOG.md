@@ -50,6 +50,12 @@ entries on top.
 
 ## 2026-09-27
 
+### Added
+- **The candidate profile header now leads with the two marks that place someone** (Juicebox parity, Step 3). Under the name and title sit the current employer and the most recent school, each with its logo — a recruiter recognises "Flipkart" and "IIT Guwahati" as marks before reading either word, which is why Juicebox puts them directly below the name. Location moved up beside them, and the ways to reach someone became a compact icon row (email, phone, LinkedIn, résumé).
+  - **Only links we actually hold are drawn.** Juicebox's header carries LinkedIn, GitHub, X, a personal site and about.me because its profiles are assembled from those sources; an ATS candidate arrives with a CV, so a greyed-out icon for something we don't have would be noise pretending to be a feature.
+  - **Institutions are abbreviated the way they're referred to** — `Indian Institute of Technology, Guwahati` → **IIT Guwahati**, `University of Virginia` → **U of Virginia**. A 256px rail truncated the long form to "Indian Institute of Technology, Guw…", hiding the campus, which is the only part that identifies it. Display only; the full name still drives the logo lookup and the tooltip.
+  - `education` and `enriched_at` are now declared on the `Candidate` type — migration 114 added them and the detail API has been returning them untyped ever since.
+
 ### Fixed
 - **Logos no longer land on the wrong company.** The first company-resolving run appended alternate endings to every name and accepted any domain that had a logo — which proves *somebody* owns it, not that they do. UCLA became `ucla.in`, WEX became `wex.in`, UCL became `ucl.co`. Four changes, each closing a different hole:
   - **A country ending is only tried for a company with roles in that country.** 64% of role rows carry a location, and 203 employers have at least one role in India; only those may be tried on `.in`. UCLA's roles are in California, so `.in` is never attempted. This one rule kills the whole class.
