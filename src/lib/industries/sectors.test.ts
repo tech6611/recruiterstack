@@ -55,6 +55,26 @@ describe('companySector', () => {
       .toBe('Consumer Internet')
   })
 
+  it('puts CPaaS in telecom, not in the cloud', () => {
+    // Plivo and Twilio sell SMS, voice and numbers. The cloud is how it is delivered,
+    // not what it is — and by this file's own rule the market beats the delivery layer.
+    expect(companySector(['Technology', 'Information and Internet', 'Cloud Communications', 'CPaaS']))
+      .toBe('Telecom')
+    // But a communication SOFTWARE product is not a carrier.
+    expect(companySector(['Communication Software', 'Software Development', 'Enterprise Software']))
+      .toBe('Enterprise Software')
+  })
+
+  it('does not let one technology layer swallow its peers', () => {
+    // Postman: API tooling that also does AI. With rule order deciding inside a tier,
+    // its fifth listed industry beat its third and it came back as an AI company.
+    expect(companySector(['Software Development', 'SaaS', 'API Development', 'CloudTech & DevOps', 'Artificial Intelligence & Machine Learning']))
+      .toBe('Developer Tools & Cloud')
+    // An AI company that lists AI first still reads as one.
+    expect(companySector(['Artificial Intelligence & Machine Learning', 'SaaS', 'API Development']))
+      .toBe('AI & Machine Learning')
+  })
+
   it('is null when no string maps', () => {
     expect(companySector(['conglomerate'])).toBeNull()
     expect(companySector([])).toBeNull()

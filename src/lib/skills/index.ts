@@ -81,18 +81,57 @@ export function isDroppedTool(skill: string): boolean {
 }
 
 /**
+ * Words that describe DOING something rather than naming it. "Chatbot development" is
+ * the chatbot skill; "Dashboard creation" is the dashboard skill. A CV writes the same
+ * capability as a noun, a gerund or a noun-plus-activity, and the catalog can't hold
+ * every phrasing of every entry — one list of activity words covers them all.
+ *
+ * Deliberately a CLOSED list of activity nouns, not "drop the last word". Trimming
+ * blindly turns "Excel at communication" into Microsoft Excel and "Java certification"
+ * into something we never checked. Each word here means an activity and nothing else.
+ */
+const ACTIVITY_SUFFIX = new Set([
+  'development', 'creation', 'design', 'designing', 'management', 'analysis', 'analytics',
+  'strategy', 'planning', 'engineering', 'modelling', 'modeling', 'pitching', 'building',
+  'implementation', 'integration', 'optimization', 'optimisation', 'automation',
+  'administration', 'operations', 'programming', 'architecture', 'research',
+  'positioning', 'visualization', 'visualisation', 'testing', 'tuning', 'migration',
+  'deployment', 'maintenance', 'configuration', 'monitoring', 'reporting', 'writing',
+  // Wrappers that mean "the idea of X" rather than a different skill: "ML algorithms",
+  // "Machine learning fundamentals", "Agile methodologies".
+  'algorithms', 'algorithm', 'techniques', 'methods', 'methodologies', 'methodology',
+  'fundamentals', 'basics', 'concepts', 'principles', 'practices',
+])
+
+/**
  * The canonical spelling of a skill, or null when the catalog has never seen it.
  *
- * A trailing parenthetical is retried without it: CVs write "Domain-Driven Design
- * (DDD)" and "Value at Risk (VaR)", where the bracket restates the name rather than
- * changing it.
+ * Three tries, each narrower than the last:
+ *  1. the string itself;
+ *  2. without a trailing parenthetical — CVs write "Domain-Driven Design (DDD)" and
+ *     "Value at Risk (VaR)", where the bracket restates the name rather than changing
+ *     it;
+ *  3. without a trailing activity word — "Chatbot development" is the chatbot skill.
+ *     Only words in ACTIVITY_SUFFIX are dropped, and only while something is left.
  */
 export function canonicalSkill(skill: string): string | null {
   const direct = CANONICAL.get(normalizeSkill(skill))
   if (direct) return direct
-  const stripped = (skill ?? '').replace(/\s*\([^)]*\)\s*$/, '').trim()
-  if (stripped && stripped !== (skill ?? '').trim()) {
-    return CANONICAL.get(normalizeSkill(stripped)) ?? null
+
+  const raw = (skill ?? '').trim()
+  const stripped = raw.replace(/\s*\([^)]*\)\s*$/, '').trim()
+  if (stripped && stripped !== raw) {
+    const byBracket = CANONICAL.get(normalizeSkill(stripped))
+    if (byBracket) return byBracket
+  }
+
+  // Peel activity words off the end, one at a time: "Financial risk modelling" tries
+  // "Financial risk" before giving up.
+  let head = (stripped || raw).split(/\s+/)
+  while (head.length > 1 && ACTIVITY_SUFFIX.has(head[head.length - 1].toLowerCase())) {
+    head = head.slice(0, -1)
+    const hit = CANONICAL.get(normalizeSkill(head.join(' ')))
+    if (hit) return hit
   }
   return null
 }

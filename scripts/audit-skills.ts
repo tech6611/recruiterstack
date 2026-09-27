@@ -91,7 +91,7 @@ async function main() {
   console.log(`mentions    : ${knownMentions} recognised, ${dropped} dropped as tools, ${unknownMentions} unknown`)
   console.log(`per profile : median ${(pct[Math.floor(pct.length / 2)] * 100).toFixed(0)}% of chips get a named category`)
   console.log('\nTop unrecognised — add the worthwhile ones to src/lib/skills/catalog.ts:\n')
-  for (const [skill, count] of unknown.sort((a, b) => b[1] - a[1]).slice(0, 60)) {
+  for (const [skill, count] of unknown.sort((a, b) => b[1] - a[1]).slice(0, Number(process.env.TOP ?? 60))) {
     console.log(`  ${String(count).padStart(4)}  ${skill}`)
   }
 }
