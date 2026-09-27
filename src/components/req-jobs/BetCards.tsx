@@ -14,11 +14,30 @@ const LOOKS = [
 ]
 const GOLD = { Icon: Sparkles, circle: 'bg-gold-500', card: 'from-gold-50 ring-gold-200' }
 
-/** Feeder-pool companies an archetype's text names — archetypes carry no company list of their own. */
-function companiesFor(a: Archetype, brief: RecruiterBrief | null | undefined): string[] {
+/**
+ * Feeder-pool companies an archetype's text names — archetypes carry no company list of
+ * their own, so the two have to be matched up.
+ *
+ * MATCH ON THE BASE NAME, NOT THE DECORATED ONE. A pool lists "Google (Area 120, X)"
+ * and "Meta (NPE)"; the archetype that draws on them says "Google Area 120, Meta NPE".
+ * Comparing the full strings finds nothing, which is why the Big-Tech bet showed no
+ * logos at all while the others showed four. The parenthetical is a note about WHICH
+ * part of the company, so it is dropped for both the match and the logo lookup —
+ * "Google (Area 120, X)" resolves to no logo either.
+ *
+ * Whole words only: a bare `includes` would let "Meta" match "metadata".
+ */
+export function companiesFor(a: Archetype, brief: RecruiterBrief | null | undefined): string[] {
   const text = `${a.where_from ?? ''} ${a.thesis ?? ''}`.toLowerCase()
-  const all = Array.from(new Set((brief?.feeder_pools ?? []).flatMap((p) => p.companies)))
-  return all.filter((c) => c.trim() && text.includes(c.toLowerCase())).slice(0, 4)
+  const out: string[] = []
+  for (const raw of (brief?.feeder_pools ?? []).flatMap((p) => p.companies)) {
+    const base = (raw ?? '').replace(/\s*\([^)]*\)/g, '').trim()
+    if (!base || out.includes(base)) continue
+    const word = new RegExp(`\\b${base.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
+    if (word.test(text)) out.push(base)
+    if (out.length === 4) break
+  }
+  return out
 }
 
 /**
