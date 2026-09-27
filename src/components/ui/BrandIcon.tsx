@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Briefcase } from 'lucide-react'
 import { brandIconSrc, brandInitials, type BrandKind } from '@/lib/brand-icon'
 import { avatarColor } from '@/lib/ui/avatar'
 
@@ -48,8 +49,21 @@ export function BrandIcon({
   const shape = rounded === 'full' ? 'rounded-full' : size >= 28 ? 'rounded-lg' : 'rounded-[4px]'
   const box = { width: `${size}px`, height: `${size}px` }
 
+  // No employer recorded — a real gap in the data, not a logo we failed to find. An
+  // empty filled square reads as a broken image; an outlined placeholder reads as
+  // "a role with no company named", keeps the row aligned with the ones above it, and
+  // never pretends to be a mark.
   if (!label) {
-    return <span style={box} className={`shrink-0 ${shape} bg-slate-100 ${className}`} aria-hidden />
+    return (
+      <span
+        style={box}
+        className={`grid shrink-0 place-items-center border border-dashed border-slate-300 text-slate-300 ${shape} ${className}`}
+        title="No employer recorded"
+        aria-hidden
+      >
+        <Briefcase style={{ width: `${Math.round(size * 0.5)}px`, height: `${Math.round(size * 0.5)}px` }} />
+      </span>
+    )
   }
 
   return (

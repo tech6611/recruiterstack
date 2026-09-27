@@ -30,6 +30,7 @@ import path from 'node:path'
 import { brandDomain, normalizeName } from '../src/lib/brand-icon'
 
 const APPLY = process.argv.includes('--apply')
+const LOGODEV = process.env.LOGODEV_TOKEN
 const UA = 'RecruiterStack/1.0 (candidate profile logos; contact tech@recruiterstack.in)'
 /** Wikidata starts refusing at speed; this keeps a full run comfortably inside its limits. */
 const THROTTLE_MS = 350
@@ -110,6 +111,61 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 interface Hit { domain: string | null; label: string; note: string }
 
+/**
+ * Branch qualifiers that name a BRANCH rather than the institution.
+ *
+ * Indian school chains are most of the education rows here, and a branch never has its
+ * own Wikidata entry — there are over 1,250 Kendriya Vidyalayas. But every branch flies
+ * the same emblem, and the parent's name is already sitting inside the branch name. So
+ * when the full name finds nothing, walk back toward the parent and try again:
+ *
+ *   "Kendriya Vidyalaya No. 3, Bhopal"          → Kendriya Vidyalaya   (kvsangathan.nic.in)
+ *   "Delhi Public School, Dhanbad"              → Delhi Public School  (dpsrkp.net)
+ *   "Amity International School, Sec-46, Gurugram" → Amity International School
+ *
+ * This invents nothing — it only ever shortens a name the record already contains.
+ */
+const BRANCH_TAIL =
+  /\s*\b(?:no\.?\s*\d+|sector\s*[-\s]?\d+|sec[-\s]?\d+|unit\s*\d+|campus|branch)\b.*$/i
+
+/**
+ * Progressively shorter names, MOST SPECIFIC FIRST — a branch that does have its own
+ * entry should win over its chain. Never shorter than two words, and never the original.
+ */
+export function parentNames(name: string): string[] {
+  const out: string[] = []
+  const original = name.trim().toLowerCase()
+  const push = (n: string) => {
+    const t = n.replace(/[\s,(-]+$/, '').replace(/\s+/g, ' ').trim()
+    if (!t || t.toLowerCase() === original) return
+    if (t.split(/\s+/).length < 2 || out.includes(t)) return
+    out.push(t)
+  }
+  const parts = name.split(',').map((p) => p.trim()).filter(Boolean)
+  // Drop trailing comma-separated qualifiers one at a time: the city, then the number.
+  for (let keep = parts.length - 1; keep >= 1; keep--) {
+    const shorter = parts.slice(0, keep).join(', ')
+    push(shorter)
+    push(shorter.replace(BRANCH_TAIL, ''))
+  }
+  push(name.replace(BRANCH_TAIL, ''))
+  return out
+}
+
+/** A domain is only worth storing if a provider actually has a logo for it. */
+async function hasLogo(domain: string): Promise<boolean> {
+  if (!LOGODEV) return true // no token here; trust Wikidata as before
+  try {
+    const res = await fetch(
+      `https://img.logo.dev/${encodeURIComponent(domain)}?token=${LOGODEV}&size=64&format=png&fallback=404`,
+      { headers: { 'User-Agent': UA } },
+    )
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 async function resolveSchool(name: string): Promise<Hit> {
   const search = await wiki(
     `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(name)}` +
@@ -150,6 +206,25 @@ async function resolveSchool(name: string): Promise<Hit> {
     }
   }
   return { domain: null, label: candidates[0].label, note: 'matches exist but none is a school' }
+}
+
+/**
+ * The full name, then its parents. A branch inherits its chain's emblem, which is the
+ * right answer — "Kendriya Vidyalaya No. 3, Bhopal" should fly the KV crest.
+ */
+async function resolveWithParents(name: string): Promise<Hit> {
+  const direct = await resolveSchool(name)
+  if (direct.domain && (await hasLogo(direct.domain))) return direct
+
+  for (const parent of parentNames(name)) {
+    await sleep(THROTTLE_MS)
+    let hit: Hit
+    try { hit = await resolveSchool(parent) } catch { break }
+    if (hit.domain && (await hasLogo(hit.domain))) {
+      return { ...hit, note: `${hit.note} via parent "${parent}"` }
+    }
+  }
+  return direct.domain ? { ...direct, domain: null, note: `${direct.note}; no logo for it` } : direct
 }
 
 async function main() {
@@ -202,7 +277,7 @@ async function main() {
   for (const [name, count] of todo) {
     let hit: Hit
     try {
-      hit = await resolveSchool(name)
+      hit = await resolveWithParents(name)
     } catch (err) {
       console.log(`  !! ${name} — ${(err as Error).message}`)
       break // rate limited: stop cleanly and keep what we have
@@ -231,4 +306,9 @@ async function main() {
   console.log(`wrote ${byKey.size} rows to brand_domains.`)
 }
 
-main().catch((err) => { console.error(err); process.exit(1) })
+// Run only when invoked directly. This module exports helpers that tests and other
+// scripts import, and a bare main() call would kick off a full resolve on import —
+// which it did, once.
+if (process.argv[1]?.endsWith('resolve-school-domains.ts')) {
+  main().catch((err) => { console.error(err); process.exit(1) })
+}

@@ -43,7 +43,17 @@ const THROTTLE_MS = 120
 const WIKI_THROTTLE_MS = 350
 
 /** Tried in order. `.in` sits high because much of this database is Indian employers. */
-const TLDS = ['com', 'in', 'io', 'ai', 'co', 'net', 'org', 'co.in', 'com.au', 'co.uk']
+/**
+ * Endings tried speculatively, once a name has earned it. `.in` is NOT here — a country
+ * ending is only tried for an employer whose own roles are in that country, because
+ * appending `.in` to every name is how UCLA became ucla.in and WEX became wex.in.
+ */
+const NEUTRAL_TLDS = ['io', 'ai', 'co', 'net', 'org']
+const INDIA_TLDS = ['in', 'co.in']
+/** An institution lives on an academic domain, never on a .com or a country .in. */
+const ACADEMIC_TLDS = ['edu', 'ac.in', 'ac.uk', 'edu.au', 'edu.in']
+/** Employer strings that name a place of education rather than a company. */
+const ACADEMIC = /\b(?:university|universidad|institute|college|school|polytechnic|iit|iim|nit|iisc|iiit|ucla|ucl)\b/i
 
 /** Legal-form tokens that are never part of a domain, trimmed from the end of a name. */
 const LEGAL_TAIL = /\b(?:pvt|private|ltd|limited|llp|llc|inc|corp|corporation|plc|gmbh|co|company|sa|bv|nv|ag)\b/gi
@@ -124,14 +134,33 @@ async function hasLogo(domain: string): Promise<boolean> {
   }
 }
 
-/** Domains worth trying for a name, most likely first. */
-export function candidateDomains(rawName: string): string[] {
+/**
+ * Domains worth trying, in two tiers.
+ *
+ * `safe` are candidates whose shape ties them to this name: a domain spelled out inside
+ * the name itself, and the `.com` of the full slug or the brand head.
+ *
+ * `speculative` are alternate TLDs. These are where "a logo exists at this address"
+ * stops meaning "this address belongs to that company": a short name is a name many
+ * organisations share, so ucla.in, wex.in, ucl.co, h1.io and m.io all returned logos
+ * belonging to somebody else entirely. Wikidata is consulted BEFORE these, and they are
+ * only tried at all when the slug is long enough that a collision is unlikely.
+ */
+const SPECULATIVE_MIN_LENGTH = 9
+
+export function candidateDomains(
+  rawName: string,
+  opts: { india?: boolean } = {},
+): { safe: string[]; speculative: string[] } {
   const name = (rawName ?? '').trim()
-  if (!name) return []
-  const out: string[] = []
-  const push = (d: string) => { if (d && !out.includes(d)) out.push(d) }
+  const safe: string[] = []
+  const speculative: string[] = []
+  if (!name) return { safe, speculative }
+  const push = (d: string) => { if (d && !safe.includes(d)) safe.push(d) }
+  const pushMaybe = (d: string) => { if (d && !safe.includes(d) && !speculative.includes(d)) speculative.push(d) }
 
   // "Salesken.ai", "konfhub.com" — the name already contains its domain.
+  // "Salesken.ai", "hackNY.org" — the name states its own domain, which is not a guess.
   const embedded = name.match(/\b([a-z0-9-]+\.(?:com|in|io|ai|co|net|org|edu))\b/i)
   if (embedded) push(embedded[1].toLowerCase())
 
@@ -146,14 +175,24 @@ export function candidateDomains(rawName: string): string[] {
     .replace(/\b(?:india|usa|uk|singapore|global|worldwide)\b\s*$/i, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-  if (!cleaned) return out
+  if (!cleaned) return { safe, speculative }
 
   // Filter out fragments with no letters or digits: "MindTickle Interactive Media Pvt
   // Ltd." leaves a bare "." behind once the legal tail goes, and that stray word made
   // the tail look non-descriptive, so the brand head was never tried.
   const words = cleaned.split(' ').filter((w) => /[a-z0-9]/.test(w))
+  // An institution never lives on a .com, and appending .in to it is how UCLA and UCL
+  // both acquired somebody else's logo. Give academic names their own endings.
+  const academic = ACADEMIC.test(name)
+  const speculativeTlds = academic
+    ? ACADEMIC_TLDS
+    : [...NEUTRAL_TLDS, ...(opts.india ? INDIA_TLDS : [])]
+
   const fullSlug = words.join('').replace(/\./g, '')
-  for (const tld of TLDS) push(`${fullSlug}.${tld}`)
+  if (!academic) push(`${fullSlug}.com`)
+  if (fullSlug.length >= SPECULATIVE_MIN_LENGTH || academic) {
+    for (const tld of speculativeTlds) pushMaybe(`${fullSlug}.${tld}`)
+  }
 
   // The brand is usually the head of a long legal name: "MindTickle Interactive
   // Media" → mindtickle. Only when that head is substantial enough to be a brand and
@@ -162,14 +201,51 @@ export function candidateDomains(rawName: string): string[] {
     const head = words[0].replace(/\./g, '')
     const tailIsFiller = words.slice(1).every((w) => DESCRIPTIVE_TAIL.has(w))
     if (head.length >= 5 && !TOO_GENERIC.has(head) && tailIsFiller) {
-      for (const tld of TLDS) push(`${head}.${tld}`)
+      if (!academic) push(`${head}.com`)
+      if (head.length >= SPECULATIVE_MIN_LENGTH || academic) {
+        for (const tld of speculativeTlds) pushMaybe(`${head}.${tld}`)
+      }
     }
     if (words.length > 2 && words.slice(2).every((w) => DESCRIPTIVE_TAIL.has(w))) {
       const two = (words[0] + words[1]).replace(/\./g, '')
-      if (two.length >= 6) for (const tld of TLDS.slice(0, 4)) push(`${two}.${tld}`)
+      if (two.length >= 6) push(`${two}.com`)
     }
   }
-  return out
+  return { safe, speculative }
+}
+
+/**
+ * Does this site actually belong to that organisation?
+ *
+ * `hasLogo` only proves SOMEBODY owns the domain and has a logo — which is how wex.in
+ * and ucla.in passed. This reads the page's own title and description and requires a
+ * distinctive word from the name to appear in it. ucla.in does not say "UCLA"; UCLA's
+ * real site does. Applied to speculative candidates only; a `.com` that matches the
+ * full slug, and anything Wikidata asserts, are already tied to the name.
+ */
+async function looksLikeSameOrg(domain: string, name: string): Promise<boolean> {
+  const tokens = name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 4 && !DESCRIPTIVE_TAIL.has(w) && !TOO_GENERIC.has(w))
+  // Nothing distinctive to look for — refuse rather than accept on no evidence.
+  if (!tokens.length) return false
+  try {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 6000)
+    const res = await fetch(`https://${domain}`, { headers: { 'User-Agent': UA }, signal: ctrl.signal, redirect: 'follow' })
+    clearTimeout(timer)
+    if (!res.ok) return false
+    const html = (await res.text()).slice(0, 60_000).toLowerCase()
+    const head = `${html.match(/<title[^>]*>([\s\S]*?)<\/title>/)?.[1] ?? ''} ` +
+      `${html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/)?.[1] ?? ''} ` +
+      `${html.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']*)["']/)?.[1] ?? ''}`
+    const hay = head.replace(/[^a-z0-9]/g, '')
+    return tokens.some((t) => hay.includes(t))
+  } catch {
+    return false
+  }
 }
 
 /** Wikidata's official website for an organisation of this name. Verified separately. */
@@ -206,13 +282,26 @@ async function main() {
       if (employer) counts.set(employer, (counts.get(employer) ?? 0) + 1)
     }
   }
-  add(await (await sb('candidate_experiences?select=employer&limit=1000')).json())
+  // Which employers have roles located in India? Only those may be tried on .in.
+  // 64% of role rows carry a location, and that is the signal that was being ignored.
+  const indiaEmployers = new Set<string>()
+  const noteIndia = (rows: { employer?: string | null; location?: string | null }[]) => {
+    for (const row of rows) {
+      const employer = (row.employer ?? '').trim()
+      const loc = (row.location ?? '').trim()
+      if (employer && /\b(?:india|,\s*in)\b|\bind\b/i.test(loc)) indiaEmployers.add(employer)
+    }
+  }
+
+  const candRows = await (await sb('candidate_experiences?select=employer,location&limit=1000')).json()
+  add(candRows); noteIndia(candRows)
   for (let offset = 0; ; offset += 1000) {
-    const rows = await (await sb(`pool_experiences?select=employer&limit=1000&offset=${offset}`)).json()
+    const rows = await (await sb(`pool_experiences?select=employer,location&limit=1000&offset=${offset}`)).json()
     if (!rows.length) break
-    add(rows)
+    add(rows); noteIndia(rows)
     if (rows.length < 1000) break
   }
+  console.log(`${indiaEmployers.size} employers have at least one role located in India — only those may be tried on .in`)
 
   // Already answered? Leave it alone — this is safe to re-run after an import.
   const existing = new Set(
@@ -237,19 +326,42 @@ async function main() {
     // The guess already works — nothing to store, nothing to change.
     if (current && (await hasLogo(current))) { kept++; await sleep(THROTTLE_MS); continue }
 
+    // Order matters. Wikidata is authoritative about which domain belongs to whom, so
+    // it is asked BEFORE any alternate-TLD guess. Every wrong answer in the first full
+    // run came from a speculative candidate that Wikidata would have overruled.
+    const { safe, speculative } = candidateDomains(name, { india: indiaEmployers.has(name) })
     let found: string | null = null
     let via = ''
-    for (const candidate of candidateDomains(name)) {
+    for (const candidate of safe) {
       if (candidate === current) continue
       await sleep(THROTTLE_MS)
-      if (await hasLogo(candidate)) { found = candidate; via = 'generated'; break }
+      if (await hasLogo(candidate)) { found = candidate; via = 'name'; break }
     }
     if (!found) {
       try {
         const wiki = await wikidataDomain(name)
         await sleep(WIKI_THROTTLE_MS)
-        if (wiki && (await hasLogo(wiki))) { found = wiki; via = 'wikidata' }
+        // Wikidata is authoritative about a company it has identified — but a name
+        // search picks the FIRST plausible entity, and short names collide: "UCL"
+        // returned Université catholique de Louvain (uclouvain.be), "Inai" returned
+        // Indal. So its answer gets the same identity check as a guess. UCLA survives
+        // it because ucla.edu says UCLA; uclouvain.be never says UCL as a whole word.
+        if (wiki && (await hasLogo(wiki)) && (await looksLikeSameOrg(wiki, name))) {
+          found = wiki
+          via = 'wikidata, name confirmed on the site'
+        }
       } catch { /* rate limited — carry on without it */ }
+    }
+    for (const candidate of speculative) {
+      if (found) break
+      if (candidate === current) continue
+      await sleep(THROTTLE_MS)
+      if (!(await hasLogo(candidate))) continue
+      // The identity check is what separates "someone owns this" from "they own this".
+      if (!(await looksLikeSameOrg(candidate, name))) continue
+      found = candidate
+      via = 'alternate-tld, name confirmed on the site'
+      break
     }
 
     if (found) {
@@ -287,4 +399,9 @@ async function main() {
   console.log(`wrote ${batch.length} rows to brand_domains.`)
 }
 
-main().catch((err) => { console.error(err); process.exit(1) })
+// Run only when invoked directly. This module exports helpers that tests and other
+// scripts import, and a bare main() call would kick off a full resolve on import —
+// which it did, once.
+if (process.argv[1]?.endsWith('resolve-company-domains.ts')) {
+  main().catch((err) => { console.error(err); process.exit(1) })
+}
