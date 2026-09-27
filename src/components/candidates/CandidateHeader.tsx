@@ -106,25 +106,25 @@ export function CandidateHeader({ candidate }: { candidate: Candidate }) {
         </p>
       )}
 
-      {/* The two marks that place someone at a glance. */}
+      {/* The two marks that place someone at a glance.
+
+          No chip, no border, no fill. Juicebox sets these as a mark followed by its
+          name, sitting on the page — and it is right: a frame around a logo is a second
+          box competing with whatever box the logo already is. An earlier version put
+          each in a bordered pill, which is what made Plivo look stuffed into a square
+          even after the icon itself stopped drawing its own tile. */}
       {(candidate.current_company || school) && (
-        <div className="mt-2.5 flex w-full flex-col gap-1.5">
+        <div className="mt-2.5 flex w-full flex-col items-start gap-1.5 text-xs text-slate-600">
           {candidate.current_company && (
-            <span
-              className="inline-flex min-w-0 items-center gap-1.5 rounded-lg bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
-              title={`Current company — ${candidate.current_company}`}
-            >
+            <span className="flex min-w-0 max-w-full items-center gap-1.5" title={`Current company — ${candidate.current_company}`}>
               <BrandIcon name={candidate.current_company} size={16} />
-              <span className="truncate">{candidate.current_company}</span>
+              <span className="truncate font-medium">{candidate.current_company}</span>
             </span>
           )}
           {school && (
-            <span
-              className="inline-flex min-w-0 items-center gap-1.5 rounded-lg bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
-              title={`Most recent qualification — ${school}`}
-            >
+            <span className="flex min-w-0 max-w-full items-center gap-1.5" title={`Most recent qualification — ${school}`}>
               <BrandIcon name={school} kind="school" size={16} />
-              <span className="truncate">{shortSchoolName(school)}</span>
+              <span className="truncate font-medium">{shortSchoolName(school)}</span>
             </span>
           )}
         </div>

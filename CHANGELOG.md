@@ -50,6 +50,10 @@ entries on top.
 
 ## 2026-09-27
 
+### Fixed
+- **The header's company and school no longer sit in bordered pills.** `<BrandIcon>` stopped drawing its own tile, but the chip *around* it kept a fill and a ring — so Plivo still read as a logo stuffed into a square. A frame around a logo is a second box competing with whatever box the logo already is. They are now a mark followed by its name, sitting on the page, as Juicebox has them.
+- **Sainik School and Narayana branches now show their chain's crest** (10 spellings, hand-set in `brand_domains`). Neither could ever be reached automatically: "Sainik School" is rejected by the is-it-a-school guard, and "Narayana" is a single word, which is exactly the shape that put a stranger's logo on UCLA this morning. D.A.V stays a monogram — no provider has a DAV logo, and the one domain that answered served a generic file icon rather than a crest.
+
 ### Added
 - **Candidates unlocked from the pool keep their photo.** A pool profile built from GitHub already carries the handle, but it wasn't travelling when the profile became a candidate — so the only portrait we had of that person was lost at exactly the moment they entered the pipeline. The unlock path now carries it across, and `scripts/backfill-candidate-avatars.ts` fills in the ones unlocked before this (4 of 7 existing unlocks have a handle, all four verified as still served by GitHub).
   - **GitHub only, deliberately.** GitHub serves a portrait publicly at `github.com/<login>.png` and the person controls it. **LinkedIn photos sit behind their authentication and their terms forbid taking them** — nothing here will ever point at LinkedIn. Résumé-embedded photos are out of scope for now: a picture in a CV needs a face check first, or a company logo ends up as someone's portrait.
