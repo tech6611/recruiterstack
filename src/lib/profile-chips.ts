@@ -28,11 +28,39 @@ import { buildSkillMap, FALLBACK_CATEGORY } from '@/lib/skills'
 import { schoolTiersFor } from '@/modules/pool/search/school-tiers'
 import { groupByEmployer, summarizeHistory, seniorityRank, type WorkRole } from '@/lib/ui/work-history'
 
+/**
+ * The mark drawn beside a chip. A name, not a component — this file is pure and knows
+ * nothing about React; the UI maps the name to an icon. Kept deliberately small and
+ * literal (rocket, hourglass, graduation cap) so a chip is recognisable before it is
+ * read, which is the entire point of a chip.
+ */
+export type ChipIcon =
+  | 'rocket' | 'hourglass' | 'trending-up' | 'move' | 'graduation' | 'crown'
+  | 'users' | 'code' | 'brain' | 'building' | 'gem' | 'landmark'
+
 export interface ProfileChip {
   label: string
   /** Why this chip is here, shown on hover. A label nobody can interrogate is noise. */
   hint: string
   kind: 'tenure' | 'trajectory' | 'domain' | 'education' | 'seniority' | 'breadth'
+  icon: ChipIcon
+}
+
+/** Which mark a derived trajectory label gets. */
+const TRAJECTORY_ICONS: [RegExp, ChipIcon][] = [
+  [/fast career growth/i, 'trending-up'],
+  [/recently moved|likely open/i, 'move'],
+  [/long tenures/i, 'hourglass'],
+  [/job hopper/i, 'move'],
+  [/^(at|ex)-/i, 'building'],
+]
+
+/** A domain chip's mark, by what the group is about. */
+function domainIcon(category: string): ChipIcon {
+  if (/ai|ml|data science|statistics/i.test(category)) return 'brain'
+  if (/front|back|mobile|devops|cloud|database|engineering|programming|qa|security|architecture/i.test(category)) return 'code'
+  if (/finance|accounting|investment|treasury|tax/i.test(category)) return 'landmark'
+  return 'building'
 }
 
 export interface ChipInput {
@@ -65,10 +93,10 @@ function schoolChips(
   const matches = (terms: string[]) =>
     terms.some((t) => schools.some((s) => s.includes(t.toLowerCase())))
   if (matches(tiers.tier1)) {
-    return [{ label: 'Top-tier school', hint: 'Studied at a tier-1 institution for this market', kind: 'education' }]
+    return [{ label: 'Top-tier school', hint: 'Studied at a tier-1 institution for this market', kind: 'education', icon: 'graduation' }]
   }
   if (matches(tiers.tier2)) {
-    return [{ label: 'Tier-2 school', hint: 'Studied at a tier-2 institution for this market', kind: 'education' }]
+    return [{ label: 'Tier-2 school', hint: 'Studied at a tier-2 institution for this market', kind: 'education', icon: 'graduation' }]
   }
   return []
 }
@@ -91,6 +119,7 @@ function domainChips(skills: string[] | undefined): ProfileChip[] {
       label: g.category,
       hint: `${g.skills.length} of ${total} listed skills sit in ${g.category}`,
       kind: 'domain' as const,
+      icon: domainIcon(g.category),
     }))
 }
 
@@ -99,9 +128,9 @@ function seniorityChip(experiences: WorkRole[], now: Date): ProfileChip | null {
   const currentRole = stints.find((s) => s.isCurrent)?.roles[0] ?? stints[0]?.roles[0]
   if (!currentRole?.title) return null
   const rank = seniorityRank(currentRole.title)
-  if (rank >= 7) return { label: 'Executive', hint: `Current title: ${currentRole.title}`, kind: 'seniority' }
-  if (rank >= MANAGER_RANK) return { label: 'People manager', hint: `Current title: ${currentRole.title}`, kind: 'seniority' }
-  if (rank >= 4) return { label: 'Senior IC', hint: `Current title: ${currentRole.title}`, kind: 'seniority' }
+  if (rank >= 7) return { label: 'Executive', hint: `Current title: ${currentRole.title}`, kind: 'seniority', icon: 'crown' }
+  if (rank >= MANAGER_RANK) return { label: 'People manager', hint: `Current title: ${currentRole.title}`, kind: 'seniority', icon: 'users' }
+  if (rank >= 4) return { label: 'Senior IC', hint: `Current title: ${currentRole.title}`, kind: 'seniority', icon: 'gem' }
   return null
 }
 
@@ -109,10 +138,10 @@ function tenureChips(experiences: WorkRole[], now: Date): ProfileChip[] {
   const { averageTenureMonths } = summarizeHistory(experiences, now)
   if (averageTenureMonths == null) return []
   if (averageTenureMonths >= HIGH_TENURE_MONTHS) {
-    return [{ label: 'High avg. tenure', hint: `Stays about ${Math.round(averageTenureMonths / 12)} years per employer`, kind: 'tenure' }]
+    return [{ label: 'High avg. tenure', hint: `Stays about ${Math.round(averageTenureMonths / 12)} years per employer`, kind: 'tenure', icon: 'hourglass' }]
   }
   if (averageTenureMonths < SHORT_TENURE_MONTHS) {
-    return [{ label: 'Short stints', hint: `Averages ${averageTenureMonths} months per employer`, kind: 'tenure' }]
+    return [{ label: 'Short stints', hint: `Averages ${averageTenureMonths} months per employer`, kind: 'tenure', icon: 'move' }]
   }
   return []
 }
@@ -134,7 +163,12 @@ export function deriveProfileChips(input: ChipInput): ProfileChip[] {
       ),
       now,
     } satisfies TagContext,
-  ).map((label) => ({ label, hint: 'Derived from the dated work history', kind: 'trajectory' as const }))
+  ).map((label) => ({
+    label,
+    hint: 'Derived from the dated work history',
+    kind: 'trajectory' as const,
+    icon: TRAJECTORY_ICONS.find(([re]) => re.test(label))?.[1] ?? 'rocket',
+  }))
 
   const seniority = seniorityChip(experiences, now)
 

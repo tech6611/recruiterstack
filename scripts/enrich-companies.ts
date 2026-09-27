@@ -300,9 +300,16 @@ async function lookup(employer: string, domain: string | null): Promise<Facts> {
   // Suppress "unicorn" off the STAGE, not just Wikidata's public flag — that flag was
   // null for the "Facebook" entity while set for "Meta", which let a two-trillion-dollar
   // company through as a unicorn. A unicorn is a PRIVATE company valued over $1B.
-  merged.is_unicorn = merged.latest_stage === 'Public' || free.is_public
-    ? false
-    : (exa.is_unicorn ?? null)
+  //
+  // A unicorn is a VENTURE-BACKED PRIVATE company valued over $1B. That is a term of
+  // art, not a synonym for "worth a lot". Asked plainly, the model says yes for EY — a
+  // 409,000-person partnership — and for Google. So the flag requires an actual venture
+  // stage: no Seed / Series / Angel / Growth round, no unicorn, however valuable.
+  const VENTURE_STAGE = /^(pre-seed|seed|angel|growth|series [a-k])$/i
+  merged.is_unicorn =
+    merged.latest_stage && VENTURE_STAGE.test(merged.latest_stage)
+      ? (exa.is_unicorn ?? null)
+      : false
 
   const tiers = [free.wikidata_id ? 'wikidata' : null, free.note.includes('enwiki') ? 'enwiki' : null, 'exa'].filter(Boolean)
   merged.enriched_by = tiers.join('+')

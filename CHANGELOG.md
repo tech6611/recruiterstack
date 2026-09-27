@@ -51,6 +51,14 @@ entries on top.
 ## 2026-09-27
 
 ### Added
+- **Chips carry an icon**, as Juicebox's do — a rocket, an hourglass, a graduation cap. A chip should be recognisable before it is read, which is the whole reason it is a chip. The derivation stays pure and emits an icon *name*; only the component knows what a rocket looks like.
+
+### Fixed
+- **PhysicsWallah and CRED had no logo, and both were our bug.** Two causes, same row of unicorns:
+  - **The parenthetical was being thrown away.** `PW (PhysicsWallah)` reduced to "PW", so `pw.com` was tried and `physicswallah.com` never was. The bracket often holds the only usable name; it is now tried too.
+  - **A four-letter brand could not reach its own ending.** CRED lives at `cred.club`, PW at `pw.live`; neither `.club` nor `.live` was in the list, and a speculative ending needed a nine-character name anyway. That length rule was standing in for identity verification — it blocked `ucla.in` only by refusing short names outright. Now that a speculative domain must carry the company's own name on its page, length is the wrong question: `cred.club` says CRED, `ucla.in` does not. Floor lowered to four.
+
+### Added
 - **`npm run enrich:companies` + migration 153 (`company_facts`)** — what we know about an *employer*, as opposed to about a person. A recruiter filters on the company as much as the candidate ("fintech background", "somewhere public", "early-stage"), and a résumé names an employer and nothing else. Wikidata fills in industry, founding year, headcount and public-listing status for the ~860 distinct employers in the database.
   - **It will not do funding stage, and the table says so.** Wikidata has no reliable round history, so `Series A through Series G` cannot be built from it without inventing the answer. Buying that is a separate decision.
   - **It reads the Wikipedia article, not just Wikidata's claims.** The structured data is thinner than the prose beside it: Flipkart, Rippling and Swiggy all carry a headcount in their article infobox and none in Wikidata. When a claim is missing the enricher follows the entity's own sitelink — never a second name search, so the identity guard still holds — and parses the infobox. On the top 14 employers that took matches from 7 to 9 and headcounts from 6 to 8; Rippling went from "no attributes" to *HR management · est 2017 · 5,000 staff*.

@@ -48,7 +48,7 @@ const WIKI_THROTTLE_MS = 350
  * ending is only tried for an employer whose own roles are in that country, because
  * appending `.in` to every name is how UCLA became ucla.in and WEX became wex.in.
  */
-const NEUTRAL_TLDS = ['io', 'ai', 'co', 'net', 'org']
+const NEUTRAL_TLDS = ['io', 'ai', 'co', 'net', 'org', 'live', 'club', 'app']
 const INDIA_TLDS = ['in', 'co.in']
 /** An institution lives on an academic domain, never on a .com or a country .in. */
 const ACADEMIC_TLDS = ['edu', 'ac.in', 'ac.uk', 'edu.au', 'edu.in']
@@ -146,7 +146,17 @@ async function hasLogo(domain: string): Promise<boolean> {
  * belonging to somebody else entirely. Wikidata is consulted BEFORE these, and they are
  * only tried at all when the slug is long enough that a collision is unlikely.
  */
-const SPECULATIVE_MIN_LENGTH = 9
+/**
+ * Lowered from 9 once the identity check existed.
+ *
+ * The length guard was standing in for identity verification — it stopped `ucla.in`
+ * only by refusing to try short names at all, and took CRED (cred.club) and PW
+ * (pw.live) down with it. Now that a speculative candidate must carry the company's
+ * own name on its page, length is the wrong question: `cred.club` says CRED and
+ * `ucla.in` does not. Four characters is the floor because a token shorter than that
+ * cannot be confirmed on a page without matching half the web.
+ */
+const SPECULATIVE_MIN_LENGTH = 4
 
 export function candidateDomains(
   rawName: string,
@@ -161,8 +171,20 @@ export function candidateDomains(
 
   // "Salesken.ai", "konfhub.com" — the name already contains its domain.
   // "Salesken.ai", "hackNY.org" — the name states its own domain, which is not a guess.
-  const embedded = name.match(/\b([a-z0-9-]+\.(?:com|in|io|ai|co|net|org|edu))\b/i)
+  const embedded = name.match(/\b([a-z0-9-]+\.(?:com|in|io|ai|co|net|org|edu|live|club|app))\b/i)
   if (embedded) push(embedded[1].toLowerCase())
+
+  // "PW (PhysicsWallah)" — the parenthetical IS the company, and an initialism outside
+  // it resolves to nothing. Stripping the bracket threw away the only usable name, so
+  // physicswallah.com was never tried while pw.com failed. Try the spelled-out form too.
+  const bracketed = name.match(/\(([^)]{3,40})\)/)
+  if (bracketed) {
+    const inner = bracketed[1].toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (inner.length >= 4) {
+      push(`${inner}.com`)
+      if (inner.length >= SPECULATIVE_MIN_LENGTH) for (const tld of NEUTRAL_TLDS) pushMaybe(`${inner}.${tld}`)
+    }
+  }
 
   const cleaned = name
     .toLowerCase()
