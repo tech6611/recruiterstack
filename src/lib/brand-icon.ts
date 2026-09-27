@@ -318,6 +318,19 @@ export function brandInitials(name: string): string {
 }
 
 /**
+ * Bump to make every client abandon its cached answers at once.
+ *
+ * A miss is cached in at least three places we do not control — the browser, a CDN
+ * edge, and whatever sits between — each keyed on the exact URL. When a logo starts
+ * working that previously did not (a provider key arrives, a domain is resolved into
+ * `brand_domains`), those caches keep serving the old "no logo" to the people who
+ * looked while it was broken, and nothing on our side can reach them. A hard reload
+ * clears the browser and not the edge. Changing the URL is the only lever that works
+ * everywhere, so this is it.
+ */
+const ICON_CACHE_VERSION = '2'
+
+/**
  * The proxy URL the <BrandIcon> img points at, or null when the name is not an
  * organisation at all and no request is worth making.
  *
@@ -330,5 +343,5 @@ export function brandInitials(name: string): string {
  */
 export function brandIconSrc(name: string, kind: BrandKind = 'company'): string | null {
   if (isUnbrandable(name)) return null
-  return `/api/brand-icon?name=${encodeURIComponent(name.trim())}&kind=${kind}`
+  return `/api/brand-icon?name=${encodeURIComponent(name.trim())}&kind=${kind}&v=${ICON_CACHE_VERSION}`
 }

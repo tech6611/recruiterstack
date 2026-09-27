@@ -25,6 +25,9 @@ entries on top.
 
 ## 2026-09-27
 
+### Fixed
+- **Icon URLs now carry a cache version (`&v=2`), so a fix reaches people who already looked.** A miss gets cached in at least three places we don't control — browser, CDN edge, and whatever sits between — each keyed on the exact URL. When a logo starts working that previously didn't (a provider key arrives, a domain lands in `brand_domains`), those caches keep serving the old "no logo" to exactly the people who were watching while it was broken. A hard reload clears the browser and not the edge. Changing the URL is the only lever that reaches all of them. Observed live: Patna University rendered immediately because it had never been requested before, while IIM Kozhikode stayed a monogram on the page and served its real crest from the same URL in a fresh incognito window.
+
 ### Added
 - **`/api/brand-icon` now diagnoses itself.** Its 404 carries a JSON body naming the reason (`no domain known for this name` vs `no provider had a logo for this domain`), the domain it tried, and whether `LOGODEV_TOKEN` is `configured` or `ABSENT` in that environment. An `<img>` ignores the body, but opening the URL in a browser answers "is it the token, the domain, or the route?" in one step — an empty 404 is indistinguishable from the route not being deployed, which cost a round of production debugging.
 

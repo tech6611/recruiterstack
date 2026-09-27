@@ -113,11 +113,11 @@ describe('brandInitials', () => {
 
 describe('brandIconSrc', () => {
   it('points at our own proxy, never a third party', () => {
-    expect(brandIconSrc('Figma')).toBe('/api/brand-icon?name=Figma&kind=company')
+    expect(brandIconSrc('Figma')).toMatch(/^\/api\/brand-icon\?name=Figma&kind=company&v=\d+$/)
   })
   it('carries the kind so the server resolves the same way we did', () => {
     expect(brandIconSrc('IIT Madras', 'school'))
-      .toBe('/api/brand-icon?name=IIT%20Madras&kind=school')
+      .toMatch(/^\/api\/brand-icon\?name=IIT%20Madras&kind=school&v=\d+$/)
   })
   it('is null only for names that are not organisations at all', () => {
     expect(brandIconSrc('Freelance')).toBeNull()
@@ -128,6 +128,6 @@ describe('brandIconSrc', () => {
     // no way to know about. Short-circuiting here made that table unreachable.
     expect(brandDomain('Patna University', 'school')).toBeNull()
     expect(brandIconSrc('Patna University', 'school'))
-      .toBe('/api/brand-icon?name=Patna%20University&kind=school')
+      .toMatch(/^\/api\/brand-icon\?name=Patna%20University&kind=school&v=\d+$/)
   })
 })
