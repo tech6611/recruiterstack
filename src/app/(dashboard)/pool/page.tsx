@@ -16,6 +16,7 @@ import { PoolSidePane } from '@/components/pool/PoolSidePane'
 import { Search, Sparkles, Loader2, Database, Filter, CalendarClock, AlertTriangle } from 'lucide-react'
 import { ProfileIdentity } from '@/components/candidates/ProfileIdentity'
 import { formatLocation } from '@/lib/ui/location'
+import type { CompanyFactsMap } from '@/lib/company-facts'
 
 type Summary = {
   id: string
@@ -130,6 +131,8 @@ export default function PoolPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [unlocking, setUnlocking] = useState(false)
   const [unlockedCandidateId, setUnlockedCandidateId] = useState<string | null>(null)
+  /** Their employers' industry, size and stage — what the company chips read. */
+  const [companies, setCompanies] = useState<CompanyFactsMap>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -161,7 +164,11 @@ export default function PoolPage() {
     setDetailLoading(true)
     setUnlockedCandidateId(null)
     const res = await fetch(`/api/pool/${id}`)
-    if (res.ok) setSelected((await res.json()).profile)
+    if (res.ok) {
+      const j = await res.json()
+      setSelected(j.profile)
+      setCompanies(j.companies ?? {})
+    }
     setDetailLoading(false)
   }
 
@@ -398,6 +405,7 @@ export default function PoolPage() {
                     }))}
                     education={selected.education ?? []}
                     skills={selected.skills ?? []}
+                    companies={companies}
                   />
                 </section>
 

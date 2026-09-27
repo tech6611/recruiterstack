@@ -2,6 +2,7 @@
 
 import { BrandIcon } from '@/components/ui/BrandIcon'
 import { TraitChips, TenureTiles } from '@/components/candidates/ProfileStats'
+import type { CompanyFactsMap } from '@/lib/company-facts'
 import {
   formatDuration,
   formatRange,
@@ -101,6 +102,7 @@ export function ExperienceTimeline({
   education,
   skills,
   country,
+  companies,
   now = new Date(),
 }: {
   roles: WorkRole[]
@@ -109,6 +111,8 @@ export function ExperienceTimeline({
   /** Feeds the domain chips, read from the same Skill Map shown further down. */
   skills?: string[]
   country?: string | null
+  /** Employer facts, for the company chips. Absent means the row simply has none. */
+  companies?: CompanyFactsMap
   now?: Date
 }) {
   if (!roles.length) return null
@@ -130,7 +134,7 @@ export function ExperienceTimeline({
       </h3>
 
       <div className="mb-4 space-y-3">
-        <TraitChips roles={roles} skills={skills} education={education} country={country} />
+        <TraitChips roles={roles} skills={skills} education={education} country={country} companies={companies} />
         <TenureTiles
           averageTenureMonths={averageTenureMonths}
           currentTenureMonths={currentTenureMonths}

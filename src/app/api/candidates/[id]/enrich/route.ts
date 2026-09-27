@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withCapability, handleSupabaseError } from '@/lib/api/helpers'
 import { enrichCandidateById, getCandidateHistory } from '@/modules/ats/domain/candidate-enrichment'
+import { loadCompanyFacts } from '@/modules/core/domain/company-facts'
 
 export const maxDuration = 60 // reads the résumé PDF + one Gemini extraction
 
@@ -8,7 +9,12 @@ export const maxDuration = 60 // reads the résumé PDF + one Gemini extraction
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   try {
     const data = await getCandidateHistory(supabase, orgId, params.id)
-    return NextResponse.json({ data })
+    // Their employers' industry, size and stage — what the company chips are read from.
+    const companies = await loadCompanyFacts(
+      supabase,
+      (data?.experiences ?? []).map((e: { employer?: string | null }) => e.employer),
+    )
+    return NextResponse.json({ data, companies })
   } catch (e) {
     return handleSupabaseError(e as { code: string; message: string })
   }

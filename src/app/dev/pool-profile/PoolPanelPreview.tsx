@@ -4,7 +4,15 @@ import { PoolProfilePanel, type PoolProfileDetailView } from '@/components/req-j
 import { ProfileIdentity } from '@/components/candidates/ProfileIdentity'
 import { ProfileDocument } from '@/components/candidates/ProfileDocument'
 import { PoolSidePane } from '@/components/pool/PoolSidePane'
+import type { CompanyFactsMap } from '@/lib/company-facts'
 import fixture from '../candidate-history/fixture.json'
+
+/** Real rows from company_facts, so the chips here are the chips production shows. */
+const COMPANIES: CompanyFactsMap = {
+  flipkart:   { name_norm: 'flipkart',   display_name: 'Flipkart',   industries: ['e-commerce'], employees: 22000, founded_year: 2007, latest_stage: 'Series J' },
+  shadowfax:  { name_norm: 'shadowfax',  display_name: 'Shadowfax',  industries: ['Logistics', 'E-commerce logistics', 'Quick commerce'], employees: 4207, founded_year: 2015, latest_stage: null },
+  signoz:     { name_norm: 'signoz',     display_name: 'SigNoz',     industries: ['Software Development', 'Developer Tools', 'Observability'], employees: 44, founded_year: 2021, latest_stage: 'Seed' },
+}
 
 /**
  * DEVELOPMENT ONLY. The pool drawer against a real history from the database (name
@@ -60,6 +68,7 @@ export function PoolPanelPreview() {
               }))}
               education={detail.education}
               skills={detail.skills}
+              companies={COMPANIES}
             />
           </div>
           <PoolSidePane unlocked={false} candidateId={null} unlocksLeft={12} unlocking={false} onUnlock={() => {}} />

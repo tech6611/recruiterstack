@@ -15,11 +15,11 @@
  * nothing, so the thresholds below are deliberately conservative: "High avg. tenure"
  * means three years, not eighteen months.
  *
- * WHAT IS MISSING AND WHY. Juicebox's company chips — "Series A through Series G",
- * "Startup + Big Tech", industry verticals — need a database of employers with funding
- * stage, headcount and industry, dated so a tenure can be intersected with a company's
- * timeline. Those come from `company-facts.ts` once an employer has been enriched;
- * everything in this file needs nothing but the profile itself.
+ * TWO SOURCES. Everything derived here needs nothing but the profile itself. The
+ * company chips — "Startup + Big Tech", "Fintech", "Early employee" — need a database
+ * of employers and so live in `company-facts.ts`; they are folded in when the caller
+ * has one, and simply absent when it does not. See that file for what those chips
+ * deliberately refuse to claim.
  *
  * PURE. `now` is injected; no clock, no I/O.
  */
@@ -27,6 +27,7 @@ import { deriveProfileTags, type TagExperience, type TagContext } from '@/lib/pr
 import { buildSkillMap, FALLBACK_CATEGORY } from '@/lib/skills'
 import { schoolTiersFor } from '@/modules/pool/search/school-tiers'
 import { groupByEmployer, summarizeHistory, seniorityRank, type WorkRole } from '@/lib/ui/work-history'
+import { companyChips, type CompanyFactsMap } from '@/lib/company-facts'
 
 /**
  * The mark drawn beside a chip. A name, not a component — this file is pure and knows
@@ -42,7 +43,7 @@ export interface ProfileChip {
   label: string
   /** Why this chip is here, shown on hover. A label nobody can interrogate is noise. */
   hint: string
-  kind: 'tenure' | 'trajectory' | 'domain' | 'education' | 'seniority' | 'breadth'
+  kind: 'tenure' | 'trajectory' | 'domain' | 'education' | 'seniority' | 'breadth' | 'company' | 'industry'
   icon: ChipIcon
 }
 
@@ -69,6 +70,8 @@ export interface ChipInput {
   education?: { degree?: string | null; field?: string | null; school?: string | null; year?: number | null }[]
   /** ISO country of the person, so school tiers are judged in the right market. */
   country?: string | null
+  /** Employer facts, keyed by normalized name. Absent means no company chips. */
+  companies?: CompanyFactsMap
   now?: Date
 }
 
@@ -76,8 +79,12 @@ export interface ChipInput {
 const HIGH_TENURE_MONTHS = 36
 const SHORT_TENURE_MONTHS = 18
 
-/** Past six, a chip row stops being something you take in at a glance. */
-const MAX_CHIPS = 6
+/**
+ * Past seven, a chip row stops being something you take in at a glance. It was six
+ * before the company chips existed; they are among the most distinguishing things on a
+ * profile, and squeezing them in would have silently dropped tenure and schooling.
+ */
+const MAX_CHIPS = 7
 
 /** Titles at or above this rank are management rather than senior individual work. */
 const MANAGER_RANK = 5
@@ -173,6 +180,9 @@ export function deriveProfileChips(input: ChipInput): ProfileChip[] {
   const seniority = seniorityChip(experiences, now)
 
   const chips = [
+    // Employers first, as Juicebox has them: "Startup + Big Tech" tells you more about
+    // someone at a glance than any single thing on their own record.
+    ...companyChips(experiences, input.companies, now),
     ...domainChips(input.skills),
     ...(seniority ? [seniority] : []),
     ...trajectory,

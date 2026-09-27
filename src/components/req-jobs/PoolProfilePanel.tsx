@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Briefcase } from 'lucide-react'
 import { ProfileDocument } from '@/components/candidates/ProfileDocument'
 import { ProfileIdentity } from '@/components/candidates/ProfileIdentity'
+import type { CompanyFactsMap } from '@/lib/company-facts'
 import { formatLocation } from '@/lib/ui/location'
 
 /**
@@ -49,6 +50,7 @@ export function PoolProfilePanel({
   initialDetail?: PoolProfileDetailView | null
 }) {
   const [detail, setDetail] = useState<PoolProfileDetailView | null>(initialDetail ?? null)
+  const [companies, setCompanies] = useState<CompanyFactsMap>({})
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -59,6 +61,7 @@ export function PoolProfilePanel({
         const j = await r.json().catch(() => ({}))
         if (!r.ok) throw new Error(j.error ?? 'Could not load')
         setDetail(j.profile)
+        setCompanies(j.companies ?? {})
       })
       .catch((e) => setError(e.message))
   }, [profileId, initialDetail])
@@ -116,6 +119,7 @@ export function PoolProfilePanel({
               }))}
               education={detail.education ?? []}
               skills={detail.skills ?? []}
+              companies={companies}
             />
           </div>
         )}

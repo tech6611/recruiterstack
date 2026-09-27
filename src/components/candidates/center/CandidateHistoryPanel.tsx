@@ -7,6 +7,7 @@ import { useCandidateProfile } from '../CandidateProfileContext'
 import { ProfileDocument } from '../ProfileDocument'
 import type { EducationEntry } from '../EducationList'
 import type { WorkRole } from '@/lib/ui/work-history'
+import type { CompanyFactsMap } from '@/lib/company-facts'
 
 interface History {
   experiences: WorkRole[]
@@ -31,6 +32,8 @@ interface History {
  */
 export function CandidateHistoryPanel({ candidateId, skills = [] }: { candidateId: string; skills?: string[] }) {
   const [history, setHistory] = useState<History | null>(null)
+  /** Their employers' industry, size and stage — what the company chips read. */
+  const [companies, setCompanies] = useState<CompanyFactsMap>({})
   const [loading, setLoading] = useState(true)
   const [enriching, setEnriching] = useState(false)
   // Enrichment also fills current_title / current_company on the candidate row —
@@ -40,7 +43,7 @@ export function CandidateHistoryPanel({ candidateId, skills = [] }: { candidateI
   const load = useCallback(() => {
     fetch(`/api/candidates/${candidateId}/enrich`)
       .then((r) => (r.ok ? r.json() : { data: null }))
-      .then((j) => setHistory(j.data ?? null))
+      .then((j) => { setHistory(j.data ?? null); setCompanies(j.companies ?? {}) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [candidateId])
@@ -97,6 +100,7 @@ export function CandidateHistoryPanel({ candidateId, skills = [] }: { candidateI
             experiences={experiences}
             education={education}
             skills={skills}
+            companies={companies}
           />
         )}
       </div>

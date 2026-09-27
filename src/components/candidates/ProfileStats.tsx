@@ -6,6 +6,7 @@ import {
   Move, Rocket, TrendingUp, Users,
 } from 'lucide-react'
 import { deriveProfileChips, type ChipIcon, type ProfileChip } from '@/lib/profile-chips'
+import type { CompanyFactsMap } from '@/lib/company-facts'
 
 /**
  * Icon names from the pure chip rules, mapped to marks here. The derivation stays free
@@ -27,6 +28,10 @@ const CHIP_ICONS: Record<ChipIcon, typeof Rocket> = {
 }
 
 /**
+ * Each KIND of chip gets its own colour. The company chips lead the row and are the
+ * only ones in a neutral grey — they describe the EMPLOYERS rather than the person, and
+ * leaving them uncoloured keeps that distinction visible without a heading.
+ *
  * Each KIND of chip gets its own colour, so the row reads as several different claims
  * rather than one repeated shape. Grouping by kind and not by label is what keeps it
  * legible: every domain chip is the same blue whether it says "AI / ML" or "Finance",
@@ -36,6 +41,8 @@ const CHIP_ICONS: Record<ChipIcon, typeof Rocket> = {
  * template string like `bg-${hue}-50` compiles to nothing at all.
  */
 const CHIP_TONES: Record<ProfileChip['kind'], { wrap: string; icon: string }> = {
+  company:    { wrap: 'border-slate-300 bg-slate-100 text-slate-900',       icon: 'text-slate-600' },
+  industry:   { wrap: 'border-teal-200 bg-teal-50 text-teal-900',           icon: 'text-teal-500' },
   domain:     { wrap: 'border-indigo-200 bg-indigo-50 text-indigo-900',     icon: 'text-indigo-500' },
   seniority:  { wrap: 'border-amber-200 bg-amber-50 text-amber-900',        icon: 'text-amber-500' },
   trajectory: { wrap: 'border-emerald-200 bg-emerald-50 text-emerald-900',  icon: 'text-emerald-500' },
@@ -62,13 +69,15 @@ export function TraitChips({
   skills,
   education,
   country,
+  companies,
 }: {
   roles: WorkRole[]
   skills?: string[]
   education?: { degree?: string | null; field?: string | null; school?: string | null; year?: number | null }[]
   country?: string | null
+  companies?: CompanyFactsMap
 }) {
-  const chips = deriveProfileChips({ experiences: roles, skills, education, country })
+  const chips = deriveProfileChips({ experiences: roles, skills, education, country, companies })
   if (!chips.length) return null
   return (
     <div className="flex flex-wrap gap-1.5">

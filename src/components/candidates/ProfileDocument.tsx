@@ -5,6 +5,7 @@ import { ExperienceTimeline } from '@/components/candidates/ExperienceTimeline'
 import { EducationList, type EducationEntry } from '@/components/candidates/EducationList'
 import { SkillMap } from '@/components/candidates/SkillMap'
 import type { WorkRole } from '@/lib/ui/work-history'
+import type { CompanyFactsMap } from '@/lib/company-facts'
 
 /**
  * The profile as ONE document, with the tabs acting as anchors into it.
@@ -48,16 +49,18 @@ export interface ProfileDocumentProps {
   skills: string[]
   /** ISO country, so school tiers are judged in the right market. */
   country?: string | null
+  /** Employer facts keyed by normalized name, for the company chips. */
+  companies?: CompanyFactsMap
   now?: Date
 }
 
-export function ProfileDocument({ experiences, education, skills, country, now }: ProfileDocumentProps) {
+export function ProfileDocument({ experiences, education, skills, country, companies, now }: ProfileDocumentProps) {
   const [tab, setTab] = useState<Tab>('Overview')
 
   // Built in document order, then sliced — so a tab can never reorder the page.
   const sections = [
     experiences.length
-      ? <ExperienceTimeline key="experience" roles={experiences} education={education} skills={skills} country={country} now={now} />
+      ? <ExperienceTimeline key="experience" roles={experiences} education={education} skills={skills} country={country} companies={companies} now={now} />
       : null,
     education.length ? <EducationList key="education" education={education} /> : null,
     skills.length ? <SkillMap key="skills" skills={skills} /> : null,
