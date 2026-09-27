@@ -2,7 +2,7 @@
 
 import { ExternalLink, FileText, Linkedin, Mail, MapPin, Phone } from 'lucide-react'
 import { BrandIcon } from '@/components/ui/BrandIcon'
-import { avatarColor, initials } from '@/lib/ui/avatar'
+import { PersonAvatar } from '@/components/ui/PersonAvatar'
 import { isPoolPlaceholderEmail } from '@/lib/pool-email'
 import type { Candidate } from '@/lib/types/database'
 
@@ -93,9 +93,7 @@ export function CandidateHeader({ candidate }: { candidate: Candidate }) {
 
   return (
     <div className="flex flex-col items-center text-center">
-      <div className={`mb-3 grid h-16 w-16 place-items-center rounded-full text-xl font-bold ${avatarColor(candidate.name)}`}>
-        {initials(candidate.name)}
-      </div>
+      <PersonAvatar name={candidate.name} src={candidate.avatar_url} size={64} className="mb-3" />
 
       <h1 className="text-lg font-bold leading-tight text-slate-900">{candidate.name}</h1>
       {candidate.current_title && (

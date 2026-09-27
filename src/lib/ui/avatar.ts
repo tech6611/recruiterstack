@@ -22,3 +22,17 @@ export function avatarColor(name: string): string {
 export function initials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 }
+
+/**
+ * GitHub serves any account's portrait at github.com/<login>.png — public, no key, and
+ * it follows the person when they change it. A handle is all we need.
+ *
+ * This is the only photo source we use. LinkedIn photos are behind their authentication
+ * and their terms forbid taking them, so nothing here should ever point at LinkedIn.
+ */
+export function githubAvatarUrl(login: string, size = 160): string | null {
+  const handle = (login ?? '').trim().replace(/^@/, '')
+  // GitHub logins are alphanumeric with single hyphens; anything else is not a handle.
+  if (!/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(handle)) return null
+  return `https://github.com/${handle}.png?size=${size}`
+}

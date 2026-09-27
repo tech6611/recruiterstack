@@ -719,6 +719,8 @@ export interface Candidate {
   status: CandidateStatus
   ai_summary: string | null
   ai_summary_generated_at: string | null
+  /** Public portrait URL (a GitHub avatar today). Never populated from LinkedIn. */
+  avatar_url: string | null
   /** Structured education, added by migration 114. Already returned by the detail API. */
   education: { degree?: string | null; field?: string | null; school?: string | null; year?: number | null }[] | null
   /** When the résumé was last broken into structured fields (migration 114). */

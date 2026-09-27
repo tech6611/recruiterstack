@@ -50,6 +50,15 @@ entries on top.
 
 ## 2026-09-27
 
+### Added
+- **Candidates unlocked from the pool keep their photo.** A pool profile built from GitHub already carries the handle, but it wasn't travelling when the profile became a candidate — so the only portrait we had of that person was lost at exactly the moment they entered the pipeline. The unlock path now carries it across, and `scripts/backfill-candidate-avatars.ts` fills in the ones unlocked before this (4 of 7 existing unlocks have a handle, all four verified as still served by GitHub).
+  - **GitHub only, deliberately.** GitHub serves a portrait publicly at `github.com/<login>.png` and the person controls it. **LinkedIn photos sit behind their authentication and their terms forbid taking them** — nothing here will ever point at LinkedIn. Résumé-embedded photos are out of scope for now: a picture in a CV needs a face check first, or a company logo ends up as someone's portrait.
+  - A URL is stored rather than a copy of the image, so the person stays in control of their own picture and it stays current.
+  - **The initials circle remains the common case** — `<PersonAvatar>` paints it first and layers the photo over once it has decoded, so a slow or missing image never leaves a hole where a face should be.
+
+### Schema
+- **Migration 152 — `candidates.avatar_url`.** Nullable; the UI falls back to initials.
+
 ### Changed
 - **A real logo is no longer put in a box.** `<BrandIcon>` framed every mark in a coloured rounded tile, so wordmarks read as something stuffed into a square. That tile belongs to the **monogram**, which needs a surface to be legible on; a logo brings its own — Rippling's is a dark square, IBM's is blue, a wordmark is transparent and wants nothing behind it. Once the image loads the tile drops its background entirely and the logo simply sits there. (An intermediate version inset the logo inside a white tile; the box was the problem, not the padding.)
 - **The candidates list shows the current company with its logo**, in its own column beside the name — the mark is recognised before the words are. `current_company` was already in that API's response.

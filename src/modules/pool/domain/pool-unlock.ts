@@ -3,6 +3,7 @@ import type { Database } from '@/lib/types/database'
 import { getPoolAccess } from '@/modules/pool/domain/pool'
 import { poolPlaceholderEmail } from '@/lib/pool-email'
 import { logger } from '@/lib/logger'
+import { githubAvatarUrl } from '@/lib/ui/avatar'
 import { formatLocationParts } from '@/modules/pool/domain/normalize'
 
 type Supabase = SupabaseClient<Database>
@@ -108,7 +109,20 @@ export async function unlockPoolProfile(
         start_date: e.start_date, end_date: e.end_date, is_current: e.is_current, summary: e.summary, sort_order: e.sort_order ?? i,
       })))
     }
-    await sb.from('candidates').update({ education: profile.education ?? [], enriched_at: new Date().toISOString() }).eq('id', candidateId).eq('org_id', orgId)
+    // A GitHub account the profile already carries is the one portrait we can show
+    // honestly: GitHub serves it publicly and the person controls it. The handle exists
+    // on the pool side and was simply not travelling, so an unlocked candidate lost the
+    // only photo we had of them.
+    const { data: gh } = await sb
+      .from('pool_identities').select('external_id')
+      .eq('profile_id', profileId).eq('source_key', 'github').maybeSingle()
+    const avatarUrl = gh?.external_id ? githubAvatarUrl(gh.external_id) : null
+
+    await sb.from('candidates').update({
+      education: profile.education ?? [],
+      enriched_at: new Date().toISOString(),
+      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+    }).eq('id', candidateId).eq('org_id', orgId)
 
     // Record the unlock + spend quota.
     await sb.from('pool_unlocks').insert({ org_id: orgId, profile_id: profileId, user_id: userId ?? null, candidate_id: candidateId })
