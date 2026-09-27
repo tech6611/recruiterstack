@@ -68,11 +68,6 @@ export function CandidateHistoryPanel({ candidateId, skills = [] }: { candidateI
 
   const experiences = history?.experiences ?? []
   const education = history?.education ?? []
-  // Newest recorded qualification — the cutoff that tells campus roles from employment.
-  const graduationYear = education.reduce<number | null>(
-    (latest, e) => (typeof e.year === 'number' && (latest == null || e.year > latest) ? e.year : latest),
-    null,
-  )
   const hasData = experiences.length > 0 || education.length > 0 || skills.length > 0
 
   return (
@@ -102,7 +97,6 @@ export function CandidateHistoryPanel({ candidateId, skills = [] }: { candidateI
             experiences={experiences}
             education={education}
             skills={skills}
-            graduationYear={graduationYear}
           />
         )}
       </div>

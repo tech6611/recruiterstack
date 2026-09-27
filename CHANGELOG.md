@@ -51,6 +51,13 @@ entries on top.
 ## 2026-09-27
 
 ### Added
+- **`npm run enrich:companies` + migration 153 (`company_facts`)** — what we know about an *employer*, as opposed to about a person. A recruiter filters on the company as much as the candidate ("fintech background", "somewhere public", "early-stage"), and a résumé names an employer and nothing else. Wikidata fills in industry, founding year, headcount and public-listing status for the ~860 distinct employers in the database.
+  - **It will not do funding stage, and the table says so.** Wikidata has no reliable round history, so `Series A through Series G` cannot be built from it without inventing the answer. Buying that is a separate decision.
+  - **Headcount is sparse and treated as unknown, never as "small".** Verified against our own pool before building: Meta, Google, Amazon and McKinsey carry a count; Flipkart, Razorpay and Shadowfax carry none.
+  - **Same identity guard as the domain resolvers**, for the same reason — a name search returns the first plausible entity, and "Shadowfax" matches a horse before a logistics company. A hit must be an organisation by Wikidata's own `instance of` *and* carry a label that resembles what we asked about.
+  - A dry run works before the migration is applied, so the results can be seen before committing to them.
+
+### Added
 - **Derived chips on every profile** — `lib/profile-chips.ts`. Juicebox opens a profile with a row of labels ("Startup + Big Tech", "High Avg. Tenure", "AI / ML"); **nobody types those, they're read off the record**, which is what separates them from `candidate_tags`. Ours now reads the same way, from three sources we already hold:
   - **Domain** — the one or two Skill Map groups a person is actually concentrated in ("AI / ML", "Back-End"). Taken from the same grouping shown further down the profile, so a chip can never contradict it. A group under a fifth of their skills is a skill they listed once, not a domain they work in.
   - **Seniority** — Executive / People manager / Senior IC, from the current title's rank on the existing ladder.

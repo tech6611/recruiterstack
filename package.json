@@ -18,6 +18,7 @@
     "audit:skills": "npx --yes tsx scripts/audit-skills.ts",
     "resolve:schools": "npx --yes tsx scripts/resolve-school-domains.ts",
     "resolve:companies": "npx --yes tsx scripts/resolve-company-domains.ts",
+    "enrich:companies": "npx --yes tsx scripts/enrich-companies.ts",
     "audit:canonical:check": "node scripts/audit-canonical-model.mjs --check",
     "check:boundaries": "node scripts/check-module-boundaries.mjs",
     "gen:types": "npx supabase gen types --lang=typescript --project-id=$SUPABASE_PROJECT_ID > src/lib/types/supabase.ts",

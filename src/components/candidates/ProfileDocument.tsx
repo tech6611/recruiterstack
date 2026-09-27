@@ -46,14 +46,12 @@ export interface ProfileDocumentProps {
   experiences: WorkRole[]
   education: EducationEntry[]
   skills: string[]
-  /** Roles that ended before graduation are campus work, not employment (tag rules). */
-  graduationYear?: number | null
   /** ISO country, so school tiers are judged in the right market. */
   country?: string | null
   now?: Date
 }
 
-export function ProfileDocument({ experiences, education, skills, graduationYear, country, now }: ProfileDocumentProps) {
+export function ProfileDocument({ experiences, education, skills, country, now }: ProfileDocumentProps) {
   const [tab, setTab] = useState<Tab>('Overview')
 
   // Built in document order, then sliced — so a tab can never reorder the page.

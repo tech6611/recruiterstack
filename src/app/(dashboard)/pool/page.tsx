@@ -408,10 +408,6 @@ export default function PoolPage() {
                     }))}
                     education={selected.education ?? []}
                     skills={selected.skills ?? []}
-                    graduationYear={(selected.education ?? []).reduce<number | null>(
-                      (latest, e) => (typeof e?.year === 'number' && (latest == null || e.year > latest) ? e.year : latest),
-                      null,
-                    )}
                   />
                 </section>
 

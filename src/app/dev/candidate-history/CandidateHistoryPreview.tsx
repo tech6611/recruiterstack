@@ -62,7 +62,6 @@ export function CandidateHistoryPreview() {
                 experiences={candidate.experiences}
                 education={candidate.education}
                 skills={candidate.skills}
-                graduationYear={candidate.education.reduce<number | null>((a, e) => (typeof e.year === 'number' && (a == null || e.year > a) ? e.year : a), null)}
                 now={NOW}
               />
             </div>

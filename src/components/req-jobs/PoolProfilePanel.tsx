@@ -65,10 +65,6 @@ export function PoolProfilePanel({
   const place = detail
     ? [detail.location_city ?? detail.location_region, detail.location_country].filter(Boolean).join(', ')
     : ''
-  const graduationYear = (detail?.education ?? []).reduce<number | null>(
-    (latest, e) => (typeof e.year === 'number' && (latest == null || e.year > latest) ? e.year : latest),
-    null,
-  )
 
   return (
     <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl">
@@ -139,7 +135,6 @@ export function PoolProfilePanel({
               }))}
               education={detail.education ?? []}
               skills={detail.skills ?? []}
-              graduationYear={graduationYear}
             />
           </div>
         )}
