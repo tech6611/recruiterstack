@@ -25,6 +25,12 @@ entries on top.
 
 ## 2026-09-27
 
+### Added
+- **`npm run resolve:companies`** — finds the real domain for employers whose guessed one is wrong, and stores it in `brand_domains`. Measured over the 70 most common guessed employers, **23% of the guesses were wrong** — and wrong in four directions that pull against each other, which is why no cleverer slugging rule fixes them: legal name ≠ brand (`MindTickle Interactive Media Pvt Ltd.` → mindtickle.com), Indian companies on `.in` not `.com` (Shadowfax, Bajaj Finserv), suffix handling that strips "Technologies" when it shouldn't and leaves "LLP" when it should, and names that already contain their domain (`Salesken.ai`). In every one of those cases logo.dev *did* have the logo, under the correct domain.
+  - **It asks and then checks.** A domain is only stored once a provider has actually returned a logo for it, so the resolver cannot record a domain that doesn't work. Candidates are generated from the name (several TLDs, the brand head of a long legal name, an embedded domain), then Wikidata's official-website claim for whatever survives — Wikidata knows PwC is pwc.com, which no slugging finds.
+  - **Guarded against two false positives found while building it:** a short generic word can own a domain belonging to a different company, so truncated candidates need a substantial head that isn't a word anyone could claim; and the tail after the brand must be corporate filler, or "Google Summer of Code" truncates to google.com and stamps Google's corporate logo on a student programme (it now resolves via Wikidata to summerofcode.withgoogle.com instead).
+  - Idempotent — employers already answered are skipped, so a re-run after an import only does the new work.
+
 ### Fixed
 - **Icon URLs now carry a cache version (`&v=2`), so a fix reaches people who already looked.** A miss gets cached in at least three places we don't control — browser, CDN edge, and whatever sits between — each keyed on the exact URL. When a logo starts working that previously didn't (a provider key arrives, a domain lands in `brand_domains`), those caches keep serving the old "no logo" to exactly the people who were watching while it was broken. A hard reload clears the browser and not the edge. Changing the URL is the only lever that reaches all of them. Observed live: Patna University rendered immediately because it had never been requested before, while IIM Kozhikode stayed a monogram on the page and served its real crest from the same URL in a fresh incognito window.
 
