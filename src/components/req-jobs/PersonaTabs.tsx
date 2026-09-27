@@ -1,21 +1,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Sparkles } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Users, Sparkles, ChevronDown, ChevronRight, UserRound, MapPin, Clock, Building2, Briefcase, Code2, BarChart3, Ban } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { BrandIcon } from '@/components/ui/BrandIcon'
 import type { Persona, PersonaChip, PersonaTab, PersonaTabKey } from '@/lib/persona-tabs'
 
 /**
- * The ideal-candidate persona as Juicebox-style tabs. Each tab shows the values the
- * job's ideal profile TARGETS (with a company logo for employers) and, when the org
- * has pool access, the distribution actually present in the pool ("the market map").
+ * The ideal-candidate persona as a profile card (IdCard) of the values the job's ideal
+ * profile TARGETS. When the org has pool access, "See your pool" opens Juicebox-style
+ * tabs with the distribution actually present in the pool ("the market map").
  * Read-only view of the search spec + pool facets — no credits spent.
  */
 export function PersonaTabs({ jobId, onOpenScoring }: { jobId: string; onOpenScoring?: () => void }) {
   const [persona, setPersona] = useState<Persona | null>(null)
   const [active, setActive] = useState<PersonaTabKey>('employers')
   const [loading, setLoading] = useState(true)
+  const [showPool, setShowPool] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -48,11 +49,11 @@ export function PersonaTabs({ jobId, onOpenScoring }: { jobId: string; onOpenSco
 
   return (
     <Card>
-      <CardHeader>
+      <CardContent className="space-y-4 pt-5">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
             <Sparkles className="h-4 w-4 text-emerald-500" /> Ideal candidate persona
-          </CardTitle>
+          </div>
           {/* Read-only here: the ideal profile is edited in one place, the Scoring tab. */}
           {onOpenScoring && (
             <button type="button" onClick={onOpenScoring} className="text-xs font-medium text-emerald-600 hover:text-emerald-800">
@@ -60,40 +61,103 @@ export function PersonaTabs({ jobId, onOpenScoring }: { jobId: string; onOpenSco
             </button>
           )}
         </div>
-        <CardDescription>
-          Who to target for this role, dimension by dimension.
-          {persona.poolTotal != null && (
-            <span className="text-slate-400"> · mapped against {persona.poolTotal.toLocaleString()} profile{persona.poolTotal === 1 ? '' : 's'} in your pool</span>
-          )}
-        </CardDescription>
-      </CardHeader>
 
-      {/* tab strip */}
-      <div className="border-y border-slate-100 bg-slate-50/50">
-        <div className="flex gap-1 overflow-x-auto px-3">
-          {persona.tabs.map((t) => {
-            const on = t.key === tab.key
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setActive(t.key)}
-                className={`shrink-0 border-b-2 px-3 py-2.5 text-xs transition-colors ${
-                  on ? 'border-emerald-500 font-semibold text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {t.label}
-                {t.summary !== '—' && <span className={`ml-1.5 ${on ? 'text-emerald-400' : 'text-slate-400'}`}>· {t.summary}</span>}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+        <IdCard persona={persona} />
 
-      <CardContent className="space-y-4 pt-4">
-        <TabBody tab={tab} hasPool={persona.hasPool} />
+        {/* The market map — the per-dimension pool breakdown, one click away. */}
+        {persona.hasPool && (
+          <div className="border-t border-slate-100 pt-3">
+            <button type="button" onClick={() => setShowPool((v) => !v)}
+              className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800">
+              <Users className="h-3.5 w-3.5" />
+              See your pool{persona.poolTotal != null && ` · ${persona.poolTotal.toLocaleString()} profile${persona.poolTotal === 1 ? '' : 's'}`}
+              {showPool ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
+            {showPool && (
+              <div className="mt-3 rounded-xl border border-slate-100">
+                <div className="flex gap-1 overflow-x-auto border-b border-slate-100 bg-slate-50/50 px-3">
+                  {persona.tabs.map((t) => {
+                    const on = t.key === tab.key
+                    return (
+                      <button key={t.key} type="button" onClick={() => setActive(t.key)}
+                        className={`shrink-0 border-b-2 px-3 py-2.5 text-xs transition-colors ${
+                          on ? 'border-emerald-500 font-semibold text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                        }`}>
+                        {t.label}
+                        {t.summary !== '—' && <span className={`ml-1.5 ${on ? 'text-emerald-400' : 'text-slate-400'}`}>· {t.summary}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="space-y-4 p-4">
+                  <TabBody tab={tab} hasPool={persona.hasPool} />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * The persona as a profile card (option P3): a green identity panel — first ideal
+ * title, location, years — and, beside it, where they come from (logos), what they
+ * are now, what they know, and who is excluded. Faded = only at a widened level.
+ */
+function IdCard({ persona }: { persona: Persona }) {
+  const get = (k: PersonaTabKey) => persona.tabs.find((t) => t.key === k)?.ideal ?? []
+  const keep = (k: PersonaTabKey) => get(k).filter((c) => !c.exclude)
+  const titles = keep('titles')
+  const headline = titles.find((c) => !c.relaxed)?.label ?? titles[0]?.label ?? 'Ideal candidate'
+  const where = keep('locations')[0]?.label
+  const years = keep('years')[0]?.label
+  const excluded = persona.tabs.flatMap((t) => t.ideal.filter((c) => c.exclude))
+  const rows: { label: string; Icon: typeof Users; color: string; chips: PersonaChip[]; logo?: boolean; chipCls: string }[] = [
+    { label: 'Comes from', Icon: Building2, color: 'text-emerald-600', chips: keep('employers'), logo: true, chipCls: 'bg-slate-50 text-slate-700' },
+    { label: 'Is now', Icon: Briefcase, color: 'text-sky-500', chips: titles, chipCls: 'bg-sky-50 text-sky-800' },
+    { label: 'Knows', Icon: Code2, color: 'text-violet-500', chips: keep('skills'), chipCls: 'bg-violet-50 text-violet-800' },
+    { label: 'Level', Icon: BarChart3, color: 'text-teal-600', chips: keep('seniority'), chipCls: 'bg-teal-50 text-teal-800' },
+    { label: 'Not from', Icon: Ban, color: 'text-slate-400', chips: excluded, chipCls: 'bg-slate-100 text-slate-500 line-through' },
+  ]
+  const shown = rows.filter((r) => r.chips.length > 0)
+
+  return (
+    <div className="flex flex-col gap-4 md:flex-row">
+      <div className="flex shrink-0 flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-800 px-6 py-5 text-white md:w-52">
+        <span className="grid h-14 w-14 place-items-center rounded-full bg-white/15 ring-4 ring-white/20">
+          <UserRound className="h-7 w-7" />
+        </span>
+        <div className="mt-3 text-center font-display text-[15px] font-bold leading-tight">{headline}</div>
+        {(where || years) && (
+          <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] text-emerald-100">
+            {where && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{where}</span>}
+            {years && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{years}</span>}
+          </div>
+        )}
+      </div>
+      <div className="grid flex-1 grid-cols-1 content-start gap-3 sm:grid-cols-2">
+        {shown.length === 0 && <p className="text-xs text-slate-400">No targets set yet — add them on Scoring.</p>}
+        {shown.map((r) => (
+          <div key={r.label} className="min-w-0">
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs text-slate-500">
+              <r.Icon className={`h-3.5 w-3.5 ${r.color}`} /> {r.label}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {r.chips.slice(0, 8).map((c, i) => (
+                <span key={i} title={c.relaxed ? `${c.label} — only at a widened search level` : c.label}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs ${r.chipCls} ${c.relaxed ? 'opacity-50' : ''}`}>
+                  {r.logo && <BrandIcon name={c.label} />}
+                  {c.label}
+                </span>
+              ))}
+              {r.chips.length > 8 && <span className="px-1 text-xs text-slate-400">+{r.chips.length - 8}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   MapPin, Clock, Briefcase, Layers, Building2, Tag, BarChart3, GraduationCap,
-  BookOpen, Ban, Pencil, Check, X, Plus, DollarSign,
+  BookOpen, Ban, Check, X, Plus, DollarSign, Lock, MoveHorizontal,
 } from 'lucide-react'
 import type { SearchCriterion, CriterionKind } from '@/lib/types/search-spec'
 import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
@@ -11,11 +11,12 @@ import { criterionLabel } from '@/lib/icp-gates'
 import { BrandIcon } from '@/components/ui/BrandIcon'
 
 /**
- * The "Ideal profile" as an editable tile grid (Option B). Each dimension is a card
- * with a per-kind icon, a relax tag, a pencil to edit inline, and — for employers —
- * fetched company logos. Colours are the platform's pine / sand / gold. Editing a
- * tile writes back the whole criterion via onChange; the parent (IcpEditor) rebuilds
- * the must-have from it, so the ICP's single source of truth stays consistent.
+ * The "Ideal profile" as one strip of coloured pills (option P1). Each must-have is a
+ * pill: a per-kind icon and colour, the value (company logos for employers), and a
+ * lock (never relaxed) or ↔ (widens at a broader search level). Clicking a pill opens
+ * its editor below the strip. Editing writes back the whole criterion via onChange;
+ * the parent (IcpEditor) rebuilds the must-have from it, so the ICP's single source of
+ * truth stays consistent.
  */
 
 type IconCmp = typeof MapPin
@@ -76,119 +77,94 @@ export function IdealProfileTiles({
     onAdd?.(c)
     setEditingId(c.id)
   }
+  const editing = criteria.find((c) => c.id === editingId) ?? null
+  // A just-added pill left empty is dropped rather than saved as a blank filter.
+  const close = () => { if (editing && isEmpty(editing)) onRemove?.(editing.id); setEditingId(null) }
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+      <div className="flex flex-wrap items-center gap-2">
         {criteria.map((c) => (
-          <Tile
-            key={c.id}
-            c={c}
-            editing={editingId === c.id}
-            onEdit={() => setEditingId(c.id)}
-            // A just-added tile left empty is dropped rather than saved as a blank filter.
-            onClose={() => { if (isEmpty(c)) onRemove?.(c.id); setEditingId(null) }}
-            onChange={(next) => {
+          <Pill key={c.id} c={c} active={c.id === editingId} onClick={() => (c.id === editingId ? close() : setEditingId(c.id))} />
+        ))}
+        {onAdd && (
+          <select id="icp-add-must-have" value="" onChange={(e) => { if (e.target.value) add(e.target.value as CriterionKind) }}
+            className="h-8 rounded-full border border-dashed border-slate-300 bg-white px-3 text-xs text-slate-500 hover:border-emerald-300">
+            <option value="">+ Add</option>
+            {/* One location per role: a second would be ANDed (nobody passes) and the job-location sync keeps only one. */}
+            {ADDABLE.filter((k) => k !== 'location' || !criteria.some((c) => c.kind === 'location')).map((k) => <option key={k} value={k}>{CRITERION_KIND_LABEL[k]}</option>)}
+          </select>
+        )}
+      </div>
+      {editing && (
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{tileHeading(editing)}</span>
+            {onRemove && (
+              <button type="button" onClick={() => { onRemove(editing.id); setEditingId(null) }}
+                className="text-[11px] text-slate-400 hover:text-red-500">Remove this must-have</button>
+            )}
+          </div>
+          <CriterionEditor
+            key={editing.id}
+            c={editing}
+            onCancel={close}
+            onSave={(next) => {
               if (isEmpty(next)) onRemove?.(next.id)
               else onChange(next)
               setEditingId(null)
             }}
-            onRemove={onRemove ? () => onRemove(c.id) : undefined}
           />
-        ))}
-      </div>
-      {onAdd && (
-        <select id="icp-add-must-have" value="" onChange={(e) => { if (e.target.value) add(e.target.value as CriterionKind) }}
-          className="h-8 rounded-md border border-dashed border-slate-300 bg-white px-2 text-xs text-slate-500">
-          <option value="">+ Add a must-have…</option>
-          {/* One location per role: a second would be ANDed (nobody passes) and the job-location sync keeps only one. */}
-          {ADDABLE.filter((k) => k !== 'location' || !criteria.some((c) => c.kind === 'location')).map((k) => <option key={k} value={k}>{CRITERION_KIND_LABEL[k]}</option>)}
-        </select>
+        </div>
       )}
     </div>
   )
 }
 
-function Tile({
-  c, editing, onEdit, onClose, onChange, onRemove,
-}: {
-  c: SearchCriterion
-  editing: boolean
-  onEdit: () => void
-  onClose: () => void
-  onChange: (next: SearchCriterion) => void
-  onRemove?: () => void
-}) {
+/** One colour per kind of must-have, so the strip reads at a glance. */
+function tone(k: CriterionKind): { pill: string; icon: string } {
+  if (k === 'location') return { pill: 'bg-rose-50 text-rose-900 ring-rose-100', icon: 'text-rose-500' }
+  if (isBand(k)) return { pill: 'bg-amber-50 text-amber-900 ring-amber-100', icon: 'text-amber-500' }
+  if (k.startsWith('title_')) return { pill: 'bg-sky-50 text-sky-900 ring-sky-100', icon: 'text-sky-500' }
+  if (isEmployer(k)) return { pill: 'bg-emerald-50 text-emerald-900 ring-emerald-100', icon: 'text-emerald-600' }
+  if (k === 'skill') return { pill: 'bg-violet-50 text-violet-900 ring-violet-100', icon: 'text-violet-500' }
+  if (k === 'school' || k === 'degree_field') return { pill: 'bg-indigo-50 text-indigo-900 ring-indigo-100', icon: 'text-indigo-500' }
+  return { pill: 'bg-teal-50 text-teal-900 ring-teal-100', icon: 'text-teal-600' }
+}
+
+/** The value, short — the icon and colour already say which kind it is. */
+function shortValue(c: SearchCriterion): string {
+  if (c.kind === 'years_band') return criterionLabel(c).replace(' years', ' yrs')
+  if (c.kind === 'grad_year_band') return criterionLabel(c)
+  if (c.kind === 'location') return `${c.values[0] ?? '?'} · ${c.radius_km ?? 50} km`
+  const vals = c.values.filter((v) => v.trim())
+  return vals.slice(0, 3).join(' · ') + (vals.length > 3 ? ` +${vals.length - 3}` : '')
+}
+
+function Pill({ c, active, onClick }: { c: SearchCriterion; active: boolean; onClick: () => void }) {
   const Icon = c.exclude ? Ban : ICON[c.kind] ?? Tag
   const never = c.relax_at == null
-  const tone = c.exclude
-    ? 'bg-slate-100 text-slate-400 border-slate-200'
-    : never
-      ? 'bg-gold-50 text-gold-600 border-gold-200'
-      : 'bg-emerald-50 text-emerald-600 border-emerald-100'
-
+  const t = c.exclude ? { pill: 'bg-slate-100 text-slate-500 ring-slate-200', icon: 'text-slate-400' } : tone(c.kind)
+  const logos = isEmployer(c.kind) && !c.exclude ? c.values.filter((v) => v.trim()) : []
+  const title = `${tileHeading(c)}: ${c.values.join(', ') || criterionLabel(c)} — ${never ? 'never relaxed' : `widens at search level ${c.relax_at}`}. Click to edit.`
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg border ${tone}`}>
-            <Icon className="h-4 w-4" />
+    <button type="button" onClick={onClick} title={title}
+      className={`inline-flex max-w-full items-center gap-1.5 rounded-full py-1.5 pl-2 pr-3 text-[13px] ring-1 transition ${t.pill} ${active ? 'ring-2 ring-emerald-500' : 'hover:brightness-95'}`}>
+      <Icon className={`h-4 w-4 shrink-0 ${t.icon}`} />
+      {logos.length > 0 ? (
+        <span className="flex items-center gap-1">
+          <span className="flex -space-x-1">
+            {logos.slice(0, 4).map((v) => <span key={v} className="rounded ring-2 ring-white"><BrandIcon name={v} /></span>)}
           </span>
-          <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">{tileHeading(c)}</span>
+          {logos.length > 4 && <span className="text-xs">+{logos.length - 4}</span>}
         </span>
-        <span className="flex shrink-0 items-center gap-1.5">
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${never ? 'border border-emerald-100 bg-emerald-50 text-emerald-700' : 'border border-slate-200 bg-slate-100 text-slate-500'}`}
-          >
-            {never ? 'never relaxed' : `relaxes at L${c.relax_at}`}
-          </span>
-          {!editing && (
-            <button
-              type="button"
-              onClick={onEdit}
-              title="Edit"
-              aria-label="Edit"
-              className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            >
-              <Pencil className="h-3 w-3" />
-            </button>
-          )}
-          {!editing && onRemove && (
-            <button
-              type="button"
-              onClick={onRemove}
-              title="Remove this must-have"
-              aria-label="Remove"
-              className="grid h-6 w-6 place-items-center rounded-md text-slate-300 hover:bg-slate-100 hover:text-red-500"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </span>
-      </div>
-
-      {editing ? (
-        <CriterionEditor c={c} onCancel={onClose} onSave={onChange} />
       ) : (
-        <Display c={c} />
+        <span className={`truncate ${c.exclude ? 'line-through decoration-slate-400' : ''}`}>{shortValue(c) || 'Empty'}</span>
       )}
-    </div>
+      {!c.exclude && (never
+        ? <Lock className={`h-3 w-3 shrink-0 ${t.icon}`} />
+        : <MoveHorizontal className={`h-3 w-3 shrink-0 ${t.icon}`} />)}
+    </button>
   )
-}
-
-function Display({ c }: { c: SearchCriterion }) {
-  if (isEmployer(c.kind) && c.values.length) {
-    return (
-      <div className="flex flex-wrap gap-1.5">
-        {c.values.map((v) => (
-          <span key={v} className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-1.5 py-1 text-[12px] text-slate-700">
-            <BrandIcon name={v} />
-            {v}
-          </span>
-        ))}
-      </div>
-    )
-  }
-  return <div className="text-[13px] font-medium text-slate-800">{criterionLabel(c)}</div>
 }
 
 // ── Inline editors ─────────────────────────────────────────────────────────────

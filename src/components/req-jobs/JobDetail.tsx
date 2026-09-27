@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Archive, ArchiveRestore, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid, LayoutTemplate, PauseCircle, PlayCircle, Copy, AlertTriangle, CheckCircle2, CircleSlash } from 'lucide-react'
+import { ArrowLeft, Archive, ArchiveRestore, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid, LayoutTemplate, PauseCircle, PlayCircle, Copy, AlertTriangle, CheckCircle2, CircleSlash,
+  LayoutDashboard, Megaphone, ClipboardList, Target, Radar, CalendarCheck, History } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -85,6 +86,17 @@ const TAB_LABELS: Record<Tab, string> = {
   source:    'Source',
   plan:      'Interview plan',
   audit:     'Audit log',
+}
+
+/** Each section's icon + colour in the left menu (white icon on a solid circle). */
+const TAB_ICONS: Record<Tab, { Icon: typeof Target; color: string }> = {
+  overview:  { Icon: LayoutDashboard, color: 'bg-blue-500' },
+  postings:  { Icon: Megaphone,       color: 'bg-orange-500' },
+  screening: { Icon: ClipboardList,   color: 'bg-violet-500' },
+  scoring:   { Icon: Target,          color: 'bg-rose-600' },
+  source:    { Icon: Radar,           color: 'bg-teal-600' },
+  plan:      { Icon: CalendarCheck,   color: 'bg-indigo-500' },
+  audit:     { Icon: History,         color: 'bg-stone-500' },
 }
 
 function initForm(job: Job) {
@@ -698,12 +710,20 @@ export function JobDetail({ job: initialJob, department, departments, locations 
               onClick={() => setTab(t)}
               aria-current={tab === t ? 'page' : undefined}
               className={cn(
-                'whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
+                'flex items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-left text-sm font-medium transition-colors',
                 tab === t
-                  ? 'bg-emerald-50 text-emerald-700'
+                  ? 'bg-slate-100 text-slate-900'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
               )}
             >
+              {(() => {
+                const { Icon, color } = TAB_ICONS[t]
+                return (
+                  <span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-full text-white shadow-sm', color)}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                )
+              })()}
               {TAB_LABELS[t]}
             </button>
           ))}

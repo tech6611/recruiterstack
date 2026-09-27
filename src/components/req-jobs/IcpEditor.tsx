@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Brain, ChevronDown, ChevronRight, Compass } from 'lucide-react'
+import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Brain, ChevronDown, ChevronRight, Compass, Lock, MoveHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import { icpToScoringCriteria } from '@/lib/scoring'
 import { RecruiterBriefBody, RecruiterBriefChips } from '@/components/req-jobs/RecruiterBriefCard'
 import { isCriterion, toCriterion, mustHaveFromCriterion, criterionLabel } from '@/lib/icp-gates'
 import { IdealProfileTiles } from '@/components/req-jobs/IdealProfileTiles'
+import { BetCards } from '@/components/req-jobs/BetCards'
 
 
 const BUCKET_LABEL: Record<string, string> = { hard_filter: 'Hard filter', ranking_signal: 'Ranking', screen_later: 'Screen later' }
@@ -382,14 +383,22 @@ export function IcpEditor({
             in one place (they used to be two panels, and the Source tab repeated them). ── */}
         {icp.sourcing_map && (
           <section className="rounded-xl border border-slate-200 bg-slate-50/60">
+            {/* Leads with the bets (who we think will fit); everything else is under Details. */}
             <button type="button" onClick={() => setShowReasoning((s) => !s)}
               className="flex w-full flex-wrap items-center gap-2 px-3 py-2.5 text-left text-xs">
-              {showReasoning ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
               <Brain className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
-              <span className="font-semibold text-slate-700">How this profile was reasoned</span>
+              <span className="font-semibold text-slate-700">{(icp.sourcing_map.archetypes?.length ?? 0) > 0 ? 'Who we’re betting on' : 'How this profile was reasoned'}</span>
               {icp.sourcing_map.recruiter_brief?.niche && <span className="text-slate-500">· {icp.sourcing_map.recruiter_brief.niche}</span>}
-              <RecruiterBriefChips brief={icp.sourcing_map.recruiter_brief ?? null} compact={!showReasoning} />
+              <RecruiterBriefChips brief={icp.sourcing_map.recruiter_brief ?? null} compact={false} />
+              <span className="ml-auto flex items-center gap-0.5 font-medium text-slate-500">
+                Details {showReasoning ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </span>
             </button>
+            {(icp.sourcing_map.archetypes?.length ?? 0) > 0 && (
+              <div className="px-3 pb-3">
+                <BetCards archetypes={icp.sourcing_map.archetypes!} brief={icp.sourcing_map.recruiter_brief} />
+              </div>
+            )}
             {showReasoning && (
               <div className="space-y-3 px-3 pb-3">
                 {(icp.sourcing_map.recruiter_brief || icp.status === 'draft') && (
@@ -442,7 +451,7 @@ export function IcpEditor({
 
                 {(icp.sourcing_map.archetypes?.length ?? 0) > 0 && (
                   <div>
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Candidate archetypes (the bets)</div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">The bets — full notes</div>
                     <div className="space-y-2">
                       {icp.sourcing_map.archetypes!.map((a, i) => (
                         <div key={i} className="rounded-lg border border-slate-200 bg-white p-2.5">
@@ -469,14 +478,14 @@ export function IcpEditor({
 
         {/* ── Ideal profile (docs/ideal-profile-plan.md) ── */}
         <section className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600"
+            title="Who we are looking for, as filters. This is the one place to edit it: it becomes the first lines of the Search plan on the Source tab, and every candidate is checked against it. Changes reach sourcing when you approve.">
             <ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> Ideal profile
+            <span className="ml-auto flex items-center gap-3 text-[10px] font-normal text-slate-400">
+              <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> never relaxed</span>
+              <span className="flex items-center gap-1"><MoveHorizontal className="h-3 w-3" /> widens later</span>
+            </span>
           </div>
-          <p className="text-[11px] text-slate-400">
-            Who we are looking for, as filters: where · years · education · roles held · companies. This is the one place to
-            edit it. It becomes the first lines of the <strong>Search plan</strong> on the Source tab (which only decides how
-            far to widen), and every candidate is checked against it. Changes reach sourcing when you approve.
-          </p>
           {(() => {
             const profile = gates.filter((g) => isCriterion(g))
             const screening = gates.filter((g) => g.attribute === 'screening')
