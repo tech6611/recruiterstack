@@ -14,6 +14,8 @@ export const searchCriterionSchema = z.object({
   // Keep every field the type carries — zod strips unknown keys, and dropping these
   // silently lost the relaxable must-haves and the planner's catch-all flags.
   relax_at: z.number().int().min(1).max(20).nullish(),
+  linked: z.boolean().optional(),
+  from: z.string().max(60).nullish(),
 })
 
 export const searchLevelSchema = z.object({

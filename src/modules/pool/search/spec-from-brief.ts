@@ -253,8 +253,10 @@ export function ladderFromIdealProfile(
   // the search and ranking only, never eligibility. ──
   const poolSorted = [...(brief?.feeder_pools ?? [])].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
   const REL_LABEL: Record<string, string> = { direct_competitor: 'Competitors', similar_problem: 'Same-space peers', adjacent_talent_market: 'Adjacent / big-tech' }
-  let laneSeq = 0
-  const companyLane = (vals: string[]): SearchCriterion => ({ ...(companies as SearchCriterion), id: `${companies!.id}-t${++laneSeq}`, values: vals, label: null })
+  // Lane ids are named after the tier (not numbered), so a saved plan's tier keeps
+  // matching the same tier when an earlier tier empties out (refreshWideningLevel).
+  const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'tier'
+  const companyLane = (vals: string[], tier: string): SearchCriterion => ({ ...(companies as SearchCriterion), id: `${companies!.id}-t-${slug(tier)}`, values: vals, label: null })
 
   // L1: the exact persona — each ideal company its own lane (distinct recruiter bets).
   // Keep the ideal-profile ids so a person bought at L1 is vendor-verified on the must-haves.
@@ -273,7 +275,7 @@ export function ladderFromIdealProfile(
       if (!terms.length) continue
       terms.forEach((t) => seen.add(t.toLowerCase()))
       const rel = p.relationship ? REL_LABEL[p.relationship] : null
-      level(rel ? `${rel}: ${p.label}` : p.label, keep(location, titles, companyLane(terms)), p.rationale ?? (p.relationship?.replace(/_/g, ' ') ?? null))
+      level(rel ? `${rel}: ${p.label}` : p.label, keep(location, titles, companyLane(terms, p.label)), p.rationale ?? (p.relationship?.replace(/_/g, ' ') ?? null))
     }
     // The brief named no peers — still widen companies (same title) before touching titles.
     if (poolSorted.length <= 1) level('Any company · same title', keep(location, titles), 'no company constraint — same title')
@@ -285,7 +287,7 @@ export function ladderFromIdealProfile(
     const adjTitles: SearchCriterion = { ...titles, id: `${titles.id}-adj`, values: adjacent, label: null }
     const allCompanies = Array.from(new Set(poolSorted.flatMap((p) => (p.companies ?? []).flatMap(employerTerms))))
     if (companies && allCompanies.length) {
-      level('Feeder titles · target companies', keep(location, companyLane(allCompanies), adjTitles), `career-progression titles at the same companies: ${adjacent.slice(0, 4).join(' / ')}${adjacent.length > 4 ? ' …' : ''}`)
+      level('Feeder titles · target companies', keep(location, companyLane(allCompanies, 'all-targets'), adjTitles), `career-progression titles at the same companies: ${adjacent.slice(0, 4).join(' / ')}${adjacent.length > 4 ? ' …' : ''}`)
     }
     level('Feeder titles · any company', keep(location, { ...adjTitles, id: `${titles.id}-adj-any` }), 'feeder titles, no company constraint', true)
   }
@@ -294,7 +296,7 @@ export function ladderFromIdealProfile(
   if (location) {
     const everyTitle = titles ? { ...titles, id: `${titles.id}-loc`, values: Array.from(new Set([...titles.values, ...adjacent])), label: null } : undefined
     const radius = (location.radius_km ?? DEFAULT_RADIUS_KM) * 3
-    level('Wider location', keep({ ...location, id: `${location.id}-loc`, radius_km: radius, label: null }, everyTitle), `within ${radius} km`, true)
+    level('Wider location', keep({ ...location, id: `${location.id}-loc`, radius_km: radius, label: null, from: location.id }, everyTitle), `within ${radius} km`, true)
   }
 
   // Seniority ceiling as before: an IC band means no executive titles.
@@ -306,6 +308,53 @@ export function ladderFromIdealProfile(
   for (const c of icp.competencies ?? []) post_fetch.push({ label: c.name, how: 'judge' })
   void ctx
   return { version: 1, base, levels, post_fetch, source: 'brief' }
+}
+
+interface LinkSources {
+  /** The ICP's structured must-haves by id (ideal-profile ids are `ip-…`). */
+  mustHaves: Map<string, SearchCriterion>
+  /** Every filter the ladder derives from the profile for its widening levels, by id
+   *  (`ip-titles-adj`, `ip-location-loc`, `ip-companies-t-growth-stage-saas`, …). */
+  derived: Map<string, SearchCriterion>
+}
+
+/** The widening-level filters a fresh ladder builds from the profile, by id. Ideal lines
+ *  are skipped: they reuse one id per company with different values. PURE. */
+function derivedCriteria(fresh: SearchSpec | null): Map<string, SearchCriterion> {
+  const out = new Map<string, SearchCriterion>()
+  for (const l of fresh?.levels ?? []) {
+    if (l.ideal) continue
+    for (const c of l.criteria) if (!out.has(c.id)) out.set(c.id, c)
+  }
+  return out
+}
+
+/** A filter that is a copy of a profile field (as opposed to one the recruiter added). */
+const isProfileCopy = (c: SearchCriterion) => c.linked === true || c.from != null || c.id.startsWith('ip-')
+
+/**
+ * Bring one saved widening level in line with the CURRENT profile. PURE.
+ *  - a copy of a must-have (same id) takes the must-have's current value;
+ *  - a filter the ladder derives from the profile (feeder titles, company tiers, the
+ *    widened location…) takes its freshly derived value;
+ *  - a widened copy (`from`) takes the must-have's values but keeps its own radius;
+ *  - a filter the recruiter added by hand is left alone.
+ * A level whose profile copy no longer exists (the field was removed on Scoring) has
+ * lost what defined it, so it is dropped rather than searched half-built.
+ */
+export function refreshWideningLevel(level: SearchLevel, link: LinkSources): SearchLevel | null {
+  const criteria: SearchCriterion[] = []
+  for (const c of level.criteria) {
+    const mh = link.mustHaves.get(c.id)
+    const derived = link.derived.get(c.id)
+    const source = c.from ? link.mustHaves.get(c.from) : undefined
+    if (mh) criteria.push({ ...mh, label: null, linked: true })
+    else if (derived) criteria.push({ ...derived, linked: true })
+    else if (source) criteria.push({ ...c, kind: source.kind, values: source.values, exclude: source.exclude, linked: true })
+    else if (isProfileCopy(c)) return null
+    else criteria.push(c)
+  }
+  return criteria.length ? { ...level, criteria } : null
 }
 
 /** An ideal-profile line. Plans saved before the `ideal` flag are recognised by the label
@@ -321,18 +370,30 @@ export function resolveSearchSpec(
 ): { spec: SearchSpec; stored: boolean } {
   const stored = icp.sourcing_map?.search_spec
   if (stored && stored.levels?.length) {
-    // One source of truth: the ICP's must-haves (edited on the Scoring tab) own the
-    // "Everyone" base line AND the ideal-profile lines. A stored plan keeps only its
-    // widening levels; the base and the ideal lines are rebuilt from the must-haves on
-    // every read, so a Scoring edit reaches the search and a plan edit can't rewrite it.
-    const mustHaves = (icp.must_haves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null && c.relax_at == null)
-    const idealNow = (ladderFromIdealProfile(icp, ctx)?.levels ?? []).filter((l) => l.ideal)
+    // One source of truth: the ICP's must-haves (edited on the Scoring tab) flow into
+    // EVERY part of a saved plan — the "Everyone" base line and the ideal-profile lines
+    // are rebuilt, and every copy of a profile field inside the widening levels is
+    // refreshed (refreshWideningLevel). What the recruiter added by hand stays theirs.
+    const all = (icp.must_haves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null)
+    const mustHaves = all.filter((c) => c.relax_at == null)
+    const fresh = ladderFromIdealProfile(icp, ctx)
+    const idealNow = (fresh?.levels ?? []).filter((l) => l.ideal)
+    const link: LinkSources = {
+      mustHaves: new Map(all.map((c) => [c.id, c])),
+      derived: derivedCriteria(fresh),
+    }
     // Keep level ids unique: the rebuilt ideal lines are numbered L1…Ln and may collide
     // with a stored widening level's id when the ideal company count changed.
     const idealIds = new Set(idealNow.map((l) => l.id))
-    const widening = stored.levels.filter((l) => !isIdealLevel(l)).map((l) => (idealIds.has(l.id) ? { ...l, id: `${l.id}-p` } : l))
-    const levels = idealNow.length ? [...idealNow, ...widening] : stored.levels
-    return { spec: { ...stored, base: mustHaves.length ? mustHaves : stored.base, levels }, stored: true }
+    const widening = stored.levels
+      .filter((l) => !isIdealLevel(l))
+      .map((l) => refreshWideningLevel(l, link))
+      .filter((l): l is SearchLevel => l != null)
+      .map((l) => (idealIds.has(l.id) ? { ...l, id: `${l.id}-p` } : l))
+    const levels = idealNow.length ? [...idealNow, ...widening] : widening
+    // The "checked after fetch" list is the ICP's competencies / screening — follow it too.
+    const post_fetch = (fresh ?? specFromIcp(icp, ctx)).post_fetch
+    return { spec: { ...stored, base: mustHaves.length ? mustHaves : stored.base, levels, post_fetch }, stored: true }
   }
   return { spec: specFromIcp(icp, ctx), stored: false }
 }

@@ -302,7 +302,7 @@ function SpecEditModal({ draft, setDraft, counts, counting, saving, stored, read
   const editOnScoring = onOpenScoring
     ? <button type="button" onClick={() => { onCancel(); onOpenScoring() }} className="font-medium text-emerald-600 hover:text-emerald-800">Edit on Scoring</button>
     : <span>Edit it on the Scoring tab</span>
-  const addLevel = () => { const last = draft.levels[draft.levels.length - 1]; update({ ...draft, levels: [...draft.levels, { id: newId('L'), label: last ? `${last.label} (copy)` : 'New level', criteria: (last?.criteria ?? []).map((c) => ({ ...c, id: newId('c') })), relaxes: null }] }) }
+  const addLevel = () => { const last = draft.levels[draft.levels.length - 1]; update({ ...draft, levels: [...draft.levels, { id: newId('L'), label: last ? `${last.label} (copy)` : 'New level', criteria: (last?.criteria ?? []).map((c) => (c.linked ? c : { ...c, id: newId('c') })), relaxes: null }] }) }
   const byIndex = (i: number) => Object.entries(counts).find(([k]) => k.startsWith(`L${i + 1}:`))?.[1]
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 md:p-8" onClick={onCancel}>
@@ -354,7 +354,15 @@ function SpecEditModal({ draft, setDraft, counts, counting, saving, stored, read
                   </span>
                 </div>
                 <div className="space-y-1.5 pl-7">
-                  {lvl.criteria.map((c, k) => <Chips key={c.id} c={c} onChange={(n) => { const criteria = lvl.criteria.slice(); criteria[k] = n; setLevel(i, { ...lvl, criteria }) }} onRemove={() => setLevel(i, { ...lvl, criteria: lvl.criteria.filter((_, x) => x !== k) })} />)}
+                  {lvl.criteria.map((c, k) => c.linked ? (
+                    // A copy of a profile field: it follows the Scoring tab, so it isn't edited here.
+                    <div key={c.id} className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <span className="w-24 shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{SHORT_KIND[c.kind]}</span>
+                      <span className="text-slate-600">{criterionPhrase(c, 8)}</span>
+                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700" title="Follows the ideal profile — change it on the Scoring tab">from Scoring</span>
+                      <button type="button" aria-label="Remove filter from this level" title="Remove from this level" onClick={() => setLevel(i, { ...lvl, criteria: lvl.criteria.filter((_, x) => x !== k) })} className="text-slate-300 hover:text-rose-500"><Trash2 className="h-3 w-3" /></button>
+                    </div>
+                  ) : <Chips key={c.id} c={c} onChange={(n) => { const criteria = lvl.criteria.slice(); criteria[k] = n; setLevel(i, { ...lvl, criteria }) }} onRemove={() => setLevel(i, { ...lvl, criteria: lvl.criteria.filter((_, x) => x !== k) })} />)}
                   <AddFilter onAdd={(kind) => setLevel(i, { ...lvl, criteria: [...lvl.criteria, { id: newId('c'), kind, values: [] }] })} />
                 </div>
               </li>

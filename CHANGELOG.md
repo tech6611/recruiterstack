@@ -3,6 +3,7 @@
 ## 2026-09-27
 
 ### Changed
+- The ideal profile now flows into EVERY level of a saved search plan, not just the ideal lines: each copy of a profile field in a widening level (title, companies, location, feeder titles, the widened location — also levels added by "Suggest a wider plan") is refreshed from the approved ICP on every read and shown read-only as "from Scoring" in the plan editor. Filters and levels the recruiter added by hand are kept; a level whose defining field was removed on Scoring is dropped. The checks-after-fetch list follows the ICP's competencies too. Company-tier filter ids are now named after the tier (e.g. `ip-companies-t-growth-stage-saas`) instead of numbered, so a saved tier can't pick up another tier's companies.
 - Scoring/Source cleanup, stage 1 of 3 ("One of Each"): one "Refine ICP" button, on the Scoring tab. The Source tab's calibration strip shows "n of 5 decisions" and then links to Scoring, and the Learning panel's button now opens Scoring instead of refining itself.
 - The recruiter brief and the "Reasoning, requirement breakdown & archetypes" panel merged into one "How this profile was reasoned" section on Scoring. The Shortlist brief no longer repeats the reasoning or archetypes; it links to Scoring (the copy-for-hiring-manager text still includes them).
 - The Scoring tab's intake-call-notes box is one shared box for Generate and Regenerate.
@@ -14,6 +15,7 @@
 - Approving an ICP whose location changed now moves the job's location with it (the Search plan save used to do this).
 
 ### Fixed
+- "Copy shortlist" works on the first click in Safari even when the shortlist is still loading (the copy starts inside the click via ClipboardItem).
 - Saving the Search plan (or applying a planned one) no longer rewrites the ICP's must-haves. It used to overwrite the APPROVED ICP in place with no new version, fight the Scoring editor's saves, and keep only the first ideal company.
 - The search-plan save validation stripped `relax_at` from criteria and `fallback` from levels, so a saved plan could drop the relaxable title/company/location must-haves and undo the planner's catch-all fix. Both kept now (plus the new `ideal` flag), with a test; the level cap rises from 16 to 40.
 - A new ICP version (Save on an approved ICP, Refine from feedback, from-template) now keeps the reasoning, recruiter brief, corrections and saved search plan; they used to vanish. Approving also carries over a newer search plan edited on the live version.
