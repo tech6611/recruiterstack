@@ -95,6 +95,17 @@ describe('/api/brand-icon', () => {
     expect(res.headers.get('cache-control')).toBe('public, max-age=600')
   })
 
+  it('says WHY it found nothing, so the URL diagnoses itself in a browser', async () => {
+    // An empty 404 is indistinguishable from the route not being deployed — which cost
+    // a round of production debugging. `logodev` surfaces an env var that is set
+    // locally and missing from the deployment, which nothing else reveals.
+    const res = await GET(req('Freelance'))
+    const body = await res.json()
+    expect(res.status).toBe(404)
+    expect(body.reason).toBe('no domain known for this name')
+    expect(body.logodev).toMatch(/configured|ABSENT/)
+  })
+
   it('rejects a request with no name', async () => {
     const res = await GET(new NextRequest('https://app.test/api/brand-icon'))
     expect(res.status).toBe(400)

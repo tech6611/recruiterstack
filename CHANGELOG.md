@@ -49,6 +49,13 @@ entries on top.
 ## 2026-09-27
 
 ### Fixed
+- **Icon URLs now carry a cache version (`&v=2`), so a fix reaches people who already looked.** A miss gets cached in at least three places we don't control — browser, CDN edge, and whatever sits between — each keyed on the exact URL. When a logo starts working that previously didn't (a provider key arrives, a domain lands in `brand_domains`), those caches keep serving the old "no logo" to exactly the people who were watching while it was broken. A hard reload clears the browser and not the edge. Changing the URL is the only lever that reaches all of them. Observed live: Patna University rendered immediately because it had never been requested before, while IIM Kozhikode stayed a monogram on the page and served its real crest from the same URL in a fresh incognito window.
+
+### Added
+- **`/api/brand-icon` now diagnoses itself.** Its 404 carries a JSON body naming the reason (`no domain known for this name` vs `no provider had a logo for this domain`), the domain it tried, and whether `LOGODEV_TOKEN` is `configured` or `ABSENT` in that environment. An `<img>` ignores the body, but opening the URL in a browser answers "is it the token, the domain, or the route?" in one step — an empty 404 is indistinguishable from the route not being deployed, which cost a round of production debugging.
+
+### Fixed
+- **The `brand_domains` override table was unreachable from the browser.** `brandIconSrc` returned null whenever the *code* tables couldn't name a domain, so the client never asked the server — and the server is the only side that reads `brand_domains`. Every school resolved into that table (Patna University among them) stayed a monogram, silently. Only `isUnbrandable` now short-circuits, because "Freelance" is not an organisation at any layer; everything else asks. The "no domain" 404 gained the same ten-minute cache so a monogram-heavy page doesn't re-ask on every render.
 - **School logos stayed monograms for a day after `LOGODEV_TOKEN` was configured.** Three caches were each holding the pre-token answer, and all three had to go:
   - `export const revalidate = 86400` on `/api/brand-icon`. Next patches global fetch and inherits a route's revalidate for the calls inside it, so the provider's "nothing here" was frozen for 24 hours. Replaced with `dynamic = 'force-dynamic'` and `cache: 'no-store'` on the outbound calls — these responses are cached deliberately, by us, with a TTL that reflects what we found.
   - the per-process memo never expired. Hits are now held a day (a logo doesn't change); **misses only ten minutes**, because a miss is often a statement about our own configuration rather than about the world.
