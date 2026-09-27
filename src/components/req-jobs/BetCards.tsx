@@ -1,6 +1,6 @@
 'use client'
 
-import { Briefcase, Rocket, Compass, Sparkles, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Briefcase, Rocket, Compass, Sparkles, ThumbsUp, ThumbsDown, TriangleAlert } from 'lucide-react'
 import type { SourcingMap, RecruiterBrief } from '@/lib/types/icp'
 import { BrandIcon } from '@/components/ui/BrandIcon'
 
@@ -41,9 +41,16 @@ export function companiesFor(a: Archetype, brief: RecruiterBrief | null | undefi
 }
 
 /**
- * The ICP's archetypes ("bets") as compact people cards: a name, one line of thesis,
- * the companies they come from, and one 👍 / 👎 each. The full archetype text (where
- * from, risk) stays in the reasoning's Details.
+ * The ICP's archetypes ("bets") as compact people cards: who they are, where they come
+ * from, what would attract them, what would not, and what could go wrong if you hire
+ * them.
+ *
+ * THIS IS THE WHOLE BET NOW. There used to be a second copy of every archetype further
+ * down the page under "The bets — full notes", which said the same things at greater
+ * length — the cards carried a one-line truncation and the notes carried the paragraph.
+ * Two renderings of one object is a maintenance trap and a reading tax. The cards clamp
+ * to two lines instead of one, which fits nearly every line the generator writes, and
+ * the full text is on the element's title for the rare one that overflows.
  */
 export function BetCards({ archetypes, brief }: { archetypes: Archetype[]; brief?: RecruiterBrief | null }) {
   let plain = 0
@@ -60,26 +67,38 @@ export function BetCards({ archetypes, brief }: { archetypes: Archetype[]; brief
               </span>
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-slate-900" title={a.name}>{a.name}</div>
-                {a.is_non_obvious
-                  ? <div className="text-[11px] font-semibold text-gold-700">✦ non-obvious</div>
-                  : a.thesis && <div className="truncate text-[11px] text-slate-500" title={a.thesis}>{a.thesis}</div>}
+                {a.is_non_obvious && <div className="text-[11px] font-semibold text-gold-700">✦ non-obvious</div>}
               </div>
             </div>
-            {logos.length > 0 && (
-              <div className="mt-2.5 flex flex-wrap gap-1">
+            {a.thesis && (
+              <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-slate-600" title={a.thesis}>{a.thesis}</p>
+            )}
+
+            {/* Where they come from. The logos say it faster than the sentence does, so
+                the sentence is only shown when no company resolved to a mark. */}
+            {logos.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1" title={a.where_from ?? undefined}>
                 {logos.map((c) => <span key={c} title={c}><BrandIcon name={c} size={20} /></span>)}
               </div>
-            )}
-            {(a.why_interested || a.why_no) && (
-              <div className="mt-2.5 space-y-0.5 text-[11px]">
+            ) : a.where_from ? (
+              <p className="mt-2 line-clamp-1 text-[11px] text-slate-400" title={a.where_from}>From: {a.where_from}</p>
+            ) : null}
+
+            {(a.why_interested || a.why_no || a.hire_risk) && (
+              <div className="mt-2.5 space-y-1 text-[11px] leading-snug">
                 {a.why_interested && (
-                  <div className="flex items-center gap-1.5 text-emerald-700" title={a.why_interested}>
-                    <ThumbsUp className="h-3 w-3 shrink-0" /><span className="truncate">{a.why_interested}</span>
+                  <div className="flex gap-1.5 text-emerald-700" title={a.why_interested}>
+                    <ThumbsUp className="mt-0.5 h-3 w-3 shrink-0" /><span className="line-clamp-2">{a.why_interested}</span>
                   </div>
                 )}
                 {a.why_no && (
-                  <div className="flex items-center gap-1.5 text-rose-600" title={a.why_no}>
-                    <ThumbsDown className="h-3 w-3 shrink-0" /><span className="truncate">{a.why_no}</span>
+                  <div className="flex gap-1.5 text-rose-600" title={a.why_no}>
+                    <ThumbsDown className="mt-0.5 h-3 w-3 shrink-0" /><span className="line-clamp-2">{a.why_no}</span>
+                  </div>
+                )}
+                {a.hire_risk && (
+                  <div className="flex gap-1.5 text-slate-400" title={a.hire_risk}>
+                    <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" /><span className="line-clamp-2">{a.hire_risk}</span>
                   </div>
                 )}
               </div>
