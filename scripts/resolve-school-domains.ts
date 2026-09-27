@@ -209,6 +209,32 @@ async function resolveSchool(name: string): Promise<Hit> {
 }
 
 /**
+ * Words that mark an UMBRELLA body rather than a branch. "Kendriya Vidyalaya Sangathan"
+ * is the organisation behind every KV, so its crest is the right one to inherit.
+ */
+const UMBRELLA = /^(?:sangathan|sangh|society|societies|group|trust|foundation|schools|organisation|organization|council|board|system)$/i
+
+/**
+ * Is the entity Wikidata matched for a PARENT name actually the chain — or just another
+ * branch of it?
+ *
+ * Searching "Delhi Public School" returns "Delhi Public School, Rourkela", an
+ * independent school in a different state. Its crest looks close enough to pass a
+ * glance, which is exactly why it should not be stored: it is a different institution's
+ * domain on someone's record. DPS branches are separate societies with separate sites,
+ * unlike KV, which has one central body — so the label has to earn the inheritance.
+ */
+export function parentLabelAcceptable(parent: string, label: string): boolean {
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+  const p = norm(parent)
+  const l = norm(label)
+  if (!p || !l) return false
+  if (p === l) return true
+  if (!l.startsWith(`${p} `)) return false
+  return l.slice(p.length).trim().split(' ').every((w) => UMBRELLA.test(w))
+}
+
+/**
  * The full name, then its parents. A branch inherits its chain's emblem, which is the
  * right answer — "Kendriya Vidyalaya No. 3, Bhopal" should fly the KV crest.
  */
@@ -220,6 +246,8 @@ async function resolveWithParents(name: string): Promise<Hit> {
     await sleep(THROTTLE_MS)
     let hit: Hit
     try { hit = await resolveSchool(parent) } catch { break }
+    // Only inherit from the chain itself, never from a sibling branch.
+    if (hit.domain && !parentLabelAcceptable(parent, hit.label)) continue
     if (hit.domain && (await hasLogo(hit.domain))) {
       return { ...hit, note: `${hit.note} via parent "${parent}"` }
     }
