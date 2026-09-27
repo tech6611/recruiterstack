@@ -48,15 +48,19 @@ export interface ProfileDocumentProps {
   skills: string[]
   /** Roles that ended before graduation are campus work, not employment (tag rules). */
   graduationYear?: number | null
+  /** ISO country, so school tiers are judged in the right market. */
+  country?: string | null
   now?: Date
 }
 
-export function ProfileDocument({ experiences, education, skills, graduationYear, now }: ProfileDocumentProps) {
+export function ProfileDocument({ experiences, education, skills, graduationYear, country, now }: ProfileDocumentProps) {
   const [tab, setTab] = useState<Tab>('Overview')
 
   // Built in document order, then sliced — so a tab can never reorder the page.
   const sections = [
-    experiences.length ? <ExperienceTimeline key="experience" roles={experiences} graduationYear={graduationYear} now={now} /> : null,
+    experiences.length
+      ? <ExperienceTimeline key="experience" roles={experiences} education={education} skills={skills} country={country} now={now} />
+      : null,
     education.length ? <EducationList key="education" education={education} /> : null,
     skills.length ? <SkillMap key="skills" skills={skills} /> : null,
   ]

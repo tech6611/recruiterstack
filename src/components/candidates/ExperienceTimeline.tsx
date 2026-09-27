@@ -98,11 +98,17 @@ function GroupedRoles({ stint }: { stint: EmployerStint }) {
 
 export function ExperienceTimeline({
   roles,
-  graduationYear,
+  education,
+  skills,
+  country,
   now = new Date(),
 }: {
   roles: WorkRole[]
-  graduationYear?: number | null
+  /** Feeds the school chip, and tells campus roles from employment in the tag rules. */
+  education?: { degree?: string | null; field?: string | null; school?: string | null; year?: number | null }[]
+  /** Feeds the domain chips, read from the same Skill Map shown further down. */
+  skills?: string[]
+  country?: string | null
   now?: Date
 }) {
   if (!roles.length) return null
@@ -124,7 +130,7 @@ export function ExperienceTimeline({
       </h3>
 
       <div className="mb-4 space-y-3">
-        <TraitChips roles={roles} graduationYear={graduationYear} />
+        <TraitChips roles={roles} skills={skills} education={education} country={country} />
         <TenureTiles
           averageTenureMonths={averageTenureMonths}
           currentTenureMonths={currentTenureMonths}

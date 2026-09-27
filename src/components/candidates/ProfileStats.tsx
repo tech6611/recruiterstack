@@ -1,31 +1,43 @@
 'use client'
 
 import { formatDuration, type WorkRole } from '@/lib/ui/work-history'
-import { deriveProfileTags } from '@/lib/profile-tags'
+import { deriveProfileChips } from '@/lib/profile-chips'
 
 /**
  * The two summary rows above the experience timeline: the trait chips a recruiter
  * reads before anything else ("Fast career growth", "Long tenures", "Recently moved"),
  * and the three tenure numbers.
  *
- * The chips come from `lib/profile-tags`, the same rules the sourcing pool uses, so the
- * pool and the profile can never label the same person differently. They are derived
- * from the dated history — no AI, nothing to re-generate, nothing to go stale.
+ * The chips come from `lib/profile-chips`, which reads the dated history, the skills
+ * list and the schools — what they do, how senior, how they move, where they studied.
+ * Nobody types them and nothing stores them: a chip is a reading of the evidence, so it
+ * is recomputed each time rather than going quietly stale when a résumé is re-extracted.
  *
  * A tile is omitted when its number is unknown rather than shown as a dash: "—" next to
  * "Current tenure" reads as "no current job", which is a claim we have not earned.
  */
-export function TraitChips({ roles, graduationYear }: { roles: WorkRole[]; graduationYear?: number | null }) {
-  const tags = deriveProfileTags(roles, { graduationYear })
-  if (!tags.length) return null
+export function TraitChips({
+  roles,
+  skills,
+  education,
+  country,
+}: {
+  roles: WorkRole[]
+  skills?: string[]
+  education?: { degree?: string | null; field?: string | null; school?: string | null; year?: number | null }[]
+  country?: string | null
+}) {
+  const chips = deriveProfileChips({ experiences: roles, skills, education, country })
+  if (!chips.length) return null
   return (
     <div className="flex flex-wrap gap-1.5">
-      {tags.map((tag) => (
+      {chips.map((chip) => (
         <span
-          key={tag}
+          key={chip.label}
+          title={chip.hint}
           className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
         >
-          {tag}
+          {chip.label}
         </span>
       ))}
     </div>

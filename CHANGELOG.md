@@ -51,6 +51,15 @@ entries on top.
 ## 2026-09-27
 
 ### Added
+- **Derived chips on every profile** — `lib/profile-chips.ts`. Juicebox opens a profile with a row of labels ("Startup + Big Tech", "High Avg. Tenure", "AI / ML"); **nobody types those, they're read off the record**, which is what separates them from `candidate_tags`. Ours now reads the same way, from three sources we already hold:
+  - **Domain** — the one or two Skill Map groups a person is actually concentrated in ("AI / ML", "Back-End"). Taken from the same grouping shown further down the profile, so a chip can never contradict it. A group under a fifth of their skills is a skill they listed once, not a domain they work in.
+  - **Seniority** — Executive / People manager / Senior IC, from the current title's rank on the existing ladder.
+  - **Tenure** — "High avg. tenure" at three years per employer, "Short stints" under eighteen months. Deliberately conservative: a chip true of almost everybody tells you nothing.
+  - **School tier** — reuses `school-tiers.ts`, the house-curated tier-1/tier-2 lists per market (IIT, IIM, ISB, BITS, NIT for India), which is the equivalent of Juicebox's "Top 50 US Uni".
+  - Plus the trajectory rules already in use — Fast career growth, Recently moved, Long tenures, Job hopper.
+  - Every chip carries a hover explaining why it's there; a label nobody can interrogate is noise. Nothing is stored — a chip is a reading of the evidence, so it's recomputed rather than going quietly stale when a résumé is re-extracted. Capped at six, because past that a row stops being something you take in at a glance.
+
+### Added
 - **The pool browser reads like Juicebox.** Rows became cards — photo, name, freshness and unlock state, **current role with the employer's mark and dates, the two before it, education** — so a market can be judged by scrolling. The detail drawer widened into two columns: the profile on the left, a **notes-and-outreach pane** on the right, which is Juicebox's third column.
   - **One card, two surfaces.** `<ResultCard>` is shared with the candidates list; each side passes its own badges and links (a candidate has applications and a résumé, a pool row has an evidence date and an unlock price). Writing the markup twice is how the two ended up describing the same person differently in the first place.
   - **The side pane says what it can honestly offer.** A pool profile isn't in your workspace — those tables are shared across orgs and carry no `org_id` — so there is nowhere for a note to live until it's unlocked. And notes attach to an *application*, so even an unlocked person needs a job first. The pane names the next real step at each stage instead of showing a disabled text box.
