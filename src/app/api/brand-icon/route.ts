@@ -125,6 +125,25 @@ async function resolveIcon(domain: string): Promise<{ body: Buffer; type: string
   return google
 }
 
+/**
+ * A 404 that explains itself.
+ *
+ * An <img> treats any 404 the same, so the body costs nothing there — but opening this
+ * URL in a browser is the fastest way to answer "is it the token, the domain, or the
+ * route?", and an empty 404 is indistinguishable from the route not being deployed at
+ * all. That ambiguity cost a round of debugging in production, so the endpoint now
+ * diagnoses itself. `logodev` in particular reveals an environment variable that is set
+ * locally but missing from the deployment, which nothing else surfaces.
+ *
+ * Cached briefly, not for a day: a miss is often a statement about our configuration.
+ */
+function miss(reason: string, detail: Record<string, unknown>) {
+  return NextResponse.json(
+    { error: 'no logo', reason, ...detail, logodev: process.env.LOGODEV_TOKEN ? 'configured' : 'ABSENT' },
+    { status: 404, headers: { 'Cache-Control': 'public, max-age=600' } },
+  )
+}
+
 export async function GET(req: NextRequest) {
   // Signed-in only: this is an outbound fetcher, and an open one would be someone
   // else's image proxy. The browser already carries the session cookie on <img>.
@@ -150,9 +169,7 @@ export async function GET(req: NextRequest) {
   // other miss: the client now asks about every name (it cannot know what
   // `brand_domains` holds), so without this a monogram-heavy page re-asks on every
   // render about names we answer instantly and negatively.
-  if (!domain) {
-    return new NextResponse(null, { status: 404, headers: { 'Cache-Control': 'public, max-age=600' } })
-  }
+  if (!domain) return miss('no domain known for this name', { name, kind })
 
   const cached = memo.get(domain)
   const fresh = cached && Date.now() - cached.at < (cached.icon ? HIT_TTL_MS : MISS_TTL_MS)
@@ -164,15 +181,7 @@ export async function GET(req: NextRequest) {
   }
   const icon = memo.get(domain)?.icon ?? null
 
-  if (!icon) {
-    return new NextResponse(null, {
-      status: 404,
-      // Cache the miss, but briefly. Without any caching a monogram-heavy page makes
-      // dozens of round-trips; with a day of it, a browser that once saw "no logo"
-      // keeps showing a monogram long after the server started returning the real one.
-      headers: { 'Cache-Control': 'public, max-age=600' },
-    })
-  }
+  if (!icon) return miss('no provider had a logo for this domain', { name, kind, domain })
 
   return new NextResponse(new Uint8Array(icon.body), {
     status: 200,
