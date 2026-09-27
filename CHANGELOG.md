@@ -23,6 +23,16 @@ entries on top.
 > `Removed`, `Schema` (migrations), `Docs`. Keep each line short and concrete.
 > This file is part of the workflow — see the "Changelog" note in `CLAUDE.md`.
 
+## 2026-09-27
+
+### Added
+- **`npm run resolve:schools`** — resolves school names to their websites via Wikidata and stores them in `brand_domains`, so colleges get logos too. Company domains can be guessed from the name; school domains cannot ("Indian Institute of Technology, Madras" is iitm.ac.in), and the free favicon tier has no record of `.ac.in` at all. Run against the live data it resolved **98 of the 286 schools the code tables couldn't name** — the unresolved remainder is almost entirely small K-12 schools with no logo anywhere. Dry run by default; `--apply` writes. Needs migration 151.
+  - **Guarded against a real false positive:** a plain name search for "IIM Kozhikode" returns the *journal* "IIM Kozhikode Society & Management Review", whose site is `ksm.sagepub.com`. Every hit must be an educational institution by Wikidata's own `instance of` claim, not merely a text match. The accepted list was widened against the real data after that guard blocked genuine schools (public high school, community college, state university of India).
+  - A `www2.` style prefix is stripped — `www2.lehigh.edu` is the same brand as `lehigh.edu`, and a logo provider keyed on the bare domain misses the subdomain.
+
+### Fixed
+- Nothing in code: **college logos were missing in production because `LOGODEV_TOKEN` is not set on Vercel.** Verified directly — logo.dev returns the real IIM Kozhikode and Patna University crests for `.ac.in` domains that Google's favicon service answers with a generic globe. The company logos now visible are coming from the free tier, which is why they work and schools don't.
+
 ## 2026-09-26
 
 ### Added
