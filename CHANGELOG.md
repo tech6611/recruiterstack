@@ -9,6 +9,14 @@
 - The Overview "Scoring rubric" card flags when a newer ICP draft is not approved yet, so draft edits no longer look like they are in use.
 - The pipeline page's "Scoring Criteria" pop-up is read-only once the job has an approved ICP, with an "Edit on the Scoring tab" link. Jobs without an ICP can still edit it there.
 
+- Scoring/Source cleanup, stage 2 of 3: the Scoring tab is the one editor for the ideal profile / must-haves (versioned, reaches sourcing on Approve). The tiles can now add a must-have, remove one, and flip it to "exclude". The Search plan shows the "Everyone" line and the ideal-profile lines read-only ("from Scoring") and owns only the widening levels. "Plan the market" is no longer a separate panel: "Suggest a wider plan" inside the Search plan shows the proposal with new levels marked, and Accept / Discard. The persona tabs link to Scoring for edits.
+- Approving an ICP whose location changed now moves the job's location with it (the Search plan save used to do this).
+
+### Fixed
+- Saving the Search plan (or applying a planned one) no longer rewrites the ICP's must-haves. It used to overwrite the APPROVED ICP in place with no new version, fight the Scoring editor's saves, and keep only the first ideal company.
+- The search-plan save validation stripped `relax_at` from criteria and `fallback` from levels, so a saved plan could drop the relaxable title/company/location must-haves and undo the planner's catch-all fix. Both kept now (plus the new `ideal` flag), with a test; the level cap rises from 16 to 40.
+- A new ICP version (Save on an approved ICP, Refine from feedback, from-template) now keeps the reasoning, recruiter brief, corrections and saved search plan; they used to vanish. Approving also carries over a newer search plan edited on the live version.
+
 ### Added
 - `?tab=<name>` opens a job page on that tab (e.g. `/req-jobs/<id>?tab=scoring`).
 

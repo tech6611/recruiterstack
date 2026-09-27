@@ -473,9 +473,9 @@ export function IcpEditor({
             <ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> Ideal profile
           </div>
           <p className="text-[11px] text-slate-400">
-            Who we are looking for, as filters: where · years · education · roles held · companies. This list is L1 of the
-            search plan and what every candidate is checked against; the ladder below it loosens one row at a time.
-            Edit it in the <strong>Search plan</strong> on the Sourcing tab.
+            Who we are looking for, as filters: where · years · education · roles held · companies. This is the one place to
+            edit it. It becomes the first lines of the <strong>Search plan</strong> on the Source tab (which only decides how
+            far to widen), and every candidate is checked against it. Changes reach sourcing when you approve.
           </p>
           {(() => {
             const profile = gates.filter((g) => isCriterion(g))
@@ -486,14 +486,15 @@ export function IcpEditor({
                 {profile.length === 0 && legacy.length === 0 && (
                   <p className="text-xs text-slate-400">No ideal profile yet — Regenerate to build it from the JD and the recruiter brief.</p>
                 )}
-                {profile.length > 0 && (
-                  <IdealProfileTiles
+                {/* Always shown, so a must-have can be added even to an empty profile. */}
+                <IdealProfileTiles
                     criteria={profile.map((g) => toCriterion(g)!)}
                     onChange={(next) =>
                       setGates((prev) => prev.map((g) => (g.id === next.id ? { ...mustHaveFromCriterion(next), relax_at: next.relax_at ?? null } : g)))
                     }
+                    onAdd={(c) => setGates((prev) => [...prev, mustHaveFromCriterion(c)])}
+                    onRemove={(id) => setGates((prev) => prev.filter((g) => g.id !== id))}
                   />
-                )}
                 {screening.length > 0 && (
                   <div className="space-y-1">
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ask the candidate</div>

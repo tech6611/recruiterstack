@@ -7,7 +7,6 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { SourcingMatrix, type MatrixIcp, type MatrixMatch } from '@/components/req-jobs/SourcingMatrix'
 import { SearchSpecEditor, type LevelRunStat } from '@/components/req-jobs/SearchSpecEditor'
-import { AdaptivePlanPanel } from '@/components/req-jobs/AdaptivePlanPanel'
 import { PoolProfilePanel } from '@/components/req-jobs/PoolProfilePanel'
 import { unexpectedGateFailures } from '@/lib/icp-gates'
 
@@ -88,7 +87,7 @@ function toMatrixMatch(m: PoolMatch, newIds?: Set<string>): MatrixMatch {
 /** Sourcing Brain — ICP-ranked sourcing over the cross-org Candidate Pool (Pool B),
  *  with unlock-&-add-to-pipeline. Lives in the Source tab; the pool itself is filled
  *  and browsed elsewhere. */
-export function PoolSourcingSection({ jobId }: { jobId: string }) {
+export function PoolSourcingSection({ jobId, onOpenScoring }: { jobId: string; onOpenScoring?: () => void }) {
   const [state, setState] = useState<'idle' | 'loading' | 'ok' | 'no_access' | 'empty'>('idle')
   const [matches, setMatches] = useState<PoolMatch[]>([])
   const [icp, setIcp] = useState<MatrixIcp | null>(null)
@@ -96,8 +95,6 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
   const [adding, setAdding] = useState(false)
   const [stale, setStale] = useState(false)
   const [open, setOpen] = useState(false)
-  // Bumped after the adaptive planner applies a new plan, to remount the SearchSpecEditor.
-  const [specKey, setSpecKey] = useState(0)
   const [sourcing, setSourcing] = useState(false)
   // How many just-found people the Fit Engine is still scoring (0 = none).
   const [scoring, setScoring] = useState(0)
@@ -254,9 +251,8 @@ export function PoolSourcingSection({ jobId }: { jobId: string }) {
       </div>
       {open && (<>
       {state !== 'no_access' && (<>
-        <SearchSpecEditor key={specKey} jobId={jobId} onFind={sourceFromCrustdata} finding={sourcing}
+        <SearchSpecEditor jobId={jobId} onFind={sourceFromCrustdata} finding={sourcing} onOpenScoring={onOpenScoring}
           lastRun={plan?.results.map((r): LevelRunStat => ({ key: r.key, fetched: r.fetched, total: r.total, exhausted: r.exhausted, error: r.error })) ?? null} />
-        <AdaptivePlanPanel jobId={jobId} onApplied={() => setSpecKey((k) => k + 1)} />
       </>)}
       {state === 'no_access' && (
         <div className="mt-3 rounded-lg border border-dashed border-slate-300 p-4 text-center">

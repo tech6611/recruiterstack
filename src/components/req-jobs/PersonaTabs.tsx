@@ -12,7 +12,7 @@ import type { Persona, PersonaChip, PersonaTab, PersonaTabKey } from '@/lib/pers
  * has pool access, the distribution actually present in the pool ("the market map").
  * Read-only view of the search spec + pool facets — no credits spent.
  */
-export function PersonaTabs({ jobId }: { jobId: string }) {
+export function PersonaTabs({ jobId, onOpenScoring }: { jobId: string; onOpenScoring?: () => void }) {
   const [persona, setPersona] = useState<Persona | null>(null)
   const [active, setActive] = useState<PersonaTabKey>('employers')
   const [loading, setLoading] = useState(true)
@@ -49,9 +49,17 @@ export function PersonaTabs({ jobId }: { jobId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Sparkles className="h-4 w-4 text-emerald-500" /> Ideal candidate persona
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Sparkles className="h-4 w-4 text-emerald-500" /> Ideal candidate persona
+          </CardTitle>
+          {/* Read-only here: the ideal profile is edited in one place, the Scoring tab. */}
+          {onOpenScoring && (
+            <button type="button" onClick={onOpenScoring} className="text-xs font-medium text-emerald-600 hover:text-emerald-800">
+              Edit on Scoring
+            </button>
+          )}
+        </div>
         <CardDescription>
           Who to target for this role, dimension by dimension.
           {persona.poolTotal != null && (

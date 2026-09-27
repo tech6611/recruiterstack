@@ -238,7 +238,7 @@ export function SourcingTab({ jobId, onOpenScoring }: { jobId: string; onOpenSco
   if (loading) {
     return (
       <div className="space-y-4">
-        <PersonaTabs jobId={jobId} />
+        <PersonaTabs jobId={jobId} onOpenScoring={onOpenScoring} />
         <Card><CardContent className="py-8 text-center text-sm text-slate-400">Loading…</CardContent></Card>
       </div>
     )
@@ -246,7 +246,7 @@ export function SourcingTab({ jobId, onOpenScoring }: { jobId: string; onOpenSco
 
   return (
     <div className="space-y-4">
-    <PersonaTabs jobId={jobId} />
+    <PersonaTabs jobId={jobId} onOpenScoring={onOpenScoring} />
     <Card>
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
@@ -412,7 +412,7 @@ export function SourcingTab({ jobId, onOpenScoring }: { jobId: string; onOpenSco
 
       {/* ── Sourcing Brain — the market (Pool B) ─────────────────────────────── */}
       <SourcingExperimentLab jobId={jobId} />
-      <PoolSourcingSection jobId={jobId} />
+      <PoolSourcingSection jobId={jobId} onOpenScoring={onOpenScoring} />
 
       {/* ── Sourcing Brain — the shortlist brief (Slice 1b) ──────────────────── */}
       <ShortlistBrief jobId={jobId} onOpenScoring={onOpenScoring} />

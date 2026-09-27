@@ -11,6 +11,9 @@ export const searchCriterionSchema = z.object({
   radius_km: z.number().min(1).max(2000).nullish(),
   exclude: z.boolean().optional(),
   label: z.string().trim().max(120).nullish(),
+  // Keep every field the type carries — zod strips unknown keys, and dropping these
+  // silently lost the relaxable must-haves and the planner's catch-all flags.
+  relax_at: z.number().int().min(1).max(20).nullish(),
 })
 
 export const searchLevelSchema = z.object({
@@ -19,12 +22,15 @@ export const searchLevelSchema = z.object({
   criteria: z.array(searchCriterionSchema).max(12),
   relaxes: z.string().trim().max(240).nullish(),
   rationale: z.string().trim().max(500).nullish(),
+  fallback: z.boolean().optional(),
+  ideal: z.boolean().optional(),
 })
 
 export const searchSpecSchema = z.object({
   version: z.literal(1),
   base: z.array(searchCriterionSchema).max(12),
-  levels: z.array(searchLevelSchema).max(16),
+  // One ideal line per ideal company + reasoned tiers + up to 8 planner moves can pass 16.
+  levels: z.array(searchLevelSchema).max(40),
   post_fetch: z.array(z.object({ label: z.string().trim().min(1).max(240), how: z.enum(['judge', 'screen', 'local']), note: z.string().trim().max(500).nullish() })).max(30).default([]),
   source: z.enum(['brief', 'edited']),
   edited_at: z.string().nullish(),

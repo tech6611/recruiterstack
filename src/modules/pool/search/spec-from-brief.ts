@@ -241,8 +241,8 @@ export function ladderFromIdealProfile(
   const others = relaxable.filter((c) => c !== companies && c !== titles && c !== location)
 
   const levels: SearchLevel[] = []
-  const level = (label: string, criteria: SearchCriterion[], relaxes: string | null, fallback = false) => {
-    if (criteria.length) levels.push({ id: `L${levels.length + 1}`, label, criteria, relaxes, rationale: null, fallback: fallback || undefined })
+  const level = (label: string, criteria: SearchCriterion[], relaxes: string | null, fallback = false, ideal = false) => {
+    if (criteria.length) levels.push({ id: `L${levels.length + 1}`, label, criteria, relaxes, rationale: null, fallback: fallback || undefined, ideal: ideal || undefined })
   }
   const keep = (...cs: (SearchCriterion | undefined)[]) => [...others, ...cs.filter((c): c is SearchCriterion => Boolean(c))]
 
@@ -260,9 +260,9 @@ export function ladderFromIdealProfile(
   // Keep the ideal-profile ids so a person bought at L1 is vendor-verified on the must-haves.
   const idealTerms = companies?.values ?? []
   if (idealTerms.length) {
-    for (const c of idealTerms) level(`Ideal profile · ${c}`, keep(location, titles, { ...(companies as SearchCriterion), values: [c], label: null }), null)
+    for (const c of idealTerms) level(`Ideal profile · ${c}`, keep(location, titles, { ...(companies as SearchCriterion), values: [c], label: null }), null, false, true)
   } else {
-    level('Ideal profile', keep(location, titles, companies), null)
+    level('Ideal profile', keep(location, titles, companies), null, false, true)
   }
 
   // Company tiers: one level PER subsequent feeder pool, in priority order, SAME title.
@@ -308,6 +308,12 @@ export function ladderFromIdealProfile(
   return { version: 1, base, levels, post_fetch, source: 'brief' }
 }
 
+/** An ideal-profile line. Plans saved before the `ideal` flag are recognised by the label
+ *  the ladder gives them. PURE. */
+export function isIdealLevel(l: Pick<SearchLevel, 'ideal' | 'label'>): boolean {
+  return l.ideal === true || /^Ideal profile\b/.test(l.label)
+}
+
 /** The spec to acquire with: the recruiter-edited one stored on the ICP, else derived from the brief. */
 export function resolveSearchSpec(
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'competencies'>>,
@@ -315,12 +321,18 @@ export function resolveSearchSpec(
 ): { spec: SearchSpec; stored: boolean } {
   const stored = icp.sourcing_map?.search_spec
   if (stored && stored.levels?.length) {
-    // One source of truth: the never-relaxed must-haves ARE the base line — a stored
-    // spec keeps its levels but not a stale base. Relaxable rows (relax_at set) live on
-    // L1, which the stored spec already holds. (setIcpSearchSpec writes an edited plan
-    // back to the must-haves, so the two never diverge.)
+    // One source of truth: the ICP's must-haves (edited on the Scoring tab) own the
+    // "Everyone" base line AND the ideal-profile lines. A stored plan keeps only its
+    // widening levels; the base and the ideal lines are rebuilt from the must-haves on
+    // every read, so a Scoring edit reaches the search and a plan edit can't rewrite it.
     const mustHaves = (icp.must_haves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null && c.relax_at == null)
-    return { spec: mustHaves.length ? { ...stored, base: mustHaves } : stored, stored: true }
+    const idealNow = (ladderFromIdealProfile(icp, ctx)?.levels ?? []).filter((l) => l.ideal)
+    // Keep level ids unique: the rebuilt ideal lines are numbered L1…Ln and may collide
+    // with a stored widening level's id when the ideal company count changed.
+    const idealIds = new Set(idealNow.map((l) => l.id))
+    const widening = stored.levels.filter((l) => !isIdealLevel(l)).map((l) => (idealIds.has(l.id) ? { ...l, id: `${l.id}-p` } : l))
+    const levels = idealNow.length ? [...idealNow, ...widening] : stored.levels
+    return { spec: { ...stored, base: mustHaves.length ? mustHaves : stored.base, levels }, stored: true }
   }
   return { spec: specFromIcp(icp, ctx), stored: false }
 }

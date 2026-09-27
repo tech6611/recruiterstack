@@ -101,7 +101,7 @@ is JSONB). Reuses `SearchSpec`/`SearchLevel`.
 > **Status: engine + UI SHIPPED (propose-only).** `runAdaptivePlan` / `applyMove` /
 > `planReach` (`src/modules/pool/search/adaptive-plan.ts`, tested) + `proposeNextMove`
 > (`src/lib/ai/next-move.ts`, Flash) + `POST /api/jobs/[id]/source/plan/adaptive` +
-> `AdaptivePlanPanel.tsx` ("Plan the market" on the Source tab: narrated moves, per-level
+> `WiderPlanProposal.tsx` ("Suggest a wider plan" inside the Search plan panel — was the separate "Plan the market" panel, AdaptivePlanPanel.tsx, until 2026-09-27: narrated moves, per-level
 > counts, "Apply this plan"). Spends only probe credits, never acquires. Safety cap = 8
 > expansions, returned as `capped`. **Remaining:** land it as a Sourcing-Lab challenger for
 > A/B before it becomes a default; verify live once the market source (Crustdata) is on.
