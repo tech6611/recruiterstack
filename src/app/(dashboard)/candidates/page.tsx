@@ -7,11 +7,12 @@ import {
   Plus, X, Users, Loader2, Clock,
   UserCheck, UserMinus, MessageSquare, FileCheck, CheckCircle, XCircle,
   ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight,
-  GripVertical, Pencil,
+  GripVertical, Pencil, Rows3, LayoutGrid,
 } from 'lucide-react'
 import type { CandidateStatus, CandidateListItem } from '@/lib/types/database'
 import { inputCls, labelCls } from '@/lib/ui/styles'
 import { BrandIcon } from '@/components/ui/BrandIcon'
+import { CandidateResultCard } from '@/components/candidates/CandidateResultCard'
 import {
   PaneSearchInput, TimeRangeControl, PaneDownloadButton, PaneFilterControl,
   ALL_RANGE_VALUE, withinRange, rowMatchesFilters, todayStamp,
@@ -414,6 +415,59 @@ const PANE_TINT: { active: PaneTone; past: PaneTone } = {
   past:   { bar: 'bg-[#eae6dd] hover:bg-[#e0dbce]', title: 'text-[#4f483d]', chevron: 'text-[#9a8f7d]' },
 }
 
+/**
+ * Table or cards.
+ *
+ * The table is denser — fifteen people to a screen, sortable columns, built for bulk
+ * work. The cards show each person's recent roles, education and assessment, so a
+ * shortlist can be judged by scrolling instead of by opening twelve profiles. Neither
+ * is better; they answer different questions, which is why this is a toggle and not a
+ * replacement. Remembered per browser so it survives a reload.
+ */
+type CandidateView = 'table' | 'cards'
+const VIEW_STORAGE_KEY = 'candidates-view'
+
+function useCandidateView(): [CandidateView, (v: CandidateView) => void] {
+  const [view, setView] = useState<CandidateView>('table')
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(VIEW_STORAGE_KEY)
+      if (saved === 'cards' || saved === 'table') setView(saved)
+    } catch { /* private window, blocked storage — the default is fine */ }
+  }, [])
+  const set = (v: CandidateView) => {
+    setView(v)
+    try { window.localStorage.setItem(VIEW_STORAGE_KEY, v) } catch { /* ignore */ }
+  }
+  return [view, set]
+}
+
+function ViewToggle({ view, onChange }: { view: CandidateView; onChange: (v: CandidateView) => void }) {
+  const base = 'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors'
+  return (
+    <div className="flex items-center gap-0.5 rounded-xl border border-slate-200 bg-white p-0.5">
+      <button
+        type="button"
+        onClick={() => onChange('table')}
+        aria-pressed={view === 'table'}
+        title="Table — denser, sortable"
+        className={`${base} ${view === 'table' ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-700'}`}
+      >
+        <Rows3 className="h-3.5 w-3.5" /> Table
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('cards')}
+        aria-pressed={view === 'cards'}
+        title="Cards — roles, education and the assessment at a glance"
+        className={`${base} ${view === 'cards' ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-700'}`}
+      >
+        <LayoutGrid className="h-3.5 w-3.5" /> Cards
+      </button>
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CandidatesBlock — one foldable pane (Active or Past): a coloured header bar
 // (click to collapse/expand) + count badge + sortable table + its own pagination.
@@ -449,6 +503,7 @@ function CandidatesBlock({
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(true)
+  const [view, setView] = useCandidateView()
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
@@ -501,6 +556,7 @@ function CandidatesBlock({
         <TimeRangeControl value={range} onChange={onRangeChange} badgeClass={accent} />
         <PaneDownloadButton filename={`candidates-${downloadName}-${todayStamp()}.csv`} rows={csvRows} badgeClass={accent} />
         <PaneFilterControl fields={filterFields} conditions={filters} onChange={c => { onFiltersChange(c); if (c.length) setOpen(true) }} badgeClass={accent} />
+        <ViewToggle view={view} onChange={setView} />
       </div>
 
       {open && (
@@ -514,6 +570,14 @@ function CandidatesBlock({
           </div>
         ) : (
           <>
+            {view === 'cards' ? (
+              /* Same rows, same paging, same footer — only the shape changes. */
+              <div className="space-y-2 p-4">
+                {paginated.map(c => (
+                  <CandidateResultCard key={c.id} candidate={c} onOpen={() => router.push(`/candidates/${c.id}`)} />
+                ))}
+              </div>
+            ) : (
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
@@ -597,6 +661,7 @@ function CandidatesBlock({
                 })}
               </tbody>
             </table>
+            )}
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
               <p className="text-xs text-slate-400">
                 {rows.length < total

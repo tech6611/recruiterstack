@@ -73,10 +73,38 @@ export const GET = withCapability('recruiting:view', async (req, orgId, supabase
     countMap.set(app.candidate_id, (countMap.get(app.candidate_id) ?? 0) + 1)
   }
 
+  // The card view shows the last few roles, which a table never needed. One batched
+  // query for the page's candidates, not one per card — and only the columns a card
+  // draws, so a long summary or a full history doesn't ride along on every list load.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pageIds = (data as any[]).map(c => c.id)
+  // candidate_experiences (migration 114) isn't in the generated Supabase types — the
+  // same loose handle the pool and icp tables use until `npm run gen:types` catches up.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const looseSb = supabase as any
+  const { data: expRows } = pageIds.length
+    ? await looseSb
+        .from('candidate_experiences')
+        .select('candidate_id,title,employer,start_date,end_date,is_current,sort_order')
+        .eq('org_id', orgId)
+        .in('candidate_id', pageIds)
+        .order('sort_order', { ascending: true })
+    : { data: [] }
+
+  const expMap = new Map<string, CandidateListItem['experiences']>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const e of ((expRows ?? []) as any[])) {
+    const list = expMap.get(e.candidate_id) ?? []
+    // A card shows at most three; fetching more would be read and thrown away.
+    if (list.length < 3) list.push(e)
+    expMap.set(e.candidate_id, list)
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const enriched: CandidateListItem[] = (data as any[]).map(c => ({
     ...c,
     active_applications_count: countMap.get(c.id) ?? 0,
+    experiences: expMap.get(c.id) ?? [],
   }))
 
   return NextResponse.json({ data: enriched, count, limit, offset })

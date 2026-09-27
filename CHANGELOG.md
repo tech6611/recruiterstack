@@ -50,6 +50,12 @@ entries on top.
 
 ## 2026-09-27
 
+### Added
+- **The candidates list has a card view, alongside the table** (Juicebox parity, Step 3 — final piece). Each person becomes a card read top to bottom: photo or initials, name with their links, location, **current role with the employer's mark and dates**, the two roles before it on a quieter indented rail, education, and the AI assessment. A shortlist can be judged by scrolling instead of by opening twelve profiles.
+  - **A toggle, not a replacement.** The table fits fifteen people on a screen and sorts by column; the cards fit about four and don't. They answer different questions, so both stay. The choice is remembered per browser.
+  - Both views share the same rows, paging and footer — only the shape changes.
+  - `GET /api/candidates` now returns each candidate's three most recent roles: one batched query for the page, not one per card, selecting only the columns a card draws.
+
 ### Fixed
 - **The header's company and school no longer sit in bordered pills.** `<BrandIcon>` stopped drawing its own tile, but the chip *around* it kept a fill and a ring — so Plivo still read as a logo stuffed into a square. A frame around a logo is a second box competing with whatever box the logo already is. They are now a mark followed by its name, sitting on the page, as Juicebox has them.
 - **Sainik School and Narayana branches now show their chain's crest** (10 spellings, hand-set in `brand_domains`). Neither could ever be reached automatically: "Sainik School" is rejected by the is-it-a-school guard, and "Narayana" is a single word, which is exactly the shape that put a stranger's logo on UCLA this morning. D.A.V stays a monogram — no provider has a DAV logo, and the one domain that answered served a generic file icon rather than a crest.

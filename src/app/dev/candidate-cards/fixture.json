@@ -1,0 +1,226 @@
+[
+  {
+    "id": "fixture-0",
+    "name": "Candidate A",
+    "email": "x@example.com",
+    "avatar_url": null,
+    "location": "Bengaluru, Karnataka, India",
+    "current_title": "Manager- Central Strategy",
+    "current_company": "Flipkart",
+    "linkedin_url": "https://linkedin.com/in/example",
+    "resume_url": "r.pdf",
+    "education": [
+      {
+        "year": 2024,
+        "field": null,
+        "degree": "BTech Minor",
+        "school": "Indian Institute of Technology, Guwahati"
+      },
+      {
+        "year": 2020,
+        "field": null,
+        "degree": null,
+        "school": "Maharishi International Residential School"
+      },
+      {
+        "year": 2024,
+        "field": null,
+        "degree": "Bachelor of Technology - BTech",
+        "school": "Indian Institute of Technology, Guwahati"
+      },
+      {
+        "year": 2016,
+        "field": null,
+        "degree": null,
+        "school": "Sri Vinayaga Vidhyalaya School"
+      }
+    ],
+    "active_applications_count": 0,
+    "experiences": [
+      {
+        "title": "Manager- Central Strategy",
+        "employer": "Flipkart",
+        "start_date": "2026-04-01",
+        "end_date": null,
+        "is_current": true
+      },
+      {
+        "title": "Senior Business Analyst- SPnA Strategy",
+        "employer": "Shadowfax",
+        "start_date": "2025-10-01",
+        "end_date": "2026-03-01",
+        "is_current": false
+      },
+      {
+        "title": "Business Analyst- SPnA Special projects",
+        "employer": "Shadowfax",
+        "start_date": "2024-06-01",
+        "end_date": "2025-10-01",
+        "is_current": false
+      }
+    ],
+    "ai_summary": "Candidate A is currently a Manager- Central Strategy and previously held roles across Flipkart, Shadowfax, University of Manitoba. Their background spans strategy, operations and analytics."
+  },
+  {
+    "id": "fixture-1",
+    "name": "Candidate B",
+    "email": "x@example.com",
+    "avatar_url": null,
+    "location": "Bengaluru",
+    "current_title": "Senior Manager - Strategy and Program Management",
+    "current_company": "Razorpay",
+    "linkedin_url": "https://linkedin.com/in/example",
+    "resume_url": "r.pdf",
+    "education": [
+      {
+        "year": 2022,
+        "field": null,
+        "degree": "MBA(IB)",
+        "school": "Indian Institute of Foreign Trade (Delhi)"
+      },
+      {
+        "year": 2015,
+        "field": null,
+        "degree": "Higher Secondary",
+        "school": "Julien Day School, Kolkata"
+      },
+      {
+        "year": 2019,
+        "field": null,
+        "degree": "Bachelor of Technology - BTech",
+        "school": "Heritage Institute of Technology"
+      },
+      {
+        "year": 2013,
+        "field": null,
+        "degree": "Secondary",
+        "school": "Julien Day School, Kolkata"
+      }
+    ],
+    "active_applications_count": 1,
+    "experiences": [
+      {
+        "title": "Senior Manager - Strategy and Program Management",
+        "employer": "Razorpay",
+        "start_date": "2026-04-01",
+        "end_date": null,
+        "is_current": true
+      },
+      {
+        "title": "Manager - Strategy & Program Management",
+        "employer": "Razorpay",
+        "start_date": "2024-11-01",
+        "end_date": "2026-04-01",
+        "is_current": false
+      },
+      {
+        "title": "Program Manager - D2C",
+        "employer": "Cambridge University Press & Assessment",
+        "start_date": "2023-11-01",
+        "end_date": "2024-11-01",
+        "is_current": false
+      }
+    ],
+    "ai_summary": null
+  },
+  {
+    "id": "fixture-2",
+    "name": "Candidate C",
+    "email": "x@example.com",
+    "avatar_url": null,
+    "location": "Bengaluru, Karnataka, India",
+    "current_title": "Investment Professional",
+    "current_company": "General Catalyst",
+    "linkedin_url": "https://linkedin.com/in/example",
+    "resume_url": "r.pdf",
+    "education": [
+      {
+        "year": 2018,
+        "field": null,
+        "degree": "Bachelor’s Degree",
+        "school": "Indian Institute of Technology, Bombay"
+      },
+      {
+        "year": 2020,
+        "field": null,
+        "degree": "PGP",
+        "school": "Indian Institute of Management Ahmedabad"
+      }
+    ],
+    "active_applications_count": 2,
+    "experiences": [
+      {
+        "title": "Investment Professional",
+        "employer": "General Catalyst",
+        "start_date": "2024-08-01",
+        "end_date": null,
+        "is_current": true
+      },
+      {
+        "title": "Investment Professional",
+        "employer": "Venture Highway",
+        "start_date": "2024-02-01",
+        "end_date": "2024-08-01",
+        "is_current": false
+      },
+      {
+        "title": "Growth & Strategy",
+        "employer": "GOAT Brand Labs",
+        "start_date": "2021-07-01",
+        "end_date": "2024-01-01",
+        "is_current": false
+      }
+    ],
+    "ai_summary": "Candidate C is currently a Investment Professional and previously held roles across General Catalyst, Venture Highway, GOAT Brand Labs. Their background spans strategy, operations and analytics."
+  },
+  {
+    "id": "fixture-3",
+    "name": "Candidate D",
+    "email": "x@example.com",
+    "avatar_url": null,
+    "location": "Bengaluru",
+    "current_title": "Mobile Architect",
+    "current_company": "InstaView",
+    "linkedin_url": "https://linkedin.com/in/example",
+    "resume_url": "r.pdf",
+    "education": [
+      {
+        "year": 2015,
+        "field": null,
+        "degree": "Master of Computer Application",
+        "school": "Bangalore University"
+      },
+      {
+        "year": 2012,
+        "field": null,
+        "degree": "Bachelor of Computer Application",
+        "school": "Veer Narmad South Gujarat University"
+      }
+    ],
+    "active_applications_count": 0,
+    "experiences": [
+      {
+        "title": "Mobile Architect",
+        "employer": "InstaView",
+        "start_date": "2023-08-01",
+        "end_date": null,
+        "is_current": true
+      },
+      {
+        "title": "Tech Lead - Mobile",
+        "employer": "SuperShare",
+        "start_date": "2022-03-01",
+        "end_date": "2023-07-01",
+        "is_current": false
+      },
+      {
+        "title": "Tech Lead - Android",
+        "employer": "Kami Vision",
+        "start_date": "2020-12-01",
+        "end_date": "2022-02-01",
+        "is_current": false
+      }
+    ],
+    "ai_summary": null
+  }
+]

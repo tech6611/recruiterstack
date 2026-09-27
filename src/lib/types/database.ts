@@ -750,6 +750,14 @@ export interface CandidateUpdate extends Partial<CandidateInsert> {}
 // Candidate enriched with aggregated pipeline data — used by the list page
 export interface CandidateListItem extends Candidate {
   active_applications_count: number
+  /** The three most recent roles — what the card view reads; the table ignores them. */
+  experiences: {
+    title: string | null
+    employer: string | null
+    start_date: string | null
+    end_date: string | null
+    is_current: boolean
+  }[]
 }
 
 export interface Role {
