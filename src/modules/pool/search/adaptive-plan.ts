@@ -103,7 +103,8 @@ export function applyMove(spec: SearchSpec, move: AdaptiveMove, seq: number): Se
   } else {
     // wider_location — only meaningful when the plan has a location dimension.
     if (!t.location) return spec
-    criteria.push({ ...t.location, id: cid('loc'), radius_km: (t.location.radius_km ?? 50) * 3, label: null })
+    // `from` keeps this widened copy following the profile's location (values), at its own radius.
+    criteria.push({ ...t.location, id: cid('loc'), radius_km: (t.location.radius_km ?? 50) * 3, label: null, from: t.location.from ?? t.location.id })
     if (t.title) criteria.push(t.title)
   }
 

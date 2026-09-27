@@ -56,8 +56,8 @@ export function shortlistText(brief: Brief): string {
  * "Copy shortlist" — the hiring-manager hand-off from the one results table. It used to
  * be a separate Shortlist brief section: a third ranked list that re-showed the ICP's
  * reasoning (which now lives once, on the Scoring tab). The brief is fetched ahead of
- * the click (`refreshKey` changes after every rank / find), because browsers only allow
- * a clipboard write straight from the click.
+ * the click (`refreshKey` changes after every rank / find); if it isn't ready yet, the
+ * copy still starts inside the click (see copy()), which Safari requires.
  */
 export function CopyShortlistButton({ jobId, refreshKey }: { jobId: string; refreshKey: number }) {
   const [brief, setBrief] = useState<Brief | null>(null)
@@ -72,13 +72,33 @@ export function CopyShortlistButton({ jobId, refreshKey }: { jobId: string; refr
 
   useEffect(() => { load() }, [load, refreshKey])
 
-  async function copy() {
-    const b = brief ?? (await load())
-    if (!b || b.shortlist.length === 0) { toast('Nothing to copy yet — rank candidates first.'); return }
-    navigator.clipboard.writeText(shortlistText(b)).then(
-      () => toast.success(`Shortlist of ${b.counts.total} copied — paste it to your hiring manager.`),
-      () => toast.error('Could not copy — your browser blocked the clipboard.'),
-    )
+  function copy() {
+    // Safari only lets a page write the clipboard during the click itself. When the
+    // brief is already here, write it now. When it isn't, hand the browser a promise of
+    // the text (ClipboardItem) — still during the click — and let the fetch fill it in.
+    const empty = () => toast('Nothing to copy yet — rank candidates first.')
+    const done = (b: Brief) => toast.success(`Shortlist of ${b.counts.total} copied — paste it to your hiring manager.`)
+    const failed = () => toast.error('Could not copy — your browser blocked the clipboard. Try again.')
+    if (brief) {
+      if (brief.shortlist.length === 0) return empty()
+      navigator.clipboard.writeText(shortlistText(brief)).then(() => done(brief), failed)
+      return
+    }
+    let got: Brief | null = null
+    const text = load().then((b) => {
+      if (!b || b.shortlist.length === 0) throw new Error('empty')
+      got = b
+      return new Blob([shortlistText(b)], { type: 'text/plain' })
+    })
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      navigator.clipboard.write([new ClipboardItem({ 'text/plain': text })]).then(
+        () => { if (got) done(got) },
+        () => (got ? failed() : empty()),
+      )
+    } else {
+      // Older browsers without ClipboardItem: fetch, then write (works outside Safari).
+      text.then((blob) => blob.text()).then((t) => navigator.clipboard.writeText(t)).then(() => { if (got) done(got) }, () => (got ? failed() : empty()))
+    }
   }
 
   return (

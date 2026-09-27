@@ -141,7 +141,7 @@ describe('ladderFromIdealProfile', () => {
   })
   it('L1 keeps the ideal-profile ids so bought people are vendor-verified on them; wider levels get their own', () => {
     expect(spec.levels[0].criteria.map((c) => c.id)).toEqual(['ip-location', 'ip-titles', 'ip-companies'])
-    expect(spec.levels[2].criteria.find((c) => c.kind === 'employer_current')?.id).toBe('ip-companies-t1')
+    expect(spec.levels[2].criteria.find((c) => c.kind === 'employer_current')?.id).toBe('ip-companies-t-growth-stage-saas')
   })
   it('is null for an ICP without an ideal profile (legacy gates keep the pool-based plan)', () => {
     expect(ladderFromIdealProfile({ must_haves: [{ id: 'x', label: 'Has SQL?', attribute: '', operator: '', value: '' }] })).toBeNull()
@@ -174,6 +174,53 @@ describe('ladderFromIdealProfile', () => {
     expect(isIdealLevel({ label: 'Ideal profile · Rippling' })).toBe(true)
     expect(isIdealLevel({ label: 'Growth-stage SaaS' })).toBe(false)
     expect(isIdealLevel({ label: 'Anything', ideal: true })).toBe(true)
+  })
+
+  // ── A Scoring change flows into EVERY level of a saved plan ───────────────────
+  const savedWith = (levels: typeof spec.levels) => ({ ...spec, source: 'edited' as const, levels })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resolveWith = (mustHaves: any[], stored: any) => resolveSpec({ ...icp, must_haves: mustHaves, sourcing_map: { ...icp.sourcing_map, search_spec: stored } } as any).spec
+  const retitle = icp.must_haves.map((g) => (g.kind === 'title_current' && !g.exclude ? { ...g, values: ['Director of Engineering'] } : g))
+
+  it('a title change on Scoring reaches the saved widening levels, not just the ideal lines', () => {
+    const r = resolveWith(retitle, savedWith(spec.levels))
+    const tier = r.levels.find((l) => l.label === 'Growth-stage SaaS')!
+    expect(tier.criteria.find((c) => c.kind === 'title_current')?.values).toEqual(['Director of Engineering'])
+    expect(tier.criteria.find((c) => c.kind === 'title_current')?.linked).toBe(true)
+    // The widened location's "every title" follows too.
+    const wider = r.levels.find((l) => l.label === 'Wider location')!
+    expect(wider.criteria.find((c) => c.kind === 'title_current')?.values).toContain('Director of Engineering')
+    expect(wider.criteria.find((c) => c.kind === 'title_current')?.values).not.toContain('Engineering Manager')
+  })
+  it('keeps what the recruiter added by hand', () => {
+    const tier = spec.levels.find((l) => l.label === 'Growth-stage SaaS')!
+    const handFilter = { id: 'hand-1', kind: 'skill' as const, values: ['Kubernetes'] }
+    const handLevel = { id: 'LX', label: 'Hand-added · fintech', criteria: [{ id: 'hx', kind: 'employer_current' as const, values: ['Brex'] }], relaxes: null }
+    const stored = savedWith([...spec.levels.map((l) => (l.id === tier.id ? { ...l, criteria: [...l.criteria, handFilter] } : l)), handLevel])
+    const r = resolveWith(retitle, stored)
+    expect(r.levels.find((l) => l.label === 'Growth-stage SaaS')!.criteria.find((c) => c.id === 'hand-1')?.values).toEqual(['Kubernetes'])
+    expect(r.levels.find((l) => l.id === 'LX')?.criteria[0].values).toEqual(['Brex'])
+  })
+  it('a location change moves every widened location, keeping its own radius', () => {
+    const moved = icp.must_haves.map((g) => (g.kind === 'location' ? { ...g, values: ['Austin'] } : g))
+    const adaptive = { id: 'LA1', label: 'Wider still', criteria: [{ id: 'adapt-0-loc', kind: 'location' as const, values: ['New York'], radius_km: 450, from: 'ip-location' }], relaxes: null }
+    const r = resolveWith(moved, savedWith([...spec.levels, adaptive]))
+    expect(r.levels.find((l) => l.label === 'Wider location')!.criteria.find((c) => c.kind === 'location')?.values).toEqual(['Austin'])
+    const still = r.levels.find((l) => l.id === 'LA1')!.criteria[0]
+    expect(still.values).toEqual(['Austin'])
+    expect(still.radius_km).toBe(450)
+  })
+  it('drops a saved level whose defining profile field was removed on Scoring', () => {
+    const noCompanies = icp.must_haves.filter((g) => !g.kind?.startsWith('employer_'))
+    const r = resolveWith(noCompanies, savedWith(spec.levels))
+    expect(r.levels.map((l) => l.label)).not.toContain('Growth-stage SaaS')
+  })
+  it('refreshes the checks-after-fetch list from the profile', () => {
+    const stored = { ...savedWith(spec.levels), post_fetch: [{ label: 'An old competency', how: 'judge' as const }] }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = resolveSpec({ ...icp, competencies: [{ id: 'c1', name: 'Hiring bar', weight: 100, behaviours: [] }], sourcing_map: { ...icp.sourcing_map, search_spec: stored } } as any).spec
+    expect(r.post_fetch.map((p) => p.label)).toContain('Hiring bar')
+    expect(r.post_fetch.map((p) => p.label)).not.toContain('An old competency')
   })
 })
 

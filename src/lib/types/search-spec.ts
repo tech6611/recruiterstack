@@ -52,6 +52,15 @@ export interface SearchCriterion {
    * dimensions with relax_at <= L; that is not a failure to fold away.
    */
   relax_at?: number | null
+  /**
+   * Set on a plan filter that is a copy of an ideal-profile field (title, companies,
+   * location…). Such copies are refreshed from the ICP on every read, so a change on the
+   * Scoring tab reaches every level of a saved plan. Shown read-only in the plan editor.
+   */
+  linked?: boolean
+  /** A widened copy of a must-have (e.g. the location at 3× radius): the must-have id it
+   *  follows. Its values track that must-have; its own widening (radius) is kept. */
+  from?: string | null
 }
 
 export interface SearchLevel {
