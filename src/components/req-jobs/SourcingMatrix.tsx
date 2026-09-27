@@ -3,8 +3,9 @@
 /**
  * Sourcing comparison matrix — every candidate scored on the same axes: the
  * ICP's must-haves (pass/fail gates, ✓/✕) and its weighted competencies (a 1–4
- * rating bar). Click a name to expand the evidence behind the scores. Shared by
- * the internal (ATS) pocket; the market pocket adopts it next.
+ * rating bar). Click a name to expand the evidence behind the scores. One table for
+ * your own candidates AND market people: each row's `row_kind` decides its actions
+ * (👍/👎 for yours; star / open / hide for the market).
  */
 
 import { Fragment, useState } from 'react'
@@ -50,6 +51,8 @@ export interface MatrixMatch {
   skills?: string[]
   competencies: { name: string; rating: number; evidence?: string }[]
   decision?: string | null
+  /** Which pool the row is from — decides its actions. Absent = your candidates. */
+  row_kind?: 'yours' | 'market'
   candidate: {
     id: string
     name: string | null
@@ -293,7 +296,7 @@ export function SourcingMatrix({
                           </div>
                         )}
                       </button>
-                      {(onStar || onHide || onOpenProfile) && (
+                      {m.row_kind === 'market' && (onStar || onHide || onOpenProfile) && (
                         <div className="ml-auto flex shrink-0 items-center gap-0.5 pt-0.5">
                           {onStar && <button type="button" title={m.starred ? 'Starred — click to unstar' : 'Star (shortlist without spending an unlock)'} onClick={(e) => { e.stopPropagation(); onStar(m.candidate_id, !m.starred) }} className={`rounded p-1 ${m.starred ? 'text-amber-500' : 'text-slate-300 hover:text-amber-500'}`}><Star className="h-3.5 w-3.5" fill={m.starred ? 'currentColor' : 'none'} /></button>}
                           {onOpenProfile && <button type="button" title="Open profile" onClick={(e) => { e.stopPropagation(); onOpenProfile(m.candidate_id) }} className="rounded p-1 text-slate-300 hover:text-slate-600"><PanelRightOpen className="h-3.5 w-3.5" /></button>}
@@ -340,10 +343,10 @@ export function SourcingMatrix({
                       ? <Loader2 className="mx-auto h-4 w-4 animate-spin text-slate-300" aria-label="Scoring…" />
                       : <span className={`text-base font-bold tabular-nums ${fitCls}`}>{m.score}</span>}
                   </td>
-                  {/* decide (internal pocket only) */}
+                  {/* decide — your candidates only; a market row leaves the cell empty */}
                   {onDecide && (
                     <td className="px-2 py-2.5">
-                      <div className="flex items-center gap-1">
+                      {m.row_kind !== 'market' && <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onDecide(m.candidate_id, 'yes') }}
@@ -360,7 +363,7 @@ export function SourcingMatrix({
                         >
                           <ThumbsDown className="h-3.5 w-3.5" />
                         </button>
-                      </div>
+                      </div>}
                     </td>
                   )}
                 </tr>
