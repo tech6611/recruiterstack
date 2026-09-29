@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { experienceBandGate, experienceBandFromGate, yearsFloorFromLabel, isSourcingOnlyCriterion, mustHaveFromCriterion } from './icp-gates'
+import { experienceBandGate, experienceBandFromGate, yearsFloorFromLabel, isSourcingOnlyCriterion, mustHaveFromCriterion, criterionLabel } from './icp-gates'
+import { icpDraftInputSchema } from '@/lib/validations/icp'
 
 describe('experience band gate', () => {
   it('round-trips a [min, max] band through the structured gate', () => {
@@ -42,5 +43,28 @@ describe('sourcing-only vs hard gate', () => {
     expect(mustHaveFromCriterion({ id: 't', kind: 'title_current', values: ['Engineering Manager'], relax_at: 3 }).enforcement).toBe('sourcing_only')
     expect(mustHaveFromCriterion({ id: 'x', kind: 'title_current', values: ['TPM'], exclude: true }).enforcement).toBe('hard')
     expect(mustHaveFromCriterion({ id: 'y', kind: 'years_band', values: [], min: 6, max: 12 }).enforcement).toBe('hard')
+  })
+})
+
+describe('automatic labels always fit the save limit', () => {
+  // A School row with the house tier-1 list made a 329-character label and the whole
+  // profile was refused on Re-approve with "Validation failed".
+  const schools = ['Indian Institute of Technology', 'IIT', 'Indian Institute of Management', 'IIM', 'Indian School of Business', 'ISB', 'BITS Pilani', 'Birla Institute of Technology and Science', 'National Institute of Technology', 'NIT', 'Shri Ram College of Commerce', 'SRCC', "St. Stephen's College", 'Faculty of Management Studies', 'FMS', 'XLRI']
+
+  it('lists what fits, then says how many more', () => {
+    const label = criterionLabel({ kind: 'school', values: schools })
+    expect(label.length).toBeLessThanOrEqual(200)
+    expect(label).toMatch(/^School: Indian Institute of Technology \/ IIT \/ .* \+\d+ more$/)
+    // The row keeps every value; only the phrase is short.
+    expect(mustHaveFromCriterion({ id: 'ip-school', kind: 'school', values: schools, relax_at: 3 }).values).toHaveLength(16)
+  })
+
+  it('a row built that way passes the save check', () => {
+    const row = mustHaveFromCriterion({ id: 'ip-school', kind: 'school', values: schools, relax_at: 3 })
+    expect(icpDraftInputSchema.safeParse({ must_haves: [row], competencies: [] }).success).toBe(true)
+  })
+
+  it('leaves a short list whole', () => {
+    expect(criterionLabel({ kind: 'school', values: ['IIM', 'IIT'] })).toBe('School: IIM / IIT')
   })
 })

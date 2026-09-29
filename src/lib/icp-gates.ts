@@ -68,9 +68,32 @@ export function toCriterion(g: IcpMustHave): SearchCriterion | null {
   return { id: g.id, kind: g.kind, values: g.values ?? [], min: g.min ?? null, max: g.max ?? null, radius_km: g.radius_km ?? null, exclude: g.exclude ?? false, label: g.label, relax_at: g.relax_at ?? null }
 }
 
+/** Room for the list inside a label: labels are capped at 200 characters on save
+ *  (icpMustHaveSchema), and the longest prefix plus a "+N more" tail must still fit. */
+const LIST_BUDGET = 150
+
+/**
+ * The values, as many as fit, then "+N more". A label is the readable phrase — the
+ * values themselves stay on the row and are what the search sends. Listing every value
+ * broke saving: a School row with sixteen institutes made a 329-character label, and
+ * the whole profile was refused with "Validation failed".
+ */
+function shortList(values: string[]): string {
+  const out: string[] = []
+  let used = 0
+  for (const v of values) {
+    const add = (out.length ? 3 : 0) + v.length
+    if (out.length && used + add > LIST_BUDGET) break
+    out.push(v.length > LIST_BUDGET ? `${v.slice(0, LIST_BUDGET - 1)}…` : v)
+    used += add
+  }
+  const rest = values.length - out.length
+  return out.join(' / ') + (rest > 0 ? ` +${rest} more` : '')
+}
+
 /** "6–12 years" · "Within 50 km of New York" · "Any title held: Engineering Manager / Tech Lead Manager". */
 export function criterionLabel(c: Pick<SearchCriterion, 'kind' | 'values' | 'min' | 'max' | 'radius_km' | 'exclude'>): string {
-  const list = (c.values ?? []).join(' / ')
+  const list = shortList(c.values ?? [])
   const not = c.exclude ? 'Not ' : ''
   switch (c.kind) {
     case 'years_band':
