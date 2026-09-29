@@ -152,8 +152,11 @@ describe('idealProfileFromBrief — the New York job', () => {
   const out = idealProfileFromBrief(brief, market)
   const by = (id: string) => out.find((g) => g.id === id)!
 
-  it('reads as where · years · education · roles held · companies', () => {
-    expect(out.map((g) => g.kind)).toEqual(['location', 'years_band', 'degree_field', 'title_current', 'employer_current'])
+  it('reads as where · years · education, then one bet per pool in search order', () => {
+    expect(out.map((g) => g.kind)).toEqual(['location', 'years_band', 'degree_field', 'employer_current', 'title_current', 'employer_current', 'title_current'])
+    expect(out.filter((g) => g.bet != null).map((g) => [g.bet, g.bet_label])).toEqual([
+      [1, 'Scaling B2B SaaS (Series A–C)'], [1, 'Scaling B2B SaaS (Series A–C)'], [2, 'Growth-stage SaaS'], [2, 'Growth-stage SaaS'],
+    ])
   })
   it('where: the job market, 50 km, relaxes at L4', () => {
     expect(by(IDEAL_PROFILE_IDS.location)).toMatchObject({ values: ['New York, New York, US'], radius_km: 50, relax_at: 4 })
@@ -162,11 +165,38 @@ describe('idealProfileFromBrief — the New York job', () => {
     expect(by(IDEAL_PROFILE_IDS.years)).toMatchObject({ min: 6, max: 12, relax_at: null })
     expect(by(IDEAL_PROFILE_IDS.education)).toMatchObject({ values: ['B.Tech', 'Engineering', 'Computer Science'], relax_at: null })
   })
-  it('roles held: whole titles, never a bare "Senior"; relaxes at L3', () => {
-    expect(by(IDEAL_PROFILE_IDS.titles)).toMatchObject({ values: ['Engineering Manager', 'Tech Lead Manager', 'Senior Software Engineer', 'Staff Software Engineer'], relax_at: 3 })
+  it('a pool with no titles of its own takes the role\'s — whole titles, never a bare "Senior"', () => {
+    expect(by('ip-bet-1-titles')).toMatchObject({ values: ['Engineering Manager', 'Tech Lead Manager', 'Senior Software Engineer', 'Staff Software Engineer'], relax_at: 3, enforcement: 'sourcing_only' })
   })
-  it('companies: the priority-1 pool only, legal suffixes stripped; relaxes at L2', () => {
-    expect(by(IDEAL_PROFILE_IDS.companies)).toMatchObject({ kind: 'employer_current', values: ['Rippling', 'Ramp', 'Vanta'], relax_at: 2 })
+  it('bet 1 is the priority-1 pool, legal suffixes stripped; a search lane, never a reject', () => {
+    expect(by('ip-bet-1-companies')).toMatchObject({ kind: 'employer_current', values: ['Rippling', 'Ramp', 'Vanta'], relax_at: 2, enforcement: 'sourcing_only' })
+    expect(by('ip-bet-2-companies').values).toEqual(['Datadog', 'Stripe'])
+  })
+  it('no pools → no bets: the role\'s titles are the one title row', () => {
+    const rows = idealProfileFromBrief({ ...brief, feeder_pools: [] }, market)
+    expect(rows.some((g) => g.bet != null)).toBe(false)
+    expect(rows.find((g) => g.id === IDEAL_PROFILE_IDS.titles)?.values).toContain('Engineering Manager')
+  })
+  it('each bet carries its OWN titles, and is named after its card', () => {
+    const so = {
+      ...brief, title_families: ['Strategy Manager'],
+      feeder_pools: [
+        { label: 'Top-Tier Consulting', companies: ['McKinsey & Company', 'Boston Consulting Group (BCG)'], role_types: ['Business Analyst', 'Associate', 'Consultant'], priority: 1 },
+        { label: 'Startup BizOps', companies: ['Swiggy'], role_types: ['Strategy Manager', 'Program Manager'], priority: 2 },
+      ],
+    }
+    const cards = [
+      { name: 'The Scaled Startup BizOps Star', thesis: '', where_from: 'BizOps at Swiggy.' },
+      { name: 'The Classic Post-Consulting Operator', thesis: '', where_from: 'Associate at McKinsey, Bain, or BCG.' },
+    ]
+    const rows = idealProfileFromBrief(so, market, { archetypes: cards })
+    const row = (id: string) => rows.find((g) => g.id === id)!
+    // McKinsey is searched for consulting titles only — not "Strategy Manager".
+    expect(row('ip-bet-1-titles').values).toEqual(['Business Analyst', 'Associate', 'Consultant'])
+    expect(row('ip-bet-1-companies').values).toEqual(['McKinsey', 'Boston Consulting Group', 'BCG'])
+    expect(row('ip-bet-1-companies').bet_label).toBe('The Classic Post-Consulting Operator')
+    expect(row('ip-bet-2-titles').values).toEqual(['Strategy Manager', 'Program Manager'])
+    expect(row('ip-bet-2-titles').bet_label).toBe('The Scaled Startup BizOps Star')
   })
   it('a remote market has no location row; an empty brief has no rows', () => {
     expect(idealProfileFromBrief(brief, { ...market, work_model: 'remote' }).some((g) => g.kind === 'location')).toBe(false)

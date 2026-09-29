@@ -37,7 +37,7 @@ type Market = Awaited<ReturnType<typeof getJobRoleContext>>['market']
 function profileFromBrief(icp: Icp | null, market: Market): IcpMustHave[] | null {
   const brief = icp?.sourcing_map?.recruiter_brief
   if (!brief || (icp?.must_haves ?? []).some((g) => isCriterion(g))) return null
-  const rows = idealProfileFromBrief(brief, market)
+  const rows = idealProfileFromBrief(brief, market, { archetypes: icp?.sourcing_map?.archetypes ?? null })
   return rows.length ? rows : null
 }
 

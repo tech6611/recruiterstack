@@ -232,13 +232,19 @@ describe('draftFromReasoning — the must-haves ARE the ideal profile', () => {
     competencies: [{ name: 'A', weight: 100, behaviours: [] }],
     must_haves: [{ label: 'Has at least 2 full years of experience?' }, { label: 'Mentions SQL?' }],
   }
-  it('builds where · years · education · roles held · companies from the brief and ignores yes/no gates', () => {
+  it('builds where · years · education · bets from the brief and ignores yes/no gates', () => {
     const d = draftFromReasoning(base, { city: 'Bengaluru', state: 'Karnataka', country: 'IN', work_model: 'onsite' })
-    expect(d.must_haves.map((g) => g.kind)).toEqual(['location', 'years_band', 'degree_field', 'title_current', 'employer_current'])
+    expect(d.must_haves.map((g) => g.kind)).toEqual(['location', 'years_band', 'degree_field', 'employer_current', 'title_current'])
+    expect(d.must_haves.filter((g) => g.bet === 1)).toHaveLength(2)
     expect(d.must_haves.find((g) => g.kind === 'years_band')).toMatchObject({ min: 2, max: 6 })
     expect(d.must_haves.find((g) => g.kind === 'employer_current')?.values).toEqual(['McKinsey', 'Bain'])
     expect(d.must_haves.find((g) => g.kind === 'employer_current')?.enforcement).toBe('sourcing_only')
     expect(d.must_haves.some((g) => /SQL/.test(g.label))).toBe(false)
+  })
+  it('keeps every bet: three pools make six rows beside the shared ones (not cut to 8)', () => {
+    const pools = ['A', 'B', 'C'].map((l, i) => ({ label: l, companies: [`${l}corp`], role_types: ['Analyst'], priority: i + 1 }))
+    const d = draftFromReasoning({ ...base, recruiter_brief: { ...base.recruiter_brief!, feeder_pools: pools, target_schools: { tier1: ['IIT'], tier2: [] }, market_gates: [{ requirement: 'Degree from a top university' }] } }, { city: 'Bengaluru', state: 'Karnataka', country: 'IN', work_model: 'onsite' })
+    expect(d.must_haves.filter((g) => g.bet != null)).toHaveLength(6)
   })
   it('with no market and no brief there is simply no profile — never a question gate', () => {
     const d = draftFromReasoning({ ...base, recruiter_brief: null })

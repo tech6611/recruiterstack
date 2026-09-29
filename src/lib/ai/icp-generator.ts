@@ -652,7 +652,10 @@ export function sourcingMapFromReasoning(g: ReasoningFirstGeneration, recruiterC
  * there is no separate gate concept. PURE + tested.
  */
 export function draftFromReasoning(g: ReasoningFirstGeneration, market?: IdealProfileMarket | null): IcpDraftInput {
-  const must_haves = idealProfileFromBrief(g.recruiter_brief ?? null, market ?? null).slice(0, MAX_GATES)
+  // Not MAX_GATES: that caps the model's free-text gates. The ideal profile is built from
+  // the brief — up to four bets of two rows each beside the shared rows — and the save
+  // schema allows 20.
+  const must_haves = idealProfileFromBrief(g.recruiter_brief ?? null, market ?? null, { archetypes: g.archetypes }).slice(0, 20)
   return { must_haves, competencies: competenciesFromGeneration(g.competencies), source: 'intake' }
 }
 

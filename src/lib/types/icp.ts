@@ -38,6 +38,9 @@ export interface IcpMustHave {
   relax_at?: number | null
   /** A sourcing-only row guides retrieval but never rejects a candidate during scoring. */
   enforcement?: 'hard' | 'sourcing_only'
+  /** The bet this row belongs to (see SearchCriterion.bet). */
+  bet?: number | null
+  bet_label?: string | null
 }
 
 /** The evaluator's answer for one structured must-have. */

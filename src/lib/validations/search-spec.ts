@@ -16,6 +16,8 @@ export const searchCriterionSchema = z.object({
   relax_at: z.number().int().min(1).max(20).nullish(),
   linked: z.boolean().optional(),
   from: z.string().max(60).nullish(),
+  bet: z.number().int().min(1).max(10).nullish(),
+  bet_label: z.string().trim().max(120).nullish(),
 })
 
 export const searchLevelSchema = z.object({

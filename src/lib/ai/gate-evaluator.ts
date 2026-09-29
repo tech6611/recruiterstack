@@ -16,7 +16,8 @@ import type { CriterionKind } from '@/lib/types/search-spec'
 import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion, criterionLabel, mustHaveFromCriterion } from '@/lib/icp-gates'
 import { resolveLocationParts, slugifyPlace } from '@/modules/pool/domain/normalize'
-import { employerTerms, schoolTiers, pedigreeMatters } from '@/modules/pool/search/spec-from-brief'
+import { employerTerms, schoolTiers, pedigreeMatters, roleTerms } from '@/modules/pool/search/spec-from-brief'
+import { sortedPools, searchPassFor, type Archetype } from '@/lib/bets'
 
 // ── Accessors (shared, in src/lib/icp-gates.ts) ─────────────────────────────────
 export { isCriterion, toCriterion, criterionLabel, mustHaveFromCriterion }
@@ -331,6 +332,9 @@ export const IDEAL_PROFILE_IDS = {
 /** The ladder: the level at which each relaxable dimension is loosened. Years and education never are. */
 export const RELAX_AT = { companies: 2, titles: 3, school: 3, location: 4 } as const
 
+/** Feeder pools turned into bets on the ideal profile (the planner's pool cap). */
+const MAX_BETS = 4
+
 export interface IdealProfileMarket { city?: string | null; state?: string | null; country?: string | null; work_model?: string | null }
 
 /**
@@ -341,7 +345,7 @@ export interface IdealProfileMarket { city?: string | null; state?: string | nul
 export function idealProfileFromBrief(
   brief: Pick<RecruiterBrief, 'experience_band' | 'title_families' | 'title_basis' | 'current_functions' | 'current_title_exclusions' | 'feeder_pools' | 'education' | 'market'> & Partial<Pick<RecruiterBrief, 'target_schools' | 'market_gates'>> | null | undefined,
   market: IdealProfileMarket | null | undefined,
-  opts: { radiusKm?: number } = {},
+  opts: { radiusKm?: number; archetypes?: Archetype[] | null } = {},
 ): IcpMustHave[] {
   const out: IcpMustHave[] = []
   const radius = opts.radiusKm ?? 50
@@ -373,8 +377,11 @@ export function idealProfileFromBrief(
   }
 
   // Strict pass: a role held TODAY unless the recruiter deliberately says prior experience is the signal.
+  const titleKind = brief?.title_basis === 'past' ? 'title_any' : 'title_current'
   const titles = Array.from(new Set((brief?.title_families ?? []).flatMap(titleTerms)))
-  if (titles.length) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.titles, kind: brief?.title_basis === 'past' ? 'title_any' : 'title_current', values: titles, relax_at: RELAX_AT.titles }))
+  const bets = sortedPools(brief as RecruiterBrief).slice(0, MAX_BETS)
+  // No pools → no bets: the role's own titles are the title row, as before.
+  if (!bets.length && titles.length) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.titles, kind: titleKind, values: titles, relax_at: RELAX_AT.titles }))
 
   const functions = Array.from(new Set((brief?.current_functions ?? []).map((v) => v.trim()).filter(Boolean)))
   if (functions.length) out.push(mustHaveFromCriterion({ id: 'ip-function', kind: 'function', values: functions }))
@@ -382,10 +389,24 @@ export function idealProfileFromBrief(
   const exclusions = Array.from(new Set((brief?.current_title_exclusions ?? []).flatMap(titleTerms)))
   if (exclusions.length) out.push(mustHaveFromCriterion({ id: 'ip-title-exclusions', kind: 'title_current', values: exclusions, exclude: true }))
 
-  // Companies: the first feeder pool (lowest priority number) is the ideal.
-  const pools = [...(brief?.feeder_pools ?? [])].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
-  const companies = Array.from(new Set((pools[0]?.companies ?? []).flatMap(employerTerms)))
-  if (companies.length) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.companies, kind: 'employer_current', values: companies, relax_at: RELAX_AT.companies }))
+  // Bets: each feeder pool, in search order, is a company group AND the titles its people
+  // hold there — McKinsey · Bain · BCG as Business Analyst / Associate / Consultant, the
+  // startups as Strategy Manager. Pairing them is the point: the role's own titles
+  // ("Strategy Manager") find almost nobody at McKinsey. A pool that names no titles
+  // falls back to the role's, written into the row so the record says what is searched.
+  // Each bet is named after its card ("The Classic Post-Consulting Operator") so the
+  // cards and the profile read as one thing.
+  bets.forEach((p, i) => {
+    const n = i + 1
+    const companies = Array.from(new Set((p.companies ?? []).flatMap(employerTerms)))
+    if (!companies.length) return
+    const own = Array.from(new Set((p.role_types ?? []).flatMap(roleTerms)))
+    const card = (opts.archetypes ?? []).find((a) => searchPassFor(a, brief as RecruiterBrief)?.pass === n)
+    const bet = { bet: n, bet_label: (card?.name ?? p.label ?? `Bet ${n}`).slice(0, 120) }
+    out.push(mustHaveFromCriterion({ id: `ip-bet-${n}-companies`, kind: 'employer_current', values: companies, relax_at: RELAX_AT.companies, ...bet }))
+    const betTitles = own.length ? own : titles
+    if (betTitles.length) out.push(mustHaveFromCriterion({ id: `ip-bet-${n}-titles`, kind: titleKind, values: betTitles, relax_at: RELAX_AT.titles, ...bet }))
+  })
 
   return out
 }

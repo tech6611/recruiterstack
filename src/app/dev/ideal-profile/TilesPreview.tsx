@@ -26,12 +26,18 @@ const OPTIONS: FetchedOptions = {
   departments: ['Engineering', 'Product', 'Design'],
 }
 
+// The Strategy & Operations Manager job, organised into bets.
+const bet = (n: number, bet_label: string, companies: string[], titles: string[]): SearchCriterion[] => [
+  { id: `ip-bet-${n}-companies`, kind: 'employer_current', values: companies, relax_at: 2, bet: n, bet_label },
+  { id: `ip-bet-${n}-titles`, kind: 'title_current', values: titles, relax_at: 3, bet: n, bet_label },
+]
 const START: SearchCriterion[] = [
-  { id: 'a', kind: 'location', values: ['San Francisco, California, United States'], radius_km: 50, relax_at: null },
-  { id: 'b', kind: 'years_band', values: [], min: 6, max: 12, relax_at: null },
-  { id: 'c', kind: 'title_current', values: ['Engineering Manager', 'Software Engineering Manager'], relax_at: 2 },
-  { id: 'd', kind: 'employer_any', values: ['Rippling', 'Ramp', 'Deel'], relax_at: 3 },
-  { id: 'e', kind: 'industry', values: [], relax_at: null },
+  { id: 'ip-location', kind: 'location', values: ['Bengaluru, Karnataka, IN'], radius_km: 50, relax_at: 4 },
+  { id: 'ip-years', kind: 'years_band', values: [], min: 2, max: 6, relax_at: null },
+  { id: 'ip-school', kind: 'school', values: ['Indian Institute of Technology', 'IIT', 'Indian Institute of Management', 'IIM', 'ISB', 'BITS Pilani'], relax_at: 3 },
+  ...bet(1, 'The Classic Post-Consulting Operator', ['McKinsey', 'Bain', 'Boston Consulting Group', 'BCG'], ['Business Analyst', 'Associate', 'Consultant']),
+  ...bet(2, 'The Scaled Startup BizOps Star', ['Udaan', 'Swiggy', 'Razorpay', 'CRED', 'Flipkart', 'Zomato', 'Google'], ['Strategy Manager', 'Business Operations Manager', 'Program Manager', "Chief of Staff's Office"]),
+  ...bet(3, 'The IB/VC Analyst Seeking Alpha', ['Goldman Sachs', 'Morgan Stanley', 'Sequoia Capital', 'Accel', 'Lightspeed Venture Partners'], ['Analyst', 'Associate']),
 ]
 
 export function TilesPreview() {

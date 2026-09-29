@@ -95,7 +95,25 @@ describe('specFromIcp', () => {
 
 // ── The ideal profile → ladder (docs/ideal-profile-plan.md) ──────────────────────
 import { ladderFromIdealProfile } from './spec-from-brief'
-import { idealProfileFromBrief } from '@/lib/ai/gate-evaluator'
+import { idealProfileFromBrief as buildProfile, titleTerms } from '@/lib/ai/gate-evaluator'
+import { mustHaveFromCriterion } from '@/lib/icp-gates'
+
+/**
+ * A profile in the PRE-BET shape — one "Current title" row (the role's titles) and one
+ * "Currently at" row (the first pool's companies) — as every profile approved before
+ * bets has (V6 of the Strategy & Ops job). These tests pin the planner for that shape,
+ * which still runs until a profile is organised into bets.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function idealProfileFromBrief(brief: any, market: any) {
+  const rows = buildProfile(brief, market)
+  const out = rows.filter((r) => r.bet == null)
+  const titles = Array.from(new Set((brief.title_families ?? []).flatMap(titleTerms))) as string[]
+  if (titles.length) out.push(mustHaveFromCriterion({ id: 'ip-titles', kind: brief.title_basis === 'past' ? 'title_any' : 'title_current', values: titles, relax_at: 3 }))
+  const first = rows.find((r) => r.bet === 1 && r.kind === 'employer_current')
+  if (first) out.push(mustHaveFromCriterion({ id: 'ip-companies', kind: 'employer_current', values: first.values ?? [], relax_at: 2 }))
+  return out
+}
 import { resolveSearchSpec as resolveSpec } from './spec-from-brief'
 
 describe('ladderFromIdealProfile', () => {
@@ -334,5 +352,94 @@ describe('searchSpecSchema', () => {
     })
     expect(parsed.levels[0]).toMatchObject({ ideal: true, fallback: true })
     expect(parsed.levels[0].criteria[0].relax_at).toBe(3)
+  })
+})
+
+describe('the bet ladder — each company group searched with its own titles', () => {
+  const bengaluru = { city: 'Bengaluru', state: 'Karnataka', country: 'IN', work_model: 'onsite' }
+  const so = {
+    niche: '', persona: '', market: 'Bengaluru', experience_band: { min_years: 2, max_years: 6 },
+    title_families: ['Strategy & Operations Manager', 'Chief of Staff'], adjacent_titles: [], current_functions: [], current_title_exclusions: [],
+    market_gates: [{ requirement: 'Degree from a top university' }], target_schools: { tier1: ['IIT', 'IIM'], tier2: ['NIT'] },
+    feeder_pools: [
+      { label: 'Top-Tier Consulting', companies: ['McKinsey & Company', 'Bain & Company', 'Boston Consulting Group (BCG)'], role_types: ['Business Analyst', 'Associate', 'Consultant'], priority: 1 },
+      { label: 'Startup BizOps', companies: ['Udaan', 'Swiggy'], role_types: ['Strategy Manager'], priority: 2 },
+      { label: 'IB / VC', companies: ['Goldman Sachs'], role_types: ['Analyst', 'Associate'], priority: 3 },
+    ],
+    jd_translations: [], market_norms: [], normal_red_flags: [], unsure_about: [],
+  }
+  const cards = [
+    { name: 'The Classic Post-Consulting Operator', thesis: '', where_from: 'Associate at McKinsey, Bain, or BCG.' },
+    { name: 'The Scaled Startup BizOps Star', thesis: '', where_from: 'BizOps at Udaan or Swiggy.' },
+    { name: 'The IB/VC Analyst', thesis: '', where_from: 'Analyst at Goldman Sachs.' },
+  ]
+  const must_haves = buildProfile(so, bengaluru, { archetypes: cards })
+  const icp = { must_haves, sourcing_map: { reasoning: '', requirement_decomposition: [], unwritten_filters: [], recruiter_brief: so, archetypes: cards }, competencies: [] }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const s = ladderFromIdealProfile(icp as any, { roleContext: { market: bengaluru } as any })!
+  const at = (label: string) => s.levels.find((l) => l.label === label)!.criteria
+  const of = (label: string, kind: string) => at(label).find((c) => c.kind === kind)
+
+  it('walks bet 1 firm by firm, then each bet, then each bet\'s former employees, then tier-2, then wider location', () => {
+    expect(s.levels.map((l) => l.label)).toEqual([
+      'Ideal profile · McKinsey', 'Ideal profile · Bain', 'Ideal profile · Boston Consulting Group (BCG)',
+      'Bet 2: The Scaled Startup BizOps Star', 'Bet 3: The IB/VC Analyst',
+      'Formerly at: The Classic Post-Consulting Operator', 'Formerly at: The Scaled Startup BizOps Star', 'Formerly at: The IB/VC Analyst',
+      'Tier-2 school · target companies', 'Wider location',
+    ])
+  })
+  it('each bet is searched for ONLY its own titles', () => {
+    expect(of('Ideal profile · McKinsey', 'title_current')?.values).toEqual(['Business Analyst', 'Associate', 'Consultant'])
+    expect(of('Bet 2: The Scaled Startup BizOps Star', 'title_current')?.values).toEqual(['Strategy Manager'])
+    expect(of('Bet 3: The IB/VC Analyst', 'title_current')?.values).toEqual(['Analyst', 'Associate'])
+  })
+  it('a firm with two names is one line; consulting firms mean consulting', () => {
+    expect(of('Ideal profile · Boston Consulting Group (BCG)', 'employer_current')?.values).toEqual(['Boston Consulting Group', 'BCG'])
+    expect(of('Ideal profile · McKinsey', 'function')?.values).toEqual(['Consulting'])
+    expect(of('Bet 2: The Scaled Startup BizOps Star', 'function')).toBeUndefined()
+  })
+  it('the profile rows ARE the search rows: edits on Scoring are what runs, and bought people are vendor-verified', () => {
+    expect(of('Ideal profile · McKinsey', 'employer_current')?.id).toBe('ip-bet-1-companies')
+    expect(of('Bet 2: The Scaled Startup BizOps Star', 'employer_current')?.id).toBe('ip-bet-2-companies')
+    expect(of('Bet 2: The Scaled Startup BizOps Star', 'title_current')?.id).toBe('ip-bet-2-titles')
+  })
+  it('former employees: worked at the bet\'s companies, held its titles at some point', () => {
+    expect(of('Formerly at: The Classic Post-Consulting Operator', 'employer_past')?.values).toEqual(['McKinsey', 'Bain', 'Boston Consulting Group', 'BCG'])
+    expect(of('Formerly at: The Classic Post-Consulting Operator', 'title_any')?.values).toEqual(['Business Analyst', 'Associate', 'Consultant'])
+  })
+  it('tier-1 schools on every company line; tier-2 once over all bets; none when no company is named', () => {
+    expect(of('Bet 3: The IB/VC Analyst', 'school')?.values).toEqual(['IIT', 'IIM'])
+    expect(of('Tier-2 school · target companies', 'school')?.values).toEqual(['NIT'])
+    expect(of('Tier-2 school · target companies', 'employer_any')?.values).toEqual(['McKinsey', 'Bain', 'Boston Consulting Group', 'BCG', 'Udaan', 'Swiggy', 'Goldman Sachs'])
+    expect(of('Wider location', 'school')).toBeUndefined()
+  })
+  it('the wider location uses the role\'s own titles, never a bet\'s "Associate"', () => {
+    expect(of('Wider location', 'title_current')?.values).toEqual(['Strategy & Operations Manager', 'Chief of Staff'])
+  })
+  it('an edit to a bet on Scoring reaches its search line', () => {
+    const edited = must_haves.map((g) => (g.id === 'ip-bet-2-titles' ? { ...g, values: ['Chief of Staff'] } : g))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s2 = ladderFromIdealProfile({ ...icp, must_haves: edited } as any)!
+    expect(s2.levels.find((l) => l.label.startsWith('Bet 2'))!.criteria.find((c) => c.kind === 'title_current')?.values).toEqual(['Chief of Staff'])
+  })
+  it('a plan built from bets passes the plan save check', () => {
+    expect(searchSpecSchema.safeParse(s).success).toBe(true)
+  })
+})
+
+describe('a plan always saves', () => {
+  it('drops a profile label too long for a plan (the School row lists every institute)', () => {
+    const schools = Array.from({ length: 16 }, (_, i) => `Institute of Technology number ${i}`)
+    const must_haves = [
+      mustHaveFromCriterion({ id: 'ip-location', kind: 'location', values: ['Bengaluru'], radius_km: 50, relax_at: 4 }),
+      mustHaveFromCriterion({ id: 'ip-school', kind: 'school', values: schools, relax_at: 3 }),
+      mustHaveFromCriterion({ id: 'ip-titles', kind: 'title_current', values: ['Strategy Manager'], relax_at: 3 }),
+    ]
+    expect(must_haves[1].label.length).toBeGreaterThan(120)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const spec = ladderFromIdealProfile({ must_haves } as any)!
+    expect(searchSpecSchema.safeParse(spec).success).toBe(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(searchSpecSchema.safeParse(resolveSpec({ must_haves, sourcing_map: { search_spec: spec } } as any).spec).success).toBe(true)
   })
 })

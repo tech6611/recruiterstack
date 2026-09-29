@@ -65,7 +65,7 @@ export function isCriterion(g: Pick<IcpMustHave, 'kind'> | null | undefined): g 
 /** The criterion view of a structured must-have (null for a legacy gate). */
 export function toCriterion(g: IcpMustHave): SearchCriterion | null {
   if (!isCriterion(g)) return null
-  return { id: g.id, kind: g.kind, values: g.values ?? [], min: g.min ?? null, max: g.max ?? null, radius_km: g.radius_km ?? null, exclude: g.exclude ?? false, label: g.label, relax_at: g.relax_at ?? null }
+  return { id: g.id, kind: g.kind, values: g.values ?? [], min: g.min ?? null, max: g.max ?? null, radius_km: g.radius_km ?? null, exclude: g.exclude ?? false, label: g.label, relax_at: g.relax_at ?? null, ...(g.bet != null ? { bet: g.bet, bet_label: g.bet_label ?? null } : {}) }
 }
 
 /** Room for the list inside a label: labels are capped at 200 characters on save
@@ -127,6 +127,7 @@ export function mustHaveFromCriterion(c: SearchCriterion, label?: string | null)
     // widen". They guide sourcing and ranking, not candidate eligibility. An exclusion
     // ("not a TPM") carries no relax_at, so it correctly stays a hard gate.
     enforcement: isLaneKind(c.kind) && c.relax_at != null ? 'sourcing_only' : 'hard',
+    ...(c.bet != null ? { bet: c.bet, bet_label: c.bet_label ?? null } : {}),
   }
 }
 

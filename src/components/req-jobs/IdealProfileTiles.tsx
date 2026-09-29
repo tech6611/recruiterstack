@@ -93,19 +93,31 @@ export function IdealProfileTiles({
   // Fixed field order, so you always know where to look. Criteria we hold come first in
   // that order; every remaining field is still listed, unset — which is the whole point
   // of a record. Without them you cannot tell "no school requirement" from "forgot one".
-  const byKind = (k: CriterionKind) => criteria.filter((c) => c.kind === k)
+  // Rows that apply to every bet first (where · years · school…), in the fixed order;
+  // then the bets, each a company group and the titles searched there.
+  const shared = criteria.filter((c) => c.bet == null)
+  const byKind = (k: CriterionKind) => shared.filter((c) => c.kind === k)
   const ordered = [
     ...ADDABLE.flatMap(byKind),
-    ...criteria.filter((c) => !ADDABLE.includes(c.kind)),
+    ...shared.filter((c) => !ADDABLE.includes(c.kind)),
   ]
   const unset = ADDABLE.filter((k) => !criteria.some((c) => c.kind === k))
+  const bets = Array.from(new Set(criteria.filter((c) => c.bet != null).map((c) => c.bet as number)))
+    .sort((a, b) => a - b)
+    .map((n) => {
+      const rows = criteria.filter((c) => c.bet === n)
+      return {
+        n,
+        label: rows.find((c) => c.bet_label)?.bet_label ?? `Bet ${n}`,
+        rows: [...rows.filter((c) => isEmployer(c.kind)), ...rows.filter((c) => !isEmployer(c.kind))],
+      }
+    })
 
-  return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      {ordered.map((c) => (
+  const row = (c: SearchCriterion, heading?: string) => (
         <Row
           key={c.id}
           c={c}
+          heading={heading}
           editing={c.id === editingId}
           onOpen={() => (c.id === editingId ? close() : setEditingId(c.id))}
         >
@@ -124,6 +136,34 @@ export function IdealProfileTiles({
             />
           )}
         </Row>
+  )
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      {ordered.map((c) => row(c))}
+
+      {/* The bets, in the order the search reaches them. Each is a company group and the
+          titles searched THERE — McKinsey is searched for Associates, not Strategy
+          Managers. Named after the bet cards above, so the two read as one thing. */}
+      {bets.map((b) => (
+        <div key={b.n} className="border-t-2 border-slate-100">
+          <div className="flex items-center gap-2 px-4 pb-0.5 pt-2.5">
+            <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Bet {b.n}</span>
+            <span className="min-w-0 truncate text-[12px] font-semibold text-slate-800" title={b.label}>{b.label}</span>
+            <span className="text-[10px] text-slate-400">searched {ordinal(b.n)}</span>
+            {onRemove && (
+              <button
+                type="button"
+                onClick={() => { b.rows.forEach((c) => onRemove(c.id)); setEditingId(null) }}
+                className="ml-auto text-[10px] text-slate-300 hover:text-red-500"
+                title="Stop searching this bet"
+              >
+                Remove bet
+              </button>
+            )}
+          </div>
+          {b.rows.map((c) => row(c, isEmployer(c.kind) ? 'Companies' : 'As titles'))}
+        </div>
       ))}
 
       {onAdd && unset.length > 0 && (
@@ -164,9 +204,11 @@ export function IdealProfileTiles({
  * when the search widens. Clicking anywhere on the row opens its editor underneath.
  */
 function Row({
-  c, editing, onOpen, children,
+  c, heading, editing, onOpen, children,
 }: {
   c: SearchCriterion
+  /** Overrides the kind label — a bet's rows read "Companies" / "As titles". */
+  heading?: string
   editing: boolean
   onOpen: () => void
   children?: React.ReactNode
@@ -187,7 +229,7 @@ function Row({
       >
         <span className="flex w-[9.5rem] shrink-0 items-center gap-1.5 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
           <Icon className={`h-3.5 w-3.5 shrink-0 ${t.icon}`} />
-          <span className="truncate">{tileHeading(c)}</span>
+          <span className="truncate">{heading ?? tileHeading(c)}</span>
         </span>
 
         <span className="min-w-0 flex-1 text-[13px] text-slate-800">
@@ -208,7 +250,8 @@ function Row({
           )}
         </span>
 
-        {!c.exclude && (
+        {/* A bet's rows say when they are searched in the bet's header instead. */}
+        {!c.exclude && c.bet == null && (
           <span className="flex shrink-0 items-center gap-1 pt-0.5 text-[10px] text-slate-400">
             {never
               ? <><Lock className="h-3 w-3" /> never relaxed</>
@@ -221,6 +264,8 @@ function Row({
     </div>
   )
 }
+
+const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`
 
 /** One colour per kind of must-have, so the strip reads at a glance. */
 function tone(k: CriterionKind): { pill: string; icon: string } {

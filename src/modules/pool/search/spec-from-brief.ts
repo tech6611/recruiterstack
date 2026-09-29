@@ -17,6 +17,7 @@ import type { SearchCriterion, SearchLevel, SearchSpec, PostFetchCheck } from '@
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
 import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion } from '@/lib/icp-gates'
 import { titleTerms } from '@/lib/ai/gate-evaluator'
+import { groupEmployerAliases } from '@/lib/employer-aliases'
 import { schoolTiersFor } from '@/modules/pool/search/school-tiers'
 import { normalizeCity, resolveLocationParts } from '@/modules/pool/domain/normalize'
 import type { PlanEveryone } from '@/modules/pool/domain/pool-sourcing'
@@ -92,12 +93,12 @@ export function employerTerms(entry: string): string[] {
   return out
 }
 
-function roleTerms(entry: string): string[] {
+export function roleTerms(entry: string): string[] {
   return entry.split(/\s*(?:,|\/|;|\bor\b)\s*/i).map((t) => t.trim()).filter((t) => t.length >= 2)
 }
 
 type PoolKind = 'consulting' | 'finance' | 'operator'
-function poolKind(pool: { label: string; companies: string[] }): PoolKind {
+export function poolKind(pool: { label: string; companies: string[] }): PoolKind {
   const text = `${pool.label} ${pool.companies.join(' ')}`.toLowerCase()
   if (/consult|mckinsey|bain|bcg|boston consulting|kearney|oliver wyman|strategy&|accenture strategy|deloitte/.test(text)) return 'consulting'
   if (/bank|capital|ventures|partners|goldman|morgan|sequoia|accel|lightspeed|private equity|\bvc\b|\bib\b|\bpe\b/.test(text)) return 'finance'
@@ -226,7 +227,7 @@ export function specFromIcp(
   }
   for (const c of icp.competencies ?? []) post_fetch.push({ label: c.name, how: 'judge' })
 
-  return { version: 1, base, levels, post_fetch, source: 'brief' }
+  return fitLabels({ version: 1, base, levels, post_fetch, source: 'brief' })
 }
 
 /**
@@ -250,13 +251,16 @@ export function ladderFromIdealProfile(
   const base = all.filter((c) => c.relax_at == null)
   const post_fetch: PostFetchCheck[] = []
 
-  const companies = relaxable.find((c) => c.kind.startsWith('employer_'))
-  const titles = relaxable.find((c) => c.kind.startsWith('title_'))
+  // Bet rows (company group + its titles) are searched as bets, below; the single
+  // companies/titles rows are the pre-bet profile shape.
+  const betRows = relaxable.filter((c) => c.bet != null)
+  const companies = relaxable.find((c) => c.kind.startsWith('employer_') && c.bet == null)
+  const titles = relaxable.find((c) => c.kind.startsWith('title_') && c.bet == null)
   const location = relaxable.find((c) => c.kind === 'location')
   // Tier-1 schools ride on every company lane (current and former), then tier-2 gets one
   // pass at the target companies, then the school is dropped — the older planner's order.
   const school = relaxable.find((c) => c.kind === 'school')
-  const others = relaxable.filter((c) => c !== companies && c !== titles && c !== location && c !== school)
+  const others = relaxable.filter((c) => c !== companies && c !== titles && c !== location && c !== school && c.bet == null)
 
   const levels: SearchLevel[] = []
   const level = (label: string, criteria: SearchCriterion[], relaxes: string | null, fallback = false, ideal = false) => {
@@ -276,114 +280,213 @@ export function ladderFromIdealProfile(
   const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'tier'
   const companyLane = (vals: string[], tier: string): SearchCriterion => ({ ...(companies as SearchCriterion), id: `${companies!.id}-t-${slug(tier)}`, values: vals, label: null })
 
-  // A pool's own titles, alongside the role's. The profile's titles are what the seat is
-  // called ("Strategy Manager"); a pool also says what its people are called where they
-  // sit today ("McKinsey · Business Analyst / Associate / Consultant"). Searching McKinsey
-  // for a current "Strategy Manager" finds almost nobody, so the consulting bet — the
-  // one the brief wants first — was never reached. Each company lane therefore searches
-  // the role's titles OR its pool's titles. Titles are sourcing lanes, never a gate, so
-  // widening them here orders the search and rejects no one.
-  const poolTitles = (p: (typeof poolSorted)[number] | undefined, id: string): SearchCriterion | undefined => {
-    if (!titles || !p) return titles
-    const own = Array.from(new Set((p.role_types ?? []).flatMap(roleTerms)))
-    const extra = own.filter((t) => !titles.values.some((v) => v.toLowerCase() === t.toLowerCase()))
-    return extra.length ? { ...titles, id, values: [...titles.values, ...extra], label: null } : titles
-  }
-
-  // "Currently at McKinsey" should mean currently CONSULTING there — an engineer at
-  // McKinsey matches the employer, not the bet. Only on current-employer lanes: someone
-  // who has left consulting is exactly who the "formerly at" lanes are for.
-  const current = companies?.kind === 'employer_current'
-  const consultingOnly = (p: (typeof poolSorted)[number] | undefined, id: string): SearchCriterion | undefined =>
-    current && p && poolKind({ label: p.label ?? '', companies: p.companies ?? [] }) === 'consulting'
-      ? { id, kind: 'function', values: ['Consulting'], label: null }
+  /**
+   * The bet ladder. Each bet is a company group and the titles searched THERE, straight
+   * from the profile, so what the recruiter edits on Scoring is exactly what runs:
+   *   bet 1, one line per firm (the ideal) → each later bet → each bet's former employees
+   *   → tier-2 schools at every bet's companies → feeder titles → a wider location.
+   * The role's own titles are used only where no company is named (the last steps), or
+   * for a bet whose titles row was removed.
+   */
+  function betLevels() {
+    const roleTitleTerms = Array.from(new Set((brief?.title_families ?? []).flatMap(titleTerms)))
+    const roleTitles: SearchCriterion | undefined = roleTitleTerms.length
+      ? { id: 'ip-role-titles', kind: brief?.title_basis === 'past' ? 'title_any' : 'title_current', values: roleTitleTerms, label: null }
       : undefined
+    const bets = Array.from(new Set(betRows.map((c) => c.bet as number))).sort((x, y) => x - y).map((n) => {
+      const rows = betRows.filter((c) => c.bet === n)
+      const employer = rows.find((c) => c.kind.startsWith('employer_'))
+      return {
+        n,
+        label: rows.find((c) => c.bet_label)?.bet_label ?? `Bet ${n}`,
+        employer: employer ? { ...employer, label: null } : undefined,
+        titles: (() => { const t = rows.find((c) => c.kind.startsWith('title_')); return t ? { ...t, label: null } : roleTitles })(),
+      }
+    })
+    // "Currently at McKinsey" should mean currently CONSULTING there — an engineer at
+    // McKinsey matches the employer, not the bet. Current-employer lanes only.
+    const consultingOnly = (b: (typeof bets)[number], id: string): SearchCriterion | undefined =>
+      b.employer?.kind === 'employer_current' && poolKind({ label: b.label, companies: b.employer.values }) === 'consulting'
+        ? { id, kind: 'function', values: ['Consulting'], label: null }
+        : undefined
 
-  // L1: the exact persona — each ideal company its own lane (distinct recruiter bets).
-  // Keep the ideal-profile ids so a person bought at L1 is vendor-verified on the must-haves
-  // (the title id too, with the first pool's titles added — the same way the company id
-  // is kept with one company in it).
-  const idealTerms = companies?.values ?? []
-  if (idealTerms.length) {
-    const idealTitles = poolTitles(poolSorted[0], titles?.id ?? '')
-    const fn = consultingOnly(poolSorted[0], `${companies!.id}-fn`)
-    // One lane per COMPANY, not per search term: "Boston Consulting Group (BCG)" is two
-    // terms for one firm, and a lane each searched (and paid for) the same people twice.
-    const lanes: string[][] = []
-    const placed = new Set<string>()
-    for (const entry of poolSorted[0]?.companies ?? []) {
-      const group = employerTerms(entry).filter((t) => idealTerms.includes(t) && !placed.has(t))
-      group.forEach((t) => placed.add(t))
-      if (group.length) lanes.push(group)
+    // Bet 1: one line per FIRM (a firm's names — "Boston Consulting Group", "BCG" — stay
+    // together). The must-have ids are kept, so a person bought here is vendor-verified.
+    const [first, ...rest] = bets
+    if (first?.employer) {
+      for (const g of groupEmployerAliases(first.employer.values)) {
+        level(`Ideal profile · ${g.display}`, keep(location, school, first.titles, { ...first.employer, values: g.members }, consultingOnly(first, `${first.employer.id}-fn`)), null, false, true)
+      }
+    } else if (first) {
+      level('Ideal profile', keep(location, school, first.titles), null, false, true)
     }
-    for (const t of idealTerms) if (!placed.has(t)) lanes.push([t])  // added by hand on Scoring
-    for (const group of lanes) level(`Ideal profile · ${group[0]}`, keep(location, school, idealTitles, { ...(companies as SearchCriterion), values: group, label: null }, fn), null, false, true)
+
+    // Each later bet, in order, with its own titles.
+    for (const b of rest) {
+      if (!b.employer) continue
+      level(`Bet ${b.n}: ${b.label}`, keep(location, school, b.titles, b.employer, consultingOnly(b, `${b.employer.id}-fn`)), `bet ${b.n - 1} → bet ${b.n}`)
+    }
+
+    // Former employees of every bet, in the same order: the same persona who has moved on.
+    for (const b of bets) {
+      if (!b.employer || b.employer.kind !== 'employer_current') continue
+      level(`Formerly at: ${b.label}`, keep(
+        location, school,
+        b.titles ? { ...b.titles, id: `${b.titles.id}-was-${b.n}`, kind: 'title_any' } : undefined,
+        { ...b.employer, id: `${b.employer.id}-was`, kind: 'employer_past' },
+      ), 'still there → moved on (any current company)')
+    }
+
+    // One bet only: widen to any company at its titles before touching titles.
+    if (bets.length === 1 && first?.titles) level('Any company · same title', keep(location, school, first.titles), 'no company constraint — same title')
+
+    const allCompanies = Array.from(new Set(bets.flatMap((b) => b.employer?.values ?? [])))
+    const allTitles = Array.from(new Set(bets.flatMap((b) => b.titles?.values ?? [])))
+
+    // Tier-2 schools: one pass over every bet's companies, any bet's titles.
+    const country = ctx.roleContext?.market?.country ?? resolveLocationParts(location?.values[0] ?? null)?.country_code ?? null
+    const tier2 = school ? schoolTiers(brief, country).tier2 : []
+    if (school && tier2.length && allCompanies.length) {
+      level('Tier-2 school · target companies', keep(
+        location,
+        { ...school, id: `${school.id}-t2`, values: tier2, label: null },
+        allTitles.length ? { id: 'ip-bets-titles-any', kind: 'title_any', values: allTitles, label: null } : undefined,
+        { id: 'ip-bets-companies-any', kind: 'employer_any', values: allCompanies, label: null },
+      ), 'tier-1 schools → tier-2 schools')
+    }
+
+    // Feeder titles at every bet's companies, then anywhere.
+    const adjacent = Array.from(new Set((brief?.adjacent_titles ?? []).flatMap(titleTerms))).filter((t) => !allTitles.includes(t) && !roleTitleTerms.includes(t))
+    if (adjacent.length) {
+      const adj: SearchCriterion = { id: 'ip-role-titles-adj', kind: roleTitles?.kind ?? 'title_current', values: adjacent, label: null }
+      if (allCompanies.length) level('Feeder titles · target companies', keep(location, { id: 'ip-bets-companies-all', kind: 'employer_current', values: allCompanies, label: null }, adj), `career-progression titles at the same companies: ${adjacent.slice(0, 4).join(' / ')}${adjacent.length > 4 ? ' …' : ''}`)
+      level('Feeder titles · any company', keep(location, { ...adj, id: 'ip-role-titles-adj-any' }), 'feeder titles, no company constraint', true)
+    }
+
+    // Location widens LAST, at the role's own titles — no company is named here, so a
+    // bet's titles ("Associate") would match everyone.
+    if (location) {
+      const every = Array.from(new Set([...roleTitleTerms, ...adjacent]))
+      const radius = (location.radius_km ?? DEFAULT_RADIUS_KM) * 3
+      level('Wider location', keep(
+        { ...location, id: `${location.id}-loc`, radius_km: radius, label: null, from: location.id },
+        every.length ? { id: 'ip-role-titles-loc', kind: roleTitles?.kind ?? 'title_current', values: every, label: null } : undefined,
+      ), `within ${radius} km`, true)
+    }
+  }
+
+  if (betRows.length) {
+    betLevels()
   } else {
-    level('Ideal profile', keep(location, school, titles, companies), null, false, true)
-  }
+    // A pool's own titles, alongside the role's. The profile's titles are what the seat is
+    // called ("Strategy Manager"); a pool also says what its people are called where they
+    // sit today ("McKinsey · Business Analyst / Associate / Consultant"). Searching McKinsey
+    // for a current "Strategy Manager" finds almost nobody, so the consulting bet — the
+    // one the brief wants first — was never reached. Each company lane therefore searches
+    // the role's titles OR its pool's titles. Titles are sourcing lanes, never a gate, so
+    // widening them here orders the search and rejects no one.
+    const poolTitles = (p: (typeof poolSorted)[number] | undefined, id: string): SearchCriterion | undefined => {
+      if (!titles || !p) return titles
+      const own = Array.from(new Set((p.role_types ?? []).flatMap(roleTerms)))
+      const extra = own.filter((t) => !titles.values.some((v) => v.toLowerCase() === t.toLowerCase()))
+      return extra.length ? { ...titles, id, values: [...titles.values, ...extra], label: null } : titles
+    }
 
-  // Company tiers: one level PER subsequent feeder pool, in priority order, SAME title.
-  const seen = new Set(idealTerms.map((t) => t.toLowerCase()))
-  if (companies) {
-    for (const p of poolSorted.slice(1)) {
-      const terms = Array.from(new Set((p.companies ?? []).flatMap(employerTerms))).filter((t) => !seen.has(t.toLowerCase()))
+    // "Currently at McKinsey" should mean currently CONSULTING there — an engineer at
+    // McKinsey matches the employer, not the bet. Only on current-employer lanes: someone
+    // who has left consulting is exactly who the "formerly at" lanes are for.
+    const current = companies?.kind === 'employer_current'
+    const consultingOnly = (p: (typeof poolSorted)[number] | undefined, id: string): SearchCriterion | undefined =>
+      current && p && poolKind({ label: p.label ?? '', companies: p.companies ?? [] }) === 'consulting'
+        ? { id, kind: 'function', values: ['Consulting'], label: null }
+        : undefined
+
+    // L1: the exact persona — each ideal company its own lane (distinct recruiter bets).
+    // Keep the ideal-profile ids so a person bought at L1 is vendor-verified on the must-haves
+    // (the title id too, with the first pool's titles added — the same way the company id
+    // is kept with one company in it).
+    const idealTerms = companies?.values ?? []
+    if (idealTerms.length) {
+      const idealTitles = poolTitles(poolSorted[0], titles?.id ?? '')
+      const fn = consultingOnly(poolSorted[0], `${companies!.id}-fn`)
+      // One lane per COMPANY, not per search term: "Boston Consulting Group (BCG)" is two
+      // terms for one firm, and a lane each searched (and paid for) the same people twice.
+      const lanes: string[][] = []
+      const placed = new Set<string>()
+      for (const entry of poolSorted[0]?.companies ?? []) {
+        const group = employerTerms(entry).filter((t) => idealTerms.includes(t) && !placed.has(t))
+        group.forEach((t) => placed.add(t))
+        if (group.length) lanes.push(group)
+      }
+      for (const t of idealTerms) if (!placed.has(t)) lanes.push([t])  // added by hand on Scoring
+      for (const group of lanes) level(`Ideal profile · ${group[0]}`, keep(location, school, idealTitles, { ...(companies as SearchCriterion), values: group, label: null }, fn), null, false, true)
+    } else {
+      level('Ideal profile', keep(location, school, titles, companies), null, false, true)
+    }
+
+    // Company tiers: one level PER subsequent feeder pool, in priority order, SAME title.
+    const seen = new Set(idealTerms.map((t) => t.toLowerCase()))
+    if (companies) {
+      for (const p of poolSorted.slice(1)) {
+        const terms = Array.from(new Set((p.companies ?? []).flatMap(employerTerms))).filter((t) => !seen.has(t.toLowerCase()))
+        if (!terms.length) continue
+        terms.forEach((t) => seen.add(t.toLowerCase()))
+        const rel = p.relationship ? REL_LABEL[p.relationship] : null
+        const tierTitles = poolTitles(p, `${titles?.id}-p-${slug(p.label)}`)
+        level(rel ? `${rel}: ${p.label}` : p.label, keep(location, school, tierTitles, companyLane(terms, p.label), consultingOnly(p, `${companies.id}-fn-${slug(p.label)}`)), p.rationale ?? (p.relationship?.replace(/_/g, ' ') ?? null))
+      }
+    }
+
+    // Formerly at the target companies: the same persona who has since moved on. A
+    // McKinsey consultant now running ops at a startup, or an engineering manager who left
+    // Rippling for another company, is still the bet — just not the first place to look.
+    // So after every current-employer lane, each pool again in priority order: worked there
+    // before, and held one of the titles at some point, wherever they are today.
+    const pastLanes = companies && current ? poolSorted : []
+    const seenPast = new Set<string>()
+    for (const p of pastLanes) {
+      const terms = Array.from(new Set((p.companies ?? []).flatMap(employerTerms))).filter((t) => !seenPast.has(t.toLowerCase()))
       if (!terms.length) continue
-      terms.forEach((t) => seen.add(t.toLowerCase()))
-      const rel = p.relationship ? REL_LABEL[p.relationship] : null
-      const tierTitles = poolTitles(p, `${titles?.id}-p-${slug(p.label)}`)
-      level(rel ? `${rel}: ${p.label}` : p.label, keep(location, school, tierTitles, companyLane(terms, p.label), consultingOnly(p, `${companies.id}-fn-${slug(p.label)}`)), p.rationale ?? (p.relationship?.replace(/_/g, ' ') ?? null))
+      terms.forEach((t) => seenPast.add(t.toLowerCase()))
+      const everHeld = titles ? { ...(poolTitles(p, '') as SearchCriterion), id: `${titles.id}-was-${slug(p.label)}`, kind: 'title_any' as const, label: null } : undefined
+      const past: SearchCriterion = { ...(companies as SearchCriterion), id: `${companies!.id}-was-${slug(p.label)}`, kind: 'employer_past', values: terms, label: null }
+      level(`Formerly at: ${p.label}`, keep(location, school, everHeld, past), 'still there → moved on (any current company)')
     }
-  }
 
-  // Formerly at the target companies: the same persona who has since moved on. A
-  // McKinsey consultant now running ops at a startup, or an engineering manager who left
-  // Rippling for another company, is still the bet — just not the first place to look.
-  // So after every current-employer lane, each pool again in priority order: worked there
-  // before, and held one of the titles at some point, wherever they are today.
-  const pastLanes = companies && current ? poolSorted : []
-  const seenPast = new Set<string>()
-  for (const p of pastLanes) {
-    const terms = Array.from(new Set((p.companies ?? []).flatMap(employerTerms))).filter((t) => !seenPast.has(t.toLowerCase()))
-    if (!terms.length) continue
-    terms.forEach((t) => seenPast.add(t.toLowerCase()))
-    const everHeld = titles ? { ...(poolTitles(p, '') as SearchCriterion), id: `${titles.id}-was-${slug(p.label)}`, kind: 'title_any' as const, label: null } : undefined
-    const past: SearchCriterion = { ...(companies as SearchCriterion), id: `${companies!.id}-was-${slug(p.label)}`, kind: 'employer_past', values: terms, label: null }
-    level(`Formerly at: ${p.label}`, keep(location, school, everHeld, past), 'still there → moved on (any current company)')
-  }
+    // The brief named no peers — still widen companies (same title) before touching titles.
+    if (companies && poolSorted.length <= 1) level('Any company · same title', keep(location, school, titles), 'no company constraint — same title')
 
-  // The brief named no peers — still widen companies (same title) before touching titles.
-  if (companies && poolSorted.length <= 1) level('Any company · same title', keep(location, school, titles), 'no company constraint — same title')
-
-  // Tier-2 schools: one pass over every target company (current or former), every title.
-  const country = ctx.roleContext?.market?.country ?? resolveLocationParts(location?.values[0] ?? null)?.country_code ?? null
-  const tier2 = school ? schoolTiers(brief, country).tier2 : []
-  if (school && tier2.length) {
-    const allTerms = Array.from(new Set(poolSorted.flatMap((p) => (p.companies ?? []).flatMap(employerTerms))))
-    const allTitles = titles ? Array.from(new Set([...titles.values, ...poolSorted.flatMap((p) => (p.role_types ?? []).flatMap(roleTerms))])) : []
-    level('Tier-2 school · target companies', keep(
-      location,
-      { ...school, id: `${school.id}-t2`, values: tier2, label: null },
-      titles ? { ...titles, id: `${titles.id}-all`, kind: 'title_any', values: allTitles, label: null } : undefined,
-      companies && allTerms.length ? { ...companies, id: `${companies.id}-t-all-targets-any`, kind: 'employer_any', values: allTerms, label: null } : undefined,
-    ), 'tier-1 schools → tier-2 schools')
-  }
-
-  // Title progression: feeder titles across the SAME broadened companies, then any company.
-  const adjacent = Array.from(new Set((brief?.adjacent_titles ?? []).flatMap(titleTerms))).filter((t) => !(titles?.values ?? []).includes(t))
-  if (titles && adjacent.length) {
-    const adjTitles: SearchCriterion = { ...titles, id: `${titles.id}-adj`, values: adjacent, label: null }
-    const allCompanies = Array.from(new Set(poolSorted.flatMap((p) => (p.companies ?? []).flatMap(employerTerms))))
-    if (companies && allCompanies.length) {
-      level('Feeder titles · target companies', keep(location, companyLane(allCompanies, 'all-targets'), adjTitles), `career-progression titles at the same companies: ${adjacent.slice(0, 4).join(' / ')}${adjacent.length > 4 ? ' …' : ''}`)
+    // Tier-2 schools: one pass over every target company (current or former), every title.
+    const country = ctx.roleContext?.market?.country ?? resolveLocationParts(location?.values[0] ?? null)?.country_code ?? null
+    const tier2 = school ? schoolTiers(brief, country).tier2 : []
+    if (school && tier2.length) {
+      const allTerms = Array.from(new Set(poolSorted.flatMap((p) => (p.companies ?? []).flatMap(employerTerms))))
+      const allTitles = titles ? Array.from(new Set([...titles.values, ...poolSorted.flatMap((p) => (p.role_types ?? []).flatMap(roleTerms))])) : []
+      level('Tier-2 school · target companies', keep(
+        location,
+        { ...school, id: `${school.id}-t2`, values: tier2, label: null },
+        titles ? { ...titles, id: `${titles.id}-all`, kind: 'title_any', values: allTitles, label: null } : undefined,
+        companies && allTerms.length ? { ...companies, id: `${companies.id}-t-all-targets-any`, kind: 'employer_any', values: allTerms, label: null } : undefined,
+      ), 'tier-1 schools → tier-2 schools')
     }
-    level('Feeder titles · any company', keep(location, { ...adjTitles, id: `${titles.id}-adj-any` }), 'feeder titles, no company constraint', true)
-  }
 
-  // Location widens LAST (absent entirely for remote roles).
-  if (location) {
-    const everyTitle = titles ? { ...titles, id: `${titles.id}-loc`, values: Array.from(new Set([...titles.values, ...adjacent])), label: null } : undefined
-    const radius = (location.radius_km ?? DEFAULT_RADIUS_KM) * 3
-    level('Wider location', keep({ ...location, id: `${location.id}-loc`, radius_km: radius, label: null, from: location.id }, everyTitle), `within ${radius} km`, true)
+    // Title progression: feeder titles across the SAME broadened companies, then any company.
+    const adjacent = Array.from(new Set((brief?.adjacent_titles ?? []).flatMap(titleTerms))).filter((t) => !(titles?.values ?? []).includes(t))
+    if (titles && adjacent.length) {
+      const adjTitles: SearchCriterion = { ...titles, id: `${titles.id}-adj`, values: adjacent, label: null }
+      const allCompanies = Array.from(new Set(poolSorted.flatMap((p) => (p.companies ?? []).flatMap(employerTerms))))
+      if (companies && allCompanies.length) {
+        level('Feeder titles · target companies', keep(location, companyLane(allCompanies, 'all-targets'), adjTitles), `career-progression titles at the same companies: ${adjacent.slice(0, 4).join(' / ')}${adjacent.length > 4 ? ' …' : ''}`)
+      }
+      level('Feeder titles · any company', keep(location, { ...adjTitles, id: `${titles.id}-adj-any` }), 'feeder titles, no company constraint', true)
+    }
+
+    // Location widens LAST (absent entirely for remote roles).
+    if (location) {
+      const everyTitle = titles ? { ...titles, id: `${titles.id}-loc`, values: Array.from(new Set([...titles.values, ...adjacent])), label: null } : undefined
+      const radius = (location.radius_km ?? DEFAULT_RADIUS_KM) * 3
+      level('Wider location', keep({ ...location, id: `${location.id}-loc`, radius_km: radius, label: null, from: location.id }, everyTitle), `within ${radius} km`, true)
+    }
   }
 
   // Seniority ceiling as before: an IC band means no executive titles.
@@ -394,7 +497,7 @@ export function ladderFromIdealProfile(
   for (const g of icp.must_haves ?? []) if (g.attribute === 'screening') post_fetch.push({ label: g.label ?? '', how: 'screen' })
   for (const c of icp.competencies ?? []) post_fetch.push({ label: c.name, how: 'judge' })
   void ctx
-  return { version: 1, base, levels, post_fetch, source: 'brief' }
+  return fitLabels({ version: 1, base, levels, post_fetch, source: 'brief' })
 }
 
 interface LinkSources {
@@ -450,6 +553,20 @@ export function isIdealLevel(l: Pick<SearchLevel, 'ideal' | 'label'>): boolean {
   return l.ideal === true || /^Ideal profile\b/.test(l.label)
 }
 
+/** A plan filter's label is capped at 120 characters (searchSpecSchema). */
+const PLAN_LABEL_MAX = 120
+
+/**
+ * Drop a filter label the plan cannot save. A plan copies profile rows, and a profile
+ * label may run to 200 characters — the School row's list of institutes is ~140 — so
+ * saving an edited plan failed with "Validation failed". The label is only a readable
+ * phrase (the plan editor shows the values); without one the kind name is shown. PURE.
+ */
+export function fitLabels(spec: SearchSpec): SearchSpec {
+  const fit = (c: SearchCriterion): SearchCriterion => (c.label && c.label.length > PLAN_LABEL_MAX ? { ...c, label: null } : c)
+  return { ...spec, base: spec.base.map(fit), levels: spec.levels.map((l) => ({ ...l, criteria: l.criteria.map(fit) })) }
+}
+
 /** The spec to acquire with: the recruiter-edited one stored on the ICP, else derived from the brief. */
 export function resolveSearchSpec(
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'competencies'>>,
@@ -480,7 +597,7 @@ export function resolveSearchSpec(
     const levels = idealNow.length ? [...idealNow, ...widening] : widening
     // The "checked after fetch" list is the ICP's competencies / screening — follow it too.
     const post_fetch = (fresh ?? specFromIcp(icp, ctx)).post_fetch
-    return { spec: { ...stored, base: mustHaves.length ? mustHaves : stored.base, levels, post_fetch }, stored: true }
+    return { spec: fitLabels({ ...stored, base: mustHaves.length ? mustHaves : stored.base, levels, post_fetch }), stored: true }
   }
   return { spec: specFromIcp(icp, ctx), stored: false }
 }

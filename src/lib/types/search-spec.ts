@@ -61,6 +61,14 @@ export interface SearchCriterion {
   /** A widened copy of a must-have (e.g. the location at 3× radius): the must-have id it
    *  follows. Its values track that must-have; its own widening (radius) is kept. */
   from?: string | null
+  /**
+   * The bet this row belongs to (1 = searched first). A bet is a company group and the
+   * titles searched THERE — "McKinsey · Bain · BCG as Associate / Consultant". Its two
+   * rows (employer + title) share the number. Absent = a row for every bet.
+   */
+  bet?: number | null
+  /** The bet's name, shown on the profile and on its search levels. */
+  bet_label?: string | null
 }
 
 export interface SearchLevel {
