@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react'
 import { Briefcase, Rocket, Compass, Sparkles, ThumbsUp, ThumbsDown, TriangleAlert } from 'lucide-react'
 import { BrandIcon } from '@/components/ui/BrandIcon'
 import { CriterionEditor } from '@/components/req-jobs/IdealProfileTiles'
-import { companiesFor, searchPassFor, sortedPools, type Archetype } from '@/lib/bets'
+import { companiesFor, searchPassFor, sortedPools, specificTitles, type Archetype } from '@/lib/bets'
 import { groupEmployerAliases } from '@/lib/employer-aliases'
 import type { RecruiterBrief } from '@/lib/types/icp'
 import type { SearchCriterion } from '@/lib/types/search-spec'
@@ -144,6 +144,26 @@ export function BetCards({
             ) : a?.where_from ? (
               <p className="mt-2 line-clamp-1 text-[11px] text-slate-400" title={a.where_from}>From: {a.where_from}</p>
             ) : null}
+
+            {/* Only level words at finance firms: the market search skips them, so offer the work they mean. */}
+            {(() => {
+              const better = as && at && onChange ? specificTitles(as.values, { label, companies: at.values }) : null
+              if (!better) return null
+              const added = better.filter((t) => !as!.values.includes(t))
+              return (
+                <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-900 ring-1 ring-amber-100">
+                  &ldquo;{as!.values.join('” and “')}&rdquo; alone fit anyone at these firms, engineers included — the market
+                  search skips them. Add {added.slice(0, 3).join(', ')}{added.length > 3 ? ` +${added.length - 3} more` : ''}?
+                  <button
+                    type="button"
+                    onClick={() => onChange!({ ...as!, values: better })}
+                    className="ml-1.5 rounded-md bg-white px-1.5 py-0.5 font-medium text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
+                  >
+                    Add these titles
+                  </button>
+                </div>
+              )
+            })()}
 
             {editing && onChange && (
               <div className="mt-2 rounded-lg bg-white p-2 ring-1 ring-slate-200">

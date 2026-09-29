@@ -392,7 +392,18 @@ describe('the bet ladder — each company group searched with its own titles', (
   it('each bet is searched for ONLY its own titles', () => {
     expect(of('Ideal profile · McKinsey', 'title_current')?.values).toEqual(['Business Analyst', 'Associate', 'Consultant'])
     expect(of('Bet 2: The Scaled Startup BizOps Star', 'title_current')?.values).toEqual(['Strategy Manager'])
-    expect(of('Bet 3: The IB/VC Analyst', 'title_current')?.values).toEqual(['Analyst', 'Associate'])
+    // Level words alone at finance firms → the work they mean (the bare words kept for the sample check).
+    expect(of('Bet 3: The IB/VC Analyst', 'title_current')?.values).toEqual([
+      'Investment Banking Analyst', 'Investment Banking Associate', 'Private Equity Analyst', 'Private Equity Associate',
+      'Venture Capital Analyst', 'Venture Capital Associate', 'Investment Analyst', 'Investment Associate', 'Analyst', 'Associate',
+    ])
+  })
+  it('the IB/VC bet\'s market search now carries a title (bare level words alone are not searchable)', () => {
+    const lane = compileSpec(s).lanes.find((l) => l.label === 'Bet 3: The IB/VC Analyst')!
+    const f = JSON.stringify(lane.filters)
+    expect(f).toContain('Investment Banking Associate')
+    expect(f).toContain('Venture Capital Analyst')
+    expect(f).not.toMatch(/"value":"Associate"/)
   })
   it('a firm with two names is one line; consulting firms mean consulting', () => {
     expect(of('Ideal profile · Boston Consulting Group (BCG)', 'employer_current')?.values).toEqual(['Boston Consulting Group', 'BCG'])

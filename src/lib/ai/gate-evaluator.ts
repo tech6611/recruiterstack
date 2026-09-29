@@ -17,23 +17,14 @@ import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion, criterionLabel, mustHaveFromCriterion } from '@/lib/icp-gates'
 import { resolveLocationParts, slugifyPlace } from '@/modules/pool/domain/normalize'
 import { employerTerms, schoolTiers, pedigreeMatters, roleTerms } from '@/modules/pool/search/spec-from-brief'
-import { sortedPools, searchPassFor, type Archetype } from '@/lib/bets'
+import { sortedPools, searchPassFor, specificTitles, isGenericTitleTerm, type Archetype } from '@/lib/bets'
+
+export { isGenericTitleTerm }
 
 // ── Accessors (shared, in src/lib/icp-gates.ts) ─────────────────────────────────
 export { isCriterion, toCriterion, criterionLabel, mustHaveFromCriterion }
 
 // ── Title terms: whole phrases only ──────────────────────────────────────────────
-
-/** Words that describe a level, not a job. Alone they match anything ("Senior" → Senior Account Executive). */
-const GENERIC_TITLE_TOKENS = new Set([
-  'senior', 'sr', 'staff', 'lead', 'head', 'manager', 'principal', 'director', 'junior', 'jr', 'associate',
-  'chief', 'vp', 'vice president', 'executive', 'intern', 'consultant', 'specialist', 'analyst', 'officer', 'partner',
-])
-
-/** True when a title term would match by level alone. Such terms are never sent to a vendor. */
-export function isGenericTitleTerm(term: string): boolean {
-  return GENERIC_TITLE_TOKENS.has(term.trim().toLowerCase().replace(/[.]/g, ''))
-}
 
 /**
  * Split a recruiter-written title family into whole-phrase terms, and repair the
@@ -430,7 +421,8 @@ export function idealProfileFromBrief(
     const card = (opts.archetypes ?? []).find((a) => searchPassFor(a, brief as RecruiterBrief)?.pass === n)
     const bet = { bet: n, bet_label: (card?.name ?? p.label ?? `Bet ${n}`).slice(0, 120) }
     out.push(mustHaveFromCriterion({ id: `ip-bet-${n}-companies`, kind: 'employer_current', values: companies, relax_at: RELAX_AT.companies, ...bet }))
-    const betTitles = own.length ? own : titles
+    // Level words alone ("Analyst · Associate") at finance firms → the work they mean.
+    const betTitles = own.length ? specificTitles(own, { label: p.label ?? '', companies }) ?? own : titles
     if (betTitles.length) out.push(mustHaveFromCriterion({ id: `ip-bet-${n}-titles`, kind: titleKind, values: betTitles, relax_at: RELAX_AT.titles, ...bet }))
   })
 

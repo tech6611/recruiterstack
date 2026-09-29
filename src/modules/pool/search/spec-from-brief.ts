@@ -18,6 +18,7 @@ import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
 import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion, jobWideMustHaves, isBetOverride, overrideBaseId } from '@/lib/icp-gates'
 import { titleTerms } from '@/lib/ai/gate-evaluator'
 import { groupEmployerAliases } from '@/lib/employer-aliases'
+import { poolKind } from '@/lib/bets'
 import { schoolTiersFor } from '@/modules/pool/search/school-tiers'
 import { normalizeCity, resolveLocationParts } from '@/modules/pool/domain/normalize'
 import type { PlanEveryone } from '@/modules/pool/domain/pool-sourcing'
@@ -97,13 +98,7 @@ export function roleTerms(entry: string): string[] {
   return entry.split(/\s*(?:,|\/|;|\bor\b)\s*/i).map((t) => t.trim()).filter((t) => t.length >= 2)
 }
 
-type PoolKind = 'consulting' | 'finance' | 'operator'
-export function poolKind(pool: { label: string; companies: string[] }): PoolKind {
-  const text = `${pool.label} ${pool.companies.join(' ')}`.toLowerCase()
-  if (/consult|mckinsey|bain|bcg|boston consulting|kearney|oliver wyman|strategy&|accenture strategy|deloitte/.test(text)) return 'consulting'
-  if (/bank|capital|ventures|partners|goldman|morgan|sequoia|accel|lightspeed|private equity|\bvc\b|\bib\b|\bpe\b/.test(text)) return 'finance'
-  return 'operator'
-}
+export { poolKind }
 
 let seq = 0
 const cid = (kind: string) => `c-${kind}-${++seq}`
