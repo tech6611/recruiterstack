@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkCriterion, rankBetSamples, hasWords, titleHas, companyQueryTerms, type BetSamplePerson } from './bet-sample-fit'
+import { checkCriterion, rankBetSamples, hasWords, titleHas, companyQueryTerms, titleFunctions, titleStrength, type BetSamplePerson } from './bet-sample-fit'
 import { betMarketSpec } from './bet-sample'
 import type { SearchCriterion } from '@/lib/types/search-spec'
 
@@ -32,6 +32,56 @@ describe('bet sample — does a pool person fit a bet', () => {
     expect(bet.map((c) => result(off, c.id))).toEqual(['pass', 'fail', 'fail', 'fail', 'fail'])
     const thin = person({ current_title: null, location_city: null, location_raw: null, experience_years: null, education: [] })
     expect(bet.slice(1).map((c) => result(thin, c.id))).toEqual(['unknown', 'unknown', 'unknown', 'unknown'])
+  })
+
+  describe('a shared level word is not the same job', () => {
+    const ib: SearchCriterion = { id: 't', kind: 'title_current', values: ['Analyst', 'Associate'] }
+    const eng: SearchCriterion = { id: 't', kind: 'title_current', values: ['Software Engineer', 'Associate'] }
+    const at = (title: string, c = ib) => checkCriterion(c, person({ current_title: title, current_company: 'Goldman Sachs' }))
+
+    it('an engineer holding "Associate" does not fit the IB bet', () => {
+      expect(titleFunctions('Software Engineer | Associate')).toEqual(['engineering'])
+      expect(at('Software Engineer | Associate')).toMatchObject({ result: 'fail', note: 'Software Engineer | Associate — engineering, not this bet' })
+      expect(at('Associate, Talent Acquisition').result).toBe('fail')
+      expect(at('Legal Associate').result).toBe('fail')
+    })
+
+    it('a word that says what the job is ABOUT is not a function', () => {
+      const pm: SearchCriterion = { id: 't', kind: 'title_current', values: ['Program Manager', 'Strategy Manager'] }
+      expect(at('Program Manager, North America Developer Ecosystem (TechM)', pm).result).toBe('pass')
+      expect(at('Program Manager, Engineering', pm).result).toBe('pass')
+      expect(at('Strategy Manager - Software Business', pm).result).toBe('pass')
+      expect(at('Senior Software Developer', pm).result).toBe('fail')
+    })
+
+    it('the same titles in the bet\'s own line of work still fit', () => {
+      expect(at('Investment Banking Associate').result).toBe('pass')
+      expect(at('Analyst - Global Markets').result).toBe('pass')
+      expect(at('Associate').result).toBe('pass')
+    })
+
+    it('a bet that asks for engineers keeps them', () => {
+      expect(at('Software Engineer | Associate', eng).result).toBe('pass')
+    })
+
+    it('a title as written ranks above its words scattered', () => {
+      expect(titleStrength('Business Analyst', ['Business Analyst'])).toBe(2)
+      expect(titleStrength('Analyst, Business Finance', ['Business Analyst'])).toBe(1)
+      expect(titleStrength('Consultant', ['Business Analyst'])).toBe(0)
+      const ranked = rankBetSamples([
+        person({ id: 'scattered', current_title: 'Analyst, Business Finance' }),
+        person({ id: 'exact', current_title: 'Business Analyst' }),
+      ], bet)
+      expect(ranked.map((r) => r.person.id)).toEqual(['exact', 'scattered'])
+    })
+
+    it('an off-function title ranks below one that fits', () => {
+      const ranked = rankBetSamples([
+        person({ id: 'eng', current_title: 'Software Engineer | Associate', current_company: 'Goldman Sachs' }),
+        person({ id: 'ib', current_title: 'Associate', current_company: 'Goldman Sachs' }),
+      ], [{ id: 'c', kind: 'employer_current', values: ['Goldman Sachs'] }, ib])
+      expect(ranked.map((r) => r.person.id)).toEqual(['ib', 'eng'])
+    })
   })
 
   it('an exclusion flips the result', () => {

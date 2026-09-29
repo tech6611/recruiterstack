@@ -2,6 +2,9 @@
 
 ## 2026-09-29
 
+### Fixed
+- **The sample person's title check was fooled by level words.** "Software Engineer | Associate" at Goldman Sachs passed the IB/VC bet because it holds "Associate". A title in a function the bet's own titles never name (engineering, design, sales, marketing, HR, support, legal, medical, IT, admin) now fails, with a note ("— engineering, not this bet"); a bet that asks for engineers keeps them. Only role nouns count — "Program Manager, North America Developer Ecosystem" and "Program Manager, Engineering" are still program managers. Among fits, a title as written ("Business Analyst") ranks above its words scattered ("Analyst, Business Finance"). On the Strategy & Ops job the only change across all three bets is that engineer. 6 tests.
+
 ### Changed
 - **The search uses each bet's own lines.** A line set on Scoring for one bet only (say Bet 3: Mumbai, 4–10 years) now runs in that bet's search steps — its own step and its "Formerly at" step — while every other step keeps the shared lines. The bet's years replace the shared years in its steps (one band per query), and a person found there counts as meeting the shared row it replaced, so they are not rejected for it. Steps that search every bet at once (tier-2 schools, feeder titles, wider location) stay shared. A saved search plan follows today's bet lines (a removed one does not linger), and those lines are read-only in the Source tab's plan editor. On the Strategy & Ops job, with no per-bet lines the plan is byte-for-byte unchanged. 5 tests.
 
