@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-29
+
+### Fixed
+- **The consulting bet lost its place.** A bet is linked to a feeder pool by the companies its text names. The pool wrote "McKinsey & Company" and "Boston Consulting Group (BCG)"; the bet wrote "McKinsey, Bain, or BCG". Only exact names matched, so the bet the brief searches FIRST got no pass number, was labelled "no lane of its own" and sorted last — and the cards no longer followed the brief's order. Matching now also accepts the name without its legal or fund suffix ("& Company", "Capital", "Venture Partners"…) and a short acronym given in brackets. New bets also name their pool outright (`feeder_pool`), so they need no name matching. 4 tests.
+- **Consulting and IB/VC pools were searched for the wrong titles.** Every company lane searched only the role's own titles ("Strategy Manager", "Chief of Staff"), so McKinsey was searched for a current Strategy Manager — almost nobody. Each lane now also searches the titles the brief lists for THAT pool ("Business Analyst / Associate / Consultant" at MBB, "Analyst / Associate" at IB/VC). Pool titles stay on their own companies: the wider-location step does not carry "Associate" to every employer. Titles are search lanes, never a reject. 1 test.
+
+### Added
+- **"Fill from recruiter brief" for older profiles.** A profile approved before the brief fed the filters showed every field as "not set" beside a brief that names the years, titles, companies and location. The Scoring tab now offers to fill them from the brief — no AI call, nothing saved until you approve.
+
 ## 2026-09-27
 
 ### Added

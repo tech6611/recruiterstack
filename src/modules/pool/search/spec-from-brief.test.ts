@@ -143,6 +143,32 @@ describe('ladderFromIdealProfile', () => {
     expect(spec.levels[0].criteria.map((c) => c.id)).toEqual(['ip-location', 'ip-titles', 'ip-companies'])
     expect(spec.levels[2].criteria.find((c) => c.kind === 'employer_current')?.id).toBe('ip-companies-t-growth-stage-saas')
   })
+  it('searches each pool for the titles its own people hold, not only the role\'s titles', () => {
+    // A McKinsey consultant is a "Business Analyst" or "Associate", never a current
+    // "Strategy Manager" — pairing consulting firms with only the role's titles found
+    // nobody, so the consulting bet the brief wanted first was never reached.
+    const so = {
+      ...brief, title_families: ['Strategy Manager', 'Chief of Staff'], adjacent_titles: [],
+      feeder_pools: [
+        { label: 'Top-Tier Consulting', companies: ['McKinsey & Company'], role_types: ['Business Analyst', 'Associate', 'Consultant'], priority: 1 },
+        { label: 'Startup BizOps', companies: ['Swiggy'], role_types: ['Strategy Manager', 'Program Manager'], priority: 2 },
+        { label: 'IB / VC', companies: ['Goldman Sachs'], role_types: ['Analyst'], priority: 3 },
+      ],
+    }
+    const soIcp = { must_haves: idealProfileFromBrief(so, market), sourcing_map: { reasoning: '', requirement_decomposition: [], unwritten_filters: [], recruiter_brief: so }, competencies: [] }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = ladderFromIdealProfile(soIcp as any)!
+    const titlesAt = (label: string) => s.levels.find((l) => l.label.includes(label))!.criteria.find((c) => c.kind === 'title_current')!
+    // The profile's title row itself stays the role's titles.
+    expect(soIcp.must_haves.find((g) => g.kind === 'title_current')?.values).toEqual(['Strategy Manager', 'Chief of Staff'])
+    // Each company lane adds its own pool's titles (no duplicates).
+    expect(titlesAt('McKinsey').values).toEqual(['Strategy Manager', 'Chief of Staff', 'Business Analyst', 'Associate', 'Consultant'])
+    expect(titlesAt('McKinsey').id).toBe('ip-titles')
+    expect(titlesAt('Startup BizOps').values).toEqual(['Strategy Manager', 'Chief of Staff', 'Program Manager'])
+    expect(titlesAt('IB / VC')).toMatchObject({ id: 'ip-titles-p-ib-vc', values: ['Strategy Manager', 'Chief of Staff', 'Analyst'] })
+    // Widening the location does NOT carry a pool's generic titles ("Associate") to every company.
+    expect(titlesAt('Wider location').values).toEqual(['Strategy Manager', 'Chief of Staff'])
+  })
   it('is null for an ICP without an ideal profile (legacy gates keep the pool-based plan)', () => {
     expect(ladderFromIdealProfile({ must_haves: [{ id: 'x', label: 'Has SQL?', attribute: '', operator: '', value: '' }] })).toBeNull()
   })

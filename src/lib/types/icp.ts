@@ -176,6 +176,9 @@ export interface SourcingMap {
     name: string
     thesis: string
     where_from?: string | null      // career path / employer patterns
+    /** The label of the feeder pool this bet is drawn from — so the card knows which
+     *  pass of the search reaches it without guessing from company names. */
+    feeder_pool?: string | null
     why_interested?: string | null
     why_no?: string | null
     is_non_obvious?: boolean

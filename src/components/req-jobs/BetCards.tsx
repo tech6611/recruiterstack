@@ -25,6 +25,33 @@ function mentions(text: string, name: string): boolean {
   return new RegExp(`\\b${name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(text)
 }
 
+/** Legal and fund suffixes people drop when they say the name out loud. */
+const SUFFIX = /\s+(?:(?:&|and)\s+(?:company|co\.?)|inc\.?|ltd\.?|llc|limited|pvt\.?\s+ltd\.?|private\s+limited|corp\.?|corporation|capital|venture\s+partners|ventures|partners|group|holdings|technologies)$/i
+
+/**
+ * Every way a card's prose might name a pool company. A pool writes the formal name —
+ * "McKinsey & Company", "Boston Consulting Group (BCG)", "Sequoia Capital" — and the
+ * card writes what a recruiter says: "McKinsey, Bain, or BCG". Matching only the formal
+ * name found nothing for the consulting bet, so it lost its pass number and sorted last
+ * although its pool is searched first. So: the name, the name without its legal
+ * suffix, and a short acronym given in brackets. A bracket that is a note about WHICH
+ * part of the company ("Google (Area 120, X)") is not an acronym and is not used.
+ */
+export function nameVariants(raw: string | null | undefined): string[] {
+  const base = baseName(raw)
+  if (!base) return []
+  const out = [base]
+  const core = base.replace(SUFFIX, '').trim()
+  if (core.length >= 3 && core !== base) out.push(core)
+  for (const m of Array.from((raw ?? '').matchAll(/\(([^)]*)\)/g))) {
+    const inner = m[1].trim()
+    if (/^[A-Z][A-Z&]{1,5}$/.test(inner)) out.push(inner)
+  }
+  return out
+}
+
+const namedIn = (text: string, raw: string) => nameVariants(raw).some((v) => mentions(text, v))
+
 /** Everything an archetype's prose says about where its people come from. */
 const proseOf = (a: Archetype) => `${a.where_from ?? ''} ${a.thesis ?? ''}`.toLowerCase()
 
@@ -52,7 +79,7 @@ export function companiesFor(a: Archetype, brief: RecruiterBrief | null | undefi
   for (const raw of (brief?.feeder_pools ?? []).flatMap((p) => p.companies)) {
     const base = baseName(raw)
     if (!base || out.includes(base)) continue
-    if (mentions(text, base)) out.push(base)
+    if (namedIn(text, raw)) out.push(base)
     if (out.length === 4) break
   }
   return out
@@ -79,9 +106,14 @@ export function searchPassFor(
   brief: RecruiterBrief | null | undefined,
 ): { pass: number; pool: string } | null {
   const pools = sortedPools(brief)
+  // A bet written since the generator started naming its pool says so outright.
+  const named = a.feeder_pool?.trim().toLowerCase()
+  const own = named ? pools.findIndex((p) => (p.label ?? '').trim().toLowerCase() === named) : -1
+  if (own >= 0) return { pass: own + 1, pool: pools[own].label ?? `Pool ${own + 1}` }
+  // Older bets only name companies, so read the pool off those.
   const text = proseOf(a)
   for (let i = 0; i < pools.length; i++) {
-    if ((pools[i].companies ?? []).some((raw) => mentions(text, baseName(raw)))) {
+    if ((pools[i].companies ?? []).some((raw) => namedIn(text, raw))) {
       return { pass: i + 1, pool: pools[i].label ?? `Pool ${i + 1}` }
     }
   }

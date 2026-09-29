@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { companiesFor, searchPassFor } from './BetCards'
+import { companiesFor, searchPassFor, nameVariants } from './BetCards'
 
 /** The real approved ICP for "Founding Engineering Manager" (v5). */
 const BRIEF = {
@@ -91,5 +91,40 @@ describe('searchPassFor', () => {
       { label: 'First', priority: 1, companies: ['Rippling'] },
     ] } as never
     expect(searchPassFor(SCALER, reversed)).toEqual({ pass: 1, pool: 'First' })
+  })
+})
+
+describe('matching a bet to its pool by the names people actually use', () => {
+  // The Strategy & Operations Manager job, as stored: the pool writes formal names, the
+  // bet writes "McKinsey, Bain, or BCG". Matching only the formal name left the consulting
+  // bet with no pass and sorted it LAST, though its pool is searched first.
+  const SO_BRIEF = { feeder_pools: [
+    { label: 'Top-Tier Management Consulting', priority: 1, companies: ['McKinsey & Company', 'Bain & Company', 'Boston Consulting Group (BCG)'] },
+    { label: 'High-Growth Startup BizOps/Strategy', priority: 2, companies: ['Udaan', 'Swiggy', 'Google (Strategy/BizOps teams)'] },
+    { label: 'Investment Banking / Venture Capital', priority: 3, companies: ['Goldman Sachs', 'Sequoia Capital', 'Lightspeed Venture Partners'] },
+  ] } as never
+  const CONSULTING = { name: 'The Classic Post-Consulting Operator', thesis: 'A purebred problem-solver from an MBB firm.', where_from: '2-3 years as a Business Analyst or Associate at McKinsey, Bain, or BCG in Bangalore/Gurgaon.' } as never
+  const IBVC = { name: 'The IB/VC Analyst', thesis: '', where_from: '2-4 years at Goldman Sachs, or as an Associate at Sequoia or Lightspeed.' } as never
+
+  it('reads "McKinsey" as McKinsey & Company and "BCG" as Boston Consulting Group (BCG)', () => {
+    expect(searchPassFor(CONSULTING, SO_BRIEF)).toEqual({ pass: 1, pool: 'Top-Tier Management Consulting' })
+    expect(companiesFor(CONSULTING, SO_BRIEF)).toEqual(['McKinsey & Company', 'Bain & Company', 'Boston Consulting Group'])
+  })
+
+  it('drops fund suffixes too ("Sequoia" is Sequoia Capital)', () => {
+    expect(searchPassFor(IBVC, SO_BRIEF)?.pass).toBe(3)
+    expect(companiesFor(IBVC, SO_BRIEF)).toEqual(['Goldman Sachs', 'Sequoia Capital', 'Lightspeed Venture Partners'])
+  })
+
+  it('never treats a note in brackets as a short name', () => {
+    expect(nameVariants('Google (Strategy/BizOps teams)')).toEqual(['Google'])
+    expect(nameVariants('Boston Consulting Group (BCG)')).toEqual(['Boston Consulting Group', 'Boston Consulting', 'BCG'])
+  })
+
+  it('trusts the pool a bet names outright over its company names', () => {
+    const tagged = { name: 'x', thesis: '', where_from: 'Goldman Sachs.', feeder_pool: 'top-tier management consulting' } as never
+    expect(searchPassFor(tagged, SO_BRIEF)?.pass).toBe(1)
+    // A label that matches no pool falls back to the company names.
+    expect(searchPassFor({ ...(tagged as object), feeder_pool: 'Nowhere' } as never, SO_BRIEF)?.pass).toBe(3)
   })
 })

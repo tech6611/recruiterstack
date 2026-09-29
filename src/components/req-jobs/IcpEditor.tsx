@@ -33,6 +33,8 @@ export function IcpEditor({
   const [icp, setIcp] = useState<Icp | null>(null)
   const [comps, setComps] = useState<IcpCompetency[]>([])
   const [gates, setGates] = useState<IcpMustHave[]>([])
+  // The profile the brief implies, offered when this ICP predates the ideal profile.
+  const [fromBrief, setFromBrief] = useState<IcpMustHave[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -100,8 +102,9 @@ export function IcpEditor({
         const res = await fetch(`/api/jobs/${jobId}/icp?latest=1`)
         if (!active) return
         if (res.ok) {
-          const { data } = await res.json()
+          const { data, profile_from_brief } = await res.json()
           if (data) hydrate(data as Icp)
+          setFromBrief(profile_from_brief ?? null)
         }
       } finally {
         if (active) setLoading(false)
@@ -476,7 +479,31 @@ export function IcpEditor({
             const legacy = gates.filter((g) => !isCriterion(g) && g.attribute !== 'screening')
             return (
               <>
-                {profile.length === 0 && legacy.length === 0 && (
+                {profile.length === 0 && fromBrief && (
+                  // Written before the brief was turned into filters, so every field
+                  // would read "not set" beside a brief that names them. Filling it is
+                  // free (no AI) and only changes the working copy — approve to use it.
+                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <span className="flex-1">
+                      This profile was approved before the recruiter brief fed the filters. The brief already
+                      names {fromBrief.length} of them — years, titles, companies{fromBrief.some((g) => g.kind === 'location') ? ', location' : ''}.
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const hasYears = fromBrief.some((g) => g.kind === 'years_band')
+                        // The old years gate says the same thing as the new years row.
+                        setGates((prev) => [...fromBrief, ...prev.filter((g) => !(hasYears && g.attribute === 'experience_band'))])
+                        setFromBrief(null)
+                        toast.success('Filled from the recruiter brief — review, then approve to use it.')
+                      }}
+                    >
+                      Fill from recruiter brief
+                    </Button>
+                  </div>
+                )}
+                {profile.length === 0 && legacy.length === 0 && !fromBrief && (
                   <p className="text-xs text-slate-400">No ideal profile yet — Regenerate to build it from the JD and the recruiter brief.</p>
                 )}
                 {/* Always shown, so a must-have can be added even to an empty profile. */}

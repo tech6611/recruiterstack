@@ -258,11 +258,28 @@ export function ladderFromIdealProfile(
   const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'tier'
   const companyLane = (vals: string[], tier: string): SearchCriterion => ({ ...(companies as SearchCriterion), id: `${companies!.id}-t-${slug(tier)}`, values: vals, label: null })
 
+  // A pool's own titles, alongside the role's. The profile's titles are what the seat is
+  // called ("Strategy Manager"); a pool also says what its people are called where they
+  // sit today ("McKinsey · Business Analyst / Associate / Consultant"). Searching McKinsey
+  // for a current "Strategy Manager" finds almost nobody, so the consulting bet — the
+  // one the brief wants first — was never reached. Each company lane therefore searches
+  // the role's titles OR its pool's titles. Titles are sourcing lanes, never a gate, so
+  // widening them here orders the search and rejects no one.
+  const poolTitles = (p: (typeof poolSorted)[number] | undefined, id: string): SearchCriterion | undefined => {
+    if (!titles || !p) return titles
+    const own = Array.from(new Set((p.role_types ?? []).flatMap(roleTerms)))
+    const extra = own.filter((t) => !titles.values.some((v) => v.toLowerCase() === t.toLowerCase()))
+    return extra.length ? { ...titles, id, values: [...titles.values, ...extra], label: null } : titles
+  }
+
   // L1: the exact persona — each ideal company its own lane (distinct recruiter bets).
-  // Keep the ideal-profile ids so a person bought at L1 is vendor-verified on the must-haves.
+  // Keep the ideal-profile ids so a person bought at L1 is vendor-verified on the must-haves
+  // (the title id too, with the first pool's titles added — the same way the company id
+  // is kept with one company in it).
   const idealTerms = companies?.values ?? []
   if (idealTerms.length) {
-    for (const c of idealTerms) level(`Ideal profile · ${c}`, keep(location, titles, { ...(companies as SearchCriterion), values: [c], label: null }), null, false, true)
+    const idealTitles = poolTitles(poolSorted[0], titles?.id ?? '')
+    for (const c of idealTerms) level(`Ideal profile · ${c}`, keep(location, idealTitles, { ...(companies as SearchCriterion), values: [c], label: null }), null, false, true)
   } else {
     level('Ideal profile', keep(location, titles, companies), null, false, true)
   }
@@ -275,7 +292,8 @@ export function ladderFromIdealProfile(
       if (!terms.length) continue
       terms.forEach((t) => seen.add(t.toLowerCase()))
       const rel = p.relationship ? REL_LABEL[p.relationship] : null
-      level(rel ? `${rel}: ${p.label}` : p.label, keep(location, titles, companyLane(terms, p.label)), p.rationale ?? (p.relationship?.replace(/_/g, ' ') ?? null))
+      const tierTitles = poolTitles(p, `${titles?.id}-p-${slug(p.label)}`)
+      level(rel ? `${rel}: ${p.label}` : p.label, keep(location, tierTitles, companyLane(terms, p.label)), p.rationale ?? (p.relationship?.replace(/_/g, ' ') ?? null))
     }
     // The brief named no peers — still widen companies (same title) before touching titles.
     if (poolSorted.length <= 1) level('Any company · same title', keep(location, titles), 'no company constraint — same title')

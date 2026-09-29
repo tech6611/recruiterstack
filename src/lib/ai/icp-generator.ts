@@ -183,6 +183,7 @@ const reasoningFirstSchema = z.object({
     name: z.string(),
     thesis: z.string(),
     where_from: z.string().nullish(),
+    feeder_pool: z.string().nullish(),
     why_interested: z.string().nullish(),
     why_no: z.string().nullish(),
     is_non_obvious: z.boolean().default(false),
@@ -553,7 +554,7 @@ Work in this exact order, and let each step drive the next:
 
 3) unwritten_filters — the things that will actually drive rejection but appear NOWHERE in the JD (background type, scale/complexity, stage/environment fit, span of management — whatever YOUR niche actually filters on). Mark inferred_from, a confidence 0–1, its exclusion_cost (which good candidates it would wrongly exclude), and recommend_apply.
 
-4) archetypes — 2–4 DISTINCT candidate "bets" that could each succeed (NOT one ideal), drawn from your feeder_pools. Each: a short name, a one-line thesis, where_from (career path / employer patterns — name employers), why_interested (the pitch), why_no (the friction), hire_risk (what this type typically gets wrong). Include at least one non-obvious/adjacent bet with is_non_obvious=true.
+4) archetypes — 2–4 DISTINCT candidate "bets" that could each succeed (NOT one ideal), drawn from your feeder_pools. Each: a short name, a one-line thesis, where_from (career path / employer patterns — name employers), feeder_pool (the EXACT label of the feeder pool this bet is drawn from, or null for a bet no pool covers), why_interested (the pitch), why_no (the friction), hire_risk (what this type typically gets wrong). Include at least one non-obvious/adjacent bet with is_non_obvious=true.
 
 5) competencies — NOW translate the reasoning above into WEIGHTED competencies: choose AS MANY as THIS role genuinely needs — usually 4 to 7. Use more when the role has several distinct, independent success factors; use fewer when one or two clearly dominate. Do not pad to a round number. THIS IS THE CRUX: the weights must be a direct consequence of your reasoning — put the most weight on whatever step 1 said matters most, and make the highest-weighted competency the strongest predictor you identified. Do NOT default to a tidy 35/30/20/15 descending split — that is a template, not a judgement. The spread must reflect THIS role's real priorities: it is fine for one competency to clearly dominate (e.g. 45–55), for two to be near-tied, or for a genuinely minor factor to sit at 5–10. Two different roles should almost never produce the same weight column. Weights are integers that MUST sum to exactly 100. For each: a specific, role-relevant name (e.g. "Enterprise deal ownership", "Payments domain depth", "Structured problem-solving" — not "Domain Experience"); 3–6 concrete, observable behaviours; a 1–4 anchor scale (1 poor → 4 excellent); optionally the hiring manager's verbatim phrasing. Give recruiter-first signals REAL weight when the role calls for them — feeder background (your feeder_pools or close comparables), scale & complexity, and span of management for leadership roles — rather than burying them in a generic competency.
 
@@ -579,7 +580,7 @@ Respond with ONLY valid JSON (no markdown), with the fields in this order:
   "reasoning": "...",
   "requirement_decomposition": [ { "requirement": "", "bucket": "hard_filter", "findable_proxy": "", "notes": "" } ],
   "unwritten_filters": [ { "filter": "", "type": "", "inferred_from": "", "confidence": 0.7, "exclusion_cost": "", "recommend_apply": true } ],
-  "archetypes": [ { "name": "", "thesis": "", "where_from": "", "why_interested": "", "why_no": "", "is_non_obvious": false, "hire_risk": "" } ],
+  "archetypes": [ { "name": "", "thesis": "", "where_from": "", "feeder_pool": "", "why_interested": "", "why_no": "", "is_non_obvious": false, "hire_risk": "" } ],
   "competencies": [ { "name": "", "weight": 30, "behaviours": ["..."], "anchors": { "1": "", "2": "", "3": "", "4": "" }, "verbatim": "" } ],
   "must_haves": []
 }`
