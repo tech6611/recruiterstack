@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import {
-  MapPin, Clock, Briefcase, Layers, Building2, Tag, BarChart3, GraduationCap,
-  BookOpen, Ban, Check, X, Plus, DollarSign, Lock, MoveHorizontal, ChevronRight,
+  MapPin, Clock, Briefcase, Layers, Building2, BarChart3, GraduationCap,
+  BookOpen, Ban, Check, X, Plus, Lock, MoveHorizontal, History, LogOut, Building,
+  CalendarCheck, Wrench, Factory, Users, Landmark, Banknote, Tag,
 } from 'lucide-react'
 import type { SearchCriterion, CriterionKind } from '@/lib/types/search-spec'
 import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
@@ -24,24 +25,25 @@ import { RADIUS_KM, YEARS_BANDS, bandLabel, optionsFor, type FetchedOptions } fr
  */
 
 type IconCmp = typeof MapPin
+/** One icon per field, so a greyed-out field still says what it is. */
 const ICON: Record<CriterionKind, IconCmp> = {
   location: MapPin,
   years_band: Clock,
-  grad_year_band: GraduationCap,
+  grad_year_band: CalendarCheck,
   title_current: Briefcase,
-  title_any: Briefcase,
+  title_any: History,
   function: Layers,
   employer_current: Building2,
-  employer_past: Building2,
-  employer_any: Building2,
-  skill: Tag,
+  employer_past: LogOut,
+  employer_any: Building,
+  skill: Wrench,
   seniority: BarChart3,
   school: GraduationCap,
   degree_field: BookOpen,
-  industry: Layers,
-  company_size: BarChart3,
-  company_type: Building2,
-  funding_stage: DollarSign,
+  industry: Factory,
+  company_size: Users,
+  company_type: Landmark,
+  funding_stage: Banknote,
 }
 
 const isEmployer = (k: CriterionKind) => k.startsWith('employer_')
@@ -79,9 +81,6 @@ export function IdealProfileTiles({
   options?: FetchedOptions
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
-  // Folded by default. Eleven empty rows under five filled ones buries the profile in
-  // fields nobody set; the count alone answers "is there anything I have missed".
-  const [showUnset, setShowUnset] = useState(false)
   function add(kind: CriterionKind) {
     const c: SearchCriterion = { id: `mh-${Date.now().toString(36)}-${++addSeq}`, kind, values: [], relax_at: null }
     onAdd?.(c)
@@ -93,8 +92,8 @@ export function IdealProfileTiles({
   // Fixed field order, so you always know where to look. Criteria we hold come first in
   // that order; every remaining field is still listed, unset — which is the whole point
   // of a record. Without them you cannot tell "no school requirement" from "forgot one".
-  // Rows that apply to every bet first (where · years · school…), in the fixed order;
-  // then the bets, each a company group and the titles searched there.
+  // Only the rows every bet shares (where · years · school…). A bet's companies and
+  // titles are edited on its card above; they still count as set for the strip below.
   const shared = criteria.filter((c) => c.bet == null)
   const byKind = (k: CriterionKind) => shared.filter((c) => c.kind === k)
   const ordered = [
@@ -102,17 +101,6 @@ export function IdealProfileTiles({
     ...shared.filter((c) => !ADDABLE.includes(c.kind)),
   ]
   const unset = ADDABLE.filter((k) => !criteria.some((c) => c.kind === k))
-  const bets = Array.from(new Set(criteria.filter((c) => c.bet != null).map((c) => c.bet as number)))
-    .sort((a, b) => a - b)
-    .map((n) => {
-      const rows = criteria.filter((c) => c.bet === n)
-      return {
-        n,
-        label: rows.find((c) => c.bet_label)?.bet_label ?? `Bet ${n}`,
-        rows: [...rows.filter((c) => isEmployer(c.kind)), ...rows.filter((c) => !isEmployer(c.kind))],
-      }
-    })
-
   const row = (c: SearchCriterion, heading?: string) => (
         <Row
           key={c.id}
@@ -142,57 +130,26 @@ export function IdealProfileTiles({
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       {ordered.map((c) => row(c))}
 
-      {/* The bets, in the order the search reaches them. Each is a company group and the
-          titles searched THERE — McKinsey is searched for Associates, not Strategy
-          Managers. Named after the bet cards above, so the two read as one thing. */}
-      {bets.map((b) => (
-        <div key={b.n} className="border-t-2 border-slate-100">
-          <div className="flex items-center gap-2 px-4 pb-0.5 pt-2.5">
-            <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Bet {b.n}</span>
-            <span className="min-w-0 truncate text-[12px] font-semibold text-slate-800" title={b.label}>{b.label}</span>
-            <span className="text-[10px] text-slate-400">searched {ordinal(b.n)}</span>
-            {onRemove && (
-              <button
-                type="button"
-                onClick={() => { b.rows.forEach((c) => onRemove(c.id)); setEditingId(null) }}
-                className="ml-auto text-[10px] text-slate-300 hover:text-red-500"
-                title="Stop searching this bet"
-              >
-                Remove bet
-              </button>
-            )}
-          </div>
-          {b.rows.map((c) => row(c, isEmployer(c.kind) ? 'Companies' : 'As titles'))}
-        </div>
-      ))}
-
+      {/* Fields nobody set: one grey strip of icon chips, click to add. Twelve "Not
+          set" rows buried five set ones; the strip still answers "have I missed
+          anything" in one line. */}
       {onAdd && unset.length > 0 && (
-        <div className="border-t border-slate-100">
-          <button
-            type="button"
-            onClick={() => setShowUnset((v) => !v)}
-            aria-expanded={showUnset}
-            className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-[11px] text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-          >
-            <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showUnset ? 'rotate-90' : ''}`} />
-            {unset.length} more field{unset.length === 1 ? '' : 's'}, not set
-          </button>
-
-          {showUnset && unset.map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => add(k)}
-              className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2 text-left hover:bg-slate-50"
-            >
-              <span className="w-[9.5rem] shrink-0 text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-                {CRITERION_KIND_LABEL[k]}
-              </span>
-              {/* Just "Not set". The kind labels are phrases ("Currently at", "Ever at"),
-                  and "Add a currently at" is not English for any of them. */}
-              <span className="text-[13px] italic text-slate-400">Not set</span>
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
+          <span className="mr-1 text-[10px] text-slate-400">Not used:</span>
+          {unset.map((k) => {
+            const Icon = ICON[k] ?? Tag
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => add(k)}
+                title={`Add ${CRITERION_KIND_LABEL[k].toLowerCase()}`}
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-slate-400 ring-1 ring-slate-200 hover:bg-white hover:text-slate-700"
+              >
+                <Icon className="h-3 w-3" />{CRITERION_KIND_LABEL[k]}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
@@ -265,8 +222,6 @@ function Row({
   )
 }
 
-const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`
-
 /** One colour per kind of must-have, so the strip reads at a glance. */
 function tone(k: CriterionKind): { pill: string; icon: string } {
   if (k === 'location') return { pill: 'bg-rose-50 text-rose-900 ring-rose-100', icon: 'text-rose-500' }
@@ -290,7 +245,7 @@ function shortValue(c: SearchCriterion): string {
 
 // ── Inline editors ─────────────────────────────────────────────────────────────
 
-function CriterionEditor({ c, onCancel, onSave, onRemove, options }: { c: SearchCriterion; onCancel: () => void; onSave: (n: SearchCriterion) => void; onRemove?: () => void; options?: FetchedOptions }) {
+export function CriterionEditor({ c, onCancel, onSave, onRemove, options }: { c: SearchCriterion; onCancel: () => void; onSave: (n: SearchCriterion) => void; onRemove?: () => void; options?: FetchedOptions }) {
   const [draft, setDraft] = useState<SearchCriterion>({ ...c, values: [...c.values] })
   // One fetch per page, shared by every pill's editor. `options` overrides it so the
   // dev fixture can show real pickers without an authenticated request.

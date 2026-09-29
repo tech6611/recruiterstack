@@ -288,9 +288,10 @@ export function SourcingTab({ jobId, onOpenScoring }: { jobId: string; onOpenSco
   // "Ask the candidate" rows can't be checked from a profile, so they're not columns.
   const baseIcp = icp ?? market.icp
   const tableIcp: MatrixIcp | null = baseIcp ? { ...baseIcp, must_haves: baseIcp.must_haves.filter((g) => g.attribute !== 'screening') } : null
-  const yoursRows: MatrixMatch[] = matches.map((m) => ({ ...m, row_kind: 'yours' as const, candidate_id: YOURS + m.candidate_id }))
+  const yoursRows: MatrixMatch[] = matches.map((m) => ({ ...m, row_kind: 'yours' as const, candidate_id: YOURS + m.candidate_id, stale: currentVersion != null && m.icp_version !== currentVersion }))
   const marketVisible = market.matches.filter((m) => (showHidden || !m.hidden) && (showOutside || !m.outside_plan) && (showFailed || market.misses(m) === 0))
-  const marketRows: MatrixMatch[] = marketVisible.map((m) => { const r = toMatrixMatch(m, market.newIds); return { ...r, candidate_id: MARKET + r.candidate_id } })
+  // The market cache is scored as one batch against one version, so it is stale as a whole.
+  const marketRows: MatrixMatch[] = marketVisible.map((m) => { const r = toMatrixMatch(m, market.newIds); return { ...r, candidate_id: MARKET + r.candidate_id, stale: market.stale && !r.pending } })
   const rows = filter === 'yours' ? yoursRows : filter === 'market' ? marketRows
     : [...yoursRows, ...marketRows].sort((a, b) => Number(!!b.pending) - Number(!!a.pending) || b.score - a.score)
 

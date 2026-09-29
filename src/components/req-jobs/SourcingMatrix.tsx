@@ -43,6 +43,9 @@ export interface MatrixMatch {
   outside_plan?: string | null
   /** Not scored yet — gate, competency and fit cells show a placeholder. */
   pending?: boolean
+  /** Scored against an OLDER version of the profile. Its gate results were recorded
+   *  under that version's must-haves, so they say nothing about today's columns. */
+  stale?: boolean
   red_flags: string[]
   rationale: string | null
   data_incomplete?: boolean | null
@@ -99,12 +102,20 @@ const GATE_CELL = {
   pass: 'bg-emerald-100 text-emerald-700',
   fail: 'bg-rose-100 text-rose-700',
   unknown: 'bg-amber-100 text-amber-700',
+  stale: 'bg-slate-100 text-slate-400',
 } as const
+/**
+ * A cell is ✓ only when this must-have was actually checked. A row scored against an
+ * older profile recorded its failures under THAT version's must-haves; matched against
+ * today's columns by label, none line up and every cell fell through to ✓ — a 22-year
+ * veteran read ✓ under "2–6 years". Such a row shows "–" (not checked) until re-ranked.
+ */
 function gateState(m: MatrixMatch, label: string): keyof typeof GATE_CELL {
+  if (m.stale) return 'stale'
   if (!mustPass(m, label)) return 'fail'
   return mustUnknown(m, label) ? 'unknown' : 'pass'
 }
-const GATE_GLYPH: Record<keyof typeof GATE_CELL, string> = { pass: '✓', fail: '✕', unknown: '?' }
+const GATE_GLYPH: Record<keyof typeof GATE_CELL, string> = { pass: '✓', fail: '✕', unknown: '?', stale: '–' }
 /** A compact column header from a long, often question-style ICP label. Drops the
  *  parenthetical aside, then strips leading filler ("Has a genuine…", "At least 1
  *  year of experience with…") so only the essential noun phrase remains. The full
@@ -322,7 +333,7 @@ export function SourcingMatrix({
                           {GATE_GLYPH[st]}
                         </button>
                         {pop?.id === m.candidate_id && pop.key === mh.id && (
-                          <Evidence onClose={() => setPop(null)} title={mh.label} text={m.gate_reasons?.[mh.label] || (st === 'unknown' ? 'Not verifiable from the data on file.' : st === 'pass' ? 'Met.' : 'Not met.')} />
+                          <Evidence onClose={() => setPop(null)} title={mh.label} text={st === 'stale' ? 'Not checked — this person was scored against an older version of the profile. Click Rank candidates to check them against this one.' : m.gate_reasons?.[mh.label] || (st === 'unknown' ? 'Not verifiable from the data on file.' : st === 'pass' ? 'Met.' : 'Not met.')} />
                         )}
                       </td>
                     )

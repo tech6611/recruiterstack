@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { ScoringCriterion } from '@/lib/types/database'
 import type { Icp, IcpCompetency, IcpMustHave } from '@/lib/types/icp'
+import type { SearchCriterion } from '@/lib/types/search-spec'
 import { icpToScoringCriteria } from '@/lib/scoring'
 import { RecruiterBriefBody, RecruiterBriefChips } from '@/components/req-jobs/RecruiterBriefCard'
 import { isCriterion, toCriterion, mustHaveFromCriterion, criterionLabel } from '@/lib/icp-gates'
@@ -66,6 +67,18 @@ export function IcpEditor({
       .then((r) => (r.ok ? r.json() : { data: [] }))
       .then((j) => setTemplates((j.data ?? []).map((t: { id: string; name: string }) => ({ id: t.id, name: t.name }))))
       .catch(() => {})
+  }
+
+  /** Save one edited profile row (a tile, or a bet card's At / As line). */
+  function updateGate(next: SearchCriterion) {
+    setGates((prev) => prev.map((g) => {
+      if (g.id !== next.id) return g
+      // Gate results are keyed by label, so keep a hand-written / AI label —
+      // but rebuild one that was auto-made (e.g. a new tile's "Current employer: ").
+      const was = toCriterion(g)
+      const auto = !g.label || (was != null && g.label === criterionLabel(was)) || was?.exclude !== next.exclude
+      return { ...mustHaveFromCriterion(auto ? { ...next, label: null } : next), relax_at: next.relax_at ?? null }
+    }))
   }
 
   const total = comps.reduce((s, c) => s + (c.weight || 0), 0)
@@ -390,16 +403,23 @@ export function IcpEditor({
             <button type="button" onClick={() => setShowReasoning((s) => !s)}
               className="flex w-full flex-wrap items-center gap-2 px-3 py-2.5 text-left text-xs">
               <Brain className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
-              <span className="font-semibold text-slate-700">{(icp.sourcing_map.archetypes?.length ?? 0) > 0 ? 'Who we’re betting on' : 'How this profile was reasoned'}</span>
+              <span className="font-semibold text-slate-700">{(icp.sourcing_map.archetypes?.length ?? 0) > 0 || gates.some((g) => g.bet != null) ? 'Who we’re betting on' : 'How this profile was reasoned'}</span>
               {icp.sourcing_map.recruiter_brief?.niche && <span className="text-slate-500">· {icp.sourcing_map.recruiter_brief.niche}</span>}
               <RecruiterBriefChips brief={icp.sourcing_map.recruiter_brief ?? null} compact={false} />
               <span className="ml-auto flex items-center gap-0.5 font-medium text-slate-500">
                 Details {showReasoning ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               </span>
             </button>
-            {(icp.sourcing_map.archetypes?.length ?? 0) > 0 && (
+            {/* Shown whenever there are bets — a profile's bets live only in these cards. */}
+            {((icp.sourcing_map.archetypes?.length ?? 0) > 0 || gates.some((g) => g.bet != null)) && (
               <div className="px-3 pb-3">
-                <BetCards archetypes={icp.sourcing_map.archetypes!} brief={icp.sourcing_map.recruiter_brief} />
+                <BetCards
+                  archetypes={icp.sourcing_map.archetypes ?? []}
+                  brief={icp.sourcing_map.recruiter_brief}
+                  bets={gates.filter((g) => isCriterion(g) && g.bet != null).map((g) => toCriterion(g)!)}
+                  onChange={updateGate}
+                  onRemoveBet={(ids) => setGates((prev) => prev.filter((g) => !ids.includes(g.id)))}
+                />
               </div>
             )}
             {showReasoning && (
@@ -500,11 +520,11 @@ export function IcpEditor({
                       onClick={() => {
                         // Old questions the new rows cover go: kept, they only repeat the
                         // profile — and before supersedeLegacyGates they overrode it.
-                        const dropped = gates.filter((g) => covered.has(g.id)).length
-                        setGates((prev) => [...fromBrief, ...prev.filter((g) => !covered.has(g.id))])
+                        const dropped = gates.filter((g) => !isCriterion(g)).length
+                        setGates((prev) => [...fromBrief, ...prev.filter((g) => isCriterion(g))])
                         setFromBrief(null)
                         setCovered(new Set())
-                        toast.success(`Filled from the recruiter brief${dropped ? `, and removed ${dropped} old question${dropped === 1 ? '' : 's'} it covers` : ''} — review, then approve to use it.`)
+                        toast.success(`Filled from the recruiter brief${dropped ? ` and removed ${dropped} old text question${dropped === 1 ? '' : 's'}` : ''} — review, then approve to use it.`)
                       }}
                     >
                       Fill from recruiter brief
@@ -524,9 +544,13 @@ export function IcpEditor({
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        setGates((prev) => [...prev.filter((g) => !toBets.replaces.includes(g.id)), ...toBets.rows])
+                        // Old text questions go too: the bets and shared rows do their job,
+                        // and they filtered, rejected and screened nobody.
+                        const dropped = gates.filter((g) => !isCriterion(g)).length
+                        setGates((prev) => [...prev.filter((g) => isCriterion(g) && !toBets.replaces.includes(g.id)), ...toBets.rows])
                         setToBets(null)
-                        toast.success('Organised into bets — review, then approve to use them.')
+                        setCovered(new Set())
+                        toast.success(`Organised into bets${dropped ? ` and removed ${dropped} old text question${dropped === 1 ? '' : 's'}` : ''} — review, then approve to use them.`)
                       }}
                     >
                       Organise into bets from the brief
@@ -539,16 +563,7 @@ export function IcpEditor({
                 {/* Always shown, so a must-have can be added even to an empty profile. */}
                 <IdealProfileTiles
                     criteria={profile.map((g) => toCriterion(g)!)}
-                    onChange={(next) =>
-                      setGates((prev) => prev.map((g) => {
-                        if (g.id !== next.id) return g
-                        // Gate results are keyed by label, so keep a hand-written / AI label —
-                        // but rebuild one that was auto-made (e.g. a new tile's "Current employer: ").
-                        const was = toCriterion(g)
-                        const auto = !g.label || (was != null && g.label === criterionLabel(was)) || was?.exclude !== next.exclude
-                        return { ...mustHaveFromCriterion(auto ? { ...next, label: null } : next), relax_at: next.relax_at ?? null }
-                      }))
-                    }
+                    onChange={updateGate}
                     onAdd={(c) => setGates((prev) => [...prev, mustHaveFromCriterion({ ...c, label: null })])}
                     onRemove={(id) => setGates((prev) => prev.filter((g) => g.id !== id))}
                   />
@@ -572,20 +587,18 @@ export function IcpEditor({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Older text gates</div>
-                      {legacy.some((g) => covered.has(g.id)) && (
-                        <button
-                          type="button"
-                          onClick={() => setGates((prev) => prev.filter((x) => !covered.has(x.id)))}
-                          className="ml-auto text-[11px] text-slate-500 underline decoration-slate-300 hover:text-red-600"
-                        >
-                          Remove the {legacy.filter((g) => covered.has(g.id)).length} the profile covers
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setGates((prev) => prev.filter((x) => !legacy.some((g) => g.id === x.id)))}
+                        className="ml-auto text-[11px] text-slate-500 underline decoration-slate-300 hover:text-red-600"
+                      >
+                        Remove all {legacy.length}
+                      </button>
                     </div>
                     <p className="text-[11px] text-slate-400">
-                      Written before the ideal profile existed. One the profile above already covers is only a
-                      screening note — never a filter, never a reject. Any other is still turned into a filter where
-                      the text allows. Approve after removing any to save the change.
+                      Yes/no questions written before the ideal profile existed. One tagged &ldquo;covered&rdquo; filters and
+                      rejects no one — the profile does its job. Any other is still turned into a filter where the text
+                      allows. The AI phone screen does not ask them. Remove them, then approve to save.
                     </p>
                     <div className="overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100">
                       {legacy.map((g) => (
