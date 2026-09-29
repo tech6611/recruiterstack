@@ -152,6 +152,52 @@ export function convertLegacyGates(gates: IcpMustHave[] | null | undefined, ctx:
   return out
 }
 
+/** What a filter is about, so an old question and a profile row can be matched up. */
+function gateFamily(kind: CriterionKind): string {
+  if (kind.startsWith('title_') || kind === 'function' || kind === 'seniority') return 'role'
+  if (kind.startsWith('employer_')) return 'employer'
+  if (kind === 'school' || kind === 'degree_field') return 'education'
+  if (kind === 'years_band' || kind === 'grad_year_band') return 'years'
+  return kind
+}
+
+/**
+ * Convert old free-text gates, but never let one override the ideal profile.
+ *
+ * An old question the ideal profile already covers stops being a filter and becomes a
+ * screening note — never a filter, never a reject. Without this, V5's "core background
+ * in consulting, IB/VC/PE or BizOps?" converted to a HARD "has held Strategy Manager /
+ * Chief of Staff…" rule on every search level: the McKinsey Associates the brief ranks
+ * first were filtered out of their own lane. "Tier-1 university (IIT, IIM, ISB, BITS)"
+ * became a hard school rule that made the tier-2 level unsatisfiable.
+ *
+ * An old question about something the profile does NOT cover still converts as before,
+ * so nothing is silently lost. Returns the gates and the ids of the old questions that
+ * the profile covers (the editor offers to delete those). PURE.
+ */
+export function supersedeLegacyGates(
+  gates: IcpMustHave[] | null | undefined,
+  ctx: ConversionContext = {},
+): { gates: IcpMustHave[]; covered: string[] } {
+  const list = gates ?? []
+  const families = new Set(list.filter((g) => isCriterion(g) && !g.exclude).map((g) => gateFamily(g.kind!)))
+  if (!families.size) return { gates: convertLegacyGates(list, ctx), covered: [] }
+  const original = new Map(list.map((g) => [g.id, g]))
+  const converted = convertLegacyGates(list, ctx)
+  const covered: string[] = []
+  const out = converted.map((g) => {
+    const was = original.get(g.id)
+    if (!was || isCriterion(was) || was.attribute === SCREENING_ATTRIBUTE) return g
+    if (!isCriterion(g) || !families.has(gateFamily(g.kind!))) return g
+    covered.push(g.id)
+    return { ...was, attribute: SCREENING_ATTRIBUTE }
+  })
+  // A legacy gate conversion dropped outright (a years question beside a Years row) is covered too.
+  const kept = new Set(out.map((g) => g.id))
+  for (const g of list) if (!isCriterion(g) && g.attribute !== SCREENING_ATTRIBUTE && !kept.has(g.id)) covered.push(g.id)
+  return { gates: out, covered }
+}
+
 // ── Evaluation ───────────────────────────────────────────────────────────────────
 
 export interface EvaluableCandidate {

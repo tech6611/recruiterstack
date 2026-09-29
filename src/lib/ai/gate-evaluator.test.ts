@@ -200,3 +200,50 @@ describe('the ladder and the fold', () => {
     expect(out.map((g) => g.id)).toEqual(['ip-years', 'ip-titles', 's'])
   })
 })
+
+
+import { supersedeLegacyGates } from './gate-evaluator'
+
+describe('supersedeLegacyGates — old questions never override the ideal profile', () => {
+  // V6 of the Strategy & Operations Manager job, as stored.
+  const profile = [
+    mustHaveFromCriterion({ id: 'ip-years', kind: 'years_band', values: [], min: 2, max: 6 }),
+    mustHaveFromCriterion({ id: 'ip-school', kind: 'school', values: ['IIT', 'IIM'], relax_at: 3 }),
+    mustHaveFromCriterion({ id: 'ip-titles', kind: 'title_current', values: ['Strategy Manager'], relax_at: 3 }),
+    mustHaveFromCriterion({ id: 'ip-companies', kind: 'employer_current', values: ['McKinsey'], relax_at: 2 }),
+  ]
+  const old = (id: string, label: string) => ({ id, label, attribute: '', operator: '', value: '' })
+  const background = old('g-ai-0', "Is the candidate's core background in top-tier Management Consulting, IB/VC/PE, or Strategy/BizOps at a high-growth tech company?")
+  const tier1 = old('g-ai-2', 'Is the candidate a graduate of a Tier-1 university (e.g., IIT, IIM A/B/C/L, ISB, BITS Pilani)?')
+  const sql = old('g-ai-3', "Does the candidate's profile explicitly mention hands-on experience with SQL?")
+  const ctx = { titleFamilies: ['Strategy Manager', 'Chief of Staff'] }
+
+  it('an old question the profile covers becomes a screening note, not a hard rule', () => {
+    const { gates, covered } = supersedeLegacyGates([...profile, background, tier1, sql], ctx)
+    expect(covered.sort()).toEqual(['g-ai-0', 'g-ai-2'])
+    for (const id of ['g-ai-0', 'g-ai-2']) {
+      const g = gates.find((x) => x.id === id)!
+      expect(g.attribute).toBe(SCREENING_ATTRIBUTE)
+      expect(isCriterion(g)).toBe(false)
+    }
+    // The label survives, so snapshots keyed by it still line up.
+    expect(gates.find((x) => x.id === 'g-ai-0')!.label).toBe(background.label)
+  })
+  it('the profile rows are untouched and nothing hard is added', () => {
+    const { gates } = supersedeLegacyGates([...profile, background, tier1, sql], ctx)
+    expect(gates.filter((g) => isCriterion(g)).map((g) => g.id)).toEqual(['ip-years', 'ip-school', 'ip-titles', 'ip-companies'])
+  })
+  it('an old question about something the profile does NOT cover still converts', () => {
+    const noSchool = profile.filter((g) => g.kind !== 'school')
+    const { gates, covered } = supersedeLegacyGates([...noSchool, tier1], ctx)
+    expect(covered).toEqual([])
+    expect(gates.find((g) => g.id === 'g-ai-2')?.kind).toBe('school')
+  })
+  it('a profile with no structured rows keeps the old conversion exactly', () => {
+    expect(supersedeLegacyGates([background, tier1], ctx).gates).toEqual(convertLegacyGates([background, tier1], ctx))
+  })
+  it('an old years question beside a Years row counts as covered', () => {
+    const years = old('g-band', 'Has between 2 and 6 years of professional experience?')
+    expect(supersedeLegacyGates([...profile, years], ctx).covered).toEqual(['g-band'])
+  })
+})

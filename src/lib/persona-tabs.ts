@@ -11,6 +11,7 @@
  * marked `relaxed` so the UI can show them as "also considering", not core.
  */
 import type { SearchSpec, SearchCriterion, CriterionKind } from '@/lib/types/search-spec'
+import { groupEmployerAliases } from '@/lib/employer-aliases'
 
 export type PersonaTabKey = 'employers' | 'titles' | 'skills' | 'seniority' | 'years' | 'locations'
 
@@ -22,6 +23,8 @@ export interface PersonaChip {
   relaxed?: boolean
   /** True when the criterion excludes this value ("not at BigCo"). */
   exclude?: boolean
+  /** The name to look a logo up by, when the label carries a short name too. */
+  logoName?: string
 }
 
 export interface PersonaTab {
@@ -93,9 +96,32 @@ function collectIdeal(spec: SearchSpec, kinds: CriterionKind[]): PersonaChip[] {
     }
   }
   for (const c of spec.base) consider(c, false)
-  spec.levels.forEach((lvl, i) => lvl.criteria.forEach((c) => consider(c, i > 0)))
+  // Every ideal-profile line is core, not just L1 — the ideal profile searches one line
+  // per target firm, so Bain on L2 is as ideal as McKinsey on L1. Only later levels widen.
+  const isIdeal = (lvl: SearchSpec['levels'][number], i: number) => i === 0 || lvl.ideal === true || /^Ideal profile\b/.test(lvl.label)
+  spec.levels.forEach((lvl, i) => lvl.criteria.forEach((c) => consider(c, !isIdeal(lvl, i))))
   // Core (non-relaxed) first, widenings after; stable within each group.
   return Array.from(seen.values()).sort((a, b) => (a.relaxed ? 1 : 0) - (b.relaxed ? 1 : 0))
+}
+
+/**
+ * "Boston Consulting Group" and "BCG" are one firm searched under two names — one chip,
+ * "Boston Consulting Group (BCG)". Counts add up; a firm is core if either name is.
+ * Exclusions are left alone. PURE.
+ */
+function mergeEmployerAliases(chips: PersonaChip[]): PersonaChip[] {
+  const kept = chips.filter((c) => !c.exclude)
+  const merged = groupEmployerAliases(kept.map((c) => c.label)).map((g) => {
+    const parts = kept.filter((c) => g.members.includes(c.label.trim()))
+    const counts = parts.map((c) => c.count).filter((n): n is number => n != null)
+    return {
+      label: g.display,
+      logoName: g.members[0],
+      relaxed: parts.every((c) => c.relaxed),
+      ...(parts.some((c) => c.count !== undefined) ? { count: counts.length ? counts.reduce((a, b) => a + b, 0) : null } : {}),
+    } as PersonaChip
+  })
+  return [...merged, ...chips.filter((c) => c.exclude)]
 }
 
 function countFor(name: string, facets: { name: string; count: number }[]): number | null {
@@ -132,7 +158,8 @@ export function buildPersonaTabs(spec: SearchSpec | null, facets: PersonaFacets 
         pool = facets.cities.slice(0, 20).map((s) => ({ label: s }))
       }
     }
-    return { key: meta.key, label: meta.label, summary: summarize(meta.key, ideal), ideal, pool }
+    const shown = meta.key === 'employers' ? mergeEmployerAliases(ideal) : ideal
+    return { key: meta.key, label: meta.label, summary: summarize(meta.key, shown), ideal: shown, pool }
   })
   return { tabs, poolTotal: facets?.total ?? null, hasPool: !!facets }
 }

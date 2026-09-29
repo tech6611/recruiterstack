@@ -148,7 +148,7 @@ function IdCard({ persona }: { persona: Persona }) {
               {r.chips.slice(0, 8).map((c, i) => (
                 <span key={i} title={c.relaxed ? `${c.label} — only at a widened search level` : c.label}
                   className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs ${r.chipCls} ${c.relaxed ? 'opacity-50' : ''}`}>
-                  {r.logo && <BrandIcon name={c.label} />}
+                  {r.logo && <BrandIcon name={c.logoName ?? c.label} />}
                   {c.label}
                 </span>
               ))}
@@ -236,7 +236,7 @@ function Chip({ chip, logo }: { chip: PersonaChip; logo: boolean }) {
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium ring-1 ${base}`}>
       {chip.exclude && <span className="text-[9px] font-bold uppercase text-rose-500">not</span>}
-      {logo && !chip.exclude && <BrandIcon name={chip.label} />}
+      {logo && !chip.exclude && <BrandIcon name={chip.logoName ?? chip.label} />}
       {chip.label}
       {chip.count != null && chip.count > 0 && (
         <span className="rounded-full bg-white/70 px-1 text-[10px] tabular-nums text-slate-500">{chip.count}</span>

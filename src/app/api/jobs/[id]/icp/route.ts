@@ -4,7 +4,7 @@ import { icpDraftInputSchema } from '@/lib/validations/icp'
 import { getCurrentIcp, getLatestIcp, createIcpDraft } from '@/modules/ats/domain/icp'
 import type { Icp, IcpDraftInput, IcpMustHave } from '@/lib/types/icp'
 import { isCriterion } from '@/lib/icp-gates'
-import { idealProfileFromBrief } from '@/lib/ai/gate-evaluator'
+import { idealProfileFromBrief, supersedeLegacyGates } from '@/lib/ai/gate-evaluator'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 
 /** GET — the ICP for this job. Default = the live/approved one (else newest draft).
@@ -16,7 +16,10 @@ export const GET = withCapability('recruiting:view', async (req, orgId, supabase
     const icp = latest
       ? await getLatestIcp(supabase, orgId, params.id)
       : await getCurrentIcp(supabase, orgId, params.id)
-    return NextResponse.json({ data: icp, profile_from_brief: latest ? await profileFromBrief(supabase, orgId, params.id, icp) : null })
+    if (!latest) return NextResponse.json({ data: icp })
+    const market = await getJobRoleContext(supabase, orgId, params.id).then((c) => c.market).catch(() => null)
+    const fromBrief = profileFromBrief(icp, market)
+    return NextResponse.json({ data: icp, profile_from_brief: fromBrief, legacy_covered: legacyCovered(icp, fromBrief, market) })
   } catch (e) {
     return handleSupabaseError(e as { code: string; message: string })
   }
@@ -29,14 +32,24 @@ export const GET = withCapability('recruiting:view', async (req, orgId, supabase
  * titles. Offered to the editor, not saved: the recruiter fills it in and approves.
  * Deterministic — no AI call. Null when there is nothing to offer.
  */
-async function profileFromBrief(
-  supabase: Parameters<typeof getJobRoleContext>[0], orgId: string, jobId: string, icp: Icp | null,
-): Promise<IcpMustHave[] | null> {
+type Market = Awaited<ReturnType<typeof getJobRoleContext>>['market']
+
+function profileFromBrief(icp: Icp | null, market: Market): IcpMustHave[] | null {
   const brief = icp?.sourcing_map?.recruiter_brief
   if (!brief || (icp?.must_haves ?? []).some((g) => isCriterion(g))) return null
-  const market = await getJobRoleContext(supabase, orgId, jobId).then((c) => c.market).catch(() => null)
   const rows = idealProfileFromBrief(brief, market)
   return rows.length ? rows : null
+}
+
+/**
+ * The old text questions that the ideal profile covers — the one on screen, or the one
+ * "Fill from recruiter brief" is about to add. They no longer filter anyone (see
+ * supersedeLegacyGates); the editor marks them and offers to delete them.
+ */
+function legacyCovered(icp: Icp | null, fromBrief: IcpMustHave[] | null, market: Market): string[] {
+  if (!icp) return []
+  const gates = [...(fromBrief ?? []), ...(icp.must_haves ?? [])]
+  return supersedeLegacyGates(gates, { market, titleFamilies: icp.sourcing_map?.recruiter_brief?.title_families ?? null }).covered
 }
 
 /** POST — create a new draft ICP for this job (manual authoring; AI seeding

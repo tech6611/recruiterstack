@@ -109,3 +109,26 @@ describe('buildPersonaTabs', () => {
     expect(emp.ideal.find((c) => c.label === 'Ramp')?.relaxed).toBe(true)
   })
 })
+
+
+describe('one chip per firm', () => {
+  it('merges a firm\'s two search names into one Comes-from chip', () => {
+    const spec = { version: 1, base: [], post_fetch: [], levels: [
+      { id: 'L1', label: 'x', relaxes: null, criteria: [{ id: 'e', kind: 'employer_current', values: ['McKinsey', 'Boston Consulting Group', 'BCG'] }] },
+    ] } as never
+    const employers = buildPersonaTabs(spec, null).tabs.find((t) => t.key === 'employers')!
+    expect(employers.ideal.map((c) => c.label)).toEqual(['McKinsey', 'Boston Consulting Group (BCG)'])
+    expect(employers.ideal[1].logoName).toBe('Boston Consulting Group')
+    expect(employers.summary).toBe('2 companies')
+  })
+
+  it('every ideal-profile line is core, not only the first', () => {
+    const spec = { version: 1, base: [], post_fetch: [], levels: [
+      { id: 'L1', label: 'Ideal profile · McKinsey', ideal: true, relaxes: null, criteria: [{ id: 'e', kind: 'employer_current', values: ['McKinsey'] }] },
+      { id: 'L2', label: 'Ideal profile · Bain', ideal: true, relaxes: null, criteria: [{ id: 'e', kind: 'employer_current', values: ['Bain'] }] },
+      { id: 'L3', label: 'Startups', relaxes: null, criteria: [{ id: 'e2', kind: 'employer_current', values: ['Swiggy'] }] },
+    ] } as never
+    const chips = buildPersonaTabs(spec, null).tabs.find((t) => t.key === 'employers')!.ideal
+    expect(chips.map((c) => [c.label, !!c.relaxed])).toEqual([['McKinsey', false], ['Bain', false], ['Swiggy', true]])
+  })
+})

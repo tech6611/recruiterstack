@@ -6,7 +6,7 @@ import { embedText } from '@/lib/ai/llm'
 import { icpEmbeddingText } from '@/lib/ai/embeddings'
 import { logger } from '@/lib/logger'
 import { mustHaveFromCriterion } from '@/lib/icp-gates'
-import { convertLegacyGates } from '@/lib/ai/gate-evaluator'
+import { supersedeLegacyGates } from '@/lib/ai/gate-evaluator'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 
 type Supabase = SupabaseClient<Database>
@@ -171,7 +171,8 @@ export async function getCurrentIcp(
  * Structured must-haves (docs/structured-must-haves-plan.md): legacy free-text gates
  * are converted to criteria on read — years → band, "based in <market>" → location,
  * "primary experience in X" → the brief's title families — and gates no profile can
- * answer become `screening`. Pure and deterministic given the row, so nothing is
+ * answer become `screening`. A legacy gate the ideal profile already covers becomes
+ * `screening` too (supersedeLegacyGates), so it can never override the profile. Pure and deterministic given the row, so nothing is
  * written back; the stored gates are untouched until the editor (Phase 2) saves.
  */
 async function withStructuredGates(supabase: Supabase, orgId: string, jobId: string, icp: Icp): Promise<Icp> {
@@ -181,7 +182,8 @@ async function withStructuredGates(supabase: Supabase, orgId: string, jobId: str
 
 /** The read-time conversion, PURE — exported for the audit script and tests. */
 export function withConvertedGates(icp: Icp, market: { city?: string | null; state?: string | null; country?: string | null; work_model?: string | null } | null): Icp {
-  const must_haves = convertLegacyGates(icp.must_haves, { market, titleFamilies: icp.sourcing_map?.recruiter_brief?.title_families ?? null })
+  // Old questions the ideal profile already covers become screening notes, not filters.
+  const { gates: must_haves } = supersedeLegacyGates(icp.must_haves, { market, titleFamilies: icp.sourcing_map?.recruiter_brief?.title_families ?? null })
   return { ...icp, must_haves }
 }
 

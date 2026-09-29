@@ -35,6 +35,8 @@ export function IcpEditor({
   const [gates, setGates] = useState<IcpMustHave[]>([])
   // The profile the brief implies, offered when this ICP predates the ideal profile.
   const [fromBrief, setFromBrief] = useState<IcpMustHave[] | null>(null)
+  // Old text questions the ideal profile covers — they no longer filter anyone.
+  const [covered, setCovered] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -102,9 +104,10 @@ export function IcpEditor({
         const res = await fetch(`/api/jobs/${jobId}/icp?latest=1`)
         if (!active) return
         if (res.ok) {
-          const { data, profile_from_brief } = await res.json()
+          const { data, profile_from_brief, legacy_covered } = await res.json()
           if (data) hydrate(data as Icp)
           setFromBrief(profile_from_brief ?? null)
+          setCovered(new Set(legacy_covered ?? []))
         }
       } finally {
         if (active) setLoading(false)
@@ -492,11 +495,13 @@ export function IcpEditor({
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        const hasYears = fromBrief.some((g) => g.kind === 'years_band')
-                        // The old years gate says the same thing as the new years row.
-                        setGates((prev) => [...fromBrief, ...prev.filter((g) => !(hasYears && g.attribute === 'experience_band'))])
+                        // Old questions the new rows cover go: kept, they only repeat the
+                        // profile — and before supersedeLegacyGates they overrode it.
+                        const dropped = gates.filter((g) => covered.has(g.id)).length
+                        setGates((prev) => [...fromBrief, ...prev.filter((g) => !covered.has(g.id))])
                         setFromBrief(null)
-                        toast.success('Filled from the recruiter brief — review, then approve to use it.')
+                        setCovered(new Set())
+                        toast.success(`Filled from the recruiter brief${dropped ? `, and removed ${dropped} old question${dropped === 1 ? '' : 's'} it covers` : ''} — review, then approve to use it.`)
                       }}
                     >
                       Fill from recruiter brief
@@ -540,12 +545,32 @@ export function IcpEditor({
                 )}
                 {legacy.length > 0 && (
                   <div className="space-y-1">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Older text gates</div>
-                    <p className="text-[11px] text-slate-400">Written before the ideal profile existed. Converted to filters where the text allows; Regenerate to replace them.</p>
+                    <div className="flex items-center gap-2">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Older text gates</div>
+                      {legacy.some((g) => covered.has(g.id)) && (
+                        <button
+                          type="button"
+                          onClick={() => setGates((prev) => prev.filter((x) => !covered.has(x.id)))}
+                          className="ml-auto text-[11px] text-slate-500 underline decoration-slate-300 hover:text-red-600"
+                        >
+                          Remove the {legacy.filter((g) => covered.has(g.id)).length} the profile covers
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Written before the ideal profile existed. One the profile above already covers is only a
+                      screening note — never a filter, never a reject. Any other is still turned into a filter where
+                      the text allows. Approve after removing any to save the change.
+                    </p>
                     <div className="overflow-hidden rounded-xl border border-slate-200 divide-y divide-slate-100">
                       {legacy.map((g) => (
                         <div key={g.id} className="flex items-center gap-2 px-3 py-2.5">
                           <Input value={g.label} onChange={(e) => setGates((prev) => prev.map((x) => (x.id === g.id ? { ...x, label: e.target.value } : x)))} className="h-8 min-w-[10rem] flex-1 text-sm" />
+                          {covered.has(g.id) && (
+                            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500" title="The ideal profile above already does this, so this question no longer filters or rejects anyone.">
+                              covered by the profile · not a filter
+                            </span>
+                          )}
                           <button type="button" onClick={() => setGates((prev) => prev.filter((x) => x.id !== g.id))} className="text-slate-300 hover:text-red-500">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

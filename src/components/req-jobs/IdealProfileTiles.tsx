@@ -9,6 +9,7 @@ import type { SearchCriterion, CriterionKind } from '@/lib/types/search-spec'
 import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 import { criterionLabel } from '@/lib/icp-gates'
 import { BrandIcon } from '@/components/ui/BrandIcon'
+import { groupEmployerAliases } from '@/lib/employer-aliases'
 import { SuggestInput } from '@/components/ui/SuggestInput'
 import { useIcpOptions } from '@/lib/hooks/useIcpOptions'
 import { RADIUS_KM, YEARS_BANDS, bandLabel, optionsFor, type FetchedOptions } from '@/lib/icp-options'
@@ -173,7 +174,8 @@ function Row({
   const Icon = c.exclude ? Ban : ICON[c.kind] ?? Tag
   const never = c.relax_at == null
   const t = c.exclude ? { pill: '', icon: 'text-slate-400' } : tone(c.kind)
-  const logos = isEmployer(c.kind) && !c.exclude ? c.values.filter((v) => v.trim()) : []
+  // One chip per firm: "Boston Consulting Group" and "BCG" are two search terms, one company.
+  const logos = isEmployer(c.kind) && !c.exclude ? groupEmployerAliases(c.values) : []
 
   return (
     <div className={`border-t border-slate-100 first:border-t-0 ${editing ? 'bg-slate-50/70' : ''}`}>
@@ -191,10 +193,10 @@ function Row({
         <span className="min-w-0 flex-1 text-[13px] text-slate-800">
           {logos.length > 0 ? (
             <span className="flex flex-wrap items-center gap-1.5">
-              {logos.slice(0, 6).map((v) => (
-                <span key={v} className="inline-flex items-center gap-1">
-                  <BrandIcon name={v} size={16} />
-                  <span>{v}</span>
+              {logos.slice(0, 6).map((g) => (
+                <span key={g.display} className="inline-flex items-center gap-1">
+                  <BrandIcon name={g.members[0]} size={16} />
+                  <span>{g.display}</span>
                 </span>
               ))}
               {logos.length > 6 && <span className="text-slate-400">+{logos.length - 6}</span>}
