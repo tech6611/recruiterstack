@@ -277,3 +277,40 @@ describe('supersedeLegacyGates — old questions never override the ideal profil
     expect(supersedeLegacyGates([...profile, years], ctx).covered).toEqual(['g-band'])
   })
 })
+
+import { organiseIntoBets } from './gate-evaluator'
+
+describe('organiseIntoBets — upgrading a profile made before bets', () => {
+  const brief = {
+    market: 'Bengaluru', experience_band: { min_years: 2, max_years: 6 }, title_families: ['Strategy Manager'], adjacent_titles: [],
+    current_functions: [], current_title_exclusions: [], market_gates: [], jd_translations: [], market_norms: [], normal_red_flags: [], unsure_about: [], niche: '', persona: '',
+    feeder_pools: [
+      { label: 'Consulting', companies: ['McKinsey & Company', 'Bain & Company'], role_types: ['Associate', 'Consultant'], priority: 1 },
+      { label: 'Startups', companies: ['Swiggy'], role_types: ['Strategy Manager'], priority: 2 },
+    ],
+  }
+  const v6 = [
+    mustHaveFromCriterion({ id: 'ip-years', kind: 'years_band', values: [], min: 2, max: 6 }),
+    mustHaveFromCriterion({ id: 'ip-titles', kind: 'title_current', values: ['Strategy Manager'], relax_at: 3 }),
+    // Edited on Scoring: Bain removed, Kearney added.
+    mustHaveFromCriterion({ id: 'ip-companies', kind: 'employer_current', values: ['McKinsey', 'Kearney'], relax_at: 2 }),
+    { id: 'g-sql', label: 'Mentions SQL?', attribute: '', operator: '', value: '' },
+  ]
+  const out = organiseIntoBets(v6, brief, { city: 'Bengaluru', country: 'IN', work_model: 'onsite' })!
+
+  it('replaces the single title and company rows, and nothing else', () => {
+    expect(out.replaces).toEqual(['ip-titles', 'ip-companies'])
+  })
+  it('bet 1 keeps the companies the profile has now; its titles are the pool\'s own', () => {
+    const b1 = out.rows.filter((g) => g.bet === 1)
+    expect(b1.find((g) => g.kind === 'employer_current')).toMatchObject({ values: ['McKinsey', 'Kearney'], label: 'Currently at: McKinsey / Kearney', enforcement: 'sourcing_only' })
+    expect(b1.find((g) => g.kind === 'title_current')?.values).toEqual(['Associate', 'Consultant'])
+  })
+  it('later bets come from the brief', () => {
+    expect(out.rows.filter((g) => g.bet === 2).map((g) => g.values)).toEqual([['Swiggy'], ['Strategy Manager']])
+  })
+  it('offers nothing for a profile already in bets, or one with no profile', () => {
+    expect(organiseIntoBets([...v6, ...out.rows], brief, null)).toBeNull()
+    expect(organiseIntoBets([v6[3]], brief, null)).toBeNull()
+  })
+})

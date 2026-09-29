@@ -4,7 +4,7 @@ import { icpDraftInputSchema } from '@/lib/validations/icp'
 import { getCurrentIcp, getLatestIcp, createIcpDraft } from '@/modules/ats/domain/icp'
 import type { Icp, IcpDraftInput, IcpMustHave } from '@/lib/types/icp'
 import { isCriterion } from '@/lib/icp-gates'
-import { idealProfileFromBrief, supersedeLegacyGates } from '@/lib/ai/gate-evaluator'
+import { idealProfileFromBrief, supersedeLegacyGates, organiseIntoBets } from '@/lib/ai/gate-evaluator'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 
 /** GET — the ICP for this job. Default = the live/approved one (else newest draft).
@@ -19,7 +19,7 @@ export const GET = withCapability('recruiting:view', async (req, orgId, supabase
     if (!latest) return NextResponse.json({ data: icp })
     const market = await getJobRoleContext(supabase, orgId, params.id).then((c) => c.market).catch(() => null)
     const fromBrief = profileFromBrief(icp, market)
-    return NextResponse.json({ data: icp, profile_from_brief: fromBrief, legacy_covered: legacyCovered(icp, fromBrief, market) })
+    return NextResponse.json({ data: icp, profile_from_brief: fromBrief, legacy_covered: legacyCovered(icp, fromBrief, market), bets_from_brief: betsFromBrief(icp, market) })
   } catch (e) {
     return handleSupabaseError(e as { code: string; message: string })
   }
@@ -39,6 +39,18 @@ function profileFromBrief(icp: Icp | null, market: Market): IcpMustHave[] | null
   if (!brief || (icp?.must_haves ?? []).some((g) => isCriterion(g))) return null
   const rows = idealProfileFromBrief(brief, market, { archetypes: icp?.sourcing_map?.archetypes ?? null })
   return rows.length ? rows : null
+}
+
+/**
+ * For a profile made before bets — one "Current title" row and one "Currently at" row —
+ * the bets its brief implies: each pool's companies and the titles searched there. Bet 1
+ * keeps the companies on the profile now, so an edit made to them survives. Offered to
+ * the editor, not saved; approve to use it. Null when there is nothing to organise.
+ */
+function betsFromBrief(icp: Icp | null, market: Market): { rows: IcpMustHave[]; replaces: string[] } | null {
+  const brief = icp?.sourcing_map?.recruiter_brief
+  if (!icp || !brief) return null
+  return organiseIntoBets(icp.must_haves ?? [], brief, market, icp.sourcing_map?.archetypes ?? null)
 }
 
 /**

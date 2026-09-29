@@ -153,6 +153,32 @@ export function convertLegacyGates(gates: IcpMustHave[] | null | undefined, ctx:
   return out
 }
 
+/**
+ * For a profile made before bets — one "Current title" row and one "Currently at" row,
+ * which together read as "a Strategy Manager at McKinsey" — the bets its brief implies,
+ * and the ids of the rows they replace. Bet 1 keeps the companies the profile has now,
+ * so an edit made to them survives. Null when there is nothing to organise (already in
+ * bets, no structured profile, or a brief with no pools). PURE.
+ */
+export function organiseIntoBets(
+  gates: IcpMustHave[],
+  brief: Parameters<typeof idealProfileFromBrief>[0],
+  market: IdealProfileMarket | null | undefined,
+  archetypes?: Archetype[] | null,
+): { rows: IcpMustHave[]; replaces: string[] } | null {
+  if (!brief || !gates.some((g) => isCriterion(g)) || gates.some((g) => g.bet != null)) return null
+  const old = gates.filter((g) => isCriterion(g) && !g.exclude && g.relax_at != null && (g.kind!.startsWith('title_') || g.kind!.startsWith('employer_')))
+  const bets = idealProfileFromBrief(brief, market, { archetypes }).filter((g) => g.bet != null)
+  if (!bets.length) return null
+  const kept = old.find((g) => g.kind!.startsWith('employer_'))?.values
+  const rows = bets.map((g) => {
+    if (g.bet !== 1 || !g.kind!.startsWith('employer_') || !kept?.length) return g
+    const c = toCriterion(g)!
+    return mustHaveFromCriterion({ ...c, values: kept, label: null })
+  })
+  return { rows, replaces: old.map((g) => g.id) }
+}
+
 /** What a filter is about, so an old question and a profile row can be matched up. */
 function gateFamily(kind: CriterionKind): string {
   if (kind.startsWith('title_') || kind === 'function' || kind === 'seniority') return 'role'

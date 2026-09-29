@@ -37,6 +37,8 @@ export function IcpEditor({
   const [fromBrief, setFromBrief] = useState<IcpMustHave[] | null>(null)
   // Old text questions the ideal profile covers — they no longer filter anyone.
   const [covered, setCovered] = useState<Set<string>>(new Set())
+  // A pre-bet profile's bets, from its brief — offered, not saved.
+  const [toBets, setToBets] = useState<{ rows: IcpMustHave[]; replaces: string[] } | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -104,7 +106,8 @@ export function IcpEditor({
         const res = await fetch(`/api/jobs/${jobId}/icp?latest=1`)
         if (!active) return
         if (res.ok) {
-          const { data, profile_from_brief, legacy_covered } = await res.json()
+          const { data, profile_from_brief, legacy_covered, bets_from_brief } = await res.json()
+          setToBets(bets_from_brief ?? null)
           if (data) hydrate(data as Icp)
           setFromBrief(profile_from_brief ?? null)
           setCovered(new Set(legacy_covered ?? []))
@@ -505,6 +508,28 @@ export function IcpEditor({
                       }}
                     >
                       Fill from recruiter brief
+                    </Button>
+                  </div>
+                )}
+                {toBets && profile.some((g) => toBets.replaces.includes(g.id)) && (
+                  // A profile from before bets: one title row and one company row, so it
+                  // reads as "a Strategy Manager at McKinsey" — not the brief's first bet.
+                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                    <span className="flex-1">
+                      This profile predates bets. The brief has {new Set(toBets.rows.map((g) => g.bet)).size} — each a group of
+                      companies and the titles searched there (McKinsey for Associates, startups for Strategy Managers).
+                      The role&apos;s own titles stay in the brief, used for the wider-location step.
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setGates((prev) => [...prev.filter((g) => !toBets.replaces.includes(g.id)), ...toBets.rows])
+                        setToBets(null)
+                        toast.success('Organised into bets — review, then approve to use them.')
+                      }}
+                    >
+                      Organise into bets from the brief
                     </Button>
                   </div>
                 )}
