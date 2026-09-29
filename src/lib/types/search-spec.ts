@@ -69,6 +69,12 @@ export interface SearchCriterion {
   bet?: number | null
   /** The bet's name, shown on the profile and on its search levels. */
   bet_label?: string | null
+  /**
+   * A bet's own version of a shared profile row, placed in that bet's search levels: the
+   * id of the shared row it stands in for. The level searches this instead of the shared
+   * row (even one on the base line), and a person it finds counts as meeting that row.
+   */
+  replaces?: string | null
 }
 
 export interface SearchLevel {

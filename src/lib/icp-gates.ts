@@ -150,9 +150,10 @@ export const betOverrideId = (baseId: string, bet: number) => `${baseId}${BET_OV
 export const overrideBaseId = (id: string) => id.split(BET_OVERRIDE_SEP)[0]
 
 /**
- * The profile without per-bet overrides — what everything but the Scoring editor reads
- * (the gates, the judge, the search plan, the screen). An override is one bet's search
- * guidance; read as a job-wide row it would apply one bet's location to every candidate.
+ * The profile without per-bet overrides — what the gates, the judge, the screen and the
+ * Copilot read. An override is one bet's search guidance; read as a job-wide row it would
+ * apply one bet's location to every candidate. The search plan builds from these rows and
+ * then puts each bet's own into its levels (applyBetOverrides in spec-from-brief).
  */
 export function jobWideMustHaves<T extends { bet?: number | null; kind?: string | null }>(gates: T[] | null | undefined): T[] {
   return (gates ?? []).filter((g) => !isBetOverride(g))
