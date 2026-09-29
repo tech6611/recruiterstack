@@ -14,6 +14,7 @@ import { RecruiterBriefBody, RecruiterBriefChips } from '@/components/req-jobs/R
 import { isCriterion, toCriterion, mustHaveFromCriterion, criterionLabel, isBetOverride, betProfile, saveBetRow, removeBetRow } from '@/lib/icp-gates'
 import { IdealProfileTiles, BetProfile } from '@/components/req-jobs/IdealProfileTiles'
 import { BetCards } from '@/components/req-jobs/BetCards'
+import { BetSampleCard, liveBetSampleClient } from '@/components/req-jobs/BetSampleCard'
 
 
 
@@ -81,6 +82,7 @@ export function IcpEditor({
     }))
   }
 
+  const [sampleClient] = useState(() => liveBetSampleClient(jobId))
   const saveForBet = (bet: number, betLabel: string, next: SearchCriterion, allBets: boolean) =>
     setGates((prev) => saveBetRow(prev, bet, betLabel, next, allBets))
   const removeForBet = (c: SearchCriterion) => setGates((prev) => removeBetRow(prev, c))
@@ -435,14 +437,18 @@ export function IcpEditor({
                         onRemove={removeForBet}
                       />
                     ),
-                    renderCandidate: () => (
-                      <div className="flex min-h-[8rem] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/60 p-4 text-center">
-                        <div className="text-xs font-semibold text-slate-500">Sample candidate</div>
-                        <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
-                          A real person who fits this bet will show here, to mark 👍 or 👎.
-                        </p>
-                      </div>
-                    ),
+                    renderCandidate: (n: number, label: string) => {
+                      const all = gates.filter(isCriterion).map((g) => toCriterion(g)!)
+                      return (
+                        <BetSampleCard
+                          client={sampleClient}
+                          bet={n}
+                          betLabel={label}
+                          icpId={icp.id}
+                          criteria={[...all.filter((c) => c.bet === n && !isBetOverride(c)), ...betProfile(all, n)]}
+                        />
+                      )
+                    },
                   } : {})}
                 />
               </div>

@@ -3,7 +3,9 @@
 import { useState } from 'react'
 import { BetCards } from '@/components/req-jobs/BetCards'
 import { BetProfile } from '@/components/req-jobs/IdealProfileTiles'
-import { mustHaveFromCriterion, toCriterion, isCriterion, betProfile, saveBetRow, removeBetRow } from '@/lib/icp-gates'
+import { mustHaveFromCriterion, toCriterion, isCriterion, betProfile, saveBetRow, removeBetRow, isBetOverride } from '@/lib/icp-gates'
+import { BetSampleCard, type BetSampleClient } from '@/components/req-jobs/BetSampleCard'
+import { rankBetSamples, hasWords, type BetSamplePerson } from '@/modules/pool/domain/bet-sample-fit'
 import type { IcpMustHave } from '@/lib/types/icp'
 import type { SearchCriterion } from '@/lib/types/search-spec'
 import { ARCHETYPES, OPTIONS, START } from '../bet-options/BetOptions'
@@ -14,6 +16,31 @@ import { ARCHETYPES, OPTIONS, START } from '../bet-options/BetOptions'
  * Operations Manager job's real bets, for review without signing in. Edits run through
  * the same saveBetRow / removeBetRow the Scoring tab uses.
  */
+// A few pool people, so the sample card can be clicked through without a database.
+const PEOPLE: BetSamplePerson[] = [
+  { id: '00000000-0000-4000-8000-000000000001', display_name: 'Ananya Rao', current_title: 'Associate', current_company: 'McKinsey & Company', location_raw: 'Bengaluru', location_city: 'Bengaluru', location_region: 'Karnataka', location_country_code: 'IN', experience_years: 3.5, education: [{ school: 'IIM Ahmedabad' }], reachable: true },
+  { id: '00000000-0000-4000-8000-000000000002', display_name: 'Karan Mehta', current_title: 'Senior Associate Consultant', current_company: 'Bain & Company', location_raw: 'Mumbai', location_city: 'Mumbai', location_region: 'Maharashtra', location_country_code: 'IN', experience_years: 5, education: [{ school: 'IIT Delhi' }], reachable: true },
+  { id: '00000000-0000-4000-8000-000000000003', display_name: 'Shyam D', current_title: 'Manager - Central Strategy', current_company: 'Flipkart', location_raw: 'Bengaluru', location_city: 'Bengaluru', location_region: 'Karnataka', location_country_code: 'IN', experience_years: 5.7, education: [{ school: 'IIT Guwahati' }], reachable: true },
+  { id: '00000000-0000-4000-8000-000000000004', display_name: 'Meera Iyer', current_title: 'Strategy Manager', current_company: 'Swiggy', location_raw: 'Bengaluru', location_city: 'Bengaluru', location_region: 'Karnataka', location_country_code: 'IN', experience_years: 7, education: [{ school: 'ISB' }], reachable: false },
+]
+const decided = new Map<string, 'yes' | 'no'>()
+const mockClient: BetSampleClient = {
+  async sample({ bet, criteria, skip }) {
+    await new Promise((r) => setTimeout(r, 250))
+    const emp = criteria.find((c) => c.kind.startsWith('employer_'))
+    const at = PEOPLE.filter((p) => emp?.values.some((v) => hasWords(p.current_company, v)))
+    const mine = Array.from(decided.entries()).filter(([k]) => k.startsWith(`${bet}:`))
+    const fresh = at.filter((p) => !decided.has(`${bet}:${p.id}`) && !skip.includes(p.id))
+    const tally = { yes: mine.filter(([, d]) => d === 'yes').length, no: mine.filter(([, d]) => d === 'no').length }
+    if (!at.length) return { person: null, checks: [], remaining: 0, decided: tally, reason: 'none_at_companies' }
+    if (!fresh.length) return { person: null, checks: [], remaining: 0, decided: tally, reason: 'all_seen' }
+    const [best, ...rest] = rankBetSamples(fresh, criteria)
+    return { person: best.person, checks: best.checks, remaining: rest.length, decided: tally, reason: null }
+  },
+  async decide({ bet, profile_id, decision }) { decided.set(`${bet}:${profile_id}`, decision) },
+  async market() { await new Promise((r) => setTimeout(r, 600)); return { fetched: 0, creditsUsed: 0 } },
+}
+
 export function BetRowsPreview() {
   const [gates, setGates] = useState<IcpMustHave[]>(() => START.map((c) => mustHaveFromCriterion(c)))
   const criteria = gates.filter(isCriterion).map((g) => toCriterion(g)!)
@@ -38,11 +65,14 @@ export function BetRowsPreview() {
               onRemove={(c) => setGates((gs) => removeBetRow(gs, c))}
             />
           )}
-          renderCandidate={() => (
-            <div className="flex min-h-[8rem] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/60 p-4 text-center">
-              <div className="text-xs font-semibold text-slate-500">Sample candidate</div>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-400">A real person who fits this bet will show here, to mark 👍 or 👎.</p>
-            </div>
+          renderCandidate={(n, label) => (
+            <BetSampleCard
+              client={mockClient}
+              bet={n}
+              betLabel={label}
+              icpId={null}
+              criteria={[...criteria.filter((c) => c.bet === n && !isBetOverride(c)), ...betProfile(criteria, n)]}
+            />
           )}
         />
         <pre className="mt-6 max-h-64 overflow-auto rounded-lg bg-slate-900 p-3 text-[10px] text-slate-200">

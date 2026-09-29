@@ -2,6 +2,12 @@
 
 ## 2026-09-29
 
+### Added
+- **A real sample person beside each bet, with 👍 / 👎.** On Scoring, each bet's row now shows the best-fitting real person from the Candidate Pool — name, current role, years, city, school, and a ✓ / ✗ / ? for each of the bet's lines (company, title, location, years, school…). It is free: stored data only, no AI, no credits. 👍 or 👎 is saved and the next person shows; "Show another" skips without deciding; changing a line in the bet's profile (even before approving) fetches a new person. When the pool has nobody at the bet's companies, "Find one in the market" pulls up to 5 people for that bet from Crustdata after a cost check (~0.15 credits). Click the person for their full profile. On the Strategy & Ops job all three bets find someone (Bain Senior Associate Consultant; Flipkart strategy manager; a Goldman Sachs Associate) in ~0.4–1 s. 6 tests; dev preview `/dev/bet-rows`.
+
+### Schema
+- **`155_bet_sample_decisions.sql`** — one row per (org, job, bet, pool person) with the 👍 / 👎, the bet's lines and the person as they were at the time. Pool people are not ATS candidates, so these can't go in `scoring_feedback`. Apply by hand before using the buttons.
+
 ### Changed
 - **Each bet is its own row, with its own ideal profile.** On Scoring the bets stack one under another instead of three cards side by side. Under each card sits that bet's profile — location, years, school and any other line — and on the right a slot for a sample candidate who fits it (filled in the next step). The single shared "Ideal profile" list is not shown for a profile organised into bets; its rows appear under every bet.
 - **A profile line can differ per bet.** Editing a line under a bet asks "Only this bet" or "Every bet". A bet's own version is tagged "only this bet" and can go back to the shared value; setting it equal to the shared value removes it. Stored as a must-have with the bet's number and id `<shared id>@bet<n>`, marked `sourcing_only` — it never rejects anyone, and everything except the Scoring editor (the gates, the judge, the search plan, the Crustdata query, the AI screen, the Copilot) reads the profile without it (`jobWideMustHaves`) until the search learns to use it. A profile can now hold 40 lines (was 20). 7 tests. Dev preview: `/dev/bet-rows`.
