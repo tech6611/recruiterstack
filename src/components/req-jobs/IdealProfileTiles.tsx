@@ -161,7 +161,7 @@ export function IdealProfileTiles({
  * when the search widens. Clicking anywhere on the row opens its editor underneath.
  */
 function Row({
-  c, heading, editing, onOpen, children,
+  c, heading, editing, onOpen, children, tag,
 }: {
   c: SearchCriterion
   /** Overrides the kind label — a bet's rows read "Companies" / "As titles". */
@@ -169,6 +169,8 @@ function Row({
   editing: boolean
   onOpen: () => void
   children?: React.ReactNode
+  /** Shown on the right instead of when the row widens (a bet's own row). */
+  tag?: React.ReactNode
 }) {
   const Icon = c.exclude ? Ban : ICON[c.kind] ?? Tag
   const never = c.relax_at == null
@@ -182,9 +184,9 @@ function Row({
         type="button"
         onClick={onOpen}
         aria-expanded={editing}
-        className="flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-slate-50"
+        className="flex w-full flex-wrap items-start gap-x-3 gap-y-1 px-4 py-2.5 text-left hover:bg-slate-50 sm:flex-nowrap"
       >
-        <span className="flex w-[9.5rem] shrink-0 items-center gap-1.5 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+        <span className="flex w-full shrink-0 items-center sm:w-[9.5rem] gap-1.5 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
           <Icon className={`h-3.5 w-3.5 shrink-0 ${t.icon}`} />
           <span className="truncate">{heading ?? tileHeading(c)}</span>
         </span>
@@ -207,8 +209,9 @@ function Row({
           )}
         </span>
 
+        {tag}
         {/* A bet's rows say when they are searched in the bet's header instead. */}
-        {!c.exclude && c.bet == null && (
+        {!tag && !c.exclude && c.bet == null && (
           <span className="flex shrink-0 items-center gap-1 pt-0.5 text-[10px] text-slate-400">
             {never
               ? <><Lock className="h-3 w-3" /> never relaxed</>
@@ -218,6 +221,120 @@ function Row({
       </button>
 
       {children && <div className="border-t border-slate-100 px-4 pb-3 pt-3">{children}</div>}
+    </div>
+  )
+}
+
+/**
+ * ONE BET'S IDEAL PROFILE, under its card: every shared row (where · years · school…)
+ * as this bet sees it — the bet's own version where it has one. Editing a row asks
+ * whether the change is for this bet only or for every bet; a row that differs from
+ * the other bets says so and can go back to the shared value. The bet's companies and
+ * titles are its card's At / As lines, so they are not repeated here.
+ */
+export function BetProfile({
+  criteria, bet, onSave, onRemove, options,
+}: {
+  /** This bet's rows, already resolved (betProfile): shared rows or its overrides. */
+  criteria: SearchCriterion[]
+  bet: number
+  onSave: (next: SearchCriterion, allBets: boolean) => void
+  onRemove: (c: SearchCriterion) => void
+  options?: FetchedOptions
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  // A line being added lives here until it is saved, so a cancelled add leaves nothing.
+  const [adding, setAdding] = useState<SearchCriterion | null>(null)
+  const [picking, setPicking] = useState(false)
+  const ordered = [
+    ...ADDABLE.flatMap((k) => criteria.filter((c) => c.kind === k)),
+    ...criteria.filter((c) => !ADDABLE.includes(c.kind)),
+  ]
+  // A bet's companies and titles are its card lines, never a profile row here.
+  const unset = ADDABLE.filter((k) => !isEmployer(k) && !k.startsWith('title_') && !criteria.some((c) => c.kind === k))
+  const own = (c: SearchCriterion) => c.bet === bet
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      {ordered.length === 0 && !adding && (
+        <p className="px-4 py-2.5 text-xs text-slate-400">No lines yet — add where, how senior, which schools…</p>
+      )}
+      {ordered.map((c) => (
+        <Row
+          key={c.id}
+          c={c}
+          editing={c.id === editingId}
+          onOpen={() => { setAdding(null); setEditingId(c.id === editingId ? null : c.id) }}
+          tag={own(c) ? (
+            <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-100" title="This bet has its own value here; the other bets use the shared one.">
+              only this bet
+            </span>
+          ) : undefined}
+        >
+          {c.id === editingId && (
+            <CriterionEditor
+              key={c.id}
+              c={c}
+              options={options}
+              scope={{ betLabel: 'this bet', allBets: false }}
+              onCancel={() => setEditingId(null)}
+              // An override goes back to the shared value; a shared row goes everywhere.
+              removeLabel={own(c) ? 'Use the same as the other bets' : 'Remove from every bet'}
+              onRemove={() => { onRemove(c); setEditingId(null) }}
+              onSave={(next, o) => {
+                if (isEmpty(next)) onRemove(c)
+                else onSave(next, o?.allBets ?? false)
+                setEditingId(null)
+              }}
+            />
+          )}
+        </Row>
+      ))}
+      {adding && (
+        <Row c={adding} editing onOpen={() => setAdding(null)}>
+          <CriterionEditor
+            key={adding.id}
+            c={adding}
+            options={options}
+            scope={{ betLabel: 'this bet', allBets: false }}
+            onCancel={() => setAdding(null)}
+            onSave={(next, o) => {
+              if (!isEmpty(next)) onSave(next, o?.allBets ?? false)
+              setAdding(null)
+            }}
+          />
+        </Row>
+      )}
+      {unset.length > 0 && !adding && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 bg-slate-50/60 px-4 py-2">
+          {!picking ? (
+            <button type="button" onClick={() => setPicking(true)} className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-800">
+              <Plus className="h-3 w-3" /> Add a line
+            </button>
+          ) : (
+            <>
+              {unset.map((k) => {
+                const Icon = ICON[k] ?? Tag
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => {
+                      setEditingId(null)
+                      setPicking(false)
+                      setAdding({ id: `mh-${Date.now().toString(36)}-${++addSeq}`, kind: k, values: [], relax_at: null })
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-slate-500 ring-1 ring-slate-200 hover:bg-white hover:text-slate-800"
+                  >
+                    <Icon className="h-3 w-3" />{CRITERION_KIND_LABEL[k]}
+                  </button>
+                )
+              })}
+              <button type="button" onClick={() => setPicking(false)} className="text-[11px] text-slate-400 hover:text-slate-600">Cancel</button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -245,8 +362,19 @@ function shortValue(c: SearchCriterion): string {
 
 // ── Inline editors ─────────────────────────────────────────────────────────────
 
-export function CriterionEditor({ c, onCancel, onSave, onRemove, options }: { c: SearchCriterion; onCancel: () => void; onSave: (n: SearchCriterion) => void; onRemove?: () => void; options?: FetchedOptions }) {
+export function CriterionEditor({ c, onCancel, onSave, onRemove, removeLabel, options, scope }: {
+  c: SearchCriterion
+  onCancel: () => void
+  /** `allBets` is set only when `scope` is given: the recruiter's choice of where it applies. */
+  onSave: (n: SearchCriterion, opts?: { allBets: boolean }) => void
+  onRemove?: () => void
+  removeLabel?: string
+  options?: FetchedOptions
+  /** Editing a row under one bet: ask whether the change is for that bet or every bet. */
+  scope?: { betLabel: string; allBets: boolean }
+}) {
   const [draft, setDraft] = useState<SearchCriterion>({ ...c, values: [...c.values] })
+  const [allBets, setAllBets] = useState(scope?.allBets ?? false)
   // One fetch per page, shared by every pill's editor. `options` overrides it so the
   // dev fixture can show real pickers without an authenticated request.
   const live = useIcpOptions()
@@ -266,16 +394,32 @@ export function CriterionEditor({ c, onCancel, onSave, onRemove, options }: { c:
           Exclude these instead (candidates must NOT match)
         </label>
       )}
+      {scope && (
+        <div className="flex flex-wrap items-center gap-1 text-[11px]">
+          <span className="mr-1 text-slate-400">Apply to</span>
+          {[false, true].map((all) => (
+            <button
+              key={String(all)}
+              type="button"
+              onClick={() => setAllBets(all)}
+              aria-pressed={allBets === all}
+              className={`rounded-md px-2 py-0.5 ring-1 ${allBets === all ? 'bg-slate-900 text-white ring-slate-900' : 'text-slate-500 ring-slate-200 hover:bg-slate-50'}`}
+            >
+              {all ? 'Every bet' : `Only ${scope.betLabel}`}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex items-center justify-end gap-1.5 pt-1">
         {onRemove && (
           <button type="button" onClick={onRemove} className="mr-auto text-[11px] text-slate-400 hover:text-red-500">
-            Remove this must-have
+            {removeLabel ?? 'Remove this must-have'}
           </button>
         )}
         <button type="button" onClick={onCancel} className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 text-slate-400 hover:bg-slate-50" aria-label="Cancel" title="Cancel">
           <X className="h-3.5 w-3.5" />
         </button>
-        <button type="button" onClick={() => onSave(draft)} className="grid h-7 w-7 place-items-center rounded-md bg-emerald-600 text-white hover:bg-emerald-700" aria-label="Save" title="Save">
+        <button type="button" onClick={() => onSave(draft, scope ? { allBets } : undefined)} className="grid h-7 w-7 place-items-center rounded-md bg-emerald-600 text-white hover:bg-emerald-700" aria-label="Save" title="Save">
           <Check className="h-3.5 w-3.5" />
         </button>
       </div>

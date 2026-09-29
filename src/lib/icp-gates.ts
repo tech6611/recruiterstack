@@ -126,21 +126,97 @@ export function mustHaveFromCriterion(c: SearchCriterion, label?: string | null)
     // search lanes — "find these titles at these companies, tier-1 schools first, then
     // widen". They guide sourcing and ranking, not candidate eligibility. An exclusion
     // ("not a TPM") carries no relax_at, so it correctly stays a hard gate.
-    enforcement: isLaneKind(c.kind) && c.relax_at != null ? 'sourcing_only' : 'hard',
+    // A bet's own copy of a shared row (its own location, years…) steers that bet's
+    // search only; the shared row stays the job-wide gate.
+    enforcement: (isLaneKind(c.kind) && c.relax_at != null) || isBetOverride(c) ? 'sourcing_only' : 'hard',
     ...(c.bet != null ? { bet: c.bet, bet_label: c.bet_label ?? null } : {}),
   }
+}
+
+/**
+ * A BET OVERRIDE: one bet's own version of an ideal-profile row every bet otherwise
+ * shares (location, years, school…), e.g. "2–4 yrs" for the IB bet while the rest keep
+ * "2–6 yrs". A bet's companies and titles are its own rows, not overrides.
+ *
+ * Its id is the shared row's id + BET_OVERRIDE_SEP + the bet number, so each override
+ * knows which row it replaces (a row only one bet has uses a fresh base id).
+ */
+export function isBetOverride(g: { bet?: number | null; kind?: string | null }): boolean {
+  return g.bet != null && !!g.kind && !g.kind.startsWith('employer_') && !g.kind.startsWith('title_')
+}
+export const BET_OVERRIDE_SEP = '@bet'
+export const betOverrideId = (baseId: string, bet: number) => `${baseId}${BET_OVERRIDE_SEP}${bet}`
+/** The id of the shared row an override replaces. */
+export const overrideBaseId = (id: string) => id.split(BET_OVERRIDE_SEP)[0]
+
+/**
+ * The profile without per-bet overrides — what the gates, the judge, the screen and the
+ * Copilot read. An override is one bet's search guidance; read as a job-wide row it would
+ * apply one bet's location to every candidate. The search plan builds from these rows and
+ * then puts each bet's own into its levels (applyBetOverrides in spec-from-brief).
+ */
+export function jobWideMustHaves<T extends { bet?: number | null; kind?: string | null }>(gates: T[] | null | undefined): T[] {
+  return (gates ?? []).filter((g) => !isBetOverride(g))
+}
+
+/**
+ * One bet's ideal profile: every shared row, replaced by the bet's override where it has
+ * one, plus rows only this bet has. Companies/titles are not included (they are the
+ * bet's card lines). PURE.
+ */
+export function betProfile(criteria: SearchCriterion[], bet: number): SearchCriterion[] {
+  const own = criteria.filter((c) => c.bet === bet && isBetOverride(c))
+  const shared = criteria.filter((c) => c.bet == null)
+  const out = shared.map((s) => own.find((o) => o.id === betOverrideId(s.id, bet)) ?? s)
+  const sharedIds = new Set(shared.map((s) => s.id))
+  return [...out, ...own.filter((o) => !sharedIds.has(overrideBaseId(o.id)))]
+}
+
+/** Two criteria that search the same thing (ids, labels and bets aside). */
+function sameSearch(a: SearchCriterion, b: SearchCriterion): boolean {
+  const vals = (c: SearchCriterion) => c.values.map((v) => v.trim().toLowerCase()).filter(Boolean).sort().join('|')
+  return a.kind === b.kind && vals(a) === vals(b) && (a.min ?? null) === (b.min ?? null) && (a.max ?? null) === (b.max ?? null)
+    && (a.radius_km ?? null) === (b.radius_km ?? null) && !!a.exclude === !!b.exclude
+}
+
+/**
+ * Save a profile row edited under one bet. "Every bet" writes the shared row and drops
+ * every bet's own version of it; "only this bet" writes (or updates) that bet's
+ * override — and drops it again when it ends up the same as the shared row. PURE.
+ */
+export function saveBetRow(gates: IcpMustHave[], bet: number, betLabel: string, next: SearchCriterion, allBets: boolean): IcpMustHave[] {
+  const baseId = overrideBaseId(next.id)
+  const shared = gates.find((g) => g.id === baseId && g.bet == null)
+  if (allBets) {
+    // No bet on it: mustHaveFromCriterion only writes bet fields for a bet's row.
+    const row = mustHaveFromCriterion({ ...next, id: baseId, label: null, bet: null, bet_label: null })
+    const kept = gates.filter((g) => !(isBetOverride(g) && overrideBaseId(g.id) === baseId))
+    return shared ? kept.map((g) => (g.id === baseId ? row : g)) : [...kept, row]
+  }
+  const id = betOverrideId(baseId, bet)
+  const sharedC = shared ? toCriterion(shared) : null
+  if (sharedC && sameSearch(sharedC, next)) return gates.filter((g) => g.id !== id)
+  const row = mustHaveFromCriterion({ ...next, id, label: null, bet, bet_label: betLabel })
+  return gates.some((g) => g.id === id) ? gates.map((g) => (g.id === id ? row : g)) : [...gates, row]
+}
+
+/** Remove a row shown under a bet: its override goes back to the shared value; a shared row leaves every bet. PURE. */
+export function removeBetRow(gates: IcpMustHave[], c: SearchCriterion): IcpMustHave[] {
+  if (c.bet != null) return gates.filter((g) => g.id !== c.id)
+  const baseId = overrideBaseId(c.id)
+  return gates.filter((g) => g.id !== baseId && !(isBetOverride(g) && overrideBaseId(g.id) === baseId))
 }
 
 /** Kinds that, when relaxable, are search lanes rather than gates. */
 const isLaneKind = (k: string) => k.startsWith('employer_') || k.startsWith('title_') || k === 'school'
 
 /** True when a row is a target-market instruction rather than a candidate gate. */
-export function isSourcingOnlyCriterion(g: Pick<IcpMustHave, 'kind' | 'relax_at' | 'enforcement'>): boolean {
+export function isSourcingOnlyCriterion(g: Pick<IcpMustHave, 'kind' | 'relax_at' | 'enforcement'> & { bet?: number | null }): boolean {
   // Fallback keeps existing ICPs created before `enforcement` on the correct side.
   // A relaxable employer OR positive-title row is a search lane, not a gate; an
   // exclusion (no relax_at) is not a lane and stays hard.
   const isLane = Boolean(g.kind && isLaneKind(g.kind))
-  return g.enforcement === 'sourcing_only' || (g.enforcement == null && isLane && g.relax_at != null)
+  return g.enforcement === 'sourcing_only' || isBetOverride(g) || (g.enforcement == null && isLane && g.relax_at != null)
 }
 
 /**

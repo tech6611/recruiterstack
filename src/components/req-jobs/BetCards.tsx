@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Briefcase, Rocket, Compass, Sparkles, ThumbsUp, ThumbsDown, TriangleAlert } from 'lucide-react'
 import { BrandIcon } from '@/components/ui/BrandIcon'
 import { CriterionEditor } from '@/components/req-jobs/IdealProfileTiles'
-import { companiesFor, searchPassFor, sortedPools, type Archetype } from '@/lib/bets'
+import { companiesFor, searchPassFor, sortedPools, specificTitles, type Archetype } from '@/lib/bets'
 import { groupEmployerAliases } from '@/lib/employer-aliases'
 import type { RecruiterBrief } from '@/lib/types/icp'
 import type { SearchCriterion } from '@/lib/types/search-spec'
@@ -31,7 +31,7 @@ const GOLD = { Icon: Sparkles, circle: 'bg-gold-500', card: 'from-gold-50 ring-g
  * profile not yet organised into bets the two lines come from the brief, read-only.
  */
 export function BetCards({
-  archetypes, brief, bets = [], onChange, onRemoveBet, options,
+  archetypes, brief, bets = [], onChange, onRemoveBet, options, renderProfile, renderCandidate,
 }: {
   archetypes: Archetype[]
   brief?: RecruiterBrief | null
@@ -40,7 +40,15 @@ export function BetCards({
   onChange?: (next: SearchCriterion) => void
   onRemoveBet?: (ids: string[]) => void
   options?: FetchedOptions
+  /**
+   * The bet's own ideal profile, shown under its card. Given, the bets STACK — one
+   * full-width row each, the card and its profile on the left and `renderCandidate`
+   * (a real person who fits it) on the right — instead of three cards side by side.
+   */
+  renderProfile?: (bet: number, label: string) => React.ReactNode
+  renderCandidate?: (bet: number, label: string) => React.ReactNode
 }) {
+  const stacked = Boolean(renderProfile)
   const [editingId, setEditingId] = useState<string | null>(null)
   const pools = sortedPools(brief)
 
@@ -67,7 +75,7 @@ export function BetCards({
           these are not sampled evenly.{onChange && bets.length > 0 ? ' Click At or As to change where we look.' : ''}
         </p>
       )}
-      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
+      <div className={stacked ? 'space-y-3' : 'grid grid-cols-1 gap-2.5 md:grid-cols-3'}>
       {cards.map(({ a, n, label }, i) => {
         const look = a?.is_non_obvious ? GOLD : LOOKS[plain++ % LOOKS.length]
         const rows = n != null ? bets.filter((c) => c.bet === n) : []
@@ -78,8 +86,8 @@ export function BetCards({
         const briefLogos = a && !rows.length ? companiesFor(a, brief) : []
         const briefTitles = pool?.role_types ?? []
         const editing = rows.find((c) => c.id === editingId)
-        return (
-          <div key={i} className={`group/card rounded-xl bg-gradient-to-br to-white p-3 ring-1 ${look.card}`}>
+        const card = (
+          <div className={`group/card rounded-xl bg-gradient-to-br to-white p-3 ring-1 ${look.card}`}>
             <div className="flex items-center gap-2">
               <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-white ${look.circle}`}>
                 <look.Icon className="h-4 w-4" />
@@ -137,6 +145,26 @@ export function BetCards({
               <p className="mt-2 line-clamp-1 text-[11px] text-slate-400" title={a.where_from}>From: {a.where_from}</p>
             ) : null}
 
+            {/* Only level words at finance firms: the market search skips them, so offer the work they mean. */}
+            {(() => {
+              const better = as && at && onChange ? specificTitles(as.values, { label, companies: at.values }) : null
+              if (!better) return null
+              const added = better.filter((t) => !as!.values.includes(t))
+              return (
+                <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-900 ring-1 ring-amber-100">
+                  &ldquo;{as!.values.join('” and “')}&rdquo; alone fit anyone at these firms, engineers included — the market
+                  search skips them. Add {added.slice(0, 3).join(', ')}{added.length > 3 ? ` +${added.length - 3} more` : ''}?
+                  <button
+                    type="button"
+                    onClick={() => onChange!({ ...as!, values: better })}
+                    className="ml-1.5 rounded-md bg-white px-1.5 py-0.5 font-medium text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
+                  >
+                    Add these titles
+                  </button>
+                </div>
+              )
+            })()}
+
             {editing && onChange && (
               <div className="mt-2 rounded-lg bg-white p-2 ring-1 ring-slate-200">
                 <CriterionEditor
@@ -150,7 +178,7 @@ export function BetCards({
             )}
 
             {a && (a.why_interested || a.why_no || a.hire_risk) && (
-              <div className="mt-2.5 space-y-1 text-[11px] leading-snug">
+              <div className={`mt-2.5 text-[11px] leading-snug ${stacked ? 'grid gap-x-4 gap-y-1 md:grid-cols-3' : 'space-y-1'}`}>
                 {a.why_interested && (
                   <div className="flex gap-1.5 text-emerald-700" title={a.why_interested}>
                     <ThumbsUp className="mt-0.5 h-3 w-3 shrink-0" /><span className="line-clamp-2">{a.why_interested}</span>
@@ -168,6 +196,16 @@ export function BetCards({
                 )}
               </div>
             )}
+
+            {/* This bet's ideal profile, right under who it is. */}
+            {stacked && n != null && <div className="mt-3">{renderProfile!(n, label)}</div>}
+          </div>
+        )
+        if (!stacked) return <Fragment key={i}>{card}</Fragment>
+        return (
+          <div key={i} className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_19rem]">
+            {card}
+            {n != null && renderCandidate ? renderCandidate(n, label) : <div className="hidden lg:block" />}
           </div>
         )
       })}

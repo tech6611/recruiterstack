@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { specFromIcp, employerTerms } from './spec-from-brief'
+import { compileSpec } from '@/modules/pool/vendors/crustdata/compile-spec'
 import type { Icp } from '@/lib/types/icp'
 
 const brief = {
@@ -391,7 +392,18 @@ describe('the bet ladder — each company group searched with its own titles', (
   it('each bet is searched for ONLY its own titles', () => {
     expect(of('Ideal profile · McKinsey', 'title_current')?.values).toEqual(['Business Analyst', 'Associate', 'Consultant'])
     expect(of('Bet 2: The Scaled Startup BizOps Star', 'title_current')?.values).toEqual(['Strategy Manager'])
-    expect(of('Bet 3: The IB/VC Analyst', 'title_current')?.values).toEqual(['Analyst', 'Associate'])
+    // Level words alone at finance firms → the work they mean (the bare words kept for the sample check).
+    expect(of('Bet 3: The IB/VC Analyst', 'title_current')?.values).toEqual([
+      'Investment Banking Analyst', 'Investment Banking Associate', 'Private Equity Analyst', 'Private Equity Associate',
+      'Venture Capital Analyst', 'Venture Capital Associate', 'Investment Analyst', 'Investment Associate', 'Analyst', 'Associate',
+    ])
+  })
+  it('the IB/VC bet\'s market search now carries a title (bare level words alone are not searchable)', () => {
+    const lane = compileSpec(s).lanes.find((l) => l.label === 'Bet 3: The IB/VC Analyst')!
+    const f = JSON.stringify(lane.filters)
+    expect(f).toContain('Investment Banking Associate')
+    expect(f).toContain('Venture Capital Analyst')
+    expect(f).not.toMatch(/"value":"Associate"/)
   })
   it('a firm with two names is one line; consulting firms mean consulting', () => {
     expect(of('Ideal profile · Boston Consulting Group (BCG)', 'employer_current')?.values).toEqual(['Boston Consulting Group', 'BCG'])
@@ -424,6 +436,73 @@ describe('the bet ladder — each company group searched with its own titles', (
   })
   it('a plan built from bets passes the plan save check', () => {
     expect(searchSpecSchema.safeParse(s).success).toBe(true)
+  })
+  describe('a bet\'s own rows (Scoring → "Only this bet") run in that bet\'s levels only', () => {
+    const loc = must_haves.find((g) => g.kind === 'location' && g.bet == null)!
+    const yrs = must_haves.find((g) => g.kind === 'years_band' && g.bet == null)!
+    const ib = { bet: 3, bet_label: 'The IB/VC Analyst' }
+    const withOverrides = [
+      ...must_haves,
+      mustHaveFromCriterion({ id: `${loc.id}@bet3`, kind: 'location', values: ['Mumbai, Maharashtra, IN'], radius_km: 25, relax_at: loc.relax_at ?? null, ...ib }),
+      mustHaveFromCriterion({ id: `${yrs.id}@bet3`, kind: 'years_band', values: [], min: 4, max: 10, relax_at: null, ...ib }),
+      mustHaveFromCriterion({ id: 'mh-cfa@bet3', kind: 'skill', values: ['Financial Modeling'], relax_at: null, ...ib }),
+    ]
+    const ctx = { roleContext: { market: bengaluru } } as never
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const spec = resolveSpec({ ...icp, must_haves: withOverrides } as any, ctx).spec
+    const lvl = (label: string) => spec.levels.find((l) => l.label === label)!
+    const text = (label: string) => JSON.stringify(lvl(label).criteria)
+
+    it('the shared ladder itself is unchanged', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const s2 = ladderFromIdealProfile({ ...icp, must_haves: withOverrides } as any, ctx)!
+      const noIds = (x: unknown) => JSON.stringify(x, (k, v) => (k === 'id' ? undefined : v))
+      expect(noIds(s2)).toEqual(noIds(s))
+      expect(spec.levels.map((l) => l.label)).toEqual(s.levels.map((l) => l.label))
+    })
+
+    it('bet 3 and its former employees search Mumbai, 4–10 years and the bet-only skill', () => {
+      for (const label of ['Bet 3: The IB/VC Analyst', 'Formerly at: The IB/VC Analyst']) {
+        const cs = lvl(label).criteria
+        expect(cs.find((c) => c.kind === 'location')).toMatchObject({ values: ['Mumbai, Maharashtra, IN'], replaces: loc.id })
+        expect(cs.find((c) => c.kind === 'years_band')).toMatchObject({ min: 4, max: 10, replaces: yrs.id })
+        expect(cs.find((c) => c.kind === 'skill')).toMatchObject({ values: ['Financial Modeling'], replaces: null })
+      }
+    })
+
+    it('every other level keeps the shared rows', () => {
+      for (const label of ['Ideal profile · McKinsey', 'Bet 2: The Scaled Startup BizOps Star', 'Formerly at: The Classic Post-Consulting Operator', 'Tier-2 school · target companies', 'Wider location']) {
+        expect(text(label)).not.toContain('Mumbai')
+        expect(text(label)).not.toContain('@bet3')
+      }
+      expect(spec.base.find((c) => c.kind === 'years_band')).toMatchObject({ min: 2, max: 6 })
+    })
+
+    it('the compiled bet-3 lane drops the shared years for its own, and counts the shared rows as searched', () => {
+      const plan = compileSpec(spec)
+      const lane = (label: string) => plan.lanes.find((l) => l.label === label)!
+      const bet3 = JSON.stringify(lane('Bet 3: The IB/VC Analyst').filters)
+      const bet2 = JSON.stringify(lane('Bet 2: The Scaled Startup BizOps Star').filters)
+      expect(bet3).toContain('Mumbai')
+      expect(bet3.match(/years_of_experience_raw/g)?.length).toBe(2) // one band = a => and a =< condition
+      expect(bet3).toMatch(/"years_of_experience_raw","type":"=<","value":10\b/)
+      expect(bet3).not.toMatch(/"years_of_experience_raw","type":"=<","value":6\b/)
+      expect(bet2).toMatch(/"years_of_experience_raw","type":"=<","value":6\b/)
+      expect(lane('Bet 3: The IB/VC Analyst').criterionIds).toEqual(expect.arrayContaining([loc.id, yrs.id, `${yrs.id}@bet3`]))
+    })
+
+    it('a saved plan follows today\'s bet rows — a removed one does not linger', () => {
+      const saved = { ...icp.sourcing_map, search_spec: spec }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const again = resolveSpec({ ...icp, must_haves: withOverrides, sourcing_map: saved } as any, ctx).spec
+      expect(JSON.stringify(again.levels.find((l) => l.label === 'Bet 3: The IB/VC Analyst')!.criteria)).toContain('Mumbai')
+      expect(JSON.stringify(again).match(/@bet3/g)?.length).toBe(JSON.stringify(spec).match(/@bet3/g)?.length)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const reverted = resolveSpec({ ...icp, must_haves, sourcing_map: saved } as any, ctx).spec
+      expect(JSON.stringify(reverted)).not.toContain('Mumbai')
+      expect(JSON.stringify(reverted)).not.toContain('@bet3')
+      expect(reverted.levels.find((l) => l.label === 'Bet 3: The IB/VC Analyst')!.criteria.find((c) => c.kind === 'location')?.id).toBe(loc.id)
+    })
   })
 })
 

@@ -6,6 +6,7 @@ import { icpToScoringCriteria } from '@/lib/scoring'
 import { findOrCreateLocation, syncJobLocationIntakeMirror } from '@/lib/jobs/inherit'
 import type { Icp } from '@/lib/types/icp'
 import { logger } from '@/lib/logger'
+import { jobWideMustHaves } from '@/lib/icp-gates'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LooseSb = any
@@ -14,7 +15,7 @@ type LooseSb = any
  *  edited on the Scoring tab, so approving an ICP whose location changed moves the job
  *  with it (this used to happen when the Source tab's search plan was saved). */
 async function syncJobLocationFromIcp(supabase: unknown, orgId: string, jobId: string, icp: Icp): Promise<void> {
-  const loc = (icp.must_haves ?? []).find((g) => g.kind === 'location' && !g.exclude)
+  const loc = jobWideMustHaves(icp.must_haves).find((g) => g.kind === 'location' && !g.exclude)
   const market = typeof loc?.values?.[0] === 'string' ? loc.values[0].trim() : ''
   if (!market) return
   const sb = supabase as LooseSb

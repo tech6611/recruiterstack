@@ -7,6 +7,7 @@
  */
 
 import type { Icp } from '@/lib/types/icp'
+import { jobWideMustHaves } from '@/lib/icp-gates'
 
 type CandidateProfile = {
   current_title: string | null
@@ -27,6 +28,6 @@ export function icpEmbeddingText(icp: Pick<Icp, 'competencies' | 'must_haves'>):
   const comps = icp.competencies
     .map((c) => (c.behaviours?.length ? `${c.name}: ${c.behaviours.join('; ')}` : c.name))
     .join(' · ')
-  const gates = icp.must_haves.map((g) => g.label).filter(Boolean).join(' · ')
+  const gates = jobWideMustHaves(icp.must_haves).map((g) => g.label).filter(Boolean).join(' · ')
   return [comps, gates].filter(Boolean).join(' · ')
 }

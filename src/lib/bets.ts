@@ -111,3 +111,45 @@ export function searchPassFor(
   return null
 }
 
+// ── Titles that say only a level ─────────────────────────────────────────────────
+
+/** Words that describe a level, not a job. Alone they match anything ("Senior" → Senior Account Executive). */
+const GENERIC_TITLE_TOKENS = new Set([
+  'senior', 'sr', 'staff', 'lead', 'head', 'manager', 'principal', 'director', 'junior', 'jr', 'associate',
+  'chief', 'vp', 'vice president', 'executive', 'intern', 'consultant', 'specialist', 'analyst', 'officer', 'partner',
+])
+
+/** True when a title term would match by level alone. Such terms are never sent to a vendor. PURE. */
+export function isGenericTitleTerm(term: string): boolean {
+  return GENERIC_TITLE_TOKENS.has(term.trim().toLowerCase().replace(/[.]/g, ''))
+}
+
+export type PoolKind = 'consulting' | 'finance' | 'operator'
+/** What kind of employers a feeder pool / bet names. PURE. */
+export function poolKind(pool: { label: string; companies: string[] }): PoolKind {
+  const text = `${pool.label} ${pool.companies.join(' ')}`.toLowerCase()
+  if (/consult|mckinsey|bain|bcg|boston consulting|kearney|oliver wyman|strategy&|accenture strategy|deloitte/.test(text)) return 'consulting'
+  if (/bank|capital|ventures|partners|goldman|morgan|sequoia|accel|lightspeed|private equity|\bvc\b|\bib\b|\bpe\b/.test(text)) return 'finance'
+  return 'operator'
+}
+
+/** The lines of work a level word means at a finance firm. */
+const FINANCE_QUALIFIERS = ['Investment Banking', 'Private Equity', 'Venture Capital', 'Investment']
+
+/**
+ * A bet whose titles are ONLY level words ("Analyst · Associate") at finance firms: the
+ * same levels in the work the bet means — Investment Banking / Private Equity / Venture
+ * Capital / Investment Analyst and Associate. The market search skips a bare level word
+ * (it matches the firm's engineers too), so without these it searched the firms with no
+ * title at all. The bare words are kept: a VC associate is often titled just "Associate",
+ * and the sample check still accepts them. Null when nothing needs adding. PURE.
+ */
+export function specificTitles(titles: string[], pool: { label: string; companies: string[] }): string[] | null {
+  const vals = titles.map((t) => t.trim()).filter(Boolean)
+  if (!vals.length || !vals.every(isGenericTitleTerm) || poolKind(pool) !== 'finance') return null
+  const cap = (t: string) => t.replace(/\b\w/g, (ch) => ch.toUpperCase())
+  const levels = vals.filter((t) => !/^(intern|partner|chief|officer|executive|head)$/i.test(t))
+  if (!levels.length) return null
+  const out = Array.from(new Set([...FINANCE_QUALIFIERS.flatMap((q) => levels.map((l) => `${q} ${cap(l)}`)), ...vals]))
+  return out.length > vals.length ? out : null
+}

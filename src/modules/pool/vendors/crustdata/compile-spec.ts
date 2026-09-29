@@ -156,6 +156,8 @@ export function compileSpec(spec: SearchSpec): CompiledSpec {
   const common: SearchPlan['common'] = []
   const baseConds: (CrustdataCondition | CrustdataFilterGroup)[] = []
   const baseCriterionIds: string[] = []
+  // Per base row, so a lane carrying a bet's own version of one can leave it out.
+  const baseByCriterion: { c: SearchCriterion; conditions: (CrustdataCondition | CrustdataFilterGroup)[] }[] = []
   // One years band per query: the brief and a must-have can both carry it.
   const seenKinds = new Set<string>()
   for (const c of spec.base) {
@@ -164,6 +166,7 @@ export function compileSpec(spec: SearchSpec): CompiledSpec {
     if ('ok' in r) {
       baseConds.push(...r.ok.conditions)
       baseCriterionIds.push(c.id)
+      baseByCriterion.push({ c, conditions: r.ok.conditions })
       for (const cond of r.ok.conditions) common.push({ label: r.ok.summary, condition: cond as CrustdataCondition })
     } else unsupported.push({ requirement: c.label ?? CRITERION_KIND_LABEL[c.kind], reason: r.unsupported, level: 'base' })
   }
@@ -179,7 +182,16 @@ export function compileSpec(spec: SearchSpec): CompiledSpec {
       else unsupported.push({ requirement: c.label ?? `${CRITERION_KIND_LABEL[c.kind]}: ${c.values.join(', ')}`, reason: r.unsupported, level: lvl.label })
     }
     if (!own.length) return // a level with nothing this source can search is skipped (reported above)
-    const filters: CrustdataFilterGroup = { op: 'and', conditions: [...own, ...baseConds] }
+    // A bet's own row (Scoring → "Only this bet") replaces the shared base row in its
+    // lanes; one years band per query, so the bet's band also stands in for any other.
+    // Only a row this source could search stands in for the shared one.
+    const replaced = new Set(lvl.criteria.filter((c) => criterionIds.includes(c.id)).map((c) => c.replaces).filter((x): x is string => !!x))
+    const ownYears = lvl.criteria.some((c) => c.kind === 'years_band' && c.replaces && replaced.has(c.replaces))
+    const dropped = baseByCriterion.filter(({ c }) => replaced.has(c.id) || (ownYears && c.kind === 'years_band'))
+    const base = dropped.length ? baseByCriterion.filter((b) => !dropped.includes(b)).flatMap((b) => b.conditions) : baseConds
+    // The shared row it replaced counts as searched: a person found here met the bet's version.
+    for (const id of Array.from(replaced)) if (!criterionIds.includes(id)) criterionIds.push(id)
+    const filters: CrustdataFilterGroup = { op: 'and', conditions: [...own, ...base] }
     lanes.push({
       key: `L${i + 1}:${slug(lvl.label)}:${hash(JSON.stringify(filters))}`,
       kind: 'level',

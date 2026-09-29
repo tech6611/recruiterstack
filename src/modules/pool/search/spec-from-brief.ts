@@ -15,9 +15,10 @@
 import type { Icp, RecruiterBrief } from '@/lib/types/icp'
 import type { SearchCriterion, SearchLevel, SearchSpec, PostFetchCheck } from '@/lib/types/search-spec'
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
-import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion } from '@/lib/icp-gates'
+import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion, jobWideMustHaves, isBetOverride, overrideBaseId } from '@/lib/icp-gates'
 import { titleTerms } from '@/lib/ai/gate-evaluator'
 import { groupEmployerAliases } from '@/lib/employer-aliases'
+import { poolKind } from '@/lib/bets'
 import { schoolTiersFor } from '@/modules/pool/search/school-tiers'
 import { normalizeCity, resolveLocationParts } from '@/modules/pool/domain/normalize'
 import type { PlanEveryone } from '@/modules/pool/domain/pool-sourcing'
@@ -97,13 +98,7 @@ export function roleTerms(entry: string): string[] {
   return entry.split(/\s*(?:,|\/|;|\bor\b)\s*/i).map((t) => t.trim()).filter((t) => t.length >= 2)
 }
 
-type PoolKind = 'consulting' | 'finance' | 'operator'
-export function poolKind(pool: { label: string; companies: string[] }): PoolKind {
-  const text = `${pool.label} ${pool.companies.join(' ')}`.toLowerCase()
-  if (/consult|mckinsey|bain|bcg|boston consulting|kearney|oliver wyman|strategy&|accenture strategy|deloitte/.test(text)) return 'consulting'
-  if (/bank|capital|ventures|partners|goldman|morgan|sequoia|accel|lightspeed|private equity|\bvc\b|\bib\b|\bpe\b/.test(text)) return 'finance'
-  return 'operator'
-}
+export { poolKind }
 
 let seq = 0
 const cid = (kind: string) => `c-${kind}-${++seq}`
@@ -121,6 +116,8 @@ export function specFromIcp(
   ctx: SpecContext = {},
 ): SearchSpec {
   seq = 0
+  // Built from the shared rows; resolveSearchSpec puts each bet's own into its levels.
+  icp = { ...icp, must_haves: jobWideMustHaves(icp.must_haves) }
   const brief: RecruiterBrief | null | undefined = icp.sourcing_map?.recruiter_brief
   const base: SearchCriterion[] = []
   const post_fetch: PostFetchCheck[] = []
@@ -244,6 +241,7 @@ export function ladderFromIdealProfile(
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'competencies'>>,
   ctx: SpecContext = {},
 ): SearchSpec | null {
+  icp = { ...icp, must_haves: jobWideMustHaves(icp.must_haves) }
   const all = (icp.must_haves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null)
   const relaxable = all.filter((c) => c.relax_at != null)
   if (!relaxable.length) return null
@@ -567,10 +565,81 @@ export function fitLabels(spec: SearchSpec): SearchSpec {
   return { ...spec, base: spec.base.map(fit), levels: spec.levels.map((l) => ({ ...l, criteria: l.criteria.map(fit) })) }
 }
 
+/**
+ * Which bet a search level belongs to: the bet whose companies or titles row it searches
+ * (the ladder's copies keep the row id as a prefix — `ip-bet-3-companies-was`). Levels
+ * that search every bet at once (tier-2, feeder titles, wider location) belong to none.
+ * PURE.
+ */
+export function levelBet(level: Pick<SearchLevel, 'criteria'>, betRowIds: Map<string, number>): number | null {
+  const found = new Set<number>()
+  for (const c of level.criteria) {
+    for (const [id, n] of Array.from(betRowIds.entries())) if (c.id === id || c.id.startsWith(`${id}-`)) found.add(n)
+  }
+  return found.size === 1 ? Array.from(found)[0] : null
+}
+
+/**
+ * Put each bet's OWN profile rows (Scoring → "Only this bet") into that bet's levels. PURE.
+ *  - the shared row in the level (location, school…) is swapped for the bet's version;
+ *  - a shared row on the base line (years…) is overridden in the level (`replaces`), and
+ *    the compiler leaves the base copy out of that lane;
+ *  - a row only this bet has is added to its levels.
+ * Levels shared by every bet keep the shared rows.
+ */
+export function applyBetOverrides(spec: SearchSpec, mustHaves: Icp['must_haves'] | null | undefined): SearchSpec {
+  const all = (mustHaves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null)
+  const overrides = all.filter((c) => isBetOverride(c))
+  if (!overrides.length) return spec
+  const betRowIds = new Map(all.filter((c) => c.bet != null && !isBetOverride(c)).map((c) => [c.id, c.bet as number]))
+  const sharedIds = new Set(all.filter((c) => c.bet == null).map((c) => c.id))
+  const baseIds = new Set(spec.base.map((c) => c.id))
+  const levels = spec.levels.map((lvl) => {
+    const n = levelBet(lvl, betRowIds)
+    const mine = n == null ? [] : overrides.filter((o) => o.bet === n)
+    if (!mine.length) return lvl
+    const criteria = [...lvl.criteria]
+    for (const o of mine) {
+      const baseId = overrideBaseId(o.id)
+      const replaces = sharedIds.has(baseId) ? baseId : null
+      // linked: a copy of a profile row — read-only in the plan editor (edited on Scoring).
+      const row: SearchCriterion = { ...o, label: null, replaces, linked: true }
+      const at = criteria.findIndex((c) => c.id === baseId)
+      if (at >= 0) criteria[at] = row
+      // On the base line, or a row only this bet has: it applies to every level of the
+      // bet. A shared row this level already dropped (a widening step) stays dropped.
+      else if ((replaces == null || baseIds.has(baseId)) && !criteria.some((c) => c.id === row.id)) criteria.push(row)
+    }
+    return { ...lvl, criteria }
+  })
+  return { ...spec, levels }
+}
+
+/** A stored level without the bet rows applyBetOverrides put there, the shared row back in its place. PURE. */
+function withoutBetOverrides(level: SearchLevel, shared: Map<string, SearchCriterion>, baseIds: Set<string>): SearchLevel {
+  const criteria: SearchCriterion[] = []
+  for (const c of level.criteria) {
+    if (!c.id.includes('@bet')) { criteria.push(c); continue }
+    const back = c.replaces && !baseIds.has(c.replaces) ? shared.get(c.replaces) : undefined
+    if (back && !level.criteria.some((x) => x.id === back.id)) criteria.push({ ...back, label: null, linked: true })
+  }
+  return { ...level, criteria }
+}
+
 /** The spec to acquire with: the recruiter-edited one stored on the ICP, else derived from the brief. */
 export function resolveSearchSpec(
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'competencies'>>,
   ctx: SpecContext = {},
+): { spec: SearchSpec; stored: boolean } {
+  // Built from the rows every bet shares; each bet's own rows go into its levels last.
+  const withBets = icp.must_haves
+  const r = resolveSharedSpec({ ...icp, must_haves: jobWideMustHaves(icp.must_haves) }, ctx)
+  return { spec: fitLabels(applyBetOverrides(r.spec, withBets)), stored: r.stored }
+}
+
+function resolveSharedSpec(
+  icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'competencies'>>,
+  ctx: SpecContext,
 ): { spec: SearchSpec; stored: boolean } {
   const stored = icp.sourcing_map?.search_spec
   if (stored && stored.levels?.length) {
@@ -589,8 +658,12 @@ export function resolveSearchSpec(
     // Keep level ids unique: the rebuilt ideal lines are numbered L1…Ln and may collide
     // with a stored widening level's id when the ideal company count changed.
     const idealIds = new Set(idealNow.map((l) => l.id))
+    // A saved plan carries the bet rows applied when it was saved; they are re-applied
+    // from today's profile, so take them out first (a removed override must not linger).
+    const baseIds = new Set(stored.base.map((c) => c.id))
     const widening = stored.levels
       .filter((l) => !isIdealLevel(l))
+      .map((l) => withoutBetOverrides(l, link.mustHaves, baseIds))
       .map((l) => refreshWideningLevel(l, link))
       .filter((l): l is SearchLevel => l != null)
       .map((l) => (idealIds.has(l.id) ? { ...l, id: `${l.id}-p` } : l))
