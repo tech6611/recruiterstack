@@ -16,7 +16,7 @@ import type { CriterionKind } from '@/lib/types/search-spec'
 import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion, criterionLabel, mustHaveFromCriterion } from '@/lib/icp-gates'
 import { resolveLocationParts, slugifyPlace } from '@/modules/pool/domain/normalize'
-import { employerTerms } from '@/modules/pool/search/spec-from-brief'
+import { employerTerms, schoolTiers, pedigreeMatters } from '@/modules/pool/search/spec-from-brief'
 
 // ── Accessors (shared, in src/lib/icp-gates.ts) ─────────────────────────────────
 export { isCriterion, toCriterion, criterionLabel, mustHaveFromCriterion }
@@ -279,11 +279,11 @@ export function evaluateMustHaves(
 
 /** Stable ids so a regenerated profile keeps matching stored snapshots and run records. */
 export const IDEAL_PROFILE_IDS = {
-  location: 'ip-location', years: 'ip-years', education: 'ip-education', titles: 'ip-titles', companies: 'ip-companies',
+  location: 'ip-location', years: 'ip-years', education: 'ip-education', school: 'ip-school', titles: 'ip-titles', companies: 'ip-companies',
 } as const
 
 /** The ladder: the level at which each relaxable dimension is loosened. Years and education never are. */
-export const RELAX_AT = { companies: 2, titles: 3, location: 4 } as const
+export const RELAX_AT = { companies: 2, titles: 3, school: 3, location: 4 } as const
 
 export interface IdealProfileMarket { city?: string | null; state?: string | null; country?: string | null; work_model?: string | null }
 
@@ -293,7 +293,7 @@ export interface IdealProfileMarket { city?: string | null; state?: string | nul
  * IS the must-have list. Rows the brief has nothing for are simply absent. PURE.
  */
 export function idealProfileFromBrief(
-  brief: Pick<RecruiterBrief, 'experience_band' | 'title_families' | 'title_basis' | 'current_functions' | 'current_title_exclusions' | 'feeder_pools' | 'education' | 'market'> | null | undefined,
+  brief: Pick<RecruiterBrief, 'experience_band' | 'title_families' | 'title_basis' | 'current_functions' | 'current_title_exclusions' | 'feeder_pools' | 'education' | 'market'> & Partial<Pick<RecruiterBrief, 'target_schools' | 'market_gates'>> | null | undefined,
   market: IdealProfileMarket | null | undefined,
   opts: { radiusKm?: number } = {},
 ): IcpMustHave[] {
@@ -316,6 +316,15 @@ export function idealProfileFromBrief(
   // Education: never relaxed.
   const edu = [...(brief?.education?.degrees ?? []), ...(brief?.education?.fields ?? [])].map((s) => s.trim()).filter(Boolean)
   if (edu.length) out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.education, kind: 'degree_field', values: Array.from(new Set(edu)) }))
+
+  // School: tier-1 first, when the brief screens on pedigree ("degree from a top
+  // university"). A search preference, not a reject — the ladder searches tier-1 schools
+  // across every target company, then tier-2, then drops the school.
+  const country = market?.country ?? fallback?.country_code ?? null
+  const tier1 = schoolTiers(brief, country).tier1
+  if (tier1.length && pedigreeMatters((brief?.market_gates ?? []).map((g) => g.requirement))) {
+    out.push(mustHaveFromCriterion({ id: IDEAL_PROFILE_IDS.school, kind: 'school', values: tier1, relax_at: RELAX_AT.school }))
+  }
 
   // Strict pass: a role held TODAY unless the recruiter deliberately says prior experience is the signal.
   const titles = Array.from(new Set((brief?.title_families ?? []).flatMap(titleTerms)))

@@ -119,9 +119,10 @@ describe('ladderFromIdealProfile', () => {
     expect(spec.levels[0]).toMatchObject({ label: 'Ideal profile · Rippling' })
     expect(spec.levels[0].criteria.map((c) => c.kind)).toEqual(['location', 'title_current', 'employer_current'])
   })
-  it('exhausts reasoned company tiers at the SAME title, then feeder titles across those companies, then location', () => {
+  it('exhausts reasoned company tiers at the SAME title, then former employees, then feeder titles, then location', () => {
     expect(spec.levels.map((l) => l.label)).toEqual([
       'Ideal profile · Rippling', 'Ideal profile · Ramp', 'Growth-stage SaaS',
+      'Formerly at: Scaling B2B SaaS', 'Formerly at: Growth-stage SaaS',
       'Feeder titles · target companies', 'Feeder titles · any company', 'Wider location',
     ])
     // A company tier widens the companies but keeps the EXACT title.
@@ -129,13 +130,13 @@ describe('ladderFromIdealProfile', () => {
     expect(tier.find((c) => c.kind === 'employer_current')?.values).toEqual(['Datadog', 'Stripe'])
     expect(tier.find((c) => c.kind === 'title_current')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager'])
     // Feeder titles apply across the SAME broadened company set (not "any company" first).
-    const feederAtCompanies = spec.levels[3].criteria
+    const feederAtCompanies = spec.levels[5].criteria
     expect(feederAtCompanies.find((c) => c.kind === 'employer_current')?.values).toEqual(['Rippling', 'Ramp', 'Datadog', 'Stripe'])
     expect(feederAtCompanies.find((c) => c.kind === 'title_current')?.values).toEqual(['Staff Software Engineer', 'Engineering Lead'])
     // Then feeder titles with no company constraint.
-    expect(spec.levels[4].criteria.some((c) => c.kind === 'employer_current')).toBe(false)
+    expect(spec.levels[6].criteria.some((c) => c.kind === 'employer_current')).toBe(false)
     // Location widens LAST (3× radius, every title so far).
-    const loc = spec.levels[5].criteria
+    const loc = spec.levels[7].criteria
     expect(loc.find((c) => c.kind === 'location')?.radius_km).toBe(150)
     expect(loc.find((c) => c.kind === 'title_current')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager', 'Staff Software Engineer', 'Engineering Lead'])
   })
@@ -168,6 +169,77 @@ describe('ladderFromIdealProfile', () => {
     expect(titlesAt('IB / VC')).toMatchObject({ id: 'ip-titles-p-ib-vc', values: ['Strategy Manager', 'Chief of Staff', 'Analyst'] })
     // Widening the location does NOT carry a pool's generic titles ("Associate") to every company.
     expect(titlesAt('Wider location').values).toEqual(['Strategy Manager', 'Chief of Staff'])
+  })
+  describe('what the older planner did, now in the ideal-profile ladder', () => {
+    // The Strategy & Operations Manager brief: pedigree is a market gate, pool 1 is MBB.
+    const so = {
+      ...brief, market: 'Bengaluru', title_families: ['Strategy Manager'], adjacent_titles: [],
+      market_gates: [{ requirement: 'Degree from a top university', why: 'pedigree screen' }],
+      target_schools: { tier1: ['IIT', 'IIM'], tier2: ['NIT'] },
+      feeder_pools: [
+        { label: 'Top-Tier Consulting', companies: ['McKinsey & Company', 'Bain & Company'], role_types: ['Associate', 'Consultant'], priority: 1 },
+        { label: 'Startup BizOps', companies: ['Swiggy'], role_types: [], priority: 2 },
+      ],
+    }
+    const bengaluru = { city: 'Bengaluru', state: 'Karnataka', country: 'IN', work_model: 'onsite' }
+    const soIcp = { must_haves: idealProfileFromBrief(so, bengaluru), sourcing_map: { reasoning: '', requirement_decomposition: [], unwritten_filters: [], recruiter_brief: so }, competencies: [] }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = ladderFromIdealProfile(soIcp as any, { roleContext: { market: bengaluru } as any })!
+    const at = (label: string) => s.levels.find((l) => l.label === label)!.criteria
+    const kinds = (label: string) => at(label).map((c) => c.kind).sort()
+
+    it('searches a firm once, under all its names', () => {
+      const soBcg = { ...so, feeder_pools: [{ ...so.feeder_pools[0], companies: ['McKinsey & Company', 'Boston Consulting Group (BCG)'] }, so.feeder_pools[1]] }
+      const i2 = { ...soIcp, must_haves: idealProfileFromBrief(soBcg, bengaluru), sourcing_map: { ...soIcp.sourcing_map, recruiter_brief: soBcg } }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ideal = ladderFromIdealProfile(i2 as any)!.levels.filter((l) => l.ideal)
+      expect(ideal.map((l) => l.criteria.find((c) => c.kind === 'employer_current')?.values)).toEqual([['McKinsey'], ['Boston Consulting Group', 'BCG']])
+    })
+    it('the profile carries tier-1 schools as a search preference, never a reject', () => {
+      const row = soIcp.must_haves.find((g) => g.kind === 'school')!
+      expect(row).toMatchObject({ values: ['IIT', 'IIM'], enforcement: 'sourcing_only' })
+      expect(row.relax_at).not.toBeNull()
+    })
+    it('orders: current employers → former employees → tier-2 schools → wider location', () => {
+      expect(s.levels.map((l) => l.label)).toEqual([
+        'Ideal profile · McKinsey', 'Ideal profile · Bain', 'Startup BizOps',
+        'Formerly at: Top-Tier Consulting', 'Formerly at: Startup BizOps',
+        'Tier-2 school · target companies', 'Wider location',
+      ])
+    })
+    it('currently at a consulting firm means currently consulting there', () => {
+      expect(at('Ideal profile · McKinsey').find((c) => c.kind === 'function')?.values).toEqual(['Consulting'])
+      // A non-consulting pool gets no function filter.
+      expect(kinds('Startup BizOps')).not.toContain('function')
+      // Nor does a former-employee lane: moving out of consulting is the point.
+      expect(kinds('Formerly at: Top-Tier Consulting')).not.toContain('function')
+    })
+    it('a former consultant is found wherever they are now', () => {
+      const was = at('Formerly at: Top-Tier Consulting')
+      expect(was.find((c) => c.kind === 'employer_past')?.values).toEqual(['McKinsey', 'Bain'])
+      expect(was.find((c) => c.kind === 'title_any')?.values).toEqual(['Strategy Manager', 'Associate', 'Consultant'])
+    })
+    it('tier-1 on every company lane, tier-2 once at all targets, then no school', () => {
+      for (const l of ['Ideal profile · McKinsey', 'Startup BizOps', 'Formerly at: Startup BizOps']) {
+        expect(at(l).find((c) => c.kind === 'school')?.values).toEqual(['IIT', 'IIM'])
+      }
+      const t2 = at('Tier-2 school · target companies')
+      expect(t2.find((c) => c.kind === 'school')?.values).toEqual(['NIT'])
+      expect(t2.find((c) => c.kind === 'employer_any')?.values).toEqual(['McKinsey', 'Bain', 'Swiggy'])
+      expect(kinds('Wider location')).not.toContain('school')
+    })
+  })
+  it('after every current employer, looks for the same people who have since moved on', () => {
+    // An engineering manager who left Rippling for another company is still the bet.
+    const was = spec.levels.find((l) => l.label === 'Formerly at: Scaling B2B SaaS')!.criteria
+    expect(was.find((c) => c.kind === 'employer_past')).toMatchObject({ id: 'ip-companies-was-scaling-b2b-saas', values: ['Rippling', 'Ramp'] })
+    // Held the title at some point — not necessarily in their current job.
+    expect(was.find((c) => c.kind === 'title_any')?.values).toEqual(['Engineering Manager', 'Tech Lead Manager'])
+    expect(was.some((c) => c.kind === 'employer_current')).toBe(false)
+  })
+  it('a plain SaaS brief gets no school row, no consulting filter and no tier-2 step', () => {
+    expect(icp.must_haves.some((g) => g.kind === 'school')).toBe(false)
+    expect(spec.levels.some((l) => l.criteria.some((c) => c.kind === 'function' || c.kind === 'school'))).toBe(false)
   })
   it('is null for an ICP without an ideal profile (legacy gates keep the pool-based plan)', () => {
     expect(ladderFromIdealProfile({ must_haves: [{ id: 'x', label: 'Has SQL?', attribute: '', operator: '', value: '' }] })).toBeNull()
