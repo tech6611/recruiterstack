@@ -68,3 +68,77 @@ describe('automatic labels always fit the save limit', () => {
     expect(criterionLabel({ kind: 'school', values: ['IIM', 'IIT'] })).toBe('School: IIM / IIT')
   })
 })
+
+import { isBetOverride, jobWideMustHaves, betProfile, betOverrideId, overrideBaseId, saveBetRow, removeBetRow } from './icp-gates'
+import { gatingMustHaves } from '@/lib/ai/fit-engine'
+import type { SearchCriterion } from '@/lib/types/search-spec'
+
+describe('bet overrides — one bet\'s own location / years / school', () => {
+  const shared: SearchCriterion[] = [
+    { id: 'ip-location', kind: 'location', values: ['Bengaluru'], radius_km: 50, relax_at: 4 },
+    { id: 'ip-years', kind: 'years_band', values: [], min: 2, max: 6, relax_at: null },
+    { id: 'ip-school', kind: 'school', values: ['IIT'], relax_at: 3 },
+  ]
+  const bet3 = [
+    { id: 'ip-bet-3-companies', kind: 'employer_current', values: ['Goldman Sachs'], relax_at: 2, bet: 3, bet_label: 'IB' },
+    { id: 'ip-bet-3-titles', kind: 'title_current', values: ['Analyst'], relax_at: 3, bet: 3, bet_label: 'IB' },
+  ] as SearchCriterion[]
+  const yrs3: SearchCriterion = { id: betOverrideId('ip-years', 3), kind: 'years_band', values: [], min: 2, max: 4, relax_at: null, bet: 3, bet_label: 'IB' }
+  const gmat3: SearchCriterion = { id: betOverrideId('mh-x', 3), kind: 'skill', values: ['Excel'], relax_at: null, bet: 3, bet_label: 'IB' }
+  const all = [...shared, ...bet3, yrs3, gmat3]
+
+  it('a bet\'s companies and titles are not overrides; its own years are', () => {
+    expect(bet3.map(isBetOverride)).toEqual([false, false])
+    expect(isBetOverride(yrs3)).toBe(true)
+    expect(shared.some(isBetOverride)).toBe(false)
+    expect(overrideBaseId(yrs3.id)).toBe('ip-years')
+  })
+
+  it('each bet sees the shared rows, replaced by its own where it has one', () => {
+    expect(betProfile(all, 3).map((c) => c.id)).toEqual(['ip-location', yrs3.id, 'ip-school', gmat3.id])
+    expect(betProfile(all, 1).map((c) => c.id)).toEqual(['ip-location', 'ip-years', 'ip-school'])
+  })
+
+  it('an override never rejects anyone and is invisible outside the editor', () => {
+    const gates = all.map((c) => mustHaveFromCriterion(c))
+    const override = gates.find((g) => g.id === yrs3.id)!
+    expect(override.enforcement).toBe('sourcing_only')
+    expect(gatingMustHaves(gates).map((g) => g.id)).not.toContain(yrs3.id)
+    expect(gatingMustHaves(gates).map((g) => g.id)).toContain('ip-years')
+    expect(jobWideMustHaves(gates).map((g) => g.id)).toEqual(['ip-location', 'ip-years', 'ip-school', 'ip-bet-3-companies', 'ip-bet-3-titles'])
+    // Even without a stored enforcement (an older writer), it is still not a gate.
+    expect(isSourcingOnlyCriterion({ ...override, enforcement: undefined })).toBe(true)
+  })
+
+  it('editing under a bet: only this bet makes an override; every bet rewrites the shared row', () => {
+    const gates = [...shared, ...bet3].map((c) => mustHaveFromCriterion(c))
+    const mine = saveBetRow(gates, 3, 'IB', { ...shared[1], min: 2, max: 4 }, false)
+    expect(mine.find((g) => g.id === 'ip-years')!.max).toBe(6)
+    expect(mine.find((g) => g.id === betOverrideId('ip-years', 3))).toMatchObject({ bet: 3, max: 4, enforcement: 'sourcing_only' })
+    // Editing the override again updates it in place.
+    const again = saveBetRow(mine, 3, 'IB', { ...yrs3, max: 5 }, false)
+    expect(again.filter((g) => g.id === yrs3.id)).toHaveLength(1)
+    expect(again.find((g) => g.id === yrs3.id)!.max).toBe(5)
+    // Set back to the shared value → the override goes away.
+    expect(saveBetRow(mine, 3, 'IB', { ...yrs3, max: 6 }, false).some((g) => g.id === yrs3.id)).toBe(false)
+    // Every bet: the shared row changes and every bet's own version is dropped.
+    const everyone = saveBetRow(mine, 3, 'IB', { ...yrs3, min: 3, max: 8 }, true)
+    expect(everyone.find((g) => g.id === 'ip-years')).toMatchObject({ min: 3, max: 8, enforcement: 'hard' })
+    expect(everyone.find((g) => g.id === 'ip-years')!.bet).toBeUndefined()
+    expect(everyone.some(isBetOverride)).toBe(false)
+  })
+
+  it('removing under a bet: an override goes back to shared; a shared row leaves every bet', () => {
+    const gates = all.map((c) => mustHaveFromCriterion(c))
+    expect(removeBetRow(gates, yrs3).map((g) => g.id)).not.toContain(yrs3.id)
+    expect(removeBetRow(gates, yrs3).map((g) => g.id)).toContain('ip-years')
+    const gone = removeBetRow(gates, shared[1])
+    expect(gone.some((g) => overrideBaseId(g.id) === 'ip-years')).toBe(false)
+    expect(gone.map((g) => g.id)).toContain(gmat3.id)
+  })
+
+  it('a profile with overrides still saves (up to 40 rows)', () => {
+    const many = Array.from({ length: 30 }, (_, i) => mustHaveFromCriterion({ id: `mh-${i}`, kind: 'skill', values: ['x'], relax_at: null }))
+    expect(icpDraftInputSchema.safeParse({ must_haves: many, competencies: [] }).success).toBe(true)
+  })
+})

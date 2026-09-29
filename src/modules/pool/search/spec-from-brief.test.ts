@@ -425,6 +425,23 @@ describe('the bet ladder — each company group searched with its own titles', (
   it('a plan built from bets passes the plan save check', () => {
     expect(searchSpecSchema.safeParse(s).success).toBe(true)
   })
+  it('a bet\'s own location or years (an override) is not searched yet, and never replaces the shared rows', () => {
+    const loc = must_haves.find((g) => g.kind === 'location' && g.bet == null)!
+    const yrs = must_haves.find((g) => g.kind === 'years_band' && g.bet == null)!
+    const withOverrides = [
+      ...must_haves,
+      mustHaveFromCriterion({ id: `${loc.id}@bet3`, kind: 'location', values: ['Mumbai'], radius_km: 25, relax_at: loc.relax_at ?? null, bet: 3, bet_label: 'The IB/VC Analyst' }),
+      mustHaveFromCriterion({ id: `${yrs.id}@bet3`, kind: 'years_band', values: [], min: 2, max: 4, relax_at: null, bet: 3, bet_label: 'The IB/VC Analyst' }),
+    ]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s2 = ladderFromIdealProfile({ ...icp, must_haves: withOverrides } as any, { roleContext: { market: bengaluru } as any })!
+    // Ids carry a run counter; everything else must match.
+    const noIds = (x: unknown) => JSON.stringify(x, (k, v) => (k === 'id' ? undefined : v))
+    expect(noIds(s2)).toEqual(noIds(s))
+    expect(JSON.stringify(s2)).not.toContain('Mumbai')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(noIds(resolveSpec({ ...icp, must_haves: withOverrides } as any, { roleContext: { market: bengaluru } as any }).spec)).toEqual(noIds(resolveSpec(icp as any, { roleContext: { market: bengaluru } as any }).spec))
+  })
 })
 
 describe('a plan always saves', () => {

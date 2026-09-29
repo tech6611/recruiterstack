@@ -10,6 +10,7 @@
 
 import type { Candidate } from '@/lib/types/database'
 import type { Icp } from '@/lib/types/icp'
+import { jobWideMustHaves } from '@/lib/icp-gates'
 
 type IcpQuery = Pick<Icp, 'competencies' | 'must_haves'>
 
@@ -24,7 +25,7 @@ function tokens(s: string | null | undefined): string[] {
 export function icpKeywords(icp: IcpQuery): string[] {
   const kw = new Set<string>()
   for (const c of icp.competencies) tokens(c.name).forEach((t) => kw.add(t))
-  for (const g of icp.must_haves) {
+  for (const g of jobWideMustHaves(icp.must_haves)) {
     if (g.attribute?.toLowerCase() === 'skill') {
       const vals = Array.isArray(g.value) ? g.value : [g.value]
       vals.forEach((v) => tokens(String(v)).forEach((t) => kw.add(t)))
@@ -41,7 +42,7 @@ export function overlapScore(candidate: Candidate, icp: IcpQuery): number {
   ])
   let score = icpKeywords(icp).reduce((s, k) => s + (hay.has(k) ? 1 : 0), 0)
 
-  for (const g of icp.must_haves) {
+  for (const g of jobWideMustHaves(icp.must_haves)) {
     const attr = g.attribute?.toLowerCase()
     if (attr === 'location' && candidate.location) {
       const loc = candidate.location.toLowerCase()

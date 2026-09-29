@@ -26,6 +26,7 @@ import { trackUsage } from '@/lib/ai/track-usage'
 import { combineFit, gatingMustHaves } from '@/lib/ai/fit-engine'
 import { logger } from '@/lib/logger'
 import type { Icp, IcpMustHave } from '@/lib/types/icp'
+import { jobWideMustHaves } from '@/lib/icp-gates'
 
 // One Gemini scoring pass.
 export const maxDuration = 60
@@ -77,8 +78,9 @@ export function buildTranscriptScorePrompt(icp: Icp, transcriptText: string): st
     })
     .join('\n')
 
-  const gates = (icp.must_haves ?? []).length
-    ? (icp.must_haves ?? []).map((g) => `  - ${g.label}`).join('\n')
+  const jobWide = jobWideMustHaves(icp.must_haves)
+  const gates = jobWide.length
+    ? jobWide.map((g) => `  - ${g.label}`).join('\n')
     : '  (none)'
 
   return `You are a senior recruiter scoring a COMPLETED phone-screen transcript against an Ideal Candidate Profile. Rate ONLY on the evidence in the conversation.

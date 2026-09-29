@@ -21,6 +21,7 @@ import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipeline
 import { generateIcpWithReasoning } from '@/lib/ai/icp-generator'
 import { logger } from '@/lib/logger'
 import type { Icp, IcpCompetency } from '@/lib/types/icp'
+import { jobWideMustHaves } from '@/lib/icp-gates'
 
 // One deep reasoning-first Gemini pass may run when a job has no ICP yet.
 export const maxDuration = 120
@@ -305,7 +306,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const mustHaves = (icp?.must_haves ?? []).map((m) => ({ label: m.label }))
+    const mustHaves = jobWideMustHaves(icp?.must_haves).map((m) => ({ label: m.label }))
 
     // 4) CANDIDATE claims + prior assessment (optional).
     let effectiveCandidateId: string | null = candidate_id ?? null

@@ -32,7 +32,7 @@ import {
   type CrustdataCondition,
   type CrustdataFilterGroup,
 } from '@/modules/pool/vendors/crustdata/query'
-import { experienceBandFromGate, yearsFloorFromLabel } from '@/lib/icp-gates'
+import { experienceBandFromGate, yearsFloorFromLabel, jobWideMustHaves } from '@/lib/icp-gates'
 export { yearsFloorFromLabel }
 
 export type LaneKind = 'feeder' | 'titles' | 'title' | 'level'
@@ -150,6 +150,7 @@ export function buildSearchPlan(
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map'>>,
   ctx: SearchPlanContext = {},
 ): SearchPlan {
+  icp = { ...icp, must_haves: jobWideMustHaves(icp.must_haves) }
   const brief: RecruiterBrief | null | undefined = icp.sourcing_map?.recruiter_brief
   const common: SearchPlan['common'] = []
   const unmapped: SearchPlan['unmapped'] = []

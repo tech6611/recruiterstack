@@ -23,6 +23,7 @@
  */
 import type { Icp, IcpMustHave } from '@/lib/types/icp'
 import type { CrustdataCondition, CrustdataFilterGroup } from '@/modules/pool/vendors/crustdata/client'
+import { jobWideMustHaves } from '@/lib/icp-gates'
 
 export type { CrustdataCondition, CrustdataFilterGroup }
 
@@ -297,7 +298,7 @@ export function buildCrustdataQueryFromIcp(
   const unmapped: CrustdataQueryBuild['unmapped'] = []
   let hasTitle = false
 
-  for (const mh of icp.must_haves ?? []) {
+  for (const mh of jobWideMustHaves(icp.must_haves)) {
     const result = conditionForMustHave(mh, ctx)
     if ('condition' in result) {
       conditions.push(result.condition)

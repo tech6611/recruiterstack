@@ -12,12 +12,12 @@ import type { FetchedOptions } from '@/lib/icp-options'
  * the Strategy & Operations Manager job's real data, for review without signing in.
  */
 
-const OPTIONS: FetchedOptions = {
+export const OPTIONS: FetchedOptions = {
   cities: ['Bengaluru, Karnataka, India'], titles: ['Consultant', 'Associate', 'Strategy Manager', 'Analyst'],
   companies: ['McKinsey', 'Bain', 'BCG', 'Kearney', 'Swiggy', 'Zepto'], skills: [], departments: [],
 }
 
-const ARCHETYPES = [
+export const ARCHETYPES = [
   { name: 'The Classic Post-Consulting Operator', thesis: 'A purebred problem-solver from an MBB firm, trained in structured thinking, who is now eager to get hands-on operational experience.', where_from: '2-3 years as a Business Analyst or Associate at McKinsey, Bain, or BCG.', why_interested: "To escape the 'PowerPoint factory' and get meaningful equity in a high-potential AI startup.", why_no: 'May be too theoretical and unaccustomed to the speed of execution.', hire_risk: "Analysis paralysis; struggles to shift from 'recommending' to 'doing'." },
   { name: 'The Scaled Startup BizOps Star', thesis: 'Has already made the leap into a high-growth Indian startup and seen the 10x–100x journey.', where_from: 'Strategy/BizOps at Udaan, Swiggy, Razorpay, or CRED.', why_interested: 'To join an even earlier stage and own more.', why_no: 'Used to the resources of a well-funded scale-up.', hire_risk: "Brings a 'late-stage' scaling playbook to a seed-stage company." },
   { name: 'The IB/VC Analyst Seeking Alpha', thesis: 'Highly quantitative; wants to move from evaluating companies to building one.', where_from: 'Analyst at Goldman Sachs, Morgan Stanley; Associate at Sequoia, Accel.', why_interested: 'Tired of the transactional lifestyle.', why_no: 'Likely no real operational experience.', hire_risk: 'Excels at a model in Excel; struggles with a messy, real project.', is_non_obvious: true },
@@ -27,7 +27,7 @@ const bet = (n: number, bet_label: string, companies: string[], titles: string[]
   { id: `ip-bet-${n}-companies`, kind: 'employer_current', values: companies, relax_at: 2, bet: n, bet_label },
   { id: `ip-bet-${n}-titles`, kind: 'title_current', values: titles, relax_at: 3, bet: n, bet_label },
 ]
-const START: SearchCriterion[] = [
+export const START: SearchCriterion[] = [
   { id: 'ip-location', kind: 'location', values: ['Bengaluru, Karnataka, IN'], radius_km: 50, relax_at: 4 },
   { id: 'ip-years', kind: 'years_band', values: [], min: 2, max: 6, relax_at: null },
   { id: 'ip-school', kind: 'school', values: ['Indian Institute of Technology', 'IIT', 'Indian Institute of Management', 'IIM', 'ISB', 'BITS Pilani'], relax_at: 3 },

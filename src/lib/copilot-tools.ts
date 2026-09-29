@@ -11,6 +11,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import type { Capability } from '@/lib/permissions'
 import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import { trackUsage } from '@/lib/ai/track-usage'
+import { jobWideMustHaves } from '@/lib/icp-gates'
 import {
   countCanonicalJobs,
   createCanonicalJobFromApprovedOpening,
@@ -1901,7 +1902,7 @@ async function getIcpTool(
   const icp = await getCurrentIcp(supabase, orgId, jobId)
   if (!icp) return 'This job has no ICP yet.'
 
-  const gates = (icp.must_haves ?? []).map((g) => `- ${g.label}`).join('\n') || '- (none)'
+  const gates = jobWideMustHaves(icp.must_haves).map((g) => `- ${g.label}`).join('\n') || '- (none)'
   const comps = (icp.competencies ?? [])
     .map((c) => `- ${c.name} (${c.weight}%)`)
     .join('\n') || '- (none)'

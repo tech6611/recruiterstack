@@ -54,7 +54,7 @@ export const icpCompetencySchema = z.object({
 })
 
 export const icpDraftInputSchema = z.object({
-  must_haves: z.array(icpMustHaveSchema).max(20).default([]),
+  must_haves: z.array(icpMustHaveSchema).max(40).default([]),
   competencies: z.array(icpCompetencySchema).max(20).default([]),
   source: z.enum(['seed', 'intake', 'refinement', 'manual', 'template']).optional(),
 })

@@ -15,7 +15,7 @@
 import type { Icp, RecruiterBrief } from '@/lib/types/icp'
 import type { SearchCriterion, SearchLevel, SearchSpec, PostFetchCheck } from '@/lib/types/search-spec'
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
-import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion } from '@/lib/icp-gates'
+import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion, jobWideMustHaves } from '@/lib/icp-gates'
 import { titleTerms } from '@/lib/ai/gate-evaluator'
 import { groupEmployerAliases } from '@/lib/employer-aliases'
 import { schoolTiersFor } from '@/modules/pool/search/school-tiers'
@@ -121,6 +121,8 @@ export function specFromIcp(
   ctx: SpecContext = {},
 ): SearchSpec {
   seq = 0
+  // Per-bet overrides are not searched yet — every bet runs on the shared rows.
+  icp = { ...icp, must_haves: jobWideMustHaves(icp.must_haves) }
   const brief: RecruiterBrief | null | undefined = icp.sourcing_map?.recruiter_brief
   const base: SearchCriterion[] = []
   const post_fetch: PostFetchCheck[] = []
@@ -244,6 +246,7 @@ export function ladderFromIdealProfile(
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'competencies'>>,
   ctx: SpecContext = {},
 ): SearchSpec | null {
+  icp = { ...icp, must_haves: jobWideMustHaves(icp.must_haves) }
   const all = (icp.must_haves ?? []).map(toCriterion).filter((c): c is SearchCriterion => c != null)
   const relaxable = all.filter((c) => c.relax_at != null)
   if (!relaxable.length) return null
@@ -572,6 +575,7 @@ export function resolveSearchSpec(
   icp: Pick<Icp, 'must_haves'> & Partial<Pick<Icp, 'sourcing_map' | 'competencies'>>,
   ctx: SpecContext = {},
 ): { spec: SearchSpec; stored: boolean } {
+  icp = { ...icp, must_haves: jobWideMustHaves(icp.must_haves) }
   const stored = icp.sourcing_map?.search_spec
   if (stored && stored.levels?.length) {
     // One source of truth: the ICP's must-haves (edited on the Scoring tab) flow into

@@ -11,8 +11,8 @@ import type { Icp, IcpCompetency, IcpMustHave } from '@/lib/types/icp'
 import type { SearchCriterion } from '@/lib/types/search-spec'
 import { icpToScoringCriteria } from '@/lib/scoring'
 import { RecruiterBriefBody, RecruiterBriefChips } from '@/components/req-jobs/RecruiterBriefCard'
-import { isCriterion, toCriterion, mustHaveFromCriterion, criterionLabel } from '@/lib/icp-gates'
-import { IdealProfileTiles } from '@/components/req-jobs/IdealProfileTiles'
+import { isCriterion, toCriterion, mustHaveFromCriterion, criterionLabel, isBetOverride, betProfile, saveBetRow, removeBetRow } from '@/lib/icp-gates'
+import { IdealProfileTiles, BetProfile } from '@/components/req-jobs/IdealProfileTiles'
 import { BetCards } from '@/components/req-jobs/BetCards'
 
 
@@ -80,6 +80,10 @@ export function IcpEditor({
       return { ...mustHaveFromCriterion(auto ? { ...next, label: null } : next), relax_at: next.relax_at ?? null }
     }))
   }
+
+  const saveForBet = (bet: number, betLabel: string, next: SearchCriterion, allBets: boolean) =>
+    setGates((prev) => saveBetRow(prev, bet, betLabel, next, allBets))
+  const removeForBet = (c: SearchCriterion) => setGates((prev) => removeBetRow(prev, c))
 
   const total = comps.reduce((s, c) => s + (c.weight || 0), 0)
   const canApprove = comps.some((c) => c.name.trim()) && total === 100
@@ -377,6 +381,9 @@ export function IcpEditor({
   }
 
   const isApproved = icp.status === 'approved'
+  // Organised into bets: each bet shows its own profile under its card, so the shared
+  // rows are edited there and the single profile list below is not shown.
+  const organised = gates.some((g) => isCriterion(g) && g.bet != null && !isBetOverride(g))
 
   return (
     <Card>
@@ -419,6 +426,24 @@ export function IcpEditor({
                   bets={gates.filter((g) => isCriterion(g) && g.bet != null).map((g) => toCriterion(g)!)}
                   onChange={updateGate}
                   onRemoveBet={(ids) => setGates((prev) => prev.filter((g) => !ids.includes(g.id)))}
+                  {...(organised ? {
+                    renderProfile: (n: number, label: string) => (
+                      <BetProfile
+                        bet={n}
+                        criteria={betProfile(gates.filter(isCriterion).map((g) => toCriterion(g)!), n)}
+                        onSave={(next, all) => saveForBet(n, label, next, all)}
+                        onRemove={removeForBet}
+                      />
+                    ),
+                    renderCandidate: () => (
+                      <div className="flex min-h-[8rem] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white/60 p-4 text-center">
+                        <div className="text-xs font-semibold text-slate-500">Sample candidate</div>
+                        <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                          A real person who fits this bet will show here, to mark 👍 or 👎.
+                        </p>
+                      </div>
+                    ),
+                  } : {})}
                 />
               </div>
             )}
@@ -491,14 +516,14 @@ export function IcpEditor({
 
         {/* ── Ideal profile (docs/ideal-profile-plan.md) ── */}
         <section className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600"
+          {!organised && <div className="flex items-center gap-2 text-xs font-semibold text-slate-600"
             title="Who we are looking for, as filters. This is the one place to edit it: it becomes the first lines of the Search plan on the Source tab, and every candidate is checked against it. Changes reach sourcing when you approve.">
             <ShieldCheck className="h-3.5 w-3.5 text-slate-400" /> Ideal profile
             <span className="ml-auto flex items-center gap-3 text-[10px] font-normal text-slate-400">
               <span className="flex items-center gap-1"><Lock className="h-3 w-3" /> never relaxed</span>
               <span className="flex items-center gap-1"><MoveHorizontal className="h-3 w-3" /> widens later</span>
             </span>
-          </div>
+          </div>}
           {(() => {
             const profile = gates.filter((g) => isCriterion(g))
             const screening = gates.filter((g) => g.attribute === 'screening')
@@ -560,13 +585,13 @@ export function IcpEditor({
                 {profile.length === 0 && legacy.length === 0 && !fromBrief && (
                   <p className="text-xs text-slate-400">No ideal profile yet — Regenerate to build it from the JD and the recruiter brief.</p>
                 )}
-                {/* Always shown, so a must-have can be added even to an empty profile. */}
-                <IdealProfileTiles
+                {/* Always shown (unless each bet shows its own), so a must-have can be added even to an empty profile. */}
+                {!organised && <IdealProfileTiles
                     criteria={profile.map((g) => toCriterion(g)!)}
                     onChange={updateGate}
                     onAdd={(c) => setGates((prev) => [...prev, mustHaveFromCriterion({ ...c, label: null })])}
                     onRemove={(id) => setGates((prev) => prev.filter((g) => g.id !== id))}
-                  />
+                  />}
                 {screening.length > 0 && (
                   <div className="space-y-1">
                     <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ask the candidate</div>
@@ -765,3 +790,4 @@ export function IcpEditor({
     </Card>
   )
 }
+
