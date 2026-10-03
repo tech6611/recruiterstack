@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Archive, ArchiveRestore, Send, Globe, Ban, X, Plus, Trash2, Pencil, LayoutGrid, LayoutTemplate, PauseCircle, PlayCircle, Copy, AlertTriangle, CheckCircle2, CircleSlash,
@@ -210,6 +210,10 @@ export function JobDetail({ job: initialJob, department, departments, locations 
   // a just-committed status change (e.g. an approval that just landed).
   const [job, setJob]                 = useState<Job>(initialJob)
   const [tab, setTab]                 = useState<Tab>('overview')
+  // Scoring tab: bumped on every approve (remounts the candidates section) + where its
+  // "refine the profile" links scroll to.
+  const [approvals, setApprovals]     = useState(0)
+  const profileTopRef                 = useRef<HTMLDivElement>(null)
   const [hmKey, setHmKey]             = useState(0)  // bump to re-fetch the team roster (HM / requisition changes)
   const [submitting, setSubmitting]   = useState(false)
   const [publishing, setPublishing]   = useState(false)
@@ -1062,11 +1066,28 @@ export function JobDetail({ job: initialJob, department, departments, locations 
       {/* The ICP's competencies ARE the rubric: approving one writes scoring_criteria
           (icpToScoringCriteria). A second, hand-edited rubric card here only let the two
           drift apart, so it was removed. */}
+      {/* Scoring: define who we want, then see and act on the candidates in the same
+          place — the Source tab's "Candidates for this role" section (search plan,
+          results, find / rank, learning) under the profile. Approving a new version
+          remounts it, so the results re-read against that version at once. */}
       {tab === 'scoring' && (
-        <IcpEditor
-          jobId={job.id}
-          onApproved={c => setJob(j => ({ ...j, custom_fields: { ...j.custom_fields, scoring_criteria: c } }))}
-        />
+        <div className="space-y-4">
+          <div ref={profileTopRef} className="scroll-mt-4">
+            <IcpEditor
+              jobId={job.id}
+              onApproved={c => {
+                setJob(j => ({ ...j, custom_fields: { ...j.custom_fields, scoring_criteria: c } }))
+                setApprovals(n => n + 1)
+              }}
+            />
+          </div>
+          <SourcingTab
+            key={approvals}
+            jobId={job.id}
+            showPersona={false}
+            onOpenScoring={() => profileTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          />
+        </div>
       )}
 
       {tab === 'source' && <SourcingTab jobId={job.id} onOpenScoring={() => setTab('scoring')} />}

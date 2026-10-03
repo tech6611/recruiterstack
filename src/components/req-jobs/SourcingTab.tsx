@@ -63,7 +63,12 @@ const unkey = (k: string) => k.slice(2)
  * yet rated. Refining the ICP happens on the Scoring tab. Sourcing Lab sits behind an
  * Experiments switch.
  */
-export function SourcingTab({ jobId, onOpenScoring }: { jobId: string; onOpenScoring?: () => void }) {
+export function SourcingTab({ jobId, onOpenScoring, showPersona = true }: {
+  jobId: string
+  onOpenScoring?: () => void
+  /** The persona card on top. Off on the Scoring tab, which shows the profile itself. */
+  showPersona?: boolean
+}) {
   const [matches, setMatches] = useState<Match[]>([])
   const [icp, setIcp] = useState<MatrixIcp | null>(null)
   const [currentVersion, setCurrentVersion] = useState<number | null>(null)
@@ -306,7 +311,7 @@ export function SourcingTab({ jobId, onOpenScoring }: { jobId: string; onOpenSco
   if (loading) {
     return (
       <div className="space-y-4">
-        <PersonaTabs jobId={jobId} onOpenScoring={onOpenScoring} />
+        {showPersona && <PersonaTabs jobId={jobId} onOpenScoring={onOpenScoring} />}
         <Card><CardContent className="py-8 text-center text-sm text-slate-400">Loading…</CardContent></Card>
       </div>
     )
@@ -321,7 +326,7 @@ export function SourcingTab({ jobId, onOpenScoring }: { jobId: string; onOpenSco
 
   return (
     <div className="space-y-4">
-    <PersonaTabs jobId={jobId} onOpenScoring={onOpenScoring} />
+    {showPersona && <PersonaTabs jobId={jobId} onOpenScoring={onOpenScoring} />}
     <Card>
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
