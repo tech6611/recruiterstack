@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkCriterion, rankBetSamples, hasWords, titleHas, companyQueryTerms, titleFunctions, titleStrength, type BetSamplePerson } from './bet-sample-fit'
+import { checkCriterion, rankBetSamples, hasWords, titleHas, titleFunctions, titleStrength, type BetSamplePerson } from './bet-sample-fit'
 import { betMarketSpec } from './bet-sample'
 import type { SearchCriterion } from '@/lib/types/search-spec'
 
@@ -96,10 +96,6 @@ describe('bet sample — does a pool person fit a bet', () => {
     ], bet)
     expect(ranked.map((r) => r.person.id)).toEqual(['perfect', 'unknown-title', 'mumbai'])
     expect(ranked[2].fails).toBe(1)
-  })
-
-  it('company terms are safe for the pool query', () => {
-    expect(companyQueryTerms(['McKinsey & Company', 'Boston Consulting Group (BCG)', 'x', 'McKinsey & Company'])).toEqual(['McKinsey & Company', 'Boston Consulting Group BCG'])
   })
 
   it('the market search is the bet\'s companies and titles, with its lines ANDed in', () => {

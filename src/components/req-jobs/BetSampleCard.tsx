@@ -8,15 +8,13 @@ import { CRITERION_KIND_LABEL, type SearchCriterion } from '@/lib/types/search-s
 import type { BetSampleResult } from '@/modules/pool/domain/bet-sample'
 import type { BetCheck } from '@/modules/pool/domain/bet-sample-fit'
 
-/** Must match MARKET_BATCH × CREDITS_PER_PERSON in modules/pool/domain/bet-sample. */
-const MARKET_PEOPLE = 5
-const MARKET_CREDITS = (MARKET_PEOPLE * 0.03).toFixed(2)
+/** Wait this long after the last edit before searching (each search can cost credits). */
+const FETCH_DELAY_MS = 2000
 
 /** How the card talks to the server — swappable so the dev preview runs without signing in. */
 export interface BetSampleClient {
   sample(body: { bet: number; criteria: SearchCriterion[]; skip: string[] }): Promise<BetSampleResult>
   decide(body: { bet: number; bet_label: string; criteria: SearchCriterion[]; profile_id: string; decision: 'yes' | 'no'; checks: BetCheck[]; icp_id: string | null }): Promise<void>
-  market(body: { bet: number; criteria: SearchCriterion[] }): Promise<{ fetched: number; creditsUsed: number }>
 }
 
 async function post<T>(url: string, body: unknown): Promise<T> {
@@ -29,15 +27,16 @@ async function post<T>(url: string, body: unknown): Promise<T> {
 export const liveBetSampleClient = (jobId: string): BetSampleClient => ({
   sample: (b) => post(`/api/jobs/${jobId}/bets/sample`, b),
   decide: (b) => post(`/api/jobs/${jobId}/bets/decide`, b),
-  market: (b) => post(`/api/jobs/${jobId}/bets/market`, b),
 })
 
 /**
- * A REAL PERSON WHO FITS THIS BET, beside its card on Scoring. The best match from the
- * Candidate Pool (free — stored data, no AI) for the bet's companies, titles and profile
- * lines, each line marked ✓ / ✗ / ?. 👍 / 👎 is saved and the next person shows; editing
- * the bet's lines fetches a new person. When the pool has nobody, one click (after a
- * cost check) pulls a few people for this bet from the market.
+ * A REAL PERSON WHO FITS THIS BET, beside its card on Scoring — fetched LIVE from the
+ * market with exactly the bet's lines (companies, titles, location, years, school…), so
+ * the card on the left and the person on the right are one search. Editing a line
+ * searches again ~2 s after the last change; each line is marked ✓ / ✗ / ? (? = a line
+ * the market can't filter on, checked from the profile). 👍 / 👎 is saved and the next
+ * person shows. Searches are paid, remembered per set of lines, and capped per job per
+ * day; the card says how many match and what has been spent.
  */
 export function BetSampleCard({
   client, bet, betLabel, criteria, icpId,
@@ -51,8 +50,7 @@ export function BetSampleCard({
 }) {
   const [result, setResult] = useState<BetSampleResult | null>(null)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState<'yes' | 'no' | 'market' | null>(null)
-  const [confirmMarket, setConfirmMarket] = useState(false)
+  const [busy, setBusy] = useState<'yes' | 'no' | null>(null)
   const [open, setOpen] = useState(false)
   // People shown this session and passed over with "Show another" (not decided).
   const skip = useRef<string[]>([])
@@ -75,7 +73,7 @@ export function BetSampleCard({
 
   // A changed line (company, title, location, years…) means a different person may fit best.
   useEffect(() => {
-    const t = setTimeout(() => load(true), 350)
+    const t = setTimeout(() => load(true), FETCH_DELAY_MS)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, bet])
@@ -100,63 +98,35 @@ export function BetSampleCard({
     load()
   }
 
-  async function searchMarket() {
-    setConfirmMarket(false)
-    setBusy('market')
-    try {
-      const r = await client.market({ bet, criteria })
-      toast.success(r.fetched ? `${r.fetched} new ${r.fetched === 1 ? 'person' : 'people'} found · ${r.creditsUsed.toFixed(2)} credits used` : `Nobody new in the market for this bet · ${r.creditsUsed.toFixed(2)} credits used`)
-      await load(true)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'The market search failed')
-    } finally {
-      setBusy(null)
-    }
-  }
-
   const p = result?.person ?? null
   const tally = result?.decided
   const shell = 'flex flex-col rounded-xl border border-slate-200 bg-white p-3'
 
+  const meter = result && <Meter total={result.total} spent={result.spent} cap={result.cap} />
+
   if (loading && !result) {
     return (
       <div className={`${shell} min-h-[10rem] items-center justify-center text-xs text-slate-400`}>
-        <Loader2 className="mb-1 h-4 w-4 animate-spin" /> Finding someone who fits…
+        <Loader2 className="mb-1 h-4 w-4 animate-spin" /> Searching the market for this bet…
       </div>
     )
   }
 
   if (!p) {
-    const why = result?.reason === 'no_companies'
-      ? 'This bet names no companies yet — click “At” on the card to add some.'
-      : result?.reason === 'all_seen'
-        ? 'You have seen everyone in the pool at these companies.'
-        : 'Nobody in the Candidate Pool works at these companies yet.'
+    const why = {
+      no_companies: 'This bet names no companies yet — click “At” on the card to add some.',
+      none: 'Nobody in the market matches all of this bet’s lines. Loosen one — a wider location, more companies or titles.',
+      all_seen: 'You have been through everyone the market has for these lines.',
+      cap: `This job has used its ${result?.cap ?? ''} credits for sample people in the last 24 hours. Searching resumes as the day rolls over.`,
+      unavailable: result?.message ?? 'The market search is unavailable right now.',
+    }[result?.reason ?? 'none'] ?? ''
     return (
-      <div className={`${shell} min-h-[10rem] justify-center text-center`}>
-        <div className="text-xs font-semibold text-slate-600">No sample person</div>
+      <div className={`${shell} min-h-[10rem] justify-center text-center ${loading ? 'opacity-60' : ''}`}>
+        <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-600">
+          {loading && <Loader2 className="h-3 w-3 animate-spin" />} No sample person
+        </div>
         <p className="mt-1 text-[11px] leading-relaxed text-slate-400">{why}</p>
-        {result?.reason !== 'no_companies' && (
-          confirmMarket ? (
-            <div className="mt-3 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-900 ring-1 ring-amber-100">
-              Search the market for up to {MARKET_PEOPLE} people for this bet? Uses about {MARKET_CREDITS} credits.
-              <div className="mt-1.5 flex justify-center gap-1.5">
-                <button type="button" onClick={searchMarket} className="rounded-md bg-slate-900 px-2 py-1 font-medium text-white hover:bg-slate-700">Yes, search</button>
-                <button type="button" onClick={() => setConfirmMarket(false)} className="rounded-md px-2 py-1 text-slate-600 ring-1 ring-slate-200 hover:bg-white">Cancel</button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmMarket(true)}
-              disabled={busy === 'market'}
-              className="mx-auto mt-3 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
-            >
-              {busy === 'market' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Globe className="h-3 w-3" />}
-              {busy === 'market' ? 'Searching the market…' : 'Find one in the market'}
-            </button>
-          )
-        )}
+        {meter}
         {tally && tally.yes + tally.no > 0 && <Tally yes={tally.yes} no={tally.no} />}
       </div>
     )
@@ -172,6 +142,7 @@ export function BetSampleCard({
         Sample person
         {loading && <Loader2 className="h-3 w-3 animate-spin" />}
       </div>
+      {meter}
 
       <button type="button" onClick={() => setOpen(true)} className="mt-2 flex items-start gap-2.5 rounded-lg text-left hover:bg-slate-50" title="Open the full profile">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-800 text-xs font-semibold text-white">{initials(p.display_name)}</span>
@@ -205,9 +176,9 @@ export function BetSampleCard({
         </button>
       </div>
       <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
-        <button type="button" onClick={another} disabled={!!busy || loading || result!.remaining === 0}
+        <button type="button" onClick={another} disabled={!!busy || loading}
           className="inline-flex items-center gap-1 hover:text-slate-700 disabled:opacity-50" title="Skip without deciding">
-          <SkipForward className="h-3 w-3" /> Show another{result!.remaining ? ` (${result!.remaining} more)` : ''}
+          <SkipForward className="h-3 w-3" /> Show another
         </button>
         {tally && tally.yes + tally.no > 0 && <Tally yes={tally.yes} no={tally.no} />}
       </div>
@@ -233,6 +204,18 @@ function CheckLine({ c }: { c: BetCheck }) {
         {c.result === 'unknown' && !c.note && <span className="text-slate-400"> · not on profile</span>}
       </span>
     </li>
+  )
+}
+
+/** How many the market has for these lines, and what this job has spent today. */
+function Meter({ total, spent, cap }: { total: number | null; spent: number; cap: number }) {
+  return (
+    <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 text-[10px] text-slate-400">
+      <span className="inline-flex items-center gap-1" title="People in the market matching every line of this bet">
+        <Globe className="h-3 w-3" />{total == null ? 'Market' : `${total.toLocaleString()} match in the market`}
+      </span>
+      <span title="Credits this job spent on sample people in the last 24 hours, of its daily cap">{spent.toFixed(2)} / {cap} credits today</span>
+    </div>
   )
 }
 

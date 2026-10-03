@@ -24,21 +24,32 @@ const PEOPLE: BetSamplePerson[] = [
   { id: '00000000-0000-4000-8000-000000000004', display_name: 'Meera Iyer', current_title: 'Strategy Manager', current_company: 'Swiggy', location_raw: 'Bengaluru', location_city: 'Bengaluru', location_region: 'Karnataka', location_country_code: 'IN', experience_years: 7, education: [{ school: 'ISB' }], reachable: false },
 ]
 const decided = new Map<string, 'yes' | 'no'>()
+let spent = 0
+// A pretend market: everyone at the bet's companies, served 3 at a time at 0.03 credits each.
+const fetched = new Map<string, string[]>()
 const mockClient: BetSampleClient = {
   async sample({ bet, criteria, skip }) {
-    await new Promise((r) => setTimeout(r, 250))
+    await new Promise((r) => setTimeout(r, 400))
     const emp = criteria.find((c) => c.kind.startsWith('employer_'))
-    const at = PEOPLE.filter((p) => emp?.values.some((v) => hasWords(p.current_company, v)))
+    const market = PEOPLE.filter((p) => emp?.values.some((v) => hasWords(p.current_company, v)))
     const mine = Array.from(decided.entries()).filter(([k]) => k.startsWith(`${bet}:`))
-    const fresh = at.filter((p) => !decided.has(`${bet}:${p.id}`) && !skip.includes(p.id))
     const tally = { yes: mine.filter(([, d]) => d === 'yes').length, no: mine.filter(([, d]) => d === 'no').length }
-    if (!at.length) return { person: null, checks: [], remaining: 0, decided: tally, reason: 'none_at_companies' }
-    if (!fresh.length) return { person: null, checks: [], remaining: 0, decided: tally, reason: 'all_seen' }
-    const [best, ...rest] = rankBetSamples(fresh, criteria)
-    return { person: best.person, checks: best.checks, remaining: rest.length, decided: tally, reason: null }
+    const base = { decided: tally, total: market.length, cap: 5 }
+    if (!emp) return { ...base, person: null, checks: [], remaining: 0, total: null, spent, reason: 'no_companies' }
+    const key = `${bet}:${JSON.stringify(criteria.map((c) => [c.kind, c.values, c.min, c.max]))}`
+    const have = fetched.get(key) ?? []
+    const unseen = (ids: string[]) => ids.filter((id) => !decided.has(`${bet}:${id}`) && !skip.includes(id))
+    if (!unseen(have).length && have.length < market.length) {
+      const page = market.slice(have.length, have.length + 3).map((p) => p.id)
+      spent += page.length * 0.03
+      fetched.set(key, [...have, ...page])
+    }
+    const ids = unseen(fetched.get(key) ?? [])
+    if (!ids.length) return { ...base, person: null, checks: [], remaining: 0, spent, reason: market.length ? 'all_seen' : 'none' }
+    const [best, ...rest] = rankBetSamples(PEOPLE.filter((p) => ids.includes(p.id)), criteria)
+    return { ...base, person: best.person, checks: best.checks, remaining: rest.length, spent, reason: null }
   },
   async decide({ bet, profile_id, decision }) { decided.set(`${bet}:${profile_id}`, decision) },
-  async market() { await new Promise((r) => setTimeout(r, 600)); return { fetched: 0, creditsUsed: 0 } },
 }
 
 export function BetRowsPreview() {

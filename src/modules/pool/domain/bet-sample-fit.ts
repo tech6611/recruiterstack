@@ -213,8 +213,3 @@ export function rankBetSamples(people: BetSamplePerson[], criteria: SearchCriter
     .sort((a, b) => a.fails - b.fails || b.title - a.title || b.passes - a.passes || Number(!!b.person.reachable) - Number(!!a.person.reachable))
     .map((r) => ({ person: r.person, checks: r.checks, fails: r.fails, passes: r.passes }))
 }
-
-/** Company search terms for the pool query: letters, digits, spaces and & only. */
-export function companyQueryTerms(values: string[]): string[] {
-  return Array.from(new Set(values.map((v) => v.replace(/[^A-Za-z0-9&\s.-]/g, ' ').replace(/\s+/g, ' ').trim()).filter((v) => v.length >= 2))).slice(0, 40)
-}

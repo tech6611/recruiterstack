@@ -7,8 +7,14 @@ import { betBodySchema } from '../schema'
 
 const bodySchema = betBodySchema.extend({ skip: z.array(z.string().uuid()).max(500).default([]) })
 
-/** POST — the best Candidate Pool person for one bet (free: stored data only, no AI). */
-export const POST = withCapability('recruiting:view', async (req, orgId, supabase, { params }) => {
+export const maxDuration = 60 // one small Crustdata page + ingest + embed
+
+/**
+ * POST — the next sample person for one bet, fetched LIVE from Crustdata with exactly the
+ * bet's lines. Spends credits (a few people per page) only when the people already
+ * fetched for these lines are used up, and never past the job's daily cap.
+ */
+export const POST = withCapability('recruiting:edit', async (req, orgId, supabase, { params }) => {
   const body = await parseBody(req, bodySchema)
   if (body instanceof NextResponse) return body
   try {
