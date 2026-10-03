@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-04
+
+### Changed
+- **The candidates are on the Scoring tab too.** Under the Ideal Candidate Profile, Scoring now shows the Source tab's "Candidates for this role" section — search plan, Your candidates / Market results, Find new people and Rank candidates, 👍/👎, add to pipeline, enroll, unlock, what the pipeline is teaching you, experiments — so the profile and the people can be worked on in one place. The persona card is left out (the profile is right above). Re-approving the profile reloads the section against the new version; its "refine the profile" links scroll up the page. The Source tab is unchanged; both render the same component.
+
 ## 2026-10-03
 
 ### Fixed
