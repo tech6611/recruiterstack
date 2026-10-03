@@ -112,6 +112,10 @@ export interface RecruiterBrief {
     label: string
     companies: string[]
     role_types: string[]
+    /** The work this pool's people do, in a few words ("investment banking deal teams"). */
+    line_of_work?: string | null
+    /** Titles at these employers that share words with role_types but are another job. */
+    title_exclusions?: string[]
     priority?: number | null
     rationale?: string | null
     /** How this pool relates to the hiring company, when the recruiter can tell. */

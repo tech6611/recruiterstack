@@ -294,26 +294,26 @@ export function ladderFromIdealProfile(
     const bets = Array.from(new Set(betRows.map((c) => c.bet as number))).sort((x, y) => x - y).map((n) => {
       const rows = betRows.filter((c) => c.bet === n)
       const employer = rows.find((c) => c.kind.startsWith('employer_'))
+      const not = rows.find((c) => c.kind.startsWith('title_') && c.exclude)
       return {
         n,
         label: rows.find((c) => c.bet_label)?.bet_label ?? `Bet ${n}`,
         employer: employer ? { ...employer, label: null } : undefined,
-        titles: (() => { const t = rows.find((c) => c.kind.startsWith('title_')); return t ? { ...t, label: null } : roleTitles })(),
+        titles: (() => { const t = rows.find((c) => c.kind.startsWith('title_') && !c.exclude); return t ? { ...t, label: null } : roleTitles })(),
+        // The jobs at these employers that are not this bet ("Software Engineer" at a
+        // bank) — written per bet by the brief, so the right exclusions for any industry.
+        not: not ? { ...not, label: null } : undefined,
       }
     })
-    // "Currently at McKinsey" should mean currently CONSULTING there — an engineer at
-    // McKinsey matches the employer, not the bet. Current-employer lanes only.
-    const consultingOnly = (b: (typeof bets)[number], id: string): SearchCriterion | undefined =>
-      b.employer?.kind === 'employer_current' && poolKind({ label: b.label, companies: b.employer.values }) === 'consulting'
-        ? { id, kind: 'function', values: ['Consulting'], label: null }
-        : undefined
+    // A bet's exclusions apply where its people are searched at their CURRENT employer.
+    const notHere = (b: (typeof bets)[number]) => (b.employer?.kind === 'employer_current' ? b.not : undefined)
 
     // Bet 1: one line per FIRM (a firm's names — "Boston Consulting Group", "BCG" — stay
     // together). The must-have ids are kept, so a person bought here is vendor-verified.
     const [first, ...rest] = bets
     if (first?.employer) {
       for (const g of groupEmployerAliases(first.employer.values)) {
-        level(`Ideal profile · ${g.display}`, keep(location, school, first.titles, { ...first.employer, values: g.members }, consultingOnly(first, `${first.employer.id}-fn`)), null, false, true)
+        level(`Ideal profile · ${g.display}`, keep(location, school, first.titles, { ...first.employer, values: g.members }, notHere(first)), null, false, true)
       }
     } else if (first) {
       level('Ideal profile', keep(location, school, first.titles), null, false, true)
@@ -322,7 +322,7 @@ export function ladderFromIdealProfile(
     // Each later bet, in order, with its own titles.
     for (const b of rest) {
       if (!b.employer) continue
-      level(`Bet ${b.n}: ${b.label}`, keep(location, school, b.titles, b.employer, consultingOnly(b, `${b.employer.id}-fn`)), `bet ${b.n - 1} → bet ${b.n}`)
+      level(`Bet ${b.n}: ${b.label}`, keep(location, school, b.titles, b.employer, notHere(b)), `bet ${b.n - 1} → bet ${b.n}`)
     }
 
     // Former employees of every bet, in the same order: the same persona who has moved on.

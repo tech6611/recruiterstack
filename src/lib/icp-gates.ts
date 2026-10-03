@@ -126,9 +126,9 @@ export function mustHaveFromCriterion(c: SearchCriterion, label?: string | null)
     // search lanes — "find these titles at these companies, tier-1 schools first, then
     // widen". They guide sourcing and ranking, not candidate eligibility. An exclusion
     // ("not a TPM") carries no relax_at, so it correctly stays a hard gate.
-    // A bet's own copy of a shared row (its own location, years…) steers that bet's
-    // search only; the shared row stays the job-wide gate.
-    enforcement: (isLaneKind(c.kind) && c.relax_at != null) || isBetOverride(c) ? 'sourcing_only' : 'hard',
+    // Every row of a bet (its companies, titles, exclusions, its own location or years)
+    // steers that bet's search only; the shared rows stay the job-wide gates.
+    enforcement: (isLaneKind(c.kind) && c.relax_at != null) || c.bet != null ? 'sourcing_only' : 'hard',
     ...(c.bet != null ? { bet: c.bet, bet_label: c.bet_label ?? null } : {}),
   }
 }
@@ -216,7 +216,7 @@ export function isSourcingOnlyCriterion(g: Pick<IcpMustHave, 'kind' | 'relax_at'
   // A relaxable employer OR positive-title row is a search lane, not a gate; an
   // exclusion (no relax_at) is not a lane and stays hard.
   const isLane = Boolean(g.kind && isLaneKind(g.kind))
-  return g.enforcement === 'sourcing_only' || isBetOverride(g) || (g.enforcement == null && isLane && g.relax_at != null)
+  return g.enforcement === 'sourcing_only' || g.bet != null || (g.enforcement == null && isLane && g.relax_at != null)
 }
 
 /**

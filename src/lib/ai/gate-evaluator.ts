@@ -17,7 +17,7 @@ import { CRITERION_KIND_LABEL } from '@/lib/types/search-spec'
 import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion, criterionLabel, mustHaveFromCriterion } from '@/lib/icp-gates'
 import { resolveLocationParts, slugifyPlace } from '@/modules/pool/domain/normalize'
 import { employerTerms, schoolTiers, pedigreeMatters, roleTerms } from '@/modules/pool/search/spec-from-brief'
-import { sortedPools, searchPassFor, specificTitles, isGenericTitleTerm, type Archetype } from '@/lib/bets'
+import { sortedPools, searchPassFor, isGenericTitleTerm, type Archetype } from '@/lib/bets'
 
 export { isGenericTitleTerm }
 
@@ -421,9 +421,12 @@ export function idealProfileFromBrief(
     const card = (opts.archetypes ?? []).find((a) => searchPassFor(a, brief as RecruiterBrief)?.pass === n)
     const bet = { bet: n, bet_label: (card?.name ?? p.label ?? `Bet ${n}`).slice(0, 120) }
     out.push(mustHaveFromCriterion({ id: `ip-bet-${n}-companies`, kind: 'employer_current', values: companies, relax_at: RELAX_AT.companies, ...bet }))
-    // Level words alone ("Analyst · Associate") at finance firms → the work they mean.
-    const betTitles = own.length ? specificTitles(own, { label: p.label ?? '', companies }) ?? own : titles
+    const betTitles = own.length ? own : titles
     if (betTitles.length) out.push(mustHaveFromCriterion({ id: `ip-bet-${n}-titles`, kind: titleKind, values: betTitles, relax_at: RELAX_AT.titles, ...bet }))
+    // The jobs at these employers the brief says to skip ("Software Engineer" at a bank) —
+    // this bet's own exclusions, searched in its levels only.
+    const not = Array.from(new Set((p.title_exclusions ?? []).flatMap(roleTerms)))
+    if (not.length) out.push(mustHaveFromCriterion({ id: `ip-bet-${n}-not`, kind: 'title_current', values: not, exclude: true, relax_at: RELAX_AT.titles, ...bet }))
   })
 
   return out

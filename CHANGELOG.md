@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-03
+
+### Changed
+- **Each bet's titles and exclusions come from the recruiter brain, not code.** The brief now writes, per feeder pool, titles as people at those companies put them on their profiles (never a bare level word — the prompt's own "Analyst/Associate" example, which taught it to write level words, is gone), a `line_of_work`, and `title_exclusions`: jobs at those companies that share words with the titles but are a different job. Exclusions become a "Not" line on the bet card (editable, searched in that bet's current-employer steps, never a job-wide reject — every bet row is now `sourcing_only`).
+- **A repair pass after every brief.** A pool still written as level words only gets one small Gemini Flash call to rewrite its titles and exclusions from the job and the bet; pools that are fine cost nothing; a failed call keeps the pool as written.
+- **"Suggest titles" on every bet card.** One Flash call writes the bet's titles and jobs to skip from the job, the bet's card and companies, and the titles real people at those companies hold in the Candidate Pool. Today's titles stay ticked; nothing changes until "Use these" (then approve). 5 tests.
+
+### Removed
+- **The hard-coded rules.** The finance title rule (Investment Banking / PE / VC qualifiers and the "Add these titles" strip), the fixed job-function word list in the sample check (replaced by each bet's own exclusions), and the McKinsey/Bain/BCG name check that added "function: Consulting" to the bet ladder (it was never sent to the market anyway). The company-type check survives only in the two older planners for profiles made before the ideal profile and bets.
+
+### Changed
+- **Sample people are fetched live from the market, with exactly the bet's lines.** Each bet's card on Scoring now runs its own Crustdata search built only from that bet's companies, titles, location, years, school and "only this bet" lines — BCG alone on the left means BCG people only on the right; adding EY-Parthenon makes the next search include it. It searches ~2 s after the last edit, 3 people a page (~0.09 credits), shows "N match in the market" and the job's spend, and remembers each set of lines with its results, so a reload or going back to lines already searched never pays twice. Each job may spend at most 5 credits on sample people in any 24 hours; past that the card says so and waits. The free Candidate Pool step and the "Find one in the market" button are gone. Fetched people still land in the Pool (👍/👎, profile panel and the Source tab all work for them). 8 tests.
+
+### Schema
+- **`156_bet_sample_searches.sql`** — `bet_sample_searches` (each bet's remembered searches: lines, people returned, next page, match count, credits) and `bet_sample_spend` (every paid fetch, for the daily cap). Apply by hand.
+
 ## 2026-09-29
 
 ### Fixed
