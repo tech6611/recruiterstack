@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ExperienceTimeline } from '@/components/candidates/ExperienceTimeline'
 import { EducationList, type EducationEntry } from '@/components/candidates/EducationList'
+import { tidyEducation } from '@/lib/education'
 import { SkillMap } from '@/components/candidates/SkillMap'
 import type { WorkRole } from '@/lib/ui/work-history'
 import type { CompanyFactsMap } from '@/lib/company-facts'
@@ -54,8 +55,10 @@ export interface ProfileDocumentProps {
   now?: Date
 }
 
-export function ProfileDocument({ experiences, education, skills, country, companies, now }: ProfileDocumentProps) {
+export function ProfileDocument({ experiences, education: rawEducation, skills, country, companies, now }: ProfileDocumentProps) {
   const [tab, setTab] = useState<Tab>('Overview')
+  // Vendors repeat and scramble education; one entry per qualification, newest first.
+  const education = useMemo(() => tidyEducation(rawEducation), [rawEducation])
 
   // Built in document order, then sliced — so a tab can never reorder the page.
   const sections = [
