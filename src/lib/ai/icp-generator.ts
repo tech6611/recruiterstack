@@ -22,6 +22,8 @@ import type { HiringRequest, ScoringCriterion } from '@/lib/types/database'
 import type { IcpCompetency, IcpDraftInput, IcpMustHave, RecruiterBrief, SourcingMap } from '@/lib/types/icp'
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
 import { idealProfileFromBrief, type IdealProfileMarket } from '@/lib/ai/gate-evaluator'
+import { onlyLevelWords, suggestBetTitles } from '@/lib/ai/bet-titles'
+import { roleTerms } from '@/modules/pool/search/spec-from-brief'
 
 const DEFAULT_RUBRIC_IDS = DEFAULT_SCORING_CRITERIA.map((c) => c.id).sort().join(',')
 
@@ -144,6 +146,8 @@ const recruiterBriefSchema = z.object({
     label: z.string(),
     companies: z.array(z.string()).default([]),
     role_types: z.array(z.string()).default([]),
+    line_of_work: z.string().nullish(),
+    title_exclusions: z.array(z.string()).max(20).optional(),
     priority: z.number().nullish(),
     rationale: z.string().nullish(),
     relationship: z.enum(['direct_competitor', 'similar_problem', 'adjacent_talent_market']).nullish(),
@@ -527,9 +531,9 @@ Work in this exact order, and let each step drive the next:
 0) recruiter_brief — BEFORE anything else, decide WHICH specialist recruiter you are for this search, given the role, the level, the hiring company and its industry/stage, and the market. Name the niche precisely (e.g. "Strategy & Operations / BizOps recruiter for scaling SaaS, Bengaluru", not "business recruiter") and write the brief you would hand a junior on your desk:
    - niche, persona: who you are and the 2–3 things you screen on first.
    - market: the hiring market as you understand it — city/country, on-site vs remote, whether relocation and visa-sponsored pools are realistic here.
-   - experience_band: the realistic years-of-experience FLOOR and CEILING for this seat, from the level, the budget, the team size and the JD. The ceiling is as real as the floor: a Bain partner with 12 years is NOT a candidate for a 2–6 year Strategy & Ops seat — they won't take it, won't stay, and are out of budget. Over-seniority is a mismatch, never a bonus. Give min_years, max_years and a one-line rationale. Your feeder_pools must then name role types INSIDE that band (Analyst/Associate, not Partner).
+   - experience_band: the realistic years-of-experience FLOOR and CEILING for this seat, from the level, the budget, the team size and the JD. The ceiling is as real as the floor: a Bain partner with 12 years is NOT a candidate for a 2–6 year Strategy & Ops seat — they won't take it, won't stay, and are out of budget. Over-seniority is a mismatch, never a bonus. Give min_years, max_years and a one-line rationale. Your feeder_pools must then name role types INSIDE that band (the junior and mid levels, not partners or heads).
    - target_schools: when education pedigree matters in this market, the SCHOOL LISTS you would actually search — tier1 (the institutions a first-pass filter accepts) and tier2 (where you look once tier1 is exhausted). Write each as the short literal name a person would type on a profile ("Indian Institute of Technology", "IIM Ahmedabad", "BITS Pilani", "University of Oxford"); a generic institution name covers all its campuses. Leave both empty when pedigree is not a real filter for this role.
-   - feeder_pools: first analyse the hiring company in <hiring_company>: its product, customer, business model, technical environment and stage — using only the supplied facts. Then name where you would search FIRST, in priority order (priority 1 = first), with a relationship for every pool. For a company with a clear product category, make the first pool its direct competitors or closest same-problem peers when you can identify them confidently; for example, an engineering role at Recruiter Stack should begin with recruiting-tech / talent-intelligence competitors and close peers, before generic SaaS employers. Next use similar_problem companies, then adjacent_talent_market companies. Each pool names REAL employers AND the role types you'd pull from them, local to this market, and its rationale must explain the shared customer, product problem, technical environment, or operating model. Do not invent competitors: when the company facts are too thin or your knowledge is uncertain, use a truthful category-level rationale and put the uncertainty in unsure_about. Target companies are SEARCH HYPOTHESES, never candidate must-haves or reasons to reject an otherwise strong person. Think like your niche: a strategy recruiter starts at top consulting, IB, VC/PE and in-house Strategy & Ops / BizOps / Chief of Staff teams; a GTM recruiter starts at quota carriers at comparable deal size and segment; an engineering recruiter at product companies solving comparable problems. Be concrete; name companies when justified. Name ENOUGH pools that you could keep widening the company set at the SAME title before you would ever compromise the title — typically 3–5 pools, ordered by priority and spanning direct_competitor → similar_problem → adjacent_talent_market — and set a relationship on EVERY pool. The first pool is the ideal; the later pools are where a recruiter goes next when the ideal is too thin.
+   - feeder_pools: first analyse the hiring company in <hiring_company>: its product, customer, business model, technical environment and stage — using only the supplied facts. Then name where you would search FIRST, in priority order (priority 1 = first), with a relationship for every pool. For a company with a clear product category, make the first pool its direct competitors or closest same-problem peers when you can identify them confidently; for example, an engineering role at Recruiter Stack should begin with recruiting-tech / talent-intelligence competitors and close peers, before generic SaaS employers. Next use similar_problem companies, then adjacent_talent_market companies. Each pool names REAL employers AND the role types you'd pull from them, local to this market — written as the titles people at THOSE employers put on their own profiles for the work you mean, with the line of work in the title, never a bare level word that fits anyone there ("Senior Analyst", "Associate", "Manager" alone would match the firm's engineers, assistants and accountants too). Give each pool a line_of_work (a few words: the work its people do) and title_exclusions (titles at those employers that share words with your role types but are a different job — the engineers, assistants or back-office staff a recruiter would skip there; empty when none apply). Its rationale must explain the shared customer, product problem, technical environment, or operating model. Do not invent competitors: when the company facts are too thin or your knowledge is uncertain, use a truthful category-level rationale and put the uncertainty in unsure_about. Target companies are SEARCH HYPOTHESES, never candidate must-haves or reasons to reject an otherwise strong person. Think like your niche: a strategy recruiter starts at top consulting, IB, VC/PE and in-house Strategy & Ops / BizOps / Chief of Staff teams; a GTM recruiter starts at quota carriers at comparable deal size and segment; an engineering recruiter at product companies solving comparable problems. Be concrete; name companies when justified. Name ENOUGH pools that you could keep widening the company set at the SAME title before you would ever compromise the title — typically 3–5 pools, ordered by priority and spanning direct_competitor → similar_problem → adjacent_talent_market — and set a relationship on EVERY pool. The first pool is the ideal; the later pools are where a recruiter goes next when the ideal is too thin.
    - title_families: the titles that are the SAME search as this role.
    - title_basis: "current" when the person must hold that role today (the default for an operating hire); "past" only when a prior role is deliberately the relevant evidence. Never use career history as a shortcut for a current-role search.
    - current_functions: the professional functions the person must work in TODAY for the strict first pass, using literal source categories where possible (for example "Engineering", "Sales", "Consulting"). Leave empty only if function is genuinely irrelevant.
@@ -566,7 +570,7 @@ Respond with ONLY valid JSON (no markdown), with the fields in this order:
     "niche": "", "persona": "", "market": "",
     "experience_band": { "min_years": 2, "max_years": 6, "rationale": "" },
     "target_schools": { "tier1": [""], "tier2": [""] },
-    "feeder_pools": [ { "label": "", "companies": [""], "role_types": [""], "priority": 1, "relationship": "direct_competitor", "rationale": "" } ],
+    "feeder_pools": [ { "label": "", "companies": [""], "role_types": [""], "line_of_work": "", "title_exclusions": [""], "priority": 1, "relationship": "direct_competitor", "rationale": "" } ],
     "title_families": [""], "title_basis": "current", "current_functions": [""], "current_title_exclusions": [""],
     "adjacent_titles": [""],
     "target": { "qualified_leads": 60, "rationale": "" },
@@ -653,10 +657,44 @@ export function sourcingMapFromReasoning(g: ReasoningFirstGeneration, recruiterC
  */
 export function draftFromReasoning(g: ReasoningFirstGeneration, market?: IdealProfileMarket | null): IcpDraftInput {
   // Not MAX_GATES: that caps the model's free-text gates. The ideal profile is built from
-  // the brief — up to four bets of two rows each beside the shared rows — and the save
-  // schema allows 20.
-  const must_haves = idealProfileFromBrief(g.recruiter_brief ?? null, market ?? null, { archetypes: g.archetypes }).slice(0, 20)
+  // the brief — up to four bets of three rows each beside the shared rows — and the save
+  // schema allows 40.
+  const must_haves = idealProfileFromBrief(g.recruiter_brief ?? null, market ?? null, { archetypes: g.archetypes }).slice(0, 40)
   return { must_haves, competencies: competenciesFromGeneration(g.competencies), source: 'intake' }
+}
+
+/**
+ * The brief's REPAIR PASS. A feeder pool whose titles are only level words ("Analyst ·
+ * Associate") cannot be searched — the market ignores bare level words, since they match
+ * a firm's engineers and assistants too. For each such pool, one small model call writes
+ * real titles (and exclusions) for that pool, from the job and the bet. A pool that is
+ * fine costs nothing; a failed call leaves the pool as it was.
+ */
+export async function repairLevelWordPools(g: ReasoningFirstGeneration, job: HiringRequest, identity: UsageIdentity = {}): Promise<ReasoningFirstGeneration> {
+  const brief = g.recruiter_brief
+  if (!brief?.feeder_pools?.length) return g
+  const pools = await Promise.all(brief.feeder_pools.map(async (p) => {
+    const titles = (p.role_types ?? []).flatMap(roleTerms)
+    if (!onlyLevelWords(titles)) return p
+    const card = (g.archetypes ?? []).find((a) => a.feeder_pool === p.label)
+    try {
+      const out = await suggestBetTitles({
+        role: { title: job.position_title, description: [job.key_requirements, job.team_context].filter(Boolean).join('\n'), niche: brief.niche, seniority: job.level ?? null },
+        bet: { label: card?.name ?? p.label, thesis: card?.thesis, where_from: card?.where_from, companies: p.companies, titles, exclusions: p.title_exclusions, line_of_work: p.line_of_work },
+      }, identity)
+      if (!out.titles.length) return p
+      return {
+        ...p,
+        role_types: out.titles.map((t) => t.title),
+        title_exclusions: p.title_exclusions?.length ? p.title_exclusions : out.exclusions.map((t) => t.title),
+        line_of_work: p.line_of_work ?? out.line_of_work ?? null,
+      }
+    } catch (err) {
+      logger.warn('ICP Generator: title repair failed, keeping the pool as written', { pool: p.label, error: err instanceof Error ? err.message : String(err) })
+      return p
+    }
+  }))
+  return { ...g, recruiter_brief: { ...brief, feeder_pools: pools } }
 }
 
 /**
@@ -681,8 +719,9 @@ export async function generateIcpWithReasoning(
       { label: 'ICP Generator (reasoning-first)' },
     )
     trackUsage('icp-generator', model, usage, identity)
-    const generation = parseAiJson(text, reasoningFirstSchema, 'ICP Generator (reasoning-first)')
-    if (!generation.competencies.length) throw new Error('no competencies generated')
+    const parsed = parseAiJson(text, reasoningFirstSchema, 'ICP Generator (reasoning-first)')
+    if (!parsed.competencies.length) throw new Error('no competencies generated')
+    const generation = await repairLevelWordPools(parsed, job, identity)
     return { draft: draftFromReasoning(generation, opts.roleContext?.market ?? null), sourcingMap: sourcingMapFromReasoning(generation, opts.recruiterCorrections) }
   } catch (err) {
     logger.warn('ICP Generator: reasoning-first generation failed, using deterministic seed', {
@@ -705,8 +744,9 @@ export async function generateChallengerIcpWithReasoning(
       { label: 'Sourcing Lab challenger' },
     )
     trackUsage('sourcing-lab-challenger', model, usage, identity)
-    const generation = parseAiJson(text, reasoningFirstSchema, 'Sourcing Lab challenger')
-    if (!generation.competencies.length) throw new Error('no competencies generated')
+    const parsed = parseAiJson(text, reasoningFirstSchema, 'Sourcing Lab challenger')
+    if (!parsed.competencies.length) throw new Error('no competencies generated')
+    const generation = await repairLevelWordPools(parsed, job, identity)
     return { draft: draftFromReasoning(generation, opts.roleContext?.market ?? null), sourcingMap: sourcingMapFromReasoning(generation, opts.recruiterCorrections) }
   } catch (err) {
     logger.warn('Sourcing Lab challenger failed, using deterministic seed', {

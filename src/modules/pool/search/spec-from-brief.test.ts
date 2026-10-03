@@ -365,7 +365,7 @@ describe('the bet ladder — each company group searched with its own titles', (
     feeder_pools: [
       { label: 'Top-Tier Consulting', companies: ['McKinsey & Company', 'Bain & Company', 'Boston Consulting Group (BCG)'], role_types: ['Business Analyst', 'Associate', 'Consultant'], priority: 1 },
       { label: 'Startup BizOps', companies: ['Udaan', 'Swiggy'], role_types: ['Strategy Manager'], priority: 2 },
-      { label: 'IB / VC', companies: ['Goldman Sachs'], role_types: ['Analyst', 'Associate'], priority: 3 },
+      { label: 'IB / VC', companies: ['Goldman Sachs'], role_types: ['Analyst', 'Associate'], title_exclusions: ['Software Engineer', 'Executive Assistant'], priority: 3 },
     ],
     jd_translations: [], market_norms: [], normal_red_flags: [], unsure_about: [],
   }
@@ -392,22 +392,22 @@ describe('the bet ladder — each company group searched with its own titles', (
   it('each bet is searched for ONLY its own titles', () => {
     expect(of('Ideal profile · McKinsey', 'title_current')?.values).toEqual(['Business Analyst', 'Associate', 'Consultant'])
     expect(of('Bet 2: The Scaled Startup BizOps Star', 'title_current')?.values).toEqual(['Strategy Manager'])
-    // Level words alone at finance firms → the work they mean (the bare words kept for the sample check).
-    expect(of('Bet 3: The IB/VC Analyst', 'title_current')?.values).toEqual([
-      'Investment Banking Analyst', 'Investment Banking Associate', 'Private Equity Analyst', 'Private Equity Associate',
-      'Venture Capital Analyst', 'Venture Capital Associate', 'Investment Analyst', 'Investment Associate', 'Analyst', 'Associate',
-    ])
+    expect(of('Bet 3: The IB/VC Analyst', 'title_current')?.values).toEqual(['Analyst', 'Associate'])
   })
-  it('the IB/VC bet\'s market search now carries a title (bare level words alone are not searchable)', () => {
+  it('a bet\'s own exclusions from the brief run in its current-employer lanes only', () => {
+    const not = (label: string) => at(label).find((c) => c.kind === 'title_current' && c.exclude)
+    expect(not('Bet 3: The IB/VC Analyst')?.values).toEqual(['Software Engineer', 'Executive Assistant'])
+    // A bet's exclusions steer its search; they never reject anyone job-wide.
+    expect(must_haves.find((g) => g.id === 'ip-bet-3-not')).toMatchObject({ exclude: true, enforcement: 'sourcing_only', bet: 3 })
+    expect(not('Ideal profile · McKinsey')).toBeUndefined()
+    expect(not('Formerly at: The IB/VC Analyst')).toBeUndefined()
+    expect(of('Bet 3: The IB/VC Analyst', 'title_current')?.exclude).toBeFalsy()
     const lane = compileSpec(s).lanes.find((l) => l.label === 'Bet 3: The IB/VC Analyst')!
-    const f = JSON.stringify(lane.filters)
-    expect(f).toContain('Investment Banking Associate')
-    expect(f).toContain('Venture Capital Analyst')
-    expect(f).not.toMatch(/"value":"Associate"/)
+    expect(JSON.stringify(lane.filters)).toContain('"type":"(!)","value":"Software Engineer"')
   })
-  it('a firm with two names is one line; consulting firms mean consulting', () => {
+  it('a firm with two names is one line; no company-name rule adds a function', () => {
     expect(of('Ideal profile · Boston Consulting Group (BCG)', 'employer_current')?.values).toEqual(['Boston Consulting Group', 'BCG'])
-    expect(of('Ideal profile · McKinsey', 'function')?.values).toEqual(['Consulting'])
+    expect(of('Ideal profile · McKinsey', 'function')).toBeUndefined()
     expect(of('Bet 2: The Scaled Startup BizOps Star', 'function')).toBeUndefined()
   })
   it('the profile rows ARE the search rows: edits on Scoring are what runs, and bought people are vendor-verified', () => {

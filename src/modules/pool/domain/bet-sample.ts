@@ -13,7 +13,8 @@ import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import type { SearchCriterion, SearchSpec } from '@/lib/types/search-spec'
-import { rankBetSamples, type BetSamplePerson, type BetCheck } from '@/modules/pool/domain/bet-sample-fit'
+import { rankBetSamples, hasWords, type BetSamplePerson, type BetCheck } from '@/modules/pool/domain/bet-sample-fit'
+import { groupEmployerAliases } from '@/lib/employer-aliases'
 import { compileSpec } from '@/modules/pool/vendors/crustdata/compile-spec'
 import { isPlanRunnable } from '@/modules/pool/vendors/crustdata/search-plan'
 import { searchPeople, crustdataConfigured, CrustdataConfigError, type CrustdataFilters } from '@/modules/pool/vendors/crustdata/client'
@@ -200,6 +201,26 @@ export function supabaseSampleStore(supabase: Supabase, orgId: string, jobId: st
       return (data ?? []) as BetSamplePerson[]
     },
   }
+}
+
+/**
+ * The titles real people at these companies hold today, most common first — evidence for
+ * the recruiter brain when it writes a bet's titles. Free: the Candidate Pool only.
+ */
+export async function observedTitlesAt(supabase: Supabase, companies: string[]): Promise<{ title: string; count: number }[]> {
+  const terms = Array.from(new Set(groupEmployerAliases(companies).flatMap((g) => g.members)
+    .map((v) => v.replace(/[^A-Za-z0-9&\s.-]/g, ' ').replace(/\s+/g, ' ').trim()).filter((v) => v.length >= 2))).slice(0, 40)
+  if (!terms.length) return []
+  const { data, error } = await (supabase as unknown as LooseSb).from('pool_profiles').select('current_title, current_company')
+    .or(terms.map((t) => `current_company.ilike.*${t}*`).join(',')).limit(1000)
+  if (error) throw error
+  const counts = new Map<string, number>()
+  for (const p of (data ?? []) as { current_title: string | null; current_company: string | null }[]) {
+    if (!p.current_title || !terms.some((t) => hasWords(p.current_company, t))) continue
+    const t = p.current_title.trim().replace(/\s+/g, ' ')
+    counts.set(t, (counts.get(t) ?? 0) + 1)
+  }
+  return Array.from(counts.entries()).map(([title, count]) => ({ title, count })).sort((a, b) => b.count - a.count).slice(0, 60)
 }
 
 /** One paid page from Crustdata for a bet's search, ingested into the pool and logged. */

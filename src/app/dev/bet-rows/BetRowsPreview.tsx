@@ -55,7 +55,7 @@ const mockClient: BetSampleClient = {
 export function BetRowsPreview() {
   const [gates, setGates] = useState<IcpMustHave[]>(() => START.map((c) => mustHaveFromCriterion(c)))
   const criteria = gates.filter(isCriterion).map((g) => toCriterion(g)!)
-  const change = (next: SearchCriterion) => setGates((gs) => gs.map((g) => (g.id === next.id ? mustHaveFromCriterion(next) : g)))
+  const change = (next: SearchCriterion) => setGates((gs) => gs.map((g) => (g.id === next.id ? mustHaveFromCriterion({ ...next, label: null }) : g)))
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -67,6 +67,16 @@ export function BetRowsPreview() {
           onChange={change}
           onRemoveBet={(ids) => setGates((gs) => gs.filter((g) => !ids.includes(g.id)))}
           options={OPTIONS}
+          onAddRow={(row) => setGates((gs) => [...gs.filter((g) => g.id !== row.id), mustHaveFromCriterion(row)])}
+          onSuggestTitles={async () => {
+            await new Promise((r) => setTimeout(r, 500))
+            return {
+              line_of_work: 'Pretend answer (dev preview — no AI call)',
+              observed: 2,
+              titles: [{ title: 'Investment Banking Analyst', why: 'what IB analysts call themselves there' }, { title: 'Private Equity Associate', why: 'PE deal teams' }],
+              exclusions: [{ title: 'Software Engineer', why: 'engineering, not deal work' }],
+            }
+          }}
           renderProfile={(n, label) => (
             <BetProfile
               bet={n}

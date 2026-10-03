@@ -428,6 +428,16 @@ export function IcpEditor({
                   bets={gates.filter((g) => isCriterion(g) && g.bet != null).map((g) => toCriterion(g)!)}
                   onChange={updateGate}
                   onRemoveBet={(ids) => setGates((prev) => prev.filter((g) => !ids.includes(g.id)))}
+                  onAddRow={(row) => setGates((prev) => [...prev.filter((g) => g.id !== row.id), mustHaveFromCriterion({ ...row, label: null })])}
+                  onSuggestTitles={async (n, label, rows) => {
+                    const res = await fetch(`/api/jobs/${jobId}/bets/suggest-titles`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ bet: n, bet_label: label, criteria: rows }),
+                    })
+                    const j = await res.json().catch(() => ({}))
+                    if (!res.ok) throw new Error(j.error ?? 'Could not suggest titles')
+                    return j.data
+                  }}
                   {...(organised ? {
                     renderProfile: (n: number, label: string) => (
                       <BetProfile

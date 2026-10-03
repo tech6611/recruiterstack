@@ -1,10 +1,11 @@
 'use client'
 
 import { Fragment, useState } from 'react'
+import { toast } from 'sonner'
 import { Briefcase, Rocket, Compass, Sparkles, ThumbsUp, ThumbsDown, TriangleAlert } from 'lucide-react'
 import { BrandIcon } from '@/components/ui/BrandIcon'
 import { CriterionEditor } from '@/components/req-jobs/IdealProfileTiles'
-import { companiesFor, searchPassFor, sortedPools, specificTitles, type Archetype } from '@/lib/bets'
+import { companiesFor, searchPassFor, sortedPools, type Archetype } from '@/lib/bets'
 import { groupEmployerAliases } from '@/lib/employer-aliases'
 import type { RecruiterBrief } from '@/lib/types/icp'
 import type { SearchCriterion } from '@/lib/types/search-spec'
@@ -31,7 +32,7 @@ const GOLD = { Icon: Sparkles, circle: 'bg-gold-500', card: 'from-gold-50 ring-g
  * profile not yet organised into bets the two lines come from the brief, read-only.
  */
 export function BetCards({
-  archetypes, brief, bets = [], onChange, onRemoveBet, options, renderProfile, renderCandidate,
+  archetypes, brief, bets = [], onChange, onRemoveBet, options, renderProfile, renderCandidate, onSuggestTitles, onAddRow,
 }: {
   archetypes: Archetype[]
   brief?: RecruiterBrief | null
@@ -47,6 +48,10 @@ export function BetCards({
    */
   renderProfile?: (bet: number, label: string) => React.ReactNode
   renderCandidate?: (bet: number, label: string) => React.ReactNode
+  /** Ask the recruiter brain for this bet's titles and exclusions (one AI call). */
+  onSuggestTitles?: (bet: number, label: string, rows: SearchCriterion[]) => Promise<SuggestedTitles>
+  /** Add a bet row the bet does not have yet (its exclusions). */
+  onAddRow?: (row: SearchCriterion) => void
 }) {
   const stacked = Boolean(renderProfile)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -80,7 +85,9 @@ export function BetCards({
         const look = a?.is_non_obvious ? GOLD : LOOKS[plain++ % LOOKS.length]
         const rows = n != null ? bets.filter((c) => c.bet === n) : []
         const at = rows.find((c) => c.kind.startsWith('employer_'))
-        const as = rows.find((c) => c.kind.startsWith('title_'))
+        const as = rows.find((c) => c.kind.startsWith('title_') && !c.exclude)
+        // The jobs at these employers that are not this bet — written per bet by the brief.
+        const not = rows.find((c) => c.kind.startsWith('title_') && c.exclude)
         // Not organised into bets yet: the same two lines, from the brief.
         const pool = !rows.length && n != null ? pools[n - 1] : undefined
         const briefLogos = a && !rows.length ? companiesFor(a, brief) : []
@@ -140,30 +147,35 @@ export function BetCards({
                 <Line c={as} onOpen={onChange && as ? () => setEditingId(as.id === editingId ? null : as.id) : undefined}>
                   <span className="text-slate-700">{(as?.values ?? briefTitles).join(' · ') || <span className="text-slate-400">the role&apos;s own titles</span>}</span>
                 </Line>
+                {not && (
+                  <>
+                    <span className="pt-0.5 font-semibold text-slate-400" title="Jobs at these companies that are not this bet — skipped in its search">Not</span>
+                    <Line c={not} onOpen={onChange ? () => setEditingId(not.id === editingId ? null : not.id) : undefined}>
+                      <span className="text-slate-500 line-through decoration-slate-300">{not.values.join(' · ')}</span>
+                    </Line>
+                  </>
+                )}
               </div>
             ) : a?.where_from ? (
               <p className="mt-2 line-clamp-1 text-[11px] text-slate-400" title={a.where_from}>From: {a.where_from}</p>
             ) : null}
 
-            {/* Only level words at finance firms: the market search skips them, so offer the work they mean. */}
-            {(() => {
-              const better = as && at && onChange ? specificTitles(as.values, { label, companies: at.values }) : null
-              if (!better) return null
-              const added = better.filter((t) => !as!.values.includes(t))
-              return (
-                <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-900 ring-1 ring-amber-100">
-                  &ldquo;{as!.values.join('” and “')}&rdquo; alone fit anyone at these firms, engineers included — the market
-                  search skips them. Add {added.slice(0, 3).join(', ')}{added.length > 3 ? ` +${added.length - 3} more` : ''}?
-                  <button
-                    type="button"
-                    onClick={() => onChange!({ ...as!, values: better })}
-                    className="ml-1.5 rounded-md bg-white px-1.5 py-0.5 font-medium text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
-                  >
-                    Add these titles
-                  </button>
-                </div>
-              )
-            })()}
+            {onSuggestTitles && onChange && n != null && at && (
+              <SuggestTitles
+                bet={n}
+                label={label}
+                rows={rows}
+                titlesRow={as}
+                notRow={not}
+                suggest={onSuggestTitles}
+                onApply={(titles, exclusions) => {
+                  if (as) onChange({ ...as, values: titles })
+                  else if (titles.length) onAddRow?.({ id: `ip-bet-${n}-titles`, kind: 'title_current', values: titles, relax_at: 3, bet: n, bet_label: label })
+                  if (not) onChange({ ...not, values: exclusions })
+                  else if (exclusions.length) onAddRow?.({ id: `ip-bet-${n}-not`, kind: 'title_current', values: exclusions, exclude: true, relax_at: 3, bet: n, bet_label: label })
+                }}
+              />
+            )}
 
             {editing && onChange && (
               <div className="mt-2 rounded-lg bg-white p-2 ring-1 ring-slate-200">
@@ -225,3 +237,99 @@ function Line({ c, onOpen, children }: { c?: SearchCriterion; onOpen?: () => voi
 }
 
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`
+
+export interface SuggestedTitles {
+  line_of_work?: string | null
+  titles: { title: string; why?: string | null }[]
+  exclusions: { title: string; why?: string | null }[]
+  /** How many pool people at the bet's companies the suggestion was grounded on. */
+  observed?: number
+}
+
+/**
+ * "Suggest titles": the recruiter brain writes this bet's titles and the jobs to skip at
+ * its companies, from the job, the bet and the titles real people there hold. Nothing
+ * changes until the recruiter picks what to keep and applies it (then approves).
+ */
+function SuggestTitles({ bet, label, rows, titlesRow, notRow, suggest, onApply }: {
+  bet: number
+  label: string
+  rows: SearchCriterion[]
+  titlesRow?: SearchCriterion
+  notRow?: SearchCriterion
+  suggest: (bet: number, label: string, rows: SearchCriterion[]) => Promise<SuggestedTitles>
+  onApply: (titles: string[], exclusions: string[]) => void
+}) {
+  const [state, setState] = useState<'idle' | 'loading' | 'open'>('idle')
+  const [result, setResult] = useState<SuggestedTitles | null>(null)
+  const [keepTitles, setKeepTitles] = useState<Set<string>>(new Set())
+  const [keepNot, setKeepNot] = useState<Set<string>>(new Set())
+  const current = titlesRow?.values ?? []
+  const currentNot = notRow?.values ?? []
+
+  async function run() {
+    setState('loading')
+    try {
+      const r = await suggest(bet, label, rows)
+      setResult(r)
+      // Everything suggested starts ticked; today's titles too, so nothing vanishes unasked.
+      setKeepTitles(new Set([...current, ...r.titles.map((t) => t.title)]))
+      setKeepNot(new Set([...currentNot, ...r.exclusions.map((t) => t.title)]))
+      setState('open')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not suggest titles')
+      setState('idle')
+    }
+  }
+
+  if (state !== 'open' || !result) {
+    return (
+      <button type="button" onClick={run} disabled={state === 'loading'}
+        className="mt-2 inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-800 disabled:opacity-60"
+        title="The recruiter brain writes this bet's titles and the jobs to skip at its companies, from the job and the titles real people there hold">
+        <Sparkles className="h-3 w-3" /> {state === 'loading' ? 'Thinking…' : 'Suggest titles'}
+      </button>
+    )
+  }
+
+  const list = (items: { title: string; why?: string | null; now?: boolean }[], keep: Set<string>, set: (s: Set<string>) => void) => (
+    <ul className="space-y-0.5">
+      {items.map((t) => (
+        <li key={t.title}>
+          <label className="flex items-start gap-1.5" title={t.why ?? undefined}>
+            <input type="checkbox" className="mt-0.5 h-3 w-3" checked={keep.has(t.title)}
+              onChange={(e) => { const n = new Set(keep); if (e.target.checked) n.add(t.title); else n.delete(t.title); set(n) }} />
+            <span className="text-slate-700">{t.title}</span>
+            {t.now ? <span className="text-slate-400">· today</span> : t.why ? <span className="line-clamp-1 text-slate-400">· {t.why}</span> : null}
+          </label>
+        </li>
+      ))}
+    </ul>
+  )
+  const merge = (now: string[], s: { title: string; why?: string | null }[]) =>
+    [...now.map((t) => ({ title: t, now: true })), ...s.filter((x) => !now.includes(x.title))]
+
+  return (
+    <div className="mt-2 rounded-lg bg-white p-2.5 text-[11px] ring-1 ring-slate-200">
+      <div className="mb-1.5 text-slate-500">
+        {result.line_of_work && <span className="font-medium text-slate-700">{result.line_of_work}. </span>}
+        {result.observed ? `Based on the job, this bet and the titles of ${result.observed} people at these companies in your pool.` : 'Based on the job and this bet (nobody at these companies in your pool yet).'}
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div>
+          <div className="mb-0.5 font-semibold text-slate-500">Search for</div>
+          {list(merge(current, result.titles), keepTitles, setKeepTitles)}
+        </div>
+        <div>
+          <div className="mb-0.5 font-semibold text-slate-500">Skip at these companies</div>
+          {list(merge(currentNot, result.exclusions), keepNot, setKeepNot)}
+        </div>
+      </div>
+      <div className="mt-2 flex justify-end gap-1.5">
+        <button type="button" onClick={() => setState('idle')} className="rounded-md px-2 py-0.5 text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50">Cancel</button>
+        <button type="button" onClick={() => { onApply(Array.from(keepTitles), Array.from(keepNot)); setState('idle') }}
+          className="rounded-md bg-slate-900 px-2 py-0.5 font-medium text-white hover:bg-slate-700">Use these</button>
+      </div>
+    </div>
+  )
+}

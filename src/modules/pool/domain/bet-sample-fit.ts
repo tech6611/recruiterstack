@@ -52,34 +52,6 @@ export function titleHas(title: string | null | undefined, value: string): boole
   return words.length > 0 && words.every((w) => hasWords(title, w))
 }
 
-/**
- * Words that put a title in a FUNCTION. A bet's titles are often level words ("Analyst",
- * "Associate") that fit anyone at the firm — "Software Engineer | Associate" at Goldman
- * Sachs holds "Associate", but is not the IB bet. A title in a function the bet's own
- * titles never name is a different job, whatever level word it shares.
- */
-const FUNCTION_WORDS: Record<string, string[]> = {
-  // Role nouns only: "Software" or "Engineering" alone also describe what a strategy or
-  // program job is ABOUT ("Program Manager, Engineering"; "Strategy, Software Business").
-  engineering: ['engineer', 'developer', 'sde', 'programmer', 'devops', 'sre', 'qa', 'tester', 'full stack', 'fullstack', 'frontend', 'front end', 'backend', 'back end', 'firmware'],
-  design: ['designer', 'ux', 'ui', 'graphic'],
-  sales: ['sales', 'account executive', 'sdr', 'bdr', 'inside sales'],
-  marketing: ['marketing', 'seo', 'brand', 'social media'],
-  people: ['recruiter', 'recruiting', 'recruitment', 'talent acquisition', 'hr', 'human resources', 'people partner', 'hrbp'],
-  support: ['customer support', 'customer success', 'support engineer', 'technical support', 'helpdesk', 'help desk'],
-  legal: ['legal', 'counsel', 'lawyer', 'attorney', 'paralegal', 'advocate'],
-  medical: ['nurse', 'doctor', 'physician', 'pharmacist', 'clinical'],
-  it: ['it support', 'system administrator', 'sysadmin', 'network administrator', 'it administrator'],
-  admin: ['executive assistant', 'administrative assistant', 'receptionist', 'office assistant'],
-}
-
-/** The functions a title names ("Software Engineer | Associate" → engineering). PURE. */
-export function titleFunctions(title: string | null | undefined): string[] {
-  // "Developer Ecosystem / Relations / Community" is a program's subject, not an engineer.
-  const t = String(title ?? '').replace(/\bdeveloper\s+(ecosystem|relations|community|experience|advocacy|marketing|platform|program|success)s?\b/gi, ' ')
-  return Object.entries(FUNCTION_WORDS).filter(([, words]) => words.some((w) => hasWords(t, w))).map(([f]) => f)
-}
-
 /** How well a title fits the bet's titles: 2 = a whole phrase in order, 1 = its words scattered, 0 = no. PURE. */
 export function titleStrength(title: string | null | undefined, values: string[]): 0 | 1 | 2 {
   if (values.some((v) => hasWords(title, v))) return 2
@@ -138,12 +110,8 @@ export function checkCriterion(c: SearchCriterion, p: BetSamplePerson): BetCheck
     case 'title_any': {
       if (!p.current_title) return { ...base, result: 'unknown', note: null }
       const hit = vals.some((v) => titleHas(p.current_title, v))
-      if (hit && !c.exclude) {
-        // Shares a word, but works in a function none of the bet's titles name.
-        const wanted = new Set(vals.flatMap(titleFunctions))
-        const other = titleFunctions(p.current_title).filter((f) => !wanted.has(f))
-        if (other.length) return { ...base, result: 'fail', note: `${p.current_title} — ${other[0]}, not this bet` }
-      }
+      // A bet's exclusions ("Software Engineer" at a bank) come from its brief, per job.
+      if (c.exclude && hit) return { ...base, result: 'fail', note: `${p.current_title} — not this bet` }
       return { ...base, result: flip(hit ? 'pass' : c.kind === 'title_current' ? 'fail' : 'unknown', c.exclude), note: p.current_title }
     }
     case 'location': {
