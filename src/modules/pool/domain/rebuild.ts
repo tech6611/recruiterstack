@@ -18,6 +18,7 @@
  * left untouched rather than nulled — see the `everClaimed` guard below. A disabled
  * source's claims still null their field; that is the kill switch and it must work.
  */
+import { tidyEducation } from '@/lib/education'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import { deriveMovability, type EnrichedExperience } from '@/lib/ai/candidate-enrichment'
@@ -156,7 +157,9 @@ export async function rebuildProfile(
   const currentTitle = asString(fused.current_title?.value)
   const currentCompany = asString(fused.current_company?.value)
   const skills = asStringArray(fused.skills?.value)
-  const education = Array.isArray(fused.education?.value) ? fused.education.value : []
+  // Vendors repeat and scramble it (one Crustdata person had XLRI twice, under two
+  // names, and the same school-board line twice): one entry per qualification, newest first.
+  const education = tidyEducation(Array.isArray(fused.education?.value) ? fused.education.value : [])
 
   // ── Dated history → movability. Only experiences from enabled sources count. ──
   const liveExps = ((exps ?? []) as (EnrichedExperience & { source_key: string })[]).filter(

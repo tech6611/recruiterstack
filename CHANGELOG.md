@@ -2,6 +2,9 @@
 
 ## 2026-10-03
 
+### Fixed
+- **Education was repeated and out of order.** Vendors send it as scraped: one Crustdata person had XLRI twice under two names ("XLRI Jamshedpur · MBA · 2023" and "XLRI - Xavier School of Management, Jamshedpur · Master of Business Administration"), BIT Mesra as both "Bachelor of Architecture" and "Undergraduate", the same CBSE line twice, in no order. `tidyEducation` (src/lib/education.ts) merges entries naming the same institution (one name's words inside the other's), the same level of qualification and no conflicting years — the fuller entry borrows what the other has — and orders newest first, undated last. Applied wherever a profile is shown (pool panel and candidate profile — fixes existing people at once, no data rewritten) and when a pool profile is built (new people are stored clean). In the Pool: 37 people had duplicates (64 entries merged), 37 more were only out of order. 6 tests.
+
 ### Changed
 - **Each bet's titles and exclusions come from the recruiter brain, not code.** The brief now writes, per feeder pool, titles as people at those companies put them on their profiles (never a bare level word — the prompt's own "Analyst/Associate" example, which taught it to write level words, is gone), a `line_of_work`, and `title_exclusions`: jobs at those companies that share words with the titles but are a different job. Exclusions become a "Not" line on the bet card (editable, searched in that bet's current-employer steps, never a job-wide reject — every bet row is now `sourcing_only`).
 - **A repair pass after every brief.** A pool still written as level words only gets one small Gemini Flash call to rewrite its titles and exclusions from the job and the bet; pools that are fine cost nothing; a failed call keeps the pool as written.
