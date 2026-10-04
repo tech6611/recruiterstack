@@ -1,25 +1,27 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Calendar, Wand2, Gift, ClipboardList, PhoneCall, Mail, ChevronDown, Sparkles, FileText, Activity } from 'lucide-react'
+import { Calendar, Wand2, Gift, ClipboardList, PhoneCall, Mail, ChevronDown, Sparkles, FileText, Activity, ScrollText } from 'lucide-react'
 import type { Candidate, CandidateTask, ApplicationEvent, Application, HiringRequest } from '@/lib/types/database'
 import { useCandidateProfile } from './CandidateProfileContext'
 import ActivitiesTab from './center/ActivitiesTab'
 import SummaryTab from './center/SummaryTab'
 import InterviewsTab from './center/InterviewsTab'
+import ResumeTab from './center/ResumeTab'
 
 type ApplicationWithAttribution = Application & {
   pipeline_stages: { name: string; color: string } | null
   hiring_requests: Pick<HiringRequest, 'id' | 'position_title' | 'department' | 'ticket_number'> | null
 }
 
-const CENTER_TABS = ['Summary', 'Activities & Progress'] as const
+const CENTER_TABS = ['Summary', 'Activities & Progress', 'Resume'] as const
 type CenterTab = typeof CENTER_TABS[number]
 
 // Small "infographic" icon paired with each tab pill.
 const TAB_ICON: Record<CenterTab, typeof FileText> = {
   'Summary': FileText,
   'Activities & Progress': Activity,
+  'Resume': ScrollText,
 }
 
 interface CenterPanelProps {
@@ -87,7 +89,7 @@ export default React.memo(function CenterPanel({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-r border-slate-200 bg-slate-50">
-      {/* Single control bar: the two tab pills + the Actions menu, all dark pills */}
+      {/* Single control bar: the three tab pills + the Actions menu, all dark pills */}
       <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-2">
         {/* Tab pills */}
         <div className="flex items-center gap-2">
@@ -158,6 +160,7 @@ export default React.memo(function CenterPanel({
             applications={filteredApps}
           />
         )}
+        {activeTab === 'Resume' && <ResumeTab candidate={candidate} />}
         {activeTab === 'Activities & Progress' && (
           <div className="divide-y divide-slate-200">
             {/* Activities: tasks, pipeline stats, attribution */}

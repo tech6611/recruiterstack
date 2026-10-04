@@ -7,6 +7,7 @@ import TagInput from './TagInput'
 import { CandidateHeader } from './CandidateHeader'
 import { isPoolPlaceholderEmail } from '@/lib/pool-email'
 import { useCandidateProfile } from './CandidateProfileContext'
+import { linkedinHref } from '@/lib/ui/profile-links'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -158,7 +159,7 @@ export default React.memo(function LeftPanel({
             ) : candidate.linkedin_url ? (
               <div className="flex items-center gap-1 flex-1 min-w-0 group">
                 <a
-                  href={candidate.linkedin_url}
+                  href={linkedinHref(candidate.linkedin_url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-emerald-600 hover:text-emerald-800 truncate flex-1"
