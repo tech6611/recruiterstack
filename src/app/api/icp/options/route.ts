@@ -84,6 +84,9 @@ export const GET = withCapability('recruiting:view', async (_req, orgId, supabas
       .map((x) => ({ name: (x.display_name ?? x.name_norm ?? '').trim(), n: x.employees ?? 0 }))
       .filter((x) => x.name.length > 1)
       .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name))
+      // Two rows can share a display name ("JPMorgan Chase" is stored under two
+      // spellings); the picker keys its rows by name, so each name appears once.
+      .filter((x, i, all) => all.findIndex((y) => y.name.toLowerCase() === x.name.toLowerCase()) === i)
       .slice(0, 400)
       .map((x) => x.name),
     // The canonical vocabulary, so an ICP's skills and a profile's Skill Map agree.

@@ -35,7 +35,7 @@ export function BriefGlance({
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2.5">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-600 text-white"><Compass className="h-4 w-4" /></span>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-900 text-white"><Compass className="h-4 w-4" /></span>
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-900">{brief?.niche || 'Recruiter brief'}</div>
           {persona && <div className="text-[11px] text-slate-500" title={brief?.persona}>{persona}</div>}
@@ -47,8 +47,8 @@ export function BriefGlance({
       </div>
 
       {thesis && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50/70 px-3 py-2 text-[13px] text-slate-800" title={reasoning ?? undefined}>
-          <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />{thesis}
+        <div className="mt-3 flex items-start gap-2 text-[13px] text-slate-700" title={reasoning ?? undefined}>
+          <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />{thesis}
         </div>
       )}
 
@@ -89,25 +89,20 @@ type Tone = 'must' | 'ask' | 'probe' | 'means' | 'plain'
 export interface GlanceFact { Icon: LucideIcon; label: string; short: string; full: string; tone: Tone }
 export interface GlanceGroup { title: string; Icon: LucideIcon; facts: GlanceFact[] }
 
-const TONES: Record<Tone, { chip: string; icon: string }> = {
-  must: { chip: 'bg-rose-50 text-rose-800 ring-rose-100', icon: 'bg-rose-500 text-white' },
-  ask: { chip: 'bg-amber-50 text-amber-900 ring-amber-200', icon: 'bg-amber-500 text-white' },
-  probe: { chip: 'bg-violet-50 text-violet-800 ring-violet-100', icon: 'bg-violet-500 text-white' },
-  means: { chip: 'bg-indigo-50 text-indigo-800 ring-indigo-100', icon: 'bg-indigo-500 text-white' },
-  plain: { chip: 'bg-slate-50 text-slate-700 ring-slate-200', icon: 'bg-slate-200 text-slate-600' },
-}
-
 const NORM_ICON: Record<NormKind, LucideIcon> = {
   pay: Wallet, notice: Hourglass, visa: Plane, relocation: Truck, titles: BadgeCheck, findability: Search, other: Info,
 }
 
+/**
+ * One brief line: no box, a thin rule, a grey icon — red only for a must-have, so the
+ * lines that reject someone are the ones that stand out.
+ */
 function Tile({ f }: { f: GlanceFact }) {
-  const t = TONES[f.tone]
   return (
-    <div title={f.full} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ring-1 ${t.chip}`}>
-      <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${t.icon}`}><f.Icon className="h-3 w-3" /></span>
+    <div title={f.full} className="flex items-center gap-2 border-l-2 border-slate-100 py-0.5 pl-2 text-slate-800">
+      <span className={`grid h-5 w-4 shrink-0 place-items-center ${f.tone === 'must' ? 'text-rose-500' : 'text-slate-400'}`}><f.Icon className="h-3 w-3" /></span>
       <span className="min-w-0">
-        <span className="block truncate text-[9px] font-semibold uppercase tracking-wide opacity-60">{f.label}</span>
+        <span className="block truncate text-[9px] font-semibold uppercase tracking-wide text-slate-400">{f.label}</span>
         <span className="block text-[12px] font-medium leading-tight">{f.short}</span>
       </span>
     </div>

@@ -8,16 +8,8 @@ import type { IcpCompetency } from '@/lib/types/icp'
  * The weighted competencies, compact: a ring of the weights beside one slim row each —
  * colour, name, behaviours (click to edit), and a −/+ weight. Pure props.
  */
-const COLORS = [
-  { dot: 'bg-indigo-500', hex: '#6366f1' },
-  { dot: 'bg-sky-500', hex: '#0ea5e9' },
-  { dot: 'bg-emerald-500', hex: '#10b981' },
-  { dot: 'bg-amber-500', hex: '#f59e0b' },
-  { dot: 'bg-rose-500', hex: '#f43f5e' },
-  { dot: 'bg-violet-500', hex: '#8b5cf6' },
-  { dot: 'bg-teal-500', hex: '#14b8a6' },
-]
-const color = (i: number) => COLORS[i % COLORS.length]
+/** Shades of grey, heaviest weight darkest. */
+const GREYS = ['#334155', '#64748b', '#94a3b8', '#cbd5e1', '#e2e8f0', '#f1f5f9', '#f8fafc']
 
 export function CompetencyWeights({
   comps, total, onName, onWeight, onRemove, onAdd, onBehaviour, onAddBehaviour, onRemoveBehaviour,
@@ -33,6 +25,7 @@ export function CompetencyWeights({
   onRemoveBehaviour: (i: number, bi: number) => void
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
+  const hex = colorsFor(comps)
   const ok = total === 100
 
   return (
@@ -51,12 +44,12 @@ export function CompetencyWeights({
       </div>
 
       <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-        <Ring comps={comps} total={total} />
+        <Ring comps={comps} total={total} hex={hex} />
         <div className="grid w-full gap-x-6 gap-y-1 md:grid-cols-2">
           {comps.map((c, i) => (
             <Fragment key={c.id}>
               <div className="group flex items-center gap-2 py-0.5">
-                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color(i).dot}`} />
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: hex[i] }} />
                 <input value={c.name} onChange={(e) => onName(i, e.target.value)} placeholder="Competency name"
                   className="min-w-0 flex-1 rounded bg-transparent px-1 text-[13px] text-slate-800 placeholder:text-slate-300 hover:bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-200" />
                 <button type="button" onClick={() => setOpenId(openId === c.id ? null : c.id)}
@@ -96,7 +89,7 @@ export function CompetencyWeights({
 }
 
 /** The weights as a ring, the total in the middle. Over 100%, slices shrink to fit. */
-function Ring({ comps, total }: { comps: IcpCompetency[]; total: number }) {
+function Ring({ comps, total, hex }: { comps: IcpCompetency[]; total: number; hex: string[] }) {
   const R = 34, C = 2 * Math.PI * R
   let offset = 0
   return (
@@ -105,7 +98,7 @@ function Ring({ comps, total }: { comps: IcpCompetency[]; total: number }) {
       {comps.map((c, i) => {
         const len = ((c.weight || 0) / Math.max(total, 100)) * C
         const el = (
-          <circle key={c.id} cx="44" cy="44" r={R} fill="none" stroke={color(i).hex} strokeWidth="10"
+          <circle key={c.id} cx="44" cy="44" r={R} fill="none" stroke={hex[i]} strokeWidth="10"
             strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset}>
             <title>{`${c.name || 'Unnamed'} · ${c.weight}%`}</title>
           </circle>
@@ -117,4 +110,12 @@ function Ring({ comps, total }: { comps: IcpCompetency[]; total: number }) {
         style={{ transformOrigin: '44px 44px' }}>{total}%</text>
     </svg>
   )
+}
+
+/** One grey per competency, by weight: the heaviest is the darkest. PURE. */
+function colorsFor(comps: IcpCompetency[]): string[] {
+  const rank = comps.map((c, i) => ({ i, w: c.weight || 0 })).sort((a, b) => b.w - a.w || a.i - b.i)
+  const out: string[] = []
+  rank.forEach(({ i }, r) => { out[i] = GREYS[Math.min(r, GREYS.length - 1)] })
+  return out
 }

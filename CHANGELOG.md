@@ -2,6 +2,12 @@
 
 ## 2026-10-04
 
+### Fixed
+- **Company picker showed one company over and over.** Typing "facebook" listed "JPMorgan Chase" six times: `company_facts` holds JPMorgan Chase under two spellings, the picker keys each row by its name, and the repeated name left stale rows behind as the list changed. The options endpoint now sends each company name once, and `SuggestInput` shows each value once whatever it is given.
+
+### Changed
+- **A plainer brief card.** The at-a-glance tiles lose their coloured boxes: a thin grey rule per line and a grey icon, red only for must-haves (the lines that reject someone). The thesis line and the brief's badge go grey too, and the scoring-weights ring and dots are shades of grey, the heaviest weight darkest. Chosen from three options on `/dev/source-overhaul`.
+
 ### Changed
 - **Candidate profile header: every profile has the same shape.** Title and location now always take the same two slots under the name — a missing one shows a faint "No title on file" / "Location not on file" instead of the rows below jumping up — and a wrapped title is balanced over two lines (no lone "2" from "Software Development Engineer 2"). The current company and school are centred on the same axis as everything above them, so a short name (Plivo) and a long one (MindTickle Interactive Media…) sit in the same place.
 - **The header's link row is the person's public profiles, in colour.** The grey email / phone / LinkedIn / résumé icons (all repeated in the contact list just below) are replaced by LinkedIn, GitHub, X and personal-site marks in brand colours, the way Juicebox opens a profile — reusing the pool panel's `SocialIcon` and `profileLinks`. New `GET /api/candidates/[id]/links` returns the candidate's LinkedIn plus, for anyone unlocked from the Candidate Pool, the pool's GitHub / website / LinkedIn (through this org's own `pool_unlocks` row; résumé PDFs, email and phone left out). Dev preview: `/dev/profile-header`.
