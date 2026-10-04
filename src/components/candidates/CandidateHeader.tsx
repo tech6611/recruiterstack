@@ -1,9 +1,11 @@
 'use client'
 
-import { ExternalLink, FileText, Linkedin, Mail, MapPin, Phone } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { MapPin } from 'lucide-react'
 import { BrandIcon } from '@/components/ui/BrandIcon'
 import { PersonAvatar } from '@/components/ui/PersonAvatar'
-import { isPoolPlaceholderEmail } from '@/lib/pool-email'
+import { SocialIcon } from '@/components/ui/SocialIcon'
+import { profileLinks } from '@/lib/ui/profile-links'
 import type { Candidate } from '@/lib/types/database'
 
 /**
@@ -17,11 +19,10 @@ import type { Candidate } from '@/lib/types/database'
  * `current_company` on the candidate row, and the most recent qualification in
  * `education`.
  *
- * WHAT WE SHOW FEWER OF THAN JUICEBOX, AND WHY. Their header carries a row of source
- * icons — LinkedIn, GitHub, X, personal site, about.me — because their profiles are
- * assembled from those sources. An ATS candidate arrives with a CV, so the honest set
- * is LinkedIn, résumé, email and phone. A link is rendered only when we hold it; a
- * greyed-out icon for something we do not have is noise pretending to be a feature.
+ * THE LINK ROW is Juicebox's too: the person's public profiles (LinkedIn, GitHub, X,
+ * personal site) in brand colours. Email, phone and résumé used to sit here as grey
+ * icons, but each was already in the contact list directly below — the row now says
+ * something the rest of the rail does not. A link is rendered only when we hold it.
  */
 
 /**
@@ -74,55 +75,63 @@ export function topSchool(
   return best.school ?? null
 }
 
-function LinkIcon({
-  href, label, icon: Icon, external = true,
-}: {
-  href: string
-  label: string
-  icon: typeof Mail
-  external?: boolean
-}) {
-  return (
-    <a
-      href={href}
-      title={label}
-      aria-label={label}
-      {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-      className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-    >
-      <Icon className="h-4 w-4" />
-    </a>
-  )
+/**
+ * Contact rows for the link row: the candidate's own LinkedIn straight away, then
+ * whatever else we know them by (GitHub, personal site, X) once the links route answers.
+ * A failed fetch leaves the LinkedIn-only row in place — never an error in the header.
+ */
+function useProfileContacts(candidate: Candidate) {
+  const own = candidate.linkedin_url ? [{ kind: 'linkedin', value: candidate.linkedin_url }] : []
+  const [fetched, setFetched] = useState<{ kind: string; value: string }[] | null>(null)
+
+  useEffect(() => {
+    let live = true
+    setFetched(null)
+    fetch(`/api/candidates/${candidate.id}/links`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { if (live && Array.isArray(j?.links)) setFetched(j.links) })
+      .catch(() => {})
+    return () => { live = false }
+    // A LinkedIn edit in the contact list re-fetches so the two never disagree.
+  }, [candidate.id, candidate.linkedin_url])
+
+  return fetched ?? own
 }
 
 export function CandidateHeader({ candidate }: { candidate: Candidate }) {
   const school = topSchool(candidate.education)
-  const hasEmail = candidate.email && !isPoolPlaceholderEmail(candidate.email)
+  const links = profileLinks(useProfileContacts(candidate))
 
   return (
     <div className="flex flex-col items-center text-center">
       <PersonAvatar name={candidate.name} src={candidate.avatar_url} size={64} className="mb-3" />
 
       <h1 className="text-lg font-bold leading-tight text-slate-900">{candidate.name}</h1>
-      {candidate.current_title && (
-        <p className="mt-0.5 text-sm leading-snug text-slate-500">{candidate.current_title}</p>
-      )}
-      {candidate.location && (
-        <p className="mt-1 inline-flex items-center gap-1 text-xs text-slate-400">
-          <MapPin className="h-3 w-3 shrink-0" />
-          <span className="truncate">{candidate.location}</span>
-        </p>
-      )}
 
-      {/* The two marks that place someone at a glance.
+      {/* Title and location always take the same two slots, so every profile has the
+          same shape: a missing value shows as a quiet placeholder rather than the rows
+          below jumping up. `text-balance` keeps a wrapped title in two even lines —
+          without it "Software Development Engineer 2" leaves the "2" alone on a line. */}
+      <p
+        className={`mt-1 line-clamp-2 text-balance text-sm leading-snug ${candidate.current_title ? 'text-slate-500' : 'italic text-slate-300'}`}
+        title={candidate.current_title ?? undefined}
+      >
+        {candidate.current_title || 'No title on file'}
+      </p>
+      <p className={`mt-1 flex max-w-full items-center justify-center gap-1 text-xs ${candidate.location ? 'text-slate-400' : 'italic text-slate-300'}`}>
+        <MapPin className="h-3 w-3 shrink-0" />
+        <span className="truncate">{candidate.location || 'Location not on file'}</span>
+      </p>
+
+      {/* The two marks that place someone at a glance — centred on the same axis as
+          everything above them, so a short name (Plivo) and a long one (MindTickle
+          Interactive Media…) sit in the same place.
 
           No chip, no border, no fill. Juicebox sets these as a mark followed by its
-          name, sitting on the page — and it is right: a frame around a logo is a second
-          box competing with whatever box the logo already is. An earlier version put
-          each in a bordered pill, which is what made Plivo look stuffed into a square
-          even after the icon itself stopped drawing its own tile. */}
+          name, sitting on the page — a frame around a logo is a second box competing
+          with whatever box the logo already is. */}
       {(candidate.current_company || school) && (
-        <div className="mt-2.5 flex w-full flex-col items-start gap-1.5 text-xs text-slate-600">
+        <div className="mt-2.5 flex w-full flex-col items-center gap-1.5 text-xs text-slate-600">
           {candidate.current_company && (
             <span className="flex min-w-0 max-w-full items-center gap-1.5" title={`Current company — ${candidate.current_company}`}>
               <BrandIcon name={candidate.current_company} size={16} />
@@ -138,20 +147,27 @@ export function CandidateHeader({ candidate }: { candidate: Candidate }) {
         </div>
       )}
 
-      {/* Only the links we actually hold. */}
-      <div className="mt-2 flex items-center justify-center gap-0.5">
-        {hasEmail && <LinkIcon href={`mailto:${candidate.email}`} label={candidate.email} icon={Mail} external={false} />}
-        {candidate.phone && <LinkIcon href={`tel:${candidate.phone}`} label={candidate.phone} icon={Phone} external={false} />}
-        {candidate.linkedin_url && <LinkIcon href={candidate.linkedin_url} label="LinkedIn profile" icon={Linkedin} />}
-        {candidate.resume_url && (
-          <LinkIcon href={`/api/candidates/${candidate.id}/resume`} label="Résumé" icon={FileText} />
-        )}
-        {!hasEmail && !candidate.phone && !candidate.linkedin_url && !candidate.resume_url && (
-          <span className="inline-flex items-center gap-1 py-1 text-[11px] text-slate-400">
-            <ExternalLink className="h-3 w-3" /> No contact details on file
-          </span>
-        )}
-      </div>
+      {/* Where else this person lives online — LinkedIn, GitHub, X, a personal site —
+          in their own colours, the way Juicebox opens a profile. Email, phone and the
+          résumé are not repeated here: the contact list below and the Resume tab
+          already carry them. Only links we hold; no row at all when there are none. */}
+      {links.length > 0 && (
+        <div className="mt-2.5 flex items-center justify-center gap-0.5">
+          {links.map(l => (
+            <a
+              key={l.network}
+              href={l.href}
+              title={l.label}
+              aria-label={l.label}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg p-1.5 transition-colors hover:bg-slate-100"
+            >
+              <SocialIcon network={l.network} />
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

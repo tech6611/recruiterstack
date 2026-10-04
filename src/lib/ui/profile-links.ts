@@ -47,6 +47,18 @@ function hostOf(value: string): string | null {
 }
 
 /**
+ * A LinkedIn value as a URL. Vendors hand some over as the bare profile slug
+ * ("jane-doe-1a2b") — read as a URL, that is a website called "jane-doe-1a2b" and a link
+ * to nowhere. A value with no dot is a slug; anything else is already a URL (or close
+ * enough that `classifyContact` will treat it as one).
+ */
+export function linkedinHref(value: string): string {
+  const v = value.trim()
+  if (v.includes('.')) return /^[a-z][a-z0-9+.-]*:/i.test(v) ? v : `https://${v}`
+  return `https://www.linkedin.com/in/${v.replace(/^\/+|\/+$/g, '')}`
+}
+
+/**
  * One contact row → a header link, or null when it is not something to link to.
  *
  * A value that is neither a URL nor a recognised kind is dropped rather than shown as a
@@ -64,8 +76,13 @@ export function classifyContact(kind: string | null | undefined, value: string |
     return { network: 'phone', label: v, href: `tel:${v.replace(/[^\d+]/g, '')}` }
   }
 
+  if (k === 'linkedin' && !v.includes('.')) {
+    return { network: 'linkedin', label: 'LinkedIn profile', href: linkedinHref(v) }
+  }
+
   const host = hostOf(v)
-  if (!host) return null
+  // A host with no dot ("localhost", a stray word) is not somewhere to send anyone.
+  if (!host || !host.includes('.')) return null
   const href = /^[a-z][a-z0-9+.-]*:/i.test(v) ? v : `https://${v}`
   const network = HOSTS.find(([re]) => re.test(host))?.[1] ?? 'website'
   const label =

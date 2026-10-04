@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyContact, profileLinks } from './profile-links'
+import { classifyContact, linkedinHref, profileLinks } from './profile-links'
 
 describe('classifyContact', () => {
   it('reads the host, not the stored kind', () => {
@@ -58,5 +58,24 @@ describe('profileLinks', () => {
   it('returns nothing for a locked profile', () => {
     expect(profileLinks([])).toEqual([])
     expect(profileLinks(null)).toEqual([])
+  })
+})
+
+describe('bare LinkedIn slugs', () => {
+  it('turns a vendor slug into the profile URL', () => {
+    expect(linkedinHref('siddhi-kasliwal')).toBe('https://www.linkedin.com/in/siddhi-kasliwal')
+    expect(linkedinHref('linkedin.com/in/a')).toBe('https://linkedin.com/in/a')
+    expect(linkedinHref('https://www.linkedin.com/in/a')).toBe('https://www.linkedin.com/in/a')
+  })
+
+  it('classifies a slug as LinkedIn, never as a website called the slug', () => {
+    const links = profileLinks([{ kind: 'linkedin', value: 'shyamd007' }])
+    expect(links).toEqual([
+      { network: 'linkedin', label: 'LinkedIn profile', href: 'https://www.linkedin.com/in/shyamd007' },
+    ])
+  })
+
+  it('drops a dotless value that is not a LinkedIn', () => {
+    expect(classifyContact('website', 'shyamd007')).toBeNull()
   })
 })
