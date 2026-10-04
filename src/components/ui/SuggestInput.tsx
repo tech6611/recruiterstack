@@ -52,12 +52,16 @@ export function SuggestInput({
 
   const matches = useMemo(() => {
     const q = value.trim().toLowerCase()
-    if (!q) return options.slice(0, 50)
+    // Each row is keyed by its text, so a repeated option would leave stale rows
+    // behind as the list changes — show every value once.
+    const seen = new Set<string>()
+    const unique = options.filter((o) => { const k = o.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
+    if (!q) return unique.slice(0, 50)
     // Values that START with what was typed first — typing "eng" should reach
     // "Engineering Manager" before "Software Engineering Manager".
     const starts: string[] = []
     const holds: string[] = []
-    for (const o of options) {
+    for (const o of unique) {
       const l = o.toLowerCase()
       if (l.startsWith(q)) starts.push(o)
       else if (l.includes(q)) holds.push(o)
