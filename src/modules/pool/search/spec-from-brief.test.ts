@@ -96,6 +96,7 @@ describe('specFromIcp', () => {
 
 // ── The ideal profile → ladder (docs/ideal-profile-plan.md) ──────────────────────
 import { ladderFromIdealProfile } from './spec-from-brief'
+import { moveBet } from '@/lib/icp-gates'
 import { idealProfileFromBrief as buildProfile, titleTerms } from '@/lib/ai/gate-evaluator'
 import { mustHaveFromCriterion } from '@/lib/icp-gates'
 
@@ -387,6 +388,16 @@ describe('the bet ladder — each company group searched with its own titles', (
       'Bet 2: The Scaled Startup BizOps Star', 'Bet 3: The IB/VC Analyst',
       'Formerly at: The Classic Post-Consulting Operator', 'Formerly at: The Scaled Startup BizOps Star', 'Formerly at: The IB/VC Analyst',
       'Tier-2 school · target companies', 'Wider location',
+    ])
+  })
+  it('follows the order the recruiter set with the arrows (bet 3 moved to the top)', () => {
+    const moved = moveBet(moveBet(must_haves, 3, -1), 3, -1)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = ladderFromIdealProfile({ ...icp, must_haves: moved } as any, { roleContext: { market: bengaluru } as any })!
+    expect(r.levels.map((l) => l.label).slice(0, 4)).toEqual([
+      'Ideal profile · Goldman Sachs',
+      'Bet 2: The Classic Post-Consulting Operator', 'Bet 3: The Scaled Startup BizOps Star',
+      'Formerly at: The IB/VC Analyst',
     ])
   })
   it('each bet is searched for ONLY its own titles', () => {

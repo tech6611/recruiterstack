@@ -19,7 +19,7 @@ import { logger } from '@/lib/logger'
 import { deriveIcpSeed } from '@/lib/ai/icp-seed'
 import { DEFAULT_SCORING_CRITERIA } from '@/lib/scoring'
 import type { HiringRequest, ScoringCriterion } from '@/lib/types/database'
-import type { IcpCompetency, IcpDraftInput, IcpMustHave, RecruiterBrief, SourcingMap } from '@/lib/types/icp'
+import { NORM_KINDS, type IcpCompetency, type IcpDraftInput, type IcpMustHave, type RecruiterBrief, type SourcingMap } from '@/lib/types/icp'
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
 import { idealProfileFromBrief, type IdealProfileMarket } from '@/lib/ai/gate-evaluator'
 import { onlyLevelWords, suggestBetTitles } from '@/lib/ai/bet-titles'
@@ -135,7 +135,9 @@ export type IcpGeneration = z.infer<typeof icpGenerationSchema>
 const recruiterBriefSchema = z.object({
   niche: z.string().default(''),
   persona: z.string().default(''),
+  persona_short: z.string().nullish(),
   market: z.string().nullish(),
+  market_short: z.string().nullish(),
   experience_band: z.object({
     min_years: z.number().nullish(),
     max_years: z.number().nullish(),
@@ -159,18 +161,28 @@ const recruiterBriefSchema = z.object({
   education: z.object({ degrees: z.array(z.string()).max(10).default([]), fields: z.array(z.string()).max(10).default([]), rationale: z.string().nullish() }).nullish(),
   adjacent_titles: z.array(z.string()).max(20).optional(),
   target: z.object({ qualified_leads: z.number().nullish(), rationale: z.string().nullish() }).nullish(),
-  market_gates: z.array(z.object({ requirement: z.string(), why: z.string().nullish() })).max(12).default([]),
-  jd_translations: z.array(z.object({ phrase: z.string(), means_here: z.string() })).max(12).default([]),
-  market_norms: z.array(z.object({ topic: z.string(), norm: z.string() })).max(12).default([]),
+  market_gates: z.array(z.object({ requirement: z.string(), why: z.string().nullish(), short: z.string().nullish() })).max(12).default([]),
+  jd_translations: z.array(z.object({ phrase: z.string(), means_here: z.string(), short: z.string().nullish() })).max(12).default([]),
+  market_norms: z.array(z.object({
+    topic: z.string(),
+    norm: z.string(),
+    short: z.string().nullish(),
+    // An unknown kind is not worth failing the brief over — it just gets the plain icon.
+    kind: z.enum(NORM_KINDS).nullish().catch(null),
+  })).max(12).default([]),
   normal_red_flags: z.array(z.string()).max(10).default([]),
+  normal_red_flags_short: z.array(z.string()).max(10).optional(),
   unsure_about: z.array(z.string()).max(10).default([]),
+  unsure_about_short: z.array(z.string()).max(10).optional(),
 })
 
 const reasoningFirstSchema = z.object({
   recruiter_brief: recruiterBriefSchema.nullish(),
   reasoning: z.string().default(''),
+  reasoning_short: z.string().nullish(),
   requirement_decomposition: z.array(z.object({
     requirement: z.string(),
+    short: z.string().nullish(),
     bucket: z.enum(['hard_filter', 'ranking_signal', 'screen_later']),
     findable_proxy: z.string().nullish(),
     notes: z.string().nullish(),
@@ -546,15 +558,16 @@ Work in this exact order, and let each step drive the next:
    - market_norms: compensation sanity vs the budget given for this level in this city, notice periods, work authorisation/visa, relocation realism, title inflation, and where these candidates are actually findable.
    - normal_red_flags: patterns that look bad elsewhere but are NORMAL in this niche (do not penalise them later).
    - unsure_about: where you would want a human to check your assumptions.
+   - SHORT TAGS, for the at-a-glance view: beside the long text, write a 2–5 word tag a recruiter can read in one glance — persona_short, market_short (e.g. "Bengaluru · on-site"), a short on every market_gates / jd_translations / market_norms entry (e.g. "SQL / Python / R", "IIT · IIM · ISB", "Lean cash + ESOP", "2–3 months"), and normal_red_flags_short / unsure_about_short as lists in the SAME order as their long lists. Each tag says the same thing as its long text, compressed; never new information, no full sentences. Give every market_norms entry a kind: one of ${NORM_KINDS.map((k) => `"${k}"`).join(', ')}.
    Everything after this step MUST be reasoned in that persona, from this brief.
 
-1) reasoning — 4–6 sentences, opinionated and specific to THIS role: what the job REALLY is beneath the JD, the 2–3 things that most predict success, and therefore where the scoring weight should concentrate. This is your recruiter's brief and it must justify the weights you choose in step 5.
+1) reasoning — 4–6 sentences, opinionated and specific to THIS role: what the job REALLY is beneath the JD, the 2–3 things that most predict success, and therefore where the scoring weight should concentrate. This is your recruiter's brief and it must justify the weights you choose in step 5. Also write reasoning_short: the same thesis in ONE line of at most ~15 words.
 
 2) requirement_decomposition — resolve each real requirement into exactly one bucket:
    - "hard_filter": verifiable from a profile AND genuinely disqualifying if absent
    - "ranking_signal": verifiable, correlates with quality, but not disqualifying
    - "screen_later": not verifiable from a profile ("self-starter") → a screening question, not a filter
-   Give a findable_proxy (what you'd actually look for) where relevant, using the jd_translations from your brief.
+   Give a findable_proxy (what you'd actually look for) where relevant, using the jd_translations from your brief. Give every screen_later entry a short: a 2–5 word tag ("Breaks problems down").
 
 3) unwritten_filters — the things that will actually drive rejection but appear NOWHERE in the JD (background type, scale/complexity, stage/environment fit, span of management — whatever YOUR niche actually filters on). Mark inferred_from, a confidence 0–1, its exclusion_cost (which good candidates it would wrongly exclude), and recommend_apply.
 
@@ -567,7 +580,7 @@ Work in this exact order, and let each step drive the next:
 Respond with ONLY valid JSON (no markdown), with the fields in this order:
 {
   "recruiter_brief": {
-    "niche": "", "persona": "", "market": "",
+    "niche": "", "persona": "", "persona_short": "", "market": "", "market_short": "",
     "experience_band": { "min_years": 2, "max_years": 6, "rationale": "" },
     "target_schools": { "tier1": [""], "tier2": [""] },
     "feeder_pools": [ { "label": "", "companies": [""], "role_types": [""], "line_of_work": "", "title_exclusions": [""], "priority": 1, "relationship": "direct_competitor", "rationale": "" } ],
@@ -575,14 +588,15 @@ Respond with ONLY valid JSON (no markdown), with the fields in this order:
     "adjacent_titles": [""],
     "target": { "qualified_leads": 60, "rationale": "" },
     "education": { "degrees": [""], "fields": [""], "rationale": "" },
-    "market_gates": [ { "requirement": "", "why": "" } ],
-    "jd_translations": [ { "phrase": "", "means_here": "" } ],
-    "market_norms": [ { "topic": "", "norm": "" } ],
-    "normal_red_flags": [""],
-    "unsure_about": [""]
+    "market_gates": [ { "requirement": "", "why": "", "short": "" } ],
+    "jd_translations": [ { "phrase": "", "means_here": "", "short": "" } ],
+    "market_norms": [ { "topic": "", "norm": "", "short": "", "kind": "pay" } ],
+    "normal_red_flags": [""], "normal_red_flags_short": [""],
+    "unsure_about": [""], "unsure_about_short": [""]
   },
   "reasoning": "...",
-  "requirement_decomposition": [ { "requirement": "", "bucket": "hard_filter", "findable_proxy": "", "notes": "" } ],
+  "reasoning_short": "",
+  "requirement_decomposition": [ { "requirement": "", "short": "", "bucket": "hard_filter", "findable_proxy": "", "notes": "" } ],
   "unwritten_filters": [ { "filter": "", "type": "", "inferred_from": "", "confidence": 0.7, "exclusion_cost": "", "recommend_apply": true } ],
   "archetypes": [ { "name": "", "thesis": "", "where_from": "", "feeder_pool": "", "why_interested": "", "why_no": "", "is_non_obvious": false, "hire_risk": "" } ],
   "competencies": [ { "name": "", "weight": 30, "behaviours": ["..."], "anchors": { "1": "", "2": "", "3": "", "4": "" }, "verbatim": "" } ],
@@ -642,6 +656,7 @@ export function sourcingMapFromReasoning(g: ReasoningFirstGeneration, recruiterC
   return {
     recruiter_brief: brief,
     reasoning: g.reasoning,
+    reasoning_short: g.reasoning_short ?? null,
     requirement_decomposition: g.requirement_decomposition,
     unwritten_filters: g.unwritten_filters,
     archetypes: g.archetypes,

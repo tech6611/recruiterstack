@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { experienceBandGate, experienceBandFromGate, yearsFloorFromLabel, isSourcingOnlyCriterion, mustHaveFromCriterion, criterionLabel } from './icp-gates'
+import { experienceBandGate, experienceBandFromGate, yearsFloorFromLabel, isSourcingOnlyCriterion, mustHaveFromCriterion, criterionLabel, moveBet, betsInOrder, toCriterion } from './icp-gates'
 import { icpDraftInputSchema } from '@/lib/validations/icp'
+import type { IcpMustHave } from '@/lib/types/icp'
 
 describe('experience band gate', () => {
   it('round-trips a [min, max] band through the structured gate', () => {
@@ -140,5 +141,33 @@ describe('bet overrides — one bet\'s own location / years / school', () => {
   it('a profile with overrides still saves (up to 40 rows)', () => {
     const many = Array.from({ length: 30 }, (_, i) => mustHaveFromCriterion({ id: `mh-${i}`, kind: 'skill', values: ['x'], relax_at: null }))
     expect(icpDraftInputSchema.safeParse({ must_haves: many, competencies: [] }).success).toBe(true)
+  })
+})
+
+describe('reordering bets', () => {
+  const row = (id: string, bet: number): IcpMustHave => ({ id, label: id, attribute: 'employer_current', operator: '', value: '', kind: 'employer_current', values: [id], bet, bet_label: `Bet ${bet}` })
+  const gates: IcpMustHave[] = [row('a', 1), row('a2', 1), row('b', 2), row('c', 3), { id: 'loc', label: 'loc', attribute: 'location', operator: '', value: '', kind: 'location', values: ['Bengaluru'] }]
+
+  it('starts in number order', () => {
+    expect(betsInOrder(gates)).toEqual([1, 2, 3])
+  })
+  it('moves a bet up and down without renumbering it', () => {
+    const up = moveBet(gates, 3, -1)
+    expect(betsInOrder(up)).toEqual([1, 3, 2])
+    // Identity is untouched — 👍/👎 and remembered searches are filed under it.
+    expect(up.find((g) => g.id === 'c')!.bet).toBe(3)
+    expect(up.filter((g) => g.bet === 1).map((g) => g.bet_order)).toEqual([1, 1])
+    expect(betsInOrder(moveBet(up, 1, 1))).toEqual([3, 1, 2])
+  })
+  it('does nothing at either end, and leaves shared rows alone', () => {
+    expect(moveBet(gates, 1, -1)).toBe(gates)
+    expect(moveBet(gates, 3, 1)).toBe(gates)
+    expect(moveBet(gates, 2, 1).find((g) => g.id === 'loc')).not.toHaveProperty('bet_order')
+  })
+  it('carries the position through the criterion view and back', () => {
+    const moved = moveBet(gates, 2, -1)
+    const c = toCriterion(moved.find((g) => g.id === 'b')!)!
+    expect(c.bet_order).toBe(1)
+    expect(mustHaveFromCriterion(c).bet_order).toBe(1)
   })
 })

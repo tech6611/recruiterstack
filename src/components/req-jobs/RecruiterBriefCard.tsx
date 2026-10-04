@@ -54,13 +54,13 @@ export function RecruiterBriefChips({ brief: b, compact }: { brief: RecruiterBri
   )
 }
 
-/** The brief's details + the corrections box. */
-export function RecruiterBriefBody({ brief: b, corrections, onCorrectionsChange, onSaveCorrections, saving }: {
+/** The brief's details, and the corrections box when its handlers are given. */
+export function RecruiterBriefBody({ brief: b, corrections = '', onCorrectionsChange, onSaveCorrections, saving = false }: {
   brief: RecruiterBrief | null
-  corrections: string
-  onCorrectionsChange: (v: string) => void
-  onSaveCorrections: () => void
-  saving: boolean
+  corrections?: string
+  onCorrectionsChange?: (v: string) => void
+  onSaveCorrections?: () => void
+  saving?: boolean
 }) {
   const pools = sortedPools(b)
   return (
@@ -94,14 +94,14 @@ export function RecruiterBriefBody({ brief: b, corrections, onCorrectionsChange,
         {(b?.unsure_about?.length ?? 0) > 0 && <div><span className="font-semibold text-amber-600">Check with HM · </span><span className="text-amber-800">{b!.unsure_about.join(' · ')}</span></div>}
       </div>
 
-      <div className="flex items-start gap-2">
+      {onCorrectionsChange && onSaveCorrections && <div className="flex items-start gap-2">
         <textarea value={corrections} onChange={(e) => onCorrectionsChange(e.target.value)} rows={2} maxLength={4000}
           placeholder="Correct this brief — companies to add or drop, what is really a gate here, market norms. Applied on the next Regenerate."
           className="flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none" />
         <Button size="sm" variant="outline" onClick={onSaveCorrections} disabled={saving || corrections === (b?.corrections ?? '')}>
           <Save className="h-3.5 w-3.5" />
         </Button>
-      </div>
+      </div>}
     </div>
   )
 }

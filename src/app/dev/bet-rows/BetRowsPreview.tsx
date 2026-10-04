@@ -27,7 +27,7 @@ const decided = new Map<string, 'yes' | 'no'>()
 let spent = 0
 // A pretend market: everyone at the bet's companies, served 3 at a time at 0.03 credits each.
 const fetched = new Map<string, string[]>()
-const mockClient: BetSampleClient = {
+export const mockClient: BetSampleClient = {
   async sample({ bet, criteria, skip }) {
     await new Promise((r) => setTimeout(r, 400))
     const emp = criteria.find((c) => c.kind.startsWith('employer_'))

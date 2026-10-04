@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Brain, ChevronDown, ChevronRight, Compass, Lock, MoveHorizontal } from 'lucide-react'
+import { Trash2, Save, Sparkles, ShieldCheck, CheckCircle2, Target, RefreshCw, Library, BookmarkPlus, Lock, MoveHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,10 +10,13 @@ import type { ScoringCriterion } from '@/lib/types/database'
 import type { Icp, IcpCompetency, IcpMustHave } from '@/lib/types/icp'
 import type { SearchCriterion } from '@/lib/types/search-spec'
 import { icpToScoringCriteria } from '@/lib/scoring'
-import { RecruiterBriefBody, RecruiterBriefChips } from '@/components/req-jobs/RecruiterBriefCard'
-import { isCriterion, toCriterion, mustHaveFromCriterion, criterionLabel, isBetOverride, betProfile, saveBetRow, removeBetRow } from '@/lib/icp-gates'
+import { BriefGlance } from '@/components/req-jobs/BriefGlance'
+import { BriefChat } from '@/components/req-jobs/BriefChat'
+import type { BriefChatMessage, BriefChatReply } from '@/lib/ai/brief-chat'
+import { CompetencyWeights } from '@/components/req-jobs/CompetencyWeights'
+import { isCriterion, toCriterion, mustHaveFromCriterion, criterionLabel, isBetOverride, betProfile, saveBetRow, removeBetRow, moveBet } from '@/lib/icp-gates'
 import { IdealProfileTiles, BetProfile } from '@/components/req-jobs/IdealProfileTiles'
-import { BetCards } from '@/components/req-jobs/BetCards'
+import { BetCards, BetsPanel, BetSplitRow } from '@/components/req-jobs/BetCards'
 import { BetSampleCard, liveBetSampleClient } from '@/components/req-jobs/BetSampleCard'
 
 
@@ -56,11 +59,8 @@ export function IcpEditor({
   // Component 04 — optional intake-call notes to enrich generation with verbatim.
   const [intakeNotes, setIntakeNotes] = useState('')
   const [showIntake, setShowIntake] = useState(false)
-  const [showReasoning, setShowReasoning] = useState(false)
-  // Phase 1 (niche recruiter) — the recruiter's corrections to the brief the model
-  // reasoned in (house knowledge fed into the next Regenerate).
-  const [openComps, setOpenComps] = useState<Set<string>>(new Set())
-  const [corrections, setCorrections] = useState('')
+  // Phase 1 (niche recruiter) — the recruiter's corrections to the brief, now written by
+  // talking to it (BriefChat); house knowledge fed into every Regenerate.
   const [savingCorrections, setSavingCorrections] = useState(false)
 
   function loadTemplates() {
@@ -94,28 +94,35 @@ export function IcpEditor({
     setIcp(next)
     setComps(next.competencies ?? [])
     setGates(next.must_haves ?? [])
-    setCorrections(next.sourcing_map?.recruiter_brief?.corrections ?? '')
   }
 
-  /** Save the recruiter's corrections to the brief. Allowed on any status — they are
-   *  house knowledge for the NEXT regenerate, not an edit to gates or weights. */
-  async function saveCorrections() {
-    if (!icp) return
+  /** One turn of the brief chat: what the AI understood + the notes rewritten. Saves nothing. */
+  async function askBrief(messages: BriefChatMessage[]): Promise<BriefChatReply> {
+    const res = await fetch(`/api/jobs/${jobId}/icp/brief-chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages }),
+    })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(j.error ?? 'Could not reach the AI')
+    return j.data as BriefChatReply
+  }
+
+  /** Save the chat's notes as the brief's corrections (allowed on any status — house
+   *  knowledge, not an edit to gates or weights), then rebuild the profile from them. */
+  async function applyBriefNotes(notes: string): Promise<boolean> {
+    if (!icp) return false
     setSavingCorrections(true)
     const res = await fetch(`/api/jobs/${jobId}/icp/${icp.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recruiter_corrections: corrections }),
+      body: JSON.stringify({ recruiter_corrections: notes }),
     })
     setSavingCorrections(false)
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
-      toast.error(j.error ?? 'Could not save corrections')
-      return
+      toast.error(j.error ?? 'Could not save your notes')
+      return false
     }
-    const { data } = await res.json()
-    setIcp(data as Icp)
-    toast.success('Corrections saved — they will shape the next Regenerate.')
+    return generate()
   }
 
   useEffect(() => {
@@ -187,7 +194,7 @@ export function IcpEditor({
     toast.success(`Saved "${name}" as a reusable role template.`)
   }
 
-  async function generate() {
+  async function generate(): Promise<boolean> {
     setGenerating(true)
     const res = await fetch(`/api/jobs/${jobId}/icp/generate`, {
       method: 'POST',
@@ -198,11 +205,12 @@ export function IcpEditor({
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
       toast.error(j.error ?? 'Could not generate an ICP')
-      return
+      return false
     }
     const { data } = await res.json()
     hydrate(data as Icp)
     toast.success('Draft ICP generated from this role — review and approve.')
+    return true
   }
 
   /** Persist the working copy as a draft; returns the saved ICP (or null). */
@@ -386,6 +394,8 @@ export function IcpEditor({
   // Organised into bets: each bet shows its own profile under its card, so the shared
   // rows are edited there and the single profile list below is not shown.
   const organised = gates.some((g) => isCriterion(g) && g.bet != null && !isBetOverride(g))
+  // How many bet cards show: one per archetype, or per bet when there are more bets.
+  const betCount = Math.max(new Set(gates.filter((g) => g.bet != null).map((g) => g.bet)).size, icp.sourcing_map?.archetypes?.length ?? 0)
 
   return (
     <Card>
@@ -403,131 +413,91 @@ export function IcpEditor({
         <CardDescription>Gates reject. Weights rank. Approving updates the scoring rubric on the Overview tab.</CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-6">
-        {/* ── How this profile was reasoned — the recruiter brief + the JD breakdown,
-            in one place (they used to be two panels, and the Source tab repeated them). ── */}
-        {icp.sourcing_map && (
-          <section className="rounded-xl border border-slate-200 bg-slate-50/60">
-            {/* Leads with the bets (who we think will fit); everything else is under Details. */}
-            <button type="button" onClick={() => setShowReasoning((s) => !s)}
-              className="flex w-full flex-wrap items-center gap-2 px-3 py-2.5 text-left text-xs">
-              <Brain className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
-              <span className="font-semibold text-slate-700">{(icp.sourcing_map.archetypes?.length ?? 0) > 0 || gates.some((g) => g.bet != null) ? 'Who we’re betting on' : 'How this profile was reasoned'}</span>
-              {icp.sourcing_map.recruiter_brief?.niche && <span className="text-slate-500">· {icp.sourcing_map.recruiter_brief.niche}</span>}
-              <RecruiterBriefChips brief={icp.sourcing_map.recruiter_brief ?? null} compact={false} />
-              <span className="ml-auto flex items-center gap-0.5 font-medium text-slate-500">
-                Details {showReasoning ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              </span>
-            </button>
-            {/* Shown whenever there are bets — a profile's bets live only in these cards. */}
-            {((icp.sourcing_map.archetypes?.length ?? 0) > 0 || gates.some((g) => g.bet != null)) && (
-              <div className="px-3 pb-3">
-                <BetCards
-                  archetypes={icp.sourcing_map.archetypes ?? []}
-                  brief={icp.sourcing_map.recruiter_brief}
-                  bets={gates.filter((g) => isCriterion(g) && g.bet != null).map((g) => toCriterion(g)!)}
-                  onChange={updateGate}
-                  onRemoveBet={(ids) => setGates((prev) => prev.filter((g) => !ids.includes(g.id)))}
-                  onAddRow={(row) => setGates((prev) => [...prev.filter((g) => g.id !== row.id), mustHaveFromCriterion({ ...row, label: null })])}
-                  onSuggestTitles={async (n, label, rows) => {
-                    const res = await fetch(`/api/jobs/${jobId}/bets/suggest-titles`, {
-                      method: 'POST', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ bet: n, bet_label: label, criteria: rows }),
-                    })
-                    const j = await res.json().catch(() => ({}))
-                    if (!res.ok) throw new Error(j.error ?? 'Could not suggest titles')
-                    return j.data
-                  }}
-                  {...(organised ? {
-                    renderProfile: (n: number, label: string) => (
-                      <BetProfile
-                        bet={n}
-                        criteria={betProfile(gates.filter(isCriterion).map((g) => toCriterion(g)!), n)}
-                        onSave={(next, all) => saveForBet(n, label, next, all)}
-                        onRemove={removeForBet}
-                      />
-                    ),
-                    renderCandidate: (n: number, label: string) => {
-                      const all = gates.filter(isCriterion).map((g) => toCriterion(g)!)
-                      return (
-                        <BetSampleCard
-                          client={sampleClient}
-                          bet={n}
-                          betLabel={label}
-                          icpId={icp.id}
-                          criteria={[...all.filter((c) => c.bet === n && !isBetOverride(c)), ...betProfile(all, n)]}
-                        />
-                      )
-                    },
-                  } : {})}
+      <CardContent className="space-y-4">
+        {/* ── Part 1: the recruiter brief at a glance, the scoring weights at its foot. ── */}
+        <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          {icp.sourcing_map && (
+            <BriefGlance
+              brief={icp.sourcing_map.recruiter_brief ?? null}
+              reasoning={icp.sourcing_map.reasoning}
+              reasoningShort={icp.sourcing_map.reasoning_short}
+              // ONLY the screen_later rows: /api/internal/screen-context turns these into
+              // what the AI screen probes. The other two buckets were never read by any
+              // route, query or scorer, so they are not shown as if they filtered.
+              probes={(icp.sourcing_map.requirement_decomposition ?? []).filter((r) => r.bucket === 'screen_later' && r.requirement)}
+              editor={(close) => (
+                <BriefChat
+                  notes={icp.sourcing_map?.recruiter_brief?.corrections ?? ''}
+                  ask={askBrief}
+                  onApply={applyBriefNotes}
+                  applying={savingCorrections || generating}
+                  onClose={close}
                 />
-              </div>
-            )}
-            {showReasoning && (
-              <div className="space-y-3 px-3 pb-3">
-                {(icp.sourcing_map.recruiter_brief || icp.status === 'draft') && (
-                  <div className="rounded-lg border border-slate-200 bg-white">
-                    <div className="flex items-center gap-1.5 px-3 pt-2.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                      <Compass className="h-3 w-3 text-indigo-600" /> Recruiter brief
-                    </div>
-                    <RecruiterBriefBody
-                      brief={icp.sourcing_map.recruiter_brief ?? null}
-                      corrections={corrections} onCorrectionsChange={setCorrections}
-                      onSaveCorrections={saveCorrections} saving={savingCorrections}
-                    />
-                  </div>
-                )}
-                {icp.sourcing_map.reasoning && (
-                  <p className="text-xs leading-relaxed text-slate-600">{icp.sourcing_map.reasoning}</p>
-                )}
+              )}
+            />
+          )}
+          <div className={icp.sourcing_map ? 'mt-4 border-t border-slate-100 pt-4' : ''}>
+            <CompetencyWeights
+              comps={comps}
+              total={total}
+              onName={(i, name) => setComp(i, { name })}
+              onWeight={setWeight}
+              onRemove={removeComp}
+              onAdd={addComp}
+              onBehaviour={setBehaviour}
+              onAddBehaviour={addBehaviour}
+              onRemoveBehaviour={removeBehaviour}
+            />
+          </div>
+        </section>
 
-                {/*
-                  ONLY THE screen_later ROWS. The generator sorts every requirement into
-                  hard_filter / ranking_signal / screen_later, and this panel used to show
-                  all three — the hard filters in red, next to a list of must-haves that
-                  actually filter. Nothing read either of those two buckets: no route, no
-                  query, no scorer. A red "HARD FILTER" badge on a line that filters nobody
-                  is a claim the product does not honour, so they are gone.
-
-                  screen_later stays because it is real: /api/internal/screen-context turns
-                  these into what the AI probes, which is why the heading now says so
-                  instead of calling them a breakdown.
-                */}
-                {(() => {
-                  const probes = (icp.sourcing_map.requirement_decomposition ?? [])
-                    .filter((r) => r.bucket === 'screen_later' && r.requirement)
-                  if (!probes.length) return null
+        {/* ── Part 2: the bets the brief gives birth to — each bet and the person it
+            finds in ONE card, all inside the Bets card. ── */}
+        {icp.sourcing_map && ((icp.sourcing_map.archetypes?.length ?? 0) > 0 || gates.some((g) => g.bet != null)) && (
+          <BetsPanel count={betCount}>
+            <BetCards
+              archetypes={icp.sourcing_map.archetypes ?? []}
+              brief={icp.sourcing_map.recruiter_brief}
+              bets={gates.filter((g) => isCriterion(g) && g.bet != null).map((g) => toCriterion(g)!)}
+              onChange={updateGate}
+              onRemoveBet={(ids) => setGates((prev) => prev.filter((g) => !ids.includes(g.id)))}
+              onAddRow={(row) => setGates((prev) => [...prev.filter((g) => g.id !== row.id), mustHaveFromCriterion({ ...row, label: null })])}
+              onSuggestTitles={async (n, label, rows) => {
+                const res = await fetch(`/api/jobs/${jobId}/bets/suggest-titles`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ bet: n, bet_label: label, criteria: rows }),
+                })
+                const j = await res.json().catch(() => ({}))
+                if (!res.ok) throw new Error(j.error ?? 'Could not suggest titles')
+                return j.data
+              }}
+              renderRow={(row) => <BetSplitRow row={row} />}
+              onMoveBet={(n, step) => setGates((prev) => moveBet(prev, n, step))}
+              {...(organised ? {
+                renderProfile: (n: number, label: string) => (
+                  <BetProfile
+                    bet={n}
+                    criteria={betProfile(gates.filter(isCriterion).map((g) => toCriterion(g)!), n)}
+                    onSave={(next, all) => saveForBet(n, label, next, all)}
+                    onRemove={removeForBet}
+                  />
+                ),
+                renderCandidate: (n: number, label: string) => {
+                  const all = gates.filter(isCriterion).map((g) => toCriterion(g)!)
                   return (
-                    <div>
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                        Asked in screening
-                      </div>
-                      <p className="mb-1.5 text-[11px] text-slate-400">
-                        Requirements no profile can prove. They become probes in the AI screen
-                        rather than filters.
-                      </p>
-                      <ul className="space-y-1">
-                        {probes.map((r, i) => (
-                          <li key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
-                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300" />
-                            <span>{r.requirement}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    <BetSampleCard
+                      bare
+                      client={sampleClient}
+                      bet={n}
+                      betLabel={label}
+                      icpId={icp.id}
+                      criteria={[...all.filter((c) => c.bet === n && !isBetOverride(c)), ...betProfile(all, n)]}
+                    />
                   )
-                })()}
-
-                {/* The inferred "unwritten filters" used to sit here, with a confidence
-                    percentage and an exclusion cost. They read as machinery and were
-                    not: nothing gated, ranked or screened on them anywhere in the
-                    chain. The generator still produces them and they are still on the
-                    ICP row, so wiring them up later costs nothing — they are simply no
-                    longer shown as if they were doing something. */}
-
-              </div>
-            )}
-          </section>
+                },
+              } : {})}
+            />
+          </BetsPanel>
         )}
 
         {/* ── Ideal profile (docs/ideal-profile-plan.md) ── */}
@@ -663,97 +633,6 @@ export function IcpEditor({
           })()}
         </section>
 
-        {/* ── Competencies ── */}
-        <section className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
-            <span>Weighted competencies</span>
-            <span className={total === 100 ? 'text-emerald-600' : 'text-amber-600'}>
-              Total: {total}%{total === 100 ? ' ✓' : ' — must equal 100%'}
-            </span>
-          </div>
-          <div className="space-y-2">
-            {comps.map((c, i) => (
-              <div key={c.id} className="rounded-xl border border-slate-200 p-3">
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={c.name}
-                    onChange={(e) => setComp(i, { name: e.target.value })}
-                    placeholder="Competency name"
-                    className="h-8 flex-1 text-sm font-medium"
-                  />
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setWeight(i, (c.weight || 0) - 5)}
-                      className="h-6 w-6 rounded font-bold text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                    >
-                      −
-                    </button>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={c.weight}
-                      onChange={(e) => setWeight(i, parseInt(e.target.value) || 0)}
-                      className={`h-8 w-12 rounded border text-center text-xs font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none ${
-                        total === 100 ? 'border-slate-200 text-slate-700' : 'border-amber-300 text-amber-600'
-                      }`}
-                    />
-                    <span className={`text-xs font-semibold ${total === 100 ? 'text-slate-500' : 'text-amber-600'}`}>%</span>
-                    <button
-                      type="button"
-                      onClick={() => setWeight(i, (c.weight || 0) + 5)}
-                      className="h-6 w-6 rounded font-bold text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <button type="button" onClick={() => removeComp(i)} className="text-slate-300 hover:text-red-500">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                {/* behaviours — folded by default; the weight row is what most people need */}
-                <button type="button" onClick={() => setOpenComps((prev) => { const n = new Set(prev); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n })}
-                  className="mt-1 ml-1 text-[11px] text-slate-400 hover:text-slate-600">
-                  {openComps.has(c.id) ? '▾' : '▸'} {c.behaviours.filter((b) => b.trim()).length} behaviours
-                </button>
-                {openComps.has(c.id) && (
-                <div className="mt-1 space-y-1.5 pl-1">
-                  {c.behaviours.map((b, bi) => (
-                    <div key={bi} className="flex items-center gap-2">
-                      <span className="text-slate-300">•</span>
-                      <Input
-                        value={b}
-                        onChange={(e) => setBehaviour(i, bi, e.target.value)}
-                        placeholder="An observable behaviour of a strong candidate"
-                        className="h-7 flex-1 text-xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeBehaviour(i, bi)}
-                        className="text-slate-300 hover:text-red-500"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => addBehaviour(i)}
-                    className="ml-4 text-xs font-medium text-slate-400 hover:text-slate-600"
-                  >
-                    + behaviour
-                  </button>
-                </div>
-                )}
-              </div>
-            ))}
-          </div>
-          <Button size="sm" variant="outline" onClick={addComp}>
-            <Plus className="h-3.5 w-3.5" /> Add competency
-          </Button>
-        </section>
       </CardContent>
 
       {/* Component 04 — optional intake notes to fold into a Regenerate. */}

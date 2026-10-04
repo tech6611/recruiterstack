@@ -70,6 +70,11 @@ export interface SearchCriterion {
   /** The bet's name, shown on the profile and on its search levels. */
   bet_label?: string | null
   /**
+   * The bet's place in the search order, set when the recruiter reorders the bets
+   * (absent = its number). `bet` stays the bet's identity.
+   */
+  bet_order?: number | null
+  /**
    * A bet's own version of a shared profile row, placed in that bet's search levels: the
    * id of the shared row it stands in for. The level searches this instead of the shared
    * row (even one on the base line), and a person it finds counts as meeting that row.

@@ -20,6 +20,7 @@ export const betCriterionSchema = z.object({
   relax_at: z.number().int().nullish(),
   bet: z.number().int().nullish(),
   bet_label: z.string().max(200).nullish(),
+  bet_order: z.number().int().nullish(),
 })
 
 export const betBodySchema = z.object({
