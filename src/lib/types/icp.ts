@@ -41,6 +41,8 @@ export interface IcpMustHave {
   /** The bet this row belongs to (see SearchCriterion.bet). */
   bet?: number | null
   bet_label?: string | null
+  /** The bet's place in the search order (see SearchCriterion.bet_order). */
+  bet_order?: number | null
 }
 
 /** The evaluator's answer for one structured must-have. */
@@ -87,13 +89,24 @@ export interface IcpChangelogEntry {
  * job and reused; `corrections` is the recruiter's own overrides, carried across
  * regenerations and fed back into the prompt as house knowledge.
  */
+/** What a market norm is about — picks its icon in the at-a-glance brief. */
+export const NORM_KINDS = ['pay', 'notice', 'visa', 'relocation', 'titles', 'findability', 'other'] as const
+export type NormKind = (typeof NORM_KINDS)[number]
+
+/**
+ * THE SHORT TAGS (`*_short`, `short`): a 2–5 word version of a long brief line, written
+ * by the AI beside it for the at-a-glance brief on Scoring. Optional — briefs from
+ * before they existed show a clipped long line instead.
+ */
 export interface RecruiterBrief {
   /** The precise niche, e.g. "Strategy & Operations / BizOps recruiter, Bengaluru". */
   niche: string
   /** 1–2 sentences: who this recruiter is and what they screen on first. */
   persona: string
+  persona_short?: string | null
   /** The hiring market as understood: city/country, work model, relocation/visa realism. */
   market?: string | null
+  market_short?: string | null
   /**
    * The realistic experience band for THIS role — floor AND ceiling. A Bain partner
    * with 12 years is not a candidate for a 2–6 year Strategy & Ops seat: over-seniority
@@ -138,15 +151,19 @@ export interface RecruiterBrief {
    *  should yield, and why. The yardstick for the adaptive planner's "too thin?" check (#3). */
   target?: { qualified_leads?: number | null; rationale?: string | null } | null
   /** Which requirements are TRUE gates in this market, and why. */
-  market_gates: { requirement: string; why?: string | null }[]
+  market_gates: { requirement: string; why?: string | null; short?: string | null }[]
   /** How JD phrases translate for this market ("2:1" → "tier-1 institute" in India). */
-  jd_translations: { phrase: string; means_here: string }[]
+  jd_translations: { phrase: string; means_here: string; short?: string | null }[]
   /** Comp sanity, notice periods, visa/relocation, title inflation, findability. */
-  market_norms: { topic: string; norm: string }[]
+  market_norms: { topic: string; norm: string; short?: string | null; kind?: NormKind | null }[]
   /** Patterns that look bad elsewhere but are normal in this niche — don't penalise. */
   normal_red_flags: string[]
+  /** Same order as normal_red_flags. */
+  normal_red_flags_short?: string[]
   /** Where the model wants a human to check its assumptions. */
   unsure_about: string[]
+  /** Same order as unsure_about. */
+  unsure_about_short?: string[]
   /** The recruiter's corrections to the brief — house knowledge that overrides defaults. */
   corrections?: string | null
 }
@@ -162,9 +179,12 @@ export interface SourcingMap {
   search_spec?: import('@/lib/types/search-spec').SearchSpec | null
   /** The "why this ICP" narrative — what the role really is and how it was weighted. */
   reasoning: string
+  /** The reasoning in one line, for the at-a-glance brief. */
+  reasoning_short?: string | null
   /** Every requirement resolved into one of three buckets. */
   requirement_decomposition: {
     requirement: string
+    short?: string | null
     bucket: 'hard_filter' | 'ranking_signal' | 'screen_later'
     findable_proxy?: string | null
     notes?: string | null

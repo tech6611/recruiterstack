@@ -34,6 +34,7 @@ export const icpMustHaveSchema = z.object({
   enforcement: z.enum(['hard', 'sourcing_only']).optional(),
   bet: z.number().int().min(1).max(10).nullable().optional(),
   bet_label: z.string().trim().max(120).nullable().optional(),
+  bet_order: z.number().int().min(1).max(10).nullable().optional(),
 })
 
 export const icpCompetencySchema = z.object({

@@ -65,7 +65,7 @@ export function isCriterion(g: Pick<IcpMustHave, 'kind'> | null | undefined): g 
 /** The criterion view of a structured must-have (null for a legacy gate). */
 export function toCriterion(g: IcpMustHave): SearchCriterion | null {
   if (!isCriterion(g)) return null
-  return { id: g.id, kind: g.kind, values: g.values ?? [], min: g.min ?? null, max: g.max ?? null, radius_km: g.radius_km ?? null, exclude: g.exclude ?? false, label: g.label, relax_at: g.relax_at ?? null, ...(g.bet != null ? { bet: g.bet, bet_label: g.bet_label ?? null } : {}) }
+  return { id: g.id, kind: g.kind, values: g.values ?? [], min: g.min ?? null, max: g.max ?? null, radius_km: g.radius_km ?? null, exclude: g.exclude ?? false, label: g.label, relax_at: g.relax_at ?? null, ...(g.bet != null ? { bet: g.bet, bet_label: g.bet_label ?? null, ...(g.bet_order != null ? { bet_order: g.bet_order } : {}) } : {}) }
 }
 
 /** Room for the list inside a label: labels are capped at 200 characters on save
@@ -129,8 +129,33 @@ export function mustHaveFromCriterion(c: SearchCriterion, label?: string | null)
     // Every row of a bet (its companies, titles, exclusions, its own location or years)
     // steers that bet's search only; the shared rows stay the job-wide gates.
     enforcement: (isLaneKind(c.kind) && c.relax_at != null) || c.bet != null ? 'sourcing_only' : 'hard',
-    ...(c.bet != null ? { bet: c.bet, bet_label: c.bet_label ?? null } : {}),
+    ...(c.bet != null ? { bet: c.bet, bet_label: c.bet_label ?? null, ...(c.bet_order != null ? { bet_order: c.bet_order } : {}) } : {}),
   }
+}
+
+/**
+ * Where bet `n` sits in the search order: the position the recruiter gave it (any of its
+ * rows carrying one), else its number. A bet's NUMBER is its identity — its 👍 / 👎 and
+ * remembered sample searches are filed under it — so reordering never renumbers. PURE.
+ */
+export function betPosition(rows: { bet?: number | null; bet_order?: number | null }[], n: number): number {
+  return rows.find((r) => r.bet === n && r.bet_order != null)?.bet_order ?? n
+}
+
+/** The bets' numbers, in search order. PURE. */
+export function betsInOrder(rows: { bet?: number | null; bet_order?: number | null }[]): number[] {
+  const ns = Array.from(new Set(rows.filter((r) => r.bet != null).map((r) => r.bet as number)))
+  return ns.sort((x, y) => betPosition(rows, x) - betPosition(rows, y) || x - y)
+}
+
+/** Move bet `n` one place up (-1) or down (+1) in the search order; every bet's rows get their new position. PURE. */
+export function moveBet(gates: IcpMustHave[], n: number, step: -1 | 1): IcpMustHave[] {
+  const order = betsInOrder(gates)
+  const i = order.indexOf(n)
+  const j = i + step
+  if (i < 0 || j < 0 || j >= order.length) return gates
+  ;[order[i], order[j]] = [order[j], order[i]]
+  return gates.map((g) => (g.bet != null ? { ...g, bet_order: order.indexOf(g.bet) + 1 } : g))
 }
 
 /**

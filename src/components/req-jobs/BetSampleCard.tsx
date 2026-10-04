@@ -39,7 +39,7 @@ export const liveBetSampleClient = (jobId: string): BetSampleClient => ({
  * day; the card says how many match and what has been spent.
  */
 export function BetSampleCard({
-  client, bet, betLabel, criteria, icpId,
+  client, bet, betLabel, criteria, icpId, bare,
 }: {
   client: BetSampleClient
   bet: number
@@ -47,6 +47,8 @@ export function BetSampleCard({
   /** The bet's companies + titles rows and its profile lines (unsaved edits included). */
   criteria: SearchCriterion[]
   icpId: string | null
+  /** No border of its own — it sits inside the bet's card. */
+  bare?: boolean
 }) {
   const [result, setResult] = useState<BetSampleResult | null>(null)
   const [loading, setLoading] = useState(true)
@@ -100,7 +102,7 @@ export function BetSampleCard({
 
   const p = result?.person ?? null
   const tally = result?.decided
-  const shell = 'flex flex-col rounded-xl border border-slate-200 bg-white p-3'
+  const shell = bare ? 'flex flex-col' : 'flex flex-col rounded-xl border border-slate-200 bg-white p-3'
 
   const meter = result && <Meter total={result.total} spent={result.spent} cap={result.cap} />
 

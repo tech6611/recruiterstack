@@ -15,7 +15,7 @@
 import type { Icp, RecruiterBrief } from '@/lib/types/icp'
 import type { SearchCriterion, SearchLevel, SearchSpec, PostFetchCheck } from '@/lib/types/search-spec'
 import type { JobRoleContext } from '@/modules/ats/domain/job-role-context'
-import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion, jobWideMustHaves, isBetOverride, overrideBaseId } from '@/lib/icp-gates'
+import { experienceBandFromGate, yearsFloorFromLabel, isCriterion, toCriterion, jobWideMustHaves, isBetOverride, overrideBaseId, betsInOrder } from '@/lib/icp-gates'
 import { titleTerms } from '@/lib/ai/gate-evaluator'
 import { groupEmployerAliases } from '@/lib/employer-aliases'
 import { poolKind } from '@/lib/bets'
@@ -291,12 +291,14 @@ export function ladderFromIdealProfile(
     const roleTitles: SearchCriterion | undefined = roleTitleTerms.length
       ? { id: 'ip-role-titles', kind: brief?.title_basis === 'past' ? 'title_any' : 'title_current', values: roleTitleTerms, label: null }
       : undefined
-    const bets = Array.from(new Set(betRows.map((c) => c.bet as number))).sort((x, y) => x - y).map((n) => {
+    // In the recruiter's order (the up/down arrows on Scoring), else by number.
+    const bets = betsInOrder(betRows).map((n, i) => {
       const rows = betRows.filter((c) => c.bet === n)
       const employer = rows.find((c) => c.kind.startsWith('employer_'))
       const not = rows.find((c) => c.kind.startsWith('title_') && c.exclude)
       return {
         n,
+        pos: i + 1,
         label: rows.find((c) => c.bet_label)?.bet_label ?? `Bet ${n}`,
         employer: employer ? { ...employer, label: null } : undefined,
         titles: (() => { const t = rows.find((c) => c.kind.startsWith('title_') && !c.exclude); return t ? { ...t, label: null } : roleTitles })(),
@@ -322,7 +324,7 @@ export function ladderFromIdealProfile(
     // Each later bet, in order, with its own titles.
     for (const b of rest) {
       if (!b.employer) continue
-      level(`Bet ${b.n}: ${b.label}`, keep(location, school, b.titles, b.employer, notHere(b)), `bet ${b.n - 1} → bet ${b.n}`)
+      level(`Bet ${b.pos}: ${b.label}`, keep(location, school, b.titles, b.employer, notHere(b)), `bet ${b.pos - 1} → bet ${b.pos}`)
     }
 
     // Former employees of every bet, in the same order: the same persona who has moved on.
