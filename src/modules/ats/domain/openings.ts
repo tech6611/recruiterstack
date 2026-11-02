@@ -120,6 +120,47 @@ export async function createOpening(
   return data as Opening
 }
 
+/** Job-step details captured up front (e.g. by the copilot form) before the
+ *  requisition is approved. Stored on `openings.custom_fields.job_draft` and used
+ *  as defaults when the job is created from this requisition. */
+export interface OpeningJobDraft {
+  level?:            string
+  job_description?:  string   // rich HTML
+  key_requirements?: string
+  nice_to_haves?:    string
+  headcount?:        number
+  remote_ok?:        boolean
+}
+
+export async function saveOpeningJobDraft(
+  supabase: Supabase,
+  orgId: string,
+  openingId: string,
+  draft: OpeningJobDraft,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('openings')
+    .select('custom_fields')
+    .eq('org_id', orgId)
+    .eq('id', openingId)
+    .maybeSingle()
+  if (error) throw error
+  const current = ((data as { custom_fields?: Record<string, unknown> } | null)?.custom_fields ?? {}) as Record<string, unknown>
+  const { error: upErr } = await supabase
+    .from('openings')
+    .update({ custom_fields: { ...current, job_draft: draft } } as never)
+    .eq('org_id', orgId)
+    .eq('id', openingId)
+  if (upErr) throw upErr
+}
+
+/** Read back the job draft saved on a requisition (empty when none). */
+export function openingJobDraft(opening: Pick<Opening, 'custom_fields'>): OpeningJobDraft {
+  const cf = (opening.custom_fields ?? {}) as Record<string, unknown>
+  const d = cf.job_draft
+  return d && typeof d === 'object' ? (d as OpeningJobDraft) : {}
+}
+
 /** Resolve a department by (case-insensitive) name within an org. Returns null
  *  when there is no match — the copilot tool surfaces the available names. */
 export async function findDepartmentByName(

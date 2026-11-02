@@ -1201,6 +1201,8 @@ export interface CreateCanonicalJobInput {
   title: string
   department_id?: string | null
   description?: string | null
+  /** intake payload (level, requirements…) + HM contact — same shape the New Job screen writes. */
+  custom_fields?: Record<string, unknown>
 }
 
 /** Gate-enforcing job creation: a job may only be created from an APPROVED
@@ -1238,6 +1240,7 @@ export async function createCanonicalJobFromApprovedOpening(
       title:         input.title,
       department_id: input.department_id ?? null,
       description:   input.description ?? null,
+      ...(input.custom_fields ? { custom_fields: input.custom_fields } : {}),
       status:        'draft',
       org_id:        orgId,
       created_by:    linkedBy ?? null,

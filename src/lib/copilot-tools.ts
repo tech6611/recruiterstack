@@ -33,6 +33,10 @@ import {
   listApprovedOpenings,
   listOpenings,
   createOpening,
+  findDepartmentByName,
+  saveOpeningJobDraft,
+  openingJobDraft,
+  type OpeningJobDraft,
 } from '@/modules/ats/domain/openings'
 import {
   openingToolInputSchema,
@@ -162,6 +166,34 @@ import type {
   TimeOffRequestType,
   TimeOffStatus,
 } from '@/lib/types/database'
+
+// Job-step details. Shared by create_job_and_pipeline (used directly) and
+// create_requisition (saved on the requisition as `job_details`, then used when
+// the job is created after approval) so details asked up front are never lost.
+const JOB_DETAIL_PROPS = {
+  level:            { type: 'string',  description: 'Seniority level, e.g. "Senior"' },
+  job_description:  { type: 'string',  description: 'Full job description (rich HTML from the form — pass through unchanged)' },
+  key_requirements: { type: 'string',  description: 'Core requirements (may be HTML)' },
+  nice_to_haves:    { type: 'string',  description: 'Nice-to-have qualifications (may be HTML)' },
+  headcount:        { type: 'number',  description: 'Number of hires needed (default: 1)' },
+  remote_ok:        { type: 'boolean', description: 'Whether remote is acceptable (default: false)' },
+} as const
+
+/** create_requisition's schema = the opening field manifest + job_details. */
+function requisitionToolInputSchema(): Record<string, unknown> {
+  const base = openingToolInputSchema() as { properties: Record<string, unknown> }
+  return {
+    ...base,
+    properties: {
+      ...base.properties,
+      job_details: {
+        type: 'object',
+        description: 'Optional job-step details collected up front (level, job description, requirements…). Saved on the requisition and applied automatically when the job is created after approval.',
+        properties: JOB_DETAIL_PROPS,
+      },
+    },
+  }
+}
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
@@ -312,13 +344,9 @@ export const COPILOT_TOOLS: ToolSchema[] = [
       properties: {
         position_title:       { type: 'string',  description: 'Job title, e.g. "Senior Backend Engineer"' },
         opening_id:           { type: 'string',  description: 'ID of the APPROVED requisition (opening) this job is created from. Required to actually create the job. Omit to get the list of approved requisitions to pick from.' },
-        location:             { type: 'string',  description: 'City / remote policy, e.g. "New York" or "Remote"' },
-        headcount:            { type: 'number',  description: 'Number of hires needed (default: 1)' },
-        department:           { type: 'string',  description: 'Department or team, e.g. "Engineering"' },
-        level:                { type: 'string',  description: 'Seniority level, e.g. "Senior" or "L5"' },
-        key_requirements:     { type: 'string',  description: 'Core requirements as free text' },
-        nice_to_haves:        { type: 'string',  description: 'Nice-to-have qualifications' },
-        remote_ok:            { type: 'boolean', description: 'Whether remote is acceptable (default: false)' },
+        location:             { type: 'string',  description: 'City / remote policy, e.g. "New York" or "Remote" (defaults to the requisition\'s location)' },
+        department:           { type: 'string',  description: 'Department name (defaults to the requisition\'s department)' },
+        ...JOB_DETAIL_PROPS,
       },
       required: ['position_title'],
     },
@@ -720,7 +748,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
     description: 'Create a new requisition (an "opening" — approved-headcount request). This is the FIRST step in opening a role: it appears on the Requisitions page as a draft. Only the position title is required; you may also set department, work location, hiring manager, employment type, compensation, target start date, and justification. To move it toward approval, follow with submit_requisition. Do NOT use this to create a job pipeline — a job comes later, from an APPROVED requisition (create_job_and_pipeline).',
     // Schema is generated from the opening field manifest (single source of
     // truth) so it can never drift from what the save path accepts.
-    input_schema: openingToolInputSchema(),
+    input_schema: requisitionToolInputSchema(),
   },
   {
     name: 'list_requisitions',
@@ -1811,7 +1839,7 @@ async function createJobAndPipeline(
   supabase: SupabaseClient,
   userId?: string | null,
 ): Promise<string> {
-  const { position_title, key_requirements, opening_id } = input
+  const { opening_id } = input
 
   if (!userId) {
     return 'Error: could not identify the acting user, so the job was not created.'
@@ -1845,14 +1873,52 @@ async function createJobAndPipeline(
     )
   }
 
-  // `department` arrives as free text from the agent, not a department_id FK, so
-  // we omit it from the canonical insert; title + description carry over.
+  // Details saved on the requisition (asked up front, before approval) are the
+  // defaults; anything passed now wins. Every accepted arg lands somewhere —
+  // mirrors where the New Job screen (POST /api/req-jobs) stores the same data.
+  const draft = openingJobDraft(opening)
+  const pick = (k: keyof OpeningJobDraft) => input[k] ?? draft[k]
+  const str  = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+
+  let departmentId: string | null = opening.department_id ?? null
+  if (str(input.department)) {
+    const dept = await findDepartmentByName(supabase as never, orgId, str(input.department)!)
+    if (!dept) return `No department named "${input.department}" exists. Use one of the org's departments, or leave it out to keep the requisition's department.`
+    departmentId = dept.id
+  }
+
+  const intake: Record<string, unknown> = {}
+  if (str(pick('level')))            intake.level            = str(pick('level'))
+  if (str(pick('key_requirements'))) intake.key_requirements = str(pick('key_requirements'))
+  if (str(pick('nice_to_haves')))    intake.nice_to_have     = str(pick('nice_to_haves'))
+  if (str(input.location))           intake.location         = str(input.location)
+  const headcount = Number(pick('headcount'))
+  if (Number.isFinite(headcount) && headcount > 0) intake.headcount = headcount
+  if (pick('remote_ok') === true)    intake.work_model       = 'remote'
+
+  // Hiring-manager contact flows down from the requisition, as on the New Job screen.
+  const customFields: Record<string, unknown> = {}
+  if (Object.keys(intake).length) customFields.intake = intake
+  if (opening.hiring_manager_name)  customFields.hiring_manager_name  = opening.hiring_manager_name
+  if (opening.hiring_manager_email) customFields.hiring_manager_email = opening.hiring_manager_email
+
   const job = await createCanonicalJobFromApprovedOpening(supabase, orgId, opening_id, {
-    title:       position_title,
-    description: key_requirements ?? null,
+    title:         str(input.position_title) ?? opening.title,
+    department_id: departmentId,
+    description:   str(pick('job_description')) ?? str(pick('key_requirements')) ?? null,
+    custom_fields: customFields,
   }, userId)
 
-  return `Created job "${job.title}" from approved requisition "${opening.title}" — ID: ${job.id}. Pipeline stages are being auto-created.`
+  const used = [
+    departmentId && 'department',
+    intake.level && 'level',
+    str(pick('job_description')) && 'job description',
+    intake.key_requirements && 'requirements',
+    intake.nice_to_have && 'nice-to-haves',
+    intake.headcount && 'headcount',
+  ].filter(Boolean)
+  return `Created job "${job.title}" from approved requisition "${opening.title}" — ID: ${job.id}. Pipeline stages are being auto-created.` +
+    (used.length ? ` Saved: ${used.join(', ')}.` : '')
 }
 
 // Component 05/14 — ICP-driven sourcing as a Copilot tool. Runs the Fit Engine over
@@ -2889,9 +2955,17 @@ async function createRequisition(
   // resolved (name/email → id) or written through, and an arg with no home errors
   // instead of being silently dropped. Resolver misses (e.g. unknown location)
   // return a clear, user-facing message.
+  // job_details isn't an opening column — split it off and save it separately.
+  const { job_details: jobDetails, ...openingArgs } = input
+  // The requisition page shows the justification as plain text, so flatten
+  // rich-text (HTML) from the copilot form into readable text.
+  if (typeof openingArgs.justification === 'string' && /<[a-z][\s\S]*>/i.test(openingArgs.justification)) {
+    openingArgs.justification = richTextToPlain(openingArgs.justification)
+  }
+
   let createInput
   try {
-    createInput = await buildOpeningCreateInput({ supabase, orgId }, input)
+    createInput = await buildOpeningCreateInput({ supabase, orgId }, openingArgs)
   } catch (e) {
     if (e instanceof FieldResolutionError) return e.message
     throw e
@@ -2899,11 +2973,19 @@ async function createRequisition(
 
   const opening = await createOpening(supabase, orgId, createInput, userId)
 
+  const draft = cleanJobDraft(jobDetails)
+  if (Object.keys(draft).length > 0) {
+    await saveOpeningJobDraft(supabase, orgId, opening.id, draft)
+  }
+
   const lines = [
     `Requisition created for "${opening.title}".`,
     `Status: draft | ID: ${opening.id}`,
     `It now appears on the Requisitions page under "Awaiting Approval".`,
   ]
+  if (Object.keys(draft).length > 0) {
+    lines.push(`Saved job details (${Object.keys(draft).join(', ')}) on the requisition — they'll be used when the job is created.`)
+  }
   if (!createInput.justification || createInput.justification.trim().length < 50) {
     lines.push(`Next: add a justification (at least 50 characters), then submit it for approval.`)
   } else {
@@ -4172,4 +4254,41 @@ async function getEmployeePayslipsTool(
     return `• ${period} — gross ${fmtPayrollMoney(Number(s.gross), s.run.currency)} · net ${fmtPayrollMoney(Number(s.net), s.run.currency)} (${s.run.status}) [payslip_id: ${s.id}]`
   })
   return `${slips.length} payslip(s):\n${lines.join('\n')}`
+}
+
+// ── Copilot-form helpers ───────────────────────────────────────────────────────
+
+/** Flatten rich-text HTML into readable plain text, keeping bullets and link URLs. */
+function richTextToPlain(html: string): string {
+  return html
+    .replace(/<a\s[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href: string, text: string) =>
+      text.replace(/<[^>]+>/g, '').trim() === href ? href : `${text} (${href})`)
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/** Keep only known, non-empty job-draft fields from the agent's job_details. */
+function cleanJobDraft(raw: unknown): OpeningJobDraft {
+  if (!raw || typeof raw !== 'object') return {}
+  const r = raw as Record<string, unknown>
+  const out: OpeningJobDraft = {}
+  const s = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+  if (s(r.level))            out.level            = s(r.level)
+  if (s(r.job_description))  out.job_description  = s(r.job_description)
+  if (s(r.key_requirements)) out.key_requirements = s(r.key_requirements)
+  if (s(r.nice_to_haves))    out.nice_to_haves    = s(r.nice_to_haves)
+  const hc = Number(r.headcount)
+  if (r.headcount != null && Number.isFinite(hc) && hc > 0) out.headcount = hc
+  if (typeof r.remote_ok === 'boolean') out.remote_ok = r.remote_ok
+  return out
 }

@@ -26,6 +26,7 @@ import {
 } from '@/lib/agents/orchestrator'
 import { checkAuthRateLimit } from '@/lib/api/rate-limit'
 import { trackUsage } from '@/lib/ai/track-usage'
+import { FORM_FIELD_TYPES, type FormField } from '@/components/copilot/form-spec'
 import {
   CopilotTurn,
   copilotConfig,
@@ -82,6 +83,35 @@ function innerToolText(name: string): string {
   if (friendly[name]) return friendly[name]
   const words = name.replace(/_/g, ' ')
   return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+// ── Form fields from ask_user_form ───────────────────────────────────────────
+// Keep only well-formed fields with a known type, so a malformed AI call can't
+// break the chat window. Unknown types fall back to a plain text box.
+function sanitizeFormFields(raw: unknown): FormField[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const out: FormField[] = []
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') continue
+    const f = r as Record<string, unknown>
+    const key = typeof f.key === 'string' ? f.key.trim() : ''
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    const type = (FORM_FIELD_TYPES as readonly string[]).includes(f.type as string)
+      ? (f.type as FormField['type']) : 'text'
+    out.push({
+      key,
+      label:      typeof f.label === 'string' && f.label.trim() ? f.label.trim() : key,
+      type,
+      required:   f.required === true,
+      default:    f.default == null ? undefined : String(f.default),
+      options:    Array.isArray(f.options) ? f.options.map(String) : undefined,
+      help:       typeof f.help === 'string' ? f.help : undefined,
+      min_length: typeof f.min_length === 'number' ? f.min_length : undefined,
+    })
+  }
+  return out
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -153,6 +183,20 @@ export async function POST(request: NextRequest) {
 
           // If the model didn't request tools, we're done.
           if (turn.calls.length === 0) break
+
+          // ── Form detection — show the click-through form and pause ────────
+          // The recruiter's answers come back as the next user message.
+          const formCall = turn.calls.find(c => c.name === 'ask_user_form')
+          if (formCall) {
+            const a = formCall.args
+            send({
+              type:   'form',
+              intro:  typeof a.intro === 'string' ? a.intro : '',
+              steps:  Array.isArray(a.steps) ? a.steps.filter((s): s is string => typeof s === 'string') : [],
+              fields: sanitizeFormFields(a.fields),
+            })
+            break
+          }
 
           // ── Checkpoint detection — pause before request_approval ──────────
           const checkpointCall = turn.calls.find(c => c.name === 'request_approval')

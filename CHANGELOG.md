@@ -2,6 +2,13 @@
 
 ## 2026-11-02
 
+### Added
+- **Copilot asks with a click-through form.** Instead of a text list of questions, the coordinator calls a new `ask_user_form` tool and the chat shows a form: the steps it will take, Required fields, then Optional fields with defaults pre-filled. Field types: department / location (the org's own lists), level (standard list + Other), employment type, currency, person (name + email with teammate suggestions), rich text (Gmail-style editor, for job description and justification), text / number / date / yes-no. Submitting sends one answer message and counts as approval for the listed steps. New `src/components/copilot/CopilotForm.tsx` + `form-spec.ts`.
+
+### Fixed
+- **Copilot job creation silently dropped most fields.** `create_job_and_pipeline` accepted department, level, location, headcount, nice-to-haves and remote_ok but saved only title + requirements. It now saves them where the New Job screen does (`department_id`, `custom_fields.intake`, HM contact from the requisition) and accepts a rich-text `job_description` (→ `jobs.description`).
+- **Job details asked before approval are kept.** `create_requisition` takes `job_details` (level, job description, requirements…), saved on `openings.custom_fields.job_draft` and used as defaults when the job is created after approval. Rich-text justifications are flattened to readable plain text (bullets + link URLs kept), since the requisition page shows plain text.
+
 ### Changed
 - **Copilot asks everything in one go.** The "ask for the minimum" rule in the orchestrator and ATS sub-agent prompts made the copilot ask only about the next step of a chain (e.g. requisition → submit for approval → job), so questions arrived one wave at a time. Both prompts now plan the whole chain first and ask once: a one-line plan of the steps, then a numbered list of Required inputs (across all steps) and Optional inputs (each with the default used if skipped). The orchestrator passes all answers to the sub-agent so it doesn't re-ask.
 

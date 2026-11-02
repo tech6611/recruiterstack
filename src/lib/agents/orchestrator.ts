@@ -81,6 +81,41 @@ export const ORCHESTRATOR_TOOLS: ToolSchema[] = [
     },
   },
   {
+    name: 'ask_user_form',
+    description:
+      'Show the recruiter ONE click-through form with every input still needed for the whole ask (all steps in the chain), instead of asking in text. The chat pauses until they submit; their answers come back as the next message. Submitting the form counts as approval for the steps it lists.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        intro: { type: 'string', description: 'One short sentence above the form, e.g. "To open this role I need a few details."' },
+        steps: {
+          type: 'array',
+          description: 'The steps you will take, in order, as short labels, e.g. ["Draft requisition", "Submit for approval", "Create job"].',
+          items: { type: 'string' },
+        },
+        fields: {
+          type: 'array',
+          description: 'Every field to ask for, required ones first. Pick the type from the FORM FIELD TYPES list in your instructions.',
+          items: {
+            type: 'object',
+            properties: {
+              key:        { type: 'string', description: 'The tool argument this answer maps to, e.g. "department", "justification", "job_description".' },
+              label:      { type: 'string', description: 'Plain-English label shown to the recruiter.' },
+              type:       { type: 'string', enum: ['text', 'rich_text', 'number', 'date', 'yes_no', 'select', 'department', 'location', 'level', 'employment_type', 'currency', 'person'] },
+              required:   { type: 'boolean' },
+              default:    { type: 'string', description: 'Pre-filled value (for optional fields: the default you will use). For a person: "Name <email>".' },
+              options:    { type: 'array', items: { type: 'string' }, description: 'Choices — ONLY for type "select".' },
+              help:       { type: 'string', description: 'Short hint under the field.' },
+              min_length: { type: 'number', description: 'Minimum characters, e.g. 50 for a requisition justification.' },
+            },
+            required: ['key', 'label', 'type'],
+          },
+        },
+      },
+      required: ['steps', 'fields'],
+    },
+  },
+  {
     name: 'request_approval',
     description:
       'Pause and ask the recruiter to approve a significant action before delegating. Use BEFORE delegating any task that involves: sending emails or WhatsApp messages, creating jobs, bulk actions affecting 3+ candidates, rejecting/withdrawing candidates, creating offers, scheduling interviews, or terminating an employee.',
@@ -121,9 +156,11 @@ APPROVAL GATES — call request_approval BEFORE delegating any task that will:
 - Submit a time-off request (commits days off; auto-routes to the requester's manager)
 - Start an onboarding plan for an employee (instantiates a checklist + notifies the new hire)
 
+Exception: if the recruiter just submitted an ask_user_form whose steps include the action, that submission is the approval — don't ask again.
+
 For simple read/lookup requests, delegate immediately — no approval needed.
 
-PLANS — for multi-step workflows or hiring initiatives, ask for missing critical info, then emit a structured plan in your response exactly like this:
+PLANS — for multi-step workflows or hiring initiatives, ask for missing info with ask_user_form (see below). If you used a form, skip the plan + approval below and proceed once it is submitted. Otherwise, emit a structured plan in your response exactly like this:
 
    <!-- PLAN: {"summary":"...","steps":[{"number":1,"description":"...","tools":["delegate_to_ats"],"needs_approval":false,"status":"pending"}]} -->
 
@@ -134,12 +171,30 @@ When the recruiter asks for something, before replying:
 1. Work out the FULL chain of steps needed to finish the ask, end to end — not just the next step (e.g. "create a job" = draft requisition → submit it for approval → job & pipeline once approved).
 2. For every step in that chain, list the inputs it needs (e.g. submitting a requisition needs a justification of at least 50 characters).
 3. Fill in everything you can yourself — from the conversation, or by having a sub-agent look it up (a lookup is cheaper than a question). Never ask for things the system handles automatically (e.g. the approver is assigned automatically by department).
-4. Ask for everything still missing in ONE message, as a numbered list in two groups:
-   • Required — what you cannot proceed without, across ALL steps in the chain.
-   • Optional — useful details the recruiter may want to set, each with the default you'll use if they skip it. Check these with the recruiter; don't silently skip them.
-   Start with one line showing the steps you will take, so the recruiter sees the whole path.
-5. Never drip-feed questions step by step. Only come back with a follow-up question if the recruiter's answer itself raises something new.
-6. When you delegate, pass ALL the answers the recruiter gave (required and optional) to the sub-agent, so it does not need to ask again.
+4. Ask for everything still missing in ONE go by calling ask_user_form (not by writing questions in text):
+   • steps — the steps you will take, so the recruiter sees the whole path.
+   • fields — Required ones (what you cannot proceed without, across ALL steps) marked required: true; then Optional ones (useful details the recruiter may want to set) with the default you'll use pre-filled. Check optional details with the recruiter via the form; don't silently skip them.
+   Only fall back to a numbered text list for a quick question that has no sensible field type.
+5. Never drip-feed questions step by step. Only come back with a follow-up (another short form) if the recruiter's answers themselves raise something new.
+6. When you delegate, pass ALL the answers the recruiter gave (required and optional) to the sub-agent VERBATIM — including any HTML in rich-text answers, unchanged — so it does not need to ask again.
+7. Submitting the form IS the recruiter's approval for the steps the form listed — do not call request_approval again for those steps. Go straight to delegating.
+
+FORM FIELD TYPES (pick the one that fits; dropdown choices are filled in automatically from the org's own data, so never invent options for these):
+- department → the org's departments (dropdown)
+- location → the org's office locations (dropdown)
+- level → seniority (dropdown: Intern … VP, or "Other")
+- employment_type → full-time / part-time / contract / internship / temporary (dropdown)
+- currency → salary currency (dropdown)
+- person → a name + email pair, with teammate suggestions (use for hiring manager, coordinator, sourcer)
+- rich_text → formatted writing with bold/italic/links/bullets (use for job description and justification)
+- text, number, date, yes_no → as named
+- select → ONLY when none of the above fits; then supply the options yourself
+
+FIELD MAP for "create a job / open a role" (requisition → submit for approval → job):
+- Required: title (text); department (department); hiring_manager (person — needed before submitting); justification (rich_text, min_length 50 — needed before submitting).
+- Optional: location (location); employment_type (employment_type, default full_time); comp_min, comp_max (number); comp_currency (currency, default INR); target_start_date (date); level (level); job_description (rich_text); key_requirements (rich_text); nice_to_haves (rich_text); headcount (number, default 1).
+- Never ask for the recruiter (it's automatically the person asking) or the approver (assigned automatically).
+Adapt this list for other tasks using the same field types.
 
 Be concise. Use names, not IDs.`
 

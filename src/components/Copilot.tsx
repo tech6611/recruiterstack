@@ -14,6 +14,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Bot, X, Send, Trash2, Pencil, Plus, ShieldAlert, Play } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
+import { CopilotForm } from '@/components/copilot/CopilotForm'
+import type { FormSpec } from '@/components/copilot/form-spec'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -45,6 +47,12 @@ type Message = {
   toolEvents?: ToolEvent[]
   checkpoint?: { action_summary: string; details: string; impact: string }
   plan?:       PlanData
+  /** Click-through form the copilot asked the recruiter to fill (ask_user_form). */
+  form?:       FormSpec
+  formDone?:   boolean
+  /** What the chat bubble shows when it differs from what the AI receives
+   *  (e.g. a short summary of a submitted form). */
+  display?:    string
 }
 
 type SSEEvent =
@@ -53,6 +61,7 @@ type SSEEvent =
   | { type: 'tool_done';  id: string; name: string; summary: string }
   | { type: 'checkpoint'; action_summary: string; details: string; impact: string }
   | { type: 'plan';       summary: string; steps: PlanStep[] }
+  | { type: 'form';       intro?: string; steps: string[]; fields: FormSpec['fields'] }
   | { type: 'done' }
   | { type: 'error';      message: string }
 
@@ -472,16 +481,23 @@ export function Copilot() {
   }, [])
 
   // ── Submit handler ──────────────────────────────────────────────────────────
-  const submit = async (text: string) => {
+  const submit = async (text: string, display?: string) => {
     const trimmed = text.trim()
     if (!trimmed || streaming) return
 
     const ts = Date.now()
-    const userMsg:      Message = { id: String(ts),     role: 'user',      content: trimmed }
+    const userMsg:      Message = { id: String(ts),     role: 'user',      content: trimmed, ...(display ? { display } : {}) }
     const assistantMsg: Message = { id: String(ts + 1), role: 'assistant', content: '', toolEvents: [] }
 
     // Build API payload from current messages + new user message
-    const apiMessages = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }))
+    // A form-only assistant turn has no text — describe the form so the AI
+    // remembers what it asked.
+    const apiMessages = [...messages, userMsg].map(m => ({
+      role: m.role,
+      content: m.content.trim() || (m.form
+        ? `(I asked the recruiter to fill a form with these fields: ${m.form.fields.map(f => `${f.label} [${f.key}]`).join(', ')})`
+        : m.content),
+    }))
 
     setMessages(prev => [...prev, userMsg, assistantMsg])
     setInput('')
@@ -570,6 +586,14 @@ export function Copilot() {
                   : m
               ))
               setStreaming(false)
+              break
+
+            case 'form':
+              setMessages(prev => prev.map((m, i) =>
+                i === prev.length - 1 && m.role === 'assistant'
+                  ? { ...m, form: { intro: event.intro, steps: event.steps ?? [], fields: event.fields ?? [] } }
+                  : m
+              ))
               break
 
             case 'plan':
@@ -720,7 +744,7 @@ export function Copilot() {
                   {msg.role === 'user' ? (
                     /* User bubble */
                     <div className="max-w-[82%] bg-slate-600 text-white rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm leading-relaxed">
-                      {msg.content}
+                      {msg.display ?? msg.content}
                     </div>
                   ) : (
                     /* Assistant bubble */
@@ -799,7 +823,7 @@ export function Copilot() {
                         </div>
                       ) : (
                         /* Loading dots — while streaming, all tools done, no checkpoint */
-                        isLastAssistant && streaming && allToolsDone && !msg.checkpoint && (
+                        isLastAssistant && streaming && allToolsDone && !msg.checkpoint && !msg.form && (
                           <div className="bg-slate-50 border border-slate-100 rounded-2xl rounded-tl-sm px-3.5 py-3">
                             <span className="flex items-center gap-1">
                               <span className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -808,6 +832,20 @@ export function Copilot() {
                             </span>
                           </div>
                         )
+                      )}
+
+                      {/* ── Click-through form (ask_user_form) ── */}
+                      {msg.form && !msg.formDone && (
+                        <CopilotForm
+                          spec={msg.form}
+                          disabled={streaming}
+                          onSubmit={({ message, display }) => {
+                            setMessages(prev => prev.map(m =>
+                              m.id === msg.id ? { ...m, formDone: true } : m
+                            ))
+                            submit(message, display)
+                          }}
+                        />
                       )}
                     </div>
                   )}

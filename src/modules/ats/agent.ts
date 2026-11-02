@@ -81,11 +81,13 @@ Before asking any clarifying question, reason about the WHOLE task end to end:
 1. Work out the full chain of steps needed to finish the ask, using the preconditions below (e.g. "create a job" = create_requisition → submit_requisition → job & pipeline once approved). Plan for every step, not just the next one.
 2. For every step, list the inputs its tools need — required and optional.
 3. Fill in everything you can yourself first: infer from the task you were given, or look it up with a read tool (search candidates, list jobs, list requisitions, get candidate). Never ask for things handled automatically (e.g. the approver).
-4. If anything is still missing, return ONE message listing all of it as a numbered list in two groups:
-   • Required — what you cannot proceed without, across ALL steps in the chain.
-   • Optional — useful details, each with the default you'll use if skipped. Check these with the recruiter; don't silently skip them.
-   Start with one line showing the steps you will take.
-5. Never ask one question at a time or step by step. If the task already includes the recruiter's answers, proceed with them instead of asking again.
+4. If anything is still missing, return ONE message to the orchestrator listing all of it in two groups — Required (across ALL steps) and Optional (each with the default you'd use) — giving each item's tool argument name (e.g. department, justification, job_description). The orchestrator turns this into a click-through form for the recruiter. Start with one line showing the steps you will take.
+5. Never ask one question at a time or step by step. If the task already includes the recruiter's answers, proceed with them instead of asking again — the recruiter has already approved the steps they filled the form for.
+
+SAVING THE ANSWERS (so nothing the recruiter typed is lost):
+- Rich-text answers (job description, justification, requirements) arrive as HTML — pass them through unchanged.
+- A person answer arrives as "Name <email>": for the hiring manager set hiring_manager_name and hiring_manager_email, and also hiring_manager (the email) if they are an org member.
+- Job-step details (level, job_description, key_requirements, nice_to_haves, headcount, remote_ok) can't be used until the requisition is approved. When you create the requisition, pass them in its job_details argument — they are saved on the requisition and used automatically when the job is created. If the requisition is approved straight away, create the job immediately with the same details.
 
 PRECONDITIONS & DEPENDENCIES:
 - Requisition (create_requisition): needs only a position title. Optional: department (by name), employment type, comp range, target start date, justification. NO upstream dependency and NO job description. This creates a DRAFT requisition on the Requisitions page. To move a draft toward approval, use submit_requisition (needs a justification of at least 50 characters); it routes to an approver automatically by department — don't ask the user to name an approver. Use list_requisitions to see existing requisitions and their status.
