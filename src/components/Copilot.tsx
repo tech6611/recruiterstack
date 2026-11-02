@@ -12,10 +12,12 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Bot, X, Send, Trash2, Pencil, Plus, ShieldAlert, Play } from 'lucide-react'
+import { Bot, X, Send, Trash2, Pencil, Plus, ShieldAlert, Play, Maximize2, Minimize2, History, SquarePen } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
 import { CopilotForm } from '@/components/copilot/CopilotForm'
 import type { FormSpec } from '@/components/copilot/form-spec'
+import { useCopilotHistory } from '@/components/copilot/useCopilotHistory'
+import { CopilotHistoryList } from '@/components/copilot/CopilotHistoryList'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -449,6 +451,22 @@ export function Copilot() {
   const [input,     setInput]     = useState('')
   const [streaming, setStreaming] = useState(false)
 
+  // Large centred pop-up vs. narrow side panel (remembered per browser).
+  const [expanded, setExpanded] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    try { return localStorage.getItem('copilot_expanded') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('copilot_expanded', expanded ? '1' : '0') } catch { /* ignore */ }
+  }, [expanded])
+  // In the narrow panel the chat list opens over the messages.
+  const [showHistory, setShowHistory] = useState(false)
+
+  // Saved chats (ChatGPT-style). Falls back to the single in-browser chat when
+  // the server doesn't have history yet.
+  const history = useCopilotHistory(messages, setMessages, streaming)
+  const startNewChat = () => { history.newChat(); setShowHistory(false); setTimeout(() => inputRef.current?.focus(), 60) }
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLTextAreaElement>(null)
 
@@ -661,12 +679,31 @@ export function Copilot() {
         </button>
       )}
 
-      {/* Slide-over panel */}
+      {/* Panel — narrow slide-over, or a large centred pop-up when expanded */}
       <div
-        className={`fixed right-0 top-0 h-full w-[440px] bg-white z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
-          open ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className={expanded
+          ? `fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(1180px,94vw)] h-[90vh] rounded-2xl overflow-hidden bg-white z-50 flex shadow-2xl transition-all duration-200 ease-out ${
+              open ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+            }`
+          : `fixed right-0 top-0 h-full w-[440px] bg-white z-50 flex shadow-2xl transition-transform duration-300 ease-in-out ${
+              open ? 'translate-x-0' : 'translate-x-full'
+            }`}
       >
+        {/* ── Chat list sidebar (expanded view) ──────────────────────────── */}
+        {expanded && history.available && (
+          <div className="w-64 flex-shrink-0 border-r border-slate-100 bg-slate-50/70">
+            <CopilotHistoryList
+              chats={history.chats}
+              activeId={history.activeId}
+              disabled={streaming}
+              onNew={startNewChat}
+              onOpen={id => history.openChat(id)}
+              onDelete={id => history.deleteChat(id)}
+            />
+          </div>
+        )}
+
+        <div className="flex-1 min-w-0 flex flex-col">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
           <div className="flex items-center gap-2.5">
@@ -685,7 +722,27 @@ export function Copilot() {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {messages.length > 0 && (
+            {history.available ? (
+              <>
+                {!expanded && (
+                  <button
+                    onClick={() => setShowHistory(v => !v)}
+                    title="Your chats"
+                    className={`rounded-lg p-1.5 transition-colors ${showHistory ? 'bg-slate-100 text-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                  >
+                    <History className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={startNewChat}
+                  disabled={streaming}
+                  title="New chat"
+                  className="text-slate-400 hover:text-slate-600 rounded-lg p-1.5 hover:bg-slate-100 transition-colors disabled:opacity-40"
+                >
+                  <SquarePen className="w-4 h-4" />
+                </button>
+              </>
+            ) : messages.length > 0 && (
               <button
                 onClick={() => {
                   setMessages([])
@@ -698,6 +755,13 @@ export function Copilot() {
               </button>
             )}
             <button
+              onClick={() => { setExpanded(v => !v); setShowHistory(false) }}
+              title={expanded ? 'Shrink to side panel' : 'Expand'}
+              className="text-slate-400 hover:text-slate-600 rounded-lg p-1.5 hover:bg-slate-100 transition-colors"
+            >
+              {expanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            <button
               onClick={() => setOpen(false)}
               className="text-slate-400 hover:text-slate-600 rounded-lg p-1.5 hover:bg-slate-100 transition-colors"
             >
@@ -706,8 +770,24 @@ export function Copilot() {
           </div>
         </div>
 
+        {/* ── Chat list over the messages (narrow view) ───────────────────── */}
+        {!expanded && showHistory && history.available && (
+          <div className="flex-1 min-h-0 bg-slate-50/70">
+            <CopilotHistoryList
+              chats={history.chats}
+              activeId={history.activeId}
+              disabled={streaming}
+              onNew={startNewChat}
+              onOpen={id => { history.openChat(id); setShowHistory(false) }}
+              onDelete={id => history.deleteChat(id)}
+            />
+          </div>
+        )}
+
         {/* ── Messages ───────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+        <div className={`flex-1 overflow-y-auto py-4 space-y-4 min-h-0 ${
+          !expanded && showHistory && history.available ? 'hidden' : ''
+        } ${expanded ? 'px-[max(1rem,calc((100%_-_48rem)/2))]' : 'px-4'}`}>
           {messages.length === 0 ? (
             /* Empty state */
             <div className="flex flex-col items-center justify-center h-full text-center pb-8">
@@ -857,7 +937,7 @@ export function Copilot() {
         </div>
 
         {/* ── Input ──────────────────────────────────────────────────────── */}
-        <div className="border-t border-slate-100 p-3 flex-shrink-0 bg-white">
+        <div className={`border-t border-slate-100 py-3 flex-shrink-0 bg-white ${expanded ? 'px-[max(0.75rem,calc((100%_-_48rem)/2))]' : 'px-3'}`}>
           <div className="flex gap-2 items-end">
             <textarea
               ref={inputRef}
@@ -891,6 +971,7 @@ export function Copilot() {
           <p className="text-xs text-slate-400 mt-1.5 px-0.5">
             Shift+Enter for new line · Esc to close
           </p>
+        </div>
         </div>
       </div>
     </>

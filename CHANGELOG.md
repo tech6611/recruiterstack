@@ -3,6 +3,13 @@
 ## 2026-11-02
 
 ### Added
+- **Copilot: expand to a large pop-up.** New expand button in the copilot header switches between the 440px side panel and a large centred pop-up (90% of the screen, conversation centred at reading width). Remembered per browser.
+- **Copilot: saved chats, per user (ChatGPT-style).** "New chat" button and a list of past chats grouped Today / Yesterday / Previous 7 days / Previous 30 days / Older — a left sidebar in the expanded view, a History button in the side panel. Chats auto-save when a reply finishes, are titled from the first message, can be deleted (with a confirm), and are private to their user. The conversation already in the browser is saved as the first chat. New `/api/copilot/conversations` (+ `/[id]`), `modules/core/domain/copilot-conversations.ts`, `useCopilotHistory`, `CopilotHistoryList`. Falls back to the old single in-browser chat until the migration is applied.
+
+### Schema
+- **157_copilot_conversations** — `copilot_conversations` (org_id, user_id → users, title, messages jsonb, timestamps). RLS on with no policy, so only the server can read it.
+
+### Added
 - **Copilot asks with a click-through form.** Instead of a text list of questions, the coordinator calls a new `ask_user_form` tool and the chat shows a form: the steps it will take, Required fields, then Optional fields with defaults pre-filled. Field types: department / location (the org's own lists), level (standard list + Other), employment type, currency, person (name + email with teammate suggestions), rich text (Gmail-style editor, for job description and justification), text / number / date / yes-no. Submitting sends one answer message and counts as approval for the listed steps. New `src/components/copilot/CopilotForm.tsx` + `form-spec.ts`.
 
 ### Fixed
