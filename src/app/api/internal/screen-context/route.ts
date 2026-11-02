@@ -21,7 +21,7 @@ import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipeline
 import { generateIcpWithReasoning } from '@/lib/ai/icp-generator'
 import { logger } from '@/lib/logger'
 import type { Icp, IcpCompetency } from '@/lib/types/icp'
-import { jobWideMustHaves } from '@/lib/icp-gates'
+import { callerBrief, callerMustHaves, cvSummaryOnly } from '@/lib/screen-briefing'
 
 // One deep reasoning-first Gemini pass may run when a job has no ICP yet.
 export const maxDuration = 120
@@ -306,7 +306,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const mustHaves = jobWideMustHaves(icp?.must_haves).map((m) => ({ label: m.label }))
+    const mustHaves = callerMustHaves(icp?.must_haves)
 
     // 4) CANDIDATE claims + prior assessment (optional).
     let effectiveCandidateId: string | null = candidate_id ?? null
@@ -403,7 +403,7 @@ export async function POST(req: Request) {
 
       candidate = {
         name,
-        summary: sumRes.data?.summary ?? null,
+        summary: cvSummaryOnly(sumRes.data?.summary),
         experiences,
         knownAssessment: known,
         redFlags: Array.from(new Set(redFlags)),
@@ -425,6 +425,8 @@ export async function POST(req: Request) {
         competencies,
         mustHaves,
         candidate,
+        // The recruiter brain that reasoned the ICP — the call is run in its persona.
+        recruiterBrief: callerBrief(icp),
       },
     })
   } catch (e) {
