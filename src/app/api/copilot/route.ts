@@ -192,6 +192,7 @@ export async function POST(request: NextRequest) {
             send({
               type:   'form',
               intro:  typeof a.intro === 'string' ? a.intro : '',
+              subject: typeof a.subject === 'string' ? a.subject : '',
               steps:  Array.isArray(a.steps) ? a.steps.filter((s): s is string => typeof s === 'string') : [],
               fields: sanitizeFormFields(a.fields),
             })

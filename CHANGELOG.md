@@ -3,6 +3,9 @@
 ## 2026-11-02
 
 ### Added
+- **"Write with AI" in the copilot form.** Every rich-text field (job description, justification, requirements, nice-to-haves) has a ✨ Write with AI button that drafts it from the other answers in the form (role, department, level, location, salary…) plus the company name from Settings; once there is text it becomes "Improve with AI". The draft lands in the editor for the recruiter to edit. New `POST /api/copilot/draft` (signed-in, 15/min per org) and `lib/ai/copilot-drafter.ts` (Gemini Flash, JSON mode — ~2–4s, ~$0.001 per draft; output HTML reduced to simple formatting tags). `ask_user_form` gains a `subject` (the role title) for context.
+
+### Added
 - **Copilot: expand to a large pop-up.** New expand button in the copilot header switches between the 440px side panel and a large centred pop-up (90% of the screen, conversation centred at reading width). Remembered per browser.
 - **Copilot: saved chats, per user (ChatGPT-style).** "New chat" button and a list of past chats grouped Today / Yesterday / Previous 7 days / Previous 30 days / Older — a left sidebar in the expanded view, a History button in the side panel. Chats auto-save when a reply finishes, are titled from the first message, can be deleted (with a confirm), and are private to their user. The conversation already in the browser is saved as the first chat. New `/api/copilot/conversations` (+ `/[id]`), `modules/core/domain/copilot-conversations.ts`, `useCopilotHistory`, `CopilotHistoryList`. Falls back to the old single in-browser chat until the migration is applied.
 

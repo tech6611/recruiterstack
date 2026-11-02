@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { ClipboardList, Check } from 'lucide-react'
+import { ClipboardList, Check, Sparkles, Loader2 } from 'lucide-react'
 import { RichTextEditor } from '@/components/RichTextEditor'
 
 // Spec types live in ./form-spec (shared with the server route).
@@ -127,6 +127,11 @@ export function CopilotForm({
     return init
   })
   const [showErrors, setShowErrors] = useState(false)
+  // "Write with AI": which field is drafting, per-field errors, and a version
+  // counter that remounts the editor so it shows the new draft.
+  const [drafting, setDrafting]     = useState<string | null>(null)
+  const [draftError, setDraftError] = useState<Record<string, string>>({})
+  const [editorVersion, setEditorVersion] = useState<Record<string, number>>({})
 
   const [departments, setDepartments] = useState<string[] | null>(null)
   const [locations,   setLocations]   = useState<string[] | null>(null)
@@ -201,6 +206,51 @@ export function CopilotForm({
     })
   }
 
+  /** Everything filled in so far, as label → readable value, for the AI. */
+  const contextForAi = (except: string): Record<string, string> => {
+    const out: Record<string, string> = {}
+    for (const f of spec.fields) {
+      if (f.key === except) continue
+      const v = values[f.key]
+      if (isBlank(v)) continue
+      let text = v!
+      if (f.type === 'rich_text') text = v!.replace(/<\/(p|li|h[1-6])>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim()
+      if (f.type === 'employment_type') text = EMPLOYMENT_TYPES.find(o => o.value === v)?.label ?? v!
+      out[f.label] = text.slice(0, 4000)
+    }
+    return out
+  }
+
+  const draftWithAi = async (f: FormField) => {
+    setDrafting(f.key)
+    setDraftError(e => ({ ...e, [f.key]: '' }))
+    try {
+      const res = await fetch('/api/copilot/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          field_key:   f.key,
+          field_label: f.label,
+          subject:     spec.subject,
+          intro:       spec.intro,
+          context:     contextForAi(f.key),
+          current:     isBlank(values[f.key]) ? undefined : values[f.key],
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || typeof j.html !== 'string') {
+        setDraftError(e => ({ ...e, [f.key]: j.error ?? "Couldn't write a draft — try again." }))
+        return
+      }
+      set(f.key, j.html)
+      setEditorVersion(v => ({ ...v, [f.key]: (v[f.key] ?? 0) + 1 }))
+    } catch {
+      setDraftError(e => ({ ...e, [f.key]: "Couldn't write a draft — try again." }))
+    } finally {
+      setDrafting(null)
+    }
+  }
+
   const errorFor = (f: FormField): string | null => {
     const v = values[f.key]
     if (f.required && isBlank(v)) return 'Required'
@@ -255,9 +305,11 @@ export function CopilotForm({
     switch (f.type) {
       case 'rich_text':
         return (
-          <RichTextEditor value={v} minHeight={90}
-            placeholder={f.help ?? `Write the ${f.label.toLowerCase()}…`}
-            onChange={html => set(f.key, html)} />
+          <div className={drafting === f.key ? 'opacity-60 pointer-events-none' : ''}>
+            <RichTextEditor key={editorVersion[f.key] ?? 0} value={v} minHeight={90}
+              placeholder={f.help ?? `Write the ${f.label.toLowerCase()}, or click "Write with AI"…`}
+              onChange={html => set(f.key, html)} />
+          </div>
         )
       case 'number':
         return <input type="number" className={inputCls} value={v} disabled={disabled} onChange={e => set(f.key, e.target.value)} />
@@ -308,10 +360,23 @@ export function CopilotForm({
         const err = showErrors ? errorFor(f) : null
         return (
           <div key={f.key} className="space-y-1">
-            <label className="block text-xs font-medium text-slate-700">
-              {f.label}{f.required && <span className="text-red-500"> *</span>}
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="block text-xs font-medium text-slate-700">
+                {f.label}{f.required && <span className="text-red-500"> *</span>}
+              </label>
+              {f.type === 'rich_text' && (
+                <button type="button" disabled={disabled || drafting !== null}
+                  onClick={() => draftWithAi(f)}
+                  title={isBlank(values[f.key]) ? 'Draft this from the details above' : 'Improve this draft using the details above'}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50">
+                  {drafting === f.key
+                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Writing…</>
+                    : <><Sparkles className="w-3 h-3" /> {isBlank(values[f.key]) ? 'Write with AI' : 'Improve with AI'}</>}
+                </button>
+              )}
+            </div>
             {renderField(f)}
+            {draftError[f.key] && <p className="text-[11px] text-red-600">{draftError[f.key]}</p>}
             {err
               ? <p className="text-[11px] text-red-600">{err}</p>
               : f.help && f.type !== 'rich_text' && <p className="text-[11px] text-slate-400">{f.help}</p>}

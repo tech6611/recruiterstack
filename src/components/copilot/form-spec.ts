@@ -23,6 +23,8 @@ export interface FormField {
 
 export interface FormSpec {
   intro?: string
+  /** What the form is about, e.g. the role title — gives "Write with AI" context. */
+  subject?: string
   steps:  string[]
   fields: FormField[]
 }

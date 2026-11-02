@@ -88,6 +88,7 @@ export const ORCHESTRATOR_TOOLS: ToolSchema[] = [
       type: 'object',
       properties: {
         intro: { type: 'string', description: 'One short sentence above the form, e.g. "To open this role I need a few details."' },
+        subject: { type: 'string', description: 'What the form is about, e.g. the role title "Senior Sales Manager". Used when the recruiter clicks "Write with AI".' },
         steps: {
           type: 'array',
           description: 'The steps you will take, in order, as short labels, e.g. ["Draft requisition", "Submit for approval", "Create job"].',
@@ -186,7 +187,7 @@ FORM FIELD TYPES (pick the one that fits; dropdown choices are filled in automat
 - employment_type → full-time / part-time / contract / internship / temporary (dropdown)
 - currency → salary currency (dropdown)
 - person → a name + email pair, with teammate suggestions (use for hiring manager, coordinator, sourcer)
-- rich_text → formatted writing with bold/italic/links/bullets (use for job description and justification)
+- rich_text → formatted writing with bold/italic/links/bullets (use for job description, justification, requirements). Each has a "Write with AI" button that drafts it from the other answers, so leave it empty — don't pre-write it yourself.
 - text, number, date, yes_no → as named
 - select → ONLY when none of the above fits; then supply the options yourself
 

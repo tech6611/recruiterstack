@@ -63,7 +63,7 @@ type SSEEvent =
   | { type: 'tool_done';  id: string; name: string; summary: string }
   | { type: 'checkpoint'; action_summary: string; details: string; impact: string }
   | { type: 'plan';       summary: string; steps: PlanStep[] }
-  | { type: 'form';       intro?: string; steps: string[]; fields: FormSpec['fields'] }
+  | { type: 'form';       intro?: string; subject?: string; steps: string[]; fields: FormSpec['fields'] }
   | { type: 'done' }
   | { type: 'error';      message: string }
 
@@ -609,7 +609,7 @@ export function Copilot() {
             case 'form':
               setMessages(prev => prev.map((m, i) =>
                 i === prev.length - 1 && m.role === 'assistant'
-                  ? { ...m, form: { intro: event.intro, steps: event.steps ?? [], fields: event.fields ?? [] } }
+                  ? { ...m, form: { intro: event.intro, subject: event.subject, steps: event.steps ?? [], fields: event.fields ?? [] } }
                   : m
               ))
               break
