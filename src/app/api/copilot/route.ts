@@ -39,7 +39,7 @@ export const maxDuration = 120
 
 // ── Human-readable labels for in-progress tool chips ─────────────────────────
 // The orchestrator only exposes delegate + approval tools to the UI; the inner
-// sub-agent's tool calls happen non-streamed inside runSubAgent.
+// sub-agent's inner tool calls are surfaced live via the onProgress hook.
 function toolLabel(name: string): string {
   const labels: Record<string, string> = {
     delegate_to_ats:   '🤝 Asking the recruiting agent...',
@@ -64,6 +64,24 @@ function toolSummary(name: string): string {
     delegate_to_payroll: 'Payroll agent responded',
   }
   return done[name] ?? 'Done'
+}
+
+// ── Live progress chips for the sub-agent's inner tool calls ────────────────
+// Turns a tool name like "create_requisition" into "Create requisition".
+// A few common ones get hand-written wording; the rest are humanized.
+function innerToolText(name: string): string {
+  const friendly: Record<string, string> = {
+    create_requisition:      'Creating requisition',
+    submit_requisition:      'Submitting requisition for approval',
+    list_requisitions:       'Checking existing requisitions',
+    create_job_and_pipeline: 'Creating job & pipeline',
+    list_jobs:               'Looking up jobs',
+    search_candidates:       'Searching candidates',
+    get_pipeline:            'Loading pipeline',
+  }
+  if (friendly[name]) return friendly[name]
+  const words = name.replace(/_/g, ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -156,6 +174,17 @@ export async function POST(request: NextRequest) {
           for (const call of turn.calls) {
             const result = await executeOrchestratorTool(call.name, call.args, {
               model: MODEL, orgId, userId, supabase, capabilities,
+              // Stream each inner step as its own chip so the recruiter sees
+              // live progress instead of one long "Asking the recruiting agent…".
+              onProgress: (p) => {
+                const chipId = `${call.id}:${p.id}`
+                const text   = innerToolText(p.name)
+                if (p.phase === 'start') {
+                  send({ type: 'tool_start', id: chipId, name: p.name, label: `${text}…` })
+                } else {
+                  send({ type: 'tool_done', id: chipId, name: p.name, summary: text })
+                }
+              },
             })
             send({ type: 'tool_done', id: call.id, name: call.name, summary: toolSummary(call.name) })
             toolResults.push({ name: call.name, result })

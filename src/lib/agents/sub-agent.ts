@@ -10,7 +10,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { executeTool } from '@/lib/copilot-tools'
-import { runToolLoop, type ToolSchema } from '@/lib/ai/llm'
+import { runToolLoop, type ToolSchema, type ToolLoopOptions } from '@/lib/ai/llm'
 import { trackUsage } from '@/lib/ai/track-usage'
 import type { Capability } from '@/lib/permissions'
 
@@ -32,6 +32,8 @@ export interface SubAgentOptions {
   capabilities?: Set<Capability> | null
   /** Override the tool-loop cap (default 8). */
   maxIterations?: number
+  /** Optional live-progress hook, fired before/after each inner tool call. */
+  onProgress?: ToolLoopOptions['onProgress']
 }
 
 export async function runSubAgent(opts: SubAgentOptions): Promise<string> {
@@ -42,7 +44,8 @@ export async function runSubAgent(opts: SubAgentOptions): Promise<string> {
     task:          opts.task,
     maxTokens:     MAX_TOKENS,
     maxIterations: opts.maxIterations,
-    executeTool:   (name, args) =>
+    onProgress:    opts.onProgress,
+    executeTool:  (name, args) =>
       executeTool(name, args, opts.orgId, opts.supabase, opts.capabilities, opts.userId),
   })
   trackUsage('sub-agent', model, usage, { orgId: opts.orgId, userId: opts.userId })

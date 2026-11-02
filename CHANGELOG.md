@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-02
+
+### Changed
+- **Copilot asks everything in one go.** The "ask for the minimum" rule in the orchestrator and ATS sub-agent prompts made the copilot ask only about the next step of a chain (e.g. requisition → submit for approval → job), so questions arrived one wave at a time. Both prompts now plan the whole chain first and ask once: a one-line plan of the steps, then a numbered list of Required inputs (across all steps) and Optional inputs (each with the default used if skipped). The orchestrator passes all answers to the sub-agent so it doesn't re-ask.
+
+### Added
+- **Live progress chips in the copilot.** The sub-agent's inner tool calls (previously hidden behind one "Asking the recruiting agent…" chip) now stream as their own chips — "Checking existing requisitions…", "Creating requisition…" → ✓. New optional `onProgress` hook on `runToolLoop` / `runSubAgent`, threaded through `executeOrchestratorTool` to the `/api/copilot` SSE stream.
+
 ## 2026-10-04
 
 ### Fixed

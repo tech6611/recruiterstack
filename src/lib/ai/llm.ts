@@ -284,6 +284,9 @@ export interface ToolLoopOptions {
   maxIterations?: number
   /** Executes one tool call and returns its result string. */
   executeTool: (name: string, args: Record<string, unknown>) => Promise<string>
+  /** Optional progress hook — fired before/after each tool call so callers
+   *  (the copilot) can show live "Creating requisition…" chips. */
+  onProgress?: (event: { phase: 'start' | 'done'; id: string; name: string }) => void
 }
 
 /** Final text plus accumulated token usage across every iteration of the loop. */
@@ -328,10 +331,17 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ToolLoopResult
     }
 
     const results: { name: string; result: string }[] = []
-    for (const call of calls) {
+    for (let j = 0; j < calls.length; j++) {
+      const call = calls[j]
       const name = call.name ?? ''
       const args = (call.args ?? {}) as Record<string, unknown>
-      results.push({ name, result: await opts.executeTool(name, args) })
+      const id = `${i}-${j}-${name}`
+      opts.onProgress?.({ phase: 'start', id, name })
+      try {
+        results.push({ name, result: await opts.executeTool(name, args) })
+      } finally {
+        opts.onProgress?.({ phase: 'done', id, name })
+      }
     }
     contents.push(functionResultsContent(results))
   }

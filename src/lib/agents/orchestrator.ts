@@ -16,7 +16,7 @@ import { ATS_SYSTEM_PROMPT, ATS_TOOLS } from '@/modules/ats/agent'
 import { HRIS_SYSTEM_PROMPT, HRIS_TOOLS } from '@/modules/hris/agent'
 import { CRM_SYSTEM_PROMPT, CRM_TOOLS } from '@/modules/crm/agent'
 import { PAYROLL_SYSTEM_PROMPT, PAYROLL_TOOLS } from '@/modules/payroll/agent'
-import { runSubAgent } from '@/lib/agents/sub-agent'
+import { runSubAgent, type SubAgentOptions } from '@/lib/agents/sub-agent'
 
 export const ORCHESTRATOR_TOOLS: ToolSchema[] = [
   {
@@ -129,7 +129,17 @@ PLANS — for multi-step workflows or hiring initiatives, ask for missing critic
 
 Then call request_approval so the recruiter can review and approve before you start delegating.
 
-ASK FOR THE MINIMUM: before asking the recruiter anything, reason about what the task actually requires. Only ask for information that is genuinely required and that you cannot infer or have a sub-agent look up (a lookup delegation is cheaper than a question). Don't ask for optional details, and don't ask for inputs that belong to a later step or a different entity — each entity has its own real preconditions (e.g. a requisition needs no job description; a job depends on an approved requisition; an approver is assigned automatically, never named by the user). When you must ask, batch the missing required inputs into ONE short question.
+PLAN THE WHOLE ASK UP FRONT — ONE ROUND OF QUESTIONS:
+When the recruiter asks for something, before replying:
+1. Work out the FULL chain of steps needed to finish the ask, end to end — not just the next step (e.g. "create a job" = draft requisition → submit it for approval → job & pipeline once approved).
+2. For every step in that chain, list the inputs it needs (e.g. submitting a requisition needs a justification of at least 50 characters).
+3. Fill in everything you can yourself — from the conversation, or by having a sub-agent look it up (a lookup is cheaper than a question). Never ask for things the system handles automatically (e.g. the approver is assigned automatically by department).
+4. Ask for everything still missing in ONE message, as a numbered list in two groups:
+   • Required — what you cannot proceed without, across ALL steps in the chain.
+   • Optional — useful details the recruiter may want to set, each with the default you'll use if they skip it. Check these with the recruiter; don't silently skip them.
+   Start with one line showing the steps you will take, so the recruiter sees the whole path.
+5. Never drip-feed questions step by step. Only come back with a follow-up question if the recruiter's answer itself raises something new.
+6. When you delegate, pass ALL the answers the recruiter gave (required and optional) to the sub-agent, so it does not need to ask again.
 
 Be concise. Use names, not IDs.`
 
@@ -142,6 +152,8 @@ interface ExecutorContext {
   supabase:  SupabaseClient
   /** Caller's RBAC capabilities, threaded to sub-agent tools (RBAC Slice 3). */
   capabilities?: Set<Capability> | null
+  /** Live-progress hook for the sub-agent's inner tool calls (copilot UI chips). */
+  onProgress?: SubAgentOptions['onProgress']
 }
 
 /**
@@ -168,6 +180,7 @@ export async function executeOrchestratorTool(
         userId:       ctx.userId,
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
+        onProgress:   ctx.onProgress,
       })
 
     case 'delegate_to_hris':
@@ -180,6 +193,7 @@ export async function executeOrchestratorTool(
         userId:       ctx.userId,
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
+        onProgress:   ctx.onProgress,
       })
 
     case 'delegate_to_crm':
@@ -192,6 +206,7 @@ export async function executeOrchestratorTool(
         userId:       ctx.userId,
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
+        onProgress:   ctx.onProgress,
       })
 
     case 'delegate_to_payroll':
@@ -204,6 +219,7 @@ export async function executeOrchestratorTool(
         userId:       ctx.userId,
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
+        onProgress:   ctx.onProgress,
       })
 
     default:
