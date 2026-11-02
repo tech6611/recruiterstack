@@ -2,6 +2,9 @@
 
 ## 2026-11-02
 
+### Security
+- **`/api/intake/preview-jd` was open to anyone.** It sits under the public `/api/intake(.*)` middleware matcher (meant for hiring-manager token links) and had no auth or rate limit, so anyone could run Gemini 2.5 Pro JD generation on our key. It now requires a signed-in org user and is limited to 10 per minute per org; usage is attributed to the org/user. Its only caller is the signed-in New Job screen; hiring-manager intake links use `/api/intake/[token]/generate-jd` and are unaffected.
+
 ### Added
 - **"Write with AI" in the copilot form.** Every rich-text field (job description, justification, requirements, nice-to-haves) has a ✨ Write with AI button that drafts it from the other answers in the form (role, department, level, location, salary…) plus the company name from Settings; once there is text it becomes "Improve with AI". The draft lands in the editor for the recruiter to edit. New `POST /api/copilot/draft` (signed-in, 15/min per org) and `lib/ai/copilot-drafter.ts` (Gemini Flash, JSON mode — ~2–4s, ~$0.001 per draft; output HTML reduced to simple formatting tags). `ask_user_form` gains a `subject` (the role title) for context.
 
