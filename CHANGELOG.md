@@ -2,6 +2,19 @@
 
 ## 2026-11-03
 
+### Security (copilot audit, batch 2 — approval lock enforced by the server)
+- **The copilot could send emails/WhatsApps without approval.** The "ask first" rule was only an instruction to the AI, so a mistake — or instructions hidden in a candidate profile, link or attached file — could send anyway. Now risky actions are never run inside the AI loop: emails, WhatsApp messages, emailed availability links, rejecting / withdrawing / hiring, bulk reject and bulk move, offer status changes, terminating an employee, recording compensation, starting onboarding, and requesting / deciding time off. The server holds the exact call (`lib/copilot/approvals.ts`) and the chat shows an approval card listing precisely what will happen (recipient, subject and full message; names of every candidate in a bulk action). Only **Approve & run** (`POST /api/copilot/approve`) runs it — once, within 30 minutes, by the same user, with their current permissions. Cancel means it can never run.
+- **Sub-agents could call any tool name.** `runSubAgent` now only runs tools on that agent's own list (protects the WhatsApp responder and HR cases too, which already never use the held actions).
+- **Outreach email HTML** — the AI-written body is now escaped before being put into the HTML email.
+
+### Fixed (copilot audit, batch 2)
+- Approval cards no longer lose their context: what was asked, approved, cancelled — and each held action's result — is kept in the chat history the AI sees, and stays visible on the card (also in saved chats). Cancel on a plan-level card is now recorded instead of just hiding it.
+- The stuck "⏸️ Awaiting your approval…" chip is gone.
+- Coordinator, recruiting and HR agent prompts updated: they no longer ask a vague "approve the plan?" before sends — the exact card replaces it.
+
+### Schema
+- **158_copilot_pending_actions** — holds actions waiting for approval (server-only; RLS on, no policy). Applied 2026-11-03.
+
 ### Fixed (copilot audit, batch 1 — actions that always failed)
 - **Copilot inbox always said "No recent activity / All up to date ✓".** `get_inbox` (and the scorecard and email-draft tools) asked for `candidates.full_name`, a column that doesn't exist (it's `name`); the query errored and the error was hidden. Fixed the column, inbox errors are now reported instead of hidden, and stage moves (`stage_moved`) show "moved X → Y" again.
 - **`create_scorecard` and `draft_application_email` always said "Application not found".** Same column bug. The email draft also always failed after that: Flash's hidden thinking used up the 600-token cap and cut the JSON off mid-email. It now uses JSON mode (thinking off, 1,500-token cap, ~$0.0006/draft) and reports the real error. `create_scorecard` now also accepts per-criterion ratings (1–4, same shape as the Scorecard drawer) and logs a `scorecard_added` timeline event like the app does.

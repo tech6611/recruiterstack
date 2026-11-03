@@ -1009,7 +1009,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   },
   {
     name: 'request_time_off',
-    description: 'Submit a time-off request for an employee. The approver is auto-set to their manager (from the HRIS reporting structure). The orchestrator must request_approval BEFORE calling this.',
+    description: 'Submit a time-off request for an employee. The approver is auto-set to their manager (from the HRIS reporting structure). Held for approval automatically — the result says WAITING FOR APPROVAL until the recruiter approves.',
     input_schema: {
       type: 'object',
       properties: {
@@ -1102,7 +1102,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   },
   {
     name: 'start_onboarding',
-    description: 'Start an onboarding plan for an employee from a template. The plan instantiates all template tasks with computed due dates anchored to start_date (defaults to the employee\'s start_date or today). The new hire is notified. The orchestrator must request_approval BEFORE calling this.',
+    description: 'Start an onboarding plan for an employee from a template. The plan instantiates all template tasks with computed due dates anchored to start_date (defaults to the employee\'s start_date or today). The new hire is notified. Held for approval automatically — the result says WAITING FOR APPROVAL until the recruiter approves.',
     input_schema: {
       type: 'object',
       properties: {
@@ -1269,7 +1269,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   },
   {
     name: 'record_employee_compensation',
-    description: 'Record a NEW compensation record for an employee — every change is a new row with an effective date (immutable history). The change auto-appears on the employee timeline. The orchestrator must request_approval BEFORE calling this.',
+    description: 'Record a NEW compensation record for an employee — every change is a new row with an effective date (immutable history). The change auto-appears on the employee timeline. Held for approval automatically — the result says WAITING FOR APPROVAL until the recruiter approves.',
     input_schema: {
       type: 'object',
       properties: {
@@ -1384,6 +1384,19 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   list_time_off: 'leave:view', request_time_off: 'leave:view', decide_time_off: 'leave:approve',
 }
 
+/** The "Permission denied" message for a tool the caller's capabilities don't
+ *  cover, or null when allowed (or when no capability set is given). Shared by
+ *  executeTool and the copilot approval lock (so a recruiter is never shown an
+ *  approval card for something they can't do anyway). */
+export function toolPermissionError(name: string, capabilities?: Set<Capability> | null): string | null {
+  if (!capabilities) return null
+  const required = TOOL_CAPABILITIES[name]
+  if (required && !capabilities.has(required)) {
+    return `Permission denied: this action requires the "${required}" capability, which you don't have. Ask an admin to grant it.`
+  }
+  return null
+}
+
 export async function executeTool(
   name: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1397,12 +1410,8 @@ export async function executeTool(
    *  that require it (canonical job creation). Null in background contexts. */
   userId?: string | null,
 ): Promise<string> {
-  if (capabilities) {
-    const required = TOOL_CAPABILITIES[name]
-    if (required && !capabilities.has(required)) {
-      return `Permission denied: this action requires the "${required}" capability, which you don't have. Ask an admin to grant it.`
-    }
-  }
+  const denied = toolPermissionError(name, capabilities)
+  if (denied) return denied
   try {
     switch (name) {
       case 'search_candidates':     return await searchCandidates(input, orgId, supabase)
@@ -2247,7 +2256,8 @@ async function sendOutreachEmail(
       from:    { email: fromEmail, name: recruiter_name },
       subject,
       text:    body,
-      html:    body.replace(/\n/g, '<br>'),
+      // Escape the AI-written body so it can't inject HTML (links, images, forms) into the email.
+      html:    String(body ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'),
     })
   } catch (err: any) {
     const errMsg = err?.response?.body?.errors?.[0]?.message ?? err?.message ?? 'Unknown SendGrid error'

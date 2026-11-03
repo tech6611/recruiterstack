@@ -9,7 +9,10 @@
  *   { type: "text",        delta: string }
  *   { type: "tool_start",  id: string, name: string, label: string }
  *   { type: "tool_done",   id: string, name: string, summary: string }
- *   { type: "checkpoint",  action_summary: string, details: string, impact: string }
+ *   { type: "checkpoint",  action_summary: string, details: string, impact: string,
+ *                          approval_id?: string, actions?: { preview: string }[] }
+ *       (approval_id present = server-held exact actions; run only via POST /api/copilot/approve)
+ *   { type: "plan", … }  { type: "form", … }
  *   { type: "done" }
  *   { type: "error",       message: string }
  */
@@ -25,6 +28,7 @@ import {
   executeOrchestratorTool,
 } from '@/lib/agents/orchestrator'
 import { checkAuthRateLimit } from '@/lib/api/rate-limit'
+import { ApprovalQueue, batchSummary, savePendingBatch } from '@/lib/copilot/approvals'
 import { trackUsage } from '@/lib/ai/track-usage'
 import { FORM_FIELD_TYPES, type FormField } from '@/components/copilot/form-spec'
 import {
@@ -148,6 +152,9 @@ export async function POST(request: NextRequest) {
       const send = (payload: object) =>
         controller.enqueue(enc.encode(`data: ${JSON.stringify(payload)}\n\n`))
 
+      // Risky inner tool calls land here instead of running (see lib/copilot/approvals).
+      const approvals = new ApprovalQueue()
+
       try {
         // Server-side conversation accumulates model turns + tool results.
         // The client only holds user/assistant text turns.
@@ -170,7 +177,8 @@ export async function POST(request: NextRequest) {
             } else if (ev.type === 'call' && ev.name) {
               // The form is shown as a card, not a progress chip — a chip would
               // never get a "done" and would spin forever.
-              if (ev.name !== 'ask_user_form') {
+              // request_approval is shown as a card too (its chip never got a "done").
+              if (ev.name !== 'ask_user_form' && ev.name !== 'request_approval') {
                 send({ type: 'tool_start', id: ev.id, name: ev.name, label: toolLabel(ev.name) })
               }
             }
@@ -225,7 +233,7 @@ export async function POST(request: NextRequest) {
 
           for (const call of turn.calls) {
             const result = await executeOrchestratorTool(call.name, call.args, {
-              model: MODEL, orgId, userId, supabase, capabilities,
+              model: MODEL, orgId, userId, supabase, capabilities, approvals,
               // Stream each inner step as its own chip so the recruiter sees
               // live progress instead of one long "Asking the recruiting agent…".
               onProgress: (p) => {
@@ -243,6 +251,23 @@ export async function POST(request: NextRequest) {
           }
 
           contents.push(functionResultsContent(toolResults))
+        }
+
+        // ── Held actions → one exact-approval card ─────────────────────────
+        if (approvals.size > 0) {
+          const saved = await savePendingBatch(supabase, orgId, userId, approvals.actions)
+          if ('error' in saved) {
+            send({ type: 'text', delta: `\n\n⚠️ I prepared ${approvals.size} action(s) that need your approval, but couldn't hold them for approval (${saved.error}). Nothing was sent or changed.` })
+          } else {
+            send({
+              type:           'checkpoint',
+              approval_id:    saved.id,
+              action_summary: batchSummary(approvals.actions),
+              details:        '',
+              impact:         'Only runs when you click Approve. Expires in 30 minutes.',
+              actions:        approvals.actions.map(a => ({ preview: a.preview })),
+            })
+          }
         }
 
         send({ type: 'done' })

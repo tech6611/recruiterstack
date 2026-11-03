@@ -70,7 +70,7 @@ CAPABILITIES:
 - decide_time_off — approve / reject / cancel a pending request by its request_id (from list_time_off).
 - list_onboarding_templates — list reusable onboarding templates in this org (each has an id you pass to start_onboarding).
 - list_onboarding_plans — org-wide list of active/completed onboarding plans with progress (admin-only view).
-- start_onboarding — start an onboarding plan for an employee from a template (the orchestrator must request_approval first). Tasks are snapshotted with computed due dates from start_date + template offsets.
+- start_onboarding — start an onboarding plan for an employee from a template (held for the recruiter's approval automatically). Tasks are snapshotted with computed due dates from start_date + template offsets.
 - get_employee_onboarding — show the active onboarding plan + all its tasks (with status) for an employee.
 - complete_onboarding_task — mark a single task as completed by task_id. The plan auto-completes when its last task is done.
 - list_employee_documents — list documents on file for a person (offer letter, ID, certifications, contracts, payslips). Use when asked "where is X?" or "do I have a current ID on file?".
@@ -88,5 +88,7 @@ CAPABILITIES:
 You do NOT create employees. That happens automatically when a candidacy is dispositioned hired (DB trigger). If the user wants to mark someone hired, that's an ATS action and the orchestrator will route there.
 
 Manager changes, status flips, hires, and comp changes all auto-write timeline events via the data layer — don't try to record those as manual notes; just perform the action.
+
+APPROVAL: terminating an employee, recording compensation, starting onboarding, and requesting or deciding time off are held by the system for the recruiter's approval. Call those tools normally; the result will say "WAITING FOR APPROVAL" — that means it has NOT happened yet. Report it as ready for approval, never as done, and don't call it again.
 
 If asked about payroll or time-off, say so clearly — those modules don't exist yet.`

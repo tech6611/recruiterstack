@@ -18,6 +18,7 @@ import { CRM_SYSTEM_PROMPT, CRM_TOOLS } from '@/modules/crm/agent'
 import { PAYROLL_SYSTEM_PROMPT, PAYROLL_TOOLS } from '@/modules/payroll/agent'
 import { runSubAgent, type SubAgentOptions } from '@/lib/agents/sub-agent'
 import { readLinkText, SourceMaterialError } from '@/lib/copilot/source-material'
+import type { ApprovalQueue } from '@/lib/copilot/approvals'
 
 export const ORCHESTRATOR_TOOLS: ToolSchema[] = [
   {
@@ -133,7 +134,7 @@ export const ORCHESTRATOR_TOOLS: ToolSchema[] = [
   {
     name: 'request_approval',
     description:
-      'Pause and ask the recruiter to approve a significant action before delegating. Use BEFORE delegating any task that involves: sending emails or WhatsApp messages, creating jobs, bulk actions affecting 3+ candidates, rejecting/withdrawing candidates, creating offers, scheduling interviews, or terminating an employee.',
+      'Pause and ask the recruiter to approve a plan before delegating. Use only for record-creating steps that no form covered: creating jobs or requisitions, creating offers, scheduling interviews. Do NOT use it for sends or other risky actions (emails, WhatsApp, rejections, bulk moves, offer status, HR changes) — the system holds those automatically and shows an exact approval card.',
     input_schema: {
       type: 'object',
       properties: {
@@ -159,19 +160,11 @@ ROUTING — pick the right delegate:
 
 When delegating, pass a clear self-contained task in natural language — include all the specifics (names, filters, criteria) the sub-agent needs. The sub-agent's reply comes back as a tool result; relay the useful parts to the user concisely.
 
-APPROVAL GATES — call request_approval BEFORE delegating any task that will:
-- Send emails or WhatsApp messages to candidates
-- Create jobs or intake requests
-- Bulk-act on 3+ candidates (move/reject/score)
-- Reject or withdraw candidates
-- Create offers
-- Schedule interviews
-- Terminate an employee
-- Change or set employee compensation (any new comp record)
-- Submit a time-off request (commits days off; auto-routes to the requester's manager)
-- Start an onboarding plan for an employee (instantiates a checklist + notifies the new hire)
-
-Exception: if the recruiter just submitted an ask_user_form whose steps include the action, that submission is the approval — don't ask again.
+APPROVAL — HOW IT WORKS:
+1. Risky actions are locked by the system, not by you: sending emails or WhatsApp messages, emailing availability links, rejecting / withdrawing / hiring candidates, bulk moves and bulk rejections, changing an offer's status, terminating an employee, recording compensation, starting onboarding, and requesting or deciding time off. When a sub-agent attempts one, it is NOT run — the system holds the exact action and shows the recruiter an approval card with the precise recipients and content. So for these, delegate straight away (no request_approval first). When the sub-agent reports an action is "waiting for approval", tell the recruiter it's ready for them to review and approve in the card below. Never say it was sent or done.
+2. call request_approval BEFORE delegating only for record-creating steps that no form covered: creating jobs or requisitions, creating offers, scheduling interviews.
+3. If the recruiter just submitted an ask_user_form whose steps include the action, that submission is the approval for creating records — don't ask again. (Sends still get their own exact approval card from the system.)
+4. A message starting "[Approval result]" reports what the recruiter approved or cancelled and what happened — use it as the record of what was done; don't redo those actions.
 
 For simple read/lookup requests, delegate immediately — no approval needed.
 
@@ -238,6 +231,8 @@ interface ExecutorContext {
   capabilities?: Set<Capability> | null
   /** Live-progress hook for the sub-agent's inner tool calls (copilot UI chips). */
   onProgress?: SubAgentOptions['onProgress']
+  /** Holds risky calls for the recruiter's approval card (see lib/copilot/approvals). */
+  approvals?: ApprovalQueue
 }
 
 /**
@@ -265,6 +260,7 @@ export async function executeOrchestratorTool(
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
         onProgress:   ctx.onProgress,
+        approvals:    ctx.approvals,
       })
 
     case 'delegate_to_hris':
@@ -278,6 +274,7 @@ export async function executeOrchestratorTool(
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
         onProgress:   ctx.onProgress,
+        approvals:    ctx.approvals,
       })
 
     case 'delegate_to_crm':
@@ -291,6 +288,7 @@ export async function executeOrchestratorTool(
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
         onProgress:   ctx.onProgress,
+        approvals:    ctx.approvals,
       })
 
     case 'delegate_to_payroll':
@@ -304,6 +302,7 @@ export async function executeOrchestratorTool(
         supabase:     ctx.supabase,
         capabilities: ctx.capabilities,
         onProgress:   ctx.onProgress,
+        approvals:    ctx.approvals,
       })
 
     case 'read_link': {

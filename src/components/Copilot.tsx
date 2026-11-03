@@ -42,12 +42,25 @@ type PlanData = {
   steps:   PlanStep[]
 }
 
+/** An approval card. With approval_id, the server is holding the exact
+ *  actions listed and runs them only via POST /api/copilot/approve. */
+type Checkpoint = {
+  action_summary: string
+  details:        string
+  impact:         string
+  approval_id?:   string
+  actions?:       { preview: string }[]
+  state?:         'pending' | 'running' | 'done' | 'cancelled'
+  results?:       { preview: string; result: string }[]
+  error?:         string
+}
+
 type Message = {
   id:          string
   role:        'user' | 'assistant'
   content:     string
   toolEvents?: ToolEvent[]
-  checkpoint?: { action_summary: string; details: string; impact: string }
+  checkpoint?: Checkpoint
   plan?:       PlanData
   /** Click-through form the copilot asked the recruiter to fill (ask_user_form). */
   form?:       FormSpec
@@ -69,10 +82,26 @@ const ACCEPTED_FILES = '.pdf,.docx,.txt,.md,application/pdf,application/vnd.open
 /** What the AI receives for one message. Attached files go in full only on
  *  recent messages — older ones are summarised, so a big PDF isn't re-sent on
  *  every turn of a long chat (the extracted details already live in the form). */
+function checkpointNote(c: Checkpoint): string {
+  if (c.approval_id) {
+    const list = (c.actions ?? []).map(a => `- ${a.preview.split('\n')[0]}`).join('\n')
+    if (c.state === 'done') {
+      return `[Approval result] The recruiter approved these held actions. What happened:\n${(c.results ?? []).map(r => `- ${r.preview.split('\n')[0]} → ${r.result}`).join('\n')}`
+    }
+    if (c.state === 'cancelled') return `[Approval result] The recruiter cancelled these held actions — nothing ran:\n${list}`
+    return `(These actions are held, waiting for the recruiter's approval — not done yet:\n${list})`
+  }
+  const asked = `(I asked the recruiter to approve: ${c.action_summary}${c.details ? ` — ${c.details}` : ''}${c.impact ? ` Impact: ${c.impact}` : ''})`
+  return c.state === 'cancelled' ? `${asked}\n[Approval result] The recruiter cancelled this.` : asked
+}
+
 function apiContent(m: Message, recent: boolean): string {
-  const base = m.content.trim() || (m.form
+  let base = m.content.trim() || (m.form
     ? `(I asked the recruiter to fill a form with these fields: ${m.form.fields.map(f => `${f.label} [${f.key}]`).join(', ')})`
     : m.content)
+  // Keep what was asked/approved in the history the AI sees — an approval card
+  // often comes with no text, and "Approved, proceed" alone loses the plan.
+  if (m.checkpoint) base = base ? `${base}\n\n${checkpointNote(m.checkpoint)}` : checkpointNote(m.checkpoint)
   if (!m.attachments?.length) return base
   const files = m.attachments.map(a => recent
     ? `<attachment name="${a.name.replace(/"/g, "'")}"${a.truncated ? ' truncated="true"' : ''}>\n${a.text}\n</attachment>`
@@ -84,7 +113,7 @@ type SSEEvent =
   | { type: 'text';       delta: string }
   | { type: 'tool_start'; id: string; name: string; label: string }
   | { type: 'tool_done';  id: string; name: string; summary: string }
-  | { type: 'checkpoint'; action_summary: string; details: string; impact: string }
+  | { type: 'checkpoint'; action_summary: string; details: string; impact: string; approval_id?: string; actions?: { preview: string }[] }
   | { type: 'plan';       summary: string; steps: PlanStep[] }
   | { type: 'form';       intro?: string; subject?: string; steps: string[]; fields: FormSpec['fields'] }
   | { type: 'done' }
@@ -189,52 +218,85 @@ function CheckpointCard({
   onProceed,
   onCancel,
 }: {
-  checkpoint: { action_summary: string; details: string; impact: string }
+  checkpoint: Checkpoint
   onProceed:  () => void
   onCancel:   () => void
 }) {
+  const state = checkpoint.state ?? 'pending'
+  const exact = !!checkpoint.approval_id
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2.5">
       {/* Header */}
       <div className="flex items-start gap-2">
-        <span className="text-base leading-none flex-shrink-0 mt-0.5">⏸️</span>
+        <span className="text-base leading-none flex-shrink-0 mt-0.5">{state === 'done' ? '✅' : state === 'cancelled' ? '✖️' : '⏸️'}</span>
         <div>
           <p className="text-sm font-semibold text-amber-900 leading-snug">
-            Approval needed
+            {state === 'done' ? (exact ? 'Approved — results below' : 'Approved') : state === 'cancelled' ? 'Cancelled' : 'Approval needed'}
           </p>
           <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
-            {checkpoint.action_summary}
+            {state === 'cancelled' && exact ? 'Nothing was sent or changed.' : checkpoint.action_summary}
           </p>
         </div>
       </div>
 
-      {/* Details */}
-      {checkpoint.details && (
+      {/* Exact actions held by the server */}
+      {exact && state !== 'done' && (checkpoint.actions?.length ?? 0) > 0 && (
+        <div className="space-y-2 max-h-72 overflow-y-auto">
+          {checkpoint.actions!.map((a, i) => (
+            <div key={i} className="text-xs text-slate-700 bg-white border border-amber-200 rounded-lg px-2.5 py-2 whitespace-pre-wrap break-words leading-relaxed">
+              {a.preview}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Results after approval */}
+      {exact && state === 'done' && (
+        <div className="space-y-1.5">
+          {(checkpoint.results ?? []).map((r, i) => (
+            <div key={i} className="text-xs text-slate-700 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5 leading-relaxed">
+              <span className="font-medium">{r.preview.split('\n')[0]}</span>
+              <span className="block text-slate-500 mt-0.5">{r.result}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Details (plan-level approvals) */}
+      {!exact && checkpoint.details && (
         <p className="text-xs text-amber-700 leading-relaxed">{checkpoint.details}</p>
       )}
 
       {/* Impact badge */}
-      {checkpoint.impact && (
+      {checkpoint.impact && state === 'pending' && (
         <div className="text-xs text-amber-700 bg-amber-100 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-relaxed">
-          <span className="font-semibold">Impact: </span>{checkpoint.impact}
+          <span className="font-semibold">{exact ? 'Note: ' : 'Impact: '}</span>{checkpoint.impact}
         </div>
       )}
 
+      {checkpoint.error && (
+        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">{checkpoint.error}</p>
+      )}
+
       {/* Actions */}
-      <div className="flex gap-2 pt-0.5">
-        <button
-          onClick={onProceed}
-          className="flex-1 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-lg px-3 py-2 transition-colors active:scale-95"
-        >
-          Proceed →
-        </button>
-        <button
-          onClick={onCancel}
-          className="text-xs font-medium text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-lg px-3 py-2 transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
+      {(state === 'pending' || state === 'running') && (
+        <div className="flex gap-2 pt-0.5">
+          <button
+            onClick={onProceed}
+            disabled={state === 'running'}
+            className="flex-1 text-xs font-semibold bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white rounded-lg px-3 py-2 transition-colors active:scale-95 inline-flex items-center justify-center gap-1.5"
+          >
+            {state === 'running' ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Running…</> : exact ? 'Approve & run' : 'Proceed →'}
+          </button>
+          <button
+            onClick={onCancel}
+            disabled={state === 'running'}
+            className="text-xs font-medium text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 disabled:opacity-60 rounded-lg px-3 py-2 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -544,6 +606,35 @@ export function Copilot() {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
+  // ── Approval cards ──────────────────────────────────────────────────────────
+  const updateCheckpoint = (msgId: string, patch: Partial<Checkpoint>) => {
+    setMessages(prev => prev.map(m =>
+      m.id === msgId && m.checkpoint ? { ...m, checkpoint: { ...m.checkpoint, ...patch } } : m
+    ))
+  }
+
+  /** Approve or cancel server-held actions. Only this click runs them. */
+  const decideApproval = async (msgId: string, approvalId: string, decision: 'approve' | 'cancel') => {
+    updateCheckpoint(msgId, { state: decision === 'approve' ? 'running' : 'cancelled', error: undefined })
+    try {
+      const res = await fetch('/api/copilot/approve', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ approval_id: approvalId, decision }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (decision === 'cancel') return
+      if (!res.ok) {
+        updateCheckpoint(msgId, { state: res.status === 409 ? 'cancelled' : 'pending', error: json.error ?? `Couldn't run it (HTTP ${res.status}). Nothing new was done.` })
+        return
+      }
+      updateCheckpoint(msgId, { state: 'done', results: json.results ?? [] })
+      trackEvent('copilot_approval_run', { count: (json.results ?? []).length })
+    } catch {
+      if (decision === 'approve') updateCheckpoint(msgId, { state: 'pending', error: 'Network error — please try again.' })
+    }
+  }
+
   // ── Submit handler ──────────────────────────────────────────────────────────
   const submit = async (text: string, display?: string, opts: { withFiles?: boolean } = {}) => {
     const attachments: Attachment[] = opts.withFiles
@@ -652,6 +743,9 @@ export function Copilot() {
                         action_summary: event.action_summary,
                         details:        event.details,
                         impact:         event.impact,
+                        approval_id:    event.approval_id,
+                        actions:        event.actions,
+                        state:          'pending',
                       },
                     }
                   : m
@@ -952,13 +1046,15 @@ export function Copilot() {
                       {msg.checkpoint && !msg.plan && (
                         <CheckpointCard
                           checkpoint={msg.checkpoint}
-                          onProceed={() => submit('Approved, please proceed with the plan.')}
+                          onProceed={() => {
+                            if (msg.checkpoint?.approval_id) { decideApproval(msg.id, msg.checkpoint.approval_id, 'approve'); return }
+                            if (streaming) return
+                            updateCheckpoint(msg.id, { state: 'done' })
+                            submit('Approved, please proceed with the plan.')
+                          }}
                           onCancel={() => {
-                            setMessages(prev => prev.map((m, i) =>
-                              i === prev.length - 1 && m.role === 'assistant'
-                                ? { ...m, checkpoint: undefined }
-                                : m
-                            ))
+                            if (msg.checkpoint?.approval_id) { decideApproval(msg.id, msg.checkpoint.approval_id, 'cancel'); return }
+                            updateCheckpoint(msg.id, { state: 'cancelled' })
                           }}
                         />
                       )}

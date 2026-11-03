@@ -41,6 +41,7 @@ type AnalyticsEvents = {
   // AI features
   ai_score_triggered: { job_id: string }
   copilot_message_sent: Record<string, never>
+  copilot_approval_run: { count: number }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
