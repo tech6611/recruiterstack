@@ -125,7 +125,6 @@ export async function createOpening(
  *  as defaults when the job is created from this requisition. */
 export interface OpeningJobDraft {
   level?:            string
-  team_context?:     string   // "What will this person work on?"
   job_description?:  string   // rich HTML
   key_requirements?: string
   nice_to_haves?:    string
