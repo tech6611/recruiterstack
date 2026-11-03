@@ -15,8 +15,9 @@ import type { AuthInfo } from '@modelcontextprotocol/server'
  * Anything else → undefined, which makes the MCP route answer 401 and point the
  * assistant at Clerk to log in. Refuse-by-default: no partial or "best effort" passes.
  *
- * NOTE (Step 2 spike): audience checking and the per-call grant / membership re-check
- * are added in Step 3, once we have seen what Clerk actually puts in the token.
+ * Clerk's OAuth tokens carry no `aud` (checked 2026-11-03), so the audience lock is
+ * replaced by the approved-client allow-list (clients.ts). Membership, role, workspace
+ * switch and revocation are re-checked on EVERY tool call in guard.ts.
  */
 
 /** Clerk's issuer URL, e.g. https://coherent-piglet-23.clerk.accounts.dev */
@@ -74,12 +75,7 @@ export async function verifyMcpToken(_req: Request, bearerToken?: string): Promi
       clientId,
       scopes: caller.scopes,
       expiresAt: payload.exp,
-      extra: {
-        caller,
-        // Kept only for the Step 2 spike so we can see what Clerk sends; removed in Step 3.
-        audience: payload.aud ?? null,
-        tokenType: typ ?? null,
-      },
+      extra: { caller },
     }
   } catch {
     // Bad signature, wrong issuer, expired, malformed → not authenticated.

@@ -2,6 +2,14 @@
 
 ## 2026-11-03
 
+### Added (AI integration — MCP server for ChatGPT / Claude, Phase 1)
+- **MCP server at `/api/mcp`** that AI assistants (ChatGPT, Claude, Claude Code) can connect to with a RecruiterStack login via Clerk OAuth. One read-only tool so far: `whoami` (workspace, role, permissions granted). Public OAuth metadata at `/.well-known/oauth-protected-resource/api/mcp`. `src/middleware.ts` lets exactly `/api/mcp` bypass the browser session; the route checks its own tokens.
+- **Per-call security check** (`src/lib/mcp/guard.ts`, `tool.ts`): every MCP tool runs only if the AI app is approved (allow-list in `clients.ts`, since Clerk tokens carry no audience), the permission was granted, the user exists and isn't deactivated, AI access is on for the workspace, the connection wasn't disconnected, and the user's role has the capability. Refusals give a plain-English reason; internal errors are hidden. 15 tests.
+- **AI activity log**: every MCP call (allowed, refused or failed) is recorded with record IDs only — never candidate details or chat text.
+
+### Schema
+- `159_ai_app_access.sql`: `ai_app_settings` (per-workspace AI access switch, on by default), `ai_app_connections` (per user + AI app; disconnect = `revoked_at`), `ai_app_audit`. Additive; RLS on, server-only.
+
 ### Added / Fixed (copilot audit, batch 5 — smaller gaps)
 - **"Who are my top candidates?"** New `top_candidates` tool: active candidates ranked by AI fit score across open jobs (or one job), with job, stage and recommendation, plus a count of candidates not scored yet. Previously the AI had to stitch several lookups together and gave partial answers.
 - **Follow-ups ("move her to onsite").** The recruiting/HR sub-agents now get the last few chat turns (text only, attachments dropped) along with the task, so they can resolve "her", "that job". If it's genuinely unclear they ask — they never guess from names or pronouns.
