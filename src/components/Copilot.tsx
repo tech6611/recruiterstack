@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Bot, X, Send, Trash2, Pencil, Plus, ShieldAlert, Play, Maximize2, Minimize2, History, SquarePen } from 'lucide-react'
+import { Bot, X, Send, Trash2, Pencil, Plus, ShieldAlert, Play, Maximize2, Minimize2, History, SquarePen, Paperclip, FileText, Loader2 } from 'lucide-react'
 import { trackEvent } from '@/lib/analytics'
 import { CopilotForm } from '@/components/copilot/CopilotForm'
 import type { FormSpec } from '@/components/copilot/form-spec'
@@ -55,6 +55,29 @@ type Message = {
   /** What the chat bubble shows when it differs from what the AI receives
    *  (e.g. a short summary of a submitted form). */
   display?:    string
+  /** Files the recruiter attached to this message, already read into text. */
+  attachments?: Attachment[]
+}
+
+type Attachment = { name: string; text: string; truncated?: boolean }
+
+/** A file in the input area: being read, ready to send, or failed. */
+type PendingFile = { id: string; name: string; status: 'reading' | 'ready' | 'error'; text?: string; truncated?: boolean; error?: string }
+
+const ACCEPTED_FILES = '.pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown'
+
+/** What the AI receives for one message. Attached files go in full only on
+ *  recent messages — older ones are summarised, so a big PDF isn't re-sent on
+ *  every turn of a long chat (the extracted details already live in the form). */
+function apiContent(m: Message, recent: boolean): string {
+  const base = m.content.trim() || (m.form
+    ? `(I asked the recruiter to fill a form with these fields: ${m.form.fields.map(f => `${f.label} [${f.key}]`).join(', ')})`
+    : m.content)
+  if (!m.attachments?.length) return base
+  const files = m.attachments.map(a => recent
+    ? `<attachment name="${a.name.replace(/"/g, "'")}"${a.truncated ? ' truncated="true"' : ''}>\n${a.text}\n</attachment>`
+    : `(Earlier I attached "${a.name}" — already read.)`).join('\n\n')
+  return `${base}\n\n${files}`
 }
 
 type SSEEvent =
@@ -450,6 +473,29 @@ export function Copilot() {
   })
   const [input,     setInput]     = useState('')
   const [streaming, setStreaming] = useState(false)
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Read each attached file into text right away, so sending is instant.
+  const addFiles = (files: FileList | File[]) => {
+    for (const file of Array.from(files).slice(0, 3)) {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      setPendingFiles(prev => [...prev, { id, name: file.name, status: 'reading' }])
+      const body = new FormData()
+      body.append('file', file)
+      fetch('/api/copilot/attachments', { method: 'POST', body })
+        .then(async r => {
+          const j = await r.json().catch(() => ({}))
+          setPendingFiles(prev => prev.map(p => p.id !== id ? p : r.ok && typeof j.text === 'string'
+            ? { ...p, status: 'ready', text: j.text, truncated: !!j.truncated }
+            : { ...p, status: 'error', error: j.error ?? "Couldn't read this file" }))
+        })
+        .catch(() => setPendingFiles(prev => prev.map(p => p.id === id ? { ...p, status: 'error', error: "Couldn't upload this file" } : p)))
+    }
+  }
+  const filesReading = pendingFiles.some(p => p.status === 'reading')
+  const readyFiles   = pendingFiles.filter(p => p.status === 'ready')
 
   // Large centred pop-up vs. narrow side panel (remembered per browser).
   const [expanded, setExpanded] = useState<boolean>(() => {
@@ -499,22 +545,29 @@ export function Copilot() {
   }, [])
 
   // ── Submit handler ──────────────────────────────────────────────────────────
-  const submit = async (text: string, display?: string) => {
-    const trimmed = text.trim()
-    if (!trimmed || streaming) return
+  const submit = async (text: string, display?: string, opts: { withFiles?: boolean } = {}) => {
+    const attachments: Attachment[] = opts.withFiles
+      ? readyFiles.map(f => ({ name: f.name, text: f.text ?? '', truncated: f.truncated }))
+      : []
+    const trimmed = text.trim() || (attachments.length ? 'Please take a look at the attached file.' : '')
+    if (!trimmed || streaming || (opts.withFiles && filesReading)) return
 
     const ts = Date.now()
-    const userMsg:      Message = { id: String(ts),     role: 'user',      content: trimmed, ...(display ? { display } : {}) }
+    const userMsg:      Message = {
+      id: String(ts), role: 'user', content: trimmed,
+      ...(display ? { display } : {}),
+      ...(attachments.length ? { attachments } : {}),
+    }
+    if (opts.withFiles) setPendingFiles([])
     const assistantMsg: Message = { id: String(ts + 1), role: 'assistant', content: '', toolEvents: [] }
 
     // Build API payload from current messages + new user message
     // A form-only assistant turn has no text — describe the form so the AI
     // remembers what it asked.
-    const apiMessages = [...messages, userMsg].map(m => ({
+    const all = [...messages, userMsg]
+    const apiMessages = all.map((m, i) => ({
       role: m.role,
-      content: m.content.trim() || (m.form
-        ? `(I asked the recruiter to fill a form with these fields: ${m.form.fields.map(f => `${f.label} [${f.key}]`).join(', ')})`
-        : m.content),
+      content: apiContent(m, i >= all.length - 4),
     }))
 
     setMessages(prev => [...prev, userMsg, assistantMsg])
@@ -827,8 +880,17 @@ export function Copilot() {
                 >
                   {msg.role === 'user' ? (
                     /* User bubble */
-                    <div className="max-w-[82%] bg-slate-600 text-white rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm leading-relaxed">
-                      {msg.display ?? msg.content}
+                    <div className="max-w-[82%] bg-slate-600 text-white rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm leading-relaxed space-y-1.5">
+                      {msg.attachments?.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {msg.attachments.map((a, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 rounded-md bg-white/15 px-1.5 py-0.5 text-xs">
+                              <FileText className="w-3 h-3" /> {a.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div>{msg.display ?? msg.content}</div>
                     </div>
                   ) : (
                     /* Assistant bubble */
@@ -942,8 +1004,43 @@ export function Copilot() {
         </div>
 
         {/* ── Input ──────────────────────────────────────────────────────── */}
-        <div className={`border-t border-slate-100 py-3 flex-shrink-0 bg-white ${expanded ? 'px-[max(0.75rem,calc((100%_-_48rem)/2))]' : 'px-3'}`}>
+        <div
+          className={`border-t py-3 flex-shrink-0 transition-colors ${dragOver ? 'border-sky-300 bg-sky-50' : 'border-slate-100 bg-white'} ${expanded ? 'px-[max(0.75rem,calc((100%_-_48rem)/2))]' : 'px-3'}`}
+          onDragOver={e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragOver(true) } }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={e => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files) }}
+        >
+          {/* Attached files, waiting to be sent */}
+          {pendingFiles.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {pendingFiles.map(f => (
+                <span key={f.id} title={f.error ?? (f.truncated ? 'Long file — only the first part will be read' : f.name)}
+                  className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs ${
+                    f.status === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                  {f.status === 'reading' ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                  <span className="max-w-[180px] truncate">{f.name}</span>
+                  {f.status === 'reading' && <span className="text-slate-400">reading…</span>}
+                  {f.status === 'error' && <span>— {f.error}</span>}
+                  <button type="button" title="Remove" className="ml-0.5 text-slate-400 hover:text-slate-700"
+                    onClick={() => setPendingFiles(prev => prev.filter(p => p.id !== f.id))}>
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex gap-2 items-end">
+            <input ref={fileInputRef} type="file" accept={ACCEPTED_FILES} multiple className="hidden"
+              onChange={e => { if (e.target.files?.length) addFiles(e.target.files); e.target.value = '' }} />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={streaming}
+              title="Attach a file (PDF, Word, text) — or drag it here"
+              className="flex-shrink-0 w-9 h-9 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors disabled:opacity-40"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
             <textarea
               ref={inputRef}
               value={input}
@@ -956,7 +1053,7 @@ export function Copilot() {
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
-                  submit(input)
+                  submit(input, undefined, { withFiles: true })
                 }
               }}
               placeholder="Give me a goal or ask a question…"
@@ -966,15 +1063,15 @@ export function Copilot() {
               style={{ maxHeight: '120px', overflowY: 'auto' }}
             />
             <button
-              onClick={() => submit(input)}
-              disabled={streaming || !input.trim()}
+              onClick={() => submit(input, undefined, { withFiles: true })}
+              disabled={streaming || filesReading || (!input.trim() && readyFiles.length === 0)}
               className="flex-shrink-0 w-9 h-9 rounded-xl bg-slate-600 text-white flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Send className="w-4 h-4" />
             </button>
           </div>
           <p className="text-xs text-slate-400 mt-1.5 px-0.5">
-            Shift+Enter for new line · Esc to close
+            Attach a PDF/Word file or paste a link · Shift+Enter for new line · Esc to close
           </p>
         </div>
         </div>

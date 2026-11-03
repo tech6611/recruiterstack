@@ -2,6 +2,12 @@
 
 ## 2026-11-03
 
+### Added
+- **Copilot: create from a file, link or pasted text.** Attach a PDF, Word (.docx) or text file (paperclip or drag-and-drop), paste a link, or paste a block of text, and ask the copilot to create a requisition/job from it. It reads the material, works out the full chain of steps, and shows the usual form with every value it found pre-filled and tagged "From your file"; only what's missing is left blank. Departments/locations are matched to the org's lists (loosely), and an unmatched one shows "Your file says X — pick the closest". New `POST /api/copilot/attachments` (reads files to text; unpdf → Gemini Flash fallback for scanned PDFs, mammoth for .docx; nothing stored) and a `read_link` coordinator tool (`lib/copilot/source-material.ts`: http(s) only, public IPs only re-checked on each redirect, 10s / 3 MB limits, 20k-char cap). Attached text is sent in full only on the latest messages of a chat, then summarised.
+
+### Reverted
+- **JD drafting back to Gemini Flash** (reverted the Pro upgrade, the extra company/past-JD context and the two extra role questions) — cost.
+
 ### Fixed
 - **Copilot: submitted form no longer dumps every answer into the chat.** The recruiter's bubble now just says "✓ Details submitted"; the full answers still go to the AI.
 - **Copilot: "⚙️ Running ask_user_form…" chip spun forever.** The form call no longer creates a progress chip (the form card stands for it), older saved chats hide the stuck chip, and any unfinished chip only animates while that reply is actually running.

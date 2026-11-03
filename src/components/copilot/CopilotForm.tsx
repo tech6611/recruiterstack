@@ -167,11 +167,14 @@ export function CopilotForm({
     }
   }, [needs])
 
-  // A suggested department/location that isn't in the org's list can't be saved
-  // (the requisition would reject it), so clear it once the list has loaded and
-  // let the recruiter pick a real one.
+  // A suggested department/location (e.g. read from a document) must match one
+  // in the org's list to be saved. Match it once the list loads — exactly, or
+  // loosely ("Engineering" ↔ "Engineering & Product") — otherwise clear it and
+  // remember what was suggested so the form can say "pick the closest".
+  const [unmatched, setUnmatched] = useState<Record<string, string>>({})
   useEffect(() => {
     const lists: [FormFieldType, string[] | null][] = [['department', departments], ['location', locations]]
+    const missed: Record<string, string> = {}
     setValues(prev => {
       let next = prev
       for (const [type, list] of lists) {
@@ -179,12 +182,17 @@ export function CopilotForm({
         for (const f of spec.fields) {
           if (f.type !== type) continue
           const v = prev[f.key]
-          const hit = v ? list.find(x => x.toLowerCase() === v.toLowerCase()) : undefined
-          if (v && hit !== v) next = { ...next, [f.key]: hit ?? '' }
+          if (!v || list.includes(v)) continue
+          const lv = v.trim().toLowerCase()
+          const hit = list.find(x => x.toLowerCase() === lv)
+            ?? list.find(x => x.toLowerCase().includes(lv) || lv.includes(x.toLowerCase()))
+          if (!hit) missed[f.key] = v
+          next = { ...next, [f.key]: hit ?? '' }
         }
       }
       return next
     })
+    if (Object.keys(missed).length) setUnmatched(u => ({ ...u, ...missed }))
   }, [departments, locations, spec.fields])
 
   const set = (key: string, v: string) => setValues(prev => ({ ...prev, [key]: v }))
@@ -362,6 +370,9 @@ export function CopilotForm({
             <div className="flex items-center justify-between gap-2">
               <label className="block text-xs font-medium text-slate-700">
                 {f.label}{f.required && <span className="text-red-500"> *</span>}
+                {f.from_source && !unmatched[f.key] && (
+                  <span className="ml-1.5 rounded bg-sky-50 px-1 py-px text-[10px] font-medium text-sky-700">From your file</span>
+                )}
               </label>
               {f.type === 'rich_text' && (
                 <button type="button" disabled={disabled || drafting !== null}
@@ -376,6 +387,9 @@ export function CopilotForm({
             </div>
             {renderField(f)}
             {draftError[f.key] && <p className="text-[11px] text-red-600">{draftError[f.key]}</p>}
+            {unmatched[f.key] && !values[f.key] && (
+              <p className="text-[11px] text-amber-700">Your file says “{unmatched[f.key]}”, which isn&apos;t in your list — pick the closest.</p>
+            )}
             {err
               ? <p className="text-[11px] text-red-600">{err}</p>
               : f.help && f.type !== 'rich_text' && <p className="text-[11px] text-slate-400">{f.help}</p>}

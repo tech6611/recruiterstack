@@ -19,6 +19,7 @@ export interface FormField {
   options?:    string[]   // only for type 'select'
   help?:       string
   min_length?: number     // e.g. 50 for a requisition justification
+  from_source?: boolean   // default was read from a file / link / pasted text
 }
 
 export interface FormSpec {

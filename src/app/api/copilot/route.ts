@@ -48,6 +48,7 @@ function toolLabel(name: string): string {
     delegate_to_crm:   '🤝 Asking the CRM agent...',
     delegate_to_payroll: '🤝 Asking the payroll agent...',
     request_approval:  '⏸️  Awaiting your approval...',
+    read_link:         '🔗 Reading the link...',
   }
   return labels[name] ?? `⚙️ Running ${name}...`
 }
@@ -63,6 +64,7 @@ function toolSummary(name: string): string {
     delegate_to_hris:    'HRIS agent responded',
     delegate_to_crm:     'CRM agent responded',
     delegate_to_payroll: 'Payroll agent responded',
+    read_link:           'Read the link',
   }
   return done[name] ?? 'Done'
 }
@@ -109,6 +111,7 @@ function sanitizeFormFields(raw: unknown): FormField[] {
       options:    Array.isArray(f.options) ? f.options.map(String) : undefined,
       help:       typeof f.help === 'string' ? f.help : undefined,
       min_length: typeof f.min_length === 'number' ? f.min_length : undefined,
+      from_source: f.from_source === true && f.default != null && String(f.default).trim() !== '' ? true : undefined,
     })
   }
   return out
