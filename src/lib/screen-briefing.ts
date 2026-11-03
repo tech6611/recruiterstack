@@ -38,3 +38,44 @@ export function callerBrief(icp: Pick<Icp, 'sourcing_map'> | null | undefined) {
     corrections: b.corrections ?? null,
   }
 }
+
+/** Strip HTML from a rich-text settings field (careers-page editor output). PURE. */
+function plain(html: string | null | undefined): string | null {
+  const t = (html ?? '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return t || null
+}
+
+/** The hiring company as a caller should describe it — from org_settings (the
+ *  careers-page / company profile). The JD alone is marketing copy that can't
+ *  answer "how big is the team?" or "what does the company do?". PURE. */
+export function callerCompany(
+  row:
+    | {
+        company_name?: string | null
+        company_size?: string | null
+        industry?: string | null
+        website?: string | null
+        tagline?: string | null
+        about?: string | null
+      }
+    | null
+    | undefined,
+) {
+  if (!row) return null
+  const out = {
+    name: plain(row.company_name),
+    size: plain(row.company_size),
+    industry: plain(row.industry),
+    website: plain(row.website),
+    tagline: plain(row.tagline),
+    about: plain(row.about)?.slice(0, 1200) ?? null,
+  }
+  return Object.values(out).some(Boolean) ? out : null
+}

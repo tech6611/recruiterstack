@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { callerBrief, callerMustHaves, cvSummaryOnly } from './screen-briefing'
+import { callerBrief, callerCompany, callerMustHaves, cvSummaryOnly } from './screen-briefing'
 import type { IcpMustHave, RecruiterBrief } from '@/lib/types/icp'
 
 describe('cvSummaryOnly', () => {
@@ -60,5 +60,30 @@ describe('callerBrief', () => {
   it('is null without an ICP or a brief', () => {
     expect(callerBrief(null)).toBeNull()
     expect(callerBrief({ sourcing_map: null } as never)).toBeNull()
+  })
+})
+
+describe('callerCompany', () => {
+  it('strips the careers-page HTML and keeps what a caller can say', () => {
+    const out = callerCompany({
+      company_name: 'RecruiterStack',
+      company_size: '1-10',
+      industry: 'SaaS',
+      website: 'https://recruiterstack.in',
+      tagline: '<p>Build the future of hiring with us</p>',
+      about: '<p><strong>We are the 1st unified Agentic AI platform</strong> &amp; more</p>',
+    })
+    expect(out).toEqual({
+      name: 'RecruiterStack',
+      size: '1-10',
+      industry: 'SaaS',
+      website: 'https://recruiterstack.in',
+      tagline: 'Build the future of hiring with us',
+      about: 'We are the 1st unified Agentic AI platform & more',
+    })
+  })
+  it('is null when there is no profile', () => {
+    expect(callerCompany(null)).toBeNull()
+    expect(callerCompany({ company_name: '', about: '<p></p>' })).toBeNull()
   })
 })

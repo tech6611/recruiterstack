@@ -21,7 +21,7 @@ import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipeline
 import { generateIcpWithReasoning } from '@/lib/ai/icp-generator'
 import { logger } from '@/lib/logger'
 import type { Icp, IcpCompetency } from '@/lib/types/icp'
-import { callerBrief, callerMustHaves, cvSummaryOnly } from '@/lib/screen-briefing'
+import { callerBrief, callerCompany, callerMustHaves, cvSummaryOnly } from '@/lib/screen-briefing'
 
 // One deep reasoning-first Gemini pass may run when a job has no ICP yet.
 export const maxDuration = 120
@@ -410,7 +410,19 @@ export async function POST(req: Request) {
       }
     }
 
-    // 5) Competencies with probe hints (needs `known` for priority flags).
+    // 5) The hiring company (careers / company profile), so the caller can answer
+    //    "what does the company do?" — best-effort, a missing row is fine.
+    const companyRes = await sb
+      .from('org_settings')
+      .select('company_name, company_size, industry, website, tagline, about')
+      .eq('org_id', org_id)
+      .maybeSingle()
+    if (companyRes.error) {
+      logger.warn('screen-context: org_settings lookup failed', { org_id, error: companyRes.error.message })
+    }
+    const company = callerCompany(companyRes.data)
+
+    // 6) Competencies with probe hints (needs `known` for priority flags).
     const competencies = icp ? buildCompetencies(icp, known) : []
 
     return NextResponse.json({
@@ -427,6 +439,7 @@ export async function POST(req: Request) {
         candidate,
         // The recruiter brain that reasoned the ICP — the call is run in its persona.
         recruiterBrief: callerBrief(icp),
+        company,
       },
     })
   } catch (e) {
