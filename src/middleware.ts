@@ -58,6 +58,10 @@ function isClerkBypassed(req: NextRequest): boolean {
     req.nextUrl.pathname.startsWith('/api/internal') ||
     // Extension endpoints authenticate via API key (withApiKey), not Clerk.
     req.nextUrl.pathname.startsWith('/api/ext') ||
+    // MCP server for ChatGPT / Claude: guarded by OAuth access tokens checked in
+    // the route itself (withMcpAuth + verifyMcpToken), not by the browser session.
+    // Exact path only — nothing else under /api is opened up.
+    req.nextUrl.pathname === '/api/mcp' ||
     req.nextUrl.pathname.startsWith('/api/webhooks/clerk') ||
     req.nextUrl.pathname.startsWith('/api/webhooks/whatsapp') ||
     req.nextUrl.pathname.startsWith('/api/webhooks/sendgrid') ||
