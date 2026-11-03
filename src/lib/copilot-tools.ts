@@ -13,7 +13,6 @@ import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import { trackUsage } from '@/lib/ai/track-usage'
 import { jobWideMustHaves } from '@/lib/icp-gates'
 import {
-  countCanonicalJobs,
   createCanonicalJobFromApprovedOpening,
   findCanonicalJobsForAgent,
   getCanonicalJobBoardDetail,
@@ -76,6 +75,7 @@ import {
   listStaleActiveApplicationsForInbox,
   getApplicationCandidateFullNameAndJob,
   getApplicationForEmailDraft,
+  recordApplicationEventSafe,
 } from '@/modules/ats/domain/applications'
 import {
   listRoleSummaries,
@@ -726,6 +726,19 @@ export const COPILOT_TOOLS: ToolSchema[] = [
         stage_name:       { type: 'string', description: 'Interview stage (e.g. "Technical Screen", "Final Round")' },
         recommendation:   { type: 'string', enum: ['strong_yes', 'yes', 'maybe', 'no'], description: 'Overall hiring recommendation' },
         overall_notes:    { type: 'string', description: 'Overall interview notes or summary' },
+        scores: {
+          type: 'array',
+          description: 'Optional per-criterion ratings',
+          items: {
+            type: 'object',
+            properties: {
+              criterion: { type: 'string', description: 'What was assessed, e.g. "System design"' },
+              rating:    { type: 'number', description: '1 = strong no, 2 = no, 3 = yes, 4 = strong yes' },
+              notes:     { type: 'string', description: 'Optional notes for this criterion' },
+            },
+            required: ['criterion', 'rating'],
+          },
+        },
       },
       required: ['application_id', 'interviewer_name', 'recommendation'],
     },
@@ -777,13 +790,12 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   // ── Interview & Offer tools ───────────────────────────────────────────────
   {
     name: 'schedule_interview',
-    description: 'Schedule an interview for a candidate application. Creates an interview record and logs a timeline event. Optionally generates a self-schedule link for the candidate.',
+    description: 'Record a scheduled interview for a candidate application and log a timeline event. Does NOT create a calendar invite or video link — tell the user to add the meeting from the candidate\'s Interviews tab if they need one. Optionally generates a self-schedule link for the candidate.',
     input_schema: {
       type: 'object',
       properties: {
         application_id:     { type: 'string', description: 'UUID of the application' },
-        candidate_id:       { type: 'string', description: 'UUID of the candidate' },
-        hiring_request_id:  { type: 'string', description: 'UUID of the hiring request / job' },
+        candidate_id:       { type: 'string', description: 'UUID of the candidate (optional — taken from the application)' },
         interviewer_name:   { type: 'string', description: 'Full name of the interviewer' },
         interview_type:     { type: 'string', enum: ['video', 'phone', 'in_person', 'panel', 'technical', 'assessment'], description: 'Type of interview (default: video)' },
         scheduled_at:       { type: 'string', description: 'ISO 8601 datetime for the interview, e.g. "2026-03-20T14:00:00Z"' },
@@ -792,7 +804,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
         notes:              { type: 'string', description: 'Topics to cover or special instructions' },
         generate_self_schedule: { type: 'boolean', description: 'Generate a self-schedule link for the candidate (default: false)' },
       },
-      required: ['application_id', 'candidate_id', 'hiring_request_id', 'interviewer_name', 'scheduled_at'],
+      required: ['application_id', 'interviewer_name', 'scheduled_at'],
     },
   },
   {
@@ -827,8 +839,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
       type: 'object',
       properties: {
         application_id:    { type: 'string', description: 'UUID of the application' },
-        candidate_id:      { type: 'string', description: 'UUID of the candidate' },
-        hiring_request_id: { type: 'string', description: 'UUID of the hiring request' },
+        candidate_id:      { type: 'string', description: 'UUID of the candidate (optional — taken from the application)' },
         position_title:    { type: 'string', description: 'Job title for the offer' },
         base_salary:       { type: 'number', description: 'Annual base salary in USD' },
         bonus:             { type: 'number', description: 'Annual bonus or signing bonus in USD' },
@@ -838,7 +849,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
         notes:             { type: 'string', description: 'Special terms, relocation, signing bonus notes' },
         offer_letter_text: { type: 'string', description: 'Full offer letter text' },
       },
-      required: ['application_id', 'candidate_id', 'hiring_request_id', 'position_title'],
+      required: ['application_id', 'position_title'],
     },
   },
   {
@@ -869,7 +880,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   },
   {
     name: 'send_assessment',
-    description: 'Send an assessment or take-home test to a candidate. Logs the event in the timeline and marks what was sent. Generates a shareable assessment link if a URL is provided.',
+    description: 'Record on the candidate\'s timeline that an assessment or take-home test was given (name, link, due date). It does NOT email the candidate — after logging, give the user the link to share, or offer to send it with send_outreach_email (with approval).',
     input_schema: {
       type: 'object',
       properties: {
@@ -889,8 +900,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
       type: 'object',
       properties: {
         application_id:    { type: 'string', description: 'UUID of the application' },
-        candidate_id:      { type: 'string', description: 'UUID of the candidate' },
-        hiring_request_id: { type: 'string', description: 'UUID of the hiring request' },
+        candidate_id:      { type: 'string', description: 'UUID of the candidate (optional — taken from the application)' },
         interviewer_name:  { type: 'string', description: 'Interviewer who will conduct the interview' },
         interviewer_email: { type: 'string', description: 'Email of the interviewer — REQUIRED for the link to show real availability' },
         additional_interviewer_emails: { type: 'array', items: { type: 'string' }, description: 'Emails of other panel members (all must be free for a slot to show)' },
@@ -898,7 +908,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
         duration_minutes:  { type: 'number', description: 'Interview duration in minutes (default: 60)' },
         expires_in_days:   { type: 'number', description: 'Days until the self-schedule link expires (default: 7)' },
       },
-      required: ['application_id', 'candidate_id', 'hiring_request_id', 'interviewer_name'],
+      required: ['application_id', 'interviewer_name'],
     },
   },
   {
@@ -2487,10 +2497,12 @@ async function bulkRejectBelowScore(
   if (!apps || apps.length === 0) return `No active scored applications below ${below_score} found.`
 
   let rejected = 0
+  const failed: string[] = []
   for (const app of apps as Record<string, unknown>[]) {
     const appId = app.id as string
 
-    await updateApplicationStatusById(supabase, appId, 'rejected')
+    const { error: updErr } = await updateApplicationStatusById(supabase, appId, 'rejected')
+    if (updErr) { failed.push(`${appId}: ${updErr.message}`); continue }
 
     await supabase.from('application_events').insert({
       application_id: appId,
@@ -2504,6 +2516,7 @@ async function bulkRejectBelowScore(
   }
 
   return `Rejected ${rejected} application(s) with AI score < ${below_score}.`
+    + (failed.length ? ` ${failed.length} could not be rejected: ${failed.slice(0, 5).join('; ')}` : '')
 }
 
 async function getApplicationEvents(
@@ -2819,24 +2832,28 @@ async function getInbox(
         id, event_type, from_stage, to_stage, note, created_by, created_at,
         application:applications(
           id, status,
-          candidate:candidates(full_name, email),
+          candidate:candidates(name, email),
           job:jobs(position_title:title)
         )
       `)
       .eq('org_id', orgId)
       .order('created_at', { ascending: false })
       .limit(20),
-    listStaleActiveApplicationsForInbox(supabase, orgId, fourteenDaysAgo),
+    listStaleActiveApplicationsForInbox(supabase, orgId, fourteenDaysAgo).catch((e: Error) => e),
   ])
+
+  // Report lookup failures honestly rather than "No recent activity" / "All up to date".
+  if (eventsRes.error) return `Error loading inbox activity: ${eventsRes.error.message}`
+  if (stale instanceof Error) return `Error loading applications needing attention: ${stale.message}`
 
   const events = eventsRes.data ?? []
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const activityLines = (events as any[]).map(ev => {
-    const candidate = ev.application?.candidate?.full_name ?? 'Unknown'
+    const candidate = ev.application?.candidate?.name ?? 'Unknown'
     const job       = ev.application?.job?.position_title  ?? 'Unknown job'
     const date      = new Date(ev.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const detail    = ev.event_type === 'stage_change'
+    const detail    = ev.event_type === 'stage_moved' || ev.event_type === 'stage_change'
       ? `moved ${ev.from_stage ?? '?'} → ${ev.to_stage ?? '?'}`
       : ev.event_type === 'note_added' ? 'note added'
       : ev.event_type === 'status_changed' ? 'status changed'
@@ -2846,7 +2863,7 @@ async function getInbox(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const staleLines = (stale as any[]).map(app => {
-    const name  = app.candidate?.full_name ?? 'Unknown'
+    const name  = app.candidate?.name ?? 'Unknown'
     const job   = app.job?.position_title  ?? 'Unknown job'
     const stage = app.stage?.name          ?? 'Unassigned'
     const days  = Math.floor((Date.now() - new Date(app.applied_at).getTime()) / 86_400_000)
@@ -2868,7 +2885,7 @@ async function createScorecard(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { application_id, interviewer_name, stage_name, recommendation, overall_notes } = input
+  const { application_id, interviewer_name, stage_name, recommendation, overall_notes, scores } = input
 
   if (!application_id || !interviewer_name?.trim() || !recommendation) {
     return 'Error: application_id, interviewer_name, and recommendation are required.'
@@ -2877,7 +2894,17 @@ async function createScorecard(
   // Verify application belongs to org
   const { data: app, error: appErr } = await getApplicationCandidateFullNameAndJob(supabase, orgId, application_id)
 
-  if (appErr || !app) return `Application not found: ${application_id}`
+  if (appErr && appErr.message && !/0 rows|no rows/i.test(appErr.message)) return `Error looking up application: ${appErr.message}`
+  if (!app) return `Application not found: ${application_id}`
+
+  // Same shape the Scorecard drawer saves: { criterion, rating 1-4, notes }.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cleanScores = (Array.isArray(scores) ? scores : []).flatMap((sc: any) => {
+    const criterion = typeof sc?.criterion === 'string' ? sc.criterion.trim() : ''
+    const rating = Math.round(Number(sc?.rating))
+    if (!criterion || !(rating >= 1 && rating <= 4)) return []
+    return [{ criterion, rating, notes: typeof sc?.notes === 'string' ? sc.notes.trim() : '' }]
+  })
 
   const { data, error } = await supabase
     .from('scorecards')
@@ -2886,7 +2913,7 @@ async function createScorecard(
       interviewer_name: interviewer_name.trim(),
       stage_name:       stage_name?.trim() || null,
       recommendation,
-      scores:           [],
+      scores:           cleanScores,
       overall_notes:    overall_notes?.trim() || null,
       org_id:           orgId,
     } as never)
@@ -2895,14 +2922,23 @@ async function createScorecard(
 
   if (error) return `Error creating scorecard: ${error.message}`
 
+  // Timeline entry, matching what the Scorecard drawer (POST /api/scorecards) records.
+  await recordApplicationEventSafe(supabase, {
+    application_id,
+    event_type: 'scorecard_added',
+    note: `${recommendation} · ${interviewer_name.trim()}`,
+    created_by: interviewer_name.trim(),
+    org_id: orgId,
+  })
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const candidateName = (app.candidate as any)?.full_name ?? 'candidate'
+  const candidateName = (app.candidate as any)?.name ?? 'candidate'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const jobTitle      = (app.job as any)?.position_title ?? 'Unknown job'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sc = data as any
 
-  return `Scorecard logged for ${candidateName} / ${jobTitle}: ${interviewer_name} → ${recommendation}${stage_name ? ` (${stage_name})` : ''}. ID: ${sc.id}`
+  return `Scorecard logged for ${candidateName} / ${jobTitle}: ${interviewer_name} → ${recommendation}${stage_name ? ` (${stage_name})` : ''}${cleanScores.length ? `, ${cleanScores.length} criteria scored` : ''}. ID: ${sc.id}`
 }
 
 async function draftApplicationEmail(
@@ -2926,7 +2962,8 @@ async function draftApplicationEmail(
 
   const { data: app, error: appErr } = await getApplicationForEmailDraft(supabase, orgId, application_id)
 
-  if (appErr || !app) return `Application not found: ${application_id}`
+  if (appErr && appErr.message && !/0 rows|no rows/i.test(appErr.message)) return `Error looking up application: ${appErr.message}`
+  if (!app) return `Application not found: ${application_id}`
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const candidate  = app.candidate as any
@@ -2935,7 +2972,7 @@ async function draftApplicationEmail(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stage      = app.stage     as any
 
-  const firstName  = candidate?.full_name?.split(' ')[0] ?? 'there'
+  const firstName  = candidate?.name?.split(' ')[0] || 'there'
   const jobTitle   = job?.position_title ?? 'the position'
   const dept       = job?.department?.name
   const stageName  = stage?.name ?? 'Applied'
@@ -2966,15 +3003,19 @@ Respond with ONLY valid JSON: {"subject": "...", "body": "..."}`
   try {
     const { text, usage, model } = await generateText(prompt, {
       model: 'gemini-2.5-flash',
-      maxTokens: 600,
+      maxTokens: 1500,
+      // JSON mode also turns off hidden thinking, which otherwise ate the
+      // output budget and cut the JSON off mid-email (always "generation failed").
+      json: true,
     })
     trackUsage('copilot-email-draft', model, usage, { orgId })
     const raw   = text.trim()
     const json  = raw.startsWith('{') ? raw : (raw.match(/\{[\s\S]*\}/)?.[0] ?? '')
     const draft = JSON.parse(json) as { subject: string; body: string }
-    return `EMAIL DRAFT (${templateKey}) for ${candidate?.full_name ?? 'candidate'}:\n\nSubject: ${draft.subject}\n\n${draft.body}`
-  } catch {
-    return 'Error: AI email generation failed.'
+    if (!draft?.subject || !draft?.body) return 'Error: AI email generation returned an incomplete draft — try again.'
+    return `EMAIL DRAFT (${templateKey}) for ${candidate?.name ?? 'candidate'}:\n\nSubject: ${draft.subject}\n\n${draft.body}`
+  } catch (err) {
+    return `Error: AI email generation failed (${err instanceof Error ? err.message : 'unknown error'}).`
   }
 }
 
@@ -3109,21 +3150,65 @@ async function submitRequisition(
 
 // ── Interview tools ───────────────────────────────────────────────────────────
 
+/** Look up an application in this org and return its candidate. Interviews and
+ *  offers link to the job through the application; the legacy
+ *  hiring_request_id column only accepts rows from the old hiring_requests
+ *  table, so canonical records leave it null (same as the REST routes). */
+async function resolveApplicationRef(
+  supabase: SupabaseClient,
+  orgId: string,
+  applicationId: unknown,
+): Promise<{ candidateId: string } | { error: string }> {
+  if (typeof applicationId !== 'string' || !applicationId.trim()) return { error: 'Error: application_id is required.' }
+  const { data, error } = await supabase
+    .from('applications')
+    .select('id, candidate_id')
+    .eq('id', applicationId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (error) return { error: `Error looking up application: ${error.message}` }
+  if (!data) return { error: `Application not found: ${applicationId}` }
+  return { candidateId: (data as { candidate_id: string }).candidate_id }
+}
+
+function absoluteAppUrl(path: string): string {
+  const base = (process.env.NEXT_PUBLIC_APP_URL || 'https://recruiterstack.in').replace(/\/$/, '')
+  return `${base}${path}`
+}
+
 async function scheduleInterview(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   input: Record<string, any>,
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { application_id, candidate_id, hiring_request_id, interviewer_name,
+  const { application_id, interviewer_name,
     interview_type, scheduled_at, duration_minutes, location, notes, generate_self_schedule } = input
 
+  if (!interviewer_name?.trim() || !scheduled_at) return 'Error: interviewer_name and scheduled_at are required.'
+  if (Number.isNaN(new Date(scheduled_at).getTime())) return `Error: scheduled_at "${scheduled_at}" is not a valid date/time.`
+
+  const ref = await resolveApplicationRef(supabase, orgId, application_id)
+  if ('error' in ref) return ref.error
+
+  // Self-schedule token is generated here (the interviews table has no
+  // generate_self_schedule column — the REST route does the same).
+  let self_schedule_token: string | null = null
+  let self_schedule_expires_at: string | null = null
+  if (generate_self_schedule) {
+    const { randomBytes } = await import('crypto')
+    self_schedule_token = randomBytes(20).toString('hex')
+    const exp = new Date()
+    exp.setDate(exp.getDate() + 7)
+    self_schedule_expires_at = exp.toISOString()
+  }
+
   const body: Record<string, unknown> = {
-    application_id, candidate_id, hiring_request_id,
-    interviewer_name, interview_type: interview_type ?? 'video',
+    application_id, candidate_id: ref.candidateId, hiring_request_id: null,
+    interviewer_name: interviewer_name.trim(), interview_type: interview_type ?? 'video',
     scheduled_at, duration_minutes: duration_minutes ?? 60,
     location: location ?? null, notes: notes ?? null,
-    generate_self_schedule: generate_self_schedule ?? false,
+    self_schedule_token, self_schedule_expires_at,
     org_id: orgId,
   }
 
@@ -3138,14 +3223,14 @@ async function scheduleInterview(
     event_type: 'interview_scheduled',
     note: `Interview scheduled with ${interviewer_name} — ${new Date(scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
     metadata: { interview_id: (data as never as Record<string, unknown>).id, interview_type: interview_type ?? 'video' },
-    created_by: orgId,
+    created_by: 'AI Copilot',
   } as never)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const d = data as any
-  let result = `Interview scheduled successfully (ID: ${d.id}).`
+  let result = `Interview recorded (ID: ${d.id}). No calendar invite or video link was created — add one from the candidate's Interviews tab if needed.`
   if (d.self_schedule_token) {
-    result += ` Self-schedule link: /schedule/${d.self_schedule_token}`
+    result += ` Self-schedule link: ${absoluteAppUrl(`/schedule/${d.self_schedule_token}`)}`
   }
   return result
 }
@@ -3216,15 +3301,20 @@ async function createOffer(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { application_id, candidate_id, hiring_request_id, position_title,
+  const { application_id, position_title,
     base_salary, bonus, equity, start_date, expiry_date, notes, offer_letter_text } = input
+
+  if (!position_title?.trim()) return 'Error: position_title is required.'
+  const ref = await resolveApplicationRef(supabase, orgId, application_id)
+  if ('error' in ref) return ref.error
+  const candidate_id = ref.candidateId
 
   let data
   try {
     data = await createOfferRow(supabase, orgId, {
       applicationId: application_id,
       candidateId: candidate_id,
-      hiringRequestId: hiring_request_id,
+      hiringRequestId: null,
       positionTitle: position_title,
       baseSalary: base_salary,
       bonus,
@@ -3242,9 +3332,9 @@ async function createOffer(
     application_id,
     org_id: orgId,
     event_type: 'offer_created',
-    note: `Offer created — ${position_title}${base_salary ? ` · $${Number(base_salary).toLocaleString()}` : ''}`,
+    note: `Offer created — ${position_title}${base_salary ? ` · ${Number(base_salary).toLocaleString()}` : ''}`,
     metadata: { offer_id: (data as never as Record<string, unknown>).id },
-    created_by: orgId,
+    created_by: 'AI Copilot',
   } as never)
 
   await markCandidateOfferExtended(supabase, orgId, candidate_id)
@@ -3332,16 +3422,21 @@ async function sendAssessment(
 ): Promise<string> {
   const { application_id, assessment_name, assessment_url, due_date, notes } = input
 
-  await supabase.from('application_events').insert({
+  if (!assessment_name?.trim()) return 'Error: assessment_name is required.'
+  const ref = await resolveApplicationRef(supabase, orgId, application_id)
+  if ('error' in ref) return ref.error
+
+  const { error } = await supabase.from('application_events').insert({
     application_id,
     org_id: orgId,
     event_type: 'assessment_sent',
-    note: `Assessment sent: ${assessment_name}${assessment_url ? ` — ${assessment_url}` : ''}${due_date ? ` (due ${due_date})` : ''}${notes ? ` — ${notes}` : ''}`,
+    note: `Assessment given: ${assessment_name}${assessment_url ? ` — ${assessment_url}` : ''}${due_date ? ` (due ${due_date})` : ''}${notes ? ` — ${notes}` : ''}`,
     metadata: { assessment_name, assessment_url: assessment_url ?? null, due_date: due_date ?? null },
-    created_by: orgId,
+    created_by: 'AI Copilot',
   } as never)
+  if (error) return `Error logging assessment: ${error.message}`
 
-  return `Assessment "${assessment_name}" logged and sent for application ${application_id}.${assessment_url ? ` Link: ${assessment_url}` : ''}`
+  return `Assessment "${assessment_name}" logged on the candidate's timeline. Nothing was emailed to the candidate yet.${assessment_url ? ` Link to share: ${assessment_url}` : ''}`
 }
 
 async function createSelfScheduleInvite(
@@ -3350,8 +3445,12 @@ async function createSelfScheduleInvite(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { application_id, candidate_id, hiring_request_id, interviewer_name,
+  const { application_id, interviewer_name,
     interviewer_email, additional_interviewer_emails, interview_type, duration_minutes, expires_in_days } = input
+
+  const ref = await resolveApplicationRef(supabase, orgId, application_id)
+  if ('error' in ref) return ref.error
+  const candidate_id = ref.candidateId
 
   const { randomBytes } = await import('crypto')
   const token = randomBytes(20).toString('hex')
@@ -3374,7 +3473,7 @@ async function createSelfScheduleInvite(
     : null
 
   const { data, error } = await createSelfScheduleInterview(supabase, orgId, {
-    application_id, candidate_id, hiring_request_id,
+    application_id, candidate_id, hiring_request_id: null,
     interviewer_name,
     interviewer_email: emails[0] ?? null,
     interview_type: interview_type ?? 'video',
@@ -3394,10 +3493,10 @@ async function createSelfScheduleInvite(
     event_type: 'interview_scheduled',
     note: `Self-schedule invite created — candidate can pick their own time slot`,
     metadata: { interview_id: (data as never as Record<string, unknown>).id, self_schedule_token: token },
-    created_by: orgId,
+    created_by: 'AI Copilot',
   } as never)
 
-  return `Self-schedule invite created. Share this link with the candidate: /schedule/${token} (expires in ${expires_in_days ?? 7} days)`
+  return `Self-schedule invite created. Share this link with the candidate: ${absoluteAppUrl(`/schedule/${token}`)} (expires in ${expires_in_days ?? 7} days)`
 }
 
 async function createInterviewerAvailabilityLink(

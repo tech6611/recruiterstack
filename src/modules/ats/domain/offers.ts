@@ -6,7 +6,7 @@ type Supabase = SupabaseClient<Database>
 export interface CreateOfferInput {
   applicationId: string
   candidateId: string
-  hiringRequestId: string
+  hiringRequestId: string | null
   positionTitle: string
   baseSalary?: number | null
   bonus?: number | null

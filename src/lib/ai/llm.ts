@@ -89,11 +89,18 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   return (res.embeddings ?? []).map((e) => e.values ?? [])
 }
 
-function toUsage(response: { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }): Usage {
+type UsageMeta = { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number }
+
+/** Gemini bills "thinking" tokens as output, so count them alongside the visible reply. */
+function outputTokens(meta: UsageMeta | undefined): number {
+  return (meta?.candidatesTokenCount ?? 0) + (meta?.thoughtsTokenCount ?? 0)
+}
+
+function toUsage(response: { usageMetadata?: UsageMeta }): Usage {
   const meta = response.usageMetadata ?? {}
   return {
     input_tokens: meta.promptTokenCount ?? 0,
-    output_tokens: meta.candidatesTokenCount ?? 0,
+    output_tokens: outputTokens(meta),
   }
 }
 
@@ -320,7 +327,7 @@ export async function runToolLoop(opts: ToolLoopOptions): Promise<ToolLoopResult
     const response = await ai.models.generateContent({ model: resolved, contents, config })
     // Accumulate token usage from every model call in the loop, not just the last.
     usage.input_tokens += response.usageMetadata?.promptTokenCount ?? 0
-    usage.output_tokens += response.usageMetadata?.candidatesTokenCount ?? 0
+    usage.output_tokens += outputTokens(response.usageMetadata)
 
     const calls = response.functionCalls ?? []
     const modelContent = response.candidates?.[0]?.content
@@ -407,7 +414,7 @@ export class CopilotTurn {
       if (chunk.usageMetadata) {
         this.usage = {
           input_tokens: chunk.usageMetadata.promptTokenCount ?? 0,
-          output_tokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
+          output_tokens: outputTokens(chunk.usageMetadata),
         }
       }
     }

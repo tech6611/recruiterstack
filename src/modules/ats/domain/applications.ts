@@ -611,7 +611,7 @@ export async function updateApplicationStageById(
 export async function listActiveApplicationsBelowScore(
   supabase: Supabase,
   orgId: string,
-  hiringRequestId: string,
+  jobId: string,
   belowScore: number,
 ): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -621,7 +621,7 @@ export async function listActiveApplicationsBelowScore(
   const { data, error } = await supabase
     .from('applications')
     .select('id, ai_score, candidate:candidates(name)')
-    .eq('hiring_request_id', hiringRequestId)
+    .eq('job_id', jobId)
     .eq('org_id', orgId)
     .eq('status', 'active')
     .not('ai_score', 'is', null)
@@ -638,15 +638,16 @@ export async function updateApplicationStatusById(
   supabase: Supabase,
   applicationId: string,
   status: string,
-): Promise<void> {
-  await supabase
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase
     .from('applications')
     .update({ status } as never)
     .eq('id', applicationId)
+  return { error: error ? { message: error.message } : null }
 }
 
 /** Active applications applied before the given cutoff, with candidate
- *  full_name, job title and stage name; oldest first, capped at 20.
+ *  name, job title and stage name; oldest first, capped at 20.
  *  Used by the copilot inbox "needs attention" panel. */
 export async function listStaleActiveApplicationsForInbox(
   supabase: Supabase,
@@ -657,15 +658,15 @@ export async function listStaleActiveApplicationsForInbox(
   status: string
   applied_at: string
   stage_id: string | null
-  candidate: { full_name: string } | null
+  candidate: { name: string } | null
   job: { position_title: string } | null
   stage: { name: string } | null
 }>> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('applications')
     .select(`
         id, status, applied_at, stage_id,
-        candidate:candidates(full_name),
+        candidate:candidates(name),
         job:jobs(position_title:title),
         stage:pipeline_stages(name)
       `)
@@ -675,11 +676,13 @@ export async function listStaleActiveApplicationsForInbox(
     .order('applied_at', { ascending: true })
     .limit(20)
 
+  // Surface query failures instead of reporting "all up to date".
+  if (error) throw new Error(error.message)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? []) as any
 }
 
-/** One application with candidate full_name and job title (org-scoped),
+/** One application with candidate name and job title (org-scoped),
  *  using the `job:` alias. Used by createScorecard. Returns { data, error }. */
 export async function getApplicationCandidateFullNameAndJob(
   supabase: Supabase,
@@ -692,7 +695,7 @@ export async function getApplicationCandidateFullNameAndJob(
 }> {
   const { data, error } = await supabase
     .from('applications')
-    .select('id, candidate:candidates(full_name), job:jobs(position_title:title)')
+    .select('id, candidate:candidates(name), job:jobs(position_title:title)')
     .eq('id', applicationId)
     .eq('org_id', orgId)
     .single()
@@ -701,7 +704,7 @@ export async function getApplicationCandidateFullNameAndJob(
   return { data: (data ?? null) as any, error: error as any }
 }
 
-/** One application with status, candidate full_name+email, job
+/** One application with status, candidate name+email, job
  *  title+department and stage name (org-scoped). Used by the copilot
  *  email-draft tool. Returns { data, error }. */
 export async function getApplicationForEmailDraft(
@@ -717,7 +720,7 @@ export async function getApplicationForEmailDraft(
     .from('applications')
     .select(`
       id, status,
-      candidate:candidates(full_name, email),
+      candidate:candidates(name, email),
       job:jobs(position_title:title, department:departments(name)),
       stage:pipeline_stages(name)
     `)
