@@ -369,7 +369,7 @@ export function CopilotForm({
                   title={isBlank(values[f.key]) ? 'Draft this from the details above' : 'Improve this draft using the details above'}
                   className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50">
                   {drafting === f.key
-                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Writing…</>
+                    ? <><Loader2 className="w-3 h-3 animate-spin" /> {/description|^jd$/i.test(f.key) ? 'Writing… (~20–30s)' : 'Writing…'}</>
                     : <><Sparkles className="w-3 h-3" /> {isBlank(values[f.key]) ? 'Write with AI' : 'Improve with AI'}</>}
                 </button>
               )}

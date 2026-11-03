@@ -172,6 +172,7 @@ import type {
 // the job is created after approval) so details asked up front are never lost.
 const JOB_DETAIL_PROPS = {
   level:            { type: 'string',  description: 'Seniority level, e.g. "Senior"' },
+  team_context:     { type: 'string',  description: 'What this person will work on / own (from the form question "What will this person work on?")' },
   job_description:  { type: 'string',  description: 'Full job description (rich HTML from the form — pass through unchanged)' },
   key_requirements: { type: 'string',  description: 'Core requirements (may be HTML)' },
   nice_to_haves:    { type: 'string',  description: 'Nice-to-have qualifications (may be HTML)' },
@@ -1889,6 +1890,7 @@ async function createJobAndPipeline(
 
   const intake: Record<string, unknown> = {}
   if (str(pick('level')))            intake.level            = str(pick('level'))
+  if (str(pick('team_context')))     intake.team_context     = str(pick('team_context'))
   if (str(pick('key_requirements'))) intake.key_requirements = str(pick('key_requirements'))
   if (str(pick('nice_to_haves')))    intake.nice_to_have     = str(pick('nice_to_haves'))
   if (str(input.location))           intake.location         = str(input.location)
@@ -4284,6 +4286,7 @@ function cleanJobDraft(raw: unknown): OpeningJobDraft {
   const out: OpeningJobDraft = {}
   const s = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
   if (s(r.level))            out.level            = s(r.level)
+  if (s(r.team_context))     out.team_context     = s(r.team_context)
   if (s(r.job_description))  out.job_description  = s(r.job_description)
   if (s(r.key_requirements)) out.key_requirements = s(r.key_requirements)
   if (s(r.nice_to_haves))    out.nice_to_haves    = s(r.nice_to_haves)

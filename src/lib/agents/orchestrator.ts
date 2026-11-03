@@ -193,7 +193,7 @@ FORM FIELD TYPES (pick the one that fits; dropdown choices are filled in automat
 
 FIELD MAP for "create a job / open a role" (requisition → submit for approval → job):
 - Required: title (text); department (department); hiring_manager (person — needed before submitting); justification (rich_text, min_length 50 — needed before submitting).
-- Optional: location (location); employment_type (employment_type, default full_time); comp_min, comp_max (number); comp_currency (currency, default INR); target_start_date (date); level (level); job_description (rich_text); key_requirements (rich_text); nice_to_haves (rich_text); headcount (number, default 1).
+- Optional: location (location); employment_type (employment_type, default full_time); comp_min, comp_max (number); comp_currency (currency, default INR); target_start_date (date); level (level); headcount (number, default 1); then, in this order, right before the job description so "Write with AI" can use them: team_context (text, label "What will this person work on?", help "One or two lines, e.g. owns our payments APIs and their reliability"); key_requirements (text, label "Must-have skills / tech", help "e.g. Go or Node, Postgres, AWS, 3+ years"); job_description (rich_text); nice_to_haves (rich_text).
 - Never ask for the recruiter (it's automatically the person asking) or the approver (assigned automatically).
 Adapt this list for other tasks using the same field types.
 

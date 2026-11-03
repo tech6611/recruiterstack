@@ -2,6 +2,10 @@
 
 ## 2026-11-03
 
+### Changed
+- **Better AI job descriptions in the copilot form.** "Write with AI" on the job description now uses Gemini Pro (~20–30s; the button says so) with a much fuller brief: 450–650 words, concrete responsibilities, a "What success looks like" (first 6 months) section, salary shown as given (never "competitive salary"), a short "How we hire", banned clichés, inclusive wording, and no invented company facts. It now also gets the company's careers-page profile (tagline + About) and up to two of the org's own past JDs for voice, and drops email addresses from what it's sent. Other fields (justification, lists) stay on fast Flash.
+- **Two new optional questions before the JD** in the job form: "What will this person work on?" (`team_context`) and "Must-have skills / tech" (`key_requirements`). Both feed the draft and are saved on the job (`custom_fields.intake`), via the requisition's job draft when approval is pending.
+
 ### Fixed
 - **Copilot: submitted form no longer dumps every answer into the chat.** The recruiter's bubble now just says "✓ Details submitted"; the full answers still go to the AI.
 - **Copilot: "⚙️ Running ask_user_form…" chip spun forever.** The form call no longer creates a progress chip (the form card stands for it), older saved chats hide the stuck chip, and any unfinished chip only animates while that reply is actually running.
