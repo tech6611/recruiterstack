@@ -192,7 +192,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   {
     name: 'search_candidates',
     description:
-      'Search for candidates by name, current job title, or skills. Returns matching candidates with status and active job applications.',
+      'Search for candidates by name or current job title (not skills — use search_candidate_pool for skills). Returns matching candidates with status and active job applications.',
     input_schema: {
       type: 'object',
       properties: {
@@ -218,7 +218,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
       properties: {
         job_id: {
           type: 'string',
-          description: 'UUID of the job/hiring request — use when you have the exact ID',
+          description: 'UUID of the job — use when you have the exact ID',
         },
         job_title_query: {
           type: 'string',
@@ -367,7 +367,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
     input_schema: {
       type: 'object',
       properties: {
-        job_id:       { type: 'string', description: 'UUID of the hiring request / job' },
+        job_id:       { type: 'string', description: 'UUID of the job' },
         candidate_ids: {
           type: 'array',
           items: { type: 'string' },
@@ -416,6 +416,18 @@ export const COPILOT_TOOLS: ToolSchema[] = [
       type: 'object',
       properties: { job_id: { type: 'string', description: 'UUID of the job' } },
       required: ['job_id'],
+    },
+  },
+  {
+    name: 'top_candidates',
+    description:
+      'The strongest active candidates right now, ranked by AI fit score — across all open jobs, or one job. Use for "who are my top candidates?". Shows each candidate\'s job, stage, score and recommendation, plus how many active candidates are not scored yet.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        job_id: { type: 'string', description: 'Optional — limit to one job' },
+        limit:  { type: 'number', description: 'How many to show (default 10, max 25)' },
+      },
     },
   },
   {
@@ -685,7 +697,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   // ── Gap-fill tools: full platform parity ───────────────────────────────────
   {
     name: 'list_roles',
-    description: 'List all roles in the ATS (roles are distinct from hiring requests — they define standing job templates with scoring thresholds).',
+    description: 'List all roles in the ATS (roles are standing job templates with scoring thresholds — distinct from jobs and requisitions).',
     input_schema: {
       type: 'object',
       properties: {
@@ -790,7 +802,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
         template:         { type: 'string', enum: ['interview_invite', 'rejection', 'offer', 'followup'], description: 'Email type to draft' },
         recruiter_name:   { type: 'string', description: 'Recruiter name for the sign-off (default: "The Recruiting Team")' },
         recruiter_title:  { type: 'string', description: 'Recruiter title (optional)' },
-        company_name:     { type: 'string', description: 'Company name to use in the email body' },
+        company_name:     { type: 'string', description: 'Company name (optional — defaults to the name in Settings)' },
       },
       required: ['application_id', 'template'],
     },
@@ -882,8 +894,8 @@ export const COPILOT_TOOLS: ToolSchema[] = [
         application_id:    { type: 'string', description: 'UUID of the application' },
         candidate_id:      { type: 'string', description: 'UUID of the candidate (optional — taken from the application)' },
         position_title:    { type: 'string', description: 'Job title for the offer' },
-        base_salary:       { type: 'number', description: 'Annual base salary in USD' },
-        bonus:             { type: 'number', description: 'Annual bonus or signing bonus in USD' },
+        base_salary:       { type: 'number', description: 'Annual base salary (in the job\'s currency)' },
+        bonus:             { type: 'number', description: 'Annual bonus or signing bonus (in the job\'s currency)' },
         equity:            { type: 'string', description: 'Equity terms, e.g. "0.05% over 4 years"' },
         start_date:        { type: 'string', description: 'Target start date (YYYY-MM-DD)' },
         expiry_date:       { type: 'string', description: 'Offer expiry date (YYYY-MM-DD)' },
@@ -1379,7 +1391,7 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   get_inbox: 'recruiting:view', get_scorecard: 'recruiting:view', get_offers: 'recruiting:view',
   get_interviews: 'recruiting:view', get_sequence: 'recruiting:view',
   list_sequences: 'recruiting:view', list_candidate_sequence_history: 'recruiting:view',
-  list_roles: 'recruiting:view', get_icp: 'recruiting:view',
+  list_roles: 'recruiting:view', get_icp: 'recruiting:view', top_candidates: 'recruiting:view',
   generate_icp: 'recruiting:edit', approve_icp: 'recruiting:edit',
   get_interview_notes: 'recruiting:view',
   // source_candidates writes the sourcing_matches cache, so it needs edit.
@@ -1422,7 +1434,7 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   list_expiring_documents: 'documents:view',
   // Leave
   get_employee_leave_balance: 'leave:view', list_holidays: 'leave:view',
-  list_time_off: 'leave:view', request_time_off: 'leave:view', decide_time_off: 'leave:approve',
+  list_time_off: 'leave:view', request_time_off: 'leave:edit', decide_time_off: 'leave:approve',
 }
 
 /** The "Permission denied" message for a tool the caller's capabilities don't
@@ -1469,6 +1481,7 @@ export async function executeTool(
       case 'source_candidates':         return await sourceCandidatesTool(input, orgId, supabase)
       case 'generate_icp':               return await generateIcpTool(input, orgId, supabase, userId)
       case 'approve_icp':                return await approveIcpTool(input, orgId, supabase, userId)
+      case 'top_candidates':             return await topCandidates(input, orgId, supabase)
       case 'get_icp':                   return await getIcpTool(input, orgId, supabase)
       case 'get_interview_notes':       return await getInterviewNotesTool(input, orgId, supabase)
       case 'bulk_add_to_pipeline':      return await bulkAddToPipeline(input, orgId, supabase)
@@ -1595,6 +1608,34 @@ async function searchCandidates(
   return `Found ${data.length} candidate(s):\n${lines.join('\n')}`
 }
 
+/** Hiring manager to show for each job: the assigned user (jobs.hiring_manager_user_id,
+ *  same as the job page's Team section) by name, else the free-text name typed on
+ *  the job/requisition, else "not set". */
+async function hiringManagerNames(
+  supabase: SupabaseClient,
+  orgId: string,
+  jobs: Array<{ id: string; hiring_manager_name?: string | null }>,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (!jobs.length) return out
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+  const { data: rows } = await sb.from('jobs').select('id, hiring_manager_user_id').eq('org_id', orgId).in('id', jobs.map(j => j.id))
+  const userIds = Array.from(new Set(((rows ?? []) as Array<{ hiring_manager_user_id: string | null }>).map(r => r.hiring_manager_user_id).filter(Boolean))) as string[]
+  const names = new Map<string, string>()
+  if (userIds.length) {
+    const { data: users } = await sb.from('users').select('id, full_name, first_name, last_name, email').in('id', userIds)
+    const { teamMemberName } = await import('@/lib/team-members')
+    for (const u of (users ?? []) as Array<{ id: string }>) names.set(u.id, teamMemberName({ user_id: u.id, users: u } as never))
+  }
+  const assigned = new Map(((rows ?? []) as Array<{ id: string; hiring_manager_user_id: string | null }>).map(r => [r.id, r.hiring_manager_user_id]))
+  for (const j of jobs) {
+    const uid = assigned.get(j.id)
+    out.set(j.id, (uid && names.get(uid)) || (j.hiring_manager_name ?? '').trim() || 'not set')
+  }
+  return out
+}
+
 async function getJobPipeline(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   input: Record<string, any>,
@@ -1651,7 +1692,8 @@ async function getJobPipeline(
   }
 
   let result = `**${job.position_title}** (${job.status})\n`
-  result += `Hiring Manager: ${job.hiring_manager_name}${job.department ? ` | ${job.department}` : ''}\n`
+  const hm = (await hiringManagerNames(supabase, orgId, [job])).get(job.id) ?? 'not set'
+  result += `Hiring Manager: ${hm}${job.department ? ` | ${job.department}` : ''}\n`
   result += `Total active candidates: ${apps.length}\n`
   result += `\nPipeline:\n`
 
@@ -1703,12 +1745,13 @@ async function listJobs(
       : 'No jobs found.'
   }
 
+  const hmNames = await hiringManagerNames(supabase, orgId, jobs)
   const lines = jobs.map(j => {
     // Active candidates per job: sum of the per-stage active counts the board
     // summary computes; total includes rejected/withdrawn/hired too.
     const active = j.stage_counts.reduce((sum, s) => sum + s.count, 0)
     const stages = j.stage_counts.filter(s => s.count > 0).map(s => `${s.stage_name}: ${s.count}`).join(', ')
-    return `• ${j.position_title}${j.department ? ` (${j.department})` : ''} | ${j.status} | HM: ${j.hiring_manager_name ?? '—'} | ` +
+    return `• ${j.position_title}${j.department ? ` (${j.department})` : ''} | ${j.status} | HM: ${hmNames.get(j.id) ?? 'not set'} | ` +
       `${active} active candidates${stages ? ` (${stages})` : ''}, ${j.total_candidates} total | ID: ${j.id}`
   })
 
@@ -1746,23 +1789,33 @@ async function findStaleApplications(
   if (appsErr) return `Error: ${appsErr.message}`
   if (!apps || apps.length === 0) return 'No active applications found.'
 
-  const appIds = apps.map((a: { id: string }) => a.id)
+  // Only candidates on live jobs (open / paused) count — closed jobs aren't "stale pipeline".
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const live = (apps as any[]).filter(a => ['open', 'paused'].includes(a.hiring_request?.status ?? 'open'))
+  if (live.length === 0) return 'No active candidates on open or paused jobs.'
 
-  // Get most recent event per application
-  const { data: events } = await supabase
-    .from('application_events')
-    .select('application_id, created_at')
-    .in('application_id', appIds)
-    .order('created_at', { ascending: false })
-
+  // Latest event per application, fetched in batches (a single huge .in() can
+  // exceed URL limits, and the default row cap would silently drop events and
+  // make busy candidates look stale).
   const latestEvent: Record<string, string> = {}
-  for (const ev of events ?? []) {
-    const e = ev as { application_id: string; created_at: string }
-    if (!latestEvent[e.application_id]) latestEvent[e.application_id] = e.created_at
+  const ids = live.map(a => a.id as string)
+  for (let i = 0; i < ids.length; i += 100) {
+    const batch = ids.slice(i, i + 100)
+    const { data: events, error: evErr } = await supabase
+      .from('application_events')
+      .select('application_id, created_at')
+      .in('application_id', batch)
+      .order('created_at', { ascending: false })
+      .limit(5000)
+    if (evErr) return `Error loading activity: ${evErr.message}`
+    for (const ev of events ?? []) {
+      const e = ev as { application_id: string; created_at: string }
+      if (!latestEvent[e.application_id]) latestEvent[e.application_id] = e.created_at
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stale = (apps as any[]).filter(app => {
+  const stale = live.filter((app: any) => {
     const last = latestEvent[app.id] ?? app.applied_at
     return last < cutoff
   })
@@ -1785,7 +1838,8 @@ async function findStaleApplications(
     return `• ${candidate} | ${job} | Stage: ${stage} | Last activity: ${daysAgo}d ago | appId: ${app.id}`
   })
 
-  return `${stale.length} stale application(s) (no activity in ${days}+ days):\n${lines.join('\n')}`
+  return `${stale.length} stale application(s) on open/paused jobs (no activity in ${days}+ days):\n${lines.slice(0, 50).join('\n')}` +
+    (lines.length > 50 ? `\n…and ${lines.length - 50} more (oldest shown first).` : '')
 }
 
 async function getCandidate(
@@ -2098,6 +2152,45 @@ export function summarizeIcp(icp: any): string {
   return `ICP — ${icp.status} v${icp.version}.\nMust-haves (hard gates):\n${gates}\nWeighted competencies:\n${comps}`
 }
 
+async function topCandidates(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+): Promise<string> {
+  const limit = Math.min(Math.max(Number(input.limit) || 10, 1), 25)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+  let jobsQ = sb.from('jobs').select('id, title').eq('org_id', orgId)
+  jobsQ = input.job_id ? jobsQ.eq('id', String(input.job_id)) : jobsQ.eq('status', 'open')
+  const { data: jobs, error: jobsErr } = await jobsQ
+  if (jobsErr) return `Error loading jobs: ${jobsErr.message}`
+  if (!jobs?.length) return input.job_id ? 'Job not found in your organization.' : 'There are no open jobs right now.'
+  const jobIds = (jobs as Array<{ id: string }>).map(j => j.id)
+
+  const [scored, unscored] = await Promise.all([
+    sb.from('applications')
+      .select('id, ai_score, ai_recommendation, stage:pipeline_stages(name), candidate:candidates(name), job:jobs(title)')
+      .eq('org_id', orgId).eq('status', 'active').in('job_id', jobIds)
+      .not('ai_score', 'is', null)
+      .order('ai_score', { ascending: false })
+      .limit(limit),
+    sb.from('applications').select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId).eq('status', 'active').in('job_id', jobIds).is('ai_score', null),
+  ])
+  if (scored.error) return `Error loading candidates: ${scored.error.message}`
+  const rows = (scored.data ?? []) as Array<{ id: string; ai_score: number; ai_recommendation: string | null; stage: { name: string } | null; candidate: { name: string } | null; job: { title: string } | null }>
+  const scope = input.job_id ? `on ${(jobs[0] as { title: string }).title}` : `across ${jobIds.length} open job(s)`
+  const notScored = unscored.count ?? 0
+  if (!rows.length) {
+    return `No scored active candidates ${scope} yet.${notScored ? ` ${notScored} active candidate(s) haven't been scored — run bulk_score_applications on the job to rank them.` : ''}`
+  }
+  const lines = rows.map((r, i) =>
+    `${i + 1}. ${r.candidate?.name ?? 'Unknown'} — ${r.ai_score}/100${r.ai_recommendation ? ` (${r.ai_recommendation.replace(/_/g, ' ')})` : ''} · ${r.job?.title ?? 'job'} · ${r.stage?.name ?? 'no stage'} [appId: ${r.id}]`)
+  return `Top ${rows.length} active candidate(s) by AI fit score ${scope}:\n${lines.join('\n')}` +
+    (notScored ? `\n${notScored} more active candidate(s) aren't scored yet, so they're not ranked here.` : '')
+}
+
 async function generateIcpTool(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   input: Record<string, any>,
@@ -2166,7 +2259,7 @@ async function getInterviewNotesTool(
   else if (candidateId) q = q.eq('candidate_id', candidateId)
 
   const { data, error } = await q
-  if (error) return 'Could not read interview notes (the notetaker may not be set up yet).'
+  if (error) return `Could not read interview notes: ${error.message}`
   if (!data || !data.length) return 'No AI interview notes found yet for that candidate/application.'
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3027,7 +3120,7 @@ async function getRecruitingAnalytics(
     funnelLines.length ? funnelLines.join('\n') : '  No active jobs with candidates.',
     `\nApplication sources:`,
     sourceLines.length ? sourceLines.join('\n') : '  No data.',
-    `\nAvg days in stage (active candidates):`,
+    `\nAvg days since applying, by current stage (active candidates):`,
     velocityLines.length ? velocityLines.join('\n') : '  No data.',
   ].join('\n')
 }
@@ -3189,7 +3282,12 @@ async function draftApplicationEmail(
   const jobTitle   = job?.position_title ?? 'the position'
   const dept       = job?.department?.name
   const stageName  = stage?.name ?? 'Applied'
-  const company    = company_name   ?? 'our company'
+  // Company name: given by the AI, else the org's name from Settings — never "our company".
+  let company = typeof company_name === 'string' && company_name.trim() ? company_name.trim() : ''
+  if (!company) {
+    const { data: settings } = await supabase.from('org_settings').select('company_name').eq('org_id', orgId).maybeSingle()
+    company = (settings as { company_name?: string | null } | null)?.company_name?.trim() || ''
+  }
   const recName    = recruiter_name ?? 'The Recruiting Team'
   const recTitle   = recruiter_title ?? ''
 
@@ -3200,8 +3298,8 @@ async function draftApplicationEmail(
 Context:
 - Candidate first name: ${firstName}
 - Role: ${jobTitle}${dept ? ` — ${dept}` : ''}
-- Current pipeline stage: ${stageName}
-- Company: ${company}
+- Where they are in our process (internal stage name — for your context only): ${stageName}
+- Company: ${company || '(not given — don\'t name the company)'}
 - Recruiter: ${recName}${recTitle ? `, ${recTitle}` : ''}
 
 Requirements:
@@ -3210,6 +3308,8 @@ Requirements:
 - Address candidate by first name
 - Sign off with recruiter name and title
 - No placeholder brackets like [date] or [time] — use natural language instead
+- Never mention internal stage names, scores, AI screening or our internal tools — describe progress in plain words (e.g. "we're reviewing your application")
+- Never write "our company" or "the company" as a name — use the company name above, or just "we" / "our team"
 
 Respond with ONLY valid JSON: {"subject": "...", "body": "..."}`
 
@@ -3276,7 +3376,7 @@ async function createRequisition(
   const lines = [
     `Requisition created for "${opening.title}".`,
     `Status: draft | ID: ${opening.id}`,
-    `It now appears on the Requisitions page under "Awaiting Approval".`,
+    `It now appears on the Requisitions page as a draft.`,
   ]
   if (Object.keys(draft).length > 0) {
     lines.push(`Saved job details (${Object.keys(draft).join(', ')}) on the requisition — they'll be used when the job is created.`)
@@ -3479,16 +3579,17 @@ async function updateInterviewStatus(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const iv = data as any
-  const eventMap: Record<string, string> = { completed: 'interview_completed', cancelled: 'interview_cancelled' }
+  // no_show / rescheduled have no event type of their own — log them as a timeline note.
+  const eventMap: Record<string, string> = { completed: 'interview_completed', cancelled: 'interview_cancelled', no_show: 'note_added', rescheduled: 'note_added' }
   const eventType = eventMap[status]
   if (eventType) {
     await supabase.from('application_events').insert({
       application_id: iv.application_id,
       org_id: orgId,
       event_type: eventType,
-      note: `Interview ${status}`,
+      note: status === 'no_show' ? 'Interview: candidate did not show up' : status === 'rescheduled' ? 'Interview marked as rescheduled' : `Interview ${status}`,
       metadata: { interview_id },
-      created_by: orgId,
+      created_by: 'AI Copilot',
     } as never)
   }
 

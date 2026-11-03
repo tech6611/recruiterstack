@@ -234,6 +234,16 @@ interface ExecutorContext {
   onProgress?: SubAgentOptions['onProgress']
   /** Holds risky calls for the recruiter's approval card (see lib/copilot/approvals). */
   approvals?: ApprovalQueue
+  /** Recent chat turns, so a sub-agent can resolve follow-ups ("move her to
+   *  onsite", "that job"). Copilot chat only. */
+  conversation?: string
+}
+
+/** The delegated task plus recent chat context for resolving references. */
+function taskWithContext(task: string, conversation?: string): string {
+  if (!conversation?.trim()) return task
+  return `${task}\n\n<recent_conversation>\n${conversation}\n</recent_conversation>\n` +
+    '(Recent chat, for resolving references like "her", "them", "that candidate" or "the job" only — the task above is what to do. A reference means whoever or whatever the LATEST turns are about: if the last exchange is clearly about one person or job, use that one. Never decide who a pronoun means from names or assumed gender. Ask only if the latest turns genuinely leave several possibilities.)'
 }
 
 /**
@@ -247,7 +257,7 @@ export async function executeOrchestratorTool(
   input: Record<string, unknown>,
   ctx: ExecutorContext,
 ): Promise<string> {
-  const task = typeof input.task === 'string' ? input.task : ''
+  const task = taskWithContext(typeof input.task === 'string' ? input.task : '', ctx.conversation)
 
   switch (name) {
     case 'delegate_to_ats':

@@ -229,7 +229,7 @@ export async function listActiveApplicationsForStaleCheck(
 }> {
   const { data, error } = await supabase
     .from('applications')
-    .select('id, applied_at, pipeline_stages(name), hiring_request:jobs(position_title:title), candidate:candidates(name)')
+    .select('id, applied_at, pipeline_stages(name), hiring_request:jobs(position_title:title, status), candidate:candidates(name)')
     .eq('org_id', orgId)
     .eq('status', 'active')
 

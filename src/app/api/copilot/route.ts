@@ -142,6 +142,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'messages array is required' }, { status: 400 })
   }
 
+  // Recent turns (text only, attachments dropped) so sub-agents can resolve
+  // follow-ups like "move her to onsite" — they otherwise see only the task note.
+  const conversation = messages.slice(-8, -1)
+    .map(m => {
+      const text = String(m.content ?? '').replace(/<attachment[\s\S]*?<\/attachment>/g, '[attached file]').trim()
+      return text ? `${m.role === 'user' ? 'Recruiter' : 'Copilot'}: ${text.length > 800 ? `${text.slice(0, 800)}…` : text}` : ''
+    })
+    .filter(Boolean)
+    .join('\n')
+
   const supabase = createAdminClient()
   // The copilot acts as the user — its tools are gated by the user's capabilities.
   const capabilities = await getPermissionSet(supabase, orgId, userId)
@@ -233,7 +243,7 @@ export async function POST(request: NextRequest) {
 
           for (const call of turn.calls) {
             const result = await executeOrchestratorTool(call.name, call.args, {
-              model: MODEL, orgId, userId, supabase, capabilities, approvals,
+              model: MODEL, orgId, userId, supabase, capabilities, approvals, conversation,
               // Stream each inner step as its own chip so the recruiter sees
               // live progress instead of one long "Asking the recruiting agent…".
               onProgress: (p) => {

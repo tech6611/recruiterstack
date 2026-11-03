@@ -2,6 +2,15 @@
 
 ## 2026-11-03
 
+### Added / Fixed (copilot audit, batch 5 — smaller gaps)
+- **"Who are my top candidates?"** New `top_candidates` tool: active candidates ranked by AI fit score across open jobs (or one job), with job, stage and recommendation, plus a count of candidates not scored yet. Previously the AI had to stitch several lookups together and gave partial answers.
+- **Follow-ups ("move her to onsite").** The recruiting/HR sub-agents now get the last few chat turns (text only, attachments dropped) along with the task, so they can resolve "her", "that job". If it's genuinely unclear they ask — they never guess from names or pronouns.
+- **Hiring manager shown as free text.** `list_jobs` / `get_job_pipeline` now show the job's assigned hiring manager (`jobs.hiring_manager_user_id`, like the job page's Team section), falling back to the typed name, else "not set".
+- **Email drafts said "our company" and leaked internal stage names** (e.g. "CV Screening (AI)"). Drafts now use the org's company name from Settings and describe progress in plain words; the recruiting agent follows the same rule for emails and WhatsApp it writes.
+- **Stale pipeline check** — activity is fetched in batches (no URL-length / row-cap failures that wrongly flagged busy candidates as stale), only open/paused jobs count, errors are reported, and long lists are capped at 50.
+- **`request_time_off` from chat** now needs `leave:edit` (submitting on someone else's behalf), matching the app; it was gated by `leave:view`.
+- Wording: requisition drafts no longer claim to be "Awaiting Approval"; `search_candidates` no longer claims to search skills; legacy "hiring request" wording and "in USD" salary labels removed; interview-notes errors show the real error; interview no-show / rescheduled now land on the timeline; analytics label "Avg days since applying, by current stage".
+
 ### Fixed (copilot audit, batch 4 — hiring bookkeeping)
 - **Hiring from chat didn't fill a seat.** `update_application_status` "hired" now does what the app does: fills one seat on the job (`recordHire`), moves the candidate into the job's Hired stage, and says how many seats are left. Errors are reported per candidate instead of counted as done.
 - **Offer accepted from chat skipped the hire.** `update_offer_status` "accepted" now marks the candidate and application hired and fills a seat — the same code as the Offers screen (`modules/ats/domain/hiring.ts`, now used by `PATCH /api/offers/:id` too).
