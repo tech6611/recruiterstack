@@ -38,6 +38,10 @@ const ALWAYS_GATED = new Set([
   'start_onboarding',
   'request_time_off',
   'decide_time_off',
+  // Changes how every candidate is scored and sourced
+  'approve_icp',
+  // Creates a calendar invite and emails the candidate + interviewer
+  'schedule_interview',
 ])
 
 /** True when this exact call must wait for the recruiter's approval. */
@@ -45,6 +49,8 @@ export function needsApproval(tool: string, args: Record<string, unknown>): bool
   if (ALWAYS_GATED.has(tool)) return true
   // Emailing the availability link contacts someone; just making the link doesn't.
   if (tool === 'create_interviewer_availability_link') return args.send_email === true
+  // Going live / off-market changes what candidates see; submit & unarchive don't.
+  if (tool === 'change_job_status') return ['publish', 'pause', 'resume', 'close'].includes(String(args.action ?? ''))
   // Re-activating is harmless; rejecting / withdrawing / hiring is not.
   if (tool === 'update_application_status') {
     return ['rejected', 'withdrawn', 'hired'].includes(String(args.status ?? ''))
@@ -184,6 +190,48 @@ export async function describeAction(
         const o = offer as any
         return `📄 Change offer for ${o?.candidate?.name ?? 'unknown candidate'}${o?.position_title ? ` (${o.position_title})` : ''} from "${o?.status ?? '?'}" to "${String(args.status)}"` +
           (str(args.notes) ? `\nNote: ${str(args.notes)}` : '')
+      }
+      case 'schedule_interview': {
+        const { data } = await supabase
+          .from('applications')
+          .select('candidate:candidates(name, email), job:jobs(title)')
+          .eq('id', str(args.application_id))
+          .eq('org_id', orgId)
+          .maybeSingle()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const d = data as any
+        const tz = str(args.timezone) || 'UTC'
+        let when = str(args.scheduled_at)
+        try { when = new Date(when).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: tz, timeZoneName: 'short' }) } catch { /* keep raw */ }
+        const type = str(args.interview_type) || 'video'
+        const platform = { google: 'Google Meet', zoom: 'Zoom', ms_teams: 'Microsoft Teams' }[str(args.meeting_platform) || 'google'] ?? 'Google Meet'
+        const others = Array.isArray(args.additional_interviewer_emails) ? args.additional_interviewer_emails.map(String).filter(Boolean) : []
+        return `📅 Schedule a ${type} interview${['video', 'panel', 'technical'].includes(type) ? ` (${platform})` : ''}: ${d?.candidate?.name ?? 'unknown candidate'}${d?.job?.title ? ` for ${d.job.title}` : ''}\n` +
+          `When: ${when} · ${Number(args.duration_minutes) || 60} min\n` +
+          `Interviewer: ${str(args.interviewer_name)}${str(args.interviewer_email) ? ` <${str(args.interviewer_email)}>` : ' (no email — they won\'t get the invite)'}${others.length ? `, plus ${others.join(', ')}` : ''}\n` +
+          `Invite + confirmation emails go to ${d?.candidate?.email ?? 'the candidate'} and the interviewer; reminders 24h and 1h before.` +
+          (str(args.notes) ? `\nNotes: ${clip(str(args.notes), 300)}` : '')
+      }
+      case 'approve_icp': {
+        const { getLatestIcp } = await import('@/modules/ats/domain/icp')
+        const { summarizeIcp } = await import('@/lib/copilot-tools')
+        const latest = await getLatestIcp(supabase as never, orgId, str(args.job_id)).catch(() => null)
+        const { data: job } = await supabase.from('jobs').select('title').eq('id', str(args.job_id)).eq('org_id', orgId).maybeSingle()
+        if (!latest || latest.status !== 'draft') return `✅ Approve the Ideal Candidate Profile for ${(job as { title?: string } | null)?.title ?? 'this job'} — but there is no draft waiting (this will do nothing).`
+        args.icp_id = latest.id // pin exactly the draft shown here
+        return `✅ Make this the live Ideal Candidate Profile for "${(job as { title?: string } | null)?.title ?? 'this job'}" (scoring and sourcing will use it):\n${summarizeIcp(latest)}`
+      }
+      case 'change_job_status': {
+        const { data: job } = await supabase.from('jobs').select('title, status').eq('id', str(args.job_id)).eq('org_id', orgId).maybeSingle()
+        const j = job as { title?: string; status?: string } | null
+        const t = j?.title ? `"${j.title}"` : 'this job'
+        const what: Record<string, string> = {
+          publish: `🌐 Publish ${t} — it goes live, its public apply link starts working and its approved seats open.`,
+          pause:   `⏸️ Pause ${t} — it stops accepting applications and live job-board postings come down.`,
+          resume:  `▶️ Resume ${t} — it accepts applications again (job-board postings are not relisted).`,
+          close:   `🔒 Close ${t} — reason: ${str(args.close_reason) || '(none given — this will fail)'}${str(args.close_note) ? ` (${str(args.close_note)})` : ''}. The public link stops working${args.close_open_seats === false ? '' : ' and unfilled seats close'}.`,
+        }
+        return `${what[String(args.action)] ?? genericPreview(tool, args)}${j?.status ? `\nCurrent status: ${j.status}` : ''}`
       }
       default:
         return genericPreview(tool, args)

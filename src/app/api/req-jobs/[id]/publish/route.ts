@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { openSeatsForJob, auditJobStatus } from '@/lib/openings/seats'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOrgAndUser } from '@/lib/auth'
 import { getViewerScope, assertCapability } from '@/lib/rbac'
-import { emitWebhook } from '@/lib/webhooks/emit'
-import { logger } from '@/lib/logger'
+import { publishJob } from '@/lib/openings/job-lifecycle'
 
 /**
  * POST /api/req-jobs/:id/publish — flip status to 'open' (first go-live).
@@ -31,62 +29,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const denied = assertCapability(await getViewerScope(supabase, orgId, userId), 'recruiting:edit')
   if (denied) return denied
 
-  const { data: job } = await supabase
-    .from('jobs')
-    .select('id, status')
-    .eq('id', params.id)
-    .eq('org_id', orgId)
-    .maybeSingle()
-  if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-  const j = job as { id: string; status: string }
-
-  if (j.status === 'open')      return NextResponse.json({ ok: true, status: 'open' })
-  if (j.status !== 'approved') {
-    return NextResponse.json(
-      { error: `Job must be 'approved' before publishing. Current status: '${j.status}'.` },
-      { status: 409 },
-    )
-  }
-
-  // Need at least one approved linked opening.
-  const { data: links } = await supabase
-    .from('job_openings')
-    .select('opening_id')
-    .eq('job_id', params.id)
-  const openingIds = (links ?? []).map(r => (r as { opening_id: string }).opening_id)
-  if (openingIds.length === 0) {
-    return NextResponse.json(
-      { error: 'Need at least one approved Opening linked to this Job before publishing.' },
-      { status: 409 },
-    )
-  }
-  const { data: openings } = await supabase
-    .from('openings')
-    .select('status')
-    .in('id', openingIds)
-  const anyApproved = (openings ?? []).some(o =>
-    ['approved', 'open', 'filled'].includes((o as { status: string }).status),
-  )
-  if (!anyApproved) {
-    return NextResponse.json(
-      { error: 'Need at least one approved Opening linked to this Job before publishing.' },
-      { status: 409 },
-    )
-  }
-
-  const { error } = await supabase
-    .from('jobs')
-    .update({ status: 'open' })
-    .eq('id', params.id)
-    .eq('org_id', orgId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Seats behind this job are now open headcount; log the status change too.
-  const opened = await openSeatsForJob(supabase, orgId, params.id, userId)
-  await auditJobStatus(orgId, params.id, userId, 'published', j.status, 'open', { seats_opened: opened })
-
-  emitWebhook(orgId, 'job.published', { job_id: params.id })
-    .catch(e => logger.error('[req-jobs publish] emit failed', e))
-
-  return NextResponse.json({ ok: true, status: 'open' })
+  // Logic shared with the copilot's change_job_status tool.
+  const r = await publishJob(supabase, orgId, params.id, userId)
+  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status })
+  return NextResponse.json({ ok: true, status: r.status })
 }

@@ -29,7 +29,7 @@ describe('needsApproval', () => {
   it('holds sends, bulk and irreversible actions', () => {
     for (const t of ['send_outreach_email', 'send_whatsapp_message', 'bulk_reject_below_score', 'bulk_move_to_stage',
       'update_offer_status', 'mark_employee_terminated', 'record_employee_compensation', 'start_onboarding',
-      'request_time_off', 'decide_time_off']) {
+      'request_time_off', 'decide_time_off', 'approve_icp', 'schedule_interview']) {
       expect(needsApproval(t, {})).toBe(true)
     }
   })
@@ -43,8 +43,12 @@ describe('needsApproval', () => {
     expect(needsApproval('create_interviewer_availability_link', { send_email: true })).toBe(true)
     expect(needsApproval('create_interviewer_availability_link', { send_email: false })).toBe(false)
   })
+  it('holds going live / off-market but not submit or unarchive', () => {
+    for (const a of ['publish', 'pause', 'resume', 'close']) expect(needsApproval('change_job_status', { action: a })).toBe(true)
+    for (const a of ['submit', 'unarchive']) expect(needsApproval('change_job_status', { action: a })).toBe(false)
+  })
   it('lets reads and ordinary writes through', () => {
-    for (const t of ['list_jobs', 'get_inbox', 'add_note_to_application', 'create_scorecard', 'send_whatsapp_reply']) {
+    for (const t of ['list_jobs', 'get_inbox', 'add_note_to_application', 'create_scorecard', 'send_whatsapp_reply', 'generate_icp', 'get_icp']) {
       expect(needsApproval(t, {})).toBe(false)
     }
   })

@@ -134,7 +134,7 @@ export const ORCHESTRATOR_TOOLS: ToolSchema[] = [
   {
     name: 'request_approval',
     description:
-      'Pause and ask the recruiter to approve a plan before delegating. Use only for record-creating steps that no form covered: creating jobs or requisitions, creating offers, scheduling interviews. Do NOT use it for sends or other risky actions (emails, WhatsApp, rejections, bulk moves, offer status, HR changes) — the system holds those automatically and shows an exact approval card.',
+      'Pause and ask the recruiter to approve a plan before delegating. Use only for record-creating steps that no form covered: creating jobs or requisitions, creating offers. Do NOT use it for sends or other risky actions (emails, WhatsApp, scheduling interviews, rejections, bulk moves, offer status, publishing/pausing/closing jobs, approving an ideal profile, HR changes) — the system holds those automatically and shows an exact approval card.',
     input_schema: {
       type: 'object',
       properties: {
@@ -161,8 +161,8 @@ ROUTING — pick the right delegate:
 When delegating, pass a clear self-contained task in natural language — include all the specifics (names, filters, criteria) the sub-agent needs. The sub-agent's reply comes back as a tool result; relay the useful parts to the user concisely.
 
 APPROVAL — HOW IT WORKS:
-1. Risky actions are locked by the system, not by you: sending emails or WhatsApp messages, emailing availability links, rejecting / withdrawing / hiring candidates, bulk moves and bulk rejections, changing an offer's status, terminating an employee, recording compensation, starting onboarding, and requesting or deciding time off. When a sub-agent attempts one, it is NOT run — the system holds the exact action and shows the recruiter an approval card with the precise recipients and content. So for these, delegate straight away (no request_approval first). When the sub-agent reports an action is "waiting for approval", tell the recruiter it's ready for them to review and approve in the card below. Never say it was sent or done.
-2. call request_approval BEFORE delegating only for record-creating steps that no form covered: creating jobs or requisitions, creating offers, scheduling interviews.
+1. Risky actions are locked by the system, not by you: sending emails or WhatsApp messages, emailing availability links, scheduling interviews (invites go out), publishing / pausing / resuming / closing a job, approving an ideal candidate profile, rejecting / withdrawing / hiring candidates, bulk moves and bulk rejections, changing an offer's status, terminating an employee, recording compensation, starting onboarding, and requesting or deciding time off. When a sub-agent attempts one, it is NOT run — the system holds the exact action and shows the recruiter an approval card with the precise recipients and content. So for these, delegate straight away (no request_approval first). When the sub-agent reports an action is "waiting for approval", tell the recruiter it's ready for them to review and approve in the card below. Never say it was sent or done.
+2. call request_approval BEFORE delegating only for record-creating steps that no form covered: creating jobs or requisitions, creating offers.
 3. If the recruiter just submitted an ask_user_form whose steps include the action, that submission is the approval for creating records — don't ask again. (Sends still get their own exact approval card from the system.)
 4. A message starting "[Approval result]" reports what the recruiter approved or cancelled and what happened — use it as the record of what was done; don't redo those actions.
 
@@ -215,6 +215,7 @@ FORM FIELD TYPES (pick the one that fits; dropdown choices are filled in automat
 FIELD MAP for "create a job / open a role" (requisition → submit for approval → job):
 - Required: title (text); department (department); hiring_manager (person — needed before submitting); justification (rich_text, min_length 50 — needed before submitting).
 - Optional: location (location); employment_type (employment_type, default full_time); comp_min, comp_max (number); comp_currency (currency, default INR); target_start_date (date); level (level); job_description (rich_text); key_requirements (rich_text); nice_to_haves (rich_text); headcount (number, default 1).
+- Headcount: in RecruiterStack one requisition = one seat. If the recruiter wants more than one hire, say plainly that this creates 1 seat and the number is kept as a note; more seats need more requisitions.
 - Never ask for the recruiter (it's automatically the person asking) or the approver (assigned automatically).
 Adapt this list for other tasks using the same field types.
 

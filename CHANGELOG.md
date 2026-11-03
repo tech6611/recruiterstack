@@ -2,6 +2,14 @@
 
 ## 2026-11-03
 
+### Added (copilot audit, batch 3 — things the copilot promised but couldn't do)
+- **Job status from chat.** New `change_job_status` tool: submit for approval, publish, pause, resume, close (with reason) and unarchive — using the exact same code as the job page buttons. Submit/publish/pause/resume logic moved out of the route files into `lib/openings/job-lifecycle.ts` (seat opening, job-board postings, audit log, webhooks); the routes now call it. Publish, pause, resume and close show an approval card first.
+- **Ideal Candidate Profile from chat.** New `generate_icp` (same as Generate on the Scoring tab; Gemini Pro ~5–10¢, ~1 min, runs in the background so the chat doesn't time out) and `approve_icp` (approval card shows the must-haves and competencies, and pins the exact draft shown). `get_icp` now also shows a newer draft waiting for approval. Generate/approve logic moved to `modules/ats/domain/icp-actions.ts`; the Scoring tab routes call it. Sourcing on a new job now has a working path.
+- **Real interview scheduling from chat.** `schedule_interview` now uses the Interviews screen's code (`lib/interviews/schedule.ts`): Google Meet / Zoom / Teams meeting on the connected calendar, confirmation emails, 24h/1h reminders, webhook. Because it emails people, it now shows an approval card (who, when with timezone, which emails). If no calendar is connected it says so plainly.
+
+### Changed (copilot audit, batch 3)
+- **Headcount > 1:** a requisition is still one seat (product decision 2026-11-03). The copilot now says plainly that "hire 3" creates 1 seat with 3 kept as a note, and that more seats need more requisitions.
+
 ### Security (copilot audit, batch 2 — approval lock enforced by the server)
 - **The copilot could send emails/WhatsApps without approval.** The "ask first" rule was only an instruction to the AI, so a mistake — or instructions hidden in a candidate profile, link or attached file — could send anyway. Now risky actions are never run inside the AI loop: emails, WhatsApp messages, emailed availability links, rejecting / withdrawing / hiring, bulk reject and bulk move, offer status changes, terminating an employee, recording compensation, starting onboarding, and requesting / deciding time off. The server holds the exact call (`lib/copilot/approvals.ts`) and the chat shows an approval card listing precisely what will happen (recipient, subject and full message; names of every candidate in a bulk action). Only **Approve & run** (`POST /api/copilot/approve`) runs it — once, within 30 minutes, by the same user, with their current permissions. Cancel means it can never run.
 - **Sub-agents could call any tool name.** `runSubAgent` now only runs tools on that agent's own list (protects the WhatsApp responder and HR cases too, which already never use the held actions).

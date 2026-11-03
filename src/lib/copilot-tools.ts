@@ -26,7 +26,7 @@ import {
   type CanonicalJobUpdate,
 } from '@/modules/ats/domain/job-pipelines'
 import { runSourcing, getSourcingMatches } from '@/modules/ats/domain/sourcing'
-import { getCurrentIcp } from '@/modules/ats/domain/icp'
+import { getCurrentIcp, getLatestIcp } from '@/modules/ats/domain/icp'
 import {
   getOpeningById,
   listApprovedOpenings,
@@ -84,7 +84,6 @@ import {
   updateRoleFields,
 } from '@/modules/ats/domain/role-profiles'
 import {
-  scheduleInterview as scheduleInterviewRow,
   listInterviews,
   updateInterviewStatus as updateInterviewStatusRow,
   createSelfScheduleInterview,
@@ -175,7 +174,7 @@ const JOB_DETAIL_PROPS = {
   job_description:  { type: 'string',  description: 'Full job description (rich HTML from the form — pass through unchanged)' },
   key_requirements: { type: 'string',  description: 'Core requirements (may be HTML)' },
   nice_to_haves:    { type: 'string',  description: 'Nice-to-have qualifications (may be HTML)' },
-  headcount:        { type: 'number',  description: 'Number of hires needed (default: 1)' },
+  headcount:        { type: 'number',  description: 'Number of hires wanted (default: 1). Saved as a note only — each requisition is one seat.' },
   remote_ok:        { type: 'boolean', description: 'Whether remote is acceptable (default: false)' },
 } as const
 
@@ -405,6 +404,29 @@ export const COPILOT_TOOLS: ToolSchema[] = [
     },
   },
   {
+    name: 'generate_icp',
+    description:
+      "Generate a new DRAFT Ideal Candidate Profile for a job with AI (the same as Generate on the job's Scoring tab). It runs in the background and takes about a minute; the draft then appears on the Scoring tab. Check with get_icp afterwards, then approve it with approve_icp. Sourcing (source_candidates) needs an approved profile. Optional intake_notes (e.g. notes from the hiring-manager call) make it sharper.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        job_id:       { type: 'string', description: 'UUID of the job' },
+        intake_notes: { type: 'string', description: 'Optional notes or transcript from the intake call' },
+      },
+      required: ['job_id'],
+    },
+  },
+  {
+    name: 'approve_icp',
+    description:
+      "Approve the job's latest DRAFT Ideal Candidate Profile so it becomes the live version used for scoring and sourcing (the same as Approve on the Scoring tab). Held for the recruiter's approval automatically — the card shows the profile's must-haves and competencies.",
+    input_schema: {
+      type: 'object',
+      properties: { job_id: { type: 'string', description: 'UUID of the job' } },
+      required: ['job_id'],
+    },
+  },
+  {
     name: 'get_icp',
     description:
       "Get a job's current Ideal Candidate Profile (approved version, or latest draft) — its hard must-haves and weighted competencies. Use it to explain what 'good' looks like for the role.",
@@ -622,7 +644,7 @@ export const COPILOT_TOOLS: ToolSchema[] = [
     name: 'update_job',
     description:
       "Update an existing job's title (drafts only), key requirements, or nice-to-haves. " +
-      'This tool can NOT change a job\'s status: publishing, pausing, resuming and closing a job must be done with the buttons on the job page for now — tell the recruiter that plainly.',
+      'It does not change a job\'s status — use change_job_status for that.',
     input_schema: {
       type: 'object',
       properties: {
@@ -632,6 +654,29 @@ export const COPILOT_TOOLS: ToolSchema[] = [
         nice_to_haves:    { type: 'string', description: 'Updated nice-to-have qualifications' },
       },
       required: ['job_id'],
+    },
+  },
+  {
+    name: 'change_job_status',
+    description:
+      'Move a job through its lifecycle, exactly like the buttons on the job page. Actions: ' +
+      '"submit" (draft → sent for approval; may be approved straight away), ' +
+      '"publish" (approved → open/live: the public apply link goes live and the job\'s approved seats open; needs an approved requisition linked), ' +
+      '"pause" (open → paused: stops new applications and takes job-board postings down), ' +
+      '"resume" (paused → open; job-board postings are NOT relisted — tell the recruiter to relist them on the Postings tab), ' +
+      '"close" (open/paused/approved → closed: needs close_reason; the public link stops working), ' +
+      '"unarchive" (restore an archived job; a job that was live comes back paused). ' +
+      'Publish, pause, resume and close are held for the recruiter\'s approval automatically.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        job_id:       { type: 'string', description: 'UUID of the job' },
+        action:       { type: 'string', enum: ['submit', 'publish', 'pause', 'resume', 'close', 'unarchive'] },
+        close_reason: { type: 'string', enum: ['filled', 'cancelled', 'on_hold', 'budget_withdrawn', 'other'], description: 'Required for close' },
+        close_note:   { type: 'string', description: 'Optional note for close' },
+        close_open_seats: { type: 'boolean', description: 'For close: also close the job\'s unfilled seats (default true)' },
+      },
+      required: ['job_id', 'action'],
     },
   },
   {
@@ -790,15 +835,19 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   // ── Interview & Offer tools ───────────────────────────────────────────────
   {
     name: 'schedule_interview',
-    description: 'Record a scheduled interview for a candidate application and log a timeline event. Does NOT create a calendar invite or video link — tell the user to add the meeting from the candidate\'s Interviews tab if they need one. Optionally generates a self-schedule link for the candidate.',
+    description: 'Schedule an interview exactly like the Interviews screen: for video/panel/technical interviews it creates the Google Meet / Zoom / Teams meeting on the interviewer\'s (or the org\'s) connected calendar, emails the candidate and interviewer, and sets 24h/1h reminders. Held for the recruiter\'s approval automatically. Pass interviewer_email so the invite reaches them and their calendar can host the meeting. If no calendar is connected the interview is still saved and the result says so. For the candidate to pick their own time, use create_self_schedule_invite instead.',
     input_schema: {
       type: 'object',
       properties: {
         application_id:     { type: 'string', description: 'UUID of the application' },
         candidate_id:       { type: 'string', description: 'UUID of the candidate (optional — taken from the application)' },
         interviewer_name:   { type: 'string', description: 'Full name of the interviewer' },
+        interviewer_email:  { type: 'string', description: 'Interviewer email — receives the invite; their connected calendar hosts the meeting' },
+        additional_interviewer_emails: { type: 'array', items: { type: 'string' }, description: 'Other panel members\' emails' },
         interview_type:     { type: 'string', enum: ['video', 'phone', 'in_person', 'panel', 'technical', 'assessment'], description: 'Type of interview (default: video)' },
-        scheduled_at:       { type: 'string', description: 'ISO 8601 datetime for the interview, e.g. "2026-03-20T14:00:00Z"' },
+        meeting_platform:   { type: 'string', enum: ['google', 'zoom', 'ms_teams'], description: 'Video platform (default: google = Google Meet)' },
+        scheduled_at:       { type: 'string', description: 'ISO 8601 datetime with offset, e.g. "2026-03-20T14:00:00+05:30"' },
+        timezone:           { type: 'string', description: 'IANA timezone for the invite, e.g. "Asia/Kolkata" (default UTC)' },
         duration_minutes:   { type: 'number', description: 'Duration in minutes (default: 60)' },
         location:           { type: 'string', description: 'Zoom link, office address, or phone number' },
         notes:              { type: 'string', description: 'Topics to cover or special instructions' },
@@ -1340,6 +1389,7 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   get_interviews: 'recruiting:view', get_sequence: 'recruiting:view',
   list_sequences: 'recruiting:view', list_candidate_sequence_history: 'recruiting:view',
   list_roles: 'recruiting:view', get_icp: 'recruiting:view',
+  generate_icp: 'recruiting:edit', approve_icp: 'recruiting:edit',
   get_interview_notes: 'recruiting:view',
   // source_candidates writes the sourcing_matches cache, so it needs edit.
   source_candidates: 'recruiting:edit',
@@ -1348,7 +1398,7 @@ const TOOL_CAPABILITIES: Record<string, Capability> = {
   bulk_add_to_pipeline: 'recruiting:edit', bulk_move_to_stage: 'recruiting:edit',
   bulk_reject_below_score: 'recruiting:edit', bulk_score_applications: 'recruiting:edit',
   create_candidate: 'recruiting:edit', create_job_and_pipeline: 'recruiting:edit',
-  update_job: 'recruiting:edit', update_candidate_status: 'recruiting:edit',
+  update_job: 'recruiting:edit', change_job_status: 'recruiting:edit', update_candidate_status: 'recruiting:edit',
   update_application_status: 'recruiting:edit', create_offer: 'recruiting:edit',
   update_offer_status: 'recruiting:edit', create_scorecard: 'recruiting:edit',
   schedule_interview: 'recruiting:edit', update_interview_status: 'recruiting:edit',
@@ -1426,6 +1476,8 @@ export async function executeTool(
       case 'create_job_and_pipeline':   return await createJobAndPipeline(input, orgId, supabase, userId)
       case 'search_candidate_pool':     return await searchCandidatePool(input, orgId, supabase)
       case 'source_candidates':         return await sourceCandidatesTool(input, orgId, supabase)
+      case 'generate_icp':               return await generateIcpTool(input, orgId, supabase, userId)
+      case 'approve_icp':                return await approveIcpTool(input, orgId, supabase, userId)
       case 'get_icp':                   return await getIcpTool(input, orgId, supabase)
       case 'get_interview_notes':       return await getInterviewNotesTool(input, orgId, supabase)
       case 'bulk_add_to_pipeline':      return await bulkAddToPipeline(input, orgId, supabase)
@@ -1444,6 +1496,7 @@ export async function executeTool(
       case 'bulk_reject_below_score':    return await bulkRejectBelowScore(input, orgId, supabase)
       case 'get_application_events':     return await getApplicationEvents(input, orgId, supabase)
       case 'update_job':                 return await updateJob(input, orgId, supabase)
+      case 'change_job_status':          return await changeJobStatus(input, orgId, supabase, userId)
       case 'get_scorecard':              return await getScorecard(input, orgId, supabase)
       // Gap-fill tools
       case 'list_roles':                 return await listRoles(input, orgId, supabase)
@@ -1958,8 +2011,10 @@ async function createJobAndPipeline(
     intake.nice_to_have && 'nice-to-haves',
     intake.headcount && 'headcount',
   ].filter(Boolean)
+  const n = Number(intake.headcount) || 1
   return `Created job "${job.title}" from approved requisition "${opening.title}" — ID: ${job.id}. Pipeline stages are being auto-created.` +
-    (used.length ? ` Saved: ${used.join(', ')}.` : '')
+    (used.length ? ` Saved: ${used.join(', ')}.` : '') +
+    (n > 1 ? ` Note: in RecruiterStack each requisition is ONE seat. The headcount of ${n} is saved as a note only — this creates 1 seat, not ${n}. Tell the recruiter that plainly; for more seats they create more requisitions.` : '')
 }
 
 // Component 05/14 — ICP-driven sourcing as a Copilot tool. Runs the Fit Engine over
@@ -1976,7 +2031,7 @@ async function sourceCandidatesTool(
 
   const result = await runSourcing(supabase, orgId, jobId, { orgId })
   if (result.status === 'no_icp') {
-    return 'This job has no approved ICP yet, so sourcing can’t run. Generate and approve an ICP first (get_icp shows the current one).'
+    return 'This job has no approved Ideal Candidate Profile yet, so sourcing can’t run. Create one with generate_icp (takes about a minute), then approve it with approve_icp.'
   }
 
   const matches = await getSourcingMatches(supabase, orgId, jobId)
@@ -2006,14 +2061,74 @@ async function getIcpTool(
 ): Promise<string> {
   const jobId = String(input.job_id ?? '')
   if (!jobId) return 'Provide a job_id.'
-  const icp = await getCurrentIcp(supabase, orgId, jobId)
-  if (!icp) return 'This job has no ICP yet.'
+  const [icp, latest] = await Promise.all([
+    getCurrentIcp(supabase, orgId, jobId),
+    getLatestIcp(supabase, orgId, jobId).catch(() => null),
+  ])
+  if (!icp) return 'This job has no ICP yet. Create one with generate_icp.'
 
-  const gates = jobWideMustHaves(icp.must_haves).map((g) => `- ${g.label}`).join('\n') || '- (none)'
+  const out = [summarizeIcp(icp)]
+  if (latest && latest.id !== icp.id && latest.status === 'draft') {
+    out.push(`\nA newer DRAFT is waiting for approval (approve it with approve_icp):\n${summarizeIcp(latest)}`)
+  } else if (icp.status === 'draft') {
+    out.push('\nThis is a draft — approve it with approve_icp before sourcing.')
+  }
+  return out.join('\n')
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function summarizeIcp(icp: any): string {
+  const gates = jobWideMustHaves(icp.must_haves ?? []).map((g) => `- ${(g as { label?: string }).label ?? ''}`).join('\n') || '- (none)'
   const comps = (icp.competencies ?? [])
-    .map((c) => `- ${c.name} (${c.weight}%)`)
+    .map((c: { name: string; weight: number }) => `- ${c.name} (${c.weight}%)`)
     .join('\n') || '- (none)'
-  return `ICP for this job — ${icp.status} v${icp.version}.\nMust-haves (hard gates):\n${gates}\nWeighted competencies:\n${comps}`
+  return `ICP — ${icp.status} v${icp.version}.\nMust-haves (hard gates):\n${gates}\nWeighted competencies:\n${comps}`
+}
+
+async function generateIcpTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+  userId?: string | null,
+): Promise<string> {
+  const jobId = String(input.job_id ?? '').trim()
+  if (!jobId) return 'Provide a job_id.'
+  const { data: job } = await supabase.from('jobs').select('id, title').eq('id', jobId).eq('org_id', orgId).maybeSingle()
+  if (!job) return 'Job not found in your organization.'
+  const notes = typeof input.intake_notes === 'string' && input.intake_notes.trim() ? input.intake_notes.slice(0, 12000) : null
+
+  // ~1 minute of Gemini Pro — too long to wait for inside a chat turn, so it
+  // runs after the reply (the same work as the Scoring tab's Generate button).
+  const { runInBackground } = await import('@/lib/api/background')
+  const { generateIcpDraftForJob } = await import('@/modules/ats/domain/icp-actions')
+  runInBackground(async () => { await generateIcpDraftForJob(supabase, orgId, jobId, userId ?? null, notes) })
+  return `Started generating a draft Ideal Candidate Profile for "${(job as { title: string }).title}". It takes about a minute and will appear on the job's Scoring tab. Then ask me to show it (get_icp) and approve it (approve_icp).`
+}
+
+async function approveIcpTool(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+  userId?: string | null,
+): Promise<string> {
+  const jobId = String(input.job_id ?? '').trim()
+  if (!jobId) return 'Provide a job_id.'
+  const latest = await getLatestIcp(supabase, orgId, jobId).catch(() => null)
+  if (!latest) return 'This job has no ICP yet. Create one with generate_icp.'
+  // The approval card pinned the exact draft it showed (icp_id) — approve that
+  // one, not a newer draft generated in the meantime.
+  const icpId = typeof input.icp_id === 'string' && input.icp_id ? input.icp_id : latest.id
+  if (icpId === latest.id && latest.status === 'approved') return `The latest profile (v${latest.version}) is already approved.`
+  if (icpId === latest.id && latest.status !== 'draft') return `The latest profile is ${latest.status}, not a draft — generate a new one with generate_icp.`
+  const { approveIcpForJob } = await import('@/modules/ats/domain/icp-actions')
+  try {
+    const icp = await approveIcpForJob(supabase, orgId, jobId, icpId, userId ?? null)
+    return `Approved — v${icp.version} is now the live Ideal Candidate Profile. Scoring and sourcing use it from now on.`
+  } catch (e) {
+    return `Couldn't approve the profile: ${e instanceof Error ? e.message : 'unknown error'}`
+  }
 }
 
 // Component 12 — query the interview conversation corpus (Notetaker output).
@@ -2570,6 +2685,71 @@ async function getApplicationEvents(
   return `Timeline for ${candidateName} / ${jobTitle}:\n${lines.join('\n')}`
 }
 
+async function changeJobStatus(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  input: Record<string, any>,
+  orgId: string,
+  supabase: SupabaseClient,
+  userId?: string | null,
+): Promise<string> {
+  const jobId = typeof input.job_id === 'string' ? input.job_id.trim() : ''
+  const action = String(input.action ?? '')
+  if (!jobId) return 'Error: job_id is required.'
+  if (!userId) return 'Error: could not identify the acting user, so the job status was not changed.'
+
+  const { data: job } = await supabase.from('jobs').select('id, title, status').eq('id', jobId).eq('org_id', orgId).maybeSingle()
+  if (!job) return 'Job not found in your organization.'
+  const title = (job as { title: string }).title
+  const from = (job as { status: string }).status
+
+  const { submitJob, publishJob, pauseJob, resumeJob } = await import('@/lib/openings/job-lifecycle')
+  const { closeJob, unarchiveEntity, JOB_CLOSE_REASONS } = await import('@/lib/openings/seats')
+
+  switch (action) {
+    case 'submit': {
+      const r = await submitJob(supabase, orgId, jobId, userId)
+      if (!r.ok) return `Couldn't submit "${title}": ${r.error}`
+      return r.status === 'approved'
+        ? `"${title}" was submitted and approved straight away (no approval chain applies). It can be published now.`
+        : `"${title}" was submitted for approval. It can be published once it's approved.`
+    }
+    case 'publish': {
+      const r = await publishJob(supabase, orgId, jobId, userId)
+      if (!r.ok) return `Couldn't publish "${title}": ${r.error}`
+      return from === 'open' ? `"${title}" is already live.` : `"${title}" is now live (open)${r.seats_opened ? ` — ${r.seats_opened} seat(s) opened` : ''}. Its public apply link works now.`
+    }
+    case 'pause': {
+      const r = await pauseJob(supabase, orgId, jobId, userId)
+      if (!r.ok) return `Couldn't pause "${title}": ${r.error}`
+      return `"${title}" is paused — it no longer accepts applications, and live job-board postings were taken down.`
+    }
+    case 'resume': {
+      const r = await resumeJob(supabase, orgId, jobId, userId)
+      if (!r.ok) return `Couldn't resume "${title}": ${r.error}`
+      return `"${title}" is open again and its apply link works. Job-board postings were not relisted — relist them on the job's Postings tab if needed.`
+    }
+    case 'close': {
+      const reason = String(input.close_reason ?? '')
+      if (!JOB_CLOSE_REASONS.some(r => r.value === reason)) {
+        return `Error: close_reason is required — one of ${JOB_CLOSE_REASONS.map(r => r.value).join(', ')}.`
+      }
+      const note = typeof input.close_note === 'string' && input.close_note.trim() ? input.close_note.trim() : null
+      const r = await closeJob(supabase, orgId, jobId, reason as never, note, userId, { closeOpenSeats: input.close_open_seats !== false })
+      if (!r.ok) return `Couldn't close "${title}": ${r.error}`
+      const { emitWebhook } = await import('@/lib/webhooks/emit')
+      emitWebhook(orgId, 'job.closed' as never, { job_id: jobId, reason }).catch(() => {})
+      return `"${title}" is closed (${reason})${r.seats_closed ? ` — ${r.seats_closed} unfilled seat(s) closed` : ''}. Its public link no longer works.`
+    }
+    case 'unarchive': {
+      const r = await unarchiveEntity(supabase, orgId, 'jobs', jobId, userId)
+      if (!r.ok) return `Couldn't restore "${title}".`
+      return from === 'archived' ? `"${title}" was restored — status is now ${r.status}.` : `"${title}" isn't archived (status: ${r.status}).`
+    }
+    default:
+      return 'Error: action must be one of submit, publish, pause, resume, close, unarchive.'
+  }
+}
+
 async function updateJob(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   input: Record<string, any>,
@@ -2582,7 +2762,7 @@ async function updateJob(
   // webhook and audit side-effects this tool doesn't). Refuse loudly, never write
   // a raw status.
   if (input.status != null) {
-    return "I can't change a job's status from chat yet — use the Publish / Pause / Resume / Close buttons on the job page."
+    return 'update_job does not change status — use change_job_status (submit / publish / pause / resume / close / unarchive).'
   }
 
   const job = await getCanonicalJobById(supabase, orgId, job_id)
@@ -3077,6 +3257,10 @@ async function createRequisition(
   ]
   if (Object.keys(draft).length > 0) {
     lines.push(`Saved job details (${Object.keys(draft).join(', ')}) on the requisition — they'll be used when the job is created.`)
+    if ((draft.headcount ?? 1) > 1) {
+      const n = draft.headcount
+      lines.push(`Note: in RecruiterStack each requisition is ONE seat. The headcount of ${n} is saved as a note only — this creates 1 seat, not ${n}. Tell the recruiter that plainly; for more seats they create more requisitions.`)
+    }
   }
   if (!createInput.justification || createInput.justification.trim().length < 50) {
     lines.push(`Next: add a justification (at least 50 characters), then submit it for approval.`)
@@ -3192,8 +3376,8 @@ async function scheduleInterview(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { application_id, interviewer_name,
-    interview_type, scheduled_at, duration_minutes, location, notes, generate_self_schedule } = input
+  const { application_id, interviewer_name, interviewer_email, additional_interviewer_emails,
+    interview_type, meeting_platform, scheduled_at, timezone, duration_minutes, location, notes, generate_self_schedule } = input
 
   if (!interviewer_name?.trim() || !scheduled_at) return 'Error: interviewer_name and scheduled_at are required.'
   if (Number.isNaN(new Date(scheduled_at).getTime())) return `Error: scheduled_at "${scheduled_at}" is not a valid date/time.`
@@ -3201,48 +3385,40 @@ async function scheduleInterview(
   const ref = await resolveApplicationRef(supabase, orgId, application_id)
   if ('error' in ref) return ref.error
 
-  // Self-schedule token is generated here (the interviews table has no
-  // generate_self_schedule column — the REST route does the same).
-  let self_schedule_token: string | null = null
-  let self_schedule_expires_at: string | null = null
-  if (generate_self_schedule) {
-    const { randomBytes } = await import('crypto')
-    self_schedule_token = randomBytes(20).toString('hex')
-    const exp = new Date()
-    exp.setDate(exp.getDate() + 7)
-    self_schedule_expires_at = exp.toISOString()
-  }
+  const emails: string[] = [
+    ...(typeof interviewer_email === 'string' ? [interviewer_email] : []),
+    ...(Array.isArray(additional_interviewer_emails) ? additional_interviewer_emails : []),
+  ].map((e: string) => String(e || '').trim()).filter(Boolean)
 
-  const body: Record<string, unknown> = {
-    application_id, candidate_id: ref.candidateId, hiring_request_id: null,
-    interviewer_name: interviewer_name.trim(), interview_type: interview_type ?? 'video',
-    scheduled_at, duration_minutes: duration_minutes ?? 60,
-    location: location ?? null, notes: notes ?? null,
-    self_schedule_token, self_schedule_expires_at,
-    org_id: orgId,
-  }
-
-  const { data, error } = await scheduleInterviewRow(supabase, orgId, body)
-
-  if (error) return `Error: ${error.message}`
-
-  // Log event
-  await supabase.from('application_events').insert({
+  // Same code path as the Interviews screen (meeting + emails + reminders + webhook).
+  const { scheduleInterviewWithMeeting } = await import('@/lib/interviews/schedule')
+  const r = await scheduleInterviewWithMeeting(supabase, orgId, {
     application_id,
-    org_id: orgId,
-    event_type: 'interview_scheduled',
-    note: `Interview scheduled with ${interviewer_name} — ${new Date(scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
-    metadata: { interview_id: (data as never as Record<string, unknown>).id, interview_type: interview_type ?? 'video' },
-    created_by: 'AI Copilot',
-  } as never)
+    candidate_id: ref.candidateId,
+    interviewer_name: interviewer_name.trim(),
+    interviewer_email: emails[0] ?? null,
+    panel: emails.length ? emails.map((email, i) => ({ name: i === 0 ? interviewer_name.trim() : '', email })) : null,
+    interview_type: interview_type ?? 'video',
+    meeting_platform: meeting_platform ?? null,
+    scheduled_at,
+    timezone: timezone ?? null,
+    duration_minutes: duration_minutes ?? 60,
+    location: location ?? null,
+    notes: notes ?? null,
+    generate_self_schedule: generate_self_schedule === true,
+  })
+  if (!r.ok) return `Error: ${r.error}`
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const d = data as any
-  let result = `Interview recorded (ID: ${d.id}). No calendar invite or video link was created — add one from the candidate's Interviews tab if needed.`
-  if (d.self_schedule_token) {
-    result += ` Self-schedule link: ${absoluteAppUrl(`/schedule/${d.self_schedule_token}`)}`
+  const d = r.data
+  const when = new Date(scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: timezone || 'UTC', timeZoneName: 'short' })
+  const parts = [`Interview scheduled for ${when} with ${interviewer_name.trim()} (ID: ${d.id}).`]
+  if (d.meet_link) parts.push(`Meeting link: ${d.meet_link}.`)
+  else if (['video', 'panel', 'technical'].includes(interview_type ?? 'video')) {
+    parts.push(`No video meeting was created${d.google_meet_error ? ` (${d.google_meet_error})` : ''} — connect a calendar in Settings → Integrations, or add a link on the candidate's Interviews tab.`)
   }
-  return result
+  parts.push('Confirmation emails are on their way to the candidate and interviewer.')
+  if (d.self_schedule_link) parts.push(`Self-schedule link: ${d.self_schedule_link}`)
+  return parts.join(' ')
 }
 
 async function getInterviews(
