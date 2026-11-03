@@ -2,6 +2,12 @@
 
 ## 2026-11-03
 
+### Fixed (copilot audit, batch 4 — hiring bookkeeping)
+- **Hiring from chat didn't fill a seat.** `update_application_status` "hired" now does what the app does: fills one seat on the job (`recordHire`), moves the candidate into the job's Hired stage, and says how many seats are left. Errors are reported per candidate instead of counted as done.
+- **Offer accepted from chat skipped the hire.** `update_offer_status` "accepted" now marks the candidate and application hired and fills a seat — the same code as the Offers screen (`modules/ats/domain/hiring.ts`, now used by `PATCH /api/offers/:id` too).
+- **The copilot could mark an offer "approved" itself** (with any approver name). It can't any more: "pending_approval" submits the draft to the org's real offer approval chain (same code as `POST /api/offers/:id/submit`, which now uses the shared helper), and only the approver approves.
+- **Stage moves could put a candidate on another job's stage.** `move_application_to_stage` / `bulk_move_to_stage` now check the stage belongs to the candidate's own job, promote a sourced lead to an active candidate when it enters an interview stage, refuse the Hired stage (that's a hire — use "hired" status), and report failures instead of hiding them.
+
 ### Added (copilot audit, batch 3 — things the copilot promised but couldn't do)
 - **Job status from chat.** New `change_job_status` tool: submit for approval, publish, pause, resume, close (with reason) and unarchive — using the exact same code as the job page buttons. Submit/publish/pause/resume logic moved out of the route files into `lib/openings/job-lifecycle.ts` (seat opening, job-board postings, audit log, webhooks); the routes now call it. Publish, pause, resume and close show an approval card first.
 - **Ideal Candidate Profile from chat.** New `generate_icp` (same as Generate on the Scoring tab; Gemini Pro ~5–10¢, ~1 min, runs in the background so the chat doesn't time out) and `approve_icp` (approval card shows the must-haves and competencies, and pins the exact draft shown). `get_icp` now also shows a newer draft waiting for approval. Generate/approve logic moved to `modules/ats/domain/icp-actions.ts`; the Scoring tab routes call it. Sourcing on a new job now has a working path.

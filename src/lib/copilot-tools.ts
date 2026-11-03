@@ -20,7 +20,6 @@ import {
   getCanonicalJobScoringContext,
   getFirstApplicationStage,
   getFirstLeadStage,
-  getPipelineStageById,
   listCanonicalJobBoardSummaries,
   updateCanonicalJob,
   type CanonicalJobUpdate,
@@ -51,14 +50,11 @@ import {
   getCandidateNameAndStatus,
   setCandidateStatus,
   markCandidateOfferExtended,
-  markCandidateHired,
 } from '@/modules/ats/domain/candidates'
 import {
   listActiveApplicationsByCandidatesWithJobTitle,
   listActiveApplicationsForStaleCheck,
   listApplicationsForCandidateWithJobAndStage,
-  getApplicationStageContext,
-  updateApplicationStage,
   getApplicationCandidateAndJob,
   listExistingApplicationCandidateIds,
   insertPipelineApplication,
@@ -66,10 +62,6 @@ import {
   applyAiScoreToApplication,
   getApplicationCandidateEmailAndJob,
   getApplicationCandidateIdAndJob,
-  findApplicationIdInOrg,
-  updateApplicationStatusInOrg,
-  getApplicationStageNameInOrg,
-  updateApplicationStageById,
   listActiveApplicationsBelowScore,
   updateApplicationStatusById,
   listStaleActiveApplicationsForInbox,
@@ -903,13 +895,12 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   },
   {
     name: 'update_offer_status',
-    description: 'Approve, send, or record the candidate response for a job offer. Use "approved" after review, "sent" after emailing the candidate, "accepted" or "declined" based on candidate response.',
+    description: 'Move a job offer along: "pending_approval" submits a draft offer to the org\'s offer approval chain (approvers decide in their Approvals inbox — the copilot can never mark an offer approved); "sent" after it was sent to the candidate; "accepted" (marks the candidate hired and fills a seat on the job) or "declined" from the candidate\'s response; "withdrawn" / "expired". Held for the recruiter\'s approval automatically.',
     input_schema: {
       type: 'object',
       properties: {
         offer_id:    { type: 'string', description: 'UUID of the offer' },
-        status:      { type: 'string', enum: ['pending_approval', 'approved', 'sent', 'accepted', 'declined', 'withdrawn', 'expired'], description: 'New offer status' },
-        approved_by: { type: 'string', description: 'Name of the approver (required when status=approved)' },
+        status:      { type: 'string', enum: ['pending_approval', 'sent', 'accepted', 'declined', 'withdrawn', 'expired'], description: 'New offer status' },
         notes:       { type: 'string', description: 'Optional notes or reason for status change' },
       },
       required: ['offer_id', 'status'],
@@ -1491,7 +1482,7 @@ export async function executeTool(
       // Extended platform tools
       case 'create_candidate':           return await createCandidate(input, orgId, supabase)
       case 'update_candidate_status':    return await updateCandidateStatus(input, orgId, supabase)
-      case 'update_application_status':  return await updateApplicationStatus(input, orgId, supabase)
+      case 'update_application_status':  return await updateApplicationStatus(input, orgId, supabase, userId)
       case 'bulk_move_to_stage':         return await bulkMoveToStage(input, orgId, supabase)
       case 'bulk_reject_below_score':    return await bulkRejectBelowScore(input, orgId, supabase)
       case 'get_application_events':     return await getApplicationEvents(input, orgId, supabase)
@@ -1513,7 +1504,7 @@ export async function executeTool(
       case 'get_interviews':             return await getInterviews(input, orgId, supabase)
       case 'update_interview_status':    return await updateInterviewStatus(input, orgId, supabase)
       case 'create_offer':               return await createOffer(input, orgId, supabase)
-      case 'update_offer_status':        return await updateOfferStatus(input, orgId, supabase)
+      case 'update_offer_status':        return await updateOfferStatus(input, orgId, supabase, userId)
       case 'get_offers':                 return await getOffers(input, orgId, supabase)
       case 'send_assessment':            return await sendAssessment(input, orgId, supabase)
       case 'create_self_schedule_invite': return await createSelfScheduleInvite(input, orgId, supabase)
@@ -1850,6 +1841,58 @@ async function getCandidate(
 
 // ── Write tools ───────────────────────────────────────────────────────────────
 
+/** Move one application to a stage of ITS OWN job, with the same rules as the
+ *  pipeline board: a sourced lead entering an interview-zone stage becomes an
+ *  active candidate; landing in Hired is the hire, so that goes through
+ *  update_application_status 'hired' (approval card + seat bookkeeping). */
+async function moveOneApplication(
+  supabase: SupabaseClient,
+  orgId: string,
+  applicationId: string,
+  stageId: string,
+  note: string | null,
+): Promise<{ ok: true; candidate: string; from: string; to: string; job: string } | { ok: false; error: string }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+  const { data: app, error: appErr } = await sb
+    .from('applications')
+    .select('id, job_id, lifecycle, stage:pipeline_stages(name), candidate:candidates(name), job:jobs(title)')
+    .eq('id', applicationId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (appErr) return { ok: false, error: `Error looking up application: ${appErr.message}` }
+  if (!app) return { ok: false, error: `Application ${applicationId} not found in your organization.` }
+  const { data: stage } = await sb.from('pipeline_stages').select('*').eq('id', stageId).eq('org_id', orgId).maybeSingle()
+  if (!stage) return { ok: false, error: 'Stage not found in your organization.' }
+  const candidate = app.candidate?.name ?? 'Candidate'
+  if (stage.job_id && app.job_id && stage.job_id !== app.job_id) {
+    return { ok: false, error: `"${stage.name}" is a stage on a different job, not ${candidate}'s (${app.job?.title ?? 'their job'}). Use get_job_pipeline for their job's stages.` }
+  }
+  const { isHiredStage } = await import('@/modules/ats/domain/hiring')
+  if (isHiredStage(stage)) {
+    return { ok: false, error: `Moving ${candidate} to "${stage.name}" is the hire — use update_application_status with status "hired" instead (it fills a seat and moves them into Hired).` }
+  }
+  const promote = app.lifecycle === 'lead' && stage.zone && stage.zone !== 'lead'
+  const { error: updErr } = await sb
+    .from('applications')
+    .update({ stage_id: stageId, ...(promote ? { lifecycle: 'active' } : {}) })
+    .eq('id', applicationId)
+    .eq('org_id', orgId)
+  if (updErr) return { ok: false, error: `Error moving ${candidate}: ${updErr.message}` }
+
+  const from = app.stage?.name ?? 'unknown'
+  await supabase.from('application_events').insert({
+    application_id: applicationId,
+    event_type: 'stage_moved',
+    from_stage: from,
+    to_stage:   stage.name,
+    note:       note ?? 'Moved by AI Copilot',
+    created_by: 'AI Copilot',
+    org_id:     orgId,
+  } as never)
+  return { ok: true, candidate, from, to: stage.name, job: app.job?.title ?? 'their job' }
+}
+
 async function moveApplicationToStage(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   input: Record<string, any>,
@@ -1857,39 +1900,9 @@ async function moveApplicationToStage(
   supabase: SupabaseClient,
 ): Promise<string> {
   const { application_id, stage_id, note } = input
-
-  // Verify application exists in this org
-  const { data: current, error: fetchErr } = await getApplicationStageContext(supabase, orgId, application_id)
-
-  if (fetchErr || !current) return `Application not found or not in your organization.`
-
-  // Verify new stage exists in this org
-  const newStage = await getPipelineStageById(supabase, orgId, stage_id)
-
-  if (!newStage) return `Stage not found in your organization.`
-
-  const { error: updateErr } = await updateApplicationStage(supabase, orgId, application_id, stage_id)
-
-  if (updateErr) return `Error moving application: ${updateErr.message}`
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fromStage     = (current.pipeline_stages as any)?.name ?? 'unknown'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const candidateName = (current.candidate as any)?.name ?? 'Candidate'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const jobTitle      = (current.hiring_request as any)?.position_title ?? 'Unknown job'
-
-  await supabase.from('application_events').insert({
-    application_id,
-    event_type: 'stage_moved',
-    from_stage: fromStage,
-    to_stage:   newStage.name,
-    note:       note ?? 'Moved by AI Copilot',
-    created_by: 'AI Copilot',
-    org_id:     orgId,
-  } as never)
-
-  return `Moved ${candidateName} from "${fromStage}" to "${newStage.name}" in ${jobTitle}.`
+  const r = await moveOneApplication(supabase, orgId, String(application_id ?? ''), String(stage_id ?? ''), note ?? null)
+  if (!r.ok) return r.error
+  return `Moved ${r.candidate} from "${r.from}" to "${r.to}" in ${r.job}.`
 }
 
 async function addNoteToApplication(
@@ -2535,6 +2548,7 @@ async function updateApplicationStatus(
   input: Record<string, any>,
   orgId: string,
   supabase: SupabaseClient,
+  userId?: string | null,
 ): Promise<string> {
   const { application_ids, status, reason } = input
 
@@ -2542,29 +2556,55 @@ async function updateApplicationStatus(
     return 'Error: application_ids must be a non-empty array'
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+  const { recordHire } = await import('@/lib/openings/seats')
+  const { isHiredStage, seatNote } = await import('@/modules/ats/domain/hiring')
   const eventNote = reason ?? `Status changed to ${status} by AI Copilot`
-  let updated = 0
+  const done: string[] = []
+  const problems: string[] = []
 
   for (const application_id of application_ids as string[]) {
-    const app = await findApplicationIdInOrg(supabase, orgId, application_id)
+    const { data: app } = await sb
+      .from('applications')
+      .select('id, job_id, stage_id, candidate:candidates(name)')
+      .eq('id', application_id)
+      .eq('org_id', orgId)
+      .maybeSingle()
+    if (!app) { problems.push(`${application_id}: not found in your organization`); continue }
+    const name = app.candidate?.name ?? 'Candidate'
 
-    if (!app) continue
+    // A hire also lands them in the job's Hired stage (if it has one), like the board.
+    let hiredStageId: string | null = null
+    if (status === 'hired' && app.job_id) {
+      const { data: stages } = await sb.from('pipeline_stages').select('*').eq('job_id', app.job_id).eq('org_id', orgId)
+      hiredStageId = ((stages ?? []) as Array<{ id: string; name: string; funnel_step?: string | null }>).find(isHiredStage)?.id ?? null
+    }
 
-    await updateApplicationStatusInOrg(supabase, orgId, application_id, status)
+    const { error } = await sb
+      .from('applications')
+      .update({ status, ...(hiredStageId && hiredStageId !== app.stage_id ? { stage_id: hiredStageId } : {}) })
+      .eq('id', application_id)
+      .eq('org_id', orgId)
+    if (error) { problems.push(`${name}: ${error.message}`); continue }
 
     await supabase.from('application_events').insert({
       application_id,
       event_type:  'status_changed',
+      to_stage:    status,
       note:        eventNote,
       created_by:  'AI Copilot',
       org_id:      orgId,
     } as never)
 
-    updated++
+    // A hire fills one seat on the job (idempotent per application), like the app.
+    const seat = status === 'hired' ? seatNote(await recordHire(supabase, orgId, application_id, userId ?? null).catch(() => null)) : ''
+    done.push(`${name}${seat ? ` —${seat}` : ''}`)
   }
 
-  const skipped = application_ids.length - updated
-  return `Updated ${updated} application(s) to "${status}".${skipped > 0 ? ` ${skipped} not found or skipped.` : ''}`
+  return `Updated ${done.length} of ${application_ids.length} application(s) to "${status}".` +
+    (done.length ? `\n- ${done.join('\n- ')}` : '') +
+    (problems.length ? `\nNot updated:\n- ${problems.join('\n- ')}` : '')
 }
 
 async function bulkMoveToStage(
@@ -2579,33 +2619,16 @@ async function bulkMoveToStage(
     return 'Error: application_ids must be a non-empty array'
   }
 
-  const stage = await getPipelineStageById(supabase, orgId, stage_id)
-
-  if (!stage) return 'Stage not found in your organization.'
-
   let moved = 0
+  let toName = ''
+  const problems: string[] = []
   for (const application_id of application_ids as string[]) {
-    const app = await getApplicationStageNameInOrg(supabase, orgId, application_id)
-
-    if (!app) continue
-
-    await updateApplicationStageById(supabase, application_id, stage_id)
-
-    await supabase.from('application_events').insert({
-      application_id,
-      event_type: 'stage_moved',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      from_stage: (app.pipeline_stages as any)?.name ?? 'unknown',
-      to_stage:   stage.name,
-      note:       note ?? `Moved to ${stage.name} by AI Copilot`,
-      created_by: 'AI Copilot',
-      org_id:     orgId,
-    } as never)
-
-    moved++
+    const r = await moveOneApplication(supabase, orgId, String(application_id), String(stage_id ?? ''), note ?? null)
+    if (r.ok) { moved++; toName = r.to } else problems.push(r.error)
   }
 
-  return `Moved ${moved} application(s) to stage "${stage.name}".`
+  return `Moved ${moved} of ${application_ids.length} application(s)${toName ? ` to "${toName}"` : ''}.` +
+    (problems.length ? ` Not moved:\n- ${Array.from(new Set(problems)).slice(0, 10).join('\n- ')}` : '')
 }
 
 async function bulkRejectBelowScore(
@@ -3526,7 +3549,7 @@ async function createOffer(
   await markCandidateOfferExtended(supabase, orgId, candidate_id)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return `Offer created (ID: ${(data as any).id}, status: draft). Submit for approval with update_offer_status.`
+  return `Offer created (ID: ${(data as any).id}, status: draft). Submit it for approval with update_offer_status status "pending_approval".`
 }
 
 async function updateOfferStatus(
@@ -3534,12 +3557,26 @@ async function updateOfferStatus(
   input: Record<string, any>,
   orgId: string,
   supabase: SupabaseClient,
+  userId?: string | null,
 ): Promise<string> {
-  const { offer_id, status, approved_by, notes } = input
+  const { offer_id, status, notes } = input
+
+  // Approval belongs to the approver, through the org's offer approval chain —
+  // never a status the copilot sets directly.
+  if (status === 'approved') {
+    return 'Offers are approved by the approver in the Approvals inbox, not from chat. I can submit a draft offer for approval (status "pending_approval").'
+  }
+  if (status === 'pending_approval') {
+    if (!userId) return 'Error: could not identify the acting user, so the offer was not submitted.'
+    const { submitOfferForApproval } = await import('@/modules/ats/domain/hiring')
+    const r = await submitOfferForApproval(supabase, orgId, String(offer_id ?? ''), userId)
+    if (!r.ok) return `Couldn't submit the offer for approval: ${r.error}`
+    return r.status === 'approved'
+      ? 'The offer was submitted and approved straight away (no approval chain applies). It can be sent now.'
+      : 'The offer was submitted for approval — the approver will see it in their Approvals inbox.'
+  }
 
   const updatePayload: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
-  if (approved_by)                                       updatePayload.approved_by  = approved_by
-  if (status === 'approved')                             updatePayload.approved_at  = new Date().toISOString()
   if (status === 'sent')                                 updatePayload.sent_at      = new Date().toISOString()
   if (status === 'accepted' || status === 'declined')    updatePayload.responded_at = new Date().toISOString()
 
@@ -3553,26 +3590,28 @@ async function updateOfferStatus(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const offer = data as any
   const eventMap: Record<string, string> = {
-    approved: 'offer_approved', sent: 'offer_sent',
-    accepted: 'offer_accepted', declined: 'offer_declined',
+    sent: 'offer_sent', accepted: 'offer_accepted', declined: 'offer_declined',
   }
   const eventType = eventMap[status]
+  let seat = ''
   if (eventType) {
     await supabase.from('application_events').insert({
       application_id: offer.application_id,
       org_id: orgId,
       event_type: eventType,
-      note: `Offer ${status}${approved_by ? ` by ${approved_by}` : ''}${notes ? ` — ${notes}` : ''}`,
+      note: `Offer ${status}${notes ? ` — ${notes}` : ''}`,
       metadata: { offer_id },
-      created_by: orgId,
+      created_by: 'AI Copilot',
     } as never)
 
     if (status === 'accepted') {
-      await markCandidateHired(supabase, orgId, offer.candidate_id)
+      // Same bookkeeping as the Offers screen: candidate + application hired, seat filled.
+      const { applyOfferAccepted, seatNote } = await import('@/modules/ats/domain/hiring')
+      seat = seatNote(await applyOfferAccepted(supabase, orgId, offer, userId ?? null))
     }
   }
 
-  return `Offer status updated to "${status}".${status === 'accepted' ? ' Candidate status set to hired.' : ''}`
+  return `Offer status updated to "${status}".${status === 'accepted' ? ` Candidate marked hired.${seat}` : ''}`
 }
 
 async function getOffers(

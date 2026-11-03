@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withCapability, parseBody, handleSupabaseError } from '@/lib/api/helpers'
 import { offerUpdateSchema } from '@/lib/validations/offers'
-import { recordHire } from '@/lib/openings/seats'
+import { applyOfferAccepted } from '@/modules/ats/domain/hiring'
 
 export const GET = withCapability('recruiting:view', async (_req, orgId, supabase, { params }) => {
   const { data, error } = await supabase
@@ -68,13 +68,8 @@ export const PATCH = withCapability('recruiting:edit', async (req, orgId, supaba
 
     // Sync candidate status when offer accepted, and fill a seat on the job.
     if (parsed.status === 'accepted') {
-      await supabase
-        .from('candidates')
-        .update({ status: 'hired', updated_at: new Date().toISOString() })
-        .eq('id', offer.candidate_id)
-        .eq('org_id', orgId)
-      await supabase.from('applications').update({ status: 'hired' } as never).eq('id', offer.application_id).eq('org_id', orgId)
-      await recordHire(supabase, orgId, offer.application_id, userId).catch(() => null)
+      // Shared with the copilot's update_offer_status (modules/ats/domain/hiring).
+      await applyOfferAccepted(supabase, orgId, offer, userId)
     }
   }
 

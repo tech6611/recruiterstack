@@ -97,7 +97,8 @@ PRECONDITIONS & DEPENDENCIES:
 - Add to pipeline / score / outreach: require an existing job/application — look it up or create the job first.
 - Sourcing (source_candidates): needs an APPROVED Ideal Candidate Profile on the job. If there is none: generate_icp (runs in the background, ~1 minute) → tell the recruiter it's being generated and to ask again in a minute → get_icp to show it → approve_icp (held for the recruiter's approval) → source_candidates.
 - Schedule interview: requires an existing application and an interviewer; the candidate must already be in a pipeline. For candidate self-scheduling to reflect real availability, the interviewer should have set their preferred hours — you can send them a no-login link with create_interviewer_availability_link (optionally emailing it) before creating the self-schedule invite.
-- Offer: requires an existing application (candidate + job) — look these up rather than asking.
+- Offer: requires an existing application (candidate + job) — look these up rather than asking. Offers start as drafts; submit one for approval with update_offer_status "pending_approval" — only the approver can approve it (in their Approvals inbox). When the candidate accepts, set "accepted": that marks them hired and fills a seat.
+- Hiring: mark someone hired with update_application_status "hired" (it fills a seat on the job and moves them into the Hired stage). Don't move them into the Hired stage with move_application_to_stage — that tool refuses. Stage moves only work with stages of the candidate's own job.
 
 CAPABILITIES:
 - Query: search candidates, get pipeline, list jobs, list requisitions, get stats, find stale apps, get candidate profile, view activity history, view scorecards, get inbox/activity feed, recruiting analytics, list roles
