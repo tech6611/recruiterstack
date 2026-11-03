@@ -2,6 +2,10 @@
 
 ## 2026-11-03
 
+### Fixed
+- **Copilot said "no active jobs" when there were 4.** `list_jobs` offered only legacy status names (`posted`, `jd_generated`…), so the AI filtered on "posted" and matched nothing. It now uses the real statuses (`open`, `paused`, `draft`, `pending_approval`, `approved`, `closed`), maps "active"/"live"/"posted" to `open`, always reports how many jobs exist per status, and shows active candidates per stage plus totals. `get_dashboard_stats` now reports open jobs and excludes archived ones from the total.
+- **Copilot `update_job` could wipe a job description and couldn't publish.** It offered legacy statuses the DB rejects, wrote "key requirements" over the whole JD, and silently dropped hiring manager / location / headcount. It now only edits the title (drafts only, like the job page), key requirements and nice-to-haves (saved to the job's intake, not the JD), and refuses status changes with a pointer to the job page's Publish / Pause / Resume / Close buttons until those are wired properly.
+
 ### Added
 - **Copilot: create from a file, link or pasted text.** Attach a PDF, Word (.docx) or text file (paperclip or drag-and-drop), paste a link, or paste a block of text, and ask the copilot to create a requisition/job from it. It reads the material, works out the full chain of steps, and shows the usual form with every value it found pre-filled and tagged "From your file"; only what's missing is left blank. Departments/locations are matched to the org's lists (loosely), and an unmatched one shows "Your file says X — pick the closest". New `POST /api/copilot/attachments` (reads files to text; unpdf → Gemini Flash fallback for scanned PDFs, mammoth for .docx; nothing stored) and a `read_link` coordinator tool (`lib/copilot/source-material.ts`: http(s) only, public IPs only re-checked on each redirect, 10s / 3 MB limits, 20k-char cap). Attached text is sent in full only on the latest messages of a chat, then summarised.
 

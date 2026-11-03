@@ -239,14 +239,17 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   {
     name: 'list_jobs',
     description:
-      'List all hiring requests with status, hiring manager, department, and active candidate counts.',
+      'List jobs (archived ones excluded) with status, hiring manager, department, and candidate counts per job. ' +
+      'Job statuses: "open" = live / active / accepting applicants; "paused" = temporarily not accepting applicants; ' +
+      '"draft" = being set up; "pending_approval" / "approved" = waiting to go live; "closed" = no longer hiring. ' +
+      'For "active" or "live" jobs use status_filter "open". Omit the filter to see every job.',
     input_schema: {
       type: 'object',
       properties: {
         status_filter: {
           type: 'string',
-          enum: ['intake_pending', 'intake_submitted', 'jd_generated', 'jd_sent', 'jd_approved', 'posted'],
-          description: 'Optional: filter by job status',
+          enum: ['open', 'paused', 'draft', 'pending_approval', 'approved', 'closed'],
+          description: 'Optional: only jobs with this status. "open" means active/live.',
         },
       },
     },
@@ -617,17 +620,16 @@ export const COPILOT_TOOLS: ToolSchema[] = [
   },
   {
     name: 'update_job',
-    description: "Update an existing job's status, title, hiring manager, or requirements. Use status 'posted' to publish, 'paused' to pause, or update details after creation.",
+    description:
+      "Update an existing job's title (drafts only), key requirements, or nice-to-haves. " +
+      'This tool can NOT change a job\'s status: publishing, pausing, resuming and closing a job must be done with the buttons on the job page for now — tell the recruiter that plainly.',
     input_schema: {
       type: 'object',
       properties: {
-        job_id:               { type: 'string', description: 'UUID of the hiring request' },
-        status:               { type: 'string', enum: ['intake_pending', 'intake_submitted', 'jd_generated', 'jd_sent', 'jd_approved', 'posted'], description: 'New status' },
-        position_title:       { type: 'string', description: 'Updated job title' },
-        hiring_manager_name:  { type: 'string', description: 'Updated hiring manager name' },
-        key_requirements:     { type: 'string', description: 'Updated key requirements' },
-        location:             { type: 'string', description: 'Updated location' },
-        headcount:            { type: 'number', description: 'Updated headcount' },
+        job_id:           { type: 'string', description: 'UUID of the job' },
+        position_title:   { type: 'string', description: 'Updated job title (only while the job is a draft)' },
+        key_requirements: { type: 'string', description: 'Updated key requirements' },
+        nice_to_haves:    { type: 'string', description: 'Updated nice-to-have qualifications' },
       },
       required: ['job_id'],
     },
@@ -1614,34 +1616,54 @@ async function listJobs(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { status_filter } = input
+  // Accept common synonyms so a wording slip can't return a false "no jobs".
+  const raw = typeof input.status_filter === 'string' ? input.status_filter.trim().toLowerCase() : ''
+  const ALIASES: Record<string, string> = { active: 'open', live: 'open', posted: 'open', published: 'open' }
+  const status_filter = raw ? (ALIASES[raw] ?? raw) : ''
 
   const summaries = await listCanonicalJobBoardSummaries(supabase, orgId)
   const jobs = status_filter
     ? summaries.filter(j => j.status === status_filter)
     : summaries
-  if (jobs.length === 0) return 'No jobs found.'
+
+  // Always say what exists, so "none with this status" is never mistaken for "no jobs at all".
+  const byStatus = summaries.reduce<Record<string, number>>((acc, j) => {
+    acc[j.status] = (acc[j.status] ?? 0) + 1
+    return acc
+  }, {})
+  const overview = `All jobs (archived excluded): ${summaries.length} — ` +
+    (Object.entries(byStatus).map(([st, n]) => `${n} ${st}`).join(', ') || 'none')
+
+  if (jobs.length === 0) {
+    return status_filter
+      ? `No jobs with status "${status_filter}". ${overview}.`
+      : 'No jobs found.'
+  }
 
   const lines = jobs.map(j => {
-    // Active candidates per job (matches prior active-only count): sum the
-    // per-stage active counts the board summary computes.
-    const count = j.stage_counts.reduce((sum, s) => sum + s.count, 0)
-    return `• ${j.position_title}${j.department ? ` (${j.department})` : ''} | ${j.status} | HM: ${j.hiring_manager_name} | ${count} candidates | ID: ${j.id}`
+    // Active candidates per job: sum of the per-stage active counts the board
+    // summary computes; total includes rejected/withdrawn/hired too.
+    const active = j.stage_counts.reduce((sum, s) => sum + s.count, 0)
+    const stages = j.stage_counts.filter(s => s.count > 0).map(s => `${s.stage_name}: ${s.count}`).join(', ')
+    return `• ${j.position_title}${j.department ? ` (${j.department})` : ''} | ${j.status} | HM: ${j.hiring_manager_name ?? '—'} | ` +
+      `${active} active candidates${stages ? ` (${stages})` : ''}, ${j.total_candidates} total | ID: ${j.id}`
   })
 
-  return `${jobs.length} job(s):\n${lines.join('\n')}`
+  return `${jobs.length} job(s)${status_filter ? ` with status "${status_filter}"` : ''}:\n${lines.join('\n')}\n${overview}.`
 }
 
 async function getDashboardStats(orgId: string, supabase: SupabaseClient): Promise<string> {
-  const [totalJobs, activeCount, interviewingCount, hiredCount] = await Promise.all([
-    countCanonicalJobs(supabase, orgId),
+  const [jobs, activeCount, interviewingCount, hiredCount] = await Promise.all([
+    listCanonicalJobBoardSummaries(supabase, orgId),   // archived excluded
     countCandidatesByStatus(supabase, orgId, 'active'),
     countCandidatesByStatus(supabase, orgId, 'interviewing'),
     countCandidatesByStatus(supabase, orgId, 'hired'),
   ])
+  const openJobs = jobs.filter(j => String(j.status) === 'open').length
 
   return `Recruiting overview:
-• Total jobs: ${totalJobs}
+• Open (active) jobs: ${openJobs}
+• All jobs, excluding archived: ${jobs.length}
 • Active candidates: ${activeCount}
 • Currently interviewing: ${interviewingCount}
 • Total hired: ${hiredCount}`
@@ -2531,26 +2553,45 @@ async function updateJob(
   orgId: string,
   supabase: SupabaseClient,
 ): Promise<string> {
-  const { job_id, status, position_title, key_requirements } = input
+  const { job_id, position_title, key_requirements, nice_to_haves } = input
+
+  // Status changes go through the job page (publish/pause/resume/close run seat,
+  // webhook and audit side-effects this tool doesn't). Refuse loudly, never write
+  // a raw status.
+  if (input.status != null) {
+    return "I can't change a job's status from chat yet — use the Publish / Pause / Resume / Close buttons on the job page."
+  }
 
   const job = await getCanonicalJobById(supabase, orgId, job_id)
   if (!job) return 'Job not found in your organization.'
 
-  // Build update payload only from provided fields, mapped to canonical `jobs`
-  // columns (title, description, status). Legacy-only fields (hiring_manager_name,
-  // location, headcount) have no canonical column; key_requirements is folded into
-  // the job description.
   const updates: CanonicalJobUpdate = {}
-  if (status         != null) updates.status      = status
-  if (position_title != null) updates.title       = position_title
-  if (key_requirements != null) updates.description = key_requirements
+  const done: string[] = []
+
+  if (position_title != null) {
+    // Same rule as the job page: identity fields are editable only while draft.
+    if (job.status !== 'draft') return `The title can only be changed while the job is a draft (this one is "${job.status}").`
+    updates.title = position_title
+    done.push(`title → "${position_title}"`)
+  }
+
+  // Requirements live in the job's intake (custom_fields.intake), NOT the job
+  // description — writing them to description used to wipe the JD.
+  if (key_requirements != null || nice_to_haves != null) {
+    const { data: row, error } = await supabase
+      .from('jobs').select('custom_fields').eq('id', job_id).eq('org_id', orgId).maybeSingle()
+    if (error) throw error
+    const cf = ((row as { custom_fields?: Record<string, unknown> } | null)?.custom_fields ?? {}) as Record<string, unknown>
+    const intake = { ...((cf.intake && typeof cf.intake === 'object') ? cf.intake as Record<string, unknown> : {}) }
+    if (key_requirements != null) { intake.key_requirements = key_requirements; done.push('key requirements') }
+    if (nice_to_haves != null)    { intake.nice_to_have     = nice_to_haves;    done.push('nice-to-haves') }
+    updates.custom_fields = { ...cf, intake }
+  }
 
   if (Object.keys(updates).length === 0) return 'No fields provided to update.'
 
   await updateCanonicalJob(supabase, orgId, job_id, updates)
-
-  const changes = Object.entries(updates).map(([k, v]) => `${k}: "${v}"`).join(', ')
-  return `Updated "${job.position_title}": ${changes}.`
+  return `Updated "${job.position_title}": ${done.join(', ')}.`
 }
 
 async function getScorecard(
