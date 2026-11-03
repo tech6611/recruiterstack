@@ -23,6 +23,6 @@ describe('buildFormAnswer', () => {
     expect(message).toContain('- Department [department]: Sales')
     expect(message).toContain('- Justification [justification]: <p>Expanding into <strong>MENA</strong></p>')
     expect(message).toContain('Left blank (optional — leave unset): Location')
-    expect(display).toBe('✓ Form submitted — Department: Sales · Justification ✓')
+    expect(display).toBe('✓ Details submitted')
   })
 })

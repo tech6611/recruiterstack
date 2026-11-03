@@ -813,8 +813,12 @@ export function Copilot() {
           ) : (
             messages.map((msg, msgIdx) => {
               const isLastAssistant = msgIdx === messages.length - 1 && msg.role === 'assistant'
-              const allToolsDone    = !msg.toolEvents?.length || msg.toolEvents.every(te => !!te.summary)
-              const isWorkflow      = (msg.toolEvents?.length ?? 0) >= 3
+              // Hide the form's own call (older saved chats still have a stuck
+              // "Running ask_user_form…" chip) — the form card stands for it.
+              const tools           = (msg.toolEvents ?? []).filter(te => te.name !== 'ask_user_form')
+              const isLive          = isLastAssistant && streaming
+              const allToolsDone    = !tools.length || tools.every(te => !!te.summary)
+              const isWorkflow      = tools.length >= 3
 
               return (
                 <div
@@ -831,17 +835,17 @@ export function Copilot() {
                     <div className="max-w-[96%] w-full space-y-2">
 
                       {/* ── Workflow step list (≥3 tools) ──── */}
-                      {isWorkflow && msg.toolEvents && (
+                      {isWorkflow && (
                         <WorkflowStepList
-                          steps={msg.toolEvents}
-                          isStreaming={isLastAssistant && streaming}
+                          steps={tools}
+                          isStreaming={isLive}
                         />
                       )}
 
                       {/* ── Small tool pills (<3 tools) ─────── */}
-                      {!isWorkflow && msg.toolEvents && msg.toolEvents.length > 0 && (
+                      {!isWorkflow && tools.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
-                          {msg.toolEvents.map((te, i) => (
+                          {tools.map((te, i) => (
                             <span
                               key={i}
                               className={`inline-flex items-center text-xs font-medium rounded-full px-2.5 py-0.5 transition-colors ${
@@ -850,7 +854,8 @@ export function Copilot() {
                                   : 'bg-slate-50 text-slate-600'
                               }`}
                             >
-                              {!te.summary && (
+                              {/* Only animate while this reply is actually running. */}
+                              {!te.summary && isLive && (
                                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-ping mr-1.5 flex-shrink-0" />
                               )}
                               {te.summary ? `✓ ${te.summary}` : te.label}

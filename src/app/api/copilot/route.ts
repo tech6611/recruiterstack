@@ -165,7 +165,11 @@ export async function POST(request: NextRequest) {
               send({ type: 'text', delta: ev.delta })
               textBuffer += ev.delta
             } else if (ev.type === 'call' && ev.name) {
-              send({ type: 'tool_start', id: ev.id, name: ev.name, label: toolLabel(ev.name) })
+              // The form is shown as a card, not a progress chip — a chip would
+              // never get a "done" and would spin forever.
+              if (ev.name !== 'ask_user_form') {
+                send({ type: 'tool_start', id: ev.id, name: ev.name, label: toolLabel(ev.name) })
+              }
             }
           }
 

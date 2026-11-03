@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-03
+
+### Fixed
+- **Copilot: submitted form no longer dumps every answer into the chat.** The recruiter's bubble now just says "✓ Details submitted"; the full answers still go to the AI.
+- **Copilot: "⚙️ Running ask_user_form…" chip spun forever.** The form call no longer creates a progress chip (the form card stands for it), older saved chats hide the stuck chip, and any unfinished chip only animates while that reply is actually running.
+
 ## 2026-11-02
 
 ### Security

@@ -47,11 +47,10 @@ function textLength(v: string | undefined): number {
   return (v ?? '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim().length
 }
 
-/** Turn the answers into (a) the message the AI reads and (b) a short summary
+/** Turn the answers into (a) the message the AI reads and (b) the short line
  *  shown in the user's chat bubble. */
 export function buildFormAnswer(spec: FormSpec, values: Record<string, string>): { message: string; display: string } {
   const lines: string[] = []
-  const summary: string[] = []
   const skipped: string[] = []
   for (const f of spec.fields) {
     const v = values[f.key]
@@ -60,7 +59,6 @@ export function buildFormAnswer(spec: FormSpec, values: Record<string, string>):
       continue
     }
     lines.push(`- ${f.label} [${f.key}]: ${v}`)
-    summary.push(f.type === 'rich_text' ? `${f.label} ✓` : `${f.label}: ${v}`)
   }
   const message = [
     `Here are my answers from the form${spec.steps.length ? ` (steps: ${spec.steps.join(' → ')})` : ''}.`,
@@ -69,7 +67,8 @@ export function buildFormAnswer(spec: FormSpec, values: Record<string, string>):
     ...lines,
     skipped.length ? `\nLeft blank (optional — leave unset): ${skipped.join(', ')}` : '',
   ].join('\n').trim()
-  return { message, display: `✓ Form submitted — ${summary.join(' · ')}` }
+  // The chat bubble stays short — the details go only to the AI.
+  return { message, display: '✓ Details submitted' }
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
