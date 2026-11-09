@@ -118,6 +118,110 @@ export type AgentPipelineEntry = {
   source: string | null
 }
 
+export type AgentCandidateCard = {
+  id: string
+  name: string | null
+  current_title: string | null
+  current_company: string | null
+  location: string | null
+  experience_years: number | null
+  skills: string[]
+}
+
+const CARD_COLUMNS = 'id, name, current_title, current_company, location, experience_years, skills, person_id'
+
+/**
+ * Search the org's candidates by free text (name, title or company), skills (any of)
+ * and location. Optionally restricted to a set of candidate ids (limited viewers).
+ * Never returns contact details.
+ */
+export async function searchCandidatesForMcp(
+  supabase: SupabaseClient,
+  orgId: string,
+  opts: { query?: string; skills?: string[]; location?: string; onlyIds?: string[]; limit: number },
+): Promise<AgentCandidateCard[]> {
+  if (opts.onlyIds && opts.onlyIds.length === 0) return []
+  const sb = supabase as Loose
+  const clean = (s: string) => s.replace(/[%_,()*]/g, ' ').trim()
+  let q = sb.from('candidates').select(CARD_COLUMNS).eq('org_id', orgId)
+  if (opts.onlyIds) q = q.in('id', opts.onlyIds)
+  const query = opts.query ? clean(opts.query) : ''
+  if (query) {
+    const { data: people } = await sb.from('people').select('id').eq('org_id', orgId).ilike('name', `%${query}%`).limit(200)
+    const personIds = ((people ?? []) as Array<{ id: string }>).map((p) => p.id)
+    const clauses = [`current_title.ilike.%${query}%`, `current_company.ilike.%${query}%`, `name.ilike.%${query}%`]
+    if (personIds.length) clauses.push(`person_id.in.(${personIds.join(',')})`)
+    q = q.or(clauses.join(','))
+  }
+  if (opts.location) q = q.ilike('location', `%${clean(opts.location)}%`)
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(300)
+  if (error) throw error
+  let rows = (data ?? []) as Loose[]
+  // Skill match is case-insensitive and "any of" — done here so "python" matches "Python".
+  if (opts.skills?.length) {
+    const wanted = opts.skills.map((s) => s.toLowerCase().trim()).filter(Boolean)
+    rows = rows.filter((r) => ((r.skills ?? []) as string[]).some((s) => wanted.includes(s.toLowerCase())))
+  }
+  return rows.slice(0, opts.limit).map((r) => ({
+    id: r.id, name: r.name ?? null, current_title: r.current_title ?? null, current_company: r.current_company ?? null,
+    location: r.location ?? null, experience_years: r.experience_years ?? null, skills: (r.skills ?? []) as string[],
+  }))
+}
+
+/** Candidate ids with an application on any of the given jobs (used for limited viewers). */
+export async function candidateIdsOnJobs(supabase: SupabaseClient, orgId: string, jobIds: string[]): Promise<string[]> {
+  if (!jobIds.length) return []
+  const { data, error } = await (supabase as Loose).from('applications').select('candidate_id').eq('org_id', orgId).in('job_id', jobIds)
+  if (error) throw error
+  return Array.from(new Set(((data ?? []) as Array<{ candidate_id: string }>).map((r) => r.candidate_id)))
+}
+
+export type AgentCandidateDetail = AgentCandidateCard & {
+  email: string | null
+  phone: string | null
+  linkedin_url: string | null
+  education: Array<{ degree?: string | null; field?: string | null; school?: string | null; year?: number | null }>
+  experiences: Array<{ title: string | null; employer: string | null; start_date: string | null; end_date: string | null; is_current: boolean | null; summary: string | null }>
+  applications: Array<{
+    id: string; job_id: string | null; job_title: string | null; job_confidentiality: string | null; stage: string | null; status: string
+    ai_score: number | null; fit_bucket: string | null; recommendation: string | null; rationale: string | null
+    strengths: string[]; gaps: string[]; red_flags: string[]; gate_failures: unknown[]; criterion_scores: unknown
+  }>
+}
+
+/** Full candidate record for get_candidate. Contact fields are included here; the TOOL decides whether to expose them. */
+export async function getCandidateDetailForMcp(supabase: SupabaseClient, orgId: string, candidateId: string): Promise<AgentCandidateDetail | null> {
+  const sb = supabase as Loose
+  const { data: c, error } = await sb
+    .from('candidates').select(`${CARD_COLUMNS}, email, phone, linkedin_url, education`)
+    .eq('org_id', orgId).eq('id', candidateId).maybeSingle()
+  if (error) throw error
+  if (!c) return null
+  const [{ data: exps }, { data: apps }] = await Promise.all([
+    sb.from('candidate_experiences').select('title, employer, start_date, end_date, is_current, summary, sort_order')
+      .eq('org_id', orgId).eq('candidate_id', candidateId).order('sort_order'),
+    sb.from('applications')
+      .select('id, job_id, status, ai_score, ai_fit_bucket, ai_recommendation, ai_rationale, ai_strengths, ai_gaps, ai_red_flags, ai_gate_failures, ai_criterion_scores, stage:pipeline_stages(name), job:jobs(title, confidentiality, status)')
+      .eq('org_id', orgId).eq('candidate_id', candidateId),
+  ])
+  return {
+    id: c.id, name: c.name ?? null, current_title: c.current_title ?? null, current_company: c.current_company ?? null,
+    location: c.location ?? null, experience_years: c.experience_years ?? null, skills: (c.skills ?? []) as string[],
+    email: c.email ?? null, phone: c.phone ?? null, linkedin_url: c.linkedin_url ?? null,
+    education: (c.education ?? []) as AgentCandidateDetail['education'],
+    experiences: ((exps ?? []) as Loose[]).map((e) => ({ title: e.title, employer: e.employer, start_date: e.start_date, end_date: e.end_date, is_current: e.is_current, summary: e.summary })),
+    applications: ((apps ?? []) as Loose[])
+      .filter((a) => a.job?.status !== 'archived')
+      .map((a) => ({
+        id: a.id, job_id: a.job_id ?? null, job_title: a.job?.title ?? null, job_confidentiality: a.job?.confidentiality ?? null,
+        stage: a.stage?.name ?? null, status: a.status, ai_score: a.ai_score ?? null, fit_bucket: a.ai_fit_bucket ?? null,
+        recommendation: a.ai_recommendation ?? null, rationale: a.ai_rationale ?? null,
+        strengths: a.ai_strengths ?? [], gaps: a.ai_gaps ?? [], red_flags: a.ai_red_flags ?? [],
+        gate_failures: a.ai_gate_failures ?? [], criterion_scores: a.ai_criterion_scores ?? null,
+      })),
+  }
+}
+
 /** Active applications for a job with a compact candidate card each (no contact details). */
 export async function listPipelineForAgent(
   supabase: SupabaseClient,

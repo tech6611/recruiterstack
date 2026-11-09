@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { verifyMcpToken } from '@/lib/mcp/verify-token'
 import { guarded } from '@/lib/mcp/tool'
 import { registerJobTools } from '@/lib/mcp/tools/jobs'
+import { registerCandidateTools } from '@/lib/mcp/tools/candidates'
 
 /**
  * RecruiterStack MCP server — the "front door" that ChatGPT, Claude and other
@@ -46,6 +47,7 @@ const handler = createMcpHandler(
     )
 
     registerJobTools(server)
+    registerCandidateTools(server)
   },
   { serverInfo: { name: 'recruiterstack', version: '0.1.0' } },
 )
