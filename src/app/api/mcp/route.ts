@@ -6,6 +6,7 @@ import { registerJobTools } from '@/lib/mcp/tools/jobs'
 import { registerCandidateTools } from '@/lib/mcp/tools/candidates'
 import { registerRankingTools } from '@/lib/mcp/tools/ranking'
 import { registerOutreachTools } from '@/lib/mcp/tools/outreach'
+import { registerActionTools } from '@/lib/mcp/tools/actions'
 
 /**
  * RecruiterStack MCP server — the "front door" that ChatGPT, Claude and other
@@ -21,7 +22,7 @@ import { registerOutreachTools } from '@/lib/mcp/tools/outreach'
  */
 
 // Scoring up to 25 candidates (5 at a time, ~7s each) needs headroom; Claude's own limit is 240s.
-export const maxDuration = 120
+export const maxDuration = 300 // market sourcing (fetch + embed + score) can take ~1 min
 
 const handler = createMcpHandler(
   (server) => {
@@ -55,6 +56,7 @@ const handler = createMcpHandler(
     registerCandidateTools(server)
     registerRankingTools(server)
     registerOutreachTools(server)
+    registerActionTools(server)
   },
   { serverInfo: { name: 'recruiterstack', version: '0.1.0' } },
 )
