@@ -5,6 +5,7 @@ import { guarded } from '@/lib/mcp/tool'
 import { registerJobTools } from '@/lib/mcp/tools/jobs'
 import { registerCandidateTools } from '@/lib/mcp/tools/candidates'
 import { registerRankingTools } from '@/lib/mcp/tools/ranking'
+import { registerOutreachTools } from '@/lib/mcp/tools/outreach'
 
 /**
  * RecruiterStack MCP server — the "front door" that ChatGPT, Claude and other
@@ -53,6 +54,7 @@ const handler = createMcpHandler(
     registerJobTools(server)
     registerCandidateTools(server)
     registerRankingTools(server)
+    registerOutreachTools(server)
   },
   { serverInfo: { name: 'recruiterstack', version: '0.1.0' } },
 )

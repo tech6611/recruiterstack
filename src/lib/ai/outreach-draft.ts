@@ -21,6 +21,20 @@ export interface OutreachContext {
   recruiter_name: string
   why_they_fit?: string | null // the Fit Engine rationale
   evidence?: string[] // per-competency evidence
+  /** Optional (MCP draft tool). Absent → the original email prompt, unchanged. */
+  channel?: 'email' | 'linkedin'
+  /** Optional tone hint, e.g. "warm", "direct", "formal". */
+  tone?: string | null
+}
+
+/** Extra requirement lines for the optional channel/tone settings ('' when neither is set). */
+function channelAndTone(ctx: OutreachContext): string {
+  const lines: string[] = []
+  if (ctx.channel === 'linkedin') {
+    lines.push('- This is a LinkedIn message, not an email: under 600 characters, 2 short paragraphs, conversational. Put a short topic line in "subject" (it may be unused).')
+  }
+  if (ctx.tone?.trim()) lines.push(`- Tone: ${ctx.tone.trim().slice(0, 40)}.`)
+  return lines.length ? `\n${lines.join('\n')}` : ''
 }
 
 /** Build the outreach prompt. PURE + tested. */
@@ -56,7 +70,7 @@ Requirements:
 - Warm, human, specific — weave in ONE or TWO of the concrete reasons above so they know this isn't a blast.
 - Short (3–4 short paragraphs). No hype, no "perfect fit" clichés.
 - A soft call to action (open to a quick chat?). No placeholder brackets like [date].
-- Sign off with the recruiter name.
+- Sign off with the recruiter name.${channelAndTone(ctx)}
 
 Respond with ONLY a valid JSON object, nothing else:
 {"subject": "...", "body": "..."}`

@@ -276,6 +276,20 @@ export async function averageFitScoringCostUsd(supabase: SupabaseClient, orgId: 
   return costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length : 0.0015 // measured 2026-11-09: $0.0014/candidate
 }
 
+/** Names used to sign and personalise outreach drafts. */
+export async function getOutreachNames(
+  supabase: SupabaseClient,
+  orgId: string,
+  userId: string,
+): Promise<{ companyName: string | null; recruiterName: string | null }> {
+  const sb = supabase as Loose
+  const [{ data: org }, { data: user }] = await Promise.all([
+    sb.from('org_settings').select('company_name').eq('org_id', orgId).maybeSingle(),
+    sb.from('users').select('full_name, first_name').eq('id', userId).maybeSingle(),
+  ])
+  return { companyName: org?.company_name ?? null, recruiterName: user?.full_name ?? user?.first_name ?? null }
+}
+
 /** Active applications for a job with a compact candidate card each (no contact details). */
 export async function listPipelineForAgent(
   supabase: SupabaseClient,

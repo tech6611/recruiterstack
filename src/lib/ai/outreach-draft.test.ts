@@ -29,3 +29,17 @@ describe('buildOutreachPrompt', () => {
     expect(p).toContain('No specific fit notes')
   })
 })
+
+describe('buildOutreachPrompt channel/tone options (MCP draft tool)', () => {
+  const base = { first_name: 'Aarav', role_title: 'Backend Engineer', company_name: 'Northwind', recruiter_name: 'Tech Team' }
+  it('leaves the original prompt unchanged when no channel/tone is given', () => {
+    const p = buildOutreachPrompt(base)
+    expect(p).toContain('- Sign off with the recruiter name.\n\nRespond with ONLY')
+    expect(p).not.toContain('LinkedIn')
+  })
+  it('adds LinkedIn length guidance and the tone when asked', () => {
+    const p = buildOutreachPrompt({ ...base, channel: 'linkedin', tone: 'direct' })
+    expect(p).toContain('under 600 characters')
+    expect(p).toContain('- Tone: direct.')
+  })
+})
