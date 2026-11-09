@@ -4,6 +4,7 @@ import { verifyMcpToken } from '@/lib/mcp/verify-token'
 import { guarded } from '@/lib/mcp/tool'
 import { registerJobTools } from '@/lib/mcp/tools/jobs'
 import { registerCandidateTools } from '@/lib/mcp/tools/candidates'
+import { registerRankingTools } from '@/lib/mcp/tools/ranking'
 
 /**
  * RecruiterStack MCP server — the "front door" that ChatGPT, Claude and other
@@ -17,6 +18,9 @@ import { registerCandidateTools } from '@/lib/mcp/tools/candidates'
  *
  * This route bypasses the Clerk browser middleware (see src/middleware.ts).
  */
+
+// Scoring up to 25 candidates (5 at a time, ~7s each) needs headroom; Claude's own limit is 240s.
+export const maxDuration = 120
 
 const handler = createMcpHandler(
   (server) => {
@@ -48,6 +52,7 @@ const handler = createMcpHandler(
 
     registerJobTools(server)
     registerCandidateTools(server)
+    registerRankingTools(server)
   },
   { serverInfo: { name: 'recruiterstack', version: '0.1.0' } },
 )

@@ -222,6 +222,60 @@ export async function getCandidateDetailForMcp(supabase: SupabaseClient, orgId: 
   }
 }
 
+export type AgentFitRow = {
+  application_id: string
+  candidate_id: string
+  stage_id: string | null
+  name: string | null
+  current_title: string | null
+  current_company: string | null
+  ai_score: number | null
+  fit_bucket: string | null
+  recommendation: string | null
+  strengths: string[]
+  gaps: string[]
+  red_flags: string[]
+  gate_failures: Array<{ label?: string } | string>
+  criterion_scores: Array<{ name?: string; rating?: number; weight?: number }> | null
+  icp_version: number | null
+  scored_at: string | null
+}
+
+/** Active applications for a job with their stored AI fit assessment (for ranking). */
+export async function listFitForAgent(supabase: SupabaseClient, orgId: string, jobId: string): Promise<AgentFitRow[]> {
+  const { data, error } = await (supabase as Loose)
+    .from('applications')
+    .select('id, candidate_id, stage_id, ai_score, ai_fit_bucket, ai_recommendation, ai_strengths, ai_gaps, ai_red_flags, ai_gate_failures, ai_criterion_scores, ai_icp_version, ai_scored_at, candidate:candidates(name, current_title, current_company)')
+    .eq('org_id', orgId).eq('job_id', jobId).eq('status', 'active')
+  if (error) throw error
+  return ((data ?? []) as Loose[]).map((a) => ({
+    application_id: a.id, candidate_id: a.candidate_id, stage_id: a.stage_id ?? null,
+    name: a.candidate?.name ?? null, current_title: a.candidate?.current_title ?? null, current_company: a.candidate?.current_company ?? null,
+    ai_score: a.ai_score ?? null, fit_bucket: a.ai_fit_bucket ?? null, recommendation: a.ai_recommendation ?? null,
+    strengths: a.ai_strengths ?? [], gaps: a.ai_gaps ?? [], red_flags: a.ai_red_flags ?? [],
+    gate_failures: a.ai_gate_failures ?? [], criterion_scores: a.ai_criterion_scores ?? null,
+    icp_version: a.ai_icp_version ?? null, scored_at: a.ai_scored_at ?? null,
+  }))
+}
+
+/** How many candidates this workspace scored through AI assistants since `sinceIso` (from the audit log). */
+export async function countMcpScoredSince(supabase: SupabaseClient, orgId: string, sinceIso: string): Promise<number> {
+  const { data, error } = await (supabase as Loose)
+    .from('ai_app_audit').select('result_count')
+    .eq('org_id', orgId).eq('tool', 'score_candidates_for_job').eq('outcome', 'ok').gte('created_at', sinceIso)
+  if (error) throw error
+  return ((data ?? []) as Array<{ result_count: number | null }>).reduce((n, r) => n + (r.result_count ?? 0), 0)
+}
+
+/** Average recorded Fit Engine cost per scoring call for this org (falls back to the measured default). */
+export async function averageFitScoringCostUsd(supabase: SupabaseClient, orgId: string): Promise<number> {
+  const { data } = await (supabase as Loose)
+    .from('ai_usage').select('estimated_cost_usd').eq('module', 'fit-engine').eq('org_id', orgId)
+    .order('created_at', { ascending: false }).limit(50)
+  const costs = ((data ?? []) as Array<{ estimated_cost_usd: number | null }>).map((r) => Number(r.estimated_cost_usd)).filter((n) => n > 0)
+  return costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length : 0.0015 // measured 2026-11-09: $0.0014/candidate
+}
+
 /** Active applications for a job with a compact candidate card each (no contact details). */
 export async function listPipelineForAgent(
   supabase: SupabaseClient,
