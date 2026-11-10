@@ -10,6 +10,27 @@ import { logger } from '@/lib/logger'
 
 type Supabase = SupabaseClient<Database>
 
+/**
+ * Which of `ids` are candidates in this org. Callers that take candidate ids from
+ * an AI model or a request body MUST filter through this before writing, because
+ * the admin client bypasses RLS and an application row only checks the FK.
+ */
+export async function filterCandidateIdsForOrg(
+  supabase: Supabase,
+  orgId: string,
+  ids: string[],
+): Promise<Set<string>> {
+  const unique = Array.from(new Set(ids.filter((id) => typeof id === 'string' && id)))
+  if (unique.length === 0) return new Set()
+  const { data, error } = await supabase
+    .from('candidates')
+    .select('id')
+    .eq('org_id', orgId)
+    .in('id', unique)
+  if (error) throw error
+  return new Set(((data ?? []) as Array<{ id: string }>).map((c) => c.id))
+}
+
 export interface CandidateProfileInput {
   name: string
   email: string

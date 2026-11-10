@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-10
+
+### Fixed
+- **Copilot `bulk_add_to_pipeline` now checks the workspace** (security). It runs on the admin client (RLS bypassed) and used to trust the job and candidate IDs the model passed, so an ID from another workspace (e.g. planted via prompt injection in a CV) could put another org's candidate on your pipeline. It now refuses a job outside the workspace, ignores candidate IDs outside it (and says how many), and writes nothing if none are valid. New facade `filterCandidateIdsForOrg` in `src/modules/ats/domain/candidates.ts`. 4 tests.
+
 ## 2026-11-03
 
 ### Added / Fixed (copilot audit, batch 5 — smaller gaps)
