@@ -154,6 +154,12 @@ export function usePoolSourcing(jobId: string) {
         toast('Finding new people isn’t switched on for your workspace yet.')
         return
       }
+      if (j.code === 'no_pool_access') {
+        // Checked before buying, so nothing was spent; show the trial prompt.
+        setState('no_access')
+        toast(j.error ?? 'Start the free trial to find new people — no credits were spent.')
+        return
+      }
       toast.error(j.error ?? 'Could not find new people')
       return
     }

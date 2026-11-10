@@ -7,6 +7,7 @@ import { CrustdataConfigError } from '@/modules/pool/vendors/crustdata/client'
 import { sourcePoolForIcp, savePoolMatches, embedPoolProfiles, pendingPoolMatches } from '@/modules/pool/domain/pool-sourcing'
 import { getJobRoleContext } from '@/modules/ats/domain/job-role-context'
 import { resolveSearchSpec, feederEmployersFromSpec, planEveryone } from '@/modules/pool/search/spec-from-brief'
+import { getPoolAccess } from '@/modules/pool/domain/pool'
 
 export const maxDuration = 300 // live vendor fetch + embed + Fit-Engine scoring
 
@@ -45,6 +46,16 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
     const icp = await getCurrentIcp(supabase, orgId, params.id).catch(() => null)
     if (!icp || icp.status !== 'approved') {
       return NextResponse.json({ error: 'Approve an ICP for this job before sourcing from Crustdata.' }, { status: 400 })
+    }
+
+    // Check talent-pool access BEFORE buying anyone: without it the scoring step
+    // returns no_access, so credits would be spent on people the recruiter never sees.
+    const access = await getPoolAccess(supabase, orgId)
+    if (!access.hasAccess) {
+      return NextResponse.json(
+        { error: "Talent-pool access isn't active for this workspace. Start the free trial first — no credits were spent.", code: 'no_pool_access' },
+        { status: 403 },
+      )
     }
 
     // How many to fetch (default 3, hard-capped). Body is optional.
