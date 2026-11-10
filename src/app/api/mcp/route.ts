@@ -1,6 +1,7 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { z } from 'zod'
 import { verifyMcpToken } from '@/lib/mcp/verify-token'
+import { MCP_REQUESTED_SCOPES } from '@/lib/mcp/clients'
 import { guarded } from '@/lib/mcp/tool'
 import { registerJobTools } from '@/lib/mcp/tools/jobs'
 import { registerCandidateTools } from '@/lib/mcp/tools/candidates'
@@ -66,4 +67,20 @@ const authHandler = withMcpAuth(handler, verifyMcpToken, {
   resourceMetadataPath: '/.well-known/oauth-protected-resource/api/mcp',
 })
 
-export { authHandler as GET, authHandler as POST, authHandler as DELETE }
+/**
+ * Name the permissions to request in the 401 "please log in" challenge (RFC 6750 `scope`).
+ * MCP clients check this first; without it claude.ai requests Clerk's ENTIRE scope list
+ * (incl. public_metadata, private_metadata, candidates:contact), which its Clerk entry
+ * isn't allowed, so Clerk refuses the sign-in with `invalid_scope`.
+ * Only the header text changes; token checking is untouched.
+ */
+async function withScopeHint(req: Request): Promise<Response> {
+  const res = await authHandler(req)
+  const challenge = res.headers.get('www-authenticate')
+  if (res.status !== 401 || !challenge || /\bscope=/.test(challenge)) return res
+  const headers = new Headers(res.headers)
+  headers.set('www-authenticate', `${challenge}, scope="${MCP_REQUESTED_SCOPES.join(' ')}"`)
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+}
+
+export { withScopeHint as GET, withScopeHint as POST, withScopeHint as DELETE }

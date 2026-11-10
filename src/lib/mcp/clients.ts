@@ -29,3 +29,14 @@ export function isApprovedClient(clientId: string): boolean {
   if (APPROVED_CLIENT_PREFIXES.some((p) => clientId.startsWith(p))) return true
   return extraClientIds().includes(clientId)
 }
+
+/**
+ * The permissions (OAuth scopes) AI apps should ask Clerk for, published in our
+ * protected-resource metadata as `scopes_supported`. Must match the scopes allowed
+ * on each AI app's Clerk entry, or Clerk rejects the sign-in with `invalid_scope`.
+ * `candidates:contact` is deliberately left out until it's enabled in Clerk.
+ */
+export const MCP_REQUESTED_SCOPES = [
+  'openid', 'profile', 'email', 'offline_access', 'user:org:read',
+  'jobs:read', 'candidates:read', 'sourcing:run', 'pipeline:write', 'notes:write',
+] as const

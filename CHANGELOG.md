@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-10
+
+### Fixed (AI integration — claude.ai sign-in)
+- **claude.ai couldn't sign in (`invalid_scope`)**: with no permission hint from us, claude.ai requested Clerk's whole scope list (incl. `public_metadata`, `private_metadata`, `candidates:contact`), which its Clerk entry isn't allowed. The `/api/mcp` 401 challenge now names the exact scopes (`scope="…"`), and the protected-resource metadata lists them as `scopes_supported` (`MCP_REQUESTED_SCOPES` in `src/lib/mcp/clients.ts`). Token checking is unchanged. Clerk (dev) side: claude.ai's CIMD client pre-registered, since client admission is "pre-registered and previously connected".
+
 ## 2026-11-03
 
 ### Added (AI integration — MCP server for ChatGPT / Claude, Phase 1)
