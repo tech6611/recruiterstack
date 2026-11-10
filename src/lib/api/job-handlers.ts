@@ -61,7 +61,8 @@ registerHandler('enrich_candidate', async (job: QueuedJob) => {
   const { candidateId } = job.payload as { candidateId: string }
   if (!candidateId) throw new Error('Missing candidateId in payload')
   const { enrichCandidateById } = await import('@/modules/ats/domain/candidate-enrichment')
-  const result = await enrichCandidateById(createAdminClient(), job.org_id, candidateId, { orgId: job.org_id })
+  // Once-only: never re-read a résumé that was already read (e.g. a retried job).
+  const result = await enrichCandidateById(createAdminClient(), job.org_id, candidateId, { orgId: job.org_id }, { onlyIfNotYet: true })
   logger.info('Candidate enrichment job done', { jobId: job.id, candidateId, status: result.status })
 })
 

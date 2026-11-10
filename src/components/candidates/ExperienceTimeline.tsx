@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { BrandIcon } from '@/components/ui/BrandIcon'
 import { TraitChips, TenureTiles } from '@/components/candidates/ProfileStats'
 import type { CompanyFactsMap } from '@/lib/company-facts'
@@ -28,6 +29,25 @@ import {
  * (later) the candidate list card. All the arithmetic lives in lib/ui/work-history.
  */
 
+/**
+ * What the person did in a role, read from their résumé. These run to a full paragraph
+ * now (they feed the AI scorer), so show three lines and let the recruiter expand.
+ */
+function RoleSummary({ text, className }: { text: string; className: string }) {
+  const [open, setOpen] = useState(false)
+  const long = text.length > 220
+  return (
+    <div className={className}>
+      <p className={`text-xs leading-relaxed text-slate-600 ${long && !open ? 'line-clamp-3' : ''}`}>{text}</p>
+      {long && (
+        <button type="button" onClick={() => setOpen((o) => !o)} className="mt-0.5 text-xs font-medium text-slate-500 hover:text-slate-700">
+          {open ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 /** Range over duration, right-aligned — the column Juicebox reads dates from. */
 function DateColumn({ start, end, isCurrent, months }: { start: string | null | undefined; end: string | null | undefined; isCurrent: boolean; months: number | null }) {
   return (
@@ -50,7 +70,7 @@ function SingleRole({ stint, role }: { stint: EmployerStint; role: StintRole }) 
         </div>
         {stint.employer && <p className="text-sm leading-snug text-slate-600">{stint.employer}</p>}
         {role.location && <p className="text-xs text-slate-400">{role.location}</p>}
-        {role.summary && <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{role.summary}</p>}
+        {role.summary && <RoleSummary text={role.summary} className="mt-1.5" />}
       </div>
     </div>
   )
@@ -88,7 +108,7 @@ function GroupedRoles({ stint }: { stint: EmployerStint }) {
                 <DateColumn start={role.start_date} end={role.end_date} isCurrent={role.is_current} months={role.months} />
               </div>
               {role.location && <p className="text-xs text-slate-400">{role.location}</p>}
-              {role.summary && <p className="mt-1 text-xs leading-relaxed text-slate-600">{role.summary}</p>}
+              {role.summary && <RoleSummary text={role.summary} className="mt-1" />}
             </li>
           ))}
         </ol>

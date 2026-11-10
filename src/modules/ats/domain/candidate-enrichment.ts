@@ -15,7 +15,7 @@ type LooseSb = any
 
 export type EnrichResult =
   | { status: 'enriched'; roles: number; education: number }
-  | { status: 'skipped'; reason: 'no_resume' | 'external_resume' | 'unsupported_format' | 'not_found' }
+  | { status: 'skipped'; reason: 'no_resume' | 'external_resume' | 'unsupported_format' | 'not_found' | 'already_enriched' }
   | { status: 'error'; message: string }
 
 /** Persist an enriched profile: replace the dated history, store education, refresh
@@ -88,12 +88,17 @@ export async function enrichCandidateById(
   orgId: string,
   candidateId: string,
   identity: UsageIdentity = {},
+  // A résumé is read ONCE, when it arrives. Automatic callers (the queue job, the
+  // pre-scoring check) pass onlyIfNotYet so they never re-read it; the recruiter's
+  // explicit "re-read" button in the app omits it to force a fresh read.
+  opts: { onlyIfNotYet?: boolean } = {},
 ): Promise<EnrichResult> {
   const sb = supabase as unknown as LooseSb
   const { data: cand } = await sb
-    .from('candidates').select('id, resume_url').eq('id', candidateId).eq('org_id', orgId).maybeSingle()
+    .from('candidates').select('id, resume_url, enriched_at').eq('id', candidateId).eq('org_id', orgId).maybeSingle()
   if (!cand) return { status: 'skipped', reason: 'not_found' }
   if (!cand.resume_url) return { status: 'skipped', reason: 'no_resume' }
+  if (opts.onlyIfNotYet && cand.enriched_at) return { status: 'skipped', reason: 'already_enriched' }
 
   const path = resumeStoragePath(cand.resume_url)
   if (!path) return { status: 'skipped', reason: 'external_resume' } // e.g. a Google Drive link
@@ -146,11 +151,52 @@ export async function getCandidatesHistory(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const e of (exps ?? []) as any[]) {
     const arr = expsById.get(e.candidate_id) ?? ([] as Exp)
+    // summary = what the person actually did in that role, read from their résumé —
+    // the scorers need it to judge real work, not just titles and dates.
     arr.push({ title: e.title, employer: e.employer, start_date: e.start_date, end_date: e.end_date, is_current: e.is_current, summary: e.summary ?? null })
     expsById.set(e.candidate_id, arr)
   }
   for (const id of ids) map.set(id, { education: eduById.get(id) ?? [], experiences: expsById.get(id) ?? [] })
   return map
+}
+
+/** Flat candidate fields a résumé read can fill in — refreshed onto in-memory rows. */
+const ENRICHED_FLAT_FIELDS = 'id, current_title, current_company, location, skills, experience_years, enriched_at'
+
+/**
+ * Pre-scoring check: make sure every candidate who has a résumé has had it read
+ * BEFORE we score them, so nobody is judged on a near-empty profile because the
+ * background read hadn't run (or had failed). Reads only résumés never read before
+ * (once-only), a few at a time, then refreshes the in-memory candidate rows with
+ * what the read found. Best-effort: a failed read never blocks scoring.
+ */
+export async function ensureResumesRead<C extends { id: string; resume_url?: string | null; enriched_at?: string | null }>(
+  supabase: Supabase,
+  orgId: string,
+  candidates: C[],
+  identity: UsageIdentity = {},
+): Promise<number> {
+  const pending = candidates.filter((c) => c?.id && c.resume_url && !c.enriched_at)
+  if (pending.length === 0) return 0
+  const read: string[] = []
+  const CONCURRENCY = 5
+  for (let i = 0; i < pending.length; i += CONCURRENCY) {
+    const chunk = pending.slice(i, i + CONCURRENCY)
+    const results = await Promise.all(chunk.map((c) =>
+      enrichCandidateById(supabase, orgId, c.id, identity, { onlyIfNotYet: true }).catch(() => null),
+    ))
+    results.forEach((r, j) => { if (r?.status === 'enriched') read.push(chunk[j].id) })
+  }
+  if (read.length === 0) return 0
+  const sb = supabase as unknown as LooseSb
+  const { data: fresh } = await sb.from('candidates').select(ENRICHED_FLAT_FIELDS).eq('org_id', orgId).in('id', read)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const byId = new Map(((fresh ?? []) as any[]).map((r) => [r.id, r]))
+  for (const c of candidates) {
+    const f = byId.get(c.id)
+    if (f) Object.assign(c, f)
+  }
+  return read.length
 }
 
 /** Read a candidate's enriched history + derived movability (for the profile UI). */

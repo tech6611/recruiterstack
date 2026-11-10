@@ -17,7 +17,7 @@ import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { createNotification } from '@/lib/api/notify'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
-import { getCandidatesHistory } from '@/modules/ats/domain/candidate-enrichment'
+import { getCandidatesHistory, ensureResumesRead } from '@/modules/ats/domain/candidate-enrichment'
 import { logger } from '@/lib/logger'
 import type { JobScoreResponse } from '@/lib/ai/schemas'
 import type { Icp } from '@/lib/types/icp'
@@ -100,11 +100,14 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
         ? stages.find(s => s.id === job.auto_advance_stage_id)
         : null
 
-      // Education + work history for all applicants up front (one batch), so the Fit
-      // Engine judges background deal-breakers on real evidence, not the title alone.
-      const histories = useIcp
-        ? await getCandidatesHistory(supabase, orgId, apps.map((a) => a.candidate?.id).filter(Boolean) as string[])
-        : new Map()
+      // Any applicant whose résumé was never read gets it read first (once-only, a few
+      // at a time), so nobody is scored on a near-empty profile.
+      const candidates = apps.map((a) => a.candidate).filter(Boolean)
+      await ensureResumesRead(supabase, orgId, candidates, { orgId, userId })
+
+      // Education + work history (with what they did in each role) for all applicants
+      // up front (one batch), so BOTH scorers judge on real evidence, not titles alone.
+      const histories = await getCandidatesHistory(supabase, orgId, candidates.map((c) => c.id))
 
       // ── 3. Score each application (sequentially for meaningful progress) ────
       for (const app of apps) {
@@ -156,7 +159,7 @@ export const POST = withCapability('recruiting:edit', async (req, orgId, supabas
               gate_failures: fit.gate_failures.map(g => g.label),
             }
           } else {
-            result = await scoreApplicationForJob(candidate, jobForScoring, { orgId, userId })
+            result = await scoreApplicationForJob(candidate, jobForScoring, { orgId, userId }, histories.get(candidate.id))
             criterionScores = result.criterion_scores
           }
 

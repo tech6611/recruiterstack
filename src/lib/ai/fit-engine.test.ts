@@ -137,3 +137,29 @@ describe('evaluateGates (experience_band)', () => {
     expect(evaluateGates(cand(null), [band])).toEqual([])
   })
 })
+
+import { formatWorkHistory } from './fit-engine'
+
+describe('formatWorkHistory (role descriptions from the résumé)', () => {
+  it('shows what the person did under each role', () => {
+    const out = formatWorkHistory([
+      { title: 'Engineering Manager', employer: 'Razorpay', start_date: '2021-04-01', is_current: true, summary: 'Led a team of 9 building the payouts API; cut failures 40%.' },
+      { title: 'SDE II', employer: 'Flipkart', start_date: '2018-01-01', end_date: '2021-03-01', summary: null },
+    ])
+    expect(out).toContain('Engineering Manager at Razorpay (2021-04-01–present)')
+    expect(out).toContain('What they did: Led a team of 9 building the payouts API; cut failures 40%.')
+    // A role with no description is just the header line — no empty "What they did".
+    expect(out.split('What they did').length).toBe(2)
+  })
+
+  it('caps very long descriptions so one CV cannot blow up the prompt', () => {
+    const long = 'word '.repeat(1000)
+    const out = formatWorkHistory(Array.from({ length: 12 }, (_, i) => ({ title: `Role ${i}`, summary: long })))
+    expect(out.length).toBeLessThan(9500)
+    expect(out).toContain('Role 11') // every role header still listed even after the budget runs out
+  })
+
+  it('says Not provided when there is no history', () => {
+    expect(formatWorkHistory([]).trim()).toBe('Not provided')
+  })
+})

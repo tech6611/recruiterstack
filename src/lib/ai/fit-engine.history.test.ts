@@ -24,7 +24,7 @@ describe('formatWorkHistory — role descriptions', () => {
     const out = formatWorkHistory(roles)
     const described = out.split('\n').filter((l) => l.includes('What they did:'))
     expect(described).toHaveLength(6)
-    for (const l of described) expect(l.replace(/^\s+What they did: /, '').length).toBeLessThanOrEqual(400)
+    for (const l of described) expect(l.replace(/^\s+What they did: /, '').length).toBeLessThanOrEqual(1200)
     expect(out).toContain('Role 7 at Co') // older roles still listed, just without the description
   })
 

@@ -254,17 +254,19 @@ export function buildCandidateEnrichmentPrompt(): string {
   "experience_years": <total years of professional experience as a number, or null>,
   "skills": [<technical skills, tools, methodologies — max 30>],
   "experiences": [
-    { "title": "", "employer": "", "location": "", "start": "YYYY-MM or YYYY", "end": "YYYY-MM or YYYY or present", "is_current": false, "summary": "<one line, optional>" }
+    { "title": "", "employer": "", "location": "", "start": "YYYY-MM or YYYY", "end": "YYYY-MM or YYYY or present", "is_current": false, "summary": "<what they actually did in this role — see rules>" }
   ],
   "education": [ { "degree": "", "field": "", "school": "", "year": <graduation year or null>, "level": "", "status": "" } ]
 }
 Rules: order experiences most-recent first. Use "present" for a current role's end and set is_current true. Use null for anything not stated — never guess dates.
+For EACH role's "summary", write a full, factual account of what this person actually did there — it is what a recruiter reads to judge the real work, so do not compress it to a headline. Cover, wherever the résumé states it: their responsibilities and what they owned; scope and scale (team size or people managed, budget, revenue, users, geographies, clients); concrete achievements and results, keeping every number exactly as written; the products, projects, clients or domains they worked on; the tools, technologies and methods they used; and any promotion or change of scope within the role. Fold projects done in that role into its summary; list internships as roles of their own. Use plain sentences, typically 3–8 per role, up to about 150 words. Use ONLY what the résumé says — never infer, embellish or add praise. If the résumé gives nothing beyond the title, use null.
 For EACH education entry also return a normalized "level" — exactly one of: "secondary" (Class 10 / SSC / Matriculation / O-levels), "senior_secondary" (Class 12 / HSC / Intermediate / A-levels / high-school diploma), "diploma" (polytechnic / associate), "undergraduate" (Bachelor's — B.Tech/BE/BA/BSc/BCom/BBA/MBBS/LLB), "postgraduate" (Master's / PG diploma — MTech/MSc/MA/MBA/PGDM), "doctorate" (PhD), or "professional_cert" (a professional certificate/licence). Map ANY country's qualifications onto these. And a "status": "completed" or "ongoing".`
 }
 
 export async function enrichFromPdf(pdfBase64: string, identity: UsageIdentity = {}): Promise<EnrichedProfile> {
   const { text, usage, model } = await withRetry(
-    () => generateFromPdf(buildCandidateEnrichmentPrompt(), pdfBase64, { model: 'gemini-2.5-flash', maxTokens: 4096, json: true }),
+    // Headroom: full role descriptions + Gemini's hidden thinking tokens must not truncate the JSON.
+    () => generateFromPdf(buildCandidateEnrichmentPrompt(), pdfBase64, { model: 'gemini-2.5-flash', maxTokens: 12288, json: true }),
     { label: 'Candidate Enrichment' },
   )
   trackUsage('candidate-enrichment', model, usage, identity)

@@ -2432,13 +2432,23 @@ async function bulkScoreApplications(
   let scored = 0, aboveThreshold = 0, totalScore = 0
   const topCandidates: string[] = []
 
+  // Same as the app's Score button: read any never-read résumé first (once-only),
+  // then score on the full work history, not just title and skills.
+  const { ensureResumesRead, getCandidatesHistory } = await import('@/modules/ats/domain/candidate-enrichment')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const appCandidates = (apps as Record<string, unknown>[]).map((a) => a.candidate).filter(Boolean) as any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await ensureResumesRead(supabase as any, orgId, appCandidates, { orgId })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const histories = await getCandidatesHistory(supabase as any, orgId, appCandidates.map((c) => c.id))
+
   for (const app of apps as Record<string, unknown>[]) {
     const candidate = app.candidate as Record<string, unknown>
     if (!candidate) continue
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await scoreApplicationForJob(candidate as any, job, { orgId })
+      const result = await scoreApplicationForJob(candidate as any, job, { orgId }, histories.get(candidate.id as string))
 
       await applyAiScoreToApplication(supabase, app.id as string, result)
 

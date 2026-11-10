@@ -11,6 +11,15 @@
 ### Schema
 - **Migration 159** (apply by hand): gives every active admin who isn't an Owner their org's Owner role and removes the placeholder Recruiter role. Repairs already-affected companies (e.g. Eyoris). Idempotent.
 
+### Fixed (AI scoring reads the résumé)
+- **Role-description caps raised for the fuller résumé read** (builds on the Fit Engine fix above): up to 1,200 chars per role (was 400) for the 6 most recent roles, plus an ~8,000-char total per candidate; tag stripping kept. `formatWorkHistory`/`formatEducation` are shared with the Sifter. Test on a fictional backend CV: 50 (okay, titles + dates only) → 90 (great, with descriptions) on the same ICP.
+- **Rubric-only scorer (Sifter) now sees education + work history** (with role descriptions), in the bulk Score button, single re-score, and the copilot's `bulk_score_applications`.
+- **Résumé read before scoring, once only.** Score (bulk / single / copilot) first reads any résumé that was never read (`ensureResumesRead`, 5 at a time), so nobody is scored on a near-empty profile. The queued `enrich_candidate` job and the pre-score check skip already-read résumés (`onlyIfNotYet`); the "re-read" button on the candidate profile still forces a fresh read.
+
+### Changed
+- **Résumé reader captures a full account of each role** — responsibilities, scope/scale, results with exact numbers, products/clients, tools, promotions; projects folded into their role; internships as roles. ~150 words per role max, résumé facts only. Output budget 4,096 → 12,288 tokens. ~$0.002 (₹0.15) per résumé, once.
+- Candidate work-history timeline clamps long role descriptions to 3 lines with Show more.
+
 ## 2026-11-03
 
 ### Added / Fixed (copilot audit, batch 5 — smaller gaps)

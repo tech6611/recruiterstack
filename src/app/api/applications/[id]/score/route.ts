@@ -4,7 +4,7 @@ import { scoreApplicationForJob } from '@/lib/ai/job-scorer'
 import { scoreAgainstIcp } from '@/lib/ai/fit-engine'
 import { getCurrentIcp } from '@/modules/ats/domain/icp'
 import { getCanonicalJobScoringContext } from '@/modules/ats/domain/job-pipelines'
-import { getCandidatesHistory } from '@/modules/ats/domain/candidate-enrichment'
+import { getCandidatesHistory, ensureResumesRead } from '@/modules/ats/domain/candidate-enrichment'
 import type { Icp } from '@/lib/types/icp'
 import type { ApplicationUpdate, HiringRequest } from '@/lib/types/database'
 
@@ -41,6 +41,11 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
     return NextResponse.json({ error: 'Candidate not found for this application' }, { status: 404 })
   }
 
+  // Read the résumé first if it never has been (once-only), so the score is based
+  // on the real CV rather than a near-empty profile.
+  await ensureResumesRead(supabase, orgId, [candidate], { orgId, userId })
+  const histories = await getCandidatesHistory(supabase, orgId, [candidate.id])
+
   // Fit Engine when the job has an approved ICP; else the flat-rubric scorer.
   // Resilient: a missing ICP table (migrations not yet applied) → flat scoring.
   let icp: Icp | null = null
@@ -54,7 +59,6 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
   let respExtra: Record<string, unknown> = {}
 
   if (icp && icp.status === 'approved') {
-    const histories = await getCandidatesHistory(supabase, orgId, [candidate.id])
     // Applicant: FLAG missing background data (don't reject); the recruiter decides.
     const fit = await scoreAgainstIcp(candidate, icp, { orgId, userId }, undefined, histories.get(candidate.id), 'flag')
     update.ai_score          = fit.score
@@ -72,7 +76,7 @@ export const POST = withCapability('recruiting:edit', async (_req, orgId, supaba
     criterionScores = fit.competencies.map(c => ({ name: c.name, rating: c.rating, weight: c.weight, evidence: c.evidence }))
     respExtra = { fit_bucket: fit.fit_bucket, red_flags: fit.red_flags, gate_failures: fit.gate_failures.map(g => g.label) }
   } else {
-    const result = await scoreApplicationForJob(candidate, context.job as HiringRequest, { orgId, userId })
+    const result = await scoreApplicationForJob(candidate, context.job as HiringRequest, { orgId, userId }, histories.get(candidate.id))
     update.ai_score          = result.score
     update.ai_recommendation = result.recommendation
     update.ai_strengths      = result.strengths

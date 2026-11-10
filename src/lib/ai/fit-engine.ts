@@ -190,12 +190,17 @@ export interface CandidateHistory {
   experiences?: { title?: string | null; employer?: string | null; start_date?: string | null; end_date?: string | null; is_current?: boolean | null; summary?: string | null }[]
 }
 
-/** Role descriptions are capped so a long CV can't blow up per-candidate cost:
- *  at most SUMMARY_CHARS per role, for the SUMMARY_ROLES most recent roles. */
-const SUMMARY_CHARS = 400
+/**
+ * Caps on the résumé role descriptions we show the judge: generous enough for a full
+ * account of each role, bounded so one very long CV can't blow up cost or time —
+ * at most SUMMARY_CHARS per role, for the SUMMARY_ROLES most recent roles, and
+ * HISTORY_SUMMARY_BUDGET_CHARS across the whole history.
+ */
+const SUMMARY_CHARS = 1200
 const SUMMARY_ROLES = 6
+const HISTORY_SUMMARY_BUDGET_CHARS = 8000
 
-function formatEducation(edu?: CandidateHistory['education']): string {
+export function formatEducation(edu?: CandidateHistory['education']): string {
   if (!edu?.length) return 'Not provided'
   const lines = edu
     .map((e) => {
@@ -208,17 +213,25 @@ function formatEducation(edu?: CandidateHistory['education']): string {
   return lines.length ? lines.join('; ') : 'Not provided'
 }
 
-/** Exported for tests. */
+/**
+ * The dated work history, most recent first. When a role has a description (what the
+ * person actually did there, read from their résumé), it is shown under the role so
+ * the judge weighs real work — scope, results, tools — not just titles. Shared by the
+ * Fit Engine and the Sifter. PURE + tested.
+ */
 export function formatWorkHistory(exps?: CandidateHistory['experiences']): string {
   if (!exps?.length) return '    Not provided'
+  let budget = HISTORY_SUMMARY_BUDGET_CHARS
   return exps
     .map((e, i) => {
       const dates = e.is_current ? `${e.start_date ?? '?'}–present` : `${e.start_date ?? '?'}–${e.end_date ?? '?'}`
       const head = `    - ${e.title ?? 'Role'}${e.employer ? ` at ${e.employer}` : ''} (${dates})`
       // CV text is untrusted: drop tag-like markers (e.g. a planted </candidate>) and line breaks.
       const raw = i < SUMMARY_ROLES ? (e.summary ?? '').replace(/<\/?[a-z_][\w-]*\s*>/gi, ' ').replace(/\s+/g, ' ').trim() : ''
-      if (!raw) return head
-      const text = raw.length > SUMMARY_CHARS ? `${raw.slice(0, SUMMARY_CHARS - 1).trimEnd()}…` : raw
+      if (!raw || budget <= 0) return head
+      let text = raw.length > SUMMARY_CHARS ? `${raw.slice(0, SUMMARY_CHARS - 1).trimEnd()}…` : raw
+      if (text.length > budget) text = `${text.slice(0, budget).trimEnd()}…`
+      budget -= text.length
       return `${head}\n      What they did: ${text}`
     })
     .join('\n')

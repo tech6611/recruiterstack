@@ -108,3 +108,15 @@ describe('employedMonths', () => {
     expect(employedMonths([exp('', null)], now)).toBeNull()
   })
 })
+
+import { buildCandidateEnrichmentPrompt as buildPromptForSummaryTest } from './candidate-enrichment'
+
+describe('enrichment prompt — full role descriptions', () => {
+  it('asks for a full factual account of each role, not a one-liner', () => {
+    const p = buildPromptForSummaryTest()
+    expect(p).not.toContain('one line, optional')
+    expect(p).toMatch(/full, factual account of what this person actually did/)
+    expect(p).toMatch(/keeping every number exactly as written/)
+    expect(p).toMatch(/never infer, embellish/)
+  })
+})
