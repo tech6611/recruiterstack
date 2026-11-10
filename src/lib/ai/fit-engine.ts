@@ -187,8 +187,13 @@ export function combineFit(
  */
 export interface CandidateHistory {
   education?: { degree?: string | null; field?: string | null; school?: string | null; year?: string | number | null; level?: string | null }[]
-  experiences?: { title?: string | null; employer?: string | null; start_date?: string | null; end_date?: string | null; is_current?: boolean | null }[]
+  experiences?: { title?: string | null; employer?: string | null; start_date?: string | null; end_date?: string | null; is_current?: boolean | null; summary?: string | null }[]
 }
+
+/** Role descriptions are capped so a long CV can't blow up per-candidate cost:
+ *  at most SUMMARY_CHARS per role, for the SUMMARY_ROLES most recent roles. */
+const SUMMARY_CHARS = 400
+const SUMMARY_ROLES = 6
 
 function formatEducation(edu?: CandidateHistory['education']): string {
   if (!edu?.length) return 'Not provided'
@@ -203,12 +208,18 @@ function formatEducation(edu?: CandidateHistory['education']): string {
   return lines.length ? lines.join('; ') : 'Not provided'
 }
 
-function formatWorkHistory(exps?: CandidateHistory['experiences']): string {
+/** Exported for tests. */
+export function formatWorkHistory(exps?: CandidateHistory['experiences']): string {
   if (!exps?.length) return '    Not provided'
   return exps
-    .map((e) => {
+    .map((e, i) => {
       const dates = e.is_current ? `${e.start_date ?? '?'}–present` : `${e.start_date ?? '?'}–${e.end_date ?? '?'}`
-      return `    - ${e.title ?? 'Role'}${e.employer ? ` at ${e.employer}` : ''} (${dates})`
+      const head = `    - ${e.title ?? 'Role'}${e.employer ? ` at ${e.employer}` : ''} (${dates})`
+      // CV text is untrusted: drop tag-like markers (e.g. a planted </candidate>) and line breaks.
+      const raw = i < SUMMARY_ROLES ? (e.summary ?? '').replace(/<\/?[a-z_][\w-]*\s*>/gi, ' ').replace(/\s+/g, ' ').trim() : ''
+      if (!raw) return head
+      const text = raw.length > SUMMARY_CHARS ? `${raw.slice(0, SUMMARY_CHARS - 1).trimEnd()}…` : raw
+      return `${head}\n      What they did: ${text}`
     })
     .join('\n')
 }

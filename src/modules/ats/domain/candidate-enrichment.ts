@@ -128,7 +128,7 @@ export async function getCandidatesHistory(
   const [{ data: cands }, { data: exps }] = await Promise.all([
     sb.from('candidates').select('id, education').eq('org_id', orgId).in('id', ids),
     sb.from('candidate_experiences')
-      .select('candidate_id, title, employer, start_date, end_date, is_current, sort_order')
+      .select('candidate_id, title, employer, start_date, end_date, is_current, summary, sort_order')
       .eq('org_id', orgId).in('candidate_id', ids).order('sort_order', { ascending: true }),
   ])
   type Edu = NonNullable<CandidateHistory['education']>
@@ -146,7 +146,7 @@ export async function getCandidatesHistory(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const e of (exps ?? []) as any[]) {
     const arr = expsById.get(e.candidate_id) ?? ([] as Exp)
-    arr.push({ title: e.title, employer: e.employer, start_date: e.start_date, end_date: e.end_date, is_current: e.is_current })
+    arr.push({ title: e.title, employer: e.employer, start_date: e.start_date, end_date: e.end_date, is_current: e.is_current, summary: e.summary ?? null })
     expsById.set(e.candidate_id, arr)
   }
   for (const id of ids) map.set(id, { education: eduById.get(id) ?? [], experiences: expsById.get(id) ?? [] })
