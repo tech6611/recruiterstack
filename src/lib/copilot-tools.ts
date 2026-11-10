@@ -50,6 +50,7 @@ import {
   getCandidateNameAndStatus,
   setCandidateStatus,
   markCandidateOfferExtended,
+  filterCandidateIdsForOrg,
 } from '@/modules/ats/domain/candidates'
 import {
   listActiveApplicationsByCandidatesWithJobTitle,
@@ -2337,6 +2338,22 @@ async function bulkAddToPipeline(
     return 'Error: candidate_ids must be a non-empty array'
   }
 
+  // The copilot runs on the admin client (RLS bypassed), so verify the job and
+  // every candidate belong to THIS org before writing anything. Ids come from the
+  // model and could have been planted by a prompt injection (e.g. text in a CV).
+  const job = await getCanonicalJobById(supabase, orgId, String(job_id ?? ''))
+  if (!job) return 'Error: no job with that ID was found in this workspace.'
+  const requested = Array.from(new Set((candidate_ids as unknown[]).map(String)))
+  const owned = await filterCandidateIdsForOrg(supabase, orgId, requested)
+  const notFound = requested.filter((id) => !owned.has(id))
+  const candidateIds = requested.filter((id) => owned.has(id))
+  const notFoundNote = notFound.length
+    ? ` ${notFound.length} ID(s) were not found in this workspace and were ignored.`
+    : ''
+  if (candidateIds.length === 0) {
+    return `Error: none of the ${requested.length} candidate ID(s) were found in this workspace — nothing was added.`
+  }
+
   // Entry stage depends on how they arrive: sourced prospects land in the lead
   // funnel ("New lead", lifecycle 'lead'); everyone else enters as an applicant in
   // the Application Review zone ("Applied", lifecycle 'active').
@@ -2344,10 +2361,10 @@ async function bulkAddToPipeline(
   let lifecycle: 'lead' | 'active'
   try {
     if (source === 'sourced') {
-      const r = await getFirstLeadStage(supabase, orgId, job_id)
+      const r = await getFirstLeadStage(supabase, orgId, job.id)
       firstStage = r.stage; lifecycle = r.lifecycle
     } else {
-      firstStage = await getFirstApplicationStage(supabase, orgId, job_id)
+      firstStage = await getFirstApplicationStage(supabase, orgId, job.id)
       lifecycle = 'active'
     }
   } catch (err) {
@@ -2355,20 +2372,20 @@ async function bulkAddToPipeline(
   }
 
   // Check for existing applications (skip duplicates)
-  const existing = await listExistingApplicationCandidateIds(supabase, orgId, job_id, candidate_ids)
+  const existing = await listExistingApplicationCandidateIds(supabase, orgId, job.id, candidateIds)
 
   const existingIds = new Set((existing ?? []).map((e: { candidate_id: string }) => e.candidate_id))
-  const toAdd = (candidate_ids as string[]).filter(id => !existingIds.has(id))
+  const toAdd = candidateIds.filter(id => !existingIds.has(id))
 
   if (toAdd.length === 0) {
-    return `All ${candidate_ids.length} candidates already have applications for this job — no duplicates added.`
+    return `All ${candidateIds.length} candidates already have applications for this job — no duplicates added.${notFoundNote}`
   }
 
   let added = 0
   for (const candidate_id of toAdd) {
     const { data: app, error: appErr } = await insertPipelineApplication(supabase, orgId, {
       candidateId: candidate_id,
-      jobId: job_id,
+      jobId: job.id,
       stageId: firstStage?.id ?? null,
       source,
       lifecycle,
@@ -2387,10 +2404,10 @@ async function bulkAddToPipeline(
     added++
   }
 
-  const skipped = candidate_ids.length - toAdd.length
+  const skipped = candidateIds.length - toAdd.length
   const stageNote = firstStage ? ` at stage "${firstStage.name}"` : ''
   const skipNote  = skipped > 0 ? ` ${skipped} skipped (already existed).` : ''
-  return `Added ${added} application(s) to the pipeline${stageNote}.${skipNote}`
+  return `Added ${added} application(s) to the pipeline${stageNote}.${skipNote}${notFoundNote}`
 }
 
 async function bulkScoreApplications(
