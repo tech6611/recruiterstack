@@ -430,3 +430,68 @@ export async function ensureDefaultMemberRole(
     .from('rbac_member_roles')
     .upsert({ org_id: orgId, user_id: userId, role_id: roleId }, { onConflict: 'org_id,user_id,role_id', ignoreDuplicates: true })
 }
+
+/**
+ * Bring a member's RBAC role in line with their org_members.role after it
+ * changes (onboarding "Your role" step). ensureMemberRow creates every member as
+ * 'recruiter' and hands them the placeholder system Recruiter role; when the
+ * role step then promotes the org's first user to admin, nothing upgraded their
+ * RBAC role — so the founder landed with Recruiter capabilities and no Admin /
+ * Settings menu.
+ *
+ *  - admin → always holds Owner; the placeholder Recruiter role is dropped.
+ *  - hiring_manager → swapped in only while the member still holds just the
+ *    placeholder Recruiter role (never clobbers a role an admin or invite set).
+ *  - anything else → no change.
+ * Idempotent.
+ */
+export async function syncMemberRbacRole(
+  supabase: Supabase,
+  orgId: string,
+  userId: string,
+  orgRole: string,
+): Promise<void> {
+  const target =
+    orgRole === 'admin' ? 'Owner'
+    : orgRole === 'hiring_manager' ? 'Hiring Manager'
+    : null
+  if (!target) return
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+  await ensureSystemRoles(supabase, orgId)
+
+  const { data: sysRoles } = await sb
+    .from('rbac_roles')
+    .select('id, name')
+    .eq('org_id', orgId)
+    .eq('is_system', true)
+  const idByName = new Map(((sysRoles ?? []) as Array<{ id: string; name: string }>).map(r => [r.name, r.id]))
+  const targetId = idByName.get(target)
+  const recruiterId = idByName.get('Recruiter')
+  if (!targetId) return
+
+  const { data: assigned } = await sb
+    .from('rbac_member_roles')
+    .select('role_id')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+  const held = ((assigned ?? []) as Array<{ role_id: string }>).map(r => r.role_id)
+  if (held.includes(targetId)) return
+
+  const onlyPlaceholder = held.every(id => id === recruiterId)
+  if (target !== 'Owner' && !onlyPlaceholder) return
+
+  await sb
+    .from('rbac_member_roles')
+    .upsert({ org_id: orgId, user_id: userId, role_id: targetId }, { onConflict: 'org_id,user_id,role_id', ignoreDuplicates: true })
+
+  if (recruiterId && held.includes(recruiterId)) {
+    await sb
+      .from('rbac_member_roles')
+      .delete()
+      .eq('org_id', orgId)
+      .eq('user_id', userId)
+      .eq('role_id', recruiterId)
+  }
+}

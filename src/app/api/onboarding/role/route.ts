@@ -5,6 +5,7 @@ import { roleSchema } from '@/lib/validations/onboarding'
 import { requireOnboardingContext, ensureMemberRow } from '@/lib/onboarding/server'
 import { resolveEffectiveRole, nextStep } from '@/lib/onboarding/steps'
 import { getInvitePreferredRole } from '@/lib/clerk/invites'
+import { syncMemberRbacRole } from '@/lib/rbac'
 import type { OrgRole } from '@/lib/types/requisitions'
 
 /**
@@ -84,6 +85,11 @@ export async function POST(req: NextRequest) {
     .eq('user_id', ctx.userId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Keep the RBAC role (what the sidebar and route guards read) in step with the
+  // org role we just wrote — otherwise a bootstrapped admin keeps the placeholder
+  // Recruiter role from ensureMemberRow and never sees Settings / Admin.
+  await syncMemberRbacRole(supabase, ctx.orgId, ctx.userId, roleToWrite)
 
   const role = await resolveEffectiveRole(ctx.orgId, ctx.userId)
   const next = nextStep('role', role)
